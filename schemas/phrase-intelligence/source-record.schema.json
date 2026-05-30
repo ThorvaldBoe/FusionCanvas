@@ -1,0 +1,339 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fusioncanvas.local/schemas/phrase-intelligence/source-record.schema.json",
+  "title": "Phrase Intelligence Source Record v2",
+  "description": "Schema for source metadata, acquisition posture, license notes, risk assessment, and tracking before any phrase, pattern, or template-family records are created.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "recordType",
+    "sourceCategory",
+    "sourceName",
+    "collectionMethod",
+    "storesExactSourceText",
+    "sourceTier",
+    "recommendedUsageMode",
+    "collectionRisk",
+    "commercialUseRisk",
+    "transformationPotential",
+    "patternExtractionPotential",
+    "structuralExtractionPotential",
+    "directUseAllowed",
+    "requiresReviewBeforeUse",
+    "requiresAttribution",
+    "reviewStatus",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/nonEmptyString"
+    },
+    "recordType": {
+      "const": "source-record"
+    },
+    "sourceCategory": {
+      "$ref": "#/$defs/sourceCategory"
+    },
+    "sourceId": {
+      "type": "string"
+    },
+    "sourceName": {
+      "$ref": "#/$defs/nonEmptyString"
+    },
+    "normalizedText": {
+      "type": "string",
+      "description": "Optional normalized source name or source key for duplicate detection and database import."
+    },
+    "provenance": {
+      "$ref": "#/$defs/provenance"
+    },
+    "sourceUrl": {
+      "$ref": "#/$defs/uriString"
+    },
+    "sourceLicense": {
+      "type": "string"
+    },
+    "collectionMethod": {
+      "$ref": "#/$defs/collectionMethod"
+    },
+    "storesExactSourceText": {
+      "type": "boolean"
+    },
+    "derivedFromExactPhrase": {
+      "type": "boolean",
+      "default": false
+    },
+    "sourcePhraseId": {
+      "type": "string"
+    },
+    "sourceTier": {
+      "$ref": "#/$defs/sourceTier"
+    },
+    "recommendedUsageMode": {
+      "$ref": "#/$defs/recommendedUsageMode"
+    },
+    "collectionRisk": {
+      "$ref": "#/$defs/collectionRisk"
+    },
+    "commercialUseRisk": {
+      "$ref": "#/$defs/commercialUseRisk"
+    },
+    "transformationPotential": {
+      "$ref": "#/$defs/potential"
+    },
+    "patternExtractionPotential": {
+      "$ref": "#/$defs/potential"
+    },
+    "structuralExtractionPotential": {
+      "$ref": "#/$defs/potential"
+    },
+    "directUseAllowed": {
+      "type": "boolean"
+    },
+    "requiresReviewBeforeUse": {
+      "type": "boolean"
+    },
+    "requiresAttribution": {
+      "type": "boolean"
+    },
+    "reviewStatus": {
+      "$ref": "#/$defs/reviewStatus"
+    },
+    "categories": {
+      "$ref": "#/$defs/stringArray"
+    },
+    "creativeIntents": {
+      "$ref": "#/$defs/stringArray"
+    },
+    "templateFamilies": {
+      "$ref": "#/$defs/stringArray"
+    },
+    "slots": {
+      "$ref": "#/$defs/slots"
+    },
+    "exampleTransformations": {
+      "$ref": "#/$defs/exampleTransformations"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "createdAt": {
+      "$ref": "#/$defs/dateTime"
+    },
+    "updatedAt": {
+      "$ref": "#/$defs/dateTime"
+    }
+  },
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "uriString": {
+      "type": "string",
+      "format": "uri"
+    },
+    "dateTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sourceCategory": {
+      "type": "string",
+      "enum": [
+        "proverb",
+        "idiom",
+        "catchphrase",
+        "movie-quote",
+        "tv-quote",
+        "famous-quote",
+        "song-title",
+        "song-lyric",
+        "advertising-slogan",
+        "internet-meme",
+        "snowclone",
+        "news-headline",
+        "blog-title",
+        "forum-language",
+        "reddit-language",
+        "youtube-title",
+        "podcast-title",
+        "social-media-catchphrase",
+        "public-domain-literature",
+        "commercial-language",
+        "workplace-language",
+        "everyday-expression",
+        "contrasting-pair-template",
+        "fake-authority-template",
+        "warning-signage-template",
+        "structural-linguistic-pattern",
+        "internal-generated",
+        "internal-manual",
+        "other"
+      ]
+    },
+    "collectionMethod": {
+      "type": "string",
+      "enum": [
+        "manual-entry",
+        "manual-review",
+        "internal-generation",
+        "licensed-import",
+        "public-domain-import",
+        "api-import",
+        "dataset-import",
+        "web-research",
+        "user-submission",
+        "derived-pattern-extraction",
+        "metadata-only"
+      ]
+    },
+    "sourceTier": {
+      "type": "string",
+      "enum": [
+        "tier-1",
+        "tier-2",
+        "tier-3",
+        "tier-4",
+        "tier-5"
+      ]
+    },
+    "recommendedUsageMode": {
+      "type": "string",
+      "enum": [
+        "direct-collection",
+        "collect-with-review",
+        "inspiration-only",
+        "pattern-extraction-only",
+        "metadata-only"
+      ]
+    },
+    "collectionRisk": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "restricted"
+      ]
+    },
+    "commercialUseRisk": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "very-high"
+      ]
+    },
+    "potential": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "very-high"
+      ]
+    },
+    "reviewStatus": {
+      "type": "string",
+      "enum": [
+        "candidate",
+        "approved",
+        "needs-review",
+        "rejected",
+        "duplicate",
+        "archived"
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "origin": {
+          "type": "string"
+        },
+        "retrievedAt": {
+          "$ref": "#/$defs/dateTime"
+        },
+        "reviewedBy": {
+          "type": "string"
+        },
+        "reviewedAt": {
+          "$ref": "#/$defs/dateTime"
+        },
+        "evidence": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "slots": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/slot"
+      }
+    },
+    "slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "type": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean",
+          "default": true
+        },
+        "description": {
+          "type": "string"
+        },
+        "exampleValues": {
+          "$ref": "#/$defs/stringArray"
+        }
+      }
+    },
+    "exampleTransformations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "$ref": "#/$defs/nonEmptyString"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "commercialUseRisk": {
+            "$ref": "#/$defs/commercialUseRisk"
+          },
+          "requiresReviewBeforeUse": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}
