@@ -1,0 +1,489 @@
+[
+  {
+    "creativeIntentId": "creative-intent-identity-role-claim",
+    "name": "Identity and Role Claim",
+    "description": "Turns a product into a wearable label: a concise declaration of who the buyer is, what role they occupy, or what identity they want others to recognize.",
+    "humanMotivations": [
+      "self-expression",
+      "recognition",
+      "social signaling",
+      "pride",
+      "personal branding"
+    ],
+    "emotions": [
+      "pride",
+      "confidence",
+      "affection",
+      "belonging",
+      "playful seriousness"
+    ],
+    "humorPotential": 7,
+    "identityPotential": 10,
+    "visualPotential": 8,
+    "commercialPotential": 10,
+    "crossNicheApplicability": 10,
+    "relatedTemplateFamilies": [
+      "Identity Declaration",
+      "Checklist Identity",
+      "Better With Companion",
+      "Problem Solver Role",
+      "Faux Certification"
+    ],
+    "exampleNiches": [
+      "professions",
+      "hobbies",
+      "pets",
+      "family roles",
+      "fitness",
+      "gaming",
+      "gardening",
+      "coffee"
+    ]
+  },
+  {
+    "creativeIntentId": "creative-intent-preference-priority",
+    "name": "Preference and Priority",
+    "description": "Expresses what the wearer would rather be doing, what comes first, or what tradeoff defines their everyday priorities.",
+    "humanMotivations": [
+      "taste signaling",
+      "aspiration",
+      "escape from obligation",
+      "routine affirmation",
+      "lifestyle alignment"
+    ],
+    "emotions": [
+      "longing",
+      "amusement",
+      "comfort",
+      "anticipation",
+      "mild frustration"
+    ],
+    "humorPotential": 8,
+    "identityPotential": 8,
+    "visualPotential": 7,
+    "commercialPotential": 9,
+    "crossNicheApplicability": 10,
+    "relatedTemplateFamilies": [
+      "Preference Statement",
+      "Priority Stack",
+      "Action Versus Obligation Contrast",
+      "Boundary Statement",
+      "Checklist Identity"
+    ],
+    "exampleNiches": [
+      "outdoor recreation",
+      "sports",
+      "crafts",
+      "pets",
+      "travel",
+      "cars",
+      "coffee",
+      "gaming"
+    ]
+  },
+  {
+    "creativeIntentId": "creative-intent-comic-self-portrait",
+    "name": "Comic Self-Portrait",
+    "description": "Frames quirks, obsessions, moods, excuses, and flaws as lovable character traits, letting the buyer laugh at themselves while still being understood.",
+    "humanMotivations": [
+      "self-deprecating humor",
+      "relatability",
+      "permission to be imperfect",
+      "conversation starting",
+      "quirk normalization"
+    ],
+    "emotions": [
+      "amusement",
+      "recognition",
+      "mischief",
+      "warm embarrassment",
+      "playfulness"
+    ],
+    "humorPotential": 10,
+    "identityPotential": 8,
+    "visualPotential": 9,
+    "commercialPotential": 10,
+    "crossNicheApplicability": 10,
+    "relatedTemplateFamilies": [
+      "Warning Label",
+      "Mood Forecast",
+      "Cause And Effect Excuse",
+      "Collection Habit",
+      "Fuel Source"
+    ],
+    "exampleNiches": [
+      "parenting",
+      "pets",
+      "coffee",
+      "fitness",
+      "gaming",
+      "gardening",
+      "workplace",
+      "crafts"
+    ]
+  },
+  {
+    "creativeIntentId": "creative-intent-belonging-companion-attachment",
+    "name": "Belonging and Companion Attachment",
+    "description": "Uses phrases to celebrate the people, animals, objects, teams, or communities that make life feel better and more socially anchored.",
+    "humanMotivations": [
+      "attachment",
+      "belonging",
+      "affection display",
+      "tribal signaling",
+      "shared enthusiasm"
+    ],
+    "emotions": [
+      "warmth",
+      "loyalty",
+      "comfort",
+      "joy",
+      "sentimentality"
+    ],
+    "humorPotential": 6,
+    "identityPotential": 9,
+    "visualPotential": 8,
+    "commercialPotential": 9,
+    "crossNicheApplicability": 9,
+    "relatedTemplateFamilies": [
+      "Better With Companion",
+      "Time And Place Claim",
+      "Identity Declaration",
+      "Checklist Identity"
+    ],
+    "exampleNiches": [
+      "pets",
+      "family",
+      "friend groups",
+      "running clubs",
+      "gaming groups",
+      "plant communities",
+      "travel",
+      "local lifestyle"
+    ]
+  },
+  {
+    "creativeIntentId": "creative-intent-achievement-resilience",
+    "name": "Achievement and Resilience",
+    "description": "Marks completion, survival, endurance, or progress in a way that makes ordinary effort feel commemorative and product-worthy.",
+    "humanMotivations": [
+      "recognition",
+      "commemoration",
+      "resilience",
+      "reward after effort",
+      "shared struggle"
+    ],
+    "emotions": [
+      "pride",
+      "relief",
+      "triumph",
+      "solidarity",
+      "amused exhaustion"
+    ],
+    "humorPotential": 8,
+    "identityPotential": 8,
+    "visualPotential": 9,
+    "commercialPotential": 9,
+    "crossNicheApplicability": 9,
+    "relatedTemplateFamilies": [
+      "Survival Badge",
+      "Tiny Achievement",
+      "Skill In Progress",
+      "Process Pride"
+    ],
+    "exampleNiches": [
+      "fitness",
+      "parenting",
+      "professions",
+      "sports",
+      "education",
+      "hobbies",
+      "pets",
+      "gaming"
+    ]
+  },
+  {
+    "creativeIntentId": "creative-intent-competence-authority-play",
+    "name": "Competence and Authority Play",
+    "description": "Creates a mock credential, job title, department, or expert role so the wearer can perform competence and status with a wink.",
+    "humanMotivations": [
+      "status play",
+      "expert identity",
+      "social proof",
+      "role performance",
+      "comic authority"
+    ],
+    "emotions": [
+      "confidence",
+      "smug amusement",
+      "pride",
+      "usefulness",
+      "playful importance"
+    ],
+    "humorPotential": 9,
+    "identityPotential": 9,
+    "visualPotential": 10,
+    "commercialPotential": 9,
+    "crossNicheApplicability": 9,
+    "relatedTemplateFamilies": [
+      "Faux Certification",
+      "Problem Solver Role",
+      "Process Pride",
+      "Simple Rule",
+      "Identity Declaration"
+    ],
+    "exampleNiches": [
+      "professions",
+      "DIY",
+      "cars",
+      "cooking",
+      "gardening",
+      "gaming",
+      "pets",
+      "family logistics"
+    ]
+  },
+  {
+    "creativeIntentId": "creative-intent-autonomy-boundaries",
+    "name": "Autonomy and Boundaries",
+    "description": "Lets the wearer declare availability, protect attention, reject obligations, or announce that a chosen priority outranks outside demands.",
+    "humanMotivations": [
+      "control",
+      "self-protection",
+      "anti-obligation relief",
+      "permission setting",
+      "personal space"
+    ],
+    "emotions": [
+      "defiance",
+      "relief",
+      "comic irritation",
+      "focus",
+      "assertiveness"
+    ],
+    "humorPotential": 8,
+    "identityPotential": 8,
+    "visualPotential": 9,
+    "commercialPotential": 8,
+    "crossNicheApplicability": 9,
+    "relatedTemplateFamilies": [
+      "Boundary Statement",
+      "Action Versus Obligation Contrast",
+      "Preference Statement",
+      "Simple Rule",
+      "Priority Stack"
+    ],
+    "exampleNiches": [
+      "remote work",
+      "reading",
+      "fitness",
+      "pets",
+      "parenting",
+      "garage hobbies",
+      "gaming",
+      "coffee"
+    ]
+  },
+  {
+    "creativeIntentId": "creative-intent-ritual-routine-fuel",
+    "name": "Ritual, Routine, and Fuel",
+    "description": "Celebrates the consumables, habits, repeated sequences, and personal rituals that make a lifestyle feel recognizable and repeatable.",
+    "humanMotivations": [
+      "habit affirmation",
+      "comfort",
+      "daily ritual",
+      "routine identity",
+      "sensory association"
+    ],
+    "emotions": [
+      "comfort",
+      "coziness",
+      "motivation",
+      "familiarity",
+      "contentment"
+    ],
+    "humorPotential": 7,
+    "identityPotential": 8,
+    "visualPotential": 8,
+    "commercialPotential": 9,
+    "crossNicheApplicability": 9,
+    "relatedTemplateFamilies": [
+      "Fuel Source",
+      "Priority Stack",
+      "Checklist Identity",
+      "Process Pride",
+      "Mood Forecast"
+    ],
+    "exampleNiches": [
+      "coffee",
+      "tea",
+      "fitness",
+      "running",
+      "gardening",
+      "crafting",
+      "teaching",
+      "parenting"
+    ]
+  },
+  {
+    "creativeIntentId": "creative-intent-escape-happy-place",
+    "name": "Escape and Happy Place",
+    "description": "Connects the buyer to a place, activity, or imagined state that offers relief from stress and signals where they emotionally want to be.",
+    "humanMotivations": [
+      "escapism",
+      "stress relief",
+      "place attachment",
+      "aspiration",
+      "mental reset"
+    ],
+    "emotions": [
+      "longing",
+      "calm",
+      "nostalgia",
+      "relief",
+      "wanderlust"
+    ],
+    "humorPotential": 6,
+    "identityPotential": 8,
+    "visualPotential": 10,
+    "commercialPotential": 9,
+    "crossNicheApplicability": 9,
+    "relatedTemplateFamilies": [
+      "Time And Place Claim",
+      "Preference Statement",
+      "Action Versus Obligation Contrast",
+      "Mood Forecast"
+    ],
+    "exampleNiches": [
+      "travel",
+      "camping",
+      "beach lifestyle",
+      "gardening",
+      "libraries",
+      "dog parks",
+      "gyms",
+      "game tables"
+    ]
+  },
+  {
+    "creativeIntentId": "creative-intent-values-rules-craft-ethos",
+    "name": "Values, Rules, and Craft Ethos",
+    "description": "Turns beliefs, practices, and standards into concise wearable commandments that make a niche feel principled rather than random.",
+    "humanMotivations": [
+      "value signaling",
+      "discipline",
+      "craft pride",
+      "group norms",
+      "moral clarity"
+    ],
+    "emotions": [
+      "conviction",
+      "focus",
+      "respect",
+      "determination",
+      "calm authority"
+    ],
+    "humorPotential": 6,
+    "identityPotential": 9,
+    "visualPotential": 8,
+    "commercialPotential": 8,
+    "crossNicheApplicability": 9,
+    "relatedTemplateFamilies": [
+      "Simple Rule",
+      "Process Pride",
+      "Boundary Statement",
+      "Priority Stack"
+    ],
+    "exampleNiches": [
+      "fitness",
+      "coaching",
+      "crafts",
+      "gardening",
+      "mechanics",
+      "coffee roasting",
+      "teaching",
+      "sports"
+    ]
+  },
+  {
+    "creativeIntentId": "creative-intent-enthusiast-excess-collection",
+    "name": "Enthusiast Excess and Collection",
+    "description": "Makes abundance, collecting, and 'just one more' behavior feel funny, justified, and socially recognizable instead of excessive.",
+    "humanMotivations": [
+      "enthusiast identity",
+      "permission to indulge",
+      "collector pride",
+      "shared obsession",
+      "purchase justification"
+    ],
+    "emotions": [
+      "delight",
+      "mischief",
+      "recognition",
+      "playful guilt",
+      "desire"
+    ],
+    "humorPotential": 9,
+    "identityPotential": 9,
+    "visualPotential": 9,
+    "commercialPotential": 10,
+    "crossNicheApplicability": 9,
+    "relatedTemplateFamilies": [
+      "Collection Habit",
+      "Warning Label",
+      "Cause And Effect Excuse",
+      "Checklist Identity",
+      "Better With Companion"
+    ],
+    "exampleNiches": [
+      "books",
+      "plants",
+      "mugs",
+      "shoes",
+      "tools",
+      "pet gear",
+      "craft supplies",
+      "dice"
+    ]
+  },
+  {
+    "creativeIntentId": "creative-intent-growth-work-in-progress",
+    "name": "Growth and Work In Progress",
+    "description": "Positions learning, practice, imperfection, and gradual improvement as an identity worth wearing before mastery is reached.",
+    "humanMotivations": [
+      "growth mindset",
+      "self-compassion",
+      "aspiration",
+      "practice identity",
+      "encouragement"
+    ],
+    "emotions": [
+      "hope",
+      "patience",
+      "determination",
+      "humility",
+      "optimism"
+    ],
+    "humorPotential": 6,
+    "identityPotential": 8,
+    "visualPotential": 8,
+    "commercialPotential": 8,
+    "crossNicheApplicability": 9,
+    "relatedTemplateFamilies": [
+      "Skill In Progress",
+      "Tiny Achievement",
+      "Process Pride",
+      "Survival Badge"
+    ],
+    "exampleNiches": [
+      "fitness beginners",
+      "music practice",
+      "language learning",
+      "parenting",
+      "crafts",
+      "sports training",
+      "gardening",
+      "professional development"
+    ]
+  }
+]
