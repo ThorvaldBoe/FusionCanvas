@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Taxonomy for evaluating cultural language source categories as inputs to the FusionCanvas Phrase Intelligence Database.",
+  "allowedUsageModes": [
+    "direct-collection",
+    "collect-with-review",
+    "inspiration-only",
+    "pattern-extraction-only",
+    "metadata-only"
+  ],
+  "scale": {
+    "collectionValue": "low | medium | high | very-high",
+    "commercialUseRisk": "low | medium | high | very-high",
+    "transformationPotential": "low | medium | high | very-high",
+    "patternExtractionPotential": "low | medium | high | very-high"
+  },
+  "categories": [
+    {
+      "category": "Proverbs",
+      "collectionValue": "very-high",
+      "commercialUseRisk": "low",
+      "transformationPotential": "high",
+      "patternExtractionPotential": "high",
+      "recommendedUsageMode": "direct-collection",
+      "notes": "Durable cultural language with strong recognition and many public-domain or traditional sources; still track variants and provenance."
+    },
+    {
+      "category": "Idioms",
+      "collectionValue": "very-high",
+      "commercialUseRisk": "low",
+      "transformationPotential": "high",
+      "patternExtractionPotential": "high",
+      "recommendedUsageMode": "collect-with-review",
+      "notes": "Common idioms are useful for literalization and niche twists; review source licenses and avoid copying proprietary definitions or examples."
+    },
+    {
+      "category": "Catchphrases",
+      "collectionValue": "high",
+      "commercialUseRisk": "high",
+      "transformationPotential": "high",
+      "patternExtractionPotential": "very-high",
+      "recommendedUsageMode": "pattern-extraction-only",
+      "notes": "Often culturally powerful and structurally reusable, but exact phrases can be associated with people, shows, brands, or campaigns."
+    },
+    {
+      "category": "Movie Quotes",
+      "collectionValue": "high",
+      "commercialUseRisk": "very-high",
+      "transformationPotential": "high",
+      "patternExtractionPotential": "very-high",
+      "recommendedUsageMode": "pattern-extraction-only",
+      "notes": "Valuable for catchphrase mechanics, cadence, and reference detection; do not treat exact quotes as product-ready text."
+    },
+    {
+      "category": "TV Quotes",
+      "collectionValue": "high",
+      "commercialUseRisk": "very-high",
+      "transformationPotential": "high",
+      "patternExtractionPotential": "very-high",
+      "recommendedUsageMode": "pattern-extraction-only",
+      "notes": "Useful for recurring line structures, character voice, and cultural reference detection; prefer abstract templates and metadata."
+    },
+    {
+      "category": "Famous Quotes",
+      "collectionValue": "high",
+      "commercialUseRisk": "medium",
+      "transformationPotential": "medium",
+      "patternExtractionPotential": "high",
+      "recommendedUsageMode": "collect-with-review",
+      "notes": "Some quotes are public domain or widely traditional, while others are modern, misattributed, or rights-sensitive; review attribution and use context."
+    },
+    {
+      "category": "Song Titles",
+      "collectionValue": "high",
+      "commercialUseRisk": "high",
+      "transformationPotential": "high",
+      "patternExtractionPotential": "high",
+      "recommendedUsageMode": "collect-with-review",
+      "notes": "Titles can be short, rhythmic, and adaptable, but many are strongly associated with artists or recordings; use careful review and transformation."
+    },
+    {
+      "category": "Song Lyrics",
+      "collectionValue": "high",
+      "commercialUseRisk": "very-high",
+      "transformationPotential": "high",
+      "patternExtractionPotential": "very-high",
+      "recommendedUsageMode": "pattern-extraction-only",
+      "notes": "Lyrics are valuable for cadence, repetition, and emotional compression, but exact text should not be used directly in products."
+    },
+    {
+      "category": "Advertising Slogans",
+      "collectionValue": "high",
+      "commercialUseRisk": "very-high",
+      "transformationPotential": "high",
+      "patternExtractionPotential": "very-high",
+      "recommendedUsageMode": "pattern-extraction-only",
+      "notes": "Designed to be memorable and persuasive, making them excellent structural inputs but poor direct-use candidates."
+    },
+    {
+      "category": "Internet Memes",
+      "collectionValue": "very-high",
+      "commercialUseRisk": "high",
+      "transformationPotential": "very-high",
+      "patternExtractionPotential": "very-high",
+      "recommendedUsageMode": "inspiration-only",
+      "notes": "Highly current source of caption formats, joke structures, and snowclones; exact meme text may involve creators, platforms, copyrighted media, or brands."
+    },
+    {
+      "category": "Snowclones",
+      "collectionValue": "very-high",
+      "commercialUseRisk": "medium",
+      "transformationPotential": "very-high",
+      "patternExtractionPotential": "very-high",
+      "recommendedUsageMode": "collect-with-review",
+      "notes": "Core phrase-family assets with explicit slots; review the origin phrase and store generic templates when direct phrase text is sensitive."
+    },
+    {
+      "category": "News Headlines",
+      "collectionValue": "high",
+      "commercialUseRisk": "medium",
+      "transformationPotential": "high",
+      "patternExtractionPotential": "very-high",
+      "recommendedUsageMode": "collect-with-review",
+      "notes": "Useful for title mechanics, curiosity gaps, contrast, and topical phrasing; avoid copying full proprietary headlines as product text."
+    },
+    {
+      "category": "Blog Titles",
+      "collectionValue": "medium",
+      "commercialUseRisk": "medium",
+      "transformationPotential": "high",
+      "patternExtractionPotential": "high",
+      "recommendedUsageMode": "collect-with-review",
+      "notes": "Good source for list formats, how-to structures, and niche language; exact titles require source and originality review."
+    },
+    {
+      "category": "Forum Language",
+      "collectionValue": "high",
+      "commercialUseRisk": "medium",
+      "transformationPotential": "high",
+      "patternExtractionPotential": "high",
+      "recommendedUsageMode": "collect-with-review",
+      "notes": "Captures authentic community phrasing and recurring rhetorical moves; protect privacy and avoid importing identifiable user content verbatim."
+    },
+    {
+      "category": "Reddit Language",
+      "collectionValue": "high",
+      "commercialUseRisk": "medium",
+      "transformationPotential": "high",
+      "patternExtractionPotential": "very-high",
+      "recommendedUsageMode": "collect-with-review",
+      "notes": "Strong signal for current community phrasing, jokes, and templates; use platform-compliant access, privacy controls, and abstraction where possible."
+    },
+    {
+      "category": "YouTube Titles",
+      "collectionValue": "high",
+      "commercialUseRisk": "medium",
+      "transformationPotential": "high",
+      "patternExtractionPotential": "very-high",
+      "recommendedUsageMode": "collect-with-review",
+      "notes": "Excellent for attention structures, escalation, challenges, and title formulas; avoid copying distinctive creator titles directly."
+    },
+    {
+      "category": "Podcast Titles",
+      "collectionValue": "medium",
+      "commercialUseRisk": "medium",
+      "transformationPotential": "medium",
+      "patternExtractionPotential": "high",
+      "recommendedUsageMode": "collect-with-review",
+      "notes": "Useful for conversational formats, episode-title patterns, and niche identity language; review show names and creator-specific phrasing."
+    },
+    {
+      "category": "Social Media Catchphrases",
+      "collectionValue": "high",
+      "commercialUseRisk": "high",
+      "transformationPotential": "very-high",
+      "patternExtractionPotential": "very-high",
+      "recommendedUsageMode": "inspiration-only",
+      "notes": "Often identifies fast-moving cultural patterns; exact wording may be creator-associated, platform-specific, or trend-sensitive."
+    },
+    {
+      "category": "Public-Domain Literature",
+      "collectionValue": "high",
+      "commercialUseRisk": "low",
+      "transformationPotential": "medium",
+      "patternExtractionPotential": "high",
+      "recommendedUsageMode": "direct-collection",
+      "notes": "Good source for durable phrasing, rhetorical structures, and quotation patterns when public-domain status and source edition are clear."
+    },
+    {
+      "category": "Commercial Language",
+      "collectionValue": "high",
+      "commercialUseRisk": "high",
+      "transformationPotential": "high",
+      "patternExtractionPotential": "high",
+      "recommendedUsageMode": "inspiration-only",
+      "notes": "Packaging, signs, listings, and marketing copy reveal persuasive mechanics and category conventions, but exact language is usually unsuitable for reuse."
+    },
+    {
+      "category": "Workplace Language",
+      "collectionValue": "high",
+      "commercialUseRisk": "low",
+      "transformationPotential": "high",
+      "patternExtractionPotential": "high",
+      "recommendedUsageMode": "direct-collection",
+      "notes": "Common workplace phrases are useful for identity, boundary, and faux-authority templates; review modern slogans or employer-specific phrases."
+    }
+  ]
+}
