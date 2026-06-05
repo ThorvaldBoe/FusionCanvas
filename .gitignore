@@ -1,3 +1,24 @@
+# Node
+node_modules/
+dist/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Visual Studio / .NET
+bin/
+obj/
+.vs/
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
 
 #Ignore thumbnails created by Windows
 Thumbs.db
