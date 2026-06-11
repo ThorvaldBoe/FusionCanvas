@@ -165,6 +165,45 @@ AI:
 Provider abstraction layer
 ```
 
+Architecture structure:
+
+```text
+FusionCanvas.Domain:
+Core business concepts, invariants, calculations, and workflow rules
+
+FusionCanvas.Application:
+Use cases, orchestration, ports, and application-facing contracts
+
+FusionCanvas.Integration:
+Persistence, file system access, marketplace APIs, AI providers,
+plugin host adapters, and other external system adapters
+
+FusionCanvas.App:
+Avalonia UI, presentation state, navigation, and user interaction
+```
+
+Project dependencies should point inward:
+
+```text
+FusionCanvas.App -> FusionCanvas.Application -> FusionCanvas.Domain
+FusionCanvas.Integration -> FusionCanvas.Application -> FusionCanvas.Domain
+```
+
+Domain code must remain independent of UI frameworks, persistence technologies, marketplace SDKs, AI provider SDKs, plugin host implementations, and file system adapters.
+
+Implementation should follow SOLID principles pragmatically. Prefer focused responsibilities, explicit dependencies, and abstractions that protect real boundaries or variation points. Avoid speculative indirection, oversized classes, and broad interfaces that are not justified by current behavior.
+
+Unit testing is part of the architecture. Every feature that adds or changes behavior should include appropriate automated tests for domain rules, application use cases, integration-facing contracts, or UI-owned decision logic. Static markup and framework-owned wiring do not require superficial tests.
+
+Preferred test project naming should mirror the production project being tested:
+
+```text
+tests/FusionCanvas.Domain.Tests
+tests/FusionCanvas.Application.Tests
+tests/FusionCanvas.Integration.Tests
+tests/FusionCanvas.App.Tests
+```
+
 Technology choices may evolve, but the architectural principles should remain stable.
 
 ---

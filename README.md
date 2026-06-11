@@ -78,6 +78,17 @@ Current intended technology stack:
 * Local-first storage
 * Plugin-friendly architecture
 
+FusionCanvas will follow Clean Architecture as meaningful implementation code is added. The intended project layers are:
+
+* `FusionCanvas.Domain` for business concepts, invariants, calculations, and workflow rules
+* `FusionCanvas.Application` for use cases, orchestration, ports, and application-facing contracts
+* `FusionCanvas.Integration` for persistence, file system access, marketplace APIs, AI providers, plugin host adapters, and other external systems
+* `FusionCanvas.App` for Avalonia UI, presentation state, navigation, and user interaction
+
+Dependencies should point inward toward the domain and application layers. Implementation should apply SOLID principles pragmatically, favoring focused responsibilities and justified abstractions without unnecessary bloat.
+
+Every feature that adds or changes behavior should include appropriate automated tests. Test projects should mirror the production project where practical, such as `tests/FusionCanvas.Domain.Tests` or `tests/FusionCanvas.Application.Tests`.
+
 The project is intended to remain useful as a local desktop tool even without cloud services.
 
 ## Project Status
@@ -127,6 +138,8 @@ FusionCanvas/
 │  └─ changes/
 └─ src/
 ```
+
+As implementation grows, `src/` should contain the Clean Architecture projects `FusionCanvas.Domain`, `FusionCanvas.Application`, `FusionCanvas.Integration`, and `FusionCanvas.App`. Feature tests should live under `tests/` in projects that mirror the production layer, such as `FusionCanvas.Domain.Tests`, `FusionCanvas.Application.Tests`, `FusionCanvas.Integration.Tests`, and `FusionCanvas.App.Tests`.
 
 ## License
 
