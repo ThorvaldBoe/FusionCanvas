@@ -1,0 +1,164 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="FusionCanvas.App.Views.MainWindow"
+        Title="FusionCanvas"
+        Width="1180"
+        Height="760"
+        MinWidth="900"
+        MinHeight="600"
+        Background="#F5F7FA">
+  <Grid RowDefinitions="Auto,*">
+    <Border Grid.Row="0"
+            Background="#FFFFFF"
+            BorderBrush="#D9E1EA"
+            BorderThickness="0,0,0,1"
+            Padding="20,14">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Spacing="2">
+          <TextBlock Text="FusionCanvas"
+                     FontSize="20"
+                     FontWeight="SemiBold"
+                     Foreground="#17212F" />
+          <TextBlock Text="Local-first workspace for Print-on-Demand product development"
+                     FontSize="12"
+                     Foreground="#627083" />
+        </StackPanel>
+
+        <Border Grid.Column="1"
+                Background="#ECF4FF"
+                BorderBrush="#B7D7FF"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="10,5"
+                VerticalAlignment="Center">
+          <TextBlock Text="Foundation Shell"
+                     FontSize="12"
+                     Foreground="#1B5FA7" />
+        </Border>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" ColumnDefinitions="280,*">
+      <Border Grid.Column="0"
+              Background="#FFFFFF"
+              BorderBrush="#D9E1EA"
+              BorderThickness="0,0,1,0"
+              Padding="18">
+        <Grid RowDefinitions="Auto,*">
+          <TextBlock Text="Workspace"
+                     FontSize="14"
+                     FontWeight="SemiBold"
+                     Foreground="#273241"
+                     Margin="0,0,0,12" />
+
+          <StackPanel Grid.Row="1" Spacing="8">
+            <Border Background="#EAF2F8"
+                    CornerRadius="4"
+                    Padding="10,8">
+              <TextBlock Text="Ideas"
+                         Foreground="#17212F" />
+            </Border>
+            <Border Background="#FFFFFF"
+                    BorderBrush="#E2E8F0"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="10,8">
+              <TextBlock Text="Concepts"
+                         Foreground="#3D4958" />
+            </Border>
+            <Border Background="#FFFFFF"
+                    BorderBrush="#E2E8F0"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="10,8">
+              <TextBlock Text="Designs"
+                         Foreground="#3D4958" />
+            </Border>
+            <Border Background="#FFFFFF"
+                    BorderBrush="#E2E8F0"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="10,8">
+              <TextBlock Text="Listings"
+                         Foreground="#3D4958" />
+            </Border>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Border Grid.Column="1"
+              Padding="28">
+        <Grid RowDefinitions="Auto,*">
+          <StackPanel Spacing="4">
+            <TextBlock Text="Idea Workspace"
+                       FontSize="24"
+                       FontWeight="SemiBold"
+                       Foreground="#17212F" />
+            <TextBlock Text="Static placeholder content for the first desktop foundation."
+                       FontSize="13"
+                       Foreground="#627083" />
+          </StackPanel>
+
+          <Grid Grid.Row="1"
+                Margin="0,24,0,0"
+                ColumnDefinitions="*,*"
+                RowDefinitions="Auto,Auto"
+                ColumnSpacing="16"
+                RowSpacing="16">
+            <Border Background="#FFFFFF"
+                    BorderBrush="#D9E1EA"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Padding="18">
+              <StackPanel Spacing="8">
+                <TextBlock Text="Theme"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Foreground="#627083" />
+                <TextBlock Text="Seasonal coffee humor"
+                           FontSize="18"
+                           Foreground="#17212F" />
+              </StackPanel>
+            </Border>
+
+            <Border Grid.Column="1"
+                    Background="#FFFFFF"
+                    BorderBrush="#D9E1EA"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Padding="18">
+              <StackPanel Spacing="8">
+                <TextBlock Text="Design Triangle"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Foreground="#627083" />
+                <TextBlock Text="Idea + Phrase + Graphic"
+                           FontSize="18"
+                           Foreground="#17212F" />
+              </StackPanel>
+            </Border>
+
+            <Border Grid.Row="1"
+                    Grid.ColumnSpan="2"
+                    Background="#FFFFFF"
+                    BorderBrush="#D9E1EA"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Padding="18">
+              <StackPanel Spacing="8">
+                <TextBlock Text="Next Milestone"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Foreground="#627083" />
+                <TextBlock Text="Define the local workspace model before adding persistence, automation, plugins, AI, listings, mockups, or marketplace integrations."
+                           TextWrapping="Wrap"
+                           FontSize="16"
+                           Foreground="#273241" />
+              </StackPanel>
+            </Border>
+          </Grid>
+        </Grid>
+      </Border>
+    </Grid>
+  </Grid>
+</Window>
