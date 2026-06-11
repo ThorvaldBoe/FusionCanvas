@@ -30,6 +30,39 @@ while remaining modular, extensible, and easy to maintain.
 
 ---
 
+# Clean Architecture Direction
+
+FusionCanvas should follow Clean Architecture for meaningful implementation work.
+
+The codebase should keep domain rules, application use cases, external integrations, and user interface concerns separated. Early milestones may begin with a small number of projects, but new behavior should move toward the following layer structure as soon as each layer has real responsibility:
+
+```text
+FusionCanvas.Domain
+    Core business concepts, invariants, calculations, and workflow rules
+
+FusionCanvas.Application
+    Use cases, orchestration, ports, and application-facing contracts
+
+FusionCanvas.Integration
+    Persistence, file system access, marketplace APIs, AI providers,
+    plugin host adapters, and other external systems
+
+FusionCanvas.App
+    Avalonia UI, presentation state, navigation, and user interaction
+```
+
+The preferred dependency direction is inward:
+
+```text
+UI and Integration -> Application -> Domain
+```
+
+The domain project should not reference Avalonia, persistence frameworks, marketplace SDKs, AI providers, plugin host implementations, file system adapters, or other external infrastructure. The application layer may define ports and use domain types. Integration and UI projects should satisfy those contracts from the outside.
+
+This structure should remain practical. Do not create empty projects or speculative abstractions before they have useful responsibilities, but do not place new domain or application behavior in the UI project merely because it is convenient.
+
+---
+
 # High-Level System Overview
 
 ```text
@@ -66,6 +99,24 @@ Features should be separated into independent modules whenever practical.
 
 The goal is to make the system easier to maintain, test, and extend.
 
+Modules should live inside the appropriate clean architecture layer. For example, workspace domain rules belong in the domain layer, workspace use cases belong in the application layer, workspace persistence adapters belong in the integration layer, and workspace presentation belongs in the UI layer.
+
+## SOLID Design
+
+Implementation should follow SOLID principles pragmatically.
+
+Classes should have focused responsibilities, dependencies should be explicit, and abstractions should protect real boundaries, variation points, or testable contracts. Interfaces and services should not be introduced only to make the code look architectural.
+
+The goal is efficient, maintainable code without speculative layers, oversized classes, broad interfaces, or indirection that is not justified by current behavior.
+
+## Testable Architecture
+
+Unit testing is a vital part of the architecture.
+
+Every feature that adds or changes behavior should include appropriate automated tests. Domain rules and application use cases should be testable without Avalonia, storage engines, marketplace APIs, AI providers, plugin hosts, or network services.
+
+Integration-facing behavior should be tested at the appropriate boundary, such as contract tests or adapter tests with controlled dependencies. UI-owned decision logic should be tested when it contains behavior, but static markup and framework-owned wiring do not need superficial tests.
+
 ## Plugin Friendly
 
 The architecture should encourage extension through plugins.
@@ -89,6 +140,8 @@ FusionCanvas should remain useful even when no AI services are configured.
 The architecture should start simple and evolve only when necessary.
 
 Avoid introducing infrastructure before a clear need exists.
+
+The initial Avalonia shell may remain a single UI project while it contains only presentation scaffolding. As soon as meaningful domain rules, application use cases, or integration adapters are introduced, they should move into the appropriate layer projects with tests that match the behavior being added.
 
 ---
 
@@ -324,6 +377,8 @@ FusionCanvas should favor:
 
 Avoid introducing dependencies unless they provide clear value.
 
+Dependencies should not leak inward. Domain code should remain independent of UI frameworks, persistence technologies, external service SDKs, plugin host implementations, and provider-specific AI libraries.
+
 ---
 
 # Future Architectural Goals
@@ -351,6 +406,7 @@ The architecture is successful if it allows FusionCanvas to:
 * Support plugins without major refactoring
 * Operate effectively offline
 * Support AI as an optional enhancement
+* Keep core behavior testable through unit tests
 * Scale from hobby creators to professional creators
 * Evolve incrementally without requiring large rewrites
 

@@ -13,4 +13,8 @@
     <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.4" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.4" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FusionCanvas.Application\FusionCanvas.Application.csproj" />
+  </ItemGroup>
 </Project>
