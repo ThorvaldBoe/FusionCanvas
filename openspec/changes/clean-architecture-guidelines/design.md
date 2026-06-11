@@ -1,13 +1,15 @@
 ## Context
 
-FusionCanvas currently has a buildable Avalonia shell in a single application project and architecture documents that describe modular, local-first, plugin-friendly growth. The existing direction intentionally avoided splitting projects before there was production code, but the next feature work will introduce domain concepts, application workflows, integrations, persistence, and UI behavior that need clear boundaries.
+FusionCanvas currently has a buildable Avalonia shell in a single application project and architecture documents that describe modular, local-first, plugin-friendly growth. The existing direction intentionally avoided splitting projects before there was production code, but the next feature work will introduce domain concepts, application workflows, integrations, persistence, and UI behavior that need clear boundaries, disciplined design principles, and reliable tests.
 
-This change updates the architecture guidance before those responsibilities become tangled. It keeps the current incremental-complexity principle, while making Clean Architecture the default shape for new system behavior.
+This change updates the architecture guidance before those responsibilities become tangled. It keeps the current incremental-complexity principle, while making Clean Architecture, SOLID design, and appropriate unit testing the default shape for new system behavior.
 
 ## Goals / Non-Goals
 
 **Goals:**
 - Establish Clean Architecture as the expected project structure for meaningful implementation work.
+- Establish SOLID principles as the expected code design guidance without encouraging bloated abstractions.
+- Establish unit testing as a core architectural expectation for feature work.
 - Define domain, application, integration, and UI layer responsibilities.
 - Require dependencies to point inward so domain behavior stays independent.
 - Align documentation, OpenSpec guidance, and future solution structure.
@@ -17,6 +19,7 @@ This change updates the architecture guidance before those responsibilities beco
 - Implement workspace, product pipeline, storage, plugin, AI, or marketplace behavior.
 - Decide final naming for every future project beyond the required layer roles.
 - Introduce new runtime dependencies.
+- Require exhaustive tests for trivial generated or framework-owned behavior.
 
 ## Decisions
 
@@ -52,19 +55,38 @@ Rationale: this preserves the project's incremental-complexity principle while m
 
 Alternative considered: create all layer projects immediately even if some remain empty. This would signal intent strongly, but empty projects add maintenance overhead and may invite placeholder abstractions.
 
+### Apply SOLID pragmatically
+
+FusionCanvas will use SOLID principles to guide class, interface, and dependency design. Single responsibility, dependency inversion, and interface segregation are especially important across domain, application, integration, and UI boundaries.
+
+Rationale: SOLID keeps code easier to test and change as features grow, but it should be applied to solve real design pressure rather than to produce layers of indirection by default.
+
+Alternative considered: rely only on Clean Architecture project boundaries. Project boundaries help at a coarse level, but individual classes can still become tightly coupled, oversized, or hard to test without code-level design guidance.
+
+### Treat unit testing as architectural support
+
+Every feature should include appropriate unit tests for domain rules, application use cases, and integration-facing contracts. UI behavior can be tested at the appropriate level when it contains decision logic, while purely declarative Avalonia markup does not need superficial tests.
+
+Rationale: Clean Architecture is valuable partly because it makes core behavior testable without UI, persistence, marketplace APIs, AI providers, or plugin hosts. Requiring appropriate tests ensures the architecture remains real rather than only documentary.
+
+Alternative considered: defer tests until features stabilize. This can feel faster early, but it makes architectural drift harder to spot and raises the cost of refactoring once workflows become central.
+
 ## Risks / Trade-offs
 
 - Project boundaries could slow early iteration -> Mitigation: split only when real domain, application, integration, or UI responsibilities exist.
 - Layer names could become inconsistent across proposals -> Mitigation: document canonical roles and prefer stable project names such as `FusionCanvas.Domain`, `FusionCanvas.Application`, `FusionCanvas.Integration`, and `FusionCanvas.App`.
 - Integrations may need shared contracts with plugins -> Mitigation: keep contracts in inward-facing application or domain abstractions unless they are explicitly plugin API contracts.
 - UI convenience code could leak business rules into Avalonia views -> Mitigation: require new feature proposals to identify which layer owns each behavior.
+- SOLID guidance could encourage unnecessary interfaces or abstractions -> Mitigation: require abstractions to protect a real boundary, variation point, or test seam.
+- Test expectations could slow small changes -> Mitigation: require appropriate tests based on risk and behavior, not blanket tests for every line or framework artifact.
 
 ## Migration Plan
 
 1. Update architecture and project guidance to state the Clean Architecture target.
-2. When implementation begins, update the solution structure only as needed for current responsibilities.
-3. Preserve the existing Avalonia shell while moving new non-UI behavior into the appropriate layer project.
-4. Validate the solution still builds after any project split.
+2. Update guidance to include pragmatic SOLID principles and appropriate unit testing expectations.
+3. When implementation begins, update the solution structure only as needed for current responsibilities.
+4. Preserve the existing Avalonia shell while moving new non-UI behavior into the appropriate layer project.
+5. Validate the solution still builds and relevant tests pass after any project split.
 
 Rollback is documentation-only unless implementation creates new projects. If a project split proves premature, the guidance can remain while unused projects are removed before feature work depends on them.
 
@@ -72,3 +94,4 @@ Rollback is documentation-only unless implementation creates new projects. If a 
 
 - Should the integration layer be named `FusionCanvas.Integration` or `FusionCanvas.Infrastructure` in the final solution?
 - Should plugin contracts live in the application layer initially, or in a separate contracts project once the plugin system begins?
+- Which .NET test framework should become the default for new unit test projects?

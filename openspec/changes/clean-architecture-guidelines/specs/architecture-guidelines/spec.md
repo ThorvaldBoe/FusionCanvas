@@ -11,6 +11,21 @@ FusionCanvas SHALL use Clean Architecture as the default architectural structure
 - **WHEN** a contributor reads the architecture guidance
 - **THEN** the guidance states that FusionCanvas separates domain, application, integration, and UI responsibilities
 
+### Requirement: SOLID principles guide implementation
+FusionCanvas SHALL use SOLID principles to guide maintainable implementation while avoiding unnecessary abstraction and code bloat.
+
+#### Scenario: Contributor designs feature code
+- **WHEN** a contributor designs new domain, application, integration, or UI code
+- **THEN** the design keeps responsibilities focused and dependencies explicit
+
+#### Scenario: Contributor introduces an abstraction
+- **WHEN** a contributor adds an interface, adapter, service, or other abstraction
+- **THEN** the abstraction protects a real boundary, variation point, or testable contract
+
+#### Scenario: Contributor reviews code complexity
+- **WHEN** a contributor reviews implementation code
+- **THEN** the code avoids speculative layers, oversized classes, and broad interfaces that are not justified by current behavior
+
 ### Requirement: Layer responsibilities are separated
 FusionCanvas SHALL separate domain, application, integration, and UI responsibilities into distinct layer boundaries.
 
@@ -55,3 +70,26 @@ FusionCanvas SHALL keep project dependencies pointing inward toward domain and a
 #### Scenario: Contributor reviews integration and UI project references
 - **WHEN** a contributor inspects integration or UI projects
 - **THEN** they depend on inward-facing application or domain contracts rather than requiring domain behavior to depend on them
+
+### Requirement: Unit testing is part of feature architecture
+FusionCanvas SHALL include appropriate unit tests for every feature that adds or changes behavior.
+
+#### Scenario: Contributor implements domain behavior
+- **WHEN** a feature adds or changes domain rules, invariants, calculations, or workflow decisions
+- **THEN** the feature includes unit tests that verify the domain behavior without requiring UI frameworks or external services
+
+#### Scenario: Contributor implements application behavior
+- **WHEN** a feature adds or changes use case orchestration or workflow coordination
+- **THEN** the feature includes unit tests that verify the application behavior through domain and application contracts
+
+#### Scenario: Contributor implements integration-facing behavior
+- **WHEN** a feature adds or changes persistence, file system, marketplace, AI provider, plugin host, or other external integration behavior
+- **THEN** the feature includes tests for the integration-facing contract or adapter behavior at the appropriate boundary
+
+#### Scenario: Contributor changes UI decision logic
+- **WHEN** a feature adds or changes UI-owned decision logic
+- **THEN** the feature includes appropriate tests for that logic without requiring superficial tests for static markup
+
+#### Scenario: Contributor reviews feature completeness
+- **WHEN** a contributor marks feature implementation complete
+- **THEN** the implemented behavior has appropriate automated test coverage or an explicit documented reason why automated unit testing is not applicable
