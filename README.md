@@ -115,6 +115,8 @@ The expected workflow is:
 Propose → Implement → Validate → Archive
 ```
 
+The original LifeOS product requirements are kept in `docs/LifeOS/PRD` as planning and product-intent source material. Before proposing a related OpenSpec change, review the relevant PRD files and translate only the applicable behavior into the new OpenSpec proposal and spec deltas. The PRDs should remain outside `openspec/specs` unless their behavior has gone through the OpenSpec workflow and been accepted.
+
 ## Repository Structure
 
 The planned repository structure is:
@@ -131,6 +133,8 @@ FusionCanvas/
 │  ├─ design-pipeline.md
 │  ├─ plugin-model.md
 │  ├─ ai-workflow.md
+│  ├─ LifeOS/
+│  │  └─ PRD/
 │  └─ decisions/
 ├─ openspec/
 │  ├─ project.md
