@@ -4,301 +4,191 @@
 
 This document defines the lifecycle of ideas and products within FusionCanvas.
 
-The Design Pipeline is the core workflow of the application. It provides structure without restricting creativity and helps creators move from vague ideas to published products.
+The Design Pipeline is the core workflow of the application. It provides structure without restricting creativity and helps creators move from vague ideas to prepared listings.
 
-Unlike traditional Print-on-Demand tools that begin with finished designs, FusionCanvas begins with the earliest stages of ideation and concept development.
+Unlike traditional Print on Demand tools that begin with finished designs, FusionCanvas begins with the earliest stages of ideation and concept development.
 
----
-
-# Core Philosophy
+## Core Philosophy
 
 Many creators do not start with a completed design.
 
 They start with:
 
-* A niche
-* A trend
-* A customer observation
-* A joke
-* A phrase
-* A graphic idea
-* A market opportunity
+- a niche
+- a trend
+- a customer observation
+- a joke
+- a phrase
+- a graphic idea
+- a market opportunity
 
-FusionCanvas should support the entire journey from initial inspiration to published product.
+FusionCanvas should support the journey from initial inspiration to prepared product listing while preserving creative context.
 
 The goal is not simply to track work, but to improve the quality of ideas before production effort is invested.
 
----
+## Pipeline Overview
 
-# Pipeline Overview
-
-The standard FusionCanvas pipeline consists of six stages:
+The standard FusionCanvas pipeline consists of four core creative stages:
 
 ```text
-Theme
-↓
 Idea
-↓
 Concept
-↓
 Design
-↓
 Listing
-↓
-Published
-↓
-Archived
 ```
 
-Each stage represents a higher level of refinement and commitment.
+Archive is a related retained state for work that is rejected, retracted, paused indefinitely, or useful only for learning. Archive may appear near the workflow, but it should not obscure the core Idea -> Concept -> Design -> Listing progression.
 
-Not every item must pass through every stage, but the pipeline provides a recommended structure.
+Not every item must pass through every stage. A creator may begin with a rough idea, a clear concept, a phrase, an existing image direction, or even a nearly complete design. FusionCanvas should allow users to skip ahead when they already have enough information, while still preserving the context of earlier stages where it exists.
 
----
+## Stage Definitions
 
-# Stage Definitions
+### Idea
 
-## Theme
-
-A Theme represents a broad topic area.
-
-Themes provide long-term organization and help creators maintain focus within a niche or market.
-
-Examples:
-
-* Dogs
-* Camping
-* Coffee
-* Gardening
-* Fitness
-* Fishing
-* Teachers
-
-Themes may contain multiple ideas and concepts.
-
-### Purpose
-
-* Strategic organization
-* Idea grouping
-* Market exploration
-
----
-
-## Idea
-
-An Idea represents a specific observation, situation, emotion, problem, or opportunity.
+An Idea represents a specific observation, situation, emotion, problem, opportunity, or product seed.
 
 Ideas are intentionally lightweight and should be easy to capture.
 
 Examples:
 
-* Dog owners think their dogs own the house
-* Campers enjoy escaping modern life
-* Coffee drinkers treat coffee as fuel
-* Gardeners never stop buying plants
-
-Ideas are not products.
+- dog owners think their dogs own the house
+- campers enjoy escaping modern life
+- coffee drinkers treat coffee as fuel
+- gardeners never stop buying plants
 
 Ideas are raw material for future concepts.
 
-### Purpose
+Idea-stage tools may work from a selected topic and create new items. They should understand the current store, niche, topic path, tags, and nearby work so generated or captured ideas land in the right context.
 
-* Capture inspiration
-* Preserve observations
-* Explore opportunities
-
----
-
-## Concept
+### Concept
 
 A Concept represents a potential product direction.
 
-At this stage the creator begins evaluating how the idea might become a product.
+At this stage the creator begins evaluating how the idea might become a product. Concept work belongs to a single existing item in the navigation structure.
 
-Concepts are where the Design Triangle becomes important.
-
-Examples:
+Concepts are where the Design Triangle becomes important:
 
 ```text
-Idea:
-Dog owners think their dogs own the house
-
-Concept:
-Phrase:
-"My Dog Allows Me To Live Here"
-
-Graphic:
-Dog sitting on a throne
+Idea
+Phrase
+Graphic
 ```
 
 A concept may contain:
 
-* Notes
-* Sketches
-* References
-* Alternative phrases
-* Graphic ideas
-* Design Triangle evaluations
+- notes
+- sketches
+- references
+- alternative phrases
+- graphic ideas
+- design triangle evaluations
+- selected concept versions
 
-### Purpose
+Promising alternate directions can branch into new items without leaving the current concept workflow.
 
-* Refine product direction
-* Evaluate commercial potential
-* Improve quality before production
-
----
-
-## Design
+### Design
 
 A Design represents an actual implementation of a concept.
 
 Examples:
 
-* Artwork
-* SVG files
-* PNG exports
-* Design source files
-* Variations
+- artwork
+- SVG files
+- PNG exports
+- design source files
+- AI-generated drafts
+- cleanup passes
+- variants for dark shirts, light shirts, or specific products
 
 Multiple designs may be derived from the same concept.
 
-### Purpose
+The Design stage should allow experimentation without confusion. Many variants can exist, but one or more must be deliberately promoted as final selected artwork before later listing, mockup, export, or product-variant work treats them as ready.
 
-* Create production-ready assets
-* Store design files
-* Track design progress
+### Listing
 
----
-
-## Listing
-
-A Listing represents a marketplace-ready product.
+A Listing represents a marketplace-ready product preparation record.
 
 A listing may contain:
 
-* Product title
-* Description
-* Keywords
-* Tags
-* Mockups
-* Marketplace-specific metadata
+- product title
+- description
+- keywords
+- tags
+- mockups
+- price
+- status
+- selected final design
+- product/template/color choices
+- marketplace notes
 
 The listing stage separates product presentation from design creation.
 
-### Purpose
+The basic Listing tool should support local mockup generation and listing preparation. Direct Printify, Shopify, Etsy, or other marketplace publishing belongs to later integrations or optional plugins.
 
-* Prepare products for publication
-* Organize marketplace content
-* Improve discoverability
+### Archive
 
----
-
-## Published
-
-A Published item represents a live product.
-
-Published products may exist on:
-
-* Etsy
-* Shopify
-* Amazon Merch
-* Redbubble
-* Other marketplaces
-
-Published products remain connected to their upstream concepts and designs.
-
-### Purpose
-
-* Track active products
-* Monitor performance
-* Enable future improvements
-
----
-
-## Archived
-
-Archived items are no longer actively maintained.
-
-Archiving should preserve history while reducing clutter.
+Archive is a retained state for work that should leave the active workflow without being forgotten.
 
 Examples:
 
-* Retired products
-* Failed concepts
-* Obsolete designs
+- rejected concepts
+- paused ideas
+- retired products
+- obsolete designs
+- experiments preserved for learning
 
-### Purpose
+Archive should preserve history while reducing active workspace noise.
 
-* Preserve history
-* Reduce workspace noise
+## Workflow Stage vs Status
 
----
+Pipeline stage and operational status are separate concepts.
 
-# The Design Triangle
-
-The Design Triangle is a core FusionCanvas concept.
-
-A strong product usually combines three elements:
+`WorkflowStage` drives the visible stage navigator and stage filtering:
 
 ```text
-          Idea
-         /   \
-        /     \
-   Phrase --- Graphic
+Idea
+Concept
+Design
+Listing
+Archive
 ```
 
-## Idea
+`Status` describes operational state:
 
-The underlying concept, emotion, identity, observation, or situation.
+```text
+Draft
+Published
+Paused
+Rejected
+```
 
-Examples:
+Do not use stage-like statuses such as Idea, Concept, Design, and Listing as status values. Those belong to `WorkflowStage`.
 
-* Coffee dependency
-* Dog ownership
-* Camping lifestyle
-* Workplace humor
+## Workflow Stage Navigator
 
-## Phrase
+The document window should include a workflow stage navigator for the current item.
 
-The written expression of the idea.
+The navigator should show Idea, Concept, Design, and Listing as distinct stage boxes. The current stage should be visually emphasized. Completed or available prior stages should be enabled. Future stages that the item has not reached should be disabled.
 
-Examples:
+Clicking an enabled stage should open the relevant information for that stage. Clicking a disabled future stage should not navigate.
 
-* Powered by Coffee and Determination
-* Weekend Forecast: Camping
-* Easily Distracted by Dogs
+This gives the creator a constant answer to three questions:
 
-## Graphic
+- Where is this item in the workflow?
+- Which previous stages can I review?
+- What has not been created yet?
 
-The visual representation supporting the idea.
-
-Examples:
-
-* Coffee mug
-* Dog illustration
-* Mountain landscape
-* Campfire scene
-
-FusionCanvas should help creators evaluate how effectively these elements reinforce each other.
-
----
-
-# Tree Structure
+## Tree Structure
 
 FusionCanvas uses a hierarchical structure to organize work.
 
-Example:
-
 ```text
-Camping
-├─ Funny Camping
-│  ├─ Weekend Forecast: Camping
-│  ├─ Professional Marshmallow Burner
-│  └─ Camp More, Worry Less
-│
-└─ Adventure Camping
-   ├─ Adventure Awaits
-   └─ Into The Wild
+Store
+  Niche
+    Topic
+      Item
+    Topic
+  Niche
 ```
 
 The hierarchy should remain stable throughout the product lifecycle.
@@ -309,37 +199,16 @@ Example:
 
 ```text
 Camping
-└─ Weekend Forecast: Camping
-   ├─ Concept
-   ├─ Design
-   ├─ Listing
-   └─ Published Product
+  Weekend Forecast: Camping
+    Idea
+    Concept
+    Design
+    Listing
 ```
 
 This allows creators to understand the full history and relationship between items.
 
----
-
-# Status Management
-
-Pipeline stage and status are separate concepts.
-
-A Concept may be in the Concept stage while also having a status of:
-
-```text
-Draft
-Ready
-In Progress
-Blocked
-Completed
-Archived
-```
-
-This allows creators to track both workflow location and current activity.
-
----
-
-# Promotion and Evolution
+## Promotion and Evolution
 
 Items may evolve through the pipeline.
 
@@ -360,51 +229,43 @@ Typography + coffee mug illustration
 
 Listing:
 Prepared for Etsy
-
-Published:
-Live product
 ```
 
 FusionCanvas should preserve these relationships throughout the lifecycle.
 
-Creators should always be able to trace a published product back to its original idea.
+Creators should always be able to trace a prepared or published product back to its original idea.
 
----
+## Multiple Outputs
 
-# Multiple Outputs
+One idea may produce many concepts.
 
-One Idea may produce many Concepts.
+One concept may produce many designs.
 
-One Concept may produce many Designs.
-
-One Design may produce many Listings.
+One design may produce many listings.
 
 Example:
 
 ```text
 Idea
-├─ Concept A
-│  ├─ Design A1
-│  └─ Design A2
-│
-└─ Concept B
-   ├─ Design B1
-   └─ Design B2
+  Concept A
+    Design A1
+    Design A2
+  Concept B
+    Design B1
+    Design B2
 ```
 
 The system should support branching without duplicating unnecessary information.
 
----
-
-# Pipeline Success Criteria
+## Pipeline Success Criteria
 
 The Design Pipeline is successful if creators can:
 
-* Capture ideas quickly
-* Refine concepts effectively
-* Maintain visibility across their workflow
-* Preserve relationships between ideas and products
-* Track product development from inspiration to publication
-* Reduce lost opportunities and duplicated effort
+- capture ideas quickly
+- refine concepts effectively
+- maintain visibility across their workflow
+- preserve relationships between ideas and products
+- track product development from inspiration to listing preparation
+- reduce lost opportunities and duplicated effort
 
 The pipeline should provide structure while remaining flexible enough to support different creative processes and working styles.

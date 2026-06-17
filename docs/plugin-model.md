@@ -58,13 +58,14 @@ Core responsibilities include:
 
 * Workspace structure
 * Project organization
-* Product pipeline stages
+* Product workflow stages
 * Design Triangle data
 * Local storage
 * Plugin discovery
 * Plugin lifecycle management
 * Shared domain models
 * Shared user interface extension points
+* Stage tool hosting
 
 ## Plugin Responsibilities
 
@@ -77,6 +78,7 @@ Plugin responsibilities may include:
 * Mockup generation methods
 * Export formats
 * AI providers
+* Stage tools
 * Reporting tools
 * Automation workflows
 * External file processing
@@ -170,6 +172,37 @@ Possible capabilities:
 * Product analysis
 
 AI plugins should assist the creator, not replace creator judgment.
+
+---
+
+## Stage Tool Plugins
+
+Stage tool plugins contribute interactive work surfaces for specific workflow stages.
+
+Core workflow stages:
+
+```text
+Idea
+Concept
+Design
+Listing
+```
+
+Archive is a related retained state, not a primary creative tool stage.
+
+Possible capabilities:
+
+* Alternative ideation tools
+* Specialized concept refinement surfaces
+* Design import or generation workspaces
+* Listing preparation tools
+* Validation and readiness panels
+
+Stage tools should receive explicit context from the application, including active store, niche, topic path, selected item, active workflow stage, inherited tags and metadata, relevant nearby work, and available AI or plugin capabilities.
+
+Stage tools should not infer context by scraping visible UI state.
+
+Default built-in tools should use the same host and context model that plugin-provided tools use where practical.
 
 ---
 
@@ -282,6 +315,7 @@ MarketplacePublishing
 PrintProviderIntegration
 MockupGeneration
 AiProvider
+StageTool
 Export
 WorkflowAutomation
 Reporting
@@ -299,6 +333,7 @@ Possible extension points:
 
 * Navigation items
 * Detail panels
+* Stage tools
 * Pipeline actions
 * Context menu actions
 * Export commands

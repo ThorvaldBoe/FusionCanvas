@@ -2,258 +2,150 @@
 
 ## Purpose
 
-FusionCanvas exists to help Print-on-Demand creators transform ideas into published products more efficiently while preserving creativity.
+FusionCanvas exists to become the operating system for creative Print on Demand businesses.
 
-Many creators struggle not because they lack ideas, but because their workflow becomes fragmented across notes, spreadsheets, design tools, mockup generators, marketplaces, and publishing platforms.
+Rather than being another graphics editor or listing tool, FusionCanvas provides a structured environment where ideas evolve into successful products through organization, creative thinking, automation, and artificial intelligence.
 
-FusionCanvas aims to provide a unified workspace where creative thinking and production work can coexist.
+The application is designed for creators who want to build long-term businesses rather than simply produce individual designs.
 
-The goal is not merely to automate tasks, but to help creators make better decisions throughout the product creation process.
+## Mission
 
-FusionCanvas is intentionally niche-independent. The platform focuses on universal Print-on-Demand workflows and creative processes rather than any specific market, audience, or product category.
+Help creators produce better products, faster, while preserving their creativity.
 
----
+FusionCanvas should eliminate repetitive work, improve decision-making, and accumulate knowledge over time so every future design benefits from previous experience.
 
-# Problem Statement
+## Long-Term Vision
 
-Most Print-on-Demand workflows suffer from several common problems.
+FusionCanvas should become the central place where creators:
 
-## Fragmented Information
+- collect ideas
+- organize knowledge
+- develop concepts
+- design products
+- prepare listings
+- publish to marketplaces
+- analyze results
+- learn from performance
+- continuously improve
 
-Ideas, concepts, graphics, listings, and performance data are often stored in separate systems.
+Instead of replacing existing creative tools, FusionCanvas should coordinate them into a coherent workflow.
 
-Creators frequently lose context as projects move from one stage to another.
+## Beyond Image Editing
 
-## Weak Idea Development
+Traditional graphics software focuses on pixels and vectors.
 
-Many tools focus on creating designs but provide little support for improving ideas before design work begins.
+FusionCanvas focuses on products.
 
-This often leads to products that are technically well-made but commercially weak.
+A successful Print on Demand product consists of far more than artwork. It includes:
 
-## Repetitive Administrative Work
+- an idea
+- a target audience
+- a niche
+- a memorable phrase
+- visual composition
+- metadata
+- marketplace optimization
+- publishing
+- analytics
+- historical knowledge
 
-Mockup generation, listing preparation, keyword management, publishing, and catalog maintenance consume significant time that could otherwise be spent creating.
+FusionCanvas should manage the entire lifecycle.
 
-## Lack of Process Visibility
+## AI-Native, Not AI-Dependent
 
-Creators often struggle to answer questions such as:
-
-* Which ideas are worth pursuing?
-* Which concepts are waiting for graphics?
-* Which designs are ready for publication?
-* Which products should be improved or retired?
-
-## Tool Overload
-
-A typical workflow may involve:
-
-* Notes applications
-* Spreadsheets
-* Design software
-* Mockup generators
-* E-commerce platforms
-* Marketplace platforms
-* AI tools
-
-Switching between tools creates friction and reduces focus.
-
----
-
-# Vision
-
-FusionCanvas will become a creative operating system for Print-on-Demand businesses.
-
-Rather than focusing on a single task, FusionCanvas will support the entire product lifecycle:
-
-```text
-Idea
- ↓
-Concept
- ↓
-Design
- ↓
-Listing
- ↓
-Published Product
- ↓
-Optimization / Retirement
-```
-
-Each stage should remain connected to the stages before and after it.
-
-A creator should always be able to understand:
-
-* Why a product exists
-* What idea it originated from
-* How it evolved
-* What actions remain
-* How it performs
-
----
-
-# Core Philosophy
-
-## Creativity First
-
-Automation should support creativity, not replace it.
-
-FusionCanvas should help creators generate stronger ideas and better products rather than encouraging mass production of low-quality content.
-
-## Local First
-
-Creators should own their data.
-
-The application should remain useful without requiring cloud services.
-
-Cloud integrations should be optional enhancements rather than requirements.
-
-## AI as an Assistant
+Artificial intelligence is a collaborative tool, not an autonomous replacement for creators.
 
 AI should assist with:
 
-* Brainstorming
-* Concept refinement
-* Idea evaluation
-* Listing preparation
-* Workflow automation
+- brainstorming
+- concept refinement
+- prompt generation
+- design critique
+- listing optimization
+- workflow automation
+- knowledge retrieval
 
-AI should not become a black box that removes creative control.
+The creator remains responsible for taste, originality, and final approval.
 
-The creator remains responsible for decisions.
+## Knowledge Compounds
 
-## Structured Flexibility
+Every project creates knowledge.
 
-Some creators think in broad themes.
+Most creators lose that knowledge because it is scattered across folders, chat sessions, documents, spreadsheets, and marketplace listings.
 
-Others think in phrases.
+FusionCanvas should preserve this information so that it becomes increasingly valuable over time. The application should gradually build an internal knowledge base describing:
 
-Others begin with graphics.
+- niches
+- audiences
+- successful styles
+- unsuccessful experiments
+- prompts
+- phrases
+- graphics
+- workflows
+- marketplace performance
 
-FusionCanvas should support multiple creative entry points while still providing a structured workflow.
+Knowledge should compound rather than disappear.
 
-## Open Ecosystem
+## Open Platform
 
-The platform should encourage extensions and experimentation.
+FusionCanvas should become an ecosystem rather than a monolithic application.
 
-Plugins should allow creators and developers to add new capabilities without modifying the core application.
+The core platform provides:
 
----
+- organization
+- data model
+- workflow
+- plugin framework
 
-# The Design Triangle
+Plugins provide specialized functionality. This allows the platform to evolve without requiring the core application to implement every feature itself.
 
-FusionCanvas is built around the concept of the Design Triangle.
+## Local Ownership
 
-A strong Print-on-Demand design typically combines three elements:
+Creators should own their data.
 
-```text
-          Idea
-         /   \
-        /     \
-   Phrase --- Graphic
-```
+FusionCanvas should store its primary information locally and remain useful without cloud services. Online integrations should enhance the experience without becoming mandatory.
 
-## Idea
+## Workflow Before Automation
 
-The underlying emotion, situation, belief, identity, interest, lifestyle, or concept.
+Automation is valuable only when the underlying workflow is well understood.
 
-Examples:
+FusionCanvas prioritizes structured processes before attempting full automation. As creators organize their work, the application becomes increasingly capable of assisting them intelligently.
 
-* Coffee culture
-* Dog ownership
-* Camping lifestyle
-* Workplace humor
-* Gardening
-* Fitness motivation
+## Community
 
-## Phrase
+FusionCanvas should encourage an ecosystem of contributors.
 
-The written expression that communicates the idea.
+Potential community contributions include:
 
-Examples:
+- plugins
+- workflow templates
+- AI prompt packs
+- niche knowledge packs
+- marketplace integrations
+- mockup generators
+- analytics providers
+- educational material
 
-* "Powered by Coffee and Determination"
-* "Weekend Forecast: Camping"
-* "Easily Distracted by Dogs"
-* "Gardening Is My Therapy"
+A healthy ecosystem is more valuable than a feature-complete core.
 
-## Graphic
+## Success Criteria
 
-The visual component that supports or enhances the phrase.
+FusionCanvas succeeds when creators spend less time managing files and more time making creative decisions.
 
-Examples:
+It succeeds when:
 
-* Coffee mugs
-* Dogs
-* Mountains
-* Fishing equipment
-* Camping scenes
-* Plants and flowers
+- ideas are never lost
+- repetitive work is automated
+- creative context is preserved
+- AI assistance becomes increasingly personalized
+- workflows become faster over time
+- creators build lasting businesses rather than isolated products
 
-FusionCanvas should help creators strengthen the relationship between these elements.
+## Looking Ahead
 
----
+Although FusionCanvas begins as a Print on Demand application, its underlying principles extend beyond that niche.
 
-# Target Audience
+The concepts of structured creativity, accumulated knowledge, AI-assisted refinement, and extensible workflows have applications in many creative domains.
 
-FusionCanvas is intended for:
-
-* Print-on-Demand creators
-* Etsy sellers
-* Shopify merchants
-* Merch designers
-* Creative entrepreneurs
-* Small digital product businesses
-
-The platform is niche-agnostic and is designed to support creators across a wide range of markets, including hobbies, professions, lifestyle interests, humor, pets, outdoor activities, family topics, and many others.
-
----
-
-# Long-Term Goals
-
-## Creative Workspace
-
-Provide a complete environment for managing product development.
-
-## Workflow Automation
-
-Reduce repetitive operational tasks.
-
-## Intelligent Assistance
-
-Help creators identify stronger opportunities and improve concepts.
-
-## Marketplace Independence
-
-Allow creators to manage their products independently of any single platform.
-
-## Community Ecosystem
-
-Enable third-party plugins, integrations, templates, and workflows.
-
----
-
-# Non-Goals
-
-FusionCanvas is not intended to become:
-
-* A replacement for professional illustration software
-* A replacement for Affinity Designer, Photoshop, or Illustrator
-* A social media platform
-* A marketplace
-* A cloud-only SaaS product
-
-The purpose is to complement existing creative tools, not replace them.
-
----
-
-# Success Criteria
-
-FusionCanvas is successful if creators can:
-
-* Generate better product ideas
-* Organize larger product catalogs
-* Reduce manual administrative work
-* Maintain visibility across their workflow
-* Spend more time creating and less time managing tools
-
-Ultimately, FusionCanvas should help creators move from scattered ideas to published products with less friction and greater confidence.
+The initial focus remains Print on Demand, but the architecture should be flexible enough to support broader creative workflows in the future without compromising the product's core identity.

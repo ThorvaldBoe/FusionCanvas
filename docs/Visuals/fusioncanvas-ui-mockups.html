@@ -1,0 +1,775 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FusionCanvas UI Mockups</title>
+  <style>
+    :root {
+      --bg: #17191d;
+      --panel: #202329;
+      --panel-2: #252a31;
+      --panel-3: #2b3038;
+      --line: #3a414b;
+      --line-soft: #303740;
+      --text: #e9edf2;
+      --muted: #aab2bd;
+      --quiet: #7d8793;
+      --accent: #b86b3d;
+      --accent-2: #d8a35f;
+      --green: #78b678;
+      --blue: #6fa8dc;
+      --red: #d06b6b;
+      --shadow: 0 12px 35px rgba(0, 0, 0, .28);
+      font-family: "Segoe UI", Inter, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+    button, input, textarea, select { font: inherit; }
+    .app {
+      width: 1440px;
+      height: 980px;
+      display: grid;
+      grid-template-rows: 42px 1fr 28px;
+      background: var(--bg);
+    }
+    .topbar {
+      display: grid;
+      grid-template-columns: 220px 1fr auto;
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      background: #15171b;
+      padding: 0 12px;
+      gap: 16px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-weight: 700;
+      color: #f4f0ea;
+    }
+    .brand-mark {
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--accent-2);
+      transform: rotate(45deg);
+      position: relative;
+    }
+    .brand-mark:after {
+      content: "";
+      position: absolute;
+      inset: 5px;
+      border: 2px solid var(--accent);
+    }
+    .command {
+      height: 28px;
+      max-width: 520px;
+      border: 1px solid var(--line);
+      background: #1d2025;
+      color: var(--muted);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .top-actions {
+      display: flex;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .main {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      min-height: 0;
+    }
+    .nav {
+      background: #1b1e23;
+      border-right: 1px solid var(--line);
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      min-width: 0;
+    }
+    .nav-head {
+      padding: 12px;
+      border-bottom: 1px solid var(--line-soft);
+    }
+    .store-select {
+      width: 100%;
+      height: 32px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--text);
+      padding: 0 10px;
+    }
+    .nav-tools {
+      display: grid;
+      grid-template-columns: 1fr 30px 30px;
+      gap: 6px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line-soft);
+    }
+    .search {
+      height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #15171b;
+      color: var(--muted);
+      padding: 0 10px;
+      font-size: 12px;
+    }
+    .icon-btn {
+      height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--muted);
+    }
+    .tree {
+      padding: 10px 8px;
+      overflow: hidden;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .tree-row {
+      height: 28px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      border-radius: 5px;
+      padding: 0 8px;
+      white-space: nowrap;
+    }
+    .tree-row.active {
+      color: var(--text);
+      background: #34313a;
+      outline: 1px solid rgba(216, 163, 95, .35);
+    }
+    .tree-row .indent-1 { margin-left: 14px; }
+    .tree-row .indent-2 { margin-left: 28px; }
+    .tree-row .indent-3 { margin-left: 42px; }
+    .tree-icon { color: var(--quiet); width: 14px; }
+    .nav-foot {
+      padding: 10px 12px;
+      border-top: 1px solid var(--line-soft);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .small-btn {
+      height: 30px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--muted);
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .workspace {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: 38px 116px 1fr;
+      background: var(--bg);
+    }
+    .tabs {
+      display: flex;
+      align-items: end;
+      gap: 1px;
+      background: #15171b;
+      border-bottom: 1px solid var(--line);
+      padding-left: 8px;
+    }
+    .tab {
+      height: 32px;
+      min-width: 166px;
+      max-width: 210px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 10px;
+      color: var(--muted);
+      background: #1c2026;
+      border: 1px solid var(--line-soft);
+      border-bottom: 0;
+      border-radius: 6px 6px 0 0;
+      font-size: 12px;
+    }
+    .tab.active {
+      background: var(--panel);
+      color: var(--text);
+      border-color: var(--line);
+    }
+    .workflow {
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+      padding: 14px 18px 12px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: center;
+    }
+    .crumb {
+      color: var(--quiet);
+      font-size: 12px;
+      margin-bottom: 9px;
+    }
+    .stage-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(150px, 1fr)) 105px;
+      gap: 10px;
+    }
+    .stage {
+      min-height: 58px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel-2);
+      padding: 10px 12px;
+      position: relative;
+    }
+    .stage.done { border-color: rgba(120, 182, 120, .55); }
+    .stage.active { border-color: var(--accent-2); background: #302b27; box-shadow: inset 0 0 0 1px rgba(216, 163, 95, .22); }
+    .stage.disabled { opacity: .45; }
+    .stage.archive { background: #1f2329; }
+    .stage-title { font-size: 13px; font-weight: 700; }
+    .stage-meta { color: var(--quiet); margin-top: 5px; font-size: 11px; }
+    .workflow-aside {
+      min-width: 200px;
+      padding: 10px 12px;
+      background: #1c2025;
+      border: 1px solid var(--line-soft);
+      border-radius: 7px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .tool-area {
+      min-height: 0;
+      background: var(--panel);
+      padding: 14px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 12px;
+    }
+    .tool-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 12px;
+    }
+    .tool-title h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+    .tool-title p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .tool-select {
+      height: 32px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 0 10px;
+      font-size: 12px;
+    }
+    .grid-2 { display: grid; grid-template-columns: 1.25fr .75fr; gap: 12px; min-height: 0; }
+    .grid-3 { display: grid; grid-template-columns: .8fr 1.2fr .8fr; gap: 12px; min-height: 0; }
+    .card {
+      background: #1d2127;
+      border: 1px solid var(--line-soft);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      min-height: 0;
+      overflow: hidden;
+    }
+    .card-head {
+      height: 38px;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--line-soft);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text);
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .card-body { padding: 12px; }
+    .field { display: grid; gap: 6px; margin-bottom: 10px; }
+    .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+    .input, .textarea {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #15171b;
+      color: var(--text);
+      padding: 9px 10px;
+      font-size: 13px;
+      width: 100%;
+    }
+    .textarea { min-height: 88px; resize: none; line-height: 1.35; }
+    .primary {
+      height: 34px;
+      border: 0;
+      border-radius: 6px;
+      color: #15100c;
+      background: var(--accent-2);
+      font-weight: 700;
+      padding: 0 12px;
+    }
+    .secondary {
+      height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--text);
+      background: var(--panel-3);
+      padding: 0 12px;
+    }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: var(--muted);
+      background: #171a1f;
+      font-size: 11px;
+    }
+    .candidate {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      align-items: center;
+      min-height: 58px;
+      border-bottom: 1px solid var(--line-soft);
+      padding: 10px 12px;
+    }
+    .candidate:last-child { border-bottom: 0; }
+    .candidate strong { display: block; font-size: 13px; }
+    .candidate span { display: block; color: var(--quiet); font-size: 12px; margin-top: 3px; }
+    .triangle {
+      position: relative;
+      height: 520px;
+      background:
+        linear-gradient(30deg, transparent 49.5%, rgba(216, 163, 95, .3) 50%, transparent 50.5%),
+        linear-gradient(150deg, transparent 49.5%, rgba(216, 163, 95, .3) 50%, transparent 50.5%),
+        linear-gradient(90deg, transparent 49.5%, rgba(216, 163, 95, .2) 50%, transparent 50.5%);
+      background-size: 520px 520px;
+      background-position: center 34px;
+    }
+    .node {
+      position: absolute;
+      width: 260px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #242932;
+      padding: 12px;
+      box-shadow: var(--shadow);
+    }
+    .node.idea { top: 24px; left: calc(50% - 130px); border-color: rgba(111, 168, 220, .7); }
+    .node.phrase { bottom: 34px; left: 54px; border-color: rgba(216, 163, 95, .7); }
+    .node.graphic { bottom: 34px; right: 54px; border-color: rgba(120, 182, 120, .7); }
+    .score {
+      position: absolute;
+      width: 126px;
+      height: 126px;
+      border-radius: 50%;
+      left: calc(50% - 63px);
+      top: 242px;
+      border: 1px solid rgba(216, 163, 95, .7);
+      background: #171a1f;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: var(--accent-2);
+      font-weight: 700;
+    }
+    .score small { display: block; color: var(--muted); font-weight: 400; margin-top: 4px; }
+    .variant-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .variant {
+      min-height: 175px;
+      border: 1px solid var(--line-soft);
+      border-radius: 7px;
+      background: #15171b;
+      padding: 10px;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      gap: 8px;
+    }
+    .art {
+      border-radius: 6px;
+      background:
+        radial-gradient(circle at 50% 38%, #d8a35f 0 10%, transparent 11%),
+        radial-gradient(circle at 48% 50%, #9f5135 0 16%, transparent 17%),
+        linear-gradient(145deg, #2a2f38, #171a1f);
+      border: 1px solid #3a414b;
+    }
+    .shirt {
+      min-height: 145px;
+      border-radius: 7px;
+      background:
+        radial-gradient(circle at center 48%, rgba(216, 163, 95, .85) 0 11%, transparent 12%),
+        linear-gradient(180deg, #101216 0 17%, #222831 18% 100%);
+      border: 1px solid var(--line-soft);
+      position: relative;
+    }
+    .shirt:before {
+      content: "";
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      width: 42px;
+      height: 18px;
+      border-radius: 0 0 24px 24px;
+      transform: translateX(-50%);
+      background: #17191d;
+    }
+    .mockup-gallery {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .split-list {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      min-height: 0;
+    }
+    .settings-list {
+      border-right: 1px solid var(--line-soft);
+      padding: 10px;
+    }
+    .settings-row {
+      padding: 9px 10px;
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .settings-row.active { background: #302b27; color: var(--text); }
+    .statusbar {
+      background: #121418;
+      border-top: 1px solid var(--line);
+      color: var(--quiet);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      font-size: 11px;
+    }
+    .view { display: none; min-height: 0; }
+    .view.active { display: grid; }
+    .compact-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .compact-table td, .compact-table th { border-bottom: 1px solid var(--line-soft); padding: 9px 8px; text-align: left; }
+    .compact-table th { color: var(--muted); font-weight: 600; }
+    .check { color: var(--green); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark"></span><span>FusionCanvas</span></div>
+      <div class="command">Search, open command, or create from current context</div>
+      <div class="top-actions"><span>Plugins</span><span>Settings</span><span>Sync later</span></div>
+    </header>
+
+    <main class="main">
+      <aside class="nav">
+        <div class="nav-head">
+          <select class="store-select"><option>Tomes of Virtue</option></select>
+        </div>
+        <div class="nav-tools">
+          <input class="search" value="Search tree">
+          <button class="icon-btn">+</button>
+          <button class="icon-btn">...</button>
+        </div>
+        <div class="tree">
+          <div class="tree-row"><span class="tree-icon">v</span><span>Tabletop RPG</span></div>
+          <div class="tree-row"><span class="indent-1"></span><span class="tree-icon">v</span><span>Dice and damage</span></div>
+          <div class="tree-row active"><span class="indent-2"></span><span class="tree-icon">#</span><span>Does a 17 hit?</span></div>
+          <div class="tree-row"><span class="indent-2"></span><span class="tree-icon">#</span><span>Roll for initiative</span></div>
+          <div class="tree-row"><span class="indent-1"></span><span class="tree-icon">v</span><span>Tavern humor</span></div>
+          <div class="tree-row"><span class="indent-2"></span><span class="tree-icon">#</span><span>Ask your barkeep</span></div>
+          <div class="tree-row"><span class="tree-icon">v</span><span>Dark fantasy</span></div>
+          <div class="tree-row"><span class="indent-1"></span><span class="tree-icon">&gt;</span><span>Quest failures</span></div>
+          <div class="tree-row"><span class="tree-icon">v</span><span>Store setup</span></div>
+          <div class="tree-row"><span class="indent-1"></span><span class="tree-icon">#</span><span>Mockup products</span></div>
+        </div>
+        <div class="nav-foot">
+          <button class="small-btn">New topic</button>
+          <button class="small-btn">New item</button>
+        </div>
+      </aside>
+
+      <section class="workspace">
+        <nav class="tabs">
+          <div class="tab active"><span>Does a 17 hit?</span><span>x</span></div>
+          <div class="tab"><span>Tavern humor</span><span>x</span></div>
+          <div class="tab"><span>Mockup products</span><span>x</span></div>
+        </nav>
+
+        <section class="workflow">
+          <div>
+            <div class="crumb">Tomes of Virtue / Tabletop RPG / Dice and damage / Does a 17 hit?</div>
+            <div class="stage-row">
+              <div class="stage done"><div class="stage-title">Idea</div><div class="stage-meta">Captured and accepted</div></div>
+              <div class="stage active" data-stage="concept"><div class="stage-title">Concept</div><div class="stage-meta">Ready for refinement</div></div>
+              <div class="stage" data-stage="design"><div class="stage-title">Design</div><div class="stage-meta">Draft variants exist</div></div>
+              <div class="stage" data-stage="listing"><div class="stage-title">Listing</div><div class="stage-meta">Needs mockups</div></div>
+              <div class="stage archive"><div class="stage-title">Archive</div><div class="stage-meta">Retain learning</div></div>
+            </div>
+          </div>
+          <aside class="workflow-aside">Active context follows the tab. The lower pane hosts the selected tool for the current stage.</aside>
+        </section>
+
+        <section class="tool-area">
+          <div class="tool-head">
+            <div class="tool-title">
+              <h1 id="view-title">FusionCanvas Workspace</h1>
+              <p id="view-subtitle">Obsidian-inspired shell with navigation, tabs, workflow stages, and a stage tool host.</p>
+            </div>
+            <select class="tool-select"><option>Built-in tool</option><option>Plugin tool</option></select>
+          </div>
+
+          <div id="view-core" class="view active grid-2">
+            <div class="card">
+              <div class="card-head"><span>Horizontal Document Split</span><span class="pill">Workflow above, tool below</span></div>
+              <div class="card-body">
+                <div class="row" style="margin-bottom: 12px">
+                  <span class="pill">Navigation pane</span><span class="pill">Tabbed view</span><span class="pill">Stage boxes</span><span class="pill">Tool selector</span>
+                </div>
+                <div class="textarea" style="height: 365px">
+The document area is intentionally split horizontally.
+
+Top: workflow stage navigator with Idea, Concept, Design, Listing, and optional Archive state.
+
+Bottom: stage tool host. The active tab and selected stage determine which tool appears here.
+
+This keeps workflow orientation visible while preserving most of the screen for actual creative work.
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-head">Current Item Snapshot</div>
+              <div class="card-body">
+                <div class="field"><span class="label">Current stage</span><div class="input">Concept</div></div>
+                <div class="field"><span class="label">Concept readiness</span><div class="input">Strong phrase, graphic needs specificity</div></div>
+                <div class="field"><span class="label">Next useful action</span><div class="input">Refine graphic direction before design</div></div>
+                <table class="compact-table">
+                  <tr><th>Stage</th><th>Status</th></tr>
+                  <tr><td>Idea</td><td><span class="check">Done</span></td></tr>
+                  <tr><td>Concept</td><td>Active</td></tr>
+                  <tr><td>Design</td><td>Available</td></tr>
+                  <tr><td>Listing</td><td>Pending</td></tr>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div id="view-ideation" class="view grid-2">
+            <div class="card">
+              <div class="card-head"><span>Idea Capture</span><span class="pill">Context-aware</span></div>
+              <div class="card-body">
+                <div class="field"><span class="label">Current scope</span><div class="input">Tomes of Virtue / Tabletop RPG / Dice and damage</div></div>
+                <div class="field"><span class="label">Quick idea</span><input class="input" value="Tiny adventurer staring up at an impossible monster foot"></div>
+                <div class="field"><span class="label">Optional notes</span><textarea class="textarea">Readable thumbnail. Dark fantasy joke about barely missing or barely surviving a roll.</textarea></div>
+                <div class="row"><button class="primary">Create idea</button><button class="secondary">Attach reference</button><button class="secondary">Generate 12 ideas</button></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-head">Generated Candidates</div>
+              <div>
+                <div class="candidate"><div><strong>Does a 17 hit?</strong><span>Tabletop anxiety, monster scale, simple phrase.</span></div><button class="secondary">Create</button><button class="small-btn">Reject</button></div>
+                <div class="candidate"><div><strong>I have darkvision and regrets</strong><span>Works for dungeon delvers; maybe phrase-led.</span></div><button class="secondary">Create</button><button class="small-btn">Reject</button></div>
+                <div class="candidate"><div><strong>Loot first, ethics later</strong><span>Tavern/shop crossover candidate.</span></div><button class="secondary">Create</button><button class="small-btn">Reject</button></div>
+                <div class="candidate"><div><strong>Failed my stealth check</strong><span>Good for visual gag, avoid duplicates.</span></div><button class="secondary">Create</button><button class="small-btn">Reject</button></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="view-concept" class="view grid-2">
+            <div class="card">
+              <div class="card-head"><span>Design Triangle</span><span class="pill">Click a node to improve</span></div>
+              <div class="triangle">
+                <div class="node idea"><span class="label">Idea</span><p>Comic tension of a player asking whether a mediocre roll survives a massive fantasy threat.</p></div>
+                <div class="node phrase"><span class="label">Phrase</span><p>Does a 17 hit?</p></div>
+                <div class="node graphic"><span class="label">Graphic</span><p>Tiny adventurer facing only the huge clawed foot of a monster.</p></div>
+                <div class="score">82<small>Graphic can sharpen</small></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-head">Concept History</div>
+              <div class="card-body">
+                <div class="field"><span class="label">Selected node</span><div class="input">Graphic</div></div>
+                <div class="field"><span class="label">AI suggestion</span><textarea class="textarea">Use a low-angle silhouette: a tiny armored figure holding a bent sword, framed by the shadow of a clawed monster foot. Keep the phrase large and readable.</textarea></div>
+                <div class="row"><button class="primary">Accept</button><button class="secondary">Regenerate</button><button class="secondary">Save alternate</button></div>
+                <table class="compact-table">
+                  <tr><th>Time</th><th>Event</th></tr>
+                  <tr><td>14:02</td><td>Phrase accepted</td></tr>
+                  <tr><td>14:05</td><td>Graphic improved</td></tr>
+                  <tr><td>14:08</td><td>Score updated</td></tr>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div id="view-design" class="view grid-3">
+            <div class="card">
+              <div class="card-head">Design Brief</div>
+              <div class="card-body">
+                <div class="field"><span class="label">Phrase</span><div class="input">Does a 17 hit?</div></div>
+                <div class="field"><span class="label">Style</span><textarea class="textarea">Gritty dark fantasy, distressed shirt graphic, high contrast, readable at thumbnail size, no copyrighted characters.</textarea></div>
+                <div class="row"><button class="secondary">Import files</button><button class="secondary">Generate variants</button></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-head"><span>Variant Workspace</span><span class="pill">Final selection explicit</span></div>
+              <div class="card-body">
+                <div class="variant-grid">
+                  <div class="variant"><div class="art"></div><div><strong>Variant A</strong><br><span class="pill">draft</span></div></div>
+                  <div class="variant"><div class="art" style="filter: contrast(1.35)"></div><div><strong>Variant B</strong><br><span class="pill">needs cleanup</span></div></div>
+                  <div class="variant"><div class="art" style="filter: sepia(.25)"></div><div><strong>Dark shirt export</strong><br><span class="pill">final</span></div></div>
+                </div>
+                <div class="row" style="margin-top: 12px"><button class="primary">Promote final</button><button class="secondary">Compare</button><button class="secondary">Mark revision</button></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-head">Variant Details</div>
+              <div class="card-body">
+                <div class="field"><span class="label">Status</span><div class="input">Selected final</div></div>
+                <div class="field"><span class="label">Tags</span><div class="row"><span class="pill">dark-shirts</span><span class="pill">distressed</span><span class="pill">final</span></div></div>
+                <div class="field"><span class="label">Assets</span><textarea class="textarea">does-a-17-hit.afdesign
+does-a-17-hit-dark.png
+does-a-17-hit-light.png</textarea></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="view-listing" class="view grid-2">
+            <div class="card">
+              <div class="card-head">Listing Metadata</div>
+              <div class="card-body">
+                <div class="field"><span class="label">Title</span><input class="input" value="Does a 17 Hit? DnD Shirt"></div>
+                <div class="field"><span class="label">Description</span><textarea class="textarea">A dark fantasy tabletop RPG shirt for players who know the dread of asking the DM one small question.</textarea></div>
+                <div class="row"><div class="field" style="width: 150px"><span class="label">Price</span><input class="input" value="24.99"></div><div class="field" style="flex: 1"><span class="label">Status</span><input class="input" value="Ready for manual Printify setup"></div></div>
+                <div class="row"><button class="primary">Save listing</button><button class="secondary">Generate text</button><button class="secondary">Attach mockup</button></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-head">Mockups and Readiness</div>
+              <div class="card-body">
+                <div class="mockup-gallery">
+                  <div class="variant"><div class="shirt"></div><div>Black front</div></div>
+                  <div class="variant"><div class="shirt" style="background: radial-gradient(circle at center 48%, rgba(216, 163, 95, .85) 0 11%, transparent 12%), linear-gradient(180deg, #101726 0 17%, #26344c 18% 100%)"></div><div>Navy front</div></div>
+                  <div class="variant"><div class="shirt" style="background: radial-gradient(circle at center 48%, rgba(216, 163, 95, .85) 0 11%, transparent 12%), linear-gradient(180deg, #222 0 17%, #46484c 18% 100%)"></div><div>Dark Heather</div></div>
+                </div>
+                <table class="compact-table" style="margin-top: 12px">
+                  <tr><td><span class="check">✓</span> Final design selected</td><td>Dark shirt export</td></tr>
+                  <tr><td><span class="check">✓</span> Mockups generated</td><td>3 files</td></tr>
+                  <tr><td><span class="check">✓</span> Price captured</td><td>$24.99</td></tr>
+                  <tr><td>Provider setup</td><td>Manual task remains</td></tr>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div id="view-mockup" class="view grid-2">
+            <div class="card">
+              <div class="card-head">Mockup Product Settings</div>
+              <div class="split-list">
+                <div class="settings-list">
+                  <div class="settings-row active">SwiftPOD / Gildan 64000</div>
+                  <div class="settings-row">SwiftPOD / Bella Canvas 3001</div>
+                  <div class="settings-row">Printify / Mug 11oz</div>
+                </div>
+                <div class="card-body">
+                  <div class="row"><div class="field" style="flex: 1"><span class="label">Vendor</span><input class="input" value="SwiftPOD"></div><div class="field" style="flex: 1"><span class="label">Product</span><input class="input" value="Gildan 64000 T-Shirt"></div></div>
+                  <div class="row"><div class="field" style="width: 180px"><span class="label">Design width</span><input class="input" value="3692"></div><div class="field" style="width: 180px"><span class="label">Design height</span><input class="input" value="4800"></div></div>
+                  <table class="compact-table">
+                    <tr><th>Template</th><th>View</th><th>Colors</th></tr>
+                    <tr><td>Flat front shirt mockup</td><td>Front</td><td>Black, Navy, Dark Heather</td></tr>
+                    <tr><td>Lifestyle front mockup</td><td>Front</td><td>Black, Navy</td></tr>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-head">Template Mapping</div>
+              <div class="card-body">
+                <div class="shirt" style="height: 390px"></div>
+                <div class="row" style="margin-top: 12px"><div class="field" style="width: 120px"><span class="label">X</span><input class="input" value="536"></div><div class="field" style="width: 120px"><span class="label">Y</span><input class="input" value="365"></div><div class="field" style="width: 120px"><span class="label">Width</span><input class="input" value="428"></div><div class="field" style="width: 120px"><span class="label">Rotation</span><input class="input" value="0"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="view-store" class="view grid-2">
+            <div class="card">
+              <div class="card-head">Store Setup</div>
+              <div class="card-body">
+                <div class="field"><span class="label">Store name</span><input class="input" value="Tomes of Virtue"></div>
+                <div class="field"><span class="label">Brand direction</span><textarea class="textarea">Dark fantasy merchandise for tabletop RPG players. Clever, gritty, readable, and not childish.</textarea></div>
+                <div class="row"><span class="pill">Shopify later</span><span class="pill">Printify manual setup</span><span class="pill">AI context enabled</span></div>
+                <div class="row" style="margin-top: 12px"><button class="primary">Save store</button><button class="secondary">Archive store</button></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-head">Niche Setup</div>
+              <div class="card-body">
+                <div class="field"><span class="label">Niche</span><input class="input" value="Tabletop RPG"></div>
+                <div class="field"><span class="label">Audience and humor</span><textarea class="textarea">Players and DMs who recognize table jokes, dice anxiety, tactical chaos, tavern problems, and campaign failures.</textarea></div>
+                <div class="field"><span class="label">Style guidance</span><textarea class="textarea">Distressed badges, woodcut-inspired monsters, readable phrases, high contrast, minimal tiny details.</textarea></div>
+                <table class="compact-table">
+                  <tr><th>Group</th><th>Listings</th><th>Notes</th></tr>
+                  <tr><td>Dice and damage</td><td>12</td><td>Core phrase-driven niche</td></tr>
+                  <tr><td>Tavern humor</td><td>8</td><td>Good for collections</td></tr>
+                  <tr><td>Quest failures</td><td>5</td><td>Needs more visual hooks</td></tr>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <footer class="statusbar">
+      <span>Local workspace: Tomes of Virtue</span>
+      <span>SQLite local-first model | plugins available later</span>
+    </footer>
+  </div>
+
+  <script>
+    const view = new URLSearchParams(location.search).get("view") || "core";
+    const titles = {
+      core: ["FusionCanvas Workspace", "Core shell: navigation, tabs, horizontal workflow split, and stage tool host."],
+      ideation: ["Ideation Tool", "Capture ideas manually or generate candidates from the selected topic context."],
+      concept: ["Concept Tool", "Refine the design triangle for a single existing item."],
+      design: ["Design Tool", "Import, generate, compare, and promote final design variants."],
+      listing: ["Listing Tool", "Prepare metadata, mockups, price, and local marketplace-ready assets."],
+      mockup: ["Mockup Setup", "Store-level product, template, color, and placement configuration."],
+      store: ["Store and Niche Setup", "Maintain brand context, niche guidance, groups, and active work scope."]
+    };
+    document.querySelectorAll(".view").forEach(el => el.classList.remove("active"));
+    document.getElementById("view-" + view).classList.add("active");
+    document.getElementById("view-title").textContent = titles[view][0];
+    document.getElementById("view-subtitle").textContent = titles[view][1];
+    const stageByView = { ideation: "Idea", concept: "Concept", design: "Design", listing: "Listing", core: "Concept", mockup: "Settings", store: "Settings" };
+    document.querySelectorAll(".stage").forEach(el => el.classList.remove("active"));
+    if (view === "ideation") document.querySelectorAll(".stage")[0].classList.add("active");
+    else if (view === "design") document.querySelectorAll(".stage")[2].classList.add("active");
+    else if (view === "listing") document.querySelectorAll(".stage")[3].classList.add("active");
+    else document.querySelectorAll(".stage")[1].classList.add("active");
+  </script>
+</body>
+</html>

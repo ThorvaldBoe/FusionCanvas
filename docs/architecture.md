@@ -1,40 +1,54 @@
 # FusionCanvas Architecture
 
-## Purpose
+## Overview
 
-This document describes the high-level architecture of FusionCanvas.
+FusionCanvas is a local-first desktop application built around a modular, extensible architecture.
 
-Its purpose is to define the major system components, architectural principles, and long-term technical direction of the project without prescribing detailed implementation decisions.
+The application is designed to support long-term evolution through clear separation of responsibilities, a plugin-based extension model, and a structured domain model.
 
-Detailed implementation should evolve over time, but the architectural principles defined here should remain relatively stable.
+The core application should remain relatively small while allowing new functionality to be added through plugins.
 
----
+## Architectural Goals
 
-# Architectural Vision
+The architecture should prioritize:
 
-FusionCanvas is designed as a local-first desktop application that helps Print-on-Demand creators manage the complete product lifecycle.
+- maintainability
+- extensibility
+- testability
+- performance
+- offline capability
+- AI integration
+- plugin support
+- long-term evolution
 
-The architecture should support:
+Features should be easy to add without requiring major changes to existing code.
 
-* Idea management
-* Concept refinement
-* Design organization
-* Product pipeline tracking
-* Mockup generation
-* Listing preparation
-* Workflow automation
-* Marketplace integrations
-* AI-assisted workflows
+The application should follow Clean Architecture principles where practical. Domain and application logic should remain independent of UI frameworks, persistence details, plugin implementations, and external services.
 
-while remaining modular, extensible, and easy to maintain.
+Code should aim to follow SOLID design principles, with small focused types, clear dependencies, explicit abstractions, and behavior that can be extended without repeatedly modifying stable core code.
 
----
+## Technology Stack
 
-# Clean Architecture Direction
+Current technology choices:
 
-FusionCanvas should follow Clean Architecture for meaningful implementation work.
+| Layer | Technology |
+| --- | --- |
+| UI | Avalonia |
+| Language | C# |
+| Framework | .NET |
+| Database | SQLite |
+| Flexible Metadata | JSON |
+| Architecture | MVVM |
+| Dependency Injection | Microsoft.Extensions.DependencyInjection |
+| Specifications | OpenSpec |
+| Source Control | Git |
+| Testing | xUnit |
 
-The codebase should keep domain rules, application use cases, external integrations, and user interface concerns separated. Early milestones may begin with a small number of projects, but new behavior should move toward the following layer structure as soon as each layer has real responsibility:
+These choices may evolve, but the architectural principles should remain stable.
+
+## Clean Architecture Direction
+
+FusionCanvas should move toward the following layer structure as soon as each layer has real responsibility:
 
 ```text
 FusionCanvas.Domain
@@ -43,7 +57,7 @@ FusionCanvas.Domain
 FusionCanvas.Application
     Use cases, orchestration, ports, and application-facing contracts
 
-FusionCanvas.Integration
+FusionCanvas.Infrastructure
     Persistence, file system access, marketplace APIs, AI providers,
     plugin host adapters, and other external systems
 
@@ -54,145 +68,126 @@ FusionCanvas.App
 The preferred dependency direction is inward:
 
 ```text
-UI and Integration -> Application -> Domain
+UI and Infrastructure -> Application -> Domain
 ```
 
-The domain project should not reference Avalonia, persistence frameworks, marketplace SDKs, AI providers, plugin host implementations, file system adapters, or other external infrastructure. The application layer may define ports and use domain types. Integration and UI projects should satisfy those contracts from the outside.
+The domain project should not reference Avalonia, persistence frameworks, marketplace SDKs, AI providers, plugin host implementations, file system adapters, or other external infrastructure. The application layer may define ports and use domain types. Infrastructure and UI projects should satisfy those contracts from the outside.
 
 This structure should remain practical. Do not create empty projects or speculative abstractions before they have useful responsibilities, but do not place new domain or application behavior in the UI project merely because it is convenient.
 
----
+## Layer Responsibilities
 
-# High-Level System Overview
+### Presentation Layer
 
-```text
-FusionCanvas
-│
-├── Workspace Module
-├── Product Pipeline Module
-├── Design Triangle Module
-├── Mockup Module
-├── Listing Module
-├── Integration Module
-├── Plugin System
-├── AI Services
-└── Storage Layer
-```
+Responsible for windows, dialogs, controls, tree views, inspectors, editors, and user interaction.
 
-Each module should have clear responsibilities and minimal coupling to other modules.
+The presentation layer should contain no business logic.
 
----
+### View Models
 
-# Architectural Principles
+View models expose data to the user interface.
 
-## Local First
+Responsibilities include:
 
-Users should own their data.
+- state management
+- commands
+- validation
+- UI interaction
+- selection management
 
-FusionCanvas should remain fully functional without cloud services.
+Business rules should remain in the application layer.
 
-Cloud integrations should enhance the experience but never become mandatory.
+### Application Layer
 
-## Modular Design
+The application layer coordinates use cases such as:
 
-Features should be separated into independent modules whenever practical.
+- Create Listing
+- Move Listing
+- Generate Mockups
+- Publish Products
+- Run AI Prompt
+- Import Assets
 
-The goal is to make the system easier to maintain, test, and extend.
+Application services orchestrate workflow without containing business rules that belong in the domain.
 
-Modules should live inside the appropriate clean architecture layer. For example, workspace domain rules belong in the domain layer, workspace use cases belong in the application layer, workspace persistence adapters belong in the integration layer, and workspace presentation belongs in the UI layer.
+### Domain Layer
 
-## SOLID Design
+The domain is the heart of FusionCanvas.
 
-Implementation should follow SOLID principles pragmatically.
+It contains concepts such as:
 
-Classes should have focused responsibilities, dependencies should be explicit, and abstractions should protect real boundaries, variation points, or testable contracts. Interfaces and services should not be introduced only to make the code look architectural.
+- Store
+- Niche
+- Group
+- Listing
+- Design
+- Idea
+- Phrase
+- Graphic
+- Mockup
+- Asset
 
-The goal is efficient, maintainable code without speculative layers, oversized classes, broad interfaces, or indirection that is not justified by current behavior.
+The domain should contain the business rules that define how these objects behave.
 
-## Testable Architecture
+The domain should have no knowledge of Avalonia, SQLite, HTTP, AI providers, Printify, Shopify, or plugin implementations.
 
-Unit testing is a vital part of the architecture.
+### Infrastructure Layer
 
-Every feature that adds or changes behavior should include appropriate automated tests. Domain rules and application use cases should be testable without Avalonia, storage engines, marketplace APIs, AI providers, plugin hosts, or network services.
+Infrastructure communicates with the outside world.
 
-Integration-facing behavior should be tested at the appropriate boundary, such as contract tests or adapter tests with controlled dependencies. UI-owned decision logic should be tested when it contains behavior, but static markup and framework-owned wiring do not need superficial tests.
+Examples include:
 
-## Plugin Friendly
+- SQLite
+- filesystem
+- AI APIs
+- marketplace APIs
+- image processing
+- exporters
+- importers
 
-The architecture should encourage extension through plugins.
+Infrastructure implements interfaces defined by the application or domain layers.
 
-New functionality should be addable without modifying the core application.
+## Core Modules
 
-## Offline Capable
-
-Most functionality should continue working without an internet connection.
-
-External services should be treated as optional dependencies.
-
-## AI Assisted
-
-AI should enhance workflows rather than control them.
-
-FusionCanvas should remain useful even when no AI services are configured.
-
-## Incremental Complexity
-
-The architecture should start simple and evolve only when necessary.
-
-Avoid introducing infrastructure before a clear need exists.
-
-The initial Avalonia shell may remain a single UI project while it contains only presentation scaffolding. As soon as meaningful domain rules, application use cases, or integration adapters are introduced, they should move into the appropriate layer projects with tests that match the behavior being added.
-
----
-
-# Core Modules
-
-## Workspace Module
+### Workspace Module
 
 The Workspace Module is responsible for organizing user projects and content.
 
 Responsibilities:
 
-* Project management
-* Collections
-* Navigation tree
-* Workspace organization
-* User preferences
+- store, niche, topic, group, and item management
+- navigation tree
+- workspace organization
+- user preferences
+- context derivation for tools
 
 The workspace serves as the entry point for most user interactions.
 
----
+### Product Workflow Module
 
-## Product Pipeline Module
-
-The Product Pipeline Module manages product progression through the workflow.
-
-Pipeline stages:
+The Product Workflow Module manages product progression through the core workflow:
 
 ```text
 Idea
-↓
 Concept
-↓
 Design
-↓
 Listing
-↓
-Published
-↓
-Archived
+Archive
 ```
+
+Archive is a retained state for work that should leave the active workflow without being forgotten.
 
 Responsibilities:
 
-* Pipeline tracking
-* Status management
-* Workflow transitions
-* Progress visibility
+- workflow stage tracking
+- operational status management
+- workflow transitions
+- progress visibility
+- stage filtering
 
----
+Workflow stage and operational status are separate concepts. `WorkflowStage` drives the visible navigator and should stay close to Idea, Concept, Design, Listing, and Archive. `Status` describes operational state, such as Draft, Published, Paused, or Rejected.
 
-## Design Triangle Module
+### Design Triangle Module
 
 The Design Triangle Module helps creators evaluate and refine concepts.
 
@@ -206,208 +201,210 @@ Graphic
 
 Responsibilities:
 
-* Concept evaluation
-* Scoring systems
-* Refinement workflows
-* Improvement suggestions
+- concept evaluation
+- scoring systems
+- refinement workflows
+- improvement suggestions
+- selected concept version tracking
 
 This module focuses on helping creators improve product quality before investing significant design effort.
 
----
-
-## Mockup Module
+### Mockup Module
 
 The Mockup Module manages product presentation assets.
 
 Responsibilities:
 
-* Mockup templates
-* Mockup generation
-* Batch processing
-* Export workflows
+- mockup products
+- mockup templates
+- color variants
+- placement settings
+- mockup generation
+- batch processing
+- export workflows
 
 The mockup system should be extensible and support multiple generation strategies.
 
----
+### Listing Module
 
-## Listing Module
-
-The Listing Module manages marketplace listing data.
+The Listing Module manages marketplace-ready product information.
 
 Responsibilities:
 
-* Product titles
-* Descriptions
-* Tags
-* Keywords
-* Marketplace metadata
+- product titles
+- descriptions
+- tags
+- keywords
+- prices
+- marketplace notes
+- selected final artwork
+- readiness checks
 
-The goal is to separate listing management from marketplace-specific implementations.
+The goal is to separate listing preparation from marketplace-specific publishing implementations.
 
----
-
-## Integration Module
+### Integration Module
 
 The Integration Module connects FusionCanvas to external systems.
 
 Potential integrations include:
 
-* Shopify
-* Printify
-* Etsy
-* CSV import/export
-* Cloud storage providers
+- Shopify
+- Printify
+- Etsy
+- CSV import/export
+- cloud storage providers
 
 Integrations should remain isolated from the core application whenever possible.
 
----
-
-## Plugin System
+### Plugin System
 
 The Plugin System allows third parties to extend FusionCanvas.
 
 Potential plugin categories:
 
-* Marketplace integrations
-* Mockup generators
-* Export formats
-* AI providers
-* Workflow automation
-* Reporting tools
+- marketplace integrations
+- mockup generators
+- export formats
+- AI providers
+- workflow automation
+- stage tools
+- reporting tools
 
 Plugins should be discoverable and manageable through a consistent extension model.
 
----
+Default workflow modules should be shaped as built-in stage tools where practical. For example, the first ideation experience may ship with the application, but it should use the same host and context model that future plugin-provided ideation tools will use.
 
-## AI Services
+Stage tools can contribute interactive work surfaces for specific workflow stages such as Idea, Concept, Design, and Listing. The document window hosts the selected stage tool in its lower detail area, while the workflow stage navigator and navigation pane provide context.
 
-The AI Services layer provides optional AI-assisted capabilities.
+### AI Services
 
-Potential use cases:
+AI should be provider-independent.
 
-* Idea generation
-* Concept refinement
-* Listing suggestions
-* Workflow automation
-* Product analysis
+The core application should define generic interfaces. Providers such as OpenAI, Anthropic, local LLMs, or future services should be implemented as plugins or infrastructure adapters.
 
-AI services should be abstracted behind provider interfaces.
-
-No specific AI provider should be hardcoded into the architecture.
-
----
-
-# Storage Architecture
-
-FusionCanvas should evolve through multiple storage phases.
-
-## Phase 1 – Local Files
-
-Initial versions may use simple local file storage.
-
-Goals:
-
-* Fast development
-* Easy debugging
-* Human-readable data
-
-## Phase 2 – SQLite
-
-As the application matures, SQLite will become the primary storage mechanism.
-
-Goals:
-
-* Improved performance
-* Query capabilities
-* Data consistency
-
-## Phase 3 – Optional Synchronization
-
-Future versions may support optional synchronization services.
-
-Goals:
-
-* Multi-device workflows
-* Backup
-* Collaboration
-
-Synchronization should never be required for basic operation.
-
----
-
-# Technology Direction
-
-Current intended technology stack:
-
-## User Interface
-
-* Avalonia UI
-
-## Language
-
-* C#
-
-## Runtime
-
-* .NET
+Changing AI providers should not require changes to the rest of the application.
 
 ## Data Storage
 
-* SQLite
+FusionCanvas uses SQLite as its primary data store.
 
-## Plugin Model
+Structured information should be stored in relational tables. Flexible or evolving information should be stored as JSON.
 
-* .NET assemblies
-* Contract-based extension points
+```text
+Listing
+--------
+Id
+Name
+StoreId
+GroupId
+Created
+Modified
+MetadataJson
+```
 
-## AI Integration
+This provides both efficient querying and schema flexibility.
 
-* Provider abstraction layer
-* Local and cloud providers supported
+## File Storage
 
----
+Large assets should remain as files.
 
-# Dependency Strategy
+Examples:
 
-FusionCanvas should favor:
+- PNG
+- SVG
+- PSD
+- Affinity Designer files
+- mockups
 
-* Stable dependencies
-* Well-supported open-source libraries
-* Minimal external infrastructure requirements
+The database stores paths to files rather than embedding them.
 
-Avoid introducing dependencies unless they provide clear value.
+Imported assets are copied into a FusionCanvas-managed workspace. The managed copy becomes the authoritative file used by the application, which keeps local projects durable when original source files are renamed, moved, or deleted outside FusionCanvas.
+
+## Dependency Injection
+
+Services should be resolved through dependency injection.
+
+Benefits include:
+
+- loose coupling
+- easier testing
+- plugin discovery
+- easier replacement of implementations
+
+## Commands
+
+User actions should be implemented as commands where practical.
+
+Examples:
+
+- Create Listing
+- Rename Group
+- Delete Asset
+- Publish Product
+
+Commands simplify undo/redo, automation, scripting, and testing.
+
+## Events
+
+The application should gradually move toward an event-driven internal architecture.
+
+Examples:
+
+- ListingCreated
+- IdeaRejected
+- AssetImported
+- MockupGenerated
+- ProductPublished
+
+Events allow plugins to react without tightly coupling components.
+
+## Testing Strategy
+
+Business logic should be testable without the UI.
+
+FusionCanvas should maintain a high level of unit test coverage, especially for domain logic, application services, persistence boundaries, and plugin contracts. New behavior should generally include focused unit tests unless there is a clear reason another test type provides better confidence.
+
+Priority should be given to testing:
+
+- domain logic
+- application services
+- plugin interfaces
+- data persistence
+- import/export functionality
+
+UI testing is valuable but secondary.
+
+## OpenSpec Development
+
+FusionCanvas is developed using OpenSpec.
+
+The expected workflow is:
+
+```text
+Idea
+Specification
+Review
+Implementation
+Testing
+Archive
+```
+
+Specifications become part of the project's permanent knowledge base and should accurately describe the intended behavior of the system.
+
+## Architectural Principles
+
+When making architectural decisions, prefer:
+
+- composition over inheritance
+- interfaces over concrete implementations
+- explicit models over hidden behavior
+- dependency injection over global state
+- immutable data where practical
+- modularity over convenience
+- stable dependencies
+- well-supported open-source libraries
+- minimal external infrastructure requirements
 
 Dependencies should not leak inward. Domain code should remain independent of UI frameworks, persistence technologies, external service SDKs, plugin host implementations, and provider-specific AI libraries.
 
----
-
-# Future Architectural Goals
-
-The following capabilities are considered future enhancements and are not required for the initial release:
-
-* Cloud synchronization
-* Team collaboration
-* Shared workspaces
-* Marketplace publishing
-* AI agents
-* Template marketplaces
-* Workflow marketplaces
-* Community extensions
-
-These capabilities should be considered during architectural decisions but should not drive early complexity.
-
----
-
-# Architectural Success Criteria
-
-The architecture is successful if it allows FusionCanvas to:
-
-* Remain maintainable as features grow
-* Support plugins without major refactoring
-* Operate effectively offline
-* Support AI as an optional enhancement
-* Keep core behavior testable through unit tests
-* Scale from hobby creators to professional creators
-* Evolve incrementally without requiring large rewrites
-
-The architecture should prioritize simplicity, extensibility, and creator ownership over unnecessary complexity.
+Every major feature should fit naturally into the existing architecture rather than introducing special cases.
