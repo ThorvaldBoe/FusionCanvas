@@ -6,13 +6,30 @@
         Height="760"
         MinWidth="900"
         MinHeight="600"
-        Background="#F5F7FA">
-  <Grid RowDefinitions="Auto,*">
-    <Border Grid.Row="0"
+        Background="#F3F5F7">
+  <DockPanel LastChildFill="True">
+    <Menu DockPanel.Dock="Top"
+          Background="#FFFFFF">
+      <MenuItem Header="_Workspace">
+        <MenuItem Header="New Workspace" />
+        <MenuItem Header="Open Workspace" />
+        <MenuItem Header="Import Asset" />
+      </MenuItem>
+      <MenuItem Header="_Edit">
+        <MenuItem Header="Undo" />
+        <MenuItem Header="Redo" />
+      </MenuItem>
+      <MenuItem Header="_View">
+        <MenuItem Header="Refresh" />
+        <MenuItem Header="Focus Search" />
+      </MenuItem>
+    </Menu>
+
+    <Border DockPanel.Dock="Top"
             Background="#FFFFFF"
-            BorderBrush="#D9E1EA"
+            BorderBrush="#D7DEE8"
             BorderThickness="0,0,0,1"
-            Padding="20,14">
+            Padding="20,12">
       <Grid ColumnDefinitions="*,Auto">
         <StackPanel Spacing="2">
           <TextBlock Text="FusionCanvas"
@@ -24,141 +41,193 @@
                      Foreground="#627083" />
         </StackPanel>
 
-        <Border Grid.Column="1"
-                Background="#ECF4FF"
-                BorderBrush="#B7D7FF"
-                BorderThickness="1"
-                CornerRadius="4"
-                Padding="10,5"
-                VerticalAlignment="Center">
-          <TextBlock Text="Foundation Shell"
-                     FontSize="12"
-                     Foreground="#1B5FA7" />
-        </Border>
+        <StackPanel Grid.Column="1"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    VerticalAlignment="Center">
+          <Button Content="New"
+                  MinWidth="72" />
+          <Button Content="Open"
+                  MinWidth="72" />
+          <Button Content="Import"
+                  MinWidth="72" />
+        </StackPanel>
       </Grid>
     </Border>
 
-    <Grid Grid.Row="1" ColumnDefinitions="280,*">
+    <Grid ColumnDefinitions="280,*">
       <Border Grid.Column="0"
               Background="#FFFFFF"
-              BorderBrush="#D9E1EA"
+              BorderBrush="#D7DEE8"
               BorderThickness="0,0,1,0"
-              Padding="18">
-        <Grid RowDefinitions="Auto,*">
+              Padding="16">
+        <Grid RowDefinitions="Auto,Auto,*">
           <TextBlock Text="Workspace"
                      FontSize="14"
                      FontWeight="SemiBold"
-                     Foreground="#273241"
-                     Margin="0,0,0,12" />
+                     Foreground="#273241" />
 
-          <StackPanel Grid.Row="1" Spacing="8">
-            <Border Background="#EAF2F8"
-                    CornerRadius="4"
-                    Padding="10,8">
-              <TextBlock Text="Ideas"
-                         Foreground="#17212F" />
-            </Border>
-            <Border Background="#FFFFFF"
-                    BorderBrush="#E2E8F0"
-                    BorderThickness="1"
-                    CornerRadius="4"
-                    Padding="10,8">
-              <TextBlock Text="Concepts"
-                         Foreground="#3D4958" />
-            </Border>
-            <Border Background="#FFFFFF"
-                    BorderBrush="#E2E8F0"
-                    BorderThickness="1"
-                    CornerRadius="4"
-                    Padding="10,8">
-              <TextBlock Text="Designs"
-                         Foreground="#3D4958" />
-            </Border>
-            <Border Background="#FFFFFF"
-                    BorderBrush="#E2E8F0"
-                    BorderThickness="1"
-                    CornerRadius="4"
-                    Padding="10,8">
-              <TextBlock Text="Listings"
-                         Foreground="#3D4958" />
-            </Border>
-          </StackPanel>
+          <TextBox Grid.Row="1"
+                   PlaceholderText="Search stores, topics, listings"
+                   Margin="0,12,0,12" />
+
+          <TreeView Grid.Row="2">
+            <TreeViewItem Header="No workspace selected"
+                          IsExpanded="True">
+              <TreeViewItem Header="Stores" />
+              <TreeViewItem Header="Niches" />
+              <TreeViewItem Header="Groups" />
+              <TreeViewItem Header="Listings" />
+              <TreeViewItem Header="Assets" />
+              <TreeViewItem Header="Tags" />
+            </TreeViewItem>
+          </TreeView>
         </Grid>
       </Border>
 
-      <Border Grid.Column="1"
-              Padding="28">
-        <Grid RowDefinitions="Auto,*">
+      <Grid Grid.Column="1"
+            RowDefinitions="Auto,Auto,*">
+        <TabControl Grid.Row="0"
+                    Background="#FFFFFF"
+                    BorderBrush="#D7DEE8"
+                    BorderThickness="0,0,0,1">
+          <TabItem Header="Home" />
+          <TabItem Header="Listing Detail" />
+          <TabItem Header="Future Inspector" />
+        </TabControl>
+
+        <Border Grid.Row="1"
+                Background="#FFFFFF"
+                BorderBrush="#D7DEE8"
+                BorderThickness="0,0,0,1"
+                Padding="18,12">
+          <Grid ColumnDefinitions="*,*,*,*"
+                ColumnSpacing="8">
+            <Border Background="#E7F0FA"
+                    BorderBrush="#BFD5ED"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="10,7">
+              <TextBlock Text="Idea"
+                         HorizontalAlignment="Center"
+                         Foreground="#174F85" />
+            </Border>
+            <Border Grid.Column="1"
+                    BorderBrush="#D7DEE8"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="10,7">
+              <TextBlock Text="Concept"
+                         HorizontalAlignment="Center"
+                         Foreground="#465365" />
+            </Border>
+            <Border Grid.Column="2"
+                    BorderBrush="#D7DEE8"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="10,7">
+              <TextBlock Text="Design"
+                         HorizontalAlignment="Center"
+                         Foreground="#465365" />
+            </Border>
+            <Border Grid.Column="3"
+                    BorderBrush="#D7DEE8"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="10,7">
+              <TextBlock Text="Listing"
+                         HorizontalAlignment="Center"
+                         Foreground="#465365" />
+            </Border>
+          </Grid>
+        </Border>
+
+        <Grid Grid.Row="2"
+              Margin="24"
+              RowDefinitions="Auto,*"
+              RowSpacing="18">
           <StackPanel Spacing="4">
-            <TextBlock Text="Idea Workspace"
-                       FontSize="24"
+            <TextBlock Text="Primary Workspace"
+                       FontSize="22"
                        FontWeight="SemiBold"
                        Foreground="#17212F" />
-            <TextBlock Text="Static placeholder content for the first desktop foundation."
+            <TextBlock Text="Select or open a workspace to load stores, topics, listings, assets, prompts, and tags."
                        FontSize="13"
                        Foreground="#627083" />
           </StackPanel>
 
           <Grid Grid.Row="1"
-                Margin="0,24,0,0"
-                ColumnDefinitions="*,*"
-                RowDefinitions="Auto,Auto"
+                ColumnDefinitions="2*,*"
+                RowDefinitions="Auto,*"
                 ColumnSpacing="16"
                 RowSpacing="16">
             <Border Background="#FFFFFF"
-                    BorderBrush="#D9E1EA"
+                    BorderBrush="#D7DEE8"
                     BorderThickness="1"
                     CornerRadius="6"
                     Padding="18">
               <StackPanel Spacing="8">
-                <TextBlock Text="Theme"
+                <TextBlock Text="Empty State"
                            FontSize="12"
                            FontWeight="SemiBold"
                            Foreground="#627083" />
-                <TextBlock Text="Seasonal coffee humor"
+                <TextBlock Text="No workspace content is selected."
                            FontSize="18"
                            Foreground="#17212F" />
+                <TextBlock Text="This area is reserved for selected-item details, workflow tools, and future inspectors."
+                           TextWrapping="Wrap"
+                           Foreground="#465365" />
               </StackPanel>
             </Border>
 
             <Border Grid.Column="1"
                     Background="#FFFFFF"
-                    BorderBrush="#D9E1EA"
+                    BorderBrush="#D7DEE8"
                     BorderThickness="1"
                     CornerRadius="6"
                     Padding="18">
               <StackPanel Spacing="8">
-                <TextBlock Text="Design Triangle"
+                <TextBlock Text="Loading State"
                            FontSize="12"
                            FontWeight="SemiBold"
                            Foreground="#627083" />
-                <TextBlock Text="Idea + Phrase + Graphic"
-                           FontSize="18"
-                           Foreground="#17212F" />
+                <ProgressBar IsIndeterminate="True"
+                             Height="6" />
+                <TextBlock Text="Workspace data can be loaded here without changing the shell."
+                           TextWrapping="Wrap"
+                           Foreground="#465365" />
               </StackPanel>
             </Border>
 
             <Border Grid.Row="1"
                     Grid.ColumnSpan="2"
                     Background="#FFFFFF"
-                    BorderBrush="#D9E1EA"
+                    BorderBrush="#D7DEE8"
                     BorderThickness="1"
                     CornerRadius="6"
                     Padding="18">
-              <StackPanel Spacing="8">
-                <TextBlock Text="Next Milestone"
-                           FontSize="12"
-                           FontWeight="SemiBold"
-                           Foreground="#627083" />
-                <TextBlock Text="Define the local workspace model before adding persistence, automation, plugins, AI, listings, mockups, or marketplace integrations."
-                           TextWrapping="Wrap"
-                           FontSize="16"
-                           Foreground="#273241" />
-              </StackPanel>
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="Unavailable State"
+                             FontSize="12"
+                             FontWeight="SemiBold"
+                             Foreground="#627083" />
+                  <TextBlock Text="Workspace files or local data can report errors here."
+                             FontSize="18"
+                             Foreground="#17212F" />
+                  <TextBlock Text="The shell separates navigation, workflow position, and detail content so later Phase 1 features can plug into stable regions."
+                             TextWrapping="Wrap"
+                             Foreground="#465365" />
+                </StackPanel>
+                <Button Grid.Column="1"
+                        Content="Retry"
+                        MinWidth="80"
+                        VerticalAlignment="Top" />
+              </Grid>
             </Border>
           </Grid>
         </Grid>
-      </Border>
+      </Grid>
     </Grid>
-  </Grid>
+  </DockPanel>
 </Window>
