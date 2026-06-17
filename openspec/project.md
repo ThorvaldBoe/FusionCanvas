@@ -267,6 +267,26 @@ Specifications are considered the source of truth for intended system behavior.
 
 Code should follow specifications, not the other way around.
 
+## Product Planning References
+
+The original LifeOS product requirements are preserved as planning source material in
+`docs/LifeOS/PRD`. These files are not accepted OpenSpec specifications and should not
+be moved under `openspec/specs` unless they are converted into accepted behavior through
+the normal OpenSpec proposal, implementation, validation, and archive process.
+
+When creating a new OpenSpec change, review the relevant PRD files first and use them
+to understand product intent, workflow scope, acceptance criteria, dependencies, and
+open questions. Then translate only the relevant behavior into the new proposal,
+design, tasks, and spec deltas.
+
+Recommended entry points:
+
+* `docs/LifeOS/Roadmap.md`
+* `docs/LifeOS/PRD/Phase 0 - Foundation.md`
+* `docs/LifeOS/PRD/Phase 1 - MVP Creative Workspace.md`
+* `docs/LifeOS/PRD/Phase 2 - Product Creation Workflow.md`
+* `docs/LifeOS/PRD/PRD Audit - 2026-06-17.md`
+
 ---
 
 # Decision-Making Guidelines

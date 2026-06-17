@@ -8,6 +8,25 @@ schema: spec-driven
 #     Tech stack: TypeScript, React, Node.js
 #     We use conventional commits
 #     Domain: e-commerce platform
+context: |
+  FusionCanvas is an OpenSpec-driven desktop application for Print-on-Demand creators.
+
+  Durable accepted behavior lives under openspec/specs. Do not treat planning PRDs as
+  accepted OpenSpec specifications.
+
+  Product planning source material lives under docs/LifeOS/PRD. When proposing,
+  designing, or scoping a FusionCanvas change, inspect the relevant PRD files in
+  docs/LifeOS/PRD and docs/LifeOS/Roadmap.md before drafting OpenSpec artifacts.
+  Prefer the PRDs for product intent, workflow boundaries, acceptance criteria, and
+  feature dependencies. Convert only the relevant intent into the new OpenSpec
+  change; do not copy the whole PRD set into a proposal.
+
+  Useful starting points:
+  - docs/LifeOS/Roadmap.md for phase and feature ordering.
+  - docs/LifeOS/PRD/Phase 0 - Foundation.md for foundation scope.
+  - docs/LifeOS/PRD/Phase 1 - MVP Creative Workspace.md for MVP scope.
+  - docs/LifeOS/PRD/Phase 2 - Product Creation Workflow.md for product workflow scope.
+  - docs/LifeOS/PRD/PRD Audit - 2026-06-17.md for known gaps, corrections, and next actions.
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.

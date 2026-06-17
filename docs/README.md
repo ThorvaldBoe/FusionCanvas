@@ -30,6 +30,12 @@ The current direction is:
 
 The application is still in early development. The current focus is on establishing the product vision, architecture, data model, plugin model, and initial MVP.
 
+## LifeOS PRD Source Material
+
+The original LifeOS product requirements live in `docs/LifeOS/PRD`. They are planning documents, not accepted OpenSpec specifications.
+
+When proposing or designing a related OpenSpec change, use the relevant PRD files as source material for product intent, workflow boundaries, dependencies, and acceptance criteria. Keep accepted behavior in `openspec/specs` and convert PRD intent through the normal OpenSpec proposal workflow.
+
 ## Core Concept
 
 FusionCanvas treats Print on Demand creation as a pipeline:
