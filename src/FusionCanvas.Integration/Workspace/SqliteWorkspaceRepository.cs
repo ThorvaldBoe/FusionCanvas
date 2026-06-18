@@ -6,14 +6,15 @@ namespace FusionCanvas.Integration.Workspace;
 
 public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceRepository
 {
+    private const int CurrentSchemaVersion = 1;
+
     private readonly string _databasePath = databasePath;
 
     public async Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_databasePath))!);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
         await EnsureSchemaAsync(connection, cancellationToken);
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -77,8 +78,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             return WorkspaceSnapshot.Empty;
         }
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
         await EnsureSchemaAsync(connection, cancellationToken);
 
         return new WorkspaceSnapshot(
@@ -93,13 +93,24 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             await LoadAssetLinksAsync(connection, cancellationToken));
     }
 
-    private SqliteConnection CreateConnection() => new($"Data Source={_databasePath}");
+    private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
+    {
+        var connection = new SqliteConnection($"Data Source={_databasePath}");
+        await connection.OpenAsync(cancellationToken);
+        await ExecuteAsync(connection, null, "PRAGMA foreign_keys = ON;", cancellationToken);
+        return connection;
+    }
 
     private static async Task EnsureSchemaAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
-        const string sql = """
-            PRAGMA foreign_keys = ON;
+        var schemaVersion = await ReadPragmaUserVersionAsync(connection, cancellationToken);
+        if (schemaVersion > CurrentSchemaVersion)
+        {
+            throw new InvalidOperationException(
+                $"Workspace database schema version {schemaVersion} requires a newer FusionCanvas version. Current supported schema version is {CurrentSchemaVersion}.");
+        }
 
+        const string sql = """
             CREATE TABLE IF NOT EXISTS stores (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -202,7 +213,19 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             """;
 
         await ExecuteAsync(connection, null, sql, cancellationToken);
+        await SetPragmaUserVersionAsync(connection, CurrentSchemaVersion, cancellationToken);
     }
+
+    private static async Task<int> ReadPragmaUserVersionAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA user_version;";
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        return Convert.ToInt32(result);
+    }
+
+    private static Task SetPragmaUserVersionAsync(SqliteConnection connection, int schemaVersion, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, null, $"PRAGMA user_version = {schemaVersion};", cancellationToken);
 
     private static async Task ExecuteAsync(
         SqliteConnection connection,
