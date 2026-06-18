@@ -48,20 +48,40 @@ public sealed record Listing(
     string MetadataJson)
     : WorkspaceEntity(Id, Name, Description, IsArchived, CreatedAt, UpdatedAt, MetadataJson);
 
-public sealed record Asset(
-    Guid Id,
-    Guid StoreId,
-    string Name,
-    string? Description,
-    AssetKind Kind,
-    string WorkspaceRelativePath,
-    string? OriginalSourcePath,
-    bool IsMissing,
-    bool IsArchived,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt,
-    string MetadataJson)
-    : WorkspaceEntity(Id, Name, Description, IsArchived, CreatedAt, UpdatedAt, MetadataJson);
+public sealed record Asset : WorkspaceEntity
+{
+    public Asset(
+        Guid id,
+        Guid storeId,
+        string name,
+        string? description,
+        AssetKind kind,
+        string workspaceRelativePath,
+        string? originalSourcePath,
+        bool isMissing,
+        bool isArchived,
+        DateTimeOffset createdAt,
+        DateTimeOffset updatedAt,
+        string metadataJson)
+        : base(id, name, description, isArchived, createdAt, updatedAt, metadataJson)
+    {
+        StoreId = storeId;
+        Kind = kind;
+        WorkspaceRelativePath = WorkspaceFileReference.Normalize(workspaceRelativePath);
+        OriginalSourcePath = string.IsNullOrWhiteSpace(originalSourcePath) ? null : originalSourcePath;
+        IsMissing = isMissing;
+    }
+
+    public Guid StoreId { get; }
+
+    public AssetKind Kind { get; }
+
+    public string WorkspaceRelativePath { get; }
+
+    public string? OriginalSourcePath { get; }
+
+    public bool IsMissing { get; }
+}
 
 public sealed record Prompt(
     Guid Id,

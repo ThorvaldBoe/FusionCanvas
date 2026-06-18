@@ -21,7 +21,8 @@ public enum AssetKind
     Font = 7,
     PromptOutput = 8,
     ExternalLink = 9,
-    Other = 10
+    Unknown = 10,
+    Other = 11
 }
 
 public enum WorkspaceEntityKind
@@ -29,9 +30,22 @@ public enum WorkspaceEntityKind
     Store = 0,
     Niche = 1,
     Group = 2,
-    Listing = 3
+    Listing = 3,
+    Asset = 4,
+    Prompt = 5,
+    Design = 6,
+    FutureRelatedRecord = 7
 }
 
 public sealed record ListingTag(Guid ListingId, Guid TagId);
 
-public sealed record AssetLink(Guid AssetId, WorkspaceEntityKind EntityKind, Guid EntityId);
+public sealed record AssetLink(Guid AssetId, WorkspaceEntityKind EntityKind, Guid EntityId)
+{
+    public Guid AssetId { get; } = AssetId == Guid.Empty
+        ? throw new ArgumentException("Identifier must not be empty.", nameof(AssetId))
+        : AssetId;
+
+    public Guid EntityId { get; } = EntityId == Guid.Empty
+        ? throw new ArgumentException("Identifier must not be empty.", nameof(EntityId))
+        : EntityId;
+}

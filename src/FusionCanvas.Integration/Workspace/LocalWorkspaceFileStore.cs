@@ -3,7 +3,7 @@ using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.Integration.Workspace;
 
-public sealed class LocalWorkspaceFileStore(string workspaceRoot) : IWorkspaceFileStore
+public sealed class LocalWorkspaceFileStore : IWorkspaceFileStore
 {
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -24,7 +24,18 @@ public sealed class LocalWorkspaceFileStore(string workspaceRoot) : IWorkspaceFi
         ".webp"
     };
 
-    public string WorkspaceRoot { get; } = Path.GetFullPath(workspaceRoot);
+    public LocalWorkspaceFileStore(string workspaceRoot)
+    {
+        if (string.IsNullOrWhiteSpace(workspaceRoot))
+        {
+            throw new ArgumentException("Workspace root must not be empty.", nameof(workspaceRoot));
+        }
+
+        WorkspaceRoot = Path.GetFullPath(workspaceRoot);
+        Directory.CreateDirectory(WorkspaceRoot);
+    }
+
+    public string WorkspaceRoot { get; }
 
     public async Task<ManagedWorkspaceFile> ImportAsync(
         string sourcePath,
@@ -55,7 +66,7 @@ public sealed class LocalWorkspaceFileStore(string workspaceRoot) : IWorkspaceFi
             await source.CopyToAsync(destination, cancellationToken);
         }
 
-        var relativePath = Path.GetRelativePath(WorkspaceRoot, destinationPath);
+        var relativePath = WorkspaceFileReference.Normalize(Path.GetRelativePath(WorkspaceRoot, destinationPath));
         return new ManagedWorkspaceFile(
             Path.GetFileName(sourcePath),
             kind,
@@ -66,10 +77,20 @@ public sealed class LocalWorkspaceFileStore(string workspaceRoot) : IWorkspaceFi
 
     public bool Exists(string workspaceRelativePath)
     {
+        string normalizedReference;
+        try
+        {
+            normalizedReference = WorkspaceFileReference.Normalize(workspaceRelativePath);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+
         var workspaceBoundary = Path.EndsInDirectorySeparator(WorkspaceRoot)
             ? WorkspaceRoot
             : WorkspaceRoot + Path.DirectorySeparatorChar;
-        var fullPath = Path.GetFullPath(Path.Combine(WorkspaceRoot, workspaceRelativePath));
+        var fullPath = Path.GetFullPath(Path.Combine(WorkspaceRoot, normalizedReference));
         return fullPath.StartsWith(workspaceBoundary, StringComparison.OrdinalIgnoreCase) && File.Exists(fullPath);
     }
 }

@@ -22,7 +22,20 @@ public class LocalWorkspaceFileStoreTests
         Assert.True(File.Exists(imported.FullPath));
         Assert.True(store.Exists(imported.WorkspaceRelativePath));
         Assert.NotEqual(sourcePath, imported.FullPath);
-        Assert.StartsWith(Path.Combine("assets", DateTimeOffset.UtcNow.ToString("yyyy")), imported.WorkspaceRelativePath);
+        Assert.False(Path.IsPathRooted(imported.WorkspaceRelativePath));
+        Assert.StartsWith($"assets/{DateTimeOffset.UtcNow:yyyy}", imported.WorkspaceRelativePath);
+    }
+
+    [Fact]
+    public void Constructor_CreatesManagedWorkspaceRoot()
+    {
+        var tempDirectory = Directory.CreateTempSubdirectory();
+        var workspaceRoot = Path.Combine(tempDirectory.FullName, "workspace");
+
+        var store = new LocalWorkspaceFileStore(workspaceRoot);
+
+        Assert.Equal(Path.GetFullPath(workspaceRoot), store.WorkspaceRoot);
+        Assert.True(Directory.Exists(workspaceRoot));
     }
 
     [Fact]
@@ -41,5 +54,24 @@ public class LocalWorkspaceFileStoreTests
         var store = new LocalWorkspaceFileStore(Path.Combine(tempDirectory.FullName, "workspace"));
 
         Assert.False(store.Exists(Path.Combine("..", "workspace-other", "asset.png")));
+        Assert.False(store.Exists(""));
+        Assert.False(store.Exists(Path.GetFullPath(Path.Combine(tempDirectory.FullName, "outside.png"))));
+    }
+
+    [Fact]
+    public async Task ImportAsync_PreservesOriginalSourceOnlyAsTraceabilityMetadata()
+    {
+        var tempDirectory = Directory.CreateTempSubdirectory();
+        var sourcePath = Path.Combine(tempDirectory.FullName, "source.svg");
+        var workspaceRoot = Path.Combine(tempDirectory.FullName, "workspace");
+        await File.WriteAllTextAsync(sourcePath, "<svg />");
+        var store = new LocalWorkspaceFileStore(workspaceRoot);
+
+        var imported = await store.ImportAsync(sourcePath, AssetKind.Svg);
+        File.Delete(sourcePath);
+
+        Assert.Equal(Path.GetFullPath(sourcePath), imported.OriginalSourcePath);
+        Assert.True(store.Exists(imported.WorkspaceRelativePath));
+        Assert.True(File.Exists(imported.FullPath));
     }
 }
