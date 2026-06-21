@@ -1,0 +1,156 @@
+using FusionCanvas.Domain.Workspace;
+
+namespace FusionCanvas.Domain.Tests;
+
+public class NavigationTreeTests
+{
+    [Fact]
+    public void BuildTree_RepresentsStoreNicheGroupAndListingHierarchy()
+    {
+        var sample = NavigationSample.Create();
+
+        var tree = WorkspaceNavigation.BuildTree(sample.Snapshot);
+
+        var store = Assert.Single(tree.Stores);
+        Assert.Equal(NavigationNodeRole.Store, store.Role);
+        var niche = Assert.Single(store.Children);
+        Assert.Equal(WorkspaceEntityKind.Niche, niche.EntityKind);
+        var group = Assert.Single(niche.Children, child => child.EntityKind == WorkspaceEntityKind.Group);
+        Assert.Equal(sample.ParentGroup.Id, group.EntityId);
+        var listing = Assert.Single(group.Children, child => child.EntityKind == WorkspaceEntityKind.Listing);
+        Assert.Equal(sample.Listing.Id, listing.EntityId);
+    }
+
+    [Fact]
+    public void BuildTree_PreservesNestedGroupsAtPracticalDepth()
+    {
+        var sample = NavigationSample.Create();
+
+        var tree = WorkspaceNavigation.BuildTree(sample.Snapshot);
+
+        var path = tree.GetPath(sample.DeepListing.Id);
+        Assert.Equal(
+            [sample.Store.Id, sample.Niche.Id, sample.ParentGroup.Id, sample.ChildGroup.Id, sample.GrandchildGroup.Id, sample.DeepListing.Id],
+            path);
+    }
+
+    [Fact]
+    public void MoveTopic_PreservesDescendantSubtree()
+    {
+        var sample = NavigationSample.Create();
+        var otherNiche = NewNiche(sample.Store.Id, "Dogs");
+        var snapshot = sample.Snapshot with { Niches = [.. sample.Snapshot.Niches, otherNiche] };
+
+        var moved = WorkspaceNavigation.MoveTopic(
+            snapshot,
+            sample.ChildGroup.Id,
+            new NavigationTopicReference(WorkspaceEntityKind.Niche, otherNiche.Id));
+
+        var tree = WorkspaceNavigation.BuildTree(moved);
+        var movedPath = tree.GetPath(sample.DeepListing.Id);
+        Assert.Equal([sample.Store.Id, otherNiche.Id, sample.ChildGroup.Id, sample.GrandchildGroup.Id, sample.DeepListing.Id], movedPath);
+        Assert.Contains(moved.Groups, group => group.Id == sample.GrandchildGroup.Id && group.ParentGroupId == sample.ChildGroup.Id);
+    }
+
+    [Fact]
+    public void MoveListing_PreservesListingIdentityAndContext()
+    {
+        var sample = NavigationSample.Create();
+        var otherGroup = NewGroup(sample.Store.Id, sample.Niche.Id, null, "Ready");
+
+        var snapshot = sample.Snapshot with { Groups = [.. sample.Snapshot.Groups, otherGroup] };
+
+        var moved = WorkspaceNavigation.MoveListing(
+            snapshot,
+            sample.Listing.Id,
+            new NavigationTopicReference(WorkspaceEntityKind.Group, otherGroup.Id));
+
+        var listing = Assert.Single(moved.Listings, candidate => candidate.Id == sample.Listing.Id);
+        Assert.Equal(otherGroup.Id, listing.GroupId);
+        Assert.Equal(sample.Listing.Status, listing.Status);
+        Assert.Equal(sample.Listing.Description, listing.Description);
+        Assert.Equal(sample.Listing.MetadataJson, listing.MetadataJson);
+    }
+
+    [Fact]
+    public void MoveTopic_RejectsCycleWithoutChangingHierarchy()
+    {
+        var sample = NavigationSample.Create();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            WorkspaceNavigation.MoveTopic(
+                sample.Snapshot,
+                sample.ParentGroup.Id,
+                new NavigationTopicReference(WorkspaceEntityKind.Group, sample.GrandchildGroup.Id)));
+
+        Assert.Contains("descendants", exception.Message);
+        Assert.Equal(sample.ParentGroup, Assert.Single(sample.Snapshot.Groups, group => group.Id == sample.ParentGroup.Id));
+    }
+
+    [Fact]
+    public void BuildTree_RejectsOrphanedListing()
+    {
+        var sample = NavigationSample.Create();
+        var orphaned = sample.Snapshot with
+        {
+            Listings =
+            [
+                sample.Listing with
+                {
+                    NicheId = null,
+                    GroupId = null
+                }
+            ]
+        };
+
+        Assert.Throws<InvalidOperationException>(() => WorkspaceNavigation.BuildTree(orphaned));
+    }
+
+    private static Niche NewNiche(Guid storeId, string name) =>
+        new(Guid.NewGuid(), storeId, name, null, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "{}");
+
+    private static TopicGroup NewGroup(Guid storeId, Guid? nicheId, Guid? parentGroupId, string name) =>
+        new(Guid.NewGuid(), storeId, nicheId, parentGroupId, name, null, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "{}");
+
+    private sealed record NavigationSample(
+        WorkspaceSnapshot Snapshot,
+        Store Store,
+        Niche Niche,
+        TopicGroup ParentGroup,
+        TopicGroup ChildGroup,
+        TopicGroup GrandchildGroup,
+        Listing Listing,
+        Listing DeepListing)
+    {
+        public static NavigationSample Create()
+        {
+            var now = DateTimeOffset.UtcNow;
+            var store = new Store(Guid.NewGuid(), "North Star Studio", null, false, now, now, "{}");
+            var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, "{}");
+            var parentGroup = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Seasonal", null, false, now, now, "{}");
+            var childGroup = new TopicGroup(Guid.NewGuid(), store.Id, null, parentGroup.Id, "Autumn", null, false, now, now, "{}");
+            var grandchildGroup = new TopicGroup(Guid.NewGuid(), store.Id, null, childGroup.Id, "Espresso", null, false, now, now, "{}");
+            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, parentGroup.Id, "Pumpkin espresso", "Cozy shirt", ListingStatus.Draft, false, now, now, """{"tags":["fall"]}""");
+            var deepListing = new Listing(Guid.NewGuid(), store.Id, niche.Id, grandchildGroup.Id, "Latte ghosts", "Halloween shirt", ListingStatus.Active, false, now, now, "{}");
+
+            return new NavigationSample(
+                new WorkspaceSnapshot(
+                    [store],
+                    [niche],
+                    [parentGroup, childGroup, grandchildGroup],
+                    [listing, deepListing],
+                    [],
+                    [],
+                    [],
+                    [],
+                    []),
+                store,
+                niche,
+                parentGroup,
+                childGroup,
+                grandchildGroup,
+                listing,
+                deepListing);
+        }
+    }
+}
