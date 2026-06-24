@@ -91,6 +91,23 @@ Every feature that adds or changes behavior should include appropriate automated
 
 The project is intended to remain useful as a local desktop tool even without cloud services.
 
+## Testing Baseline
+
+Run the automated baseline from the repository root:
+
+```powershell
+dotnet test .\FusionCanvas.sln
+```
+
+The baseline test suite uses mirrored test projects under `tests/`:
+
+* `FusionCanvas.Domain.Tests` protects domain rules, entity relationships, invariants, workflow decisions, and persistence-neutral boundaries.
+* `FusionCanvas.Application.Tests` protects use-case orchestration and application contracts with deterministic collaborators.
+* `FusionCanvas.Integration.Tests` protects local persistence and workspace file boundaries with isolated temporary resources.
+* `FusionCanvas.App.Tests` protects UI-owned state and navigation decisions that can be tested without full visual UI automation.
+
+New foundational behavior should include focused automated tests in the relevant layer. Static Avalonia markup, framework-owned rendering, full UI automation, visual regression infrastructure, performance benchmarking, marketplace integration access, AI provider access, and manual QA process setup are outside the Phase 0 baseline unless a later OpenSpec change accepts that scope.
+
 ## Project Status
 
 FusionCanvas is currently in the initial public repository setup phase.
