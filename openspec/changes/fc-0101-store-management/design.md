@@ -12,6 +12,8 @@ The current repository pattern persists complete `WorkspaceSnapshot` values. Sto
 - Keep store creation lightweight, requiring only a name and allowing optional context.
 - Preserve archived store data and make archived stores visible through an intentional archived view.
 - Keep active store selection available to navigation, document, and tool-context flows.
+- Keep the normal workspace chrome focused on store switching, not store editing.
+- Provide a dedicated store editor window for create, save, archive, restore, and delete operations.
 - Add focused unit and integration coverage for store workflows.
 
 **Non-Goals:**
@@ -47,11 +49,29 @@ The current repository pattern persists complete `WorkspaceSnapshot` values. Sto
 
    Alternative considered: store active-store selection in the workspace database. That would blur durable creative data with local UI preference and complicate future multi-window behavior.
 
-5. Provide a compact store selector/management surface in the Avalonia shell.
+5. Provide a compact/expanded store selector in the regular Avalonia shell.
 
-   The UI should let a first-time user create a store, switch between active stores, edit store context, and intentionally reveal archived stores. Navigation can continue to represent store hierarchy; this change adds the management actions around that hierarchy.
+   The normal workspace UI should only support switching stores and opening the store editor. In compact mode, it should show the selected store as a highlighted control with an affordance to expand the store list. In expanded mode, it should show all active stores with the selected store highlighted, plus a clear way to collapse back to the compact view. This borrows from Obsidian's preference for a quiet left sidebar that can disclose navigation depth, and from Postman's compact workspace/environment selectors that keep global context visible without turning the main chrome into a management form.
 
-   Alternative considered: implement store management only through the navigation tree context menu. That would hide first-store setup and archived-store restoration from users who do not yet have navigable content.
+   Alternative considered: keep store create/edit fields inline in the left rail. That gives immediate access, but it turns the regular workspace into an administration panel and consumes too much space when there are many stores.
+
+6. Move store management into a dedicated editor window.
+
+   The store editor should behave like a focused management dialog/window opened from the store selector, with a list of stores on the left and an editor/details pane on the right. Inspired by Obsidian settings/community-plugin dialogs and Postman environment/workspace management screens, it should preserve a stable shell context while letting the user create, edit, archive, restore, and delete stores in one intentional place. Archived stores should be grouped or filtered separately from active stores.
+
+   Alternative considered: use separate modal dialogs for create, edit, archive, restore, and delete. That reduces initial UI work, but it scatters store management and makes review of active versus archived stores more awkward.
+
+7. Prompt for first-store creation when no stores exist.
+
+   On startup or when loading an empty workspace, FusionCanvas should present a popup that asks whether the user wants to create a store. Accepting opens the store editor in create mode or a focused first-store create dialog. Declining should leave the workspace in a limited empty state with an obvious way to open the store editor later.
+
+   Alternative considered: only show inline empty-state text in the sidebar. That is easy to miss and weakens the store-as-primary-scope model.
+
+8. Add guarded permanent deletion.
+
+   Permanent deletion should be available in the store editor, require an explicit warning/confirmation, and be blocked if any niches, groups, listings, tags, assets, prompts, listing tags, asset links, or other store-scoped data remain connected to the store. Archive remains the normal reversible path for inactive stores.
+
+   Alternative considered: cascade delete connected store data. That is too destructive for Phase 1 and conflicts with the requirement that store context preserves creative history.
 
 ## Risks / Trade-offs
 
@@ -59,13 +79,14 @@ The current repository pattern persists complete `WorkspaceSnapshot` values. Sto
 - [Risk] Snapshot-level saves are coarse-grained -> Mitigation: keep store operations small and deterministic, and revisit narrower repository operations only when the app has heavier concurrent edits.
 - [Risk] Archived stores might disappear too completely from the UI -> Mitigation: require a dedicated archived-store view or filter with restore actions.
 - [Risk] Active-store selection may conflict with open tabs from another store -> Mitigation: update active store through explicit selection while allowing existing document contexts to continue carrying their own store identity.
+- [Risk] First-run popup could interrupt users repeatedly -> Mitigation: show it only when the loaded workspace has no stores and let declining fall back to a stable empty state.
+- [Risk] Delete warnings can become routine and ignored -> Mitigation: block deletion when connected data exists and require explicit confirmation only for truly empty stores.
 
 ## Migration Plan
 
-No database migration is expected for the initial implementation because stores already persist name, description, archive state, timestamps, and metadata JSON. Existing workspaces without stores should open into an empty-state flow that invites the user to create the first store. Rollback is limited to removing the service/UI behavior; persisted store records remain compatible with the existing SQLite model.
+No database migration is expected for the initial implementation because stores already persist name, description, archive state, timestamps, and metadata JSON. Existing workspaces without stores should open into a first-store prompt and then fall back to an empty-state flow if the user declines. Permanent deletion can remove empty store records through the existing snapshot persistence model. Rollback is limited to removing the service/UI behavior; persisted store records remain compatible with the existing SQLite model.
 
 ## Open Questions
 
-- Which store context fields should be shown as first-class UI fields in the first implementation versus stored only as notes/context?
 - Should the app remember the last active store after restart as a user preference, or should startup always show the store selector?
-- Should archived stores be hidden everywhere by default, or only from the primary selector and active navigation list?
+- Should the first-store prompt open the full store editor in create mode, or a smaller create-only dialog that can hand off to the editor after creation?
