@@ -1,4 +1,5 @@
 using FusionCanvas.App.Views;
+using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.App.Tests;
@@ -9,7 +10,7 @@ public class MainWindowViewModelTests
     public void OpenFromNavigation_OpensTabAndCoordinatesNavigationAndWorkflow()
     {
         var viewModel = new MainWindowViewModel();
-        var navigationContext = viewModel.NavigationContexts[1];
+        var navigationContext = viewModel.NavigationContexts[2];
 
         viewModel.OpenFromNavigation(navigationContext);
 
@@ -25,24 +26,24 @@ public class MainWindowViewModelTests
     {
         var viewModel = new MainWindowViewModel();
 
-        viewModel.OpenFromNavigation(viewModel.NavigationContexts[0]);
-        viewModel.OpenFromNavigation(viewModel.NavigationContexts[2]);
+        viewModel.OpenFromNavigation(viewModel.NavigationContexts[1]);
+        viewModel.OpenFromNavigation(viewModel.NavigationContexts[3]);
 
         Assert.Equal(2, viewModel.DocumentWindow.Tabs.Count);
-        Assert.Equal(viewModel.NavigationContexts[2].Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
+        Assert.Equal(viewModel.NavigationContexts[3].Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
     }
 
     [Fact]
     public void SelectingOpenTab_RecoordinatesNavigationAndWorkflow()
     {
         var viewModel = new MainWindowViewModel();
-        var first = viewModel.DocumentWindow.Open(viewModel.NavigationContexts[0].Context);
-        viewModel.DocumentWindow.Open(viewModel.NavigationContexts[2].Context);
+        var first = viewModel.DocumentWindow.Open(viewModel.NavigationContexts[1].Context);
+        viewModel.DocumentWindow.Open(viewModel.NavigationContexts[3].Context);
 
         viewModel.DocumentWindow.SelectTab(first);
 
-        Assert.Equal(viewModel.NavigationContexts[0].Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
-        Assert.Equal(viewModel.NavigationContexts[0].Context.NavigationLocation?.NodePath[^1], viewModel.NavigationState.RevealedNodeId);
+        Assert.Equal(viewModel.NavigationContexts[1].Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
+        Assert.Equal(viewModel.NavigationContexts[1].Context.NavigationLocation?.NodePath[^1], viewModel.NavigationState.RevealedNodeId);
         Assert.Equal(WorkflowStage.Idea, viewModel.WorkflowNavigator.ActiveViewStage);
     }
 
@@ -50,7 +51,7 @@ public class MainWindowViewModelTests
     public void SelectWorkflowStage_UpdatesDocumentAndNavigator()
     {
         var viewModel = new MainWindowViewModel();
-        viewModel.OpenFromNavigation(viewModel.NavigationContexts[0]);
+        viewModel.OpenFromNavigation(viewModel.NavigationContexts[1]);
 
         viewModel.SelectWorkflowStage(WorkflowStage.Listing);
 
@@ -63,11 +64,34 @@ public class MainWindowViewModelTests
     public void ClosingLastTab_ClearsWorkflowNavigator()
     {
         var viewModel = new MainWindowViewModel();
-        var tab = viewModel.DocumentWindow.Open(viewModel.NavigationContexts[0].Context);
+        var tab = viewModel.DocumentWindow.Open(viewModel.NavigationContexts[1].Context);
 
         viewModel.DocumentWindow.CloseTab(tab);
 
         Assert.False(viewModel.DocumentWindow.HasActiveDocument);
         Assert.False(viewModel.WorkflowNavigator.HasActiveItem);
+    }
+
+    [Fact]
+    public void OpenFromNavigation_ResolvesVisibleToolContextScope()
+    {
+        var viewModel = new MainWindowViewModel();
+
+        viewModel.OpenFromNavigation(viewModel.NavigationContexts[0]);
+
+        Assert.True(viewModel.DocumentWindow.CanRunActiveTool);
+        Assert.Equal("Topic: Dogs and coffee", viewModel.DocumentWindow.ActiveToolScopeLabel);
+        Assert.Contains("Dogs and coffee", viewModel.DocumentWindow.ActiveToolScopeDescription);
+    }
+
+    [Fact]
+    public void ChangeToolScopeCommand_ReResolvesVisibleToolScope()
+    {
+        var viewModel = new MainWindowViewModel();
+        viewModel.OpenFromNavigation(viewModel.NavigationContexts[0]);
+
+        viewModel.DocumentWindow.ChangeToolScopeCommand.Execute(ToolContextScopeKind.CurrentSubtree);
+
+        Assert.Equal("Subtree: Dogs and coffee", viewModel.DocumentWindow.ActiveToolScopeLabel);
     }
 }
