@@ -53,6 +53,41 @@ public class SqliteWorkspaceRepositoryTests
     }
 
     [Fact]
+    public async Task SaveAndLoadAsync_RoundTripsStoreManagementFieldsWithoutSchemaChanges()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("workspace.db");
+        var repository = new SqliteWorkspaceRepository(databasePath);
+        var createdAt = new DateTimeOffset(2026, 7, 4, 12, 0, 0, TimeSpan.Zero);
+        var updatedAt = createdAt.AddMinutes(15);
+        var active = new Store(
+            Guid.NewGuid(),
+            "North Star Studio",
+            "POD brand",
+            false,
+            createdAt,
+            updatedAt,
+            """{"notes":"Soft humor","targetMarket":"Coffee fans","brandDirection":"Warm vintage","planningContext":"Fall launch"}""");
+        var archived = new Store(
+            Guid.NewGuid(),
+            "Paused Studio",
+            "Inactive brand",
+            true,
+            createdAt,
+            updatedAt,
+            """{"notes":"Review later"}""");
+        var snapshot = new WorkspaceSnapshot([active, archived], [], [], [], [], [], [], [], []);
+
+        await repository.SaveAsync(snapshot);
+        var loaded = await repository.LoadAsync();
+
+        Assert.Equal(2, loaded.Stores.Count);
+        Assert.Equal(active, loaded.Stores.Single(store => store.Id == active.Id));
+        Assert.Equal(archived, loaded.Stores.Single(store => store.Id == archived.Id));
+        Assert.Equal(1, await ReadUserVersionAsync(databasePath));
+    }
+
+    [Fact]
     public async Task LoadAsync_UpgradesUnversionedDatabaseToCurrentSchemaVersion()
     {
         using var tempDirectory = new TemporaryDirectory();

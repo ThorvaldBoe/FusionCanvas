@@ -30,6 +30,88 @@
                      Foreground="#687385" />
         </StackPanel>
 
+        <StackPanel DockPanel.Dock="Top"
+                    Spacing="8"
+                    Margin="0,0,0,18">
+          <TextBlock Text="Stores"
+                     FontSize="13"
+                     FontWeight="SemiBold"
+                     Foreground="#243447" />
+          <ItemsControl ItemsSource="{Binding StoreManagement.ActiveStores}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="workflow:StoreSummary">
+                <Button Content="{Binding Name}"
+                        Command="{Binding $parent[ItemsControl].DataContext.StoreManagement.SelectStoreCommand}"
+                        CommandParameter="{Binding}"
+                        Classes="storeSelector"
+                        HorizontalContentAlignment="Left" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock IsVisible="{Binding StoreManagement.NeedsFirstStore}"
+                     Text="Create your first store."
+                     FontSize="12"
+                     Foreground="#687385" />
+          <TextBox Text="{Binding StoreManagement.NewStoreName}"
+                   PlaceholderText="Store name"
+                   Classes="storeField" />
+          <TextBox Text="{Binding StoreManagement.Description}"
+                   PlaceholderText="Description"
+                   Classes="storeField" />
+          <TextBox Text="{Binding StoreManagement.Notes}"
+                   PlaceholderText="Notes"
+                   Classes="storeField"
+                   AcceptsReturn="True"
+                   MinHeight="56" />
+          <TextBox Text="{Binding StoreManagement.TargetMarket}"
+                   PlaceholderText="Target market"
+                   Classes="storeField" />
+          <TextBox Text="{Binding StoreManagement.BrandDirection}"
+                   PlaceholderText="Brand direction"
+                   Classes="storeField" />
+          <TextBox Text="{Binding StoreManagement.PlanningContext}"
+                   PlaceholderText="Planning context"
+                   Classes="storeField" />
+          <Grid ColumnDefinitions="*,*"
+                ColumnSpacing="8">
+            <Button Grid.Column="0"
+                    Content="Create"
+                    Command="{Binding StoreManagement.CreateStoreCommand}"
+                    Classes="storeAction" />
+            <Button Grid.Column="1"
+                    Content="Save"
+                    Command="{Binding StoreManagement.SaveSelectedStoreCommand}"
+                    Classes="storeAction" />
+          </Grid>
+          <Button Content="Archive"
+                  IsVisible="{Binding StoreManagement.HasSelectedStore}"
+                  Command="{Binding StoreManagement.ArchiveSelectedStoreCommand}"
+                  Classes="storeSecondary" />
+          <TextBlock IsVisible="{Binding StoreManagement.HasError}"
+                     Text="{Binding StoreManagement.ErrorMessage}"
+                     FontSize="12"
+                     Foreground="#9A4B43" />
+          <StackPanel IsVisible="{Binding StoreManagement.HasArchivedStores}"
+                      Spacing="6"
+                      Margin="0,6,0,0">
+            <TextBlock Text="Archived"
+                       FontSize="12"
+                       FontWeight="SemiBold"
+                       Foreground="#687385" />
+            <ItemsControl ItemsSource="{Binding StoreManagement.ArchivedStores}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="workflow:StoreSummary">
+                  <Button Content="{Binding Name}"
+                          Command="{Binding $parent[ItemsControl].DataContext.StoreManagement.RestoreStoreCommand}"
+                          CommandParameter="{Binding}"
+                          Classes="storeSecondary"
+                          HorizontalContentAlignment="Left" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </StackPanel>
+
         <ItemsControl ItemsSource="{Binding NavigationContexts}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="views:NavigationDocumentContext">
@@ -235,6 +317,38 @@
       <Setter Property="Background" Value="#F7F8FA" />
       <Setter Property="Foreground" Value="#243447" />
       <Setter Property="BorderBrush" Value="#E1E5EA" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.storeSelector">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Margin" Value="0,0,0,6" />
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="#EEF6FF" />
+      <Setter Property="Foreground" Value="#204466" />
+      <Setter Property="BorderBrush" Value="#B9D7F2" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.storeAction">
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="#243447" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#243447" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.storeSecondary">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="Foreground" Value="#425066" />
+      <Setter Property="BorderBrush" Value="#D9DEE7" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="TextBox.storeField">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="8,6" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="Foreground" Value="#243447" />
+      <Setter Property="BorderBrush" Value="#D9DEE7" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Border.tabFrame">
