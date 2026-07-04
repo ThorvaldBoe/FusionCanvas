@@ -10,6 +10,7 @@ public sealed class DocumentWindowViewModel : INotifyPropertyChanged
 {
     private DocumentTabViewModel? _activeTab;
     private ToolContextResolution? _activeToolContext;
+    private StageToolHostState? _stageToolHostState;
 
     public DocumentWindowViewModel()
     {
@@ -34,6 +35,13 @@ public sealed class DocumentWindowViewModel : INotifyPropertyChanged
                 ToolScopeChangeRequested?.Invoke(this, scope);
             }
         });
+        SelectStageToolCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is StageToolOptionViewModel option)
+            {
+                StageToolSelectionRequested?.Invoke(this, option.Id);
+            }
+        });
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -41,6 +49,8 @@ public sealed class DocumentWindowViewModel : INotifyPropertyChanged
     public event EventHandler<DocumentContext?>? ActiveContextChanged;
 
     public event EventHandler<ToolContextScopeKind>? ToolScopeChangeRequested;
+
+    public event EventHandler<string>? StageToolSelectionRequested;
 
     public ObservableCollection<DocumentTabViewModel> Tabs { get; } = [];
 
@@ -117,6 +127,52 @@ public sealed class DocumentWindowViewModel : INotifyPropertyChanged
 
     public bool CanRunActiveTool => ActiveToolContext?.IsAvailable == true;
 
+    public StageToolHostState? StageToolHostState
+    {
+        get => _stageToolHostState;
+        private set
+        {
+            if (Equals(_stageToolHostState, value))
+            {
+                return;
+            }
+
+            _stageToolHostState = value;
+            OnPropertyChanged(nameof(StageToolHostState));
+            OnPropertyChanged(nameof(AvailableStageTools));
+            OnPropertyChanged(nameof(SelectedStageTool));
+            OnPropertyChanged(nameof(HasMultipleStageTools));
+            OnPropertyChanged(nameof(ActiveStageToolName));
+            OnPropertyChanged(nameof(ActiveStageToolDescription));
+            OnPropertyChanged(nameof(ActiveStageToolUnavailableMessage));
+        }
+    }
+
+    public IReadOnlyList<StageToolOptionViewModel> AvailableStageTools =>
+        StageToolHostState?.AvailableTools
+            .Select(state => new StageToolOptionViewModel(state.Tool.Id, state.Tool.DisplayName))
+            .ToArray()
+        ?? [];
+
+    public StageToolOptionViewModel? SelectedStageTool =>
+        StageToolHostState?.SelectedTool is StageToolAvailability selected
+            ? new StageToolOptionViewModel(selected.Tool.Id, selected.Tool.DisplayName)
+            : null;
+
+    public bool HasMultipleStageTools => StageToolHostState?.HasMultipleAvailableTools == true;
+
+    public string ActiveStageToolName => StageToolHostState?.SelectedTool?.Tool.DisplayName ?? "No stage tool";
+
+    public string ActiveStageToolDescription =>
+        StageToolHostState?.SelectedTool?.Tool.Description
+        ?? StageToolHostState?.ToolStates.FirstOrDefault()?.Reason
+        ?? "No stage tool is available for the current context.";
+
+    public string ActiveStageToolUnavailableMessage =>
+        StageToolHostState?.SelectedTool?.Reason
+        ?? StageToolHostState?.ToolStates.FirstOrDefault(state => !state.IsAvailable)?.Reason
+        ?? string.Empty;
+
     public IReadOnlyList<ToolContextScopeKind> SupportedToolScopes { get; } =
     [
         ToolContextScopeKind.CurrentItem,
@@ -132,6 +188,8 @@ public sealed class DocumentWindowViewModel : INotifyPropertyChanged
     public ICommand CloseTabCommand { get; }
 
     public ICommand ChangeToolScopeCommand { get; }
+
+    public ICommand SelectStageToolCommand { get; }
 
     public DocumentTabViewModel Open(DocumentContext context)
     {
@@ -215,6 +273,12 @@ public sealed class DocumentWindowViewModel : INotifyPropertyChanged
     public void ApplyToolContext(ToolContextResolution? resolution) =>
         ActiveToolContext = resolution;
 
+    public void ApplyStageToolHostState(StageToolHostState? state)
+    {
+        StageToolHostState = state;
+        ActiveToolContext = state?.ActiveToolContext;
+    }
+
     public static string GetDefaultDetailViewKey(WorkflowStage stage) =>
         stage switch
         {
@@ -240,3 +304,5 @@ public sealed class DocumentWindowViewModel : INotifyPropertyChanged
     private void OnPropertyChanged(string propertyName) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }
+
+public sealed record StageToolOptionViewModel(string Id, string DisplayName);

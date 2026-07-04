@@ -105,6 +105,54 @@ public class DocumentWindowViewModelTests
         Assert.Equal("concept-stage-tool", viewModel.ActiveDetailViewKey);
     }
 
+    [Fact]
+    public void ApplyStageToolHostState_ExposesSelectorWhenMultipleToolsAreAvailable()
+    {
+        var viewModel = new DocumentWindowViewModel();
+        var state = NewHostState(
+            NewAvailability("basic-idea", isAvailable: true),
+            NewAvailability("advanced-idea", isAvailable: true));
+
+        viewModel.ApplyStageToolHostState(state);
+
+        Assert.True(viewModel.HasMultipleStageTools);
+        Assert.Equal(2, viewModel.AvailableStageTools.Count);
+        Assert.Equal("basic-idea", viewModel.SelectedStageTool?.Id);
+    }
+
+    [Fact]
+    public void ApplyStageToolHostState_HidesSelectorWhenOneToolIsAvailable()
+    {
+        var viewModel = new DocumentWindowViewModel();
+
+        viewModel.ApplyStageToolHostState(NewHostState(NewAvailability("basic-idea", isAvailable: true)));
+
+        Assert.False(viewModel.HasMultipleStageTools);
+        Assert.Single(viewModel.AvailableStageTools);
+    }
+
+    [Fact]
+    public void ApplyStageToolHostState_ExposesUnavailableReason()
+    {
+        var viewModel = new DocumentWindowViewModel();
+        var unavailable = NewAvailability(
+            "concept-tool",
+            isAvailable: false,
+            StageToolAvailabilityKind.RequiresSelectedItem,
+            "This tool requires a selected item.");
+
+        viewModel.ApplyStageToolHostState(new StageToolHostState(
+            WorkflowStage.Concept,
+            StageToolContextKind.Topic,
+            [unavailable],
+            [],
+            null,
+            unavailable.ToolContext));
+
+        Assert.False(viewModel.CanRunActiveTool);
+        Assert.Equal("This tool requires a selected item.", viewModel.ActiveStageToolUnavailableMessage);
+    }
+
     private static DocumentContext NewContext(string title, WorkflowStage stage)
     {
         var contextId = Guid.NewGuid();
@@ -118,5 +166,40 @@ public class DocumentWindowViewModelTests
             workflow,
             stage,
             DocumentWindowViewModel.GetDefaultDetailViewKey(stage));
+    }
+
+    private static StageToolHostState NewHostState(params StageToolAvailability[] tools) =>
+        new(
+            WorkflowStage.Idea,
+            StageToolContextKind.Topic,
+            tools,
+            tools.Where(tool => tool.IsAvailable).ToArray(),
+            tools.FirstOrDefault(tool => tool.IsAvailable),
+            tools.FirstOrDefault(tool => tool.IsAvailable)?.ToolContext);
+
+    private static StageToolAvailability NewAvailability(
+        string id,
+        bool isAvailable,
+        StageToolAvailabilityKind unavailableKind = StageToolAvailabilityKind.Unavailable,
+        string? reason = null)
+    {
+        var descriptor = new StageToolDescriptor(
+            id,
+            id,
+            $"{id} description",
+            $"{id}-view",
+            [WorkflowStage.Idea],
+            RequiresSelectedItem: false,
+            IsDefault: id.StartsWith("basic", StringComparison.Ordinal));
+        var summary = new ToolContextScopeSummary(ToolContextScopeKind.CurrentTopic, "Topic: Test", "Test", isAvailable);
+        var resolution = isAvailable
+            ? new ToolContextResolution(true, null, summary, null)
+            : ToolContextResolution.Unavailable(reason ?? "Unavailable.");
+
+        return new StageToolAvailability(
+            descriptor,
+            isAvailable ? StageToolAvailabilityKind.Available : unavailableKind,
+            reason,
+            resolution);
     }
 }
