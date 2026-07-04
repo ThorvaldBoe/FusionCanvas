@@ -17,6 +17,7 @@ public sealed class MainWindowViewModel
     private static readonly Guid ListingNodeId = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
 
     private readonly IToolContextResolver _toolContextResolver;
+    private readonly IStageToolHostService _stageToolHostService;
     private readonly WorkspaceSnapshot _workspaceSnapshot;
 
     public MainWindowViewModel()
@@ -24,6 +25,7 @@ public sealed class MainWindowViewModel
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
             new DocumentWindowViewModel(),
             new ToolContextResolver(),
+            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             CreateSampleWorkspace())
     {
     }
@@ -31,7 +33,12 @@ public sealed class MainWindowViewModel
     public MainWindowViewModel(
         WorkflowStageNavigatorViewModel workflowNavigator,
         DocumentWindowViewModel documentWindow)
-        : this(workflowNavigator, documentWindow, new ToolContextResolver(), CreateSampleWorkspace())
+        : this(
+            workflowNavigator,
+            documentWindow,
+            new ToolContextResolver(),
+            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
+            CreateSampleWorkspace())
     {
     }
 
@@ -39,11 +46,13 @@ public sealed class MainWindowViewModel
         WorkflowStageNavigatorViewModel workflowNavigator,
         DocumentWindowViewModel documentWindow,
         IToolContextResolver toolContextResolver,
+        IStageToolHostService stageToolHostService,
         WorkspaceSnapshot workspaceSnapshot)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
         _toolContextResolver = toolContextResolver;
+        _stageToolHostService = stageToolHostService;
         _workspaceSnapshot = workspaceSnapshot;
         NavigationState = new NavigationTreePresentationState();
         OpenNavigationContextCommand = new RelayCommand(parameter =>
@@ -63,6 +72,7 @@ public sealed class MainWindowViewModel
         NavigationContexts = CreateNavigationContexts();
         DocumentWindow.ActiveContextChanged += (_, context) => CoordinateActiveContext(context);
         DocumentWindow.ToolScopeChangeRequested += (_, scope) => ResolveActiveToolContext(scope);
+        DocumentWindow.StageToolSelectionRequested += (_, toolId) => SelectStageTool(toolId);
     }
 
     public WorkflowStageNavigatorViewModel WorkflowNavigator { get; }
@@ -96,6 +106,7 @@ public sealed class MainWindowViewModel
         {
             WorkflowNavigator.SetActiveItem(null);
             DocumentWindow.ApplyToolContext(null);
+            DocumentWindow.ApplyStageToolHostState(null);
             return;
         }
 
@@ -116,6 +127,7 @@ public sealed class MainWindowViewModel
         if (context is null)
         {
             DocumentWindow.ApplyToolContext(null);
+            DocumentWindow.ApplyStageToolHostState(null);
             return;
         }
 
@@ -126,15 +138,36 @@ public sealed class MainWindowViewModel
             _ => ToolContextSelectionKind.Store
         };
 
-        var resolution = _toolContextResolver.Resolve(new ToolContextResolveRequest(
+        var request = new ToolContextResolveRequest(
             _workspaceSnapshot,
             selectionKind,
             context.EntityKind,
             context.Id,
             context.WorkflowStage,
-            scopeOverride));
+            scopeOverride);
+        var resolution = _toolContextResolver.Resolve(request);
+        var hostState = _stageToolHostService.Build(new StageToolHostRequest(
+            _workspaceSnapshot,
+            selectionKind,
+            context.EntityKind,
+            context.Id,
+            context.WorkflowStage,
+            ScopeOverride: scopeOverride));
 
         DocumentWindow.ApplyToolContext(resolution);
+        DocumentWindow.ApplyStageToolHostState(hostState);
+    }
+
+    private void SelectStageTool(string toolId)
+    {
+        var state = DocumentWindow.StageToolHostState;
+        if (state is null)
+        {
+            return;
+        }
+
+        _stageToolHostService.SelectTool(new StageToolSelectionKey(state.WorkflowStage, state.ContextKind), toolId);
+        ResolveActiveToolContext();
     }
 
     private static IReadOnlyList<NavigationDocumentContext> CreateNavigationContexts()

@@ -80,6 +80,7 @@ public class MainWindowViewModelTests
         viewModel.OpenFromNavigation(viewModel.NavigationContexts[0]);
 
         Assert.True(viewModel.DocumentWindow.CanRunActiveTool);
+        Assert.Equal("Idea", viewModel.DocumentWindow.ActiveStageToolName);
         Assert.Equal("Topic: Dogs and coffee", viewModel.DocumentWindow.ActiveToolScopeLabel);
         Assert.Contains("Dogs and coffee", viewModel.DocumentWindow.ActiveToolScopeDescription);
     }
@@ -93,5 +94,30 @@ public class MainWindowViewModelTests
         viewModel.DocumentWindow.ChangeToolScopeCommand.Execute(ToolContextScopeKind.CurrentSubtree);
 
         Assert.Equal("Subtree: Dogs and coffee", viewModel.DocumentWindow.ActiveToolScopeLabel);
+    }
+
+    [Fact]
+    public void SelectWorkflowStage_RefreshesStageToolHost()
+    {
+        var viewModel = new MainWindowViewModel();
+        viewModel.OpenFromNavigation(viewModel.NavigationContexts[1]);
+
+        viewModel.SelectWorkflowStage(WorkflowStage.Design);
+
+        Assert.Equal("Design", viewModel.DocumentWindow.ActiveStageToolName);
+        Assert.Equal("built-in-design-tool", viewModel.DocumentWindow.SelectedStageTool?.Id);
+        Assert.True(viewModel.DocumentWindow.CanRunActiveTool);
+    }
+
+    [Fact]
+    public void TopicContextInItemBoundStage_ShowsItemRequiredState()
+    {
+        var viewModel = new MainWindowViewModel();
+        viewModel.OpenFromNavigation(viewModel.NavigationContexts[0]);
+
+        viewModel.SelectWorkflowStage(WorkflowStage.Concept);
+
+        Assert.False(viewModel.DocumentWindow.CanRunActiveTool);
+        Assert.Contains("requires a selected item", viewModel.DocumentWindow.ActiveStageToolUnavailableMessage);
     }
 }
