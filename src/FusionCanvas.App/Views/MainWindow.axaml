@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:doc="clr-namespace:FusionCanvas.App.DocumentWindow"
+        xmlns:stores="clr-namespace:FusionCanvas.App.Stores"
         xmlns:views="clr-namespace:FusionCanvas.App.Views"
         xmlns:workflow="clr-namespace:FusionCanvas.Application.Workspace;assembly=FusionCanvas.Application"
         x:Class="FusionCanvas.App.Views.MainWindow"
@@ -28,6 +29,58 @@
           <TextBlock Text="Workspace"
                      FontSize="12"
                      Foreground="#687385" />
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Top"
+                    Spacing="8"
+                    Margin="0,0,0,18">
+          <Grid ColumnDefinitions="*,Auto,Auto"
+                ColumnSpacing="6">
+            <TextBlock Text="Stores"
+                       VerticalAlignment="Center"
+                       FontSize="13"
+                       FontWeight="SemiBold"
+                       Foreground="#243447" />
+            <Button Grid.Column="1"
+                    Content="{Binding StoreManagement.SelectorToggleGlyph}"
+                    ToolTip.Tip="{Binding StoreManagement.SelectorToggleTooltip}"
+                    Command="{Binding StoreManagement.ToggleStoreSelectorCommand}"
+                    Classes="iconButton" />
+            <Button Grid.Column="2"
+                    Content="..."
+                    ToolTip.Tip="Store actions"
+                    Classes="iconButton">
+              <Button.Flyout>
+                <MenuFlyout>
+                  <MenuItem Header="Manage stores"
+                            Command="{Binding StoreManagement.OpenStoreEditorCommand}" />
+                </MenuFlyout>
+              </Button.Flyout>
+            </Button>
+          </Grid>
+          <Button IsVisible="{Binding StoreManagement.IsSelectorCompact}"
+                  Content="{Binding StoreManagement.SelectedStore.Name}"
+                  Command="{Binding StoreManagement.ToggleStoreSelectorCommand}"
+                  Classes="storeSelector selected"
+                  HorizontalContentAlignment="Left" />
+          <StackPanel IsVisible="{Binding StoreManagement.IsSelectorExpanded}"
+                      Spacing="6">
+            <ScrollViewer MaxHeight="170"
+                          VerticalScrollBarVisibility="Auto">
+              <ItemsControl ItemsSource="{Binding StoreManagement.SelectorStores}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="stores:StoreSelectorEntry">
+                    <Button Content="{Binding Name}"
+                            Command="{Binding $parent[ItemsControl].DataContext.StoreManagement.SelectStoreCommand}"
+                            CommandParameter="{Binding}"
+                            Classes="storeSelector"
+                            Classes.selected="{Binding IsSelected}"
+                            HorizontalContentAlignment="Left" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </StackPanel>
         </StackPanel>
 
         <ItemsControl ItemsSource="{Binding NavigationContexts}">
@@ -226,6 +279,38 @@
         </Grid>
       </Border>
     </Grid>
+    <Border Grid.ColumnSpan="2"
+            IsVisible="{Binding StoreManagement.ShouldShowFirstStorePrompt}"
+            Background="#99000000">
+      <Border Width="420"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center"
+              Padding="20"
+              Background="#FFFFFF"
+              BorderBrush="#D9DEE7"
+              BorderThickness="1">
+        <StackPanel Spacing="12">
+          <TextBlock Text="Create your first store?"
+                     FontSize="22"
+                     FontWeight="SemiBold"
+                     Foreground="#1E2733" />
+          <TextBlock Text="FusionCanvas needs a store before workspace content can be organized."
+                     TextWrapping="Wrap"
+                     FontSize="13"
+                     Foreground="#687385" />
+          <StackPanel Orientation="Horizontal"
+                      HorizontalAlignment="Right"
+                      Spacing="8">
+            <Button Content="Create store"
+                    Command="{Binding StoreManagement.AcceptFirstStorePromptCommand}"
+                    Classes="storeAction fixedDialog" />
+            <Button Content="Not now"
+                    Command="{Binding StoreManagement.DeclineFirstStorePromptCommand}"
+                    Classes="storeSecondary fixedDialog" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Border>
   </Grid>
   <Window.Styles>
     <Style Selector="Button.navigation">
@@ -236,6 +321,51 @@
       <Setter Property="Foreground" Value="#243447" />
       <Setter Property="BorderBrush" Value="#E1E5EA" />
       <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.storeSelector">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Margin" Value="0,0,0,6" />
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="#EEF6FF" />
+      <Setter Property="Foreground" Value="#204466" />
+      <Setter Property="BorderBrush" Value="#B9D7F2" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.storeSelector.selected">
+      <Setter Property="Background" Value="#243447" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#243447" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.storeAction">
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="#243447" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#243447" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.fixedDialog">
+      <Setter Property="Width" Value="116" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <Style Selector="Button.storeSecondary">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="Foreground" Value="#425066" />
+      <Setter Property="BorderBrush" Value="#D9DEE7" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.iconButton">
+      <Setter Property="Width" Value="28" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="Foreground" Value="#425066" />
+      <Setter Property="BorderBrush" Value="#D9DEE7" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
     <Style Selector="Border.tabFrame">
       <Setter Property="BorderBrush" Value="#D9DEE7" />

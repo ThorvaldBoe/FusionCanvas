@@ -270,6 +270,20 @@ Preferred direction:
 
 Cards should be used for tool panels and repeated content, not for every page section.
 
+## Specific UI Elements
+
+### Buttons
+
+Buttons should size to the command group, not automatically stretch to fill the full width of a dialog or editor window.
+
+Use fixed or content-based button widths for modal dialogs, setup prompts, editor action rows, warning confirmations, and compact command groups. Align the group intentionally, usually left-aligned in editor forms and right-aligned in confirmation prompts.
+
+Avoid evenly distributing unrelated action buttons across the full window width. Full-width buttons are appropriate only when the button itself is the primary row item, such as a navigation row, list item, or selected store control.
+
+Icon-only buttons should be small, square, and close to the label or object they control. They must expose a tooltip that describes the action, such as "Expand stores" or "Collapse stores".
+
+When a compact control and an explicit button perform the same action, prefer the clearer compact control and remove the duplicate button.
+
 ## Screenshot Concepts
 
 The current screenshot concepts live in [Visuals](Visuals/).

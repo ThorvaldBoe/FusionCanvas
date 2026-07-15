@@ -1,13 +1,17 @@
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Navigation;
+using FusionCanvas.App.Stores;
+using FusionCanvas.App.Workspace;
 using FusionCanvas.App.Workflow;
 using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using System.Windows.Input;
 
 namespace FusionCanvas.App.Views;
 
-public sealed class MainWindowViewModel
+public sealed class MainWindowViewModel : INotifyPropertyChanged
 {
     private static readonly Guid StoreNodeId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static readonly Guid NicheNodeId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
@@ -19,6 +23,7 @@ public sealed class MainWindowViewModel
     private readonly IToolContextResolver _toolContextResolver;
     private readonly IStageToolHostService _stageToolHostService;
     private readonly WorkspaceSnapshot _workspaceSnapshot;
+    private IReadOnlyList<NavigationDocumentContext> _navigationContexts = [];
 
     public MainWindowViewModel()
         : this(
@@ -26,7 +31,32 @@ public sealed class MainWindowViewModel
             new DocumentWindowViewModel(),
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
+            new StoreManagementService(new InMemoryWorkspaceRepository(CreateSampleWorkspace())),
             CreateSampleWorkspace())
+    {
+    }
+
+    public static MainWindowViewModel CreateForDefaultWorkspace() =>
+        new(
+            new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
+            new DocumentWindowViewModel(),
+            new ToolContextResolver(),
+            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
+            AppWorkspaceFactory.CreateDefault());
+
+    private MainWindowViewModel(
+        WorkflowStageNavigatorViewModel workflowNavigator,
+        DocumentWindowViewModel documentWindow,
+        IToolContextResolver toolContextResolver,
+        IStageToolHostService stageToolHostService,
+        AppWorkspaceRuntime runtime)
+        : this(
+            workflowNavigator,
+            documentWindow,
+            toolContextResolver,
+            stageToolHostService,
+            new StoreManagementService(runtime.Repository),
+            runtime.Snapshot)
     {
     }
 
@@ -38,6 +68,7 @@ public sealed class MainWindowViewModel
             documentWindow,
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
+            new StoreManagementService(new InMemoryWorkspaceRepository(CreateSampleWorkspace())),
             CreateSampleWorkspace())
     {
     }
@@ -47,10 +78,12 @@ public sealed class MainWindowViewModel
         DocumentWindowViewModel documentWindow,
         IToolContextResolver toolContextResolver,
         IStageToolHostService stageToolHostService,
+        IStoreManagementService storeManagementService,
         WorkspaceSnapshot workspaceSnapshot)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
+        StoreManagement = new StoreManagementViewModel(storeManagementService);
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
         _workspaceSnapshot = workspaceSnapshot;
@@ -69,19 +102,32 @@ public sealed class MainWindowViewModel
                 SelectWorkflowStage(stage);
             }
         });
-        NavigationContexts = CreateNavigationContexts();
+        StoreManagement.ActiveStoreChanged += (_, store) => RebuildNavigationContexts(store);
+        InitializeStores();
         DocumentWindow.ActiveContextChanged += (_, context) => CoordinateActiveContext(context);
         DocumentWindow.ToolScopeChangeRequested += (_, scope) => ResolveActiveToolContext(scope);
         DocumentWindow.StageToolSelectionRequested += (_, toolId) => SelectStageTool(toolId);
     }
 
+    public event PropertyChangedEventHandler? PropertyChanged;
+
     public WorkflowStageNavigatorViewModel WorkflowNavigator { get; }
 
     public DocumentWindowViewModel DocumentWindow { get; }
 
+    public StoreManagementViewModel StoreManagement { get; }
+
     public NavigationTreePresentationState NavigationState { get; }
 
-    public IReadOnlyList<NavigationDocumentContext> NavigationContexts { get; }
+    public IReadOnlyList<NavigationDocumentContext> NavigationContexts
+    {
+        get => _navigationContexts;
+        private set
+        {
+            _navigationContexts = value;
+            OnPropertyChanged();
+        }
+    }
 
     public ICommand OpenNavigationContextCommand { get; }
 
@@ -99,6 +145,21 @@ public sealed class MainWindowViewModel
         DocumentWindow.ChangeActiveWorkflowStage(stage);
         WorkflowNavigator.SelectStage(stage);
     }
+
+    private void InitializeStores()
+    {
+        StoreManagement.LoadAsync().GetAwaiter().GetResult();
+        if (StoreManagement.SelectedStore is null && StoreManagement.ActiveStores.Count > 0)
+        {
+            StoreManagement.SelectStoreAsync(StoreManagement.ActiveStores[0]).GetAwaiter().GetResult();
+            return;
+        }
+
+        RebuildNavigationContexts(StoreManagement.SelectedStore);
+    }
+
+    private void RebuildNavigationContexts(StoreSummary? selectedStore) =>
+        NavigationContexts = CreateNavigationContexts(_workspaceSnapshot, selectedStore);
 
     private void CoordinateActiveContext(DocumentContext? context)
     {
@@ -170,44 +231,89 @@ public sealed class MainWindowViewModel
         ResolveActiveToolContext();
     }
 
-    private static IReadOnlyList<NavigationDocumentContext> CreateNavigationContexts()
+    private static IReadOnlyList<NavigationDocumentContext> CreateNavigationContexts(
+        WorkspaceSnapshot snapshot,
+        StoreSummary? selectedStore)
     {
-        return
-        [
-            NewNavigationContext(
-                TopicNodeId,
-                "Dogs and coffee",
-                WorkflowStage.Idea,
-                DocumentContextKind.Topic,
-                WorkspaceEntityKind.Group,
-                [StoreNodeId, NicheNodeId, TopicNodeId],
-                "North Star Studio / Coffee / Dogs and coffee"),
-            NewNavigationContext(
-                IdeaNodeId,
-                "Morning coffee idea",
-                WorkflowStage.Idea,
-                DocumentContextKind.Item,
-                WorkspaceEntityKind.Listing,
-                [StoreNodeId, NicheNodeId, TopicNodeId, IdeaNodeId],
-                "North Star Studio / Coffee / Morning coffee idea"),
-            NewNavigationContext(
-                DesignNodeId,
-                "Retro mug design",
-                WorkflowStage.Design,
-                DocumentContextKind.Item,
-                WorkspaceEntityKind.Listing,
-                [StoreNodeId, NicheNodeId, TopicNodeId, DesignNodeId],
-                "North Star Studio / Coffee / Retro mug design"),
-            NewNavigationContext(
-                ListingNodeId,
-                "Espresso listing draft",
-                WorkflowStage.Listing,
-                DocumentContextKind.Item,
-                WorkspaceEntityKind.Listing,
-                [StoreNodeId, NicheNodeId, TopicNodeId, ListingNodeId],
-                "North Star Studio / Coffee / Espresso listing draft")
-        ];
+        if (selectedStore is null)
+        {
+            return [];
+        }
+
+        var store = snapshot.Stores.SingleOrDefault(candidate => candidate.Id == selectedStore.Id)
+            ?? new Store(
+                selectedStore.Id,
+                selectedStore.Name,
+                selectedStore.Context.Description,
+                selectedStore.IsArchived,
+                selectedStore.CreatedAt,
+                selectedStore.UpdatedAt,
+                "{}");
+        var contexts = new List<NavigationDocumentContext>();
+
+        foreach (var niche in snapshot.Niches.Where(niche => niche.StoreId == store.Id))
+        {
+            foreach (var group in snapshot.Groups.Where(group => group.StoreId == store.Id && group.NicheId == niche.Id && group.ParentGroupId is null))
+            {
+                AddGroupContexts(snapshot, contexts, group, [store.Id, niche.Id, group.Id], $"{store.Name} / {niche.Name} / {group.Name}");
+            }
+
+            foreach (var listing in snapshot.Listings.Where(listing => listing.StoreId == store.Id && listing.NicheId == niche.Id && listing.GroupId is null))
+            {
+                contexts.Add(NewListingContext(listing, [store.Id, niche.Id, listing.Id], $"{store.Name} / {niche.Name} / {listing.Name}"));
+            }
+        }
+
+        return contexts;
     }
+
+    private static void AddGroupContexts(
+        WorkspaceSnapshot snapshot,
+        List<NavigationDocumentContext> contexts,
+        TopicGroup group,
+        IReadOnlyList<Guid> nodePath,
+        string displayPath)
+    {
+        contexts.Add(NewNavigationContext(
+            group.Id,
+            group.Name,
+            WorkflowStage.Idea,
+            DocumentContextKind.Topic,
+            WorkspaceEntityKind.Group,
+            nodePath,
+            displayPath));
+
+        foreach (var childGroup in snapshot.Groups.Where(candidate => candidate.ParentGroupId == group.Id))
+        {
+            AddGroupContexts(snapshot, contexts, childGroup, [.. nodePath, childGroup.Id], $"{displayPath} / {childGroup.Name}");
+        }
+
+        foreach (var listing in snapshot.Listings.Where(listing => listing.GroupId == group.Id))
+        {
+            contexts.Add(NewListingContext(listing, [.. nodePath, listing.Id], $"{displayPath} / {listing.Name}"));
+        }
+    }
+
+    private static NavigationDocumentContext NewListingContext(
+        Listing listing,
+        IReadOnlyList<Guid> nodePath,
+        string displayPath) =>
+        NewNavigationContext(
+            listing.Id,
+            listing.Name,
+            WorkflowStageForListing(listing),
+            DocumentContextKind.Item,
+            WorkspaceEntityKind.Listing,
+            nodePath,
+            displayPath);
+
+    private static WorkflowStage WorkflowStageForListing(Listing listing) =>
+        listing.Status switch
+        {
+            ListingStatus.Ready => WorkflowStage.Design,
+            ListingStatus.Active => WorkflowStage.Listing,
+            _ => WorkflowStage.Idea
+        };
 
     private static NavigationDocumentContext NewNavigationContext(
         Guid contextId,
@@ -255,6 +361,23 @@ public sealed class MainWindowViewModel
             [],
             [],
             []);
+    }
+
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+    private sealed class InMemoryWorkspaceRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
+    {
+        private WorkspaceSnapshot _snapshot = snapshot;
+
+        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
+        {
+            _snapshot = snapshot;
+            return Task.CompletedTask;
+        }
+
+        public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(_snapshot);
     }
 }
 
