@@ -6,7 +6,7 @@ namespace FusionCanvas.Integration.Workspace;
 
 public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceRepository
 {
-    private const int CurrentSchemaVersion = 1;
+    private const int CurrentSchemaVersion = 2;
 
     private readonly string _databasePath = databasePath;
 
@@ -18,9 +18,16 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         await EnsureSchemaAsync(connection, cancellationToken);
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        foreach (var table in new[] { "asset_links", "listing_tags", "prompts", "assets", "listings", "groups", "niches", "tags", "stores" })
+        ValidateSnapshot(snapshot);
+
+        foreach (var table in new[] { "asset_links", "listing_tags", "prompts", "assets", "listings", "groups", "niches", "tags", "stores", "workspaces" })
         {
             await ExecuteAsync(connection, transaction, $"DELETE FROM {table};", cancellationToken);
+        }
+
+        foreach (var workspace in snapshot.Workspaces)
+        {
+            await InsertWorkspaceAsync(connection, transaction, workspace, cancellationToken);
         }
 
         foreach (var store in snapshot.Stores)
@@ -82,6 +89,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         await EnsureSchemaAsync(connection, cancellationToken);
 
         return new WorkspaceSnapshot(
+            await LoadWorkspacesAsync(connection, cancellationToken),
             await LoadStoresAsync(connection, cancellationToken),
             await LoadNichesAsync(connection, cancellationToken),
             await LoadGroupsAsync(connection, cancellationToken),
@@ -111,8 +119,19 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         }
 
         const string sql = """
+            CREATE TABLE IF NOT EXISTS workspaces (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NULL,
+                is_archived INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS stores (
                 id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
                 name TEXT NOT NULL,
                 description TEXT NULL,
                 is_archived INTEGER NOT NULL,
@@ -213,7 +232,52 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             """;
 
         await ExecuteAsync(connection, null, sql, cancellationToken);
+        if (schemaVersion < 2)
+        {
+            await MigrateToVersion2Async(connection, cancellationToken);
+        }
+
         await SetPragmaUserVersionAsync(connection, CurrentSchemaVersion, cancellationToken);
+    }
+
+    private static async Task MigrateToVersion2Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow.ToString("O");
+        await ExecuteAsync(connection, null, """
+            INSERT OR IGNORE INTO workspaces (id, name, description, is_archived, created_at, updated_at, metadata_json)
+            VALUES ($id, $name, NULL, 0, $created_at, $updated_at, '{}');
+            """, cancellationToken,
+            ("$id", WorkspaceDefaults.DefaultWorkspaceId.ToString()),
+            ("$name", WorkspaceDefaults.DefaultWorkspaceName),
+            ("$created_at", now),
+            ("$updated_at", now));
+
+        if (!await ColumnExistsAsync(connection, "stores", "workspace_id", cancellationToken).ConfigureAwait(false))
+        {
+            await ExecuteAsync(connection, null, "ALTER TABLE stores ADD COLUMN workspace_id TEXT NULL REFERENCES workspaces(id) ON DELETE RESTRICT;", cancellationToken);
+        }
+
+        await ExecuteAsync(connection, null, "UPDATE stores SET workspace_id = $workspace_id WHERE workspace_id IS NULL OR workspace_id = '';", cancellationToken, ("$workspace_id", WorkspaceDefaults.DefaultWorkspaceId.ToString()));
+    }
+
+    private static async Task<bool> ColumnExistsAsync(
+        SqliteConnection connection,
+        string tableName,
+        string columnName,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"PRAGMA table_info({tableName});";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static async Task<int> ReadPragmaUserVersionAsync(SqliteConnection connection, CancellationToken cancellationToken)
@@ -246,11 +310,17 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    private static Task InsertWorkspaceAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, FusionCanvas.Domain.Workspace.Workspace workspace, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO workspaces (id, name, description, is_archived, created_at, updated_at, metadata_json)
+            VALUES ($id, $name, $description, $is_archived, $created_at, $updated_at, $metadata_json);
+            """, cancellationToken, CommonParameters(workspace));
+
     private static Task InsertStoreAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Store store, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
-            INSERT INTO stores (id, name, description, is_archived, created_at, updated_at, metadata_json)
-            VALUES ($id, $name, $description, $is_archived, $created_at, $updated_at, $metadata_json);
-            """, cancellationToken, CommonParameters(store));
+            INSERT INTO stores (id, workspace_id, name, description, is_archived, created_at, updated_at, metadata_json)
+            VALUES ($id, $workspace_id, $name, $description, $is_archived, $created_at, $updated_at, $metadata_json);
+            """, cancellationToken, [.. CommonParameters(store), ("$workspace_id", store.WorkspaceId.ToString())]);
 
     private static Task InsertTagAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Tag tag, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
@@ -305,12 +375,23 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         ("$metadata_json", entity.MetadataJson)
     ];
 
+    private static async Task<IReadOnlyList<FusionCanvas.Domain.Workspace.Workspace>> LoadWorkspacesAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var workspaces = new List<FusionCanvas.Domain.Workspace.Workspace>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM workspaces ORDER BY name;", cancellationToken))
+        {
+            workspaces.Add(new FusionCanvas.Domain.Workspace.Workspace(ReadGuid(reader, "id"), ReadString(reader, "name"), ReadNullableString(reader, "description"), ReadBool(reader, "is_archived"), ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json")));
+        }
+
+        return workspaces;
+    }
+
     private static async Task<IReadOnlyList<Store>> LoadStoresAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
         var stores = new List<Store>();
         await foreach (var reader in ReadAsync(connection, "SELECT * FROM stores ORDER BY name;", cancellationToken))
         {
-            stores.Add(new Store(ReadGuid(reader, "id"), ReadString(reader, "name"), ReadNullableString(reader, "description"), ReadBool(reader, "is_archived"), ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json")));
+            stores.Add(new Store(ReadGuid(reader, "id"), ReadGuid(reader, "workspace_id"), ReadString(reader, "name"), ReadNullableString(reader, "description"), ReadBool(reader, "is_archived"), ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json")));
         }
 
         return stores;
@@ -439,4 +520,16 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
     private static bool ReadBool(SqliteDataReader reader, string name) => ReadInt(reader, name) == 1;
 
     private static DateTimeOffset ReadDate(SqliteDataReader reader, string name) => DateTimeOffset.Parse(ReadString(reader, name));
+
+    private static void ValidateSnapshot(WorkspaceSnapshot snapshot)
+    {
+        var workspaceIds = snapshot.Workspaces.Select(workspace => workspace.Id).ToHashSet();
+        foreach (var store in snapshot.Stores)
+        {
+            if (!workspaceIds.Contains(store.WorkspaceId))
+            {
+                throw new InvalidOperationException("Every store must belong to an existing workspace before saving.");
+            }
+        }
+    }
 }

@@ -180,7 +180,31 @@ public class StoreManagementServiceTests
         Assert.Empty(state.ArchivedStores);
     }
 
+    [Fact]
+    public async Task StoreManagement_IsScopedToActiveWorkspace()
+    {
+        var personal = NewWorkspace("Personal");
+        var client = NewWorkspace("Client");
+        var personalStore = NewStore("Shared Name") with { WorkspaceId = personal.Id };
+        var clientStore = NewStore("Client Store") with { WorkspaceId = client.Id };
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([personal, client], [personalStore, clientStore], [], [], [], [], [], [], [], []));
+        var service = new StoreManagementService(repository, () => Now, () => Guid.NewGuid());
+        service.SetActiveWorkspace(client.Id);
+
+        var state = await service.LoadAsync();
+        var allowedDuplicate = await service.CreateStoreAsync(new StoreManagementCreateRequest("Shared Name"));
+        var rejectedOtherWorkspaceStore = await service.SelectStoreAsync(personalStore.Id);
+
+        Assert.Equal(clientStore.Id, Assert.Single(state.ActiveStores).Id);
+        Assert.True(allowedDuplicate.Succeeded);
+        Assert.False(rejectedOtherWorkspaceStore.Succeeded);
+        Assert.Contains("active workspace", rejectedOtherWorkspaceStore.Error);
+    }
+
     private static Store NewStore(string name) =>
+        new(Guid.NewGuid(), name, null, false, Now, Now, "{}");
+
+    private static FusionCanvas.Domain.Workspace.Workspace NewWorkspace(string name) =>
         new(Guid.NewGuid(), name, null, false, Now, Now, "{}");
 
     private sealed class InMemoryWorkspaceRepository(WorkspaceSnapshot? snapshot = null) : IWorkspaceRepository

@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.Application.Workspace;
+using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.App.Stores;
 
@@ -594,6 +595,19 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
+        var state = await _service.LoadAsync(cancellationToken).ConfigureAwait(false);
+        ApplyState(state);
+        await LoadNichesForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task SetActiveWorkspaceAsync(Guid? workspaceId, CancellationToken cancellationToken = default)
+    {
+        _service.SetActiveWorkspace(workspaceId);
+        _nicheService?.SetActiveWorkspace(workspaceId);
+        _isCreatingNewStore = false;
+        _isCreatingNewNiche = false;
+        _draftStoreId = null;
+        _draftNicheId = null;
         var state = await _service.LoadAsync(cancellationToken).ConfigureAwait(false);
         ApplyState(state);
         await LoadNichesForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
@@ -1276,7 +1290,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
         var now = DateTimeOffset.Now;
         var name = string.IsNullOrWhiteSpace(NewStoreName) ? "New store" : NewStoreName.Trim();
-        return new StoreSummary(id, name, CurrentContext(), IsArchived: false, now, now);
+        return new StoreSummary(id, SelectedStore?.WorkspaceId ?? WorkspaceDefaults.DefaultWorkspaceId, name, CurrentContext(), false, now, now);
     }
 
     private NicheSummary? DraftNiche()

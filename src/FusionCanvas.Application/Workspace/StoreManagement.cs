@@ -18,6 +18,7 @@ public sealed record StoreManagementDeleteRequest(Guid StoreId, bool ConfirmPerm
 
 public sealed record StoreSummary(
     Guid Id,
+    Guid WorkspaceId,
     string Name,
     StoreContext Context,
     bool IsArchived,
@@ -25,6 +26,7 @@ public sealed record StoreSummary(
     DateTimeOffset UpdatedAt);
 
 public sealed record StoreManagementState(
+    Guid? ActiveWorkspaceId,
     IReadOnlyList<StoreSummary> ActiveStores,
     IReadOnlyList<StoreSummary> ArchivedStores,
     Guid? ActiveStoreId,
@@ -46,7 +48,11 @@ public sealed record StoreManagementResult(
 
 public interface IStoreManagementService
 {
+    Guid? ActiveWorkspaceId { get; }
+
     Guid? ActiveStoreId { get; }
+
+    void SetActiveWorkspace(Guid? workspaceId);
 
     Task<StoreManagementState> LoadAsync(CancellationToken cancellationToken = default);
 
@@ -73,6 +79,7 @@ public sealed class StoreManagementService : IStoreManagementService
     private readonly IWorkspaceRepository _repository;
     private readonly Func<DateTimeOffset> _clock;
     private readonly Func<Guid> _newId;
+    private Guid? _activeWorkspaceId;
     private Guid? _activeStoreId;
 
     public StoreManagementService(
@@ -85,11 +92,24 @@ public sealed class StoreManagementService : IStoreManagementService
         _newId = newId ?? Guid.NewGuid;
     }
 
+    public Guid? ActiveWorkspaceId => _activeWorkspaceId;
+
     public Guid? ActiveStoreId => _activeStoreId;
+
+    public void SetActiveWorkspace(Guid? workspaceId)
+    {
+        if (_activeWorkspaceId != workspaceId)
+        {
+            _activeStoreId = null;
+        }
+
+        _activeWorkspaceId = workspaceId;
+    }
 
     public async Task<StoreManagementState> LoadAsync(CancellationToken cancellationToken = default)
     {
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        EnsureActiveWorkspace(snapshot);
         return BuildState(snapshot);
     }
 
@@ -99,6 +119,11 @@ public sealed class StoreManagementService : IStoreManagementService
     {
         ArgumentNullException.ThrowIfNull(request);
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        if (EnsureActiveWorkspace(snapshot) is null)
+        {
+            return StoreManagementResult.Failure("Active workspace is required before creating stores.", BuildState(snapshot));
+        }
+
         var normalizedName = NormalizeName(request.Name);
         var validation = ValidateName(normalizedName, snapshot, existingStoreId: null);
         if (validation is not null)
@@ -108,8 +133,11 @@ public sealed class StoreManagementService : IStoreManagementService
 
         var now = _clock();
         var context = request.Context ?? new StoreContext();
-        var store = new Store(_newId(), normalizedName, NormalizeOptional(context.Description), false, now, now, ToMetadataJson(context));
-        var updated = snapshot with { Stores = [.. snapshot.Stores, store] };
+        var store = new Store(_newId(), _activeWorkspaceId!.Value, normalizedName, NormalizeOptional(context.Description), false, now, now, ToMetadataJson(context));
+        var workspaces = snapshot.Workspaces.Any(workspace => workspace.Id == store.WorkspaceId)
+            ? snapshot.Workspaces
+            : [.. snapshot.Workspaces, WorkspaceSnapshot.DefaultWorkspace(now)];
+        var updated = snapshot with { Workspaces = workspaces, Stores = [.. snapshot.Stores, store] };
         await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
 
         _activeStoreId = store.Id;
@@ -122,10 +150,16 @@ public sealed class StoreManagementService : IStoreManagementService
     {
         ArgumentNullException.ThrowIfNull(request);
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        EnsureActiveWorkspace(snapshot);
         var existing = snapshot.Stores.SingleOrDefault(store => store.Id == request.StoreId);
         if (existing is null)
         {
             return StoreManagementResult.Failure("Store was not found.", BuildState(snapshot));
+        }
+
+        if (existing.WorkspaceId != _activeWorkspaceId)
+        {
+            return StoreManagementResult.Failure("Store does not belong to the active workspace.", BuildState(snapshot));
         }
 
         var normalizedName = NormalizeName(request.Name);
@@ -156,10 +190,16 @@ public sealed class StoreManagementService : IStoreManagementService
     public async Task<StoreManagementResult> ArchiveStoreAsync(Guid storeId, CancellationToken cancellationToken = default)
     {
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        EnsureActiveWorkspace(snapshot);
         var existing = snapshot.Stores.SingleOrDefault(store => store.Id == storeId);
         if (existing is null)
         {
             return StoreManagementResult.Failure("Store was not found.", BuildState(snapshot));
+        }
+
+        if (existing.WorkspaceId != _activeWorkspaceId)
+        {
+            return StoreManagementResult.Failure("Store does not belong to the active workspace.", BuildState(snapshot));
         }
 
         var archived = existing with { IsArchived = true, UpdatedAt = _clock() };
@@ -180,14 +220,21 @@ public sealed class StoreManagementService : IStoreManagementService
     public async Task<StoreManagementResult> RestoreStoreAsync(Guid storeId, CancellationToken cancellationToken = default)
     {
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        EnsureActiveWorkspace(snapshot);
         var existing = snapshot.Stores.SingleOrDefault(store => store.Id == storeId);
         if (existing is null)
         {
             return StoreManagementResult.Failure("Store was not found.", BuildState(snapshot));
         }
 
+        if (existing.WorkspaceId != _activeWorkspaceId)
+        {
+            return StoreManagementResult.Failure("Store does not belong to the active workspace.", BuildState(snapshot));
+        }
+
         var duplicate = snapshot.Stores.Any(store =>
             store.Id != existing.Id &&
+            store.WorkspaceId == existing.WorkspaceId &&
             !store.IsArchived &&
             string.Equals(store.Name, existing.Name, StringComparison.OrdinalIgnoreCase));
         if (duplicate)
@@ -211,10 +258,16 @@ public sealed class StoreManagementService : IStoreManagementService
     {
         ArgumentNullException.ThrowIfNull(request);
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        EnsureActiveWorkspace(snapshot);
         var existing = snapshot.Stores.SingleOrDefault(store => store.Id == request.StoreId);
         if (existing is null)
         {
             return StoreManagementResult.Failure("Store was not found.", BuildState(snapshot));
+        }
+
+        if (existing.WorkspaceId != _activeWorkspaceId)
+        {
+            return StoreManagementResult.Failure("Store does not belong to the active workspace.", BuildState(snapshot));
         }
 
         if (!request.ConfirmPermanentDeletion)
@@ -244,10 +297,16 @@ public sealed class StoreManagementService : IStoreManagementService
     public async Task<StoreManagementResult> SelectStoreAsync(Guid storeId, CancellationToken cancellationToken = default)
     {
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        EnsureActiveWorkspace(snapshot);
         var existing = snapshot.Stores.SingleOrDefault(store => store.Id == storeId);
         if (existing is null)
         {
             return StoreManagementResult.Failure("Store was not found.", BuildState(snapshot));
+        }
+
+        if (existing.WorkspaceId != _activeWorkspaceId)
+        {
+            return StoreManagementResult.Failure("Store does not belong to the active workspace.", BuildState(snapshot));
         }
 
         if (existing.IsArchived)
@@ -261,19 +320,22 @@ public sealed class StoreManagementService : IStoreManagementService
 
     private StoreManagementState BuildState(WorkspaceSnapshot snapshot)
     {
+        EnsureActiveWorkspace(snapshot);
+
         if (_activeStoreId is Guid activeStoreId &&
-            snapshot.Stores.SingleOrDefault(store => store.Id == activeStoreId) is not { IsArchived: false })
+            snapshot.Stores.SingleOrDefault(store => store.Id == activeStoreId) is not { IsArchived: false } ||
+            _activeStoreId is Guid activeId && snapshot.Stores.SingleOrDefault(store => store.Id == activeId)?.WorkspaceId != _activeWorkspaceId)
         {
             _activeStoreId = null;
         }
 
         var activeStores = snapshot.Stores
-            .Where(store => !store.IsArchived)
+            .Where(store => store.WorkspaceId == _activeWorkspaceId && !store.IsArchived)
             .OrderBy(store => store.Name, StringComparer.OrdinalIgnoreCase)
             .Select(ToSummary)
             .ToArray();
         var archivedStores = snapshot.Stores
-            .Where(store => store.IsArchived)
+            .Where(store => store.WorkspaceId == _activeWorkspaceId && store.IsArchived)
             .OrderBy(store => store.Name, StringComparer.OrdinalIgnoreCase)
             .Select(ToSummary)
             .ToArray();
@@ -281,10 +343,32 @@ public sealed class StoreManagementService : IStoreManagementService
             ? activeStores.SingleOrDefault(store => store.Id == id)
             : null;
 
-        return new StoreManagementState(activeStores, archivedStores, _activeStoreId, activeStore, snapshot.Stores.Count == 0);
+        return new StoreManagementState(_activeWorkspaceId, activeStores, archivedStores, _activeStoreId, activeStore, _activeWorkspaceId is not null && !snapshot.Stores.Any(store => store.WorkspaceId == _activeWorkspaceId));
     }
 
-    private static string? ValidateName(string name, WorkspaceSnapshot snapshot, Guid? existingStoreId)
+    private Guid? EnsureActiveWorkspace(WorkspaceSnapshot snapshot)
+    {
+        if (_activeWorkspaceId is Guid activeWorkspaceId &&
+            snapshot.Workspaces.Any(workspace => workspace.Id == activeWorkspaceId && !workspace.IsArchived))
+        {
+            return _activeWorkspaceId;
+        }
+
+        _activeWorkspaceId = snapshot.Workspaces
+            .Where(workspace => !workspace.IsArchived)
+            .OrderBy(workspace => workspace.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(workspace => (Guid?)workspace.Id)
+            .FirstOrDefault();
+
+        if (_activeWorkspaceId is null && snapshot.Workspaces.Count == 0)
+        {
+            _activeWorkspaceId = WorkspaceDefaults.DefaultWorkspaceId;
+        }
+
+        return _activeWorkspaceId;
+    }
+
+    private string? ValidateName(string name, WorkspaceSnapshot snapshot, Guid? existingStoreId)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -293,6 +377,7 @@ public sealed class StoreManagementService : IStoreManagementService
 
         var duplicate = snapshot.Stores.Any(store =>
             store.Id != existingStoreId &&
+            store.WorkspaceId == _activeWorkspaceId &&
             !store.IsArchived &&
             string.Equals(store.Name, name, StringComparison.OrdinalIgnoreCase));
 
@@ -328,7 +413,7 @@ public sealed class StoreManagementService : IStoreManagementService
         };
 
     private static StoreSummary ToSummary(Store store) =>
-        new(store.Id, store.Name, ToContext(store), store.IsArchived, store.CreatedAt, store.UpdatedAt);
+        new(store.Id, store.WorkspaceId, store.Name, ToContext(store), store.IsArchived, store.CreatedAt, store.UpdatedAt);
 
     private static StoreContext ToContext(Store store)
     {

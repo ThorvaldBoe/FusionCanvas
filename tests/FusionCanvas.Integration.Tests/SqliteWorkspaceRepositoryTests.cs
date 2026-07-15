@@ -49,7 +49,7 @@ public class SqliteWorkspaceRepositoryTests
 
         await repository.SaveAsync(CreateCompleteSnapshot(), TestContext.Current.CancellationToken);
 
-        Assert.Equal(1, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(2, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public class SqliteWorkspaceRepositoryTests
         Assert.Equal(2, loaded.Stores.Count);
         Assert.Equal(active, loaded.Stores.Single(store => store.Id == active.Id));
         Assert.Equal(archived, loaded.Stores.Single(store => store.Id == archived.Id));
-        Assert.Equal(1, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(2, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -103,7 +103,7 @@ public class SqliteWorkspaceRepositoryTests
 
         Assert.Equal(first.Id, Assert.Single(loaded.Stores).Id);
         Assert.DoesNotContain(loaded.Stores, store => store.Id == deleted.Id);
-        Assert.Equal(1, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(2, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -141,7 +141,7 @@ public class SqliteWorkspaceRepositoryTests
         Assert.Equal(2, loaded.Niches.Count);
         Assert.Equal(active, loaded.Niches.Single(niche => niche.Id == active.Id));
         Assert.Equal(archived, loaded.Niches.Single(niche => niche.Id == archived.Id));
-        Assert.Equal(1, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(2, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -161,7 +161,7 @@ public class SqliteWorkspaceRepositoryTests
 
         Assert.Equal(kept.Id, Assert.Single(loaded.Niches).Id);
         Assert.DoesNotContain(loaded.Niches, niche => niche.Id == deleted.Id);
-        Assert.Equal(1, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(2, await ReadUserVersionAsync(databasePath));
     }
 
 
@@ -176,7 +176,7 @@ public class SqliteWorkspaceRepositoryTests
 
         await repository.LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(1, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(2, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -184,7 +184,7 @@ public class SqliteWorkspaceRepositoryTests
     {
         using var tempDirectory = new TemporaryDirectory();
         var databasePath = tempDirectory.GetPath("workspace.db");
-        await SetUserVersionAsync(databasePath, 2);
+        await SetUserVersionAsync(databasePath, 3);
         var repository = new SqliteWorkspaceRepository(databasePath);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -214,12 +214,35 @@ public class SqliteWorkspaceRepositoryTests
 
         await repository.SaveAsync(original, TestContext.Current.CancellationToken);
 
-        await Assert.ThrowsAsync<SqliteException>(
+        await Assert.ThrowsAnyAsync<Exception>(
             () => repository.SaveAsync(invalidSnapshot, TestContext.Current.CancellationToken));
         var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(original.Stores[0], Assert.Single(loaded.Stores));
         Assert.Equal(original.Tags[0], Assert.Single(loaded.Tags));
+    }
+
+    [Fact]
+    public async Task SaveAndLoadAsync_RoundTripsWorkspacesAndStoreOwnership()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("workspace.db");
+        var repository = new SqliteWorkspaceRepository(databasePath);
+        var now = new DateTimeOffset(2026, 7, 15, 12, 0, 0, TimeSpan.Zero);
+        var personal = new FusionCanvas.Domain.Workspace.Workspace(Guid.NewGuid(), "Personal", null, false, now, now, "{}");
+        var client = new FusionCanvas.Domain.Workspace.Workspace(Guid.NewGuid(), "Client", "Client work", false, now, now, """{"notes":"Retainer"}""");
+        var personalStore = new Store(Guid.NewGuid(), personal.Id, "Personal Store", null, false, now, now, "{}");
+        var clientStore = new Store(Guid.NewGuid(), client.Id, "Client Store", null, false, now, now, "{}");
+        var snapshot = new WorkspaceSnapshot([personal, client], [personalStore, clientStore], [], [], [], [], [], [], [], []);
+
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, loaded.Workspaces.Count);
+        Assert.Equal(personal, loaded.Workspaces.Single(workspace => workspace.Id == personal.Id));
+        Assert.Equal(client, loaded.Workspaces.Single(workspace => workspace.Id == client.Id));
+        Assert.Equal(personal.Id, loaded.Stores.Single(store => store.Id == personalStore.Id).WorkspaceId);
+        Assert.Equal(client.Id, loaded.Stores.Single(store => store.Id == clientStore.Id).WorkspaceId);
     }
 
     private static WorkspaceSnapshot CreateCompleteSnapshot()

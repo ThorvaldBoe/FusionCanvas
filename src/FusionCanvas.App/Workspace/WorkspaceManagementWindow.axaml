@@ -1,0 +1,205 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:workspace="clr-namespace:FusionCanvas.App.Workspace"
+        xmlns:workflow="clr-namespace:FusionCanvas.Application.Workspace;assembly=FusionCanvas.Application"
+        x:Class="FusionCanvas.App.Workspace.WorkspaceManagementWindow"
+        x:DataType="workspace:WorkspaceManagementViewModel"
+        Title="Workspace Management"
+        Width="780"
+        Height="560"
+        MinWidth="680"
+        MinHeight="500"
+        Background="#F7F8FA">
+  <Grid ColumnDefinitions="240,*">
+    <Border Grid.Column="0"
+            Background="#FFFFFF"
+            BorderBrush="#D9DEE7"
+            BorderThickness="0,0,1,0"
+            Padding="16">
+      <DockPanel LastChildFill="True">
+        <StackPanel DockPanel.Dock="Top"
+                    Spacing="8"
+                    Margin="0,0,0,16">
+          <TextBlock Text="Workspaces"
+                     FontSize="18"
+                     FontWeight="SemiBold"
+                     Foreground="#1E2733" />
+          <Button Content="New workspace"
+                  Command="{Binding StartCreateWorkspaceCommand}"
+                  Classes="primary" />
+        </StackPanel>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="12">
+            <TextBlock Text="Active"
+                       FontSize="12"
+                       FontWeight="SemiBold"
+                       Foreground="#687385" />
+            <ItemsControl ItemsSource="{Binding ActiveWorkspaces}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="workflow:WorkspaceSummary">
+                  <Button Content="{Binding Name}"
+                          Command="{Binding $parent[ItemsControl].DataContext.SelectWorkspaceCommand}"
+                          CommandParameter="{Binding}"
+                          Classes="listItem"
+                          HorizontalContentAlignment="Left" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock IsVisible="{Binding HasArchivedWorkspaces}"
+                       Text="Archived"
+                       FontSize="12"
+                       FontWeight="SemiBold"
+                       Foreground="#687385"
+                       Margin="0,8,0,0" />
+            <ItemsControl IsVisible="{Binding HasArchivedWorkspaces}"
+                          ItemsSource="{Binding ArchivedWorkspaces}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="workflow:WorkspaceSummary">
+                  <Button Content="{Binding Name}"
+                          Command="{Binding $parent[ItemsControl].DataContext.RestoreWorkspaceCommand}"
+                          CommandParameter="{Binding}"
+                          Classes="listItem"
+                          HorizontalContentAlignment="Left" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+
+    <Border Grid.Column="1"
+            Margin="18"
+            Padding="20"
+            Background="#FFFFFF"
+            BorderBrush="#D9DEE7"
+            BorderThickness="1">
+      <ScrollViewer>
+        <StackPanel Spacing="12">
+          <TextBlock Text="Workspace Management"
+                     FontSize="22"
+                     FontWeight="SemiBold"
+                     Foreground="#1E2733" />
+          <TextBlock Text="{Binding ErrorMessage}"
+                     IsVisible="{Binding HasError}"
+                     FontSize="12"
+                     Foreground="#9A4B43" />
+
+          <TextBox Text="{Binding WorkspaceName}"
+                   PlaceholderText="Workspace name"
+                   Classes="field" />
+          <TextBox Text="{Binding Description}"
+                   PlaceholderText="Description"
+                   Classes="field" />
+          <TextBox Text="{Binding Notes}"
+                   PlaceholderText="Notes"
+                   AcceptsReturn="True"
+                   MinHeight="96"
+                   Classes="field" />
+
+          <StackPanel Orientation="Horizontal"
+                      Spacing="8"
+                      Margin="0,8,0,0">
+            <Button Content="Create"
+                    IsVisible="{Binding IsCreatingNewWorkspace}"
+                    Command="{Binding CreateWorkspaceCommand}"
+                    Classes="primary fixedAction" />
+            <Button Content="Save"
+                    IsVisible="{Binding !IsCreatingNewWorkspace}"
+                    IsEnabled="{Binding CanSaveSelectedWorkspace}"
+                    Command="{Binding SaveSelectedWorkspaceCommand}"
+                    Classes="primary fixedAction" />
+            <Button Content="Archive"
+                    IsVisible="{Binding !IsCreatingNewWorkspace}"
+                    IsEnabled="{Binding CanArchiveSelectedWorkspace}"
+                    Command="{Binding ArchiveSelectedWorkspaceCommand}"
+                    Classes="secondary fixedAction" />
+            <Button Content="Delete"
+                    IsVisible="{Binding !IsCreatingNewWorkspace}"
+                    IsEnabled="{Binding CanDeleteSelectedWorkspace}"
+                    Command="{Binding RequestDeleteSelectedWorkspaceCommand}"
+                    Classes="danger fixedAction" />
+          </StackPanel>
+
+          <TextBlock IsVisible="{Binding HasArchivedWorkspaces}"
+                     Text="Select an archived workspace in the list to restore it."
+                     FontSize="12"
+                     Foreground="#687385" />
+
+          <Border IsVisible="{Binding DeleteWarningVisible}"
+                  Background="#FFF7F2"
+                  BorderBrush="#DFA481"
+                  BorderThickness="1"
+                  Padding="12"
+                  Margin="0,8,0,0">
+            <StackPanel Spacing="8">
+              <TextBlock Text="{Binding DeleteWarningMessage}"
+                         TextWrapping="Wrap"
+                         FontSize="13"
+                         Foreground="#6B3527" />
+              <TextBox Text="{Binding DeleteConfirmationName}"
+                       PlaceholderText="Type workspace name"
+                       Classes="field" />
+              <StackPanel Orientation="Horizontal"
+                          Spacing="8">
+                <Button Content="Delete permanently"
+                        Command="{Binding ConfirmDeleteWorkspaceCommand}"
+                        IsEnabled="{Binding CanConfirmDeleteWorkspace}"
+                        Classes="danger fixedDanger" />
+                <Button Content="Cancel"
+                        Command="{Binding CancelDeleteWorkspaceCommand}"
+                        Classes="secondary fixedAction" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
+  </Grid>
+  <Window.Styles>
+    <Style Selector="Button.primary">
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="#243447" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#243447" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.secondary">
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="Foreground" Value="#425066" />
+      <Setter Property="BorderBrush" Value="#D9DEE7" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="#8F3D31" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#8F3D31" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.listItem">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Margin" Value="0,0,0,6" />
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="#F7F8FA" />
+      <Setter Property="Foreground" Value="#243447" />
+      <Setter Property="BorderBrush" Value="#E1E5EA" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="TextBox.field">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="8" />
+    </Style>
+    <Style Selector="Button.fixedAction">
+      <Setter Property="Width" Value="104" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <Style Selector="Button.fixedDanger">
+      <Setter Property="Width" Value="156" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+  </Window.Styles>
+</Window>
