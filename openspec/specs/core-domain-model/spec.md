@@ -2,25 +2,38 @@
 
 ## Purpose
 
-Defines the initial FusionCanvas domain entities, their relationships, and the Phase 0 boundaries for topics, items, assets, prompts, and tags.
+Defines the initial FusionCanvas domain entities, their relationships, and the Phase 0 boundaries for workspaces, topics, items, assets, prompts, and tags.
 
 ## Requirements
 
 ### Requirement: Core domain entities are defined
-FusionCanvas SHALL define Store, Niche, Group, Listing, Asset, Prompt, and Tag as the Phase 0 core domain entities.
+FusionCanvas SHALL define Workspace, Store, Niche, Group, Listing, Asset, Prompt, and Tag as the Phase 0 and Phase 1 core organizational domain entities.
 
 #### Scenario: Contributor reviews the core model
 - **WHEN** a contributor inspects the domain model
-- **THEN** Store, Niche, Group, Listing, Asset, Prompt, and Tag are represented as named domain concepts
+- **THEN** Workspace, Store, Niche, Group, Listing, Asset, Prompt, and Tag are represented as named domain concepts
 - **AND** the model does not require future concepts such as Concept, Design, Mockup, Marketplace Product, Performance Record, Plugin Data, or Workflow Template
 
 ### Requirement: Store is the top-level business context
-A Store SHALL represent the top-level business or brand context for Print-on-Demand work.
+A Store SHALL represent a business, brand, client, or publishing context inside a Workspace.
 
-#### Scenario: Store owns workspace organization
+#### Scenario: Store owns workspace-local organization
 - **WHEN** a store is represented in the domain model
-- **THEN** it can contain niches, listings, assets, prompts, and tags as store-scoped work
+- **THEN** it belongs to a workspace
+- **AND** it can contain niches, listings, assets, prompts, and tags as store-scoped work
 - **AND** it is not required to have a parent store or marketplace account
+
+### Requirement: Workspace is the top-level organizational context
+A Workspace SHALL represent the highest-level user-facing organizational scope for separating personal, client, portfolio, or project settings.
+
+#### Scenario: Workspace owns store contexts
+- **WHEN** a workspace is represented in the domain model
+- **THEN** it can contain stores as workspace-scoped business contexts
+- **AND** it is not required to have a marketplace account, cloud account, or user permission model
+
+#### Scenario: Contributor explains the workspace hierarchy
+- **WHEN** a contributor reviews the model
+- **THEN** they can explain that workspaces contain stores, stores contain top-level niches, niches and groups form topic paths, and listings are item-like product concepts inside store topic context
 
 ### Requirement: Niches and groups are topic concepts
 The model SHALL distinguish topic concepts from item concepts. A Niche SHALL represent a top-level topic area inside a Store, and a Group SHALL represent a flexible nested topic below a Niche or another Group.
