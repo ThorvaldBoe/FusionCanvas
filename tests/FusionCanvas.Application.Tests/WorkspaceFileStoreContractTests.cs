@@ -10,7 +10,10 @@ public class WorkspaceFileStoreContractTests
     {
         IWorkspaceFileStore fileStore = new InMemoryWorkspaceFileStore();
 
-        var imported = await fileStore.ImportAsync(@"C:\imports\source.png", AssetKind.ExportedImage);
+        var imported = await fileStore.ImportAsync(
+            @"C:\imports\source.png",
+            AssetKind.ExportedImage,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal("source.png", imported.Name);
         Assert.Equal(AssetKind.ExportedImage, imported.Kind);

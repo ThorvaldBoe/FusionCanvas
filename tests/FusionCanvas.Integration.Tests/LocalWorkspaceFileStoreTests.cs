@@ -11,11 +11,14 @@ public class LocalWorkspaceFileStoreTests
         using var tempDirectory = new TemporaryDirectory();
         var sourcePath = tempDirectory.GetPath("source.png");
         var workspaceRoot = tempDirectory.GetPath("workspace");
-        await File.WriteAllTextAsync(sourcePath, "image-bytes");
+        await File.WriteAllTextAsync(sourcePath, "image-bytes", TestContext.Current.CancellationToken);
 
         var store = new LocalWorkspaceFileStore(workspaceRoot);
 
-        var imported = await store.ImportAsync(sourcePath, AssetKind.ExportedImage);
+        var imported = await store.ImportAsync(
+            sourcePath,
+            AssetKind.ExportedImage,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal("source.png", imported.Name);
         Assert.Equal(Path.GetFullPath(sourcePath), imported.OriginalSourcePath);
@@ -64,10 +67,13 @@ public class LocalWorkspaceFileStoreTests
         using var tempDirectory = new TemporaryDirectory();
         var sourcePath = tempDirectory.GetPath("source.svg");
         var workspaceRoot = tempDirectory.GetPath("workspace");
-        await File.WriteAllTextAsync(sourcePath, "<svg />");
+        await File.WriteAllTextAsync(sourcePath, "<svg />", TestContext.Current.CancellationToken);
         var store = new LocalWorkspaceFileStore(workspaceRoot);
 
-        var imported = await store.ImportAsync(sourcePath, AssetKind.Svg);
+        var imported = await store.ImportAsync(
+            sourcePath,
+            AssetKind.Svg,
+            TestContext.Current.CancellationToken);
         File.Delete(sourcePath);
 
         Assert.Equal(Path.GetFullPath(sourcePath), imported.OriginalSourcePath);
