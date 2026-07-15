@@ -107,6 +107,65 @@ public class SqliteWorkspaceRepositoryTests
     }
 
     [Fact]
+    public async Task SaveAndLoadAsync_RoundTripsNicheManagementFieldsWithoutSchemaChanges()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("workspace.db");
+        var repository = new SqliteWorkspaceRepository(databasePath);
+        var createdAt = new DateTimeOffset(2026, 7, 15, 12, 0, 0, TimeSpan.Zero);
+        var updatedAt = createdAt.AddMinutes(15);
+        var store = new Store(Guid.NewGuid(), "North Star Studio", null, false, createdAt, updatedAt, "{}");
+        var active = new Niche(
+            Guid.NewGuid(),
+            store.Id,
+            "Coffee",
+            "Warm drink designs",
+            false,
+            createdAt,
+            updatedAt,
+            """{"audience":"Coffee fans","humorStyle":"Gentle","visualStyleGuidance":"Vintage badges","constraints":"No logos","risks":"Crowded","researchNotes":"Fall works","notes":"Try cozy textures"}""");
+        var archived = new Niche(
+            Guid.NewGuid(),
+            store.Id,
+            "Paused",
+            "Inactive niche",
+            true,
+            createdAt,
+            updatedAt,
+            """{"notes":"Review later"}""");
+        var snapshot = new WorkspaceSnapshot([store], [active, archived], [], [], [], [], [], [], []);
+
+        await repository.SaveAsync(snapshot);
+        var loaded = await repository.LoadAsync();
+
+        Assert.Equal(2, loaded.Niches.Count);
+        Assert.Equal(active, loaded.Niches.Single(niche => niche.Id == active.Id));
+        Assert.Equal(archived, loaded.Niches.Single(niche => niche.Id == archived.Id));
+        Assert.Equal(1, await ReadUserVersionAsync(databasePath));
+    }
+
+    [Fact]
+    public async Task SaveAndLoadAsync_PersistsNicheDeletionThroughSnapshotReplacement()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("workspace.db");
+        var repository = new SqliteWorkspaceRepository(databasePath);
+        var createdAt = new DateTimeOffset(2026, 7, 15, 12, 0, 0, TimeSpan.Zero);
+        var store = new Store(Guid.NewGuid(), "North Star Studio", null, false, createdAt, createdAt, "{}");
+        var kept = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, createdAt, createdAt, "{}");
+        var deleted = new Niche(Guid.NewGuid(), store.Id, "Deleted", null, false, createdAt, createdAt, "{}");
+
+        await repository.SaveAsync(new WorkspaceSnapshot([store], [kept, deleted], [], [], [], [], [], [], []));
+        await repository.SaveAsync(new WorkspaceSnapshot([store], [kept], [], [], [], [], [], [], []));
+        var loaded = await repository.LoadAsync();
+
+        Assert.Equal(kept.Id, Assert.Single(loaded.Niches).Id);
+        Assert.DoesNotContain(loaded.Niches, niche => niche.Id == deleted.Id);
+        Assert.Equal(1, await ReadUserVersionAsync(databasePath));
+    }
+
+
+    [Fact]
     public async Task LoadAsync_UpgradesUnversionedDatabaseToCurrentSchemaVersion()
     {
         using var tempDirectory = new TemporaryDirectory();

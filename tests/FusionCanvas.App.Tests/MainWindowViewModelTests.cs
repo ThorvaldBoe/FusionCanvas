@@ -10,7 +10,7 @@ public class MainWindowViewModelTests
     public void OpenFromNavigation_OpensTabAndCoordinatesNavigationAndWorkflow()
     {
         var viewModel = new MainWindowViewModel();
-        var navigationContext = viewModel.NavigationContexts[2];
+        var navigationContext = ReadyListingContext(viewModel);
 
         viewModel.OpenFromNavigation(navigationContext);
 
@@ -25,25 +25,29 @@ public class MainWindowViewModelTests
     public void OpenFromNavigation_DoesNotDiscardExistingTabs()
     {
         var viewModel = new MainWindowViewModel();
+        var first = DraftListingContext(viewModel);
+        var second = ActiveListingContext(viewModel);
 
-        viewModel.OpenFromNavigation(viewModel.NavigationContexts[1]);
-        viewModel.OpenFromNavigation(viewModel.NavigationContexts[3]);
+        viewModel.OpenFromNavigation(first);
+        viewModel.OpenFromNavigation(second);
 
         Assert.Equal(2, viewModel.DocumentWindow.Tabs.Count);
-        Assert.Equal(viewModel.NavigationContexts[3].Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
+        Assert.Equal(second.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
     }
 
     [Fact]
     public void SelectingOpenTab_RecoordinatesNavigationAndWorkflow()
     {
         var viewModel = new MainWindowViewModel();
-        var first = viewModel.DocumentWindow.Open(viewModel.NavigationContexts[1].Context);
-        viewModel.DocumentWindow.Open(viewModel.NavigationContexts[3].Context);
+        var draft = DraftListingContext(viewModel);
+        var active = ActiveListingContext(viewModel);
+        var first = viewModel.DocumentWindow.Open(draft.Context);
+        viewModel.DocumentWindow.Open(active.Context);
 
         viewModel.DocumentWindow.SelectTab(first);
 
-        Assert.Equal(viewModel.NavigationContexts[1].Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
-        Assert.Equal(viewModel.NavigationContexts[1].Context.NavigationLocation?.NodePath[^1], viewModel.NavigationState.RevealedNodeId);
+        Assert.Equal(draft.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
+        Assert.Equal(draft.Context.NavigationLocation?.NodePath[^1], viewModel.NavigationState.RevealedNodeId);
         Assert.Equal(WorkflowStage.Idea, viewModel.WorkflowNavigator.ActiveViewStage);
     }
 
@@ -51,7 +55,7 @@ public class MainWindowViewModelTests
     public void SelectWorkflowStage_UpdatesDocumentAndNavigator()
     {
         var viewModel = new MainWindowViewModel();
-        viewModel.OpenFromNavigation(viewModel.NavigationContexts[1]);
+        viewModel.OpenFromNavigation(DraftListingContext(viewModel));
 
         viewModel.SelectWorkflowStage(WorkflowStage.Listing);
 
@@ -64,7 +68,7 @@ public class MainWindowViewModelTests
     public void ClosingLastTab_ClearsWorkflowNavigator()
     {
         var viewModel = new MainWindowViewModel();
-        var tab = viewModel.DocumentWindow.Open(viewModel.NavigationContexts[1].Context);
+        var tab = viewModel.DocumentWindow.Open(DraftListingContext(viewModel).Context);
 
         viewModel.DocumentWindow.CloseTab(tab);
 
@@ -77,7 +81,7 @@ public class MainWindowViewModelTests
     {
         var viewModel = new MainWindowViewModel();
 
-        viewModel.OpenFromNavigation(viewModel.NavigationContexts[0]);
+        viewModel.OpenFromNavigation(GroupContext(viewModel));
 
         Assert.True(viewModel.DocumentWindow.CanRunActiveTool);
         Assert.Equal("Idea", viewModel.DocumentWindow.ActiveStageToolName);
@@ -89,7 +93,7 @@ public class MainWindowViewModelTests
     public void ChangeToolScopeCommand_ReResolvesVisibleToolScope()
     {
         var viewModel = new MainWindowViewModel();
-        viewModel.OpenFromNavigation(viewModel.NavigationContexts[0]);
+        viewModel.OpenFromNavigation(GroupContext(viewModel));
 
         viewModel.DocumentWindow.ChangeToolScopeCommand.Execute(ToolContextScopeKind.CurrentSubtree);
 
@@ -100,7 +104,7 @@ public class MainWindowViewModelTests
     public void SelectWorkflowStage_RefreshesStageToolHost()
     {
         var viewModel = new MainWindowViewModel();
-        viewModel.OpenFromNavigation(viewModel.NavigationContexts[1]);
+        viewModel.OpenFromNavigation(DraftListingContext(viewModel));
 
         viewModel.SelectWorkflowStage(WorkflowStage.Design);
 
@@ -113,11 +117,31 @@ public class MainWindowViewModelTests
     public void TopicContextInItemBoundStage_ShowsItemRequiredState()
     {
         var viewModel = new MainWindowViewModel();
-        viewModel.OpenFromNavigation(viewModel.NavigationContexts[0]);
+        viewModel.OpenFromNavigation(GroupContext(viewModel));
 
         viewModel.SelectWorkflowStage(WorkflowStage.Concept);
 
         Assert.False(viewModel.DocumentWindow.CanRunActiveTool);
         Assert.Contains("requires a selected item", viewModel.DocumentWindow.ActiveStageToolUnavailableMessage);
     }
+
+    private static NavigationDocumentContext GroupContext(MainWindowViewModel viewModel) =>
+        viewModel.NavigationContexts.Single(context =>
+            context.Context.EntityKind == WorkspaceEntityKind.Group &&
+            context.Context.Title == "Dogs and coffee");
+
+    private static NavigationDocumentContext DraftListingContext(MainWindowViewModel viewModel) =>
+        viewModel.NavigationContexts.Single(context =>
+            context.Context.EntityKind == WorkspaceEntityKind.Listing &&
+            context.Context.Title == "Morning coffee idea");
+
+    private static NavigationDocumentContext ReadyListingContext(MainWindowViewModel viewModel) =>
+        viewModel.NavigationContexts.Single(context =>
+            context.Context.EntityKind == WorkspaceEntityKind.Listing &&
+            context.Context.Title == "Retro mug design");
+
+    private static NavigationDocumentContext ActiveListingContext(MainWindowViewModel viewModel) =>
+        viewModel.NavigationContexts.Single(context =>
+            context.Context.EntityKind == WorkspaceEntityKind.Listing &&
+            context.Context.Title == "Espresso listing draft");
 }

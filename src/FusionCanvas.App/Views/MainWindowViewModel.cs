@@ -22,17 +22,23 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     private readonly IToolContextResolver _toolContextResolver;
     private readonly IStageToolHostService _stageToolHostService;
-    private readonly WorkspaceSnapshot _workspaceSnapshot;
+    private readonly IWorkspaceRepository? _workspaceRepository;
+    private WorkspaceSnapshot _workspaceSnapshot;
     private IReadOnlyList<NavigationDocumentContext> _navigationContexts = [];
 
     public MainWindowViewModel()
+        : this(CreateSampleWorkspace())
+    {
+    }
+
+    private MainWindowViewModel(WorkspaceSnapshot sampleWorkspace)
         : this(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
             new DocumentWindowViewModel(),
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            new StoreManagementService(new InMemoryWorkspaceRepository(CreateSampleWorkspace())),
-            CreateSampleWorkspace())
+            new InMemoryWorkspaceRepository(sampleWorkspace),
+            sampleWorkspace)
     {
     }
 
@@ -55,7 +61,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             documentWindow,
             toolContextResolver,
             stageToolHostService,
-            new StoreManagementService(runtime.Repository),
+            runtime.Repository,
             runtime.Snapshot)
     {
     }
@@ -68,7 +74,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             documentWindow,
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            new StoreManagementService(new InMemoryWorkspaceRepository(CreateSampleWorkspace())),
+            new InMemoryWorkspaceRepository(CreateSampleWorkspace()),
             CreateSampleWorkspace())
     {
     }
@@ -80,10 +86,29 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IStageToolHostService stageToolHostService,
         IStoreManagementService storeManagementService,
         WorkspaceSnapshot workspaceSnapshot)
+        : this(
+            workflowNavigator,
+            documentWindow,
+            toolContextResolver,
+            stageToolHostService,
+            storeManagementService,
+            null,
+            workspaceSnapshot)
+    {
+    }
+
+    public MainWindowViewModel(
+        WorkflowStageNavigatorViewModel workflowNavigator,
+        DocumentWindowViewModel documentWindow,
+        IToolContextResolver toolContextResolver,
+        IStageToolHostService stageToolHostService,
+        IStoreManagementService storeManagementService,
+        INicheManagementService? nicheManagementService,
+        WorkspaceSnapshot workspaceSnapshot)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
-        StoreManagement = new StoreManagementViewModel(storeManagementService);
+        StoreManagement = new StoreManagementViewModel(storeManagementService, nicheManagementService);
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
         _workspaceSnapshot = workspaceSnapshot;
@@ -103,6 +128,47 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             }
         });
         StoreManagement.ActiveStoreChanged += (_, store) => RebuildNavigationContexts(store);
+        StoreManagement.WorkspaceStructureChanged += (_, _) => RefreshWorkspaceSnapshot();
+        InitializeStores();
+        DocumentWindow.ActiveContextChanged += (_, context) => CoordinateActiveContext(context);
+        DocumentWindow.ToolScopeChangeRequested += (_, scope) => ResolveActiveToolContext(scope);
+        DocumentWindow.StageToolSelectionRequested += (_, toolId) => SelectStageTool(toolId);
+    }
+
+    public MainWindowViewModel(
+        WorkflowStageNavigatorViewModel workflowNavigator,
+        DocumentWindowViewModel documentWindow,
+        IToolContextResolver toolContextResolver,
+        IStageToolHostService stageToolHostService,
+        IWorkspaceRepository workspaceRepository,
+        WorkspaceSnapshot workspaceSnapshot)
+    {
+        WorkflowNavigator = workflowNavigator;
+        DocumentWindow = documentWindow;
+        StoreManagement = new StoreManagementViewModel(
+            new StoreManagementService(workspaceRepository),
+            new NicheManagementService(workspaceRepository));
+        _toolContextResolver = toolContextResolver;
+        _stageToolHostService = stageToolHostService;
+        _workspaceRepository = workspaceRepository;
+        _workspaceSnapshot = workspaceSnapshot;
+        NavigationState = new NavigationTreePresentationState();
+        OpenNavigationContextCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is NavigationDocumentContext navigationContext)
+            {
+                OpenFromNavigation(navigationContext);
+            }
+        });
+        SelectWorkflowStageCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is WorkflowStage stage)
+            {
+                SelectWorkflowStage(stage);
+            }
+        });
+        StoreManagement.ActiveStoreChanged += (_, store) => RebuildNavigationContexts(store);
+        StoreManagement.WorkspaceStructureChanged += (_, _) => RefreshWorkspaceSnapshot();
         InitializeStores();
         DocumentWindow.ActiveContextChanged += (_, context) => CoordinateActiveContext(context);
         DocumentWindow.ToolScopeChangeRequested += (_, scope) => ResolveActiveToolContext(scope);
@@ -160,6 +226,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     private void RebuildNavigationContexts(StoreSummary? selectedStore) =>
         NavigationContexts = CreateNavigationContexts(_workspaceSnapshot, selectedStore);
+
+    private void RefreshWorkspaceSnapshot()
+    {
+        if (_workspaceRepository is not null)
+        {
+            _workspaceSnapshot = _workspaceRepository.LoadAsync().GetAwaiter().GetResult();
+        }
+
+        RebuildNavigationContexts(StoreManagement.SelectedStore);
+    }
 
     private void CoordinateActiveContext(DocumentContext? context)
     {
@@ -251,14 +327,23 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 "{}");
         var contexts = new List<NavigationDocumentContext>();
 
-        foreach (var niche in snapshot.Niches.Where(niche => niche.StoreId == store.Id))
+        foreach (var niche in snapshot.Niches.Where(niche => niche.StoreId == store.Id && !niche.IsArchived))
         {
-            foreach (var group in snapshot.Groups.Where(group => group.StoreId == store.Id && group.NicheId == niche.Id && group.ParentGroupId is null))
+            contexts.Add(NewNavigationContext(
+                niche.Id,
+                niche.Name,
+                WorkflowStage.Idea,
+                DocumentContextKind.Topic,
+                WorkspaceEntityKind.Niche,
+                [store.Id, niche.Id],
+                $"{store.Name} / {niche.Name}"));
+
+            foreach (var group in snapshot.Groups.Where(group => group.StoreId == store.Id && group.NicheId == niche.Id && group.ParentGroupId is null && !group.IsArchived))
             {
                 AddGroupContexts(snapshot, contexts, group, [store.Id, niche.Id, group.Id], $"{store.Name} / {niche.Name} / {group.Name}");
             }
 
-            foreach (var listing in snapshot.Listings.Where(listing => listing.StoreId == store.Id && listing.NicheId == niche.Id && listing.GroupId is null))
+            foreach (var listing in snapshot.Listings.Where(listing => listing.StoreId == store.Id && listing.NicheId == niche.Id && listing.GroupId is null && !listing.IsArchived))
             {
                 contexts.Add(NewListingContext(listing, [store.Id, niche.Id, listing.Id], $"{store.Name} / {niche.Name} / {listing.Name}"));
             }
@@ -283,12 +368,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             nodePath,
             displayPath));
 
-        foreach (var childGroup in snapshot.Groups.Where(candidate => candidate.ParentGroupId == group.Id))
+        foreach (var childGroup in snapshot.Groups.Where(candidate => candidate.ParentGroupId == group.Id && !candidate.IsArchived))
         {
             AddGroupContexts(snapshot, contexts, childGroup, [.. nodePath, childGroup.Id], $"{displayPath} / {childGroup.Name}");
         }
 
-        foreach (var listing in snapshot.Listings.Where(listing => listing.GroupId == group.Id))
+        foreach (var listing in snapshot.Listings.Where(listing => listing.GroupId == group.Id && !listing.IsArchived))
         {
             contexts.Add(NewListingContext(listing, [.. nodePath, listing.Id], $"{displayPath} / {listing.Name}"));
         }

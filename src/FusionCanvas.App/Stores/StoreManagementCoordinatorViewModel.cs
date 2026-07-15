@@ -13,6 +13,12 @@ public sealed record StoreSelectorEntry(StoreSummary Store, bool IsSelected)
     public string Name => Store.Name;
 }
 
+public enum StoreManagementEditorTab
+{
+    BasicInfo,
+    Niches
+}
+
 public sealed class StoreManagementViewModel : INotifyPropertyChanged
 {
     private enum PendingEditorAction
@@ -20,7 +26,11 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         None,
         SelectStore,
         StartNewStore,
-        CloseEditor
+        CloseEditor,
+        SelectNiche,
+        StartNewNiche,
+        SelectBasicInfoTab,
+        SelectNichesTab
     }
 
     private sealed record EditorState(
@@ -31,34 +41,70 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         string BrandDirection,
         string PlanningContext);
 
+    private sealed record NicheEditorState(
+        string Name,
+        string Description,
+        string Audience,
+        string HumorStyle,
+        string VisualStyleGuidance,
+        string Constraints,
+        string Risks,
+        string ResearchNotes,
+        string Notes);
+
     private readonly IStoreManagementService _service;
+    private readonly INicheManagementService? _nicheService;
     private bool _isSelectorExpanded;
     private bool _isStoreEditorOpen;
     private bool _firstStorePromptDismissed;
     private bool _deleteWarningVisible;
+    private bool _nicheDeleteWarningVisible;
     private bool _discardChangesPromptVisible;
     private bool _isCreatingNewStore;
+    private bool _isCreatingNewNiche;
     private Guid? _draftStoreId;
+    private Guid? _draftNicheId;
     private StoreSummary? _pendingDeleteStore;
+    private NicheSummary? _pendingDeleteNiche;
     private StoreSummary? _pendingEditorStore;
+    private NicheSummary? _pendingEditorNiche;
     private PendingEditorAction _pendingEditorAction;
     private EditorState _originalEditorState = EmptyEditorState();
+    private NicheEditorState _originalNicheEditorState = EmptyNicheEditorState();
+    private StoreManagementEditorTab _selectedEditorTab;
     private string _newStoreName = string.Empty;
     private string _description = string.Empty;
     private string _notes = string.Empty;
     private string _targetMarket = string.Empty;
     private string _brandDirection = string.Empty;
     private string _planningContext = string.Empty;
+    private string _nicheName = string.Empty;
+    private string _nicheDescription = string.Empty;
+    private string _nicheAudience = string.Empty;
+    private string _nicheHumorStyle = string.Empty;
+    private string _nicheVisualStyleGuidance = string.Empty;
+    private string _nicheConstraints = string.Empty;
+    private string _nicheRisks = string.Empty;
+    private string _nicheResearchNotes = string.Empty;
+    private string _nicheNotes = string.Empty;
     private string? _errorMessage;
 
-    public StoreManagementViewModel(IStoreManagementService service)
+    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
+        _nicheService = nicheService;
         ToggleStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = !IsSelectorExpanded);
         ExpandStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = true);
         CollapseStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = false);
-        OpenStoreEditorCommand = new RelayCommand(_ => OpenStoreEditor());
+        OpenStoreEditorCommand = new RelayCommand(_ => OpenBasicInfoTab());
+        OpenNichesTabCommand = new RelayCommand(_ =>
+        {
+            OpenNichesTab();
+        });
+        SelectBasicInfoTabCommand = new RelayCommand(_ => SelectBasicInfoTab());
+        SelectNichesTabCommand = new RelayCommand(_ => SelectNichesTab());
         StartCreateStoreCommand = new RelayCommand(_ => StartCreateStore());
+        StartCreateNicheCommand = new RelayCommand(_ => StartCreateNiche());
         CloseStoreEditorCommand = new RelayCommand(_ => TryCloseStoreEditor());
         AcceptFirstStorePromptCommand = new RelayCommand(_ =>
         {
@@ -107,6 +153,32 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         RequestDeleteSelectedStoreCommand = new RelayCommand(_ => RequestDeleteSelectedStore());
         ConfirmDeleteStoreCommand = new RelayCommand(_ => Run(ConfirmDeleteStoreAsync()));
         CancelDeleteStoreCommand = new RelayCommand(_ => ClearDeleteWarning());
+        SelectNicheCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is NicheSummary niche)
+            {
+                Run(SelectNicheAsync(niche));
+            }
+        });
+        EditNicheCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is NicheSummary niche)
+            {
+                SelectNicheForEditing(niche);
+            }
+        });
+        SaveSelectedNicheCommand = new RelayCommand(_ => Run(SaveSelectedNicheAsync()));
+        ArchiveSelectedNicheCommand = new RelayCommand(_ => Run(ArchiveSelectedNicheAsync()));
+        RestoreNicheCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is NicheSummary niche)
+            {
+                Run(RestoreNicheAsync(niche));
+            }
+        });
+        RequestDeleteSelectedNicheCommand = new RelayCommand(_ => RequestDeleteSelectedNiche());
+        ConfirmDeleteNicheCommand = new RelayCommand(_ => Run(ConfirmDeleteNicheAsync()));
+        CancelDeleteNicheCommand = new RelayCommand(_ => ClearNicheDeleteWarning());
         ConfirmDiscardChangesCommand = new RelayCommand(_ => ConfirmDiscardChanges());
         KeepEditingCommand = new RelayCommand(_ => ClearDiscardChangesPrompt());
     }
@@ -114,6 +186,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public event EventHandler<StoreSummary?>? ActiveStoreChanged;
+
+    public event EventHandler? WorkspaceStructureChanged;
 
     public event EventHandler? StoreNameFocusRequested;
 
@@ -123,6 +197,15 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public IReadOnlyList<StoreSelectorEntry> SelectorStores { get; private set; } = [];
 
+    public IReadOnlyList<NicheSummary> ActiveNiches { get; private set; } = [];
+
+    public IReadOnlyList<NicheSummary> ArchivedNiches { get; private set; } = [];
+
+    public IReadOnlyList<NicheSummary> EditorActiveNiches =>
+        _isCreatingNewNiche && DraftNiche() is { } draft
+            ? ActiveNiches.Concat([draft]).ToArray()
+            : ActiveNiches;
+
     public IReadOnlyList<StoreSummary> EditorActiveStores =>
         _isCreatingNewStore && DraftStore() is { } draft
             ? ActiveStores.Concat([draft]).ToArray()
@@ -130,17 +213,33 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public StoreSummary? SelectedStore { get; private set; }
 
+    public NicheSummary? SelectedNiche { get; private set; }
+
     public bool NeedsFirstStore { get; private set; }
 
     public bool HasActiveStores => ActiveStores.Count > 0;
 
     public bool HasArchivedStores => ArchivedStores.Count > 0;
 
+    public bool HasActiveNiches => ActiveNiches.Count > 0;
+
+    public bool HasArchivedNiches => ArchivedNiches.Count > 0;
+
+    public bool NeedsFirstNiche { get; private set; }
+
     public bool HasSelectedStore => SelectedStore is not null;
+
+    public bool HasSelectedNiche => SelectedNiche is not null;
 
     public bool CanRestoreSelectedStore => SelectedStore is { IsArchived: true };
 
+    public bool CanRestoreSelectedNiche => SelectedNiche is { IsArchived: true };
+
     public bool HasUnsavedChanges => CurrentEditorState() != _originalEditorState;
+
+    public bool HasUnsavedNicheChanges => CurrentNicheEditorState() != _originalNicheEditorState;
+
+    public bool HasAnyUnsavedChanges => HasUnsavedChanges || HasUnsavedNicheChanges;
 
     public bool CanSaveSelectedStore => _isCreatingNewStore || (SelectedStore is not null && HasUnsavedChanges);
 
@@ -148,9 +247,32 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public bool CanDeleteSelectedStore => SelectedStore is not null && !_isCreatingNewStore;
 
+    public bool CanSaveSelectedNiche => _nicheService is not null && (_isCreatingNewNiche || (SelectedNiche is not null && HasUnsavedNicheChanges));
+
+    public bool CanArchiveSelectedNiche => _nicheService is not null && SelectedNiche is { IsArchived: false } && !_isCreatingNewNiche;
+
+    public bool CanDeleteSelectedNiche => _nicheService is not null && SelectedNiche is not null && !_isCreatingNewNiche;
+
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     public bool ShouldShowFirstStorePrompt => NeedsFirstStore && !_firstStorePromptDismissed && !IsStoreEditorOpen;
+
+    public bool IsBasicInfoTabSelected => SelectedEditorTab == StoreManagementEditorTab.BasicInfo;
+
+    public bool IsNichesTabSelected => SelectedEditorTab == StoreManagementEditorTab.Niches;
+
+    public StoreManagementEditorTab SelectedEditorTab
+    {
+        get => _selectedEditorTab;
+        private set
+        {
+            if (SetField(ref _selectedEditorTab, value))
+            {
+                OnPropertyChanged(nameof(IsBasicInfoTabSelected));
+                OnPropertyChanged(nameof(IsNichesTabSelected));
+            }
+        }
+    }
 
     public string SelectorToggleGlyph => IsSelectorExpanded ? "▲" : "▼";
 
@@ -190,6 +312,12 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         private set => SetField(ref _deleteWarningVisible, value);
     }
 
+    public bool NicheDeleteWarningVisible
+    {
+        get => _nicheDeleteWarningVisible;
+        private set => SetField(ref _nicheDeleteWarningVisible, value);
+    }
+
     public bool DiscardChangesPromptVisible
     {
         get => _discardChangesPromptVisible;
@@ -200,7 +328,13 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         ? "Permanent deletion cannot be undone."
         : $"Delete '{_pendingDeleteStore.Name}' permanently? This cannot be undone.";
 
-    public string DiscardChangesMessage => "Discard changes? Unsaved store edits will be lost.";
+    public string NicheDeleteWarningMessage => _pendingDeleteNiche is null
+        ? "Permanent deletion cannot be undone."
+        : $"Delete niche '{_pendingDeleteNiche.Name}' permanently? This cannot be undone.";
+
+    public string DiscardChangesMessage => HasUnsavedNicheChanges && !HasUnsavedChanges
+        ? "Discard changes? Unsaved niche edits will be lost."
+        : "Discard changes? Unsaved store or niche edits will be lost.";
 
     public string NewStoreName
     {
@@ -275,6 +409,115 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         }
     }
 
+    public string NicheName
+    {
+        get => _nicheName;
+        set
+        {
+            if (SetField(ref _nicheName, value))
+            {
+                RaiseNicheEditorStateProperties();
+                OnPropertyChanged(nameof(EditorActiveNiches));
+            }
+        }
+    }
+
+    public string NicheDescription
+    {
+        get => _nicheDescription;
+        set
+        {
+            if (SetField(ref _nicheDescription, value))
+            {
+                RaiseNicheEditorStateProperties();
+            }
+        }
+    }
+
+    public string NicheAudience
+    {
+        get => _nicheAudience;
+        set
+        {
+            if (SetField(ref _nicheAudience, value))
+            {
+                RaiseNicheEditorStateProperties();
+            }
+        }
+    }
+
+    public string NicheHumorStyle
+    {
+        get => _nicheHumorStyle;
+        set
+        {
+            if (SetField(ref _nicheHumorStyle, value))
+            {
+                RaiseNicheEditorStateProperties();
+            }
+        }
+    }
+
+    public string NicheVisualStyleGuidance
+    {
+        get => _nicheVisualStyleGuidance;
+        set
+        {
+            if (SetField(ref _nicheVisualStyleGuidance, value))
+            {
+                RaiseNicheEditorStateProperties();
+            }
+        }
+    }
+
+    public string NicheConstraints
+    {
+        get => _nicheConstraints;
+        set
+        {
+            if (SetField(ref _nicheConstraints, value))
+            {
+                RaiseNicheEditorStateProperties();
+            }
+        }
+    }
+
+    public string NicheRisks
+    {
+        get => _nicheRisks;
+        set
+        {
+            if (SetField(ref _nicheRisks, value))
+            {
+                RaiseNicheEditorStateProperties();
+            }
+        }
+    }
+
+    public string NicheResearchNotes
+    {
+        get => _nicheResearchNotes;
+        set
+        {
+            if (SetField(ref _nicheResearchNotes, value))
+            {
+                RaiseNicheEditorStateProperties();
+            }
+        }
+    }
+
+    public string NicheNotes
+    {
+        get => _nicheNotes;
+        set
+        {
+            if (SetField(ref _nicheNotes, value))
+            {
+                RaiseNicheEditorStateProperties();
+            }
+        }
+    }
+
     public string? ErrorMessage
     {
         get => _errorMessage;
@@ -295,7 +538,15 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public ICommand OpenStoreEditorCommand { get; }
 
+    public ICommand OpenNichesTabCommand { get; }
+
+    public ICommand SelectBasicInfoTabCommand { get; }
+
+    public ICommand SelectNichesTabCommand { get; }
+
     public ICommand StartCreateStoreCommand { get; }
+
+    public ICommand StartCreateNicheCommand { get; }
 
     public ICommand CloseStoreEditorCommand { get; }
 
@@ -321,6 +572,22 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public ICommand CancelDeleteStoreCommand { get; }
 
+    public ICommand SelectNicheCommand { get; }
+
+    public ICommand EditNicheCommand { get; }
+
+    public ICommand SaveSelectedNicheCommand { get; }
+
+    public ICommand ArchiveSelectedNicheCommand { get; }
+
+    public ICommand RestoreNicheCommand { get; }
+
+    public ICommand RequestDeleteSelectedNicheCommand { get; }
+
+    public ICommand ConfirmDeleteNicheCommand { get; }
+
+    public ICommand CancelDeleteNicheCommand { get; }
+
     public ICommand ConfirmDiscardChangesCommand { get; }
 
     public ICommand KeepEditingCommand { get; }
@@ -329,6 +596,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     {
         var state = await _service.LoadAsync(cancellationToken).ConfigureAwait(false);
         ApplyState(state);
+        await LoadNichesForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task CreateStoreAsync(CancellationToken cancellationToken = default)
@@ -362,7 +630,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             return;
         }
 
-        if (HasUnsavedChanges && SelectedStore?.Id != store.Id)
+        if (HasAnyUnsavedChanges && SelectedStore?.Id != store.Id)
         {
             RequestDiscardBefore(PendingEditorAction.SelectStore, store);
             return;
@@ -385,11 +653,12 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(HasSelectedStore));
         OnPropertyChanged(nameof(CanRestoreSelectedStore));
         RaiseEditorActionProperties();
+        Run(LoadNichesForSelectedStoreAsync());
     }
 
     public void StartCreateStore()
     {
-        if (HasUnsavedChanges)
+        if (HasAnyUnsavedChanges)
         {
             RequestDiscardBefore(PendingEditorAction.StartNewStore);
             return;
@@ -402,6 +671,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     {
         _isCreatingNewStore = true;
         _draftStoreId = Guid.NewGuid();
+        ClearNicheSelection();
         SelectedStore = DraftStore();
         ErrorMessage = null;
         ClearDeleteWarning();
@@ -414,6 +684,75 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanRestoreSelectedStore));
         RaiseEditorActionProperties();
         StoreNameFocusRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void SelectNicheForEditing(NicheSummary niche)
+    {
+        ArgumentNullException.ThrowIfNull(niche);
+        if (_isCreatingNewNiche && niche.Id == _draftNicheId)
+        {
+            SelectedNiche = DraftNiche();
+            OnPropertyChanged(nameof(SelectedNiche));
+            return;
+        }
+
+        if (HasUnsavedNicheChanges && SelectedNiche?.Id != niche.Id)
+        {
+            RequestDiscardBefore(PendingEditorAction.SelectNiche, niche: niche);
+            return;
+        }
+
+        PerformSelectNicheForEditing(niche);
+    }
+
+    private void PerformSelectNicheForEditing(NicheSummary niche)
+    {
+        _isCreatingNewNiche = false;
+        _draftNicheId = null;
+        SelectedNiche = niche;
+        ApplySelectedNicheFields(niche);
+        CaptureOriginalNicheEditorState();
+        ClearNicheDeleteWarning();
+        ClearDiscardChangesPrompt();
+        OnPropertyChanged(nameof(SelectedNiche));
+        OnPropertyChanged(nameof(EditorActiveNiches));
+        OnPropertyChanged(nameof(HasSelectedNiche));
+        OnPropertyChanged(nameof(CanRestoreSelectedNiche));
+        RaiseNicheEditorActionProperties();
+    }
+
+    public void StartCreateNiche()
+    {
+        if (SelectedStore is null || SelectedStore.IsArchived || _isCreatingNewStore)
+        {
+            ErrorMessage = "Select an active saved store before creating a niche.";
+            return;
+        }
+
+        if (HasUnsavedNicheChanges)
+        {
+            RequestDiscardBefore(PendingEditorAction.StartNewNiche);
+            return;
+        }
+
+        BeginCreateNicheDraft();
+    }
+
+    private void BeginCreateNicheDraft()
+    {
+        _isCreatingNewNiche = true;
+        _draftNicheId = Guid.NewGuid();
+        SelectedNiche = DraftNiche();
+        ErrorMessage = null;
+        ClearNicheDeleteWarning();
+        ClearDiscardChangesPrompt();
+        ClearNicheEditorFields();
+        CaptureOriginalNicheEditorState();
+        OnPropertyChanged(nameof(SelectedNiche));
+        OnPropertyChanged(nameof(EditorActiveNiches));
+        OnPropertyChanged(nameof(HasSelectedNiche));
+        OnPropertyChanged(nameof(CanRestoreSelectedNiche));
+        RaiseNicheEditorActionProperties();
     }
 
     public async Task SaveSelectedStoreAsync(CancellationToken cancellationToken = default)
@@ -454,6 +793,48 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         ApplyResult(result);
     }
 
+    public async Task SaveSelectedNicheAsync(CancellationToken cancellationToken = default)
+    {
+        if (_nicheService is null)
+        {
+            ErrorMessage = "Niche management is not available.";
+            return;
+        }
+
+        if (SelectedStore is null)
+        {
+            ErrorMessage = "Select a store before saving a niche.";
+            return;
+        }
+
+        if (_isCreatingNewNiche)
+        {
+            var createResult = await _nicheService.CreateNicheAsync(
+                new NicheManagementCreateRequest(SelectedStore.Id, NicheName, CurrentNicheContext()),
+                cancellationToken).ConfigureAwait(false);
+
+            if (createResult.Succeeded)
+            {
+                _isCreatingNewNiche = false;
+                _draftNicheId = null;
+            }
+
+            ApplyNicheResult(createResult);
+            return;
+        }
+
+        if (SelectedNiche is null)
+        {
+            ErrorMessage = "Select a niche before saving.";
+            return;
+        }
+
+        var result = await _nicheService.UpdateNicheAsync(
+            new NicheManagementUpdateRequest(SelectedNiche.Id, NicheName, CurrentNicheContext()),
+            cancellationToken).ConfigureAwait(false);
+        ApplyNicheResult(result);
+    }
+
     public async Task ArchiveSelectedStoreAsync(CancellationToken cancellationToken = default)
     {
         if (_isCreatingNewStore)
@@ -472,11 +853,48 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         ApplyResult(result);
     }
 
+    public async Task ArchiveSelectedNicheAsync(CancellationToken cancellationToken = default)
+    {
+        if (_nicheService is null)
+        {
+            ErrorMessage = "Niche management is not available.";
+            return;
+        }
+
+        if (_isCreatingNewNiche)
+        {
+            ErrorMessage = "Save the new niche before archiving it.";
+            return;
+        }
+
+        if (SelectedNiche is null)
+        {
+            ErrorMessage = "Select a niche before archiving.";
+            return;
+        }
+
+        var result = await _nicheService.ArchiveNicheAsync(SelectedNiche.Id, cancellationToken).ConfigureAwait(false);
+        ApplyNicheResult(result);
+    }
+
     public async Task RestoreStoreAsync(StoreSummary store, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(store);
         var result = await _service.RestoreStoreAsync(store.Id, cancellationToken).ConfigureAwait(false);
         ApplyResult(result);
+    }
+
+    public async Task RestoreNicheAsync(NicheSummary niche, CancellationToken cancellationToken = default)
+    {
+        if (_nicheService is null)
+        {
+            ErrorMessage = "Niche management is not available.";
+            return;
+        }
+
+        ArgumentNullException.ThrowIfNull(niche);
+        var result = await _nicheService.RestoreNicheAsync(niche.Id, cancellationToken).ConfigureAwait(false);
+        ApplyNicheResult(result);
     }
 
     public void RequestDeleteSelectedStore()
@@ -496,6 +914,25 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         _pendingDeleteStore = SelectedStore;
         DeleteWarningVisible = true;
         OnPropertyChanged(nameof(DeleteWarningMessage));
+    }
+
+    public void RequestDeleteSelectedNiche()
+    {
+        if (_isCreatingNewNiche)
+        {
+            ErrorMessage = "Save the new niche before deleting it.";
+            return;
+        }
+
+        if (SelectedNiche is null)
+        {
+            ErrorMessage = "Select a niche before deleting.";
+            return;
+        }
+
+        _pendingDeleteNiche = SelectedNiche;
+        NicheDeleteWarningVisible = true;
+        OnPropertyChanged(nameof(NicheDeleteWarningMessage));
     }
 
     public async Task ConfirmDeleteStoreAsync(CancellationToken cancellationToken = default)
@@ -519,6 +956,46 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         ClearDeleteWarning();
     }
 
+    public async Task ConfirmDeleteNicheAsync(CancellationToken cancellationToken = default)
+    {
+        if (_nicheService is null)
+        {
+            ErrorMessage = "Niche management is not available.";
+            return;
+        }
+
+        if (_pendingDeleteNiche is null)
+        {
+            ErrorMessage = "Select a niche before deleting.";
+            return;
+        }
+
+        var result = await _nicheService.DeleteNicheAsync(
+            new NicheManagementDeleteRequest(_pendingDeleteNiche.Id, ConfirmPermanentDeletion: true),
+            cancellationToken).ConfigureAwait(false);
+        ErrorMessage = result.Error;
+        ApplyNicheState(result.State);
+        if (result.Succeeded)
+        {
+            SelectDefaultNicheForEditing();
+        }
+
+        ClearNicheDeleteWarning();
+    }
+
+    public async Task SelectNicheAsync(NicheSummary niche, CancellationToken cancellationToken = default)
+    {
+        if (_nicheService is null)
+        {
+            ErrorMessage = "Niche management is not available.";
+            return;
+        }
+
+        ArgumentNullException.ThrowIfNull(niche);
+        var result = await _nicheService.SelectNicheAsync(niche.Id, cancellationToken).ConfigureAwait(false);
+        ApplyNicheResult(result);
+    }
+
     private void OpenStoreEditor()
     {
         IsStoreEditorOpen = true;
@@ -529,6 +1006,41 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         }
     }
 
+    private void OpenBasicInfoTab()
+    {
+        OpenStoreEditor();
+        SelectBasicInfoTab();
+    }
+
+    private void OpenNichesTab()
+    {
+        OpenStoreEditor();
+        SelectNichesTab();
+    }
+
+    private void SelectBasicInfoTab()
+    {
+        if (HasUnsavedNicheChanges)
+        {
+            RequestDiscardBefore(PendingEditorAction.SelectBasicInfoTab);
+            return;
+        }
+
+        SelectedEditorTab = StoreManagementEditorTab.BasicInfo;
+    }
+
+    private void SelectNichesTab()
+    {
+        if (HasUnsavedChanges)
+        {
+            RequestDiscardBefore(PendingEditorAction.SelectNichesTab);
+            return;
+        }
+
+        SelectedEditorTab = StoreManagementEditorTab.Niches;
+        Run(LoadNichesForSelectedStoreAsync());
+    }
+
     public bool TryCloseStoreEditor()
     {
         if (!IsStoreEditorOpen)
@@ -536,7 +1048,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             return true;
         }
 
-        if (HasUnsavedChanges)
+        if (HasAnyUnsavedChanges)
         {
             RequestDiscardBefore(PendingEditorAction.CloseEditor);
             return false;
@@ -554,6 +1066,18 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         if (result.Store is not null && result.Succeeded)
         {
             PerformSelectStoreForEditing(result.Store);
+            WorkspaceStructureChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void ApplyNicheResult(NicheManagementResult result)
+    {
+        ErrorMessage = result.Error;
+        ApplyNicheState(result.State);
+        if (result.Niche is not null && result.Succeeded)
+        {
+            PerformSelectNicheForEditing(result.Niche);
+            WorkspaceStructureChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -594,6 +1118,48 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         ActiveStoreChanged?.Invoke(this, state.ActiveStore);
     }
 
+    private async Task LoadNichesForSelectedStoreAsync(CancellationToken cancellationToken = default)
+    {
+        if (_nicheService is null)
+        {
+            return;
+        }
+
+        var state = await _nicheService.LoadAsync(SelectedStore is { IsArchived: false } ? SelectedStore.Id : null, cancellationToken).ConfigureAwait(false);
+        ApplyNicheState(state);
+    }
+
+    private void ApplyNicheState(NicheManagementState state)
+    {
+        ActiveNiches = state.ActiveNiches;
+        ArchivedNiches = state.ArchivedNiches;
+        SelectedNiche = _isCreatingNewNiche
+            ? DraftNiche()
+            : state.ActiveNiche
+                ?? ActiveNiches.FirstOrDefault(niche => niche.Id == SelectedNiche?.Id)
+                ?? ArchivedNiches.FirstOrDefault(niche => niche.Id == SelectedNiche?.Id)
+                ?? ActiveNiches.FirstOrDefault()
+                ?? ArchivedNiches.FirstOrDefault();
+        NeedsFirstNiche = state.NeedsFirstNiche;
+        if (!_isCreatingNewNiche)
+        {
+            ApplySelectedNicheFields(SelectedNiche);
+            CaptureOriginalNicheEditorState();
+        }
+
+        OnPropertyChanged(nameof(ActiveNiches));
+        OnPropertyChanged(nameof(EditorActiveNiches));
+        OnPropertyChanged(nameof(ArchivedNiches));
+        OnPropertyChanged(nameof(SelectedNiche));
+        OnPropertyChanged(nameof(NeedsFirstNiche));
+        OnPropertyChanged(nameof(HasActiveNiches));
+        OnPropertyChanged(nameof(HasArchivedNiches));
+        OnPropertyChanged(nameof(HasSelectedNiche));
+        OnPropertyChanged(nameof(CanRestoreSelectedNiche));
+        RaiseNicheEditorActionProperties();
+        RaiseNicheEditorStateProperties();
+    }
+
     private void SelectDefaultStoreForEditing()
     {
         var defaultStore = ActiveStores.FirstOrDefault() ?? ArchivedStores.FirstOrDefault();
@@ -612,6 +1178,38 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         RaiseEditorActionProperties();
     }
 
+    private void SelectDefaultNicheForEditing()
+    {
+        var defaultNiche = ActiveNiches.FirstOrDefault() ?? ArchivedNiches.FirstOrDefault();
+        if (defaultNiche is not null)
+        {
+            PerformSelectNicheForEditing(defaultNiche);
+            return;
+        }
+
+        ClearNicheSelection();
+    }
+
+    private void ClearNicheSelection()
+    {
+        _isCreatingNewNiche = false;
+        _draftNicheId = null;
+        ActiveNiches = [];
+        ArchivedNiches = [];
+        SelectedNiche = null;
+        ClearNicheEditorFields();
+        CaptureOriginalNicheEditorState();
+        OnPropertyChanged(nameof(ActiveNiches));
+        OnPropertyChanged(nameof(EditorActiveNiches));
+        OnPropertyChanged(nameof(ArchivedNiches));
+        OnPropertyChanged(nameof(SelectedNiche));
+        OnPropertyChanged(nameof(HasSelectedNiche));
+        OnPropertyChanged(nameof(HasActiveNiches));
+        OnPropertyChanged(nameof(HasArchivedNiches));
+        OnPropertyChanged(nameof(CanRestoreSelectedNiche));
+        RaiseNicheEditorActionProperties();
+    }
+
     private void ApplySelectedStoreFields(StoreSummary? store)
     {
         if (store is null)
@@ -627,6 +1225,25 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         PlanningContext = store.Context.PlanningContext ?? string.Empty;
     }
 
+    private void ApplySelectedNicheFields(NicheSummary? niche)
+    {
+        if (niche is null)
+        {
+            ClearNicheEditorFields();
+            return;
+        }
+
+        NicheName = niche.Name;
+        NicheDescription = niche.Context.Description ?? string.Empty;
+        NicheAudience = niche.Context.Audience ?? string.Empty;
+        NicheHumorStyle = niche.Context.HumorStyle ?? string.Empty;
+        NicheVisualStyleGuidance = niche.Context.VisualStyleGuidance ?? string.Empty;
+        NicheConstraints = niche.Context.Constraints ?? string.Empty;
+        NicheRisks = niche.Context.Risks ?? string.Empty;
+        NicheResearchNotes = niche.Context.ResearchNotes ?? string.Empty;
+        NicheNotes = niche.Context.Notes ?? string.Empty;
+    }
+
     private void ClearEditorFields()
     {
         NewStoreName = string.Empty;
@@ -635,6 +1252,19 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         TargetMarket = string.Empty;
         BrandDirection = string.Empty;
         PlanningContext = string.Empty;
+    }
+
+    private void ClearNicheEditorFields()
+    {
+        NicheName = string.Empty;
+        NicheDescription = string.Empty;
+        NicheAudience = string.Empty;
+        NicheHumorStyle = string.Empty;
+        NicheVisualStyleGuidance = string.Empty;
+        NicheConstraints = string.Empty;
+        NicheRisks = string.Empty;
+        NicheResearchNotes = string.Empty;
+        NicheNotes = string.Empty;
     }
 
     private StoreSummary? DraftStore()
@@ -649,11 +1279,25 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         return new StoreSummary(id, name, CurrentContext(), IsArchived: false, now, now);
     }
 
-    private void RequestDiscardBefore(PendingEditorAction action, StoreSummary? store = null)
+    private NicheSummary? DraftNiche()
+    {
+        if (!_isCreatingNewNiche || _draftNicheId is not { } id || SelectedStore is null)
+        {
+            return null;
+        }
+
+        var now = DateTimeOffset.Now;
+        var name = string.IsNullOrWhiteSpace(NicheName) ? "New niche" : NicheName.Trim();
+        return new NicheSummary(id, SelectedStore.Id, name, CurrentNicheContext(), IsArchived: false, now, now);
+    }
+
+    private void RequestDiscardBefore(PendingEditorAction action, StoreSummary? store = null, NicheSummary? niche = null)
     {
         _pendingEditorAction = action;
         _pendingEditorStore = store;
+        _pendingEditorNiche = niche;
         ClearDeleteWarning();
+        ClearNicheDeleteWarning();
         DiscardChangesPromptVisible = true;
         OnPropertyChanged(nameof(DiscardChangesMessage));
     }
@@ -662,6 +1306,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     {
         var action = _pendingEditorAction;
         var store = _pendingEditorStore;
+        var niche = _pendingEditorNiche;
         DiscardCurrentEditorChanges();
         ClearDiscardChangesPrompt();
 
@@ -675,6 +1320,19 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 break;
             case PendingEditorAction.CloseEditor:
                 IsStoreEditorOpen = false;
+                break;
+            case PendingEditorAction.SelectNiche when niche is not null:
+                PerformSelectNicheForEditing(niche);
+                break;
+            case PendingEditorAction.StartNewNiche:
+                BeginCreateNicheDraft();
+                break;
+            case PendingEditorAction.SelectBasicInfoTab:
+                SelectedEditorTab = StoreManagementEditorTab.BasicInfo;
+                break;
+            case PendingEditorAction.SelectNichesTab:
+                SelectedEditorTab = StoreManagementEditorTab.Niches;
+                Run(LoadNichesForSelectedStoreAsync());
                 break;
         }
     }
@@ -694,17 +1352,30 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         }
 
         CaptureOriginalEditorState();
+        if (_isCreatingNewNiche)
+        {
+            _isCreatingNewNiche = false;
+            _draftNicheId = null;
+            SelectedNiche = ActiveNiches.FirstOrDefault(niche => niche.Id == SelectedNiche?.Id) ?? ActiveNiches.FirstOrDefault();
+        }
+
+        ApplySelectedNicheFields(SelectedNiche);
+        CaptureOriginalNicheEditorState();
         OnPropertyChanged(nameof(SelectedStore));
         OnPropertyChanged(nameof(EditorActiveStores));
+        OnPropertyChanged(nameof(SelectedNiche));
+        OnPropertyChanged(nameof(EditorActiveNiches));
         OnPropertyChanged(nameof(HasSelectedStore));
         OnPropertyChanged(nameof(CanRestoreSelectedStore));
         RaiseEditorActionProperties();
+        RaiseNicheEditorActionProperties();
     }
 
     private void ClearDiscardChangesPrompt()
     {
         _pendingEditorAction = PendingEditorAction.None;
         _pendingEditorStore = null;
+        _pendingEditorNiche = null;
         DiscardChangesPromptVisible = false;
     }
 
@@ -715,6 +1386,13 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(DeleteWarningMessage));
     }
 
+    private void ClearNicheDeleteWarning()
+    {
+        _pendingDeleteNiche = null;
+        NicheDeleteWarningVisible = false;
+        OnPropertyChanged(nameof(NicheDeleteWarningMessage));
+    }
+
     private StoreContext CurrentContext() =>
         new(
             EmptyToNull(Description),
@@ -723,13 +1401,33 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             EmptyToNull(BrandDirection),
             EmptyToNull(PlanningContext));
 
+    private NicheContext CurrentNicheContext() =>
+        new(
+            EmptyToNull(NicheDescription),
+            EmptyToNull(NicheAudience),
+            EmptyToNull(NicheHumorStyle),
+            EmptyToNull(NicheVisualStyleGuidance),
+            EmptyToNull(NicheConstraints),
+            EmptyToNull(NicheRisks),
+            EmptyToNull(NicheResearchNotes),
+            EmptyToNull(NicheNotes));
+
     private EditorState CurrentEditorState() =>
         new(NewStoreName, Description, Notes, TargetMarket, BrandDirection, PlanningContext);
+
+    private NicheEditorState CurrentNicheEditorState() =>
+        new(NicheName, NicheDescription, NicheAudience, NicheHumorStyle, NicheVisualStyleGuidance, NicheConstraints, NicheRisks, NicheResearchNotes, NicheNotes);
 
     private void CaptureOriginalEditorState()
     {
         _originalEditorState = CurrentEditorState();
         RaiseEditorStateProperties();
+    }
+
+    private void CaptureOriginalNicheEditorState()
+    {
+        _originalNicheEditorState = CurrentNicheEditorState();
+        RaiseNicheEditorStateProperties();
     }
 
     private void RaiseEditorStateProperties() =>
@@ -738,12 +1436,27 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private void RaiseEditorActionProperties()
     {
         OnPropertyChanged(nameof(HasUnsavedChanges));
+        OnPropertyChanged(nameof(HasAnyUnsavedChanges));
         OnPropertyChanged(nameof(CanSaveSelectedStore));
         OnPropertyChanged(nameof(CanArchiveSelectedStore));
         OnPropertyChanged(nameof(CanDeleteSelectedStore));
     }
 
+    private void RaiseNicheEditorStateProperties() =>
+        RaiseNicheEditorActionProperties();
+
+    private void RaiseNicheEditorActionProperties()
+    {
+        OnPropertyChanged(nameof(HasUnsavedNicheChanges));
+        OnPropertyChanged(nameof(HasAnyUnsavedChanges));
+        OnPropertyChanged(nameof(CanSaveSelectedNiche));
+        OnPropertyChanged(nameof(CanArchiveSelectedNiche));
+        OnPropertyChanged(nameof(CanDeleteSelectedNiche));
+    }
+
     private static EditorState EmptyEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
+
+    private static NicheEditorState EmptyNicheEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
 
     private static string? EmptyToNull(string value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
