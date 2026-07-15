@@ -88,6 +88,25 @@ public class SqliteWorkspaceRepositoryTests
     }
 
     [Fact]
+    public async Task SaveAndLoadAsync_PersistsStoreDeletionThroughSnapshotReplacement()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("workspace.db");
+        var repository = new SqliteWorkspaceRepository(databasePath);
+        var createdAt = new DateTimeOffset(2026, 7, 4, 12, 0, 0, TimeSpan.Zero);
+        var first = new Store(Guid.NewGuid(), "First Studio", null, false, createdAt, createdAt, "{}");
+        var deleted = new Store(Guid.NewGuid(), "Deleted Studio", null, false, createdAt, createdAt, "{}");
+
+        await repository.SaveAsync(new WorkspaceSnapshot([first, deleted], [], [], [], [], [], [], [], []));
+        await repository.SaveAsync(new WorkspaceSnapshot([first], [], [], [], [], [], [], [], []));
+        var loaded = await repository.LoadAsync();
+
+        Assert.Equal(first.Id, Assert.Single(loaded.Stores).Id);
+        Assert.DoesNotContain(loaded.Stores, store => store.Id == deleted.Id);
+        Assert.Equal(1, await ReadUserVersionAsync(databasePath));
+    }
+
+    [Fact]
     public async Task LoadAsync_UpgradesUnversionedDatabaseToCurrentSchemaVersion()
     {
         using var tempDirectory = new TemporaryDirectory();

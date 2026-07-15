@@ -6,7 +6,7 @@ using FusionCanvas.Application.Workspace;
 
 namespace FusionCanvas.App.Stores;
 
-public sealed class StoreManagementViewModel : INotifyPropertyChanged
+internal sealed class InlineStoreManagementViewModel : INotifyPropertyChanged
 {
     private readonly IStoreManagementService _service;
     private string _newStoreName = string.Empty;
@@ -17,7 +17,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private string _planningContext = string.Empty;
     private string? _errorMessage;
 
-    public StoreManagementViewModel(IStoreManagementService service)
+    public InlineStoreManagementViewModel(IStoreManagementService service)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
         CreateStoreCommand = new RelayCommand(_ => Run(CreateStoreAsync()));

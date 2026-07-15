@@ -4,6 +4,8 @@ FusionCanvas already has Phase 0 foundations for store-shaped data: `Store` exis
 
 The current repository pattern persists complete `WorkspaceSnapshot` values. Store management should build on that contract first, adding application-level commands that load, transform, and save snapshots. A later persistence change can introduce narrower repository methods if mutation volume or concurrency needs justify it.
 
+Store management UI should follow [FusionCanvas UI Guidelines](../../../docs/ui-guidelines.md), especially the Specific UI Elements guidance for button sizing, icon buttons, and avoiding duplicate controls.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -51,7 +53,7 @@ The current repository pattern persists complete `WorkspaceSnapshot` values. Sto
 
 5. Provide a compact/expanded store selector in the regular Avalonia shell.
 
-   The normal workspace UI should only support switching stores and opening the store editor. In compact mode, it should show the selected store as a highlighted control with an affordance to expand the store list. In expanded mode, it should show all active stores with the selected store highlighted, plus a clear way to collapse back to the compact view. This borrows from Obsidian's preference for a quiet left sidebar that can disclose navigation depth, and from Postman's compact workspace/environment selectors that keep global context visible without turning the main chrome into a management form.
+   The normal workspace UI should only support switching stores and opening store actions from a small icon menu. In compact mode, it should show the selected store as a highlighted control that expands the store list when clicked. The Stores label row should include a small arrow toggle with an expand/collapse tooltip, keeping the control discoverable without becoming a large command. It should not include a second visible "Collapse stores" button because the arrow toggle already owns that action. In expanded mode, it should show all active stores with the selected store highlighted, plus a clear way to collapse back to the compact view. This borrows from Obsidian's preference for a quiet left sidebar that can disclose navigation depth, and from Postman's compact workspace/environment selectors and overflow menus that keep global context visible without turning the main chrome into a management form.
 
    Alternative considered: keep store create/edit fields inline in the left rail. That gives immediate access, but it turns the regular workspace into an administration panel and consumes too much space when there are many stores.
 
@@ -84,7 +86,7 @@ The current repository pattern persists complete `WorkspaceSnapshot` values. Sto
 
 ## Migration Plan
 
-No database migration is expected for the initial implementation because stores already persist name, description, archive state, timestamps, and metadata JSON. Existing workspaces without stores should open into a first-store prompt and then fall back to an empty-state flow if the user declines. Permanent deletion can remove empty store records through the existing snapshot persistence model. Rollback is limited to removing the service/UI behavior; persisted store records remain compatible with the existing SQLite model.
+No database migration is expected for the initial implementation because stores already persist name, description, archive state, timestamps, and metadata JSON. Existing workspaces without stores should open into a first-store prompt and then fall back to an empty-state flow if the user declines. The desktop app's default runtime path should use the SQLite workspace repository, not an in-memory sample repository, so store creates and edits survive app restart. Permanent deletion can remove empty store records through the existing snapshot persistence model. Rollback is limited to removing the service/UI behavior; persisted store records remain compatible with the existing SQLite model.
 
 ## Open Questions
 

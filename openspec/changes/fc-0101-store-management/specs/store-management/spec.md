@@ -14,9 +14,16 @@ FusionCanvas SHALL allow users to create stores as top-level business, brand, cl
 - **AND** the user can open the store editor later to create a store
 
 #### Scenario: User creates store with optional context
-- **WHEN** the user creates a store from the store editor with a name and optional description, notes, target market, brand direction, or planning context
+- **WHEN** the user starts a new store draft from the store editor, enters a name and optional description, notes, target market, brand direction, or planning context, and saves
 - **THEN** FusionCanvas persists the provided store context with the store
 - **AND** the user is not required to configure marketplace accounts, publishing destinations, analytics, permissions, or templates
+
+#### Scenario: New store remains draft until saved
+- **WHEN** the user clicks New store in the store editor
+- **THEN** FusionCanvas shows a local "New store" draft in the editor side panel
+- **AND** FusionCanvas places keyboard focus in the Store name field
+- **AND** FusionCanvas does not persist the store until the user clicks Save
+- **AND** the Save action creates the store when the selected editor item is a new-store draft
 
 ### Requirement: Store management edits store context
 FusionCanvas SHALL allow users to rename stores and edit basic store-level context while preserving the store identity and contained work.
@@ -24,12 +31,31 @@ FusionCanvas SHALL allow users to rename stores and edit basic store-level conte
 #### Scenario: User renames a store in the editor
 - **WHEN** the user renames an existing store to a valid new name in the store editor
 - **THEN** FusionCanvas persists the new store name
+- **AND** the renamed store remains renamed after the application reloads the workspace database
 - **AND** niches, groups, listings, tags, assets, prompts, and other store-scoped context remain associated with the same store identity
 
 #### Scenario: User edits store notes in the editor
 - **WHEN** the user updates store-level notes, description, target market, brand direction, or planning context in the store editor
 - **THEN** FusionCanvas persists the updated context for use while working inside that store
+- **AND** the updated context remains available after the application reloads the workspace database
 - **AND** the update does not require changes to child niches, groups, or listings
+
+#### Scenario: Save updates the selected existing store
+- **WHEN** the selected editor item is an existing store and the user clicks Save after changing the store name or context
+- **THEN** FusionCanvas updates that store in place
+- **AND** FusionCanvas preserves the store identity and contained work
+
+#### Scenario: User switches stores with unsaved editor changes
+- **WHEN** the user has unsaved changes in the store editor and clicks another store
+- **THEN** FusionCanvas asks whether to discard changes
+- **AND** choosing Yes discards the unsaved changes and selects the clicked store
+- **AND** choosing No keeps the user editing the current store or draft
+
+#### Scenario: User closes editor with unsaved changes
+- **WHEN** the user has unsaved changes in the store editor and clicks the window close control
+- **THEN** FusionCanvas asks whether to discard changes
+- **AND** choosing Yes discards the unsaved changes and closes the editor
+- **AND** choosing No leaves the editor open on the current store or draft
 
 ### Requirement: Store management distinguishes active and archived stores
 FusionCanvas SHALL distinguish active stores from archived stores and SHALL keep archived stores out of the normal active workspace by default.
@@ -62,6 +88,7 @@ FusionCanvas SHALL allow permanent store deletion only from the store editor, on
 - **AND** the user confirms the deletion warning
 - **THEN** FusionCanvas permanently removes the store
 - **AND** the store no longer appears in active or archived store lists
+- **AND** FusionCanvas selects another remaining store by default when one exists
 
 #### Scenario: User attempts to delete a store with connected data
 - **WHEN** the user requests permanent deletion for a store that has connected store-scoped data
@@ -94,13 +121,27 @@ FusionCanvas SHALL keep regular workspace store UI focused on store selection an
 
 #### Scenario: Regular workspace shows store selector only
 - **WHEN** the regular workspace UI is shown
-- **THEN** FusionCanvas provides controls for selecting the active store and opening the store editor
+- **THEN** FusionCanvas provides controls for selecting the active store and opening store actions from a modern icon menu
 - **AND** the regular workspace UI does not show inline controls for renaming, saving, archiving, restoring, deleting, or editing store context
 
 #### Scenario: User opens store editor
-- **WHEN** the user chooses to manage stores from the regular workspace UI
+- **WHEN** the user chooses manage stores from the regular workspace icon menu
 - **THEN** FusionCanvas opens a dedicated store editor window
-- **AND** create, save, archive, restore, delete, and store-context editing actions are available from that editor
+- **AND** the active store is pre-selected in the editor
+- **AND** new-store draft, save, archive, restore, delete, and store-context editing actions are available from that editor
+- **AND** the Save action handles both creating a selected draft and updating a selected existing store
+- **AND** editor action buttons use compact fixed or content-based widths rather than stretching evenly across the window
+
+#### Scenario: Store editor actions are enabled only when relevant
+- **WHEN** the selected editor item is a new-store draft
+- **THEN** FusionCanvas enables Save
+- **AND** FusionCanvas disables Archive and Delete
+- **WHEN** the selected editor item is an unchanged existing store
+- **THEN** FusionCanvas disables Save
+- **AND** FusionCanvas enables Delete
+- **AND** FusionCanvas enables Archive only when the existing store is active
+- **WHEN** the selected editor item is an existing store with unsaved changes
+- **THEN** FusionCanvas enables Save
 
 ### Requirement: Store selector supports compact and expanded modes
 FusionCanvas SHALL allow the active store selector to collapse to a compact selected-store view or expand to show active stores.
@@ -109,6 +150,14 @@ FusionCanvas SHALL allow the active store selector to collapse to a compact sele
 - **WHEN** the store selector is collapsed and an active store is selected
 - **THEN** FusionCanvas shows the selected store in a highlighted compact control
 - **AND** the user can expand the selector to see other active stores
+- **AND** clicking the highlighted selected store expands the selector
+
+#### Scenario: Selector toggle sits beside label
+- **WHEN** the regular workspace UI shows the Stores label
+- **THEN** FusionCanvas shows a small arrow toggle beside the label
+- **AND** the arrow indicates expanded or collapsed state
+- **AND** the toggle exposes a tooltip that describes the action as expand or collapse
+- **AND** FusionCanvas does not show a separate visible collapse button elsewhere in the store selector
 
 #### Scenario: Expanded selector shows all active stores
 - **WHEN** the store selector is expanded
@@ -120,3 +169,16 @@ FusionCanvas SHALL allow the active store selector to collapse to a compact sele
 - **WHEN** the user has many active stores
 - **THEN** FusionCanvas allows the store list to remain collapsed during normal work
 - **AND** store switching remains available without permanently taking space from navigation content
+
+### Requirement: Store management follows shared UI element guidelines
+FusionCanvas SHALL follow the shared button and icon-button guidance in `docs/ui-guidelines.md` for store prompts, store selectors, and store editor actions.
+
+#### Scenario: First-store prompt button sizing
+- **WHEN** the first-store prompt is shown
+- **THEN** its action buttons use compact fixed or content-based widths
+- **AND** the buttons are not evenly stretched across the full prompt width
+
+#### Scenario: Store editor action button sizing
+- **WHEN** the store editor shows save, archive, restore, delete, discard-confirmation, or warning-confirmation actions
+- **THEN** those action buttons use compact fixed or content-based widths
+- **AND** the buttons are not evenly stretched across the full editor width

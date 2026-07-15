@@ -124,6 +124,51 @@ public class StoreManagementServiceTests
     }
 
     [Fact]
+    public async Task DeleteStoreAsync_DeletesConfirmedEmptyStore()
+    {
+        var empty = NewStore("Empty Studio");
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([empty], [], [], [], [], [], [], [], []));
+        var service = new StoreManagementService(repository);
+        await service.SelectStoreAsync(empty.Id);
+
+        var result = await service.DeleteStoreAsync(new StoreManagementDeleteRequest(empty.Id, ConfirmPermanentDeletion: true));
+
+        Assert.True(result.Succeeded);
+        Assert.Empty(result.State.ActiveStores);
+        Assert.Null(result.State.ActiveStoreId);
+        Assert.Empty((await repository.LoadAsync()).Stores);
+    }
+
+    [Fact]
+    public async Task DeleteStoreAsync_RequiresConfirmation()
+    {
+        var empty = NewStore("Empty Studio");
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([empty], [], [], [], [], [], [], [], []));
+        var service = new StoreManagementService(repository);
+
+        var result = await service.DeleteStoreAsync(new StoreManagementDeleteRequest(empty.Id, ConfirmPermanentDeletion: false));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("confirmation", result.Error);
+        Assert.Equal(empty.Id, Assert.Single((await repository.LoadAsync()).Stores).Id);
+    }
+
+    [Fact]
+    public async Task DeleteStoreAsync_BlocksStoreWithConnectedData()
+    {
+        var store = NewStore("North Star Studio");
+        var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, Now, Now, "{}");
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []));
+        var service = new StoreManagementService(repository);
+
+        var result = await service.DeleteStoreAsync(new StoreManagementDeleteRequest(store.Id, ConfirmPermanentDeletion: true));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("connected data", result.Error);
+        Assert.Equal(store.Id, Assert.Single((await repository.LoadAsync()).Stores).Id);
+    }
+
+    [Fact]
     public async Task LoadAsync_ReportsFirstStoreNeededForEmptyWorkspace()
     {
         var service = new StoreManagementService(new InMemoryWorkspaceRepository());

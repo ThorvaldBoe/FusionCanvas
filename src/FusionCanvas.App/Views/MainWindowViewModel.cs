@@ -1,6 +1,7 @@
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Stores;
+using FusionCanvas.App.Workspace;
 using FusionCanvas.App.Workflow;
 using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
@@ -30,8 +31,32 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             new DocumentWindowViewModel(),
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            CreateSampleStoreManagementService(),
+            new StoreManagementService(new InMemoryWorkspaceRepository(CreateSampleWorkspace())),
             CreateSampleWorkspace())
+    {
+    }
+
+    public static MainWindowViewModel CreateForDefaultWorkspace() =>
+        new(
+            new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
+            new DocumentWindowViewModel(),
+            new ToolContextResolver(),
+            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
+            AppWorkspaceFactory.CreateDefault());
+
+    private MainWindowViewModel(
+        WorkflowStageNavigatorViewModel workflowNavigator,
+        DocumentWindowViewModel documentWindow,
+        IToolContextResolver toolContextResolver,
+        IStageToolHostService stageToolHostService,
+        AppWorkspaceRuntime runtime)
+        : this(
+            workflowNavigator,
+            documentWindow,
+            toolContextResolver,
+            stageToolHostService,
+            new StoreManagementService(runtime.Repository),
+            runtime.Snapshot)
     {
     }
 
@@ -43,7 +68,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             documentWindow,
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            CreateSampleStoreManagementService(),
+            new StoreManagementService(new InMemoryWorkspaceRepository(CreateSampleWorkspace())),
             CreateSampleWorkspace())
     {
     }
@@ -336,12 +361,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             [],
             [],
             []);
-    }
-
-    private static IStoreManagementService CreateSampleStoreManagementService()
-    {
-        var repository = new InMemoryWorkspaceRepository(CreateSampleWorkspace());
-        return new StoreManagementService(repository);
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
