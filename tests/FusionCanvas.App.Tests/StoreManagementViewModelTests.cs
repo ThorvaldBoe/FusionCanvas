@@ -232,6 +232,25 @@ public class StoreManagementViewModelTests
         Assert.True(viewModel.IsStoreEditorOpen);
         Assert.Equal(second.Id, viewModel.SelectedStore?.Id);
         Assert.Equal("Second Studio", viewModel.NewStoreName);
+        Assert.True(viewModel.IsBasicInfoTabSelected);
+    }
+
+    [Fact]
+    public async Task OpenNichesTabCommand_OpensStoreEditorOnNichesTab()
+    {
+        var store = NewStore("North Star Studio");
+        var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, Now, Now, "{}");
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []));
+        var viewModel = new StoreManagementViewModel(
+            new StoreManagementService(repository),
+            new NicheManagementService(repository));
+        await viewModel.LoadAsync();
+
+        viewModel.OpenNichesTabCommand.Execute(null);
+
+        Assert.True(viewModel.IsStoreEditorOpen);
+        Assert.True(viewModel.IsNichesTabSelected);
+        Assert.Equal(niche.Id, viewModel.SelectedNiche?.Id);
     }
 
     [Fact]
@@ -340,6 +359,101 @@ public class StoreManagementViewModelTests
     }
 
     [Fact]
+    public async Task StoreEditor_UsesBasicInfoAndNichesTabs()
+    {
+        var store = NewStore("North Star Studio");
+        var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, Now, Now, "{}");
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []));
+        var viewModel = new StoreManagementViewModel(
+            new StoreManagementService(repository),
+            new NicheManagementService(repository));
+        await viewModel.LoadAsync();
+
+        Assert.True(viewModel.IsBasicInfoTabSelected);
+
+        viewModel.SelectNichesTabCommand.Execute(null);
+
+        Assert.True(viewModel.IsNichesTabSelected);
+        Assert.Equal(niche.Id, Assert.Single(viewModel.ActiveNiches).Id);
+        Assert.Equal(niche.Id, viewModel.SelectedNiche?.Id);
+
+        viewModel.SelectBasicInfoTabCommand.Execute(null);
+
+        Assert.True(viewModel.IsBasicInfoTabSelected);
+        Assert.Equal(store.Id, viewModel.SelectedStore?.Id);
+    }
+
+    [Fact]
+    public async Task NichesTab_CreatesArchivesRestoresAndDeletesNiches()
+    {
+        var store = NewStore("North Star Studio");
+        var nicheId = Guid.NewGuid();
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
+        var viewModel = new StoreManagementViewModel(
+            new StoreManagementService(repository),
+            new NicheManagementService(repository, () => Now, () => nicheId));
+        await viewModel.LoadAsync();
+        viewModel.SelectNichesTabCommand.Execute(null);
+
+        viewModel.StartCreateNiche();
+        viewModel.NicheName = "Coffee";
+        viewModel.NicheAudience = "Coffee fans";
+        await viewModel.SaveSelectedNicheAsync();
+
+        Assert.Equal(nicheId, viewModel.SelectedNiche?.Id);
+        Assert.Equal("Coffee fans", viewModel.SelectedNiche?.Context.Audience);
+        Assert.Single(viewModel.ActiveNiches);
+
+        await viewModel.ArchiveSelectedNicheAsync();
+
+        var archived = Assert.Single(viewModel.ArchivedNiches);
+        Assert.Empty(viewModel.ActiveNiches);
+        Assert.True(viewModel.CanRestoreSelectedNiche);
+
+        await viewModel.RestoreNicheAsync(archived);
+
+        Assert.Single(viewModel.ActiveNiches);
+        Assert.Empty(viewModel.ArchivedNiches);
+
+        viewModel.RequestDeleteSelectedNicheCommand.Execute(null);
+        viewModel.CancelDeleteNicheCommand.Execute(null);
+
+        Assert.False(viewModel.NicheDeleteWarningVisible);
+        Assert.Single((await repository.LoadAsync()).Niches);
+
+        viewModel.RequestDeleteSelectedNicheCommand.Execute(null);
+        await viewModel.ConfirmDeleteNicheAsync();
+
+        Assert.Empty((await repository.LoadAsync()).Niches);
+    }
+
+    [Fact]
+    public async Task NichesTab_DiscardPromptProtectsUnsavedNicheEdits()
+    {
+        var store = NewStore("North Star Studio");
+        var first = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, Now, Now, "{}");
+        var second = new Niche(Guid.NewGuid(), store.Id, "Cats", null, false, Now, Now, "{}");
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [first, second], [], [], [], [], [], [], []));
+        var viewModel = new StoreManagementViewModel(
+            new StoreManagementService(repository),
+            new NicheManagementService(repository));
+        await viewModel.LoadAsync();
+        viewModel.SelectNichesTabCommand.Execute(null);
+        viewModel.SelectNicheForEditing(viewModel.ActiveNiches.Single(niche => niche.Id == first.Id));
+        viewModel.NicheName = "Unsaved";
+
+        viewModel.SelectNicheForEditing(viewModel.ActiveNiches.Single(niche => niche.Id == second.Id));
+
+        Assert.True(viewModel.DiscardChangesPromptVisible);
+        Assert.Equal(first.Id, viewModel.SelectedNiche?.Id);
+
+        viewModel.ConfirmDiscardChangesCommand.Execute(null);
+
+        Assert.Equal(second.Id, viewModel.SelectedNiche?.Id);
+        Assert.False(viewModel.HasUnsavedNicheChanges);
+    }
+
+    [Fact]
     public void OpenStoreEditorCommand_ProvidesMenuFriendlyManagementEntry()
     {
         var viewModel = new StoreManagementViewModel(new StoreManagementService(new InMemoryWorkspaceRepository()));
@@ -395,6 +509,59 @@ public class StoreManagementViewModelTests
 
         Assert.Contains(viewModel.NavigationContexts, context => context.Context.Id == secondListing.Id);
         Assert.DoesNotContain(viewModel.NavigationContexts, context => context.Context.Id == firstListing.Id);
+    }
+
+    [Fact]
+    public async Task MainWindowViewModel_ShowsActiveNichesAsTopLevelSidebarContexts()
+    {
+        var store = NewStore("North Star Studio");
+        var activeNiche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, Now, Now, "{}");
+        var archivedNiche = new Niche(Guid.NewGuid(), store.Id, "Dogs", null, true, Now, Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, activeNiche.Id, null, "Espresso", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var snapshot = new WorkspaceSnapshot([store], [activeNiche, archivedNiche], [], [listing], [], [], [], [], []);
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+
+        var viewModel = new MainWindowViewModel(
+            new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
+            new DocumentWindowViewModel(),
+            new ToolContextResolver(),
+            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
+            repository,
+            snapshot);
+        await viewModel.StoreManagement.SelectStoreAsync(viewModel.StoreManagement.ActiveStores.Single());
+
+        Assert.Contains(viewModel.NavigationContexts, context =>
+            context.Context.Id == activeNiche.Id &&
+            context.Context.Kind == DocumentContextKind.Topic &&
+            context.Context.EntityKind == WorkspaceEntityKind.Niche &&
+            context.Context.NavigationLocation?.NodePath.SequenceEqual([store.Id, activeNiche.Id]) == true);
+        Assert.DoesNotContain(viewModel.NavigationContexts, context => context.Context.Id == archivedNiche.Id);
+        Assert.Contains(viewModel.NavigationContexts, context => context.Context.Id == listing.Id);
+    }
+
+    [Fact]
+    public async Task MainWindowViewModel_RefreshesSidebarAfterNicheCreation()
+    {
+        var store = NewStore("North Star Studio");
+        var snapshot = new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []);
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+        var viewModel = new MainWindowViewModel(
+            new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
+            new DocumentWindowViewModel(),
+            new ToolContextResolver(),
+            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
+            repository,
+            snapshot);
+        await viewModel.StoreManagement.SelectStoreAsync(viewModel.StoreManagement.ActiveStores.Single());
+
+        viewModel.StoreManagement.SelectNichesTabCommand.Execute(null);
+        viewModel.StoreManagement.StartCreateNiche();
+        viewModel.StoreManagement.NicheName = "Coffee";
+        await viewModel.StoreManagement.SaveSelectedNicheAsync();
+
+        Assert.Contains(viewModel.NavigationContexts, context =>
+            context.Context.Title == "Coffee" &&
+            context.Context.EntityKind == WorkspaceEntityKind.Niche);
     }
 
     private static Store NewStore(string name, bool isArchived = false) =>

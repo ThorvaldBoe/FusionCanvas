@@ -54,6 +54,8 @@
                 <MenuFlyout>
                   <MenuItem Header="Manage stores"
                             Command="{Binding StoreManagement.OpenStoreEditorCommand}" />
+                  <MenuItem Header="Manage niches"
+                            Command="{Binding StoreManagement.OpenNichesTabCommand}" />
                 </MenuFlyout>
               </Button.Flyout>
             </Button>

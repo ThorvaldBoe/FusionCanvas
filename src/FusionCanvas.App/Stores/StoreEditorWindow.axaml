@@ -77,7 +77,7 @@
             BorderThickness="1">
       <ScrollViewer>
         <StackPanel Spacing="12">
-          <TextBlock Text="Store Details"
+          <TextBlock Text="Store Management"
                      FontSize="22"
                      FontWeight="SemiBold"
                      Foreground="#1E2733" />
@@ -85,50 +85,180 @@
                      IsVisible="{Binding HasError}"
                      FontSize="12"
                      Foreground="#9A4B43" />
-          <TextBox x:Name="StoreNameTextBox"
-                   Text="{Binding NewStoreName}"
-                   PlaceholderText="Store name"
-                   Classes="field" />
-          <TextBox Text="{Binding Description}"
-                   PlaceholderText="Description"
-                   Classes="field" />
-          <TextBox Text="{Binding Notes}"
-                   PlaceholderText="Notes"
-                   AcceptsReturn="True"
-                   MinHeight="84"
-                   Classes="field" />
-          <TextBox Text="{Binding TargetMarket}"
-                   PlaceholderText="Target market"
-                   Classes="field" />
-          <TextBox Text="{Binding BrandDirection}"
-                   PlaceholderText="Brand direction"
-                   Classes="field" />
-          <TextBox Text="{Binding PlanningContext}"
-                   PlaceholderText="Planning context"
-                   Classes="field" />
-
           <StackPanel Orientation="Horizontal"
-                      Spacing="8"
-                      Margin="0,8,0,0">
-            <Button Content="Save"
-                    Command="{Binding SaveSelectedStoreCommand}"
-                    IsEnabled="{Binding CanSaveSelectedStore}"
-                    Classes="primary fixedAction" />
-            <Button Content="Archive"
-                    Command="{Binding ArchiveSelectedStoreCommand}"
-                    IsEnabled="{Binding CanArchiveSelectedStore}"
-                    Classes="secondary fixedAction" />
-            <Button Content="Delete"
-                    Command="{Binding RequestDeleteSelectedStoreCommand}"
-                    IsEnabled="{Binding CanDeleteSelectedStore}"
-                    Classes="danger fixedAction" />
+                      Spacing="8">
+            <Button Content="Basic info"
+                    Command="{Binding SelectBasicInfoTabCommand}"
+                    Classes="tabButton"
+                    Classes.selected="{Binding IsBasicInfoTabSelected}" />
+            <Button Content="Niches"
+                    Command="{Binding SelectNichesTabCommand}"
+                    Classes="tabButton"
+                    Classes.selected="{Binding IsNichesTabSelected}" />
           </StackPanel>
 
-          <Button Content="Restore selected archived store"
-                  IsVisible="{Binding CanRestoreSelectedStore}"
-                  Command="{Binding RestoreStoreCommand}"
-                  CommandParameter="{Binding SelectedStore}"
-                  Classes="secondary restoreAction" />
+          <StackPanel IsVisible="{Binding IsBasicInfoTabSelected}"
+                      Spacing="12">
+            <TextBlock Text="Basic info"
+                       FontSize="16"
+                       FontWeight="SemiBold"
+                       Foreground="#243447" />
+            <TextBox x:Name="StoreNameTextBox"
+                     Text="{Binding NewStoreName}"
+                     PlaceholderText="Store name"
+                     Classes="field" />
+            <TextBox Text="{Binding Description}"
+                     PlaceholderText="Description"
+                     Classes="field" />
+            <TextBox Text="{Binding Notes}"
+                     PlaceholderText="Notes"
+                     AcceptsReturn="True"
+                     MinHeight="84"
+                     Classes="field" />
+            <TextBox Text="{Binding TargetMarket}"
+                     PlaceholderText="Target market"
+                     Classes="field" />
+            <TextBox Text="{Binding BrandDirection}"
+                     PlaceholderText="Brand direction"
+                     Classes="field" />
+            <TextBox Text="{Binding PlanningContext}"
+                     PlaceholderText="Planning context"
+                     Classes="field" />
+
+            <StackPanel Orientation="Horizontal"
+                        Spacing="8"
+                        Margin="0,8,0,0">
+              <Button Content="Save"
+                      Command="{Binding SaveSelectedStoreCommand}"
+                      IsEnabled="{Binding CanSaveSelectedStore}"
+                      Classes="primary fixedAction" />
+              <Button Content="Archive"
+                      Command="{Binding ArchiveSelectedStoreCommand}"
+                      IsEnabled="{Binding CanArchiveSelectedStore}"
+                      Classes="secondary fixedAction" />
+              <Button Content="Delete"
+                      Command="{Binding RequestDeleteSelectedStoreCommand}"
+                      IsEnabled="{Binding CanDeleteSelectedStore}"
+                      Classes="danger fixedAction" />
+            </StackPanel>
+
+            <Button Content="Restore selected archived store"
+                    IsVisible="{Binding CanRestoreSelectedStore}"
+                    Command="{Binding RestoreStoreCommand}"
+                    CommandParameter="{Binding SelectedStore}"
+                    Classes="secondary restoreAction" />
+          </StackPanel>
+
+          <Grid IsVisible="{Binding IsNichesTabSelected}"
+                ColumnDefinitions="220,*"
+                ColumnSpacing="16">
+            <StackPanel Grid.Column="0"
+                        Spacing="10">
+              <Button Content="New niche"
+                      Command="{Binding StartCreateNicheCommand}"
+                      Classes="primary" />
+              <TextBlock Text="Active niches"
+                         FontSize="12"
+                         FontWeight="SemiBold"
+                         Foreground="#687385" />
+              <TextBlock Text="No active niches"
+                         IsVisible="{Binding !HasActiveNiches}"
+                         FontSize="12"
+                         Foreground="#687385" />
+              <ItemsControl ItemsSource="{Binding EditorActiveNiches}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="workflow:NicheSummary">
+                    <Button Content="{Binding Name}"
+                            Command="{Binding $parent[ItemsControl].DataContext.EditNicheCommand}"
+                            CommandParameter="{Binding}"
+                            Classes="listItem"
+                            HorizontalContentAlignment="Left" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <TextBlock IsVisible="{Binding HasArchivedNiches}"
+                         Text="Archived niches"
+                         FontSize="12"
+                         FontWeight="SemiBold"
+                         Foreground="#687385"
+                         Margin="0,8,0,0" />
+              <ItemsControl IsVisible="{Binding HasArchivedNiches}"
+                            ItemsSource="{Binding ArchivedNiches}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="workflow:NicheSummary">
+                    <Button Content="{Binding Name}"
+                            Command="{Binding $parent[ItemsControl].DataContext.EditNicheCommand}"
+                            CommandParameter="{Binding}"
+                            Classes="listItem"
+                            HorizontalContentAlignment="Left" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1"
+                        Spacing="10">
+              <TextBlock Text="Niche details"
+                         FontSize="16"
+                         FontWeight="SemiBold"
+                         Foreground="#243447" />
+              <TextBox Text="{Binding NicheName}"
+                       PlaceholderText="Niche name"
+                       Classes="field" />
+              <TextBox Text="{Binding NicheDescription}"
+                       PlaceholderText="Description"
+                       Classes="field" />
+              <TextBox Text="{Binding NicheAudience}"
+                       PlaceholderText="Audience"
+                       Classes="field" />
+              <TextBox Text="{Binding NicheHumorStyle}"
+                       PlaceholderText="Humor style"
+                       Classes="field" />
+              <TextBox Text="{Binding NicheVisualStyleGuidance}"
+                       PlaceholderText="Visual style guidance"
+                       Classes="field" />
+              <TextBox Text="{Binding NicheConstraints}"
+                       PlaceholderText="Constraints"
+                       Classes="field" />
+              <TextBox Text="{Binding NicheRisks}"
+                       PlaceholderText="Risks"
+                       Classes="field" />
+              <TextBox Text="{Binding NicheResearchNotes}"
+                       PlaceholderText="Research notes"
+                       AcceptsReturn="True"
+                       MinHeight="70"
+                       Classes="field" />
+              <TextBox Text="{Binding NicheNotes}"
+                       PlaceholderText="Notes"
+                       AcceptsReturn="True"
+                       MinHeight="70"
+                       Classes="field" />
+
+              <StackPanel Orientation="Horizontal"
+                          Spacing="8"
+                          Margin="0,8,0,0">
+                <Button Content="Save"
+                        Command="{Binding SaveSelectedNicheCommand}"
+                        IsEnabled="{Binding CanSaveSelectedNiche}"
+                        Classes="primary fixedAction" />
+                <Button Content="Archive"
+                        Command="{Binding ArchiveSelectedNicheCommand}"
+                        IsEnabled="{Binding CanArchiveSelectedNiche}"
+                        Classes="secondary fixedAction" />
+                <Button Content="Delete"
+                        Command="{Binding RequestDeleteSelectedNicheCommand}"
+                        IsEnabled="{Binding CanDeleteSelectedNiche}"
+                        Classes="danger fixedAction" />
+              </StackPanel>
+
+              <Button Content="Restore selected archived niche"
+                      IsVisible="{Binding CanRestoreSelectedNiche}"
+                      Command="{Binding RestoreNicheCommand}"
+                      CommandParameter="{Binding SelectedNiche}"
+                      Classes="secondary restoreAction" />
+            </StackPanel>
+          </Grid>
 
           <Border IsVisible="{Binding DeleteWarningVisible}"
                   Background="#FFF7F2"
@@ -147,6 +277,28 @@
                         Classes="danger fixedDanger" />
                 <Button Content="Cancel"
                         Command="{Binding CancelDeleteStoreCommand}"
+                        Classes="secondary fixedAction" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <Border IsVisible="{Binding NicheDeleteWarningVisible}"
+                  Background="#FFF7F2"
+                  BorderBrush="#DFA481"
+                  BorderThickness="1"
+                  Padding="12"
+                  Margin="0,8,0,0">
+            <StackPanel Spacing="8">
+              <TextBlock Text="{Binding NicheDeleteWarningMessage}"
+                         FontSize="13"
+                         Foreground="#6B3527" />
+              <StackPanel Orientation="Horizontal"
+                          Spacing="8">
+                <Button Content="Delete permanently"
+                        Command="{Binding ConfirmDeleteNicheCommand}"
+                        Classes="danger fixedDanger" />
+                <Button Content="Cancel"
+                        Command="{Binding CancelDeleteNicheCommand}"
                         Classes="secondary fixedAction" />
               </StackPanel>
             </StackPanel>
@@ -219,6 +371,20 @@
       <Setter Property="Foreground" Value="#243447" />
       <Setter Property="BorderBrush" Value="#E1E5EA" />
       <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.tabButton">
+      <Setter Property="Width" Value="116" />
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="Foreground" Value="#425066" />
+      <Setter Property="BorderBrush" Value="#D9DEE7" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.tabButton.selected">
+      <Setter Property="Background" Value="#243447" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#243447" />
+      <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="TextBox.field">
       <Setter Property="MinHeight" Value="36" />
