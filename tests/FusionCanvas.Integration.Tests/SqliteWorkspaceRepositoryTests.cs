@@ -14,9 +14,9 @@ public class SqliteWorkspaceRepositoryTests
         var repository = new SqliteWorkspaceRepository(databasePath);
         var snapshot = CreateCompleteSnapshot();
 
-        await repository.SaveAsync(snapshot);
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
 
-        var loaded = await repository.LoadAsync();
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(snapshot.Stores[0], Assert.Single(loaded.Stores));
         Assert.Equal(snapshot.Niches[0], Assert.Single(loaded.Niches));
@@ -35,7 +35,7 @@ public class SqliteWorkspaceRepositoryTests
         using var tempDirectory = new TemporaryDirectory();
         var repository = new SqliteWorkspaceRepository(tempDirectory.GetPath("missing.db"));
 
-        var loaded = await repository.LoadAsync();
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Same(WorkspaceSnapshot.Empty, loaded);
     }
@@ -47,7 +47,7 @@ public class SqliteWorkspaceRepositoryTests
         var databasePath = tempDirectory.GetPath("workspace.db");
         var repository = new SqliteWorkspaceRepository(databasePath);
 
-        await repository.SaveAsync(CreateCompleteSnapshot());
+        await repository.SaveAsync(CreateCompleteSnapshot(), TestContext.Current.CancellationToken);
 
         Assert.Equal(1, await ReadUserVersionAsync(databasePath));
     }
@@ -61,7 +61,7 @@ public class SqliteWorkspaceRepositoryTests
 
         var repository = new SqliteWorkspaceRepository(databasePath);
 
-        await repository.LoadAsync();
+        await repository.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(1, await ReadUserVersionAsync(databasePath));
     }
@@ -74,7 +74,8 @@ public class SqliteWorkspaceRepositoryTests
         await SetUserVersionAsync(databasePath, 2);
         var repository = new SqliteWorkspaceRepository(databasePath);
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => repository.LoadAsync());
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => repository.LoadAsync(TestContext.Current.CancellationToken));
 
         Assert.Contains("requires a newer FusionCanvas version", exception.Message);
     }
@@ -98,10 +99,11 @@ public class SqliteWorkspaceRepositoryTests
             [],
             []);
 
-        await repository.SaveAsync(original);
+        await repository.SaveAsync(original, TestContext.Current.CancellationToken);
 
-        await Assert.ThrowsAsync<SqliteException>(() => repository.SaveAsync(invalidSnapshot));
-        var loaded = await repository.LoadAsync();
+        await Assert.ThrowsAsync<SqliteException>(
+            () => repository.SaveAsync(invalidSnapshot, TestContext.Current.CancellationToken));
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(original.Stores[0], Assert.Single(loaded.Stores));
         Assert.Equal(original.Tags[0], Assert.Single(loaded.Tags));
@@ -134,19 +136,19 @@ public class SqliteWorkspaceRepositoryTests
     private static async Task<int> ReadUserVersionAsync(string databasePath)
     {
         await using var connection = new SqliteConnection($"Data Source={databasePath}");
-        await connection.OpenAsync();
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version;";
-        return Convert.ToInt32(await command.ExecuteScalarAsync());
+        return Convert.ToInt32(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken));
     }
 
     private static async Task SetUserVersionAsync(string databasePath, int version)
     {
         await using var connection = new SqliteConnection($"Data Source={databasePath}");
-        await connection.OpenAsync();
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = $"PRAGMA user_version = {version};";
-        await command.ExecuteNonQueryAsync();
+        await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
     }
 
     private sealed class TemporaryDirectory : IDisposable

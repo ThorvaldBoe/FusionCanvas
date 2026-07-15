@@ -20,8 +20,8 @@ public class WorkspaceRepositoryContractTests
             [],
             []);
 
-        await repository.SaveAsync(snapshot);
-        var loaded = await repository.LoadAsync();
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(snapshot, loaded);
     }
