@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:doc="clr-namespace:FusionCanvas.App.DocumentWindow"
         xmlns:stores="clr-namespace:FusionCanvas.App.Stores"
+        xmlns:workspace="clr-namespace:FusionCanvas.App.Workspace"
         xmlns:views="clr-namespace:FusionCanvas.App.Views"
         xmlns:workflow="clr-namespace:FusionCanvas.Application.Workspace;assembly=FusionCanvas.Application"
         x:Class="FusionCanvas.App.Views.MainWindow"
@@ -26,9 +27,28 @@
                      FontSize="20"
                      FontWeight="SemiBold"
                      Foreground="#1E2733" />
-          <TextBlock Text="Workspace"
-                     FontSize="12"
-                     Foreground="#687385" />
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Top"
+                    Spacing="4"
+                    Margin="0,0,0,18">
+          <Grid ColumnDefinitions="*,Auto"
+                ColumnSpacing="6">
+            <TextBlock Text="Workspaces"
+                       VerticalAlignment="Center"
+                       FontSize="13"
+                       FontWeight="SemiBold"
+                       Foreground="#243447" />
+            <Button Grid.Column="1"
+                    Content="⚙"
+                    ToolTip.Tip="Manage workspaces"
+                    Command="{Binding WorkspaceManagement.OpenWorkspaceManagementCommand}"
+                    Classes="iconButton" />
+          </Grid>
+          <TextBlock Text="{Binding WorkspaceManagement.SelectedWorkspace.Name}"
+                     FontSize="11"
+                     Foreground="#687385"
+                     TextTrimming="CharacterEllipsis" />
         </StackPanel>
 
         <StackPanel DockPanel.Dock="Top"
@@ -282,7 +302,36 @@
       </Border>
     </Grid>
     <Border Grid.ColumnSpan="2"
-            IsVisible="{Binding StoreManagement.ShouldShowFirstStorePrompt}"
+            IsVisible="{Binding WorkspaceManagement.ShouldShowNoWorkspaceState}"
+            Background="#99000000">
+      <Border Width="420"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center"
+              Padding="20"
+              Background="#FFFFFF"
+              BorderBrush="#D9DEE7"
+              BorderThickness="1">
+        <StackPanel Spacing="12">
+          <TextBlock Text="Create your first workspace?"
+                     FontSize="22"
+                     FontWeight="SemiBold"
+                     Foreground="#1E2733" />
+          <TextBlock Text="FusionCanvas needs a workspace before stores can be organized."
+                     TextWrapping="Wrap"
+                     FontSize="13"
+                     Foreground="#687385" />
+          <StackPanel Orientation="Horizontal"
+                      HorizontalAlignment="Right"
+                      Spacing="8">
+            <Button Content="Create workspace"
+                    Command="{Binding WorkspaceManagement.CreateWorkspaceCommand}"
+                    Classes="storeAction fixedDialog" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Border>
+    <Border Grid.ColumnSpan="2"
+            IsVisible="{Binding ShouldShowFirstStorePrompt}"
             Background="#99000000">
       <Border Width="420"
               HorizontalAlignment="Center"

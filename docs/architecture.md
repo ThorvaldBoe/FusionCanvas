@@ -116,6 +116,7 @@ The domain is the heart of FusionCanvas.
 
 It contains concepts such as:
 
+- Workspace
 - Store
 - Niche
 - Group
@@ -151,11 +152,11 @@ Infrastructure implements interfaces defined by the application or domain layers
 
 ### Workspace Module
 
-The Workspace Module is responsible for organizing user projects and content.
+The Workspace Module is responsible for organizing user projects and content. In user-facing terms, a workspace is the top-level scope above stores; internally, the module also contains repository and snapshot types that represent the local structured data set.
 
 Responsibilities:
 
-- store, niche, topic, group, and item management
+- workspace, store, niche, topic, group, and item management
 - navigation tree
 - workspace organization
 - user preferences

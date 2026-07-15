@@ -108,6 +108,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
+        WorkspaceManagement = new WorkspaceManagementViewModel(new WorkspaceManagementService(new InMemoryWorkspaceRepository(workspaceSnapshot)));
         StoreManagement = new StoreManagementViewModel(storeManagementService, nicheManagementService);
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
@@ -129,6 +130,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         });
         StoreManagement.ActiveStoreChanged += (_, store) => RebuildNavigationContexts(store);
         StoreManagement.WorkspaceStructureChanged += (_, _) => RefreshWorkspaceSnapshot();
+        WorkspaceManagement.ActiveWorkspaceChanged += (_, workspace) => SwitchWorkspace(workspace);
+        SubscribeToWorkspacePromptState();
+        InitializeWorkspaces();
         InitializeStores();
         DocumentWindow.ActiveContextChanged += (_, context) => CoordinateActiveContext(context);
         DocumentWindow.ToolScopeChangeRequested += (_, scope) => ResolveActiveToolContext(scope);
@@ -145,6 +149,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
+        WorkspaceManagement = new WorkspaceManagementViewModel(new WorkspaceManagementService(workspaceRepository));
         StoreManagement = new StoreManagementViewModel(
             new StoreManagementService(workspaceRepository),
             new NicheManagementService(workspaceRepository));
@@ -169,6 +174,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         });
         StoreManagement.ActiveStoreChanged += (_, store) => RebuildNavigationContexts(store);
         StoreManagement.WorkspaceStructureChanged += (_, _) => RefreshWorkspaceSnapshot();
+        WorkspaceManagement.ActiveWorkspaceChanged += (_, workspace) => SwitchWorkspace(workspace);
+        SubscribeToWorkspacePromptState();
+        InitializeWorkspaces();
         InitializeStores();
         DocumentWindow.ActiveContextChanged += (_, context) => CoordinateActiveContext(context);
         DocumentWindow.ToolScopeChangeRequested += (_, scope) => ResolveActiveToolContext(scope);
@@ -180,6 +188,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public WorkflowStageNavigatorViewModel WorkflowNavigator { get; }
 
     public DocumentWindowViewModel DocumentWindow { get; }
+
+    public WorkspaceManagementViewModel WorkspaceManagement { get; }
 
     public StoreManagementViewModel StoreManagement { get; }
 
@@ -199,6 +209,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand SelectWorkflowStageCommand { get; }
 
+    public bool ShouldShowFirstStorePrompt =>
+        !WorkspaceManagement.IsWorkspaceManagementOpen &&
+        !WorkspaceManagement.ShouldShowNoWorkspaceState &&
+        StoreManagement.ShouldShowFirstStorePrompt;
+
     public void OpenFromNavigation(NavigationDocumentContext navigationContext)
     {
         ArgumentNullException.ThrowIfNull(navigationContext);
@@ -212,6 +227,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         WorkflowNavigator.SelectStage(stage);
     }
 
+    private void InitializeWorkspaces()
+    {
+        WorkspaceManagement.LoadAsync().GetAwaiter().GetResult();
+        StoreManagement.SetActiveWorkspaceAsync(WorkspaceManagement.SelectedWorkspace?.Id).GetAwaiter().GetResult();
+    }
+
     private void InitializeStores()
     {
         StoreManagement.LoadAsync().GetAwaiter().GetResult();
@@ -222,6 +243,31 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
 
         RebuildNavigationContexts(StoreManagement.SelectedStore);
+    }
+
+    private void SwitchWorkspace(WorkspaceSummary? workspace)
+    {
+        StoreManagement.SetActiveWorkspaceAsync(workspace?.Id).GetAwaiter().GetResult();
+        RefreshWorkspaceSnapshot();
+    }
+
+    private void SubscribeToWorkspacePromptState()
+    {
+        WorkspaceManagement.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName is nameof(WorkspaceManagementViewModel.ShouldShowNoWorkspaceState) or
+                nameof(WorkspaceManagementViewModel.IsWorkspaceManagementOpen))
+            {
+                OnPropertyChanged(nameof(ShouldShowFirstStorePrompt));
+            }
+        };
+        StoreManagement.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName is nameof(StoreManagementViewModel.ShouldShowFirstStorePrompt))
+            {
+                OnPropertyChanged(nameof(ShouldShowFirstStorePrompt));
+            }
+        };
     }
 
     private void RebuildNavigationContexts(StoreSummary? selectedStore) =>

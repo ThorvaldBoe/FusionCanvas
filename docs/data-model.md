@@ -12,7 +12,7 @@ FusionCanvas should use a hybrid model:
 - JSON metadata fields for flexible, evolving information
 - managed workspace file paths for large assets such as images, source files, and mockups
 
-The data model should preserve creative context, workflow state, and relationships between stores, niches, listings, designs, and assets.
+The data model should preserve creative context, workflow state, and relationships between workspaces, stores, niches, listings, designs, and assets.
 
 ## Core Principles
 
@@ -29,7 +29,7 @@ Examples:
 - created dates
 - modified dates
 - workflow status
-- store ownership
+- workspace and store ownership
 
 Structured fields allow fast search, filtering, sorting, and validation.
 
@@ -66,19 +66,20 @@ Examples:
 ## Primary Entities
 
 ```text
-Store
-  Mockup Product
-    Mockup Template
-      Mockup Color Variant
-  Niche
-    Group
-      Listing
-        Concept
-        Design
-        Asset
-        Mockup
-        Listing Metadata
-        Performance Data
+Workspace
+  Store
+    Mockup Product
+      Mockup Template
+        Mockup Color Variant
+    Niche
+      Group
+        Listing
+          Concept
+          Design
+          Asset
+          Mockup
+          Listing Metadata
+          Performance Data
 ```
 
 ## Navigation Topic and Item Model
@@ -96,17 +97,39 @@ The current navigation context should be derivable from the selected item or top
 
 New work created from a topic should be able to inherit applicable tags and metadata from the selected topic and parent context. Inheritance should reduce manual data entry, but it should remain understandable and editable so inherited context does not become hidden magic.
 
+## Workspace
+
+A workspace represents the highest-level user-facing organizational scope in FusionCanvas.
+
+Workspaces separate settings such as personal projects, client work, or a large client portfolio. Each workspace contains its own stores, and normal store selection, navigation, and context-aware work operate inside the active workspace.
+
+Suggested fields:
+
+```text
+Workspace
+- Id
+- Name
+- Description
+- CreatedAt
+- UpdatedAt
+- IsArchived
+- MetadataJson
+```
+
+Existing single-workspace data should migrate into a default workspace so users keep their current stores and child work.
+
 ## Store
 
-A store represents a brand, business, client, or publishing context.
+A store represents a brand, business, client, or publishing context inside a workspace.
 
-A store is the highest-level business context in FusionCanvas.
+A store is the highest-level business context within one workspace.
 
 Suggested fields:
 
 ```text
 Store
 - Id
+- WorkspaceId
 - Name
 - Description
 - CreatedAt
@@ -742,6 +765,7 @@ Store relationships:
 
 ```text
 Store
+- belongs to Workspace
 - has many Niches
 - has many Groups
 - has many Listings

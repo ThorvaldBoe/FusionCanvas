@@ -1,6 +1,13 @@
 namespace FusionCanvas.Domain.Workspace;
 
-public sealed record Store(
+public static class WorkspaceDefaults
+{
+    public static Guid DefaultWorkspaceId { get; } = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
+    public const string DefaultWorkspaceName = "Personal";
+}
+
+public sealed record Workspace(
     Guid Id,
     string Name,
     string? Description,
@@ -9,6 +16,39 @@ public sealed record Store(
     DateTimeOffset UpdatedAt,
     string MetadataJson)
     : WorkspaceEntity(Id, Name, Description, IsArchived, CreatedAt, UpdatedAt, MetadataJson);
+
+public sealed record Store : WorkspaceEntity
+{
+    public Store(
+        Guid id,
+        string name,
+        string? description,
+        bool isArchived,
+        DateTimeOffset createdAt,
+        DateTimeOffset updatedAt,
+        string metadataJson)
+        : this(id, WorkspaceDefaults.DefaultWorkspaceId, name, description, isArchived, createdAt, updatedAt, metadataJson)
+    {
+    }
+
+    public Store(
+        Guid id,
+        Guid workspaceId,
+        string name,
+        string? description,
+        bool isArchived,
+        DateTimeOffset createdAt,
+        DateTimeOffset updatedAt,
+        string metadataJson)
+        : base(id, name, description, isArchived, createdAt, updatedAt, metadataJson)
+    {
+        WorkspaceId = workspaceId == Guid.Empty
+            ? throw new ArgumentException("Workspace identifier must not be empty.", nameof(workspaceId))
+            : workspaceId;
+    }
+
+    public Guid WorkspaceId { get; init; }
+}
 
 public sealed record Niche(
     Guid Id,

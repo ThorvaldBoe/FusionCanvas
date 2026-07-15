@@ -22,6 +22,19 @@ public class NavigationTreeTests
     }
 
     [Fact]
+    public void WorkspaceSnapshot_RepresentsWorkspaceStoreHierarchy()
+    {
+        var sample = NavigationSample.Create();
+
+        var workspace = Assert.Single(sample.Snapshot.Workspaces);
+
+        Assert.Equal(sample.Store.WorkspaceId, workspace.Id);
+        Assert.Equal(workspace.Id, sample.Store.WorkspaceId);
+        Assert.Equal(sample.Store.Id, sample.Niche.StoreId);
+        Assert.Equal(sample.Store.Id, sample.Listing.StoreId);
+    }
+
+    [Fact]
     public void BuildTree_PreservesNestedGroupsAtPracticalDepth()
     {
         var sample = NavigationSample.Create();

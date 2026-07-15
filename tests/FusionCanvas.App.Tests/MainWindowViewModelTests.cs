@@ -1,4 +1,5 @@
 using FusionCanvas.App.Views;
+using FusionCanvas.App.Workflow;
 using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
 
@@ -125,6 +126,62 @@ public class MainWindowViewModelTests
         Assert.Contains("requires a selected item", viewModel.DocumentWindow.ActiveStageToolUnavailableMessage);
     }
 
+    [Fact]
+    public async Task SelectingWorkspace_RefreshesStoresAndNavigationForWorkspace()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var personal = new FusionCanvas.Domain.Workspace.Workspace(Guid.NewGuid(), "Personal", null, false, now, now, "{}");
+        var client = new FusionCanvas.Domain.Workspace.Workspace(Guid.NewGuid(), "Client", null, false, now, now, "{}");
+        var personalStore = new Store(Guid.NewGuid(), personal.Id, "Personal Store", null, false, now, now, "{}");
+        var clientStore = new Store(Guid.NewGuid(), client.Id, "Client Store", null, false, now, now, "{}");
+        var clientNiche = new Niche(Guid.NewGuid(), clientStore.Id, "Client Niche", null, false, now, now, "{}");
+        var clientListing = new Listing(Guid.NewGuid(), clientStore.Id, clientNiche.Id, null, "Client Listing", null, ListingStatus.Draft, false, now, now, "{}");
+        var snapshot = new WorkspaceSnapshot([personal, client], [personalStore, clientStore], [clientNiche], [], [clientListing], [], [], [], [], []);
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+        var viewModel = new MainWindowViewModel(
+            new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
+            new FusionCanvas.App.DocumentWindow.DocumentWindowViewModel(),
+            new ToolContextResolver(),
+            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
+            repository,
+            snapshot);
+
+        var clientWorkspace = viewModel.WorkspaceManagement.ActiveWorkspaces.Single(workspace => workspace.Id == client.Id);
+        await viewModel.WorkspaceManagement.SelectWorkspaceAsync(clientWorkspace);
+
+        Assert.Equal(client.Id, viewModel.WorkspaceManagement.SelectedWorkspace?.Id);
+        Assert.DoesNotContain(viewModel.StoreManagement.ActiveStores, store => store.Id == personalStore.Id);
+        Assert.Contains(viewModel.StoreManagement.ActiveStores, store => store.Id == clientStore.Id);
+        Assert.Contains(viewModel.NavigationContexts, context => context.Context.Title == "Client Listing");
+    }
+
+    [Fact]
+    public async Task WorkspaceManagementOpen_DefersFirstStorePromptUntilClosed()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var personal = new FusionCanvas.Domain.Workspace.Workspace(Guid.NewGuid(), "Alpha Personal", null, false, now, now, "{}");
+        var client = new FusionCanvas.Domain.Workspace.Workspace(Guid.NewGuid(), "Zulu Client", null, false, now, now, "{}");
+        var personalStore = new Store(Guid.NewGuid(), personal.Id, "Personal Store", null, false, now, now, "{}");
+        var snapshot = new WorkspaceSnapshot([personal, client], [personalStore], [], [], [], [], [], [], [], []);
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+        var viewModel = new MainWindowViewModel(
+            new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
+            new FusionCanvas.App.DocumentWindow.DocumentWindowViewModel(),
+            new ToolContextResolver(),
+            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
+            repository,
+            snapshot);
+
+        viewModel.WorkspaceManagement.OpenWorkspaceManagementCommand.Execute(null);
+        await viewModel.WorkspaceManagement.SelectWorkspaceAsync(viewModel.WorkspaceManagement.ActiveWorkspaces.Single(workspace => workspace.Id == client.Id));
+
+        Assert.False(viewModel.ShouldShowFirstStorePrompt);
+
+        viewModel.WorkspaceManagement.CloseWorkspaceManagementCommand.Execute(null);
+
+        Assert.True(viewModel.ShouldShowFirstStorePrompt);
+    }
+
     private static NavigationDocumentContext GroupContext(MainWindowViewModel viewModel) =>
         viewModel.NavigationContexts.Single(context =>
             context.Context.EntityKind == WorkspaceEntityKind.Group &&
@@ -144,4 +201,18 @@ public class MainWindowViewModelTests
         viewModel.NavigationContexts.Single(context =>
             context.Context.EntityKind == WorkspaceEntityKind.Listing &&
             context.Context.Title == "Espresso listing draft");
+
+    private sealed class InMemoryWorkspaceRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
+    {
+        private WorkspaceSnapshot _snapshot = snapshot;
+
+        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
+        {
+            _snapshot = snapshot;
+            return Task.CompletedTask;
+        }
+
+        public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(_snapshot);
+    }
 }

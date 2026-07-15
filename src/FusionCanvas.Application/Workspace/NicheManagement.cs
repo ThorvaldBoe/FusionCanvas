@@ -51,9 +51,13 @@ public sealed record NicheManagementResult(
 
 public interface INicheManagementService
 {
+    Guid? ActiveWorkspaceId { get; }
+
     Guid? ActiveStoreId { get; }
 
     Guid? ActiveNicheId { get; }
+
+    void SetActiveWorkspace(Guid? workspaceId);
 
     Task<NicheManagementState> LoadAsync(Guid? storeId, CancellationToken cancellationToken = default);
 
@@ -83,6 +87,7 @@ public sealed class NicheManagementService : INicheManagementService
     private readonly IWorkspaceRepository _repository;
     private readonly Func<DateTimeOffset> _clock;
     private readonly Func<Guid> _newId;
+    private Guid? _activeWorkspaceId;
     private Guid? _activeStoreId;
     private Guid? _activeNicheId;
 
@@ -96,9 +101,22 @@ public sealed class NicheManagementService : INicheManagementService
         _newId = newId ?? Guid.NewGuid;
     }
 
+    public Guid? ActiveWorkspaceId => _activeWorkspaceId;
+
     public Guid? ActiveStoreId => _activeStoreId;
 
     public Guid? ActiveNicheId => _activeNicheId;
+
+    public void SetActiveWorkspace(Guid? workspaceId)
+    {
+        if (_activeWorkspaceId != workspaceId)
+        {
+            _activeStoreId = null;
+            _activeNicheId = null;
+        }
+
+        _activeWorkspaceId = workspaceId;
+    }
 
     public async Task<NicheManagementState> LoadAsync(Guid? storeId, CancellationToken cancellationToken = default)
     {
@@ -295,12 +313,12 @@ public sealed class NicheManagementService : INicheManagementService
     {
         if (storeId is Guid requestedStoreId)
         {
-            _activeStoreId = snapshot.Stores.Any(store => store.Id == requestedStoreId && !store.IsArchived)
+            _activeStoreId = snapshot.Stores.Any(store => store.Id == requestedStoreId && !store.IsArchived && StoreBelongsToActiveWorkspace(store))
                 ? requestedStoreId
                 : null;
         }
         else if (_activeStoreId is Guid activeStoreId &&
-            !snapshot.Stores.Any(store => store.Id == activeStoreId && !store.IsArchived))
+            !snapshot.Stores.Any(store => store.Id == activeStoreId && !store.IsArchived && StoreBelongsToActiveWorkspace(store)))
         {
             _activeStoreId = null;
         }
@@ -333,7 +351,7 @@ public sealed class NicheManagementService : INicheManagementService
         return new NicheManagementState(_activeStoreId, activeNiches, archivedNiches, _activeNicheId, active, _activeStoreId is not null && activeNiches.Count() == 0);
     }
 
-    private static string? ValidateActiveStore(WorkspaceSnapshot snapshot, Guid storeId)
+    private string? ValidateActiveStore(WorkspaceSnapshot snapshot, Guid storeId)
     {
         var store = snapshot.Stores.SingleOrDefault(candidate => candidate.Id == storeId);
         if (store is null)
@@ -341,8 +359,16 @@ public sealed class NicheManagementService : INicheManagementService
             return "Active store is required before creating niches.";
         }
 
-        return store.IsArchived ? "Archived stores must be restored before niches can be managed." : null;
+        if (store.IsArchived)
+        {
+            return "Archived stores must be restored before niches can be managed.";
+        }
+
+        return StoreBelongsToActiveWorkspace(store) ? null : "Store does not belong to the active workspace.";
     }
+
+    private bool StoreBelongsToActiveWorkspace(Store store) =>
+        _activeWorkspaceId is null || store.WorkspaceId == _activeWorkspaceId;
 
     private static string? ValidateName(string name, WorkspaceSnapshot snapshot, Guid storeId, Guid? existingNicheId)
     {
