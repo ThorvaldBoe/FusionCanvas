@@ -1,3 +1,4 @@
+using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Integration.Workspace;
 using Microsoft.Data.Sqlite;
@@ -49,7 +50,7 @@ public class SqliteWorkspaceRepositoryTests
 
         await repository.SaveAsync(CreateCompleteSnapshot(), TestContext.Current.CancellationToken);
 
-        Assert.Equal(2, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(3, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -84,7 +85,7 @@ public class SqliteWorkspaceRepositoryTests
         Assert.Equal(2, loaded.Stores.Count);
         Assert.Equal(active, loaded.Stores.Single(store => store.Id == active.Id));
         Assert.Equal(archived, loaded.Stores.Single(store => store.Id == archived.Id));
-        Assert.Equal(2, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(3, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -103,7 +104,7 @@ public class SqliteWorkspaceRepositoryTests
 
         Assert.Equal(first.Id, Assert.Single(loaded.Stores).Id);
         Assert.DoesNotContain(loaded.Stores, store => store.Id == deleted.Id);
-        Assert.Equal(2, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(3, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -141,7 +142,7 @@ public class SqliteWorkspaceRepositoryTests
         Assert.Equal(2, loaded.Niches.Count);
         Assert.Equal(active, loaded.Niches.Single(niche => niche.Id == active.Id));
         Assert.Equal(archived, loaded.Niches.Single(niche => niche.Id == archived.Id));
-        Assert.Equal(2, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(3, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -161,7 +162,68 @@ public class SqliteWorkspaceRepositoryTests
 
         Assert.Equal(kept.Id, Assert.Single(loaded.Niches).Id);
         Assert.DoesNotContain(loaded.Niches, niche => niche.Id == deleted.Id);
-        Assert.Equal(2, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(3, await ReadUserVersionAsync(databasePath));
+    }
+
+    [Fact]
+    public async Task GroupManagement_RoundTripsHierarchyContextMovesArchiveAndListingRelationshipsWithoutSchemaChange()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("workspace.db");
+        var repository = new SqliteWorkspaceRepository(databasePath);
+        var now = new DateTimeOffset(2026, 7, 18, 12, 0, 0, TimeSpan.Zero);
+        var store = new Store(Guid.NewGuid(), "North Star Studio", null, false, now, now, "{}");
+        var sourceNiche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, "{}");
+        var destinationNiche = new Niche(Guid.NewGuid(), store.Id, "Dogs", null, false, now, now, "{}");
+        await repository.SaveAsync(
+            new WorkspaceSnapshot([store], [sourceNiche, destinationNiche], [], [], [], [], [], [], []),
+            TestContext.Current.CancellationToken);
+        var ids = new Queue<Guid>([Guid.NewGuid(), Guid.NewGuid()]);
+        var service = new GroupManagementService(repository, () => now.AddMinutes(1), () => ids.Dequeue());
+
+        var root = await service.CreateGroupAsync(
+            new GroupManagementCreateRequest(
+                new GroupParentReference(WorkspaceEntityKind.Niche, sourceNiche.Id),
+                "Campaign",
+                new GroupContext("Fall launch", "Keep variants together")),
+            TestContext.Current.CancellationToken);
+        var child = await service.CreateGroupAsync(
+            new GroupManagementCreateRequest(
+                new GroupParentReference(WorkspaceEntityKind.Group, root.Group!.Id),
+                "Shirts"),
+            TestContext.Current.CancellationToken);
+        var withListing = await repository.LoadAsync(TestContext.Current.CancellationToken);
+        var listing = new Listing(Guid.NewGuid(), store.Id, sourceNiche.Id, child.Group!.Id, "Cozy shirt", null, ListingStatus.Draft, false, now, now, "{}");
+        await repository.SaveAsync(withListing with { Listings = [listing] }, TestContext.Current.CancellationToken);
+
+        var updated = await service.UpdateGroupAsync(
+            new GroupManagementUpdateRequest(child.Group.Id, "Apparel", new GroupContext("Product split", "Ready for art")),
+            TestContext.Current.CancellationToken);
+        var moved = await service.MoveGroupAsync(
+            new GroupManagementMoveRequest(root.Group.Id, new GroupParentReference(WorkspaceEntityKind.Niche, destinationNiche.Id)),
+            TestContext.Current.CancellationToken);
+        var archived = await service.ArchiveGroupAsync(root.Group.Id, TestContext.Current.CancellationToken);
+        var archivedSnapshot = await repository.LoadAsync(TestContext.Current.CancellationToken);
+        var restored = await service.RestoreGroupAsync(root.Group.Id, TestContext.Current.CancellationToken);
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(updated.Succeeded, updated.Error);
+        Assert.True(moved.Succeeded, moved.Error);
+        Assert.True(archived.Succeeded, archived.Error);
+        Assert.True(restored.Succeeded, restored.Error);
+        Assert.True(archivedSnapshot.Groups.Single(group => group.Id == root.Group.Id).IsArchived);
+        var loadedRoot = loaded.Groups.Single(group => group.Id == root.Group.Id);
+        var loadedChild = loaded.Groups.Single(group => group.Id == child.Group.Id);
+        var loadedListing = Assert.Single(loaded.Listings);
+        Assert.Equal(destinationNiche.Id, loadedRoot.NicheId);
+        Assert.False(loadedRoot.IsArchived);
+        Assert.Equal(root.Group.Id, loadedChild.ParentGroupId);
+        Assert.Equal("Apparel", loadedChild.Name);
+        Assert.Equal("Product split", loadedChild.Description);
+        Assert.Contains("Ready for art", loadedChild.MetadataJson);
+        Assert.Equal(child.Group.Id, loadedListing.GroupId);
+        Assert.Equal(destinationNiche.Id, loadedListing.NicheId);
+        Assert.Equal(3, await ReadUserVersionAsync(databasePath));
     }
 
 
@@ -176,7 +238,49 @@ public class SqliteWorkspaceRepositoryTests
 
         await repository.LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(2, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(3, await ReadUserVersionAsync(databasePath));
+    }
+
+    [Fact]
+    public async Task LoadAsync_UpgradesVersion2WithDefaultNicheAndAlphabeticalSiblingOrder()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("workspace.db");
+        var now = new DateTimeOffset(2026, 7, 18, 12, 0, 0, TimeSpan.Zero);
+        var workspaceId = WorkspaceDefaults.DefaultWorkspaceId;
+        var storeId = Guid.NewGuid();
+        var nicheId = Guid.NewGuid();
+        await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE workspaces (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NULL, is_archived INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL);
+                CREATE TABLE stores (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT NULL, is_archived INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL);
+                CREATE TABLE niches (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT NULL, is_archived INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL);
+                CREATE TABLE groups (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, niche_id TEXT NULL, parent_group_id TEXT NULL, name TEXT NOT NULL, description TEXT NULL, is_archived INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL);
+                INSERT INTO workspaces VALUES ($workspace_id, 'Personal', NULL, 0, $now, $now, '{}');
+                INSERT INTO stores VALUES ($store_id, $workspace_id, 'Store', NULL, 0, $now, $now, '{}');
+                INSERT INTO niches VALUES ($niche_id, $store_id, 'Niche', NULL, 0, $now, $now, '{}');
+                INSERT INTO groups VALUES ($z_id, $store_id, $niche_id, NULL, 'Zulu', NULL, 0, $now, $now, '{}');
+                INSERT INTO groups VALUES ($a_id, $store_id, $niche_id, NULL, 'Alpha', NULL, 0, $now, $now, '{}');
+                PRAGMA user_version = 2;
+                """;
+            command.Parameters.AddWithValue("$workspace_id", workspaceId.ToString());
+            command.Parameters.AddWithValue("$store_id", storeId.ToString());
+            command.Parameters.AddWithValue("$niche_id", nicheId.ToString());
+            command.Parameters.AddWithValue("$z_id", Guid.NewGuid().ToString());
+            command.Parameters.AddWithValue("$a_id", Guid.NewGuid().ToString());
+            command.Parameters.AddWithValue("$now", now.ToString("O"));
+            await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+
+        var loaded = await new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(3, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(nicheId, Assert.Single(loaded.Stores).DefaultNicheId);
+        Assert.Equal(["Alpha", "Zulu"], loaded.Groups.OrderBy(group => group.SortOrder).Select(group => group.Name));
+        Assert.Equal([0, 1], loaded.Groups.OrderBy(group => group.SortOrder).Select(group => group.SortOrder));
     }
 
     [Fact]
@@ -184,7 +288,7 @@ public class SqliteWorkspaceRepositoryTests
     {
         using var tempDirectory = new TemporaryDirectory();
         var databasePath = tempDirectory.GetPath("workspace.db");
-        await SetUserVersionAsync(databasePath, 3);
+        await SetUserVersionAsync(databasePath, 4);
         var repository = new SqliteWorkspaceRepository(databasePath);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -251,7 +355,8 @@ public class SqliteWorkspaceRepositoryTests
         var updatedAt = createdAt.AddMinutes(5);
         var store = new Store(Guid.NewGuid(), "North Star Studio", "POD brand", false, createdAt, updatedAt, """{"currency":"USD"}""");
         var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", "Warm drink designs", false, createdAt, updatedAt, """{"season":"fall"}""");
-        var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Fall launch", "Seasonal rollout", true, createdAt, updatedAt, """{"priority":2}""");
+        store = store with { DefaultNicheId = niche.Id };
+        var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Fall launch", "Seasonal rollout", true, createdAt, updatedAt, """{"priority":2}""", 4);
         var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Pumpkin espresso", "Cozy shirt idea", ListingStatus.Draft, false, createdAt, updatedAt, """{"audience":"baristas"}""");
         var asset = new Asset(Guid.NewGuid(), store.Id, "design.png", "Primary export", AssetKind.ExportedImage, "assets/2026/06/design.png", "C:/imports/design.png", false, false, createdAt, updatedAt, """{"width":4500}""");
         var prompt = new Prompt(Guid.NewGuid(), store.Id, listing.Id, "Listing prompt", "Phrase prompt", "Create a warm fall coffee phrase.", false, createdAt, updatedAt, """{"model":"manual"}""");
