@@ -20,7 +20,7 @@ The implementation remains local-first and follows Clean Architecture. Avalonia 
 **Non-Goals:**
 
 - Implementing items, item-specific property editors, or final item-copy semantics beyond defining the shared command boundary.
-- Permanent deletion, cross-store moves, batch editing, saved searches, analytics, templates, automation, or production queues.
+- Cross-store moves, batch editing, saved searches, analytics, templates, automation, or production queues.
 - Introducing Avalonia Pro controls or coupling application behavior to Avalonia control instances.
 - Defining final visual iconography, status vocabularies, or tag schemas.
 
@@ -109,6 +109,12 @@ The initial group row requires a group icon, optional color token, name, child c
 ### 10. Preserve existing group lifecycle and hierarchy rules
 
 Existing rules remain authoritative: exactly one direct parent, same-store moves only, no cycles, active destination paths, normalized unique sibling names, archived subtree hiding, explicit archived review, stable identities, and non-cascading archive flags. Copy is the exception to identity preservation because it intentionally creates new records.
+
+### 11. Put contextual actions on the group row and isolate destructive deletion
+
+Right-clicking an active group selects it and opens a compact context menu containing New group, Rename, Copy, Cut, Paste, and Delete. New group uses the clicked group as the direct parent. Copy/Cut use the application clipboard, while Paste is disabled when no group payload exists.
+
+Delete is deliberately separate from archive. It opens a focused confirmation dialog naming the group and warning that the complete descendant group structure and every contained listing/item will be permanently lost. Only explicit confirmation invokes the application command. The command resolves the subtree against the latest snapshot, removes descendant groups, contained listings, listing tags, listing-owned prompts, and links to removed entities in one repository save. Reusable asset records remain in the asset library after their deleted links are removed. On success selection falls back to the nearest surviving parent and tabs for deleted entities close; on failure the confirmed snapshot remains visible.
 
 ## Risks / Trade-offs
 

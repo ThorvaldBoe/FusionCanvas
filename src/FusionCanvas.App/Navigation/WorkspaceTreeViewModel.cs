@@ -17,6 +17,7 @@ public sealed class WorkspaceTreeNodeViewModel : INotifyPropertyChanged
     private bool _isDropTarget;
     private bool _isDropBefore;
     private bool _isDropAfter;
+    private bool _canPaste;
     private string _draftName;
 
     public WorkspaceTreeNodeViewModel(
@@ -73,6 +74,7 @@ public sealed class WorkspaceTreeNodeViewModel : INotifyPropertyChanged
 
     public string CountLabel => ChildCount == 0 ? string.Empty : ChildCount.ToString();
     public bool HasChildren => ChildCount > 0;
+    public bool IsGroup => EntityKind == WorkspaceEntityKind.Group;
     public ObservableCollection<WorkspaceTreeNodeViewModel> Children { get; }
 
     public bool IsExpanded
@@ -102,6 +104,7 @@ public sealed class WorkspaceTreeNodeViewModel : INotifyPropertyChanged
     public bool IsDropTarget { get => _isDropTarget; set => SetField(ref _isDropTarget, value); }
     public bool IsDropBefore { get => _isDropBefore; set => SetField(ref _isDropBefore, value); }
     public bool IsDropAfter { get => _isDropAfter; set => SetField(ref _isDropAfter, value); }
+    public bool CanPaste { get => _canPaste; set => SetField(ref _canPaste, value); }
 
     public string DraftName
     {
@@ -180,6 +183,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     public event EventHandler<WorkspaceTreeSelection>? OpenInTabRequested;
     public event EventHandler<Guid>? EditPropertiesRequested;
     public event EventHandler? StructureChanged;
+    public event EventHandler<IReadOnlySet<Guid>>? EntitiesDeleted;
 
     public ObservableCollection<WorkspaceTreeNodeViewModel> Roots { get; } = [];
     public ICommand SelectNodeCommand { get; }
@@ -363,7 +367,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         if (SelectedNode is { EntityKind: WorkspaceEntityKind.Group } node)
         {
             _clipboard.Set(new WorkspaceTreeClipboardPayload(WorkspaceTreeClipboardMode.Copy, node.EntityKind, node.EntityId));
-            ApplyCutState();
+            ApplyClipboardState();
         }
     }
 
@@ -372,7 +376,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         if (SelectedNode is { EntityKind: WorkspaceEntityKind.Group } node)
         {
             _clipboard.Set(new WorkspaceTreeClipboardPayload(WorkspaceTreeClipboardMode.Cut, node.EntityKind, node.EntityId));
-            ApplyCutState();
+            ApplyClipboardState();
         }
     }
 
@@ -404,6 +408,56 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
         await ReloadAsync().ConfigureAwait(false);
         Select(FindNode(result.Group!.Id));
+        StructureChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public GroupDeleteImpact GetDeleteImpact(Guid groupId)
+    {
+        var group = _snapshot.Groups.Single(candidate => candidate.Id == groupId);
+        var groupIds = GroupHierarchy.GetDescendants(_snapshot, group)
+            .Select(candidate => candidate.Id)
+            .Append(group.Id)
+            .ToHashSet();
+        var listingIds = _snapshot.Listings
+            .Where(listing => listing.GroupId is Guid id && groupIds.Contains(id))
+            .Select(listing => listing.Id)
+            .ToHashSet();
+        var promptIds = _snapshot.Prompts
+            .Where(prompt => prompt.ListingId is Guid id && listingIds.Contains(id))
+            .Select(prompt => prompt.Id);
+        var entityIds = new HashSet<Guid>(groupIds);
+        entityIds.UnionWith(listingIds);
+        entityIds.UnionWith(promptIds);
+        return new GroupDeleteImpact(group.Id, group.Name, groupIds.Count - 1, listingIds.Count, entityIds);
+    }
+
+    public async Task DeleteGroupAsync(Guid groupId, bool ConfirmPermanentDeletion)
+    {
+        if (IsBusy || _snapshot.Groups.All(group => group.Id != groupId))
+        {
+            return;
+        }
+
+        var impact = GetDeleteImpact(groupId);
+        IsBusy = true;
+        ErrorMessage = null;
+        var result = await _groups.DeleteGroupAsync(new GroupManagementDeleteRequest(groupId, ConfirmPermanentDeletion)).ConfigureAwait(false);
+        IsBusy = false;
+        if (!result.Succeeded)
+        {
+            ErrorMessage = result.Error;
+            return;
+        }
+
+        if (_clipboard.Payload is { } payload && impact.DeletedEntityIds.Contains(payload.EntityId))
+        {
+            _clipboard.Clear();
+        }
+
+        await ReloadAsync().ConfigureAwait(false);
+        var fallbackId = result.State.ActiveGroupId ?? result.State.ActiveNicheId;
+        Select(fallbackId is Guid id ? FindNode(id) : null);
+        EntitiesDeleted?.Invoke(this, impact.DeletedEntityIds);
         StructureChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -525,7 +579,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
 
         SelectedNode = selectedId is Guid id ? FindNode(id) : null;
-        ApplyCutState();
+        ApplyClipboardState();
     }
 
     private WorkspaceTreeNodeViewModel ToNode(WorkspaceTreeProjectionNode projected)
@@ -599,11 +653,12 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
     }
 
-    private void ApplyCutState()
+    private void ApplyClipboardState()
     {
         foreach (var node in Flatten(Roots))
         {
             node.IsCut = _clipboard.Payload is { Mode: WorkspaceTreeClipboardMode.Cut } payload && payload.EntityId == node.EntityId;
+            node.CanPaste = node.IsGroup && _clipboard.Payload is { Kind: WorkspaceEntityKind.Group };
         }
     }
 
@@ -624,3 +679,10 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }
+
+public sealed record GroupDeleteImpact(
+    Guid GroupId,
+    string GroupName,
+    int DescendantGroupCount,
+    int ItemCount,
+    IReadOnlySet<Guid> DeletedEntityIds);

@@ -207,6 +207,22 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task PermanentGroupDeletionClosesTabsForDeletedEntities()
+    {
+        var viewModel = new MainWindowViewModel();
+        var groupNode = viewModel.WorkspaceTree.Roots
+            .SelectMany(root => root.Children)
+            .Single(node => node.EntityId == GroupContext(viewModel).Context.Id);
+        viewModel.WorkspaceTree.OpenInTabCommand.Execute(groupNode);
+        Assert.Equal(groupNode.EntityId, viewModel.DocumentWindow.ActiveContext!.Id);
+
+        await viewModel.WorkspaceTree.DeleteGroupAsync(groupNode.EntityId, ConfirmPermanentDeletion: true);
+
+        Assert.DoesNotContain(viewModel.DocumentWindow.Tabs, tab => tab.Context.Id == groupNode.EntityId);
+        Assert.DoesNotContain(viewModel.NavigationContexts, context => context.Context.Id == groupNode.EntityId);
+    }
+
+    [Fact]
     public async Task GroupChanges_RefreshNavigationRevealResultsAndPreserveDocumentContextOnArchive()
     {
         var now = DateTimeOffset.UtcNow;

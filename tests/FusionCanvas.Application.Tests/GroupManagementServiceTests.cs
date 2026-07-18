@@ -240,6 +240,84 @@ public class GroupManagementServiceTests
         Assert.Equal(new GroupParentReference(WorkspaceEntityKind.Niche, otherNiche.Id), fallback.Parent);
     }
 
+    [Fact]
+    public async Task DeleteGroupAsync_RequiresConfirmationAndLeavesSnapshotUntouched()
+    {
+        var sample = Sample.CreateWithGroups();
+        var repository = new TestRepository(sample.Snapshot);
+        var service = new GroupManagementService(repository);
+
+        var result = await service.DeleteGroupAsync(new GroupManagementDeleteRequest(
+            sample.RootGroup!.Id,
+            ConfirmPermanentDeletion: false));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("confirmation", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, repository.SaveCount);
+        Assert.Equal(2, repository.Snapshot.Groups.Count);
+        Assert.Single(repository.Snapshot.Listings);
+    }
+
+    [Fact]
+    public async Task DeleteGroupAsync_RemovesCompleteSubtreeAndItemRelationshipsButPreservesAssets()
+    {
+        var sample = Sample.CreateWithGroups();
+        var child = sample.ChildGroup! with { SortOrder = 0 };
+        var sibling = new TopicGroup(Guid.NewGuid(), sample.Store.Id, null, sample.RootGroup!.Id, "Sibling", null, false, sample.Now, sample.Now, "{}", 3);
+        var grandchild = new TopicGroup(Guid.NewGuid(), sample.Store.Id, null, child.Id, "Grandchild", null, false, sample.Now, sample.Now, "{}", 0);
+        var listing = sample.Snapshot.Listings.Single() with { GroupId = grandchild.Id };
+        var prompt = new Prompt(Guid.NewGuid(), sample.Store.Id, listing.Id, "Prompt", null, "Text", false, sample.Now, sample.Now, "{}");
+        var tag = new Tag(Guid.NewGuid(), sample.Store.Id, "Tag", null, false, sample.Now, sample.Now, "{}");
+        var asset = new Asset(Guid.NewGuid(), sample.Store.Id, "Asset", null, AssetKind.SourceDesign, "assets/source.png", null, false, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with
+        {
+            Groups = [sample.RootGroup, child, sibling, grandchild],
+            Listings = [listing],
+            Prompts = [prompt],
+            Tags = [tag],
+            ListingTags = [new ListingTag(listing.Id, tag.Id)],
+            Assets = [asset],
+            AssetLinks =
+            [
+                new AssetLink(asset.Id, WorkspaceEntityKind.Listing, listing.Id),
+                new AssetLink(asset.Id, WorkspaceEntityKind.Group, sample.RootGroup.Id)
+            ]
+        };
+        var repository = new TestRepository(snapshot);
+        var service = new GroupManagementService(repository);
+        await service.SelectGroupAsync(child.Id);
+
+        var result = await service.DeleteGroupAsync(new GroupManagementDeleteRequest(
+            child.Id,
+            ConfirmPermanentDeletion: true));
+
+        Assert.True(result.Succeeded, result.Error);
+        Assert.Equal([sample.RootGroup.Id, sibling.Id], repository.Snapshot.Groups.Select(group => group.Id));
+        Assert.Equal(0, repository.Snapshot.Groups.Single(group => group.Id == sibling.Id).SortOrder);
+        Assert.Empty(repository.Snapshot.Listings);
+        Assert.Empty(repository.Snapshot.Prompts);
+        Assert.Empty(repository.Snapshot.ListingTags);
+        Assert.Single(repository.Snapshot.Assets);
+        Assert.Equal(sample.RootGroup.Id, Assert.Single(repository.Snapshot.AssetLinks).EntityId);
+        Assert.Equal(sample.RootGroup.Id, result.State.ActiveGroupId);
+    }
+
+    [Fact]
+    public async Task DeleteGroupAsync_SaveFailureIsAtomic()
+    {
+        var sample = Sample.CreateWithGroups();
+        var repository = new TestRepository(sample.Snapshot) { FailSaves = true };
+        var service = new GroupManagementService(repository);
+
+        var result = await service.DeleteGroupAsync(new GroupManagementDeleteRequest(
+            sample.RootGroup!.Id,
+            ConfirmPermanentDeletion: true));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(sample.Snapshot, repository.Snapshot);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
     private sealed class TestRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
     {
         public WorkspaceSnapshot Snapshot { get; private set; } = snapshot;

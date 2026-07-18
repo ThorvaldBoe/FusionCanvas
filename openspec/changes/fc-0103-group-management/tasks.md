@@ -56,4 +56,10 @@ FC-0103 was revised after user validation of the first UI implementation. Comple
 - [ ] 6.2 Manually verify keyboard-only rapid create, rename, cut/copy/paste, selection, inspector, Ctrl-click tabs, archive/restore, filtering, validation retention, and recoverable save failures.
 - [ ] 6.3 Manually verify drag/drop onto/before/after targets, invalid-target feedback, persistent ordering after reload, auto-expand, filtered-tree safety, and rollback after simulated persistence failure.
 - [x] 6.4 Verify representative deep/wide trees remain responsive and preserve expansion/selection state across refresh and filtering.
-- [x] 6.5 Confirm FC-0103 adds no item implementation, item-inclusive copy, permanent deletion, cross-store move, batch editing, saved views, analytics, templates, automation, or production-queue behavior.
+- [x] 6.5 Confirm FC-0103 adds no item implementation, item-inclusive copy, cross-store move, batch editing, saved views, analytics, templates, automation, or production-queue behavior.
+
+## 7. Group Context Menu and Permanent Deletion
+
+- [x] 7.1 Add confirmed application-owned group-subtree deletion that atomically removes descendant groups, contained listings/items and dependent relationships, normalizes surviving sibling order, preserves reusable assets, and returns safe fallback selection.
+- [x] 7.2 Add a right-click group context menu for child creation, rename, state-aware copy/cut/paste, and Delete with a focused irreversible-loss confirmation dialog and deleted-tab cleanup.
+- [x] 7.3 Add application and app tests for confirmation enforcement, cascade scope, failure atomicity, selection fallback, clipboard/menu state, and view-model deletion coordination; rerun the complete solution suite and strict OpenSpec validation.

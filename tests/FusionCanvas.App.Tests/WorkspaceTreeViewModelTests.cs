@@ -1,4 +1,5 @@
 using FusionCanvas.App.Navigation;
+using FusionCanvas.App.Groups;
 using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
 
@@ -89,6 +90,61 @@ public class WorkspaceTreeViewModelTests
         root = Assert.Single(viewModel.Roots);
         Assert.True(root.IsExpanded);
         Assert.Equal(group.EntityId, viewModel.SelectedNode!.EntityId);
+    }
+
+    [Fact]
+    public void ClipboardStateEnablesPasteOnGroupContextRows()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var repository = new TestRepository(sample.Snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+        var group = Assert.Single(Assert.Single(viewModel.Roots).Children);
+        Assert.False(group.CanPaste);
+
+        viewModel.SelectNodeCommand.Execute(group);
+        viewModel.Copy();
+
+        Assert.True(group.CanPaste);
+    }
+
+    [Fact]
+    public async Task ConfirmedDeleteRaisesDeletedEntitiesClearsClipboardAndSelectsParent()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var root = Assert.Single(sample.Snapshot.Groups);
+        var child = new TopicGroup(Guid.NewGuid(), sample.Store.Id, null, root.Id, "Child", null, false, sample.Now, sample.Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, child.Id, "Item", null, ListingStatus.Draft, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Groups = [root, child], Listings = [listing] };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        var rootNode = Assert.Single(Assert.Single(viewModel.Roots).Children);
+        var childNode = Assert.Single(rootNode.Children);
+        IReadOnlySet<Guid>? deletedIds = null;
+        viewModel.EntitiesDeleted += (_, ids) => deletedIds = ids;
+        viewModel.SelectNodeCommand.Execute(childNode);
+        viewModel.Cut();
+
+        await viewModel.DeleteGroupAsync(child.Id, ConfirmPermanentDeletion: true);
+
+        Assert.Equal(root.Id, viewModel.SelectedNode!.EntityId);
+        Assert.Contains(child.Id, deletedIds!);
+        Assert.Contains(listing.Id, deletedIds!);
+        Assert.False(viewModel.SelectedNode.CanPaste);
+        Assert.DoesNotContain(repository.Snapshot.Groups, group => group.Id == child.Id);
+    }
+
+    [Fact]
+    public void DeleteConfirmationNamesIrreversibleSubgroupAndItemLoss()
+    {
+        var impact = new GroupDeleteImpact(Guid.NewGuid(), "Campaign", 2, 3, new HashSet<Guid>());
+
+        var confirmation = new GroupDeleteConfirmationViewModel(impact);
+
+        Assert.Contains("Campaign", confirmation.Title);
+        Assert.Contains("2 subgroups", confirmation.WarningMessage);
+        Assert.Contains("3 items", confirmation.WarningMessage);
     }
 
     private sealed class TestRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
