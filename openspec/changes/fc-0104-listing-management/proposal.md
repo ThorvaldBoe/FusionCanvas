@@ -1,32 +1,34 @@
 ## Why
 
-FusionCanvas has the domain concept and navigation shape for listings, but creators still need a durable workflow for capturing and maintaining product ideas before artwork or marketplace data exists. FC-0104 makes listings usable as the primary unit of daily creative work and supplies the Phase 1 foundation required by lifecycle, inspector, search, tagging, and asset features.
+FusionCanvas now has a niche-rooted editable workspace tree and complete group-management foundation, but creators still cannot capture and maintain listings as the primary product concepts inside that structure. FC-0104 adds the fast item workflow needed to preserve ideas before artwork or marketplace data exists and supplies the Phase 1 foundation for lifecycle, inspector, search, tagging, and asset features.
 
 ## What Changes
 
-- Add fast listing capture in the primary workspace from a selected active store, niche, or group, requiring only one line of idea text and inheriting applicable parent context.
-- Add focused listing management for renaming, editing core creative details, moving, duplicating, archiving, restoring, and permanently deleting listings.
-- Preserve listing identity and all related context when a listing moves; create a distinct identity when it is duplicated.
+- Add fast inline listing capture in the editable workspace tree, requiring one line of idea text and placing the listing in the selected niche/group, the selected listing's containing topic, or the store's active default niche.
+- Add inline rename, canonical tree selection, drag/drop and cut/paste movement, and copy/paste or explicit duplication for listings without automatically opening document tabs.
+- Add a secondary focused listing-properties/lifecycle surface for optional core details, archived review, restore, and guarded permanent deletion.
+- Reuse FC-0103's `GroupHierarchy`, archive-aware tree projection, default-niche resolution model, canonical selection, optimistic rollback, and explicit Ctrl-click/open-tab behavior.
+- Preserve listing identity and related context when moving; create a distinct draft identity when duplicating and exclude asset and prompt relationships by default.
 - Allow listings to exist without assets, mockups, optimized marketplace metadata, or other later-stage records.
-- Keep common capture and selection actions close to the navigation context while progressively disclosing occasional and destructive management actions.
-- Define complete empty, validation, blocked, success, cancellation, focus, and destructive-action behavior for listing workflows.
-- Resolve Phase 1 safety defaults: permanent deletion requires explicit confirmation, duplicated listings exclude asset relationships by default, and converting a listing into a group is out of scope.
+- Define complete empty, validation, blocked, loading, rollback, cancellation, focus, and destructive-action behavior.
+- Keep listings alphabetically ordered within a topic for FC-0104; persisted manual sibling ordering and before/after listing drops remain out of scope.
+- Keep listing-to-group conversion out of scope and require explicit confirmation plus dependency checks for permanent deletion.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `listing-management`: Defines creation, core creative-detail editing, movement, duplication, archival, restoration, deletion, persistence, and user-facing interaction behavior for listings.
+- `listing-management`: Defines topic-resolved creation, inline editing, movement, duplication, archival, restoration, deletion, persistence, canonical selection, and secondary property-management behavior for listings.
 
 ### Modified Capabilities
 
-- `navigation-tree`: Extend listing placement and movement so listings may appear directly under a store as well as under niche or group topics, while retaining the existing hierarchy and context-preservation rules.
+None. FC-0103's navigation-tree, persistence, and tab contracts already establish the niche-rooted editable tree, default niche, canonical selection, archive-aware projection, and explicit tab-opening behavior that FC-0104 extends for listing items.
 
 ## Impact
 
-- Adds listing-management application contracts and orchestration alongside existing store and niche management services.
-- Extends workspace persistence with listing queries and mutations while preserving workspace/store/topic ownership constraints.
-- Adds listing capture and management presentation in the Avalonia desktop app, integrated with active store and navigation context.
-- Extends navigation destination handling for store-level listings while preserving existing niche and group behavior.
-- Adds domain, application, integration, and app tests for listing lifecycle operations, validation, inherited context, persistence, selection, drafts, and confirmations.
-- Depends on the accepted workspace, store, niche, core-domain, persistence, and navigation contracts; group destinations become available when FC-0103 group management is present.
+- Adds listing-management application contracts and orchestration alongside the completed group-management service.
+- Reuses `GroupHierarchy` and extends `WorkspaceTreeViewModel` with listing-specific inline creation, rename, move, copy, paste, archive, and selection operations.
+- Extends `AppWorkspaceFactory` and main-window coordination with listing management while preserving the repository boundary.
+- Exercises existing listing persistence, tag links, asset links, prompts, and metadata; no schema migration or listing sibling-order field is expected.
+- Adds domain, application, integration, view-model, and UI tests for placement resolution, inherited context, archive ancestry, persistence, canonical selection, tree operations, rollback, focused lifecycle actions, and explicit tab opening.
+- Requires the completed FC-0103 group-management implementation and its accepted OpenSpec deltas.
