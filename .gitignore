@@ -33,3 +33,13 @@ _ReSharper*/
 .idea/
 #Nuget packages folder
 packages/
+
+#Secrets and local credentials (never commit)
+.env*
+*.pfx
+*.snk
+secrets.json
+appsettings.*.local.json
+appsettings.Local.json
+*.secret
+*.key
