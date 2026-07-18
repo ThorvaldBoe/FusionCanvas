@@ -36,6 +36,8 @@ public sealed record GroupManagementMoveRequest(
 
 public sealed record GroupManagementCopyRequest(Guid GroupId, GroupParentReference Destination);
 
+public sealed record GroupManagementDeleteRequest(Guid GroupId, bool ConfirmPermanentDeletion);
+
 public sealed record WorkspaceTreeSelection(WorkspaceEntityKind Kind, Guid Id);
 
 public sealed record GroupCreationDestinationResult(GroupParentReference? Parent, string? Error)
@@ -98,6 +100,7 @@ public interface IGroupManagementService
     Task<GroupManagementResult> UpdateGroupAsync(GroupManagementUpdateRequest request, CancellationToken cancellationToken = default);
     Task<GroupManagementResult> MoveGroupAsync(GroupManagementMoveRequest request, CancellationToken cancellationToken = default);
     Task<GroupManagementResult> CopyGroupAsync(GroupManagementCopyRequest request, CancellationToken cancellationToken = default);
+    Task<GroupManagementResult> DeleteGroupAsync(GroupManagementDeleteRequest request, CancellationToken cancellationToken = default);
     Task<GroupManagementResult> ArchiveGroupAsync(Guid groupId, CancellationToken cancellationToken = default);
     Task<GroupManagementResult> RestoreGroupAsync(Guid groupId, CancellationToken cancellationToken = default);
     Task<GroupManagementResult> SelectGroupAsync(Guid groupId, CancellationToken cancellationToken = default);
@@ -424,6 +427,65 @@ public sealed class GroupManagementService : IGroupManagementService
         }
 
         return Success(archived, updated);
+    }
+
+    public async Task<GroupManagementResult> DeleteGroupAsync(
+        GroupManagementDeleteRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var existing = snapshot.Groups.SingleOrDefault(group => group.Id == request.GroupId);
+        if (existing is null)
+        {
+            return Failure("Group was not found.", snapshot, _activeStoreId, _activeNicheId);
+        }
+
+        var nicheId = EffectiveNicheId(snapshot, existing);
+        if (!request.ConfirmPermanentDeletion)
+        {
+            return Failure("Permanent deletion requires confirmation.", snapshot, existing.StoreId, nicheId);
+        }
+
+        var parent = ToParent(existing);
+        var deletedGroupIds = GroupHierarchy.GetDescendants(snapshot, existing)
+            .Select(group => group.Id)
+            .Append(existing.Id)
+            .ToHashSet();
+        var deletedListingIds = snapshot.Listings
+            .Where(listing => listing.GroupId is Guid groupId && deletedGroupIds.Contains(groupId))
+            .Select(listing => listing.Id)
+            .ToHashSet();
+        var deletedPromptIds = snapshot.Prompts
+            .Where(prompt => prompt.ListingId is Guid listingId && deletedListingIds.Contains(listingId))
+            .Select(prompt => prompt.Id)
+            .ToHashSet();
+        var deletedEntityIds = new HashSet<Guid>(deletedGroupIds);
+        deletedEntityIds.UnionWith(deletedListingIds);
+        deletedEntityIds.UnionWith(deletedPromptIds);
+
+        var remainingGroups = snapshot.Groups
+            .Where(group => !deletedGroupIds.Contains(group.Id))
+            .ToArray();
+        var normalizedGroups = NormalizeSiblings(remainingGroups, parent);
+        var updated = snapshot with
+        {
+            Groups = normalizedGroups,
+            Listings = snapshot.Listings.Where(listing => !deletedListingIds.Contains(listing.Id)).ToArray(),
+            Prompts = snapshot.Prompts.Where(prompt => !deletedPromptIds.Contains(prompt.Id)).ToArray(),
+            ListingTags = snapshot.ListingTags.Where(link => !deletedListingIds.Contains(link.ListingId)).ToArray(),
+            AssetLinks = snapshot.AssetLinks.Where(link => !deletedEntityIds.Contains(link.EntityId)).ToArray()
+        };
+        var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        if (saveError is not null)
+        {
+            return Failure(saveError, snapshot, existing.StoreId, nicheId);
+        }
+
+        Guid? fallbackGroupId = parent.Kind == WorkspaceEntityKind.Group ? parent.Id : null;
+        SetSelection(existing.StoreId, nicheId, fallbackGroupId);
+        var deletedSummary = ToSummary(snapshot, existing);
+        return GroupManagementResult.Success(deletedSummary, BuildState(updated, existing.StoreId, nicheId));
     }
 
     public async Task<GroupManagementResult> RestoreGroupAsync(Guid groupId, CancellationToken cancellationToken = default)
@@ -838,6 +900,21 @@ public sealed class GroupManagementService : IGroupManagementService
 
     private static int NextSortOrder(IReadOnlyList<TopicGroup> groups, GroupParentReference parent) =>
         groups.Where(group => ToParent(group) == parent).Select(group => group.SortOrder).DefaultIfEmpty(-1).Max() + 1;
+
+    private static IReadOnlyList<TopicGroup> NormalizeSiblings(
+        IReadOnlyList<TopicGroup> groups,
+        GroupParentReference parent)
+    {
+        var orders = groups
+            .Where(group => ToParent(group) == parent)
+            .OrderBy(group => group.SortOrder)
+            .ThenBy(group => group.Name, StringComparer.OrdinalIgnoreCase)
+            .Select((group, index) => (group.Id, index))
+            .ToDictionary(entry => entry.Id, entry => entry.index);
+        return groups
+            .Select(group => orders.TryGetValue(group.Id, out var order) ? group with { SortOrder = order } : group)
+            .ToArray();
+    }
 
     private static IReadOnlyList<TopicGroup> PlaceGroup(
         IReadOnlyList<TopicGroup> groups,

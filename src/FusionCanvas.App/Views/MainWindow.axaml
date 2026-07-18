@@ -156,7 +156,19 @@
                       DragDrop.DragOver="OnTreeNodeDragOver"
                       DragDrop.DragLeave="OnTreeNodeDragLeave"
                       DragDrop.Drop="OnTreeNodeDrop"
-                      ToolTip.Tip="Ctrl-click opens a tab; F2 renames; Ctrl+C/X/V copies or moves">
+                      ToolTip.Tip="Right-click for group actions; Ctrl-click opens a tab; F2 renames">
+                <Border.ContextMenu>
+                  <ContextMenu IsVisible="{Binding IsGroup}">
+                    <MenuItem Header="New group (subgroup)" Click="OnContextNewGroup" />
+                    <Separator />
+                    <MenuItem Header="Rename" Click="OnContextRename" />
+                    <MenuItem Header="Copy" Click="OnContextCopy" />
+                    <MenuItem Header="Cut" Click="OnContextCut" />
+                    <MenuItem Header="Paste" IsEnabled="{Binding CanPaste}" Click="OnContextPaste" />
+                    <Separator />
+                    <MenuItem Header="Delete..." Click="OnContextDelete" />
+                  </ContextMenu>
+                </Border.ContextMenu>
                 <Grid ColumnDefinitions="3,22,*,Auto" MinHeight="34">
                   <Border Grid.Column="0" Background="#59A17D" CornerRadius="2" />
                   <TextBlock Grid.Column="1" Text="{Binding Icon}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="#526173" />

@@ -132,7 +132,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        var point = e.GetCurrentPoint(control);
+        if (point.Properties.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Control))
         {
             viewModel.WorkspaceTree.OpenInTabCommand.Execute(node);
         }
@@ -141,7 +142,6 @@ public partial class MainWindow : Window
             viewModel.WorkspaceTree.SelectNodeCommand.Execute(node);
         }
 
-        var point = e.GetCurrentPoint(control);
         if (node.EntityKind == FusionCanvas.Domain.Workspace.WorkspaceEntityKind.Group && point.Properties.IsLeftButtonPressed)
         {
             _dragPointerArgs = e;
@@ -307,5 +307,75 @@ public partial class MainWindow : Window
         }
 
         e.Handled = true;
+    }
+
+    private async void OnContextNewGroup(object? sender, RoutedEventArgs e)
+    {
+        if (TrySelectContextGroup(sender, out var viewModel, out _))
+        {
+            await viewModel.WorkspaceTree.BeginCreateAsync();
+        }
+    }
+
+    private void OnContextRename(object? sender, RoutedEventArgs e)
+    {
+        if (TrySelectContextGroup(sender, out var viewModel, out _))
+        {
+            viewModel.WorkspaceTree.BeginRename();
+        }
+    }
+
+    private void OnContextCopy(object? sender, RoutedEventArgs e)
+    {
+        if (TrySelectContextGroup(sender, out var viewModel, out _))
+        {
+            viewModel.WorkspaceTree.Copy();
+        }
+    }
+
+    private void OnContextCut(object? sender, RoutedEventArgs e)
+    {
+        if (TrySelectContextGroup(sender, out var viewModel, out _))
+        {
+            viewModel.WorkspaceTree.Cut();
+        }
+    }
+
+    private async void OnContextPaste(object? sender, RoutedEventArgs e)
+    {
+        if (TrySelectContextGroup(sender, out var viewModel, out _))
+        {
+            await viewModel.WorkspaceTree.PasteAsync();
+        }
+    }
+
+    private async void OnContextDelete(object? sender, RoutedEventArgs e)
+    {
+        if (!TrySelectContextGroup(sender, out var viewModel, out var node))
+        {
+            return;
+        }
+
+        var dialog = new GroupDeleteConfirmationWindow(viewModel.WorkspaceTree.GetDeleteImpact(node.EntityId));
+        if (await dialog.ShowDialog<bool>(this))
+        {
+            await viewModel.WorkspaceTree.DeleteGroupAsync(node.EntityId, ConfirmPermanentDeletion: true);
+        }
+    }
+
+    private bool TrySelectContextGroup(
+        object? sender,
+        out MainWindowViewModel viewModel,
+        out WorkspaceTreeNodeViewModel node)
+    {
+        viewModel = DataContext as MainWindowViewModel ?? null!;
+        node = sender is MenuItem { DataContext: WorkspaceTreeNodeViewModel candidate } ? candidate : null!;
+        if (viewModel is null || node is null || node.EntityKind != FusionCanvas.Domain.Workspace.WorkspaceEntityKind.Group)
+        {
+            return false;
+        }
+
+        viewModel.WorkspaceTree.SelectNodeCommand.Execute(node);
+        return true;
     }
 }

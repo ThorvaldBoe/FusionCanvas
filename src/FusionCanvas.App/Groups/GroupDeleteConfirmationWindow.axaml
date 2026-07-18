@@ -1,0 +1,45 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:groups="using:FusionCanvas.App.Groups"
+        x:Class="FusionCanvas.App.Groups.GroupDeleteConfirmationWindow"
+        x:DataType="groups:GroupDeleteConfirmationViewModel"
+        Title="Delete group permanently"
+        Width="470"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner">
+  <Grid RowDefinitions="Auto,Auto" Margin="24" RowSpacing="22">
+    <StackPanel Spacing="10">
+      <TextBlock Text="{Binding Title}"
+                 FontSize="20"
+                 FontWeight="SemiBold"
+                 Foreground="#9B2C2C" />
+      <TextBlock Text="{Binding WarningMessage}"
+                 TextWrapping="Wrap"
+                 FontSize="14" />
+      <Border Background="#FFF1F0"
+              BorderBrush="#E7A4A0"
+              BorderThickness="1"
+              CornerRadius="6"
+              Padding="12">
+        <TextBlock Text="This action cannot be undone. Reusable asset files are retained, but links from deleted groups and items are removed."
+                   TextWrapping="Wrap"
+                   Foreground="#7A2727" />
+      </Border>
+    </StackPanel>
+
+    <StackPanel Grid.Row="1"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8">
+      <Button Content="Cancel"
+              MinWidth="90"
+              Click="OnCancelClick" />
+      <Button Content="Delete permanently"
+              MinWidth="145"
+              Background="#B42318"
+              Foreground="White"
+              Click="OnConfirmClick" />
+    </StackPanel>
+  </Grid>
+</Window>

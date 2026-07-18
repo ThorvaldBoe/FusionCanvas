@@ -349,6 +349,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ManageGroupCommand = new RelayCommand(_ => Run(OpenManageGroupAsync()));
         WorkspaceTree.OpenInTabRequested += (_, selection) => OpenTreeSelectionInTab(selection);
         WorkspaceTree.EditPropertiesRequested += (_, groupId) => Run(OpenManageGroupAsync(groupId));
+        WorkspaceTree.EntitiesDeleted += (_, entityIds) => CloseDeletedEntityTabs(entityIds);
         WorkspaceTree.StructureChanged += (_, _) => RefreshWorkspaceSnapshot();
         WorkspaceTree.PropertyChanged += (_, args) =>
         {
@@ -421,6 +422,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         if (context is not null)
         {
             OpenFromNavigation(context);
+        }
+    }
+
+    private void CloseDeletedEntityTabs(IReadOnlySet<Guid> entityIds)
+    {
+        foreach (var tab in DocumentWindow.Tabs.Where(tab => entityIds.Contains(tab.Context.Id)).ToArray())
+        {
+            DocumentWindow.CloseTab(tab);
         }
     }
 

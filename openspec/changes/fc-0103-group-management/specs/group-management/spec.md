@@ -236,3 +236,32 @@ FusionCanvas SHALL provide predictable keyboard navigation and shortcuts without
 #### Scenario: Operation is unavailable
 - **WHEN** a shortcut has no valid source or destination
 - **THEN** FusionCanvas leaves the workspace unchanged and communicates actionable guidance
+
+### Requirement: Group rows expose contextual management actions
+FusionCanvas SHALL provide a context menu when the user right-clicks an active group row.
+
+#### Scenario: User opens a group context menu
+- **WHEN** the user right-clicks an active group
+- **THEN** FusionCanvas selects that group and offers New group, Rename, Copy, Cut, Paste, and Delete actions
+- **AND** New group creates a direct child of the clicked group
+- **AND** Paste reflects whether the application clipboard currently contains a group operation
+
+### Requirement: Group deletion is confirmed, permanent, and atomic
+FusionCanvas SHALL require explicit confirmation before permanently deleting a group subtree and its contained items.
+
+#### Scenario: User requests permanent group deletion
+- **WHEN** the user invokes Delete from a group context menu
+- **THEN** FusionCanvas shows the group name and warns that the group, every descendant group, and every contained item will be permanently lost
+- **AND** canceling leaves all data and selection unchanged
+
+#### Scenario: User confirms permanent group deletion
+- **WHEN** the user confirms the destructive warning
+- **THEN** FusionCanvas atomically removes the selected group, all descendant groups, all listings/items contained anywhere in that subtree, and dependent listing relationships
+- **AND** removes links to deleted entities without deleting otherwise reusable asset records
+- **AND** closes document tabs whose entity was deleted
+- **AND** selects the nearest surviving parent group or niche
+
+#### Scenario: Permanent deletion cannot be saved
+- **WHEN** persistence fails while deleting a confirmed subtree
+- **THEN** FusionCanvas leaves the complete confirmed hierarchy and related records unchanged
+- **AND** reports a recoverable error

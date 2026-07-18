@@ -14,6 +14,7 @@ FC-0103 is revised so the niche-rooted navigation tree becomes the primary group
 - Persist parent-scoped sibling order so drops between rows remain stable instead of reverting to alphabetical order.
 - Add a filter-ready tree projection for free text, status, tags, archive state, and future properties while retaining ancestor paths and stable entity selection.
 - Retain the detailed group editor as a secondary "Edit properties" surface for notes/context, appearance metadata, archive/restore, and other lower-frequency properties.
+- Add a group-row context menu for child creation, rename, clipboard operations, and explicitly confirmed permanent subtree deletion.
 - Preserve existing hierarchy validation, stable identities, archive behavior, same-store movement, atomic snapshot saves, and active/archived projections.
 
 ## Capabilities
@@ -30,7 +31,7 @@ FC-0103 is revised so the niche-rooted navigation tree becomes the primary group
 
 ## Impact
 
-- **Domain/application:** Add sibling ordering, default-niche resolution, copy-subtree commands, filter projection contracts, canonical selection, and structural-operation results suitable for optimistic UI rollback.
+- **Domain/application:** Add sibling ordering, default-niche resolution, copy/delete-subtree commands, filter projection contracts, canonical selection, and structural-operation results suitable for optimistic UI rollback.
 - **Persistence:** Add versioned persistence for group sibling order and store default niche; retain stable IDs and transactional snapshot replacement.
 - **Desktop UI:** Replace the flat `ItemsControl` navigation with a styled Avalonia `TreeView`, inline editors, keyboard shortcuts, drag/drop adorners, filter controls, rich row indicators, and a selection-bound inspector.
 - **Testing:** Extend domain, application, integration, and view-model coverage for inline drafts, keyboard flows, ordering, default destinations, clipboard semantics, drag/drop validation, filtered paths, inspector selection, Ctrl-click tabs, autosave, and rollback.
