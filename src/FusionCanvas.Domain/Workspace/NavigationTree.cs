@@ -75,31 +75,40 @@ public static class WorkspaceNavigation
         ArgumentNullException.ThrowIfNull(snapshot);
         ValidateWorkspace(snapshot);
 
-        var nichesByStore = snapshot.Niches
+        var activeStores = snapshot.Stores.Where(store => !store.IsArchived).ToArray();
+        var activeNiches = snapshot.Niches
+            .Where(niche => !niche.IsArchived && activeStores.Any(store => store.Id == niche.StoreId))
+            .ToArray();
+        var activeGroups = snapshot.Groups
+            .Where(group => GroupHierarchy.IsEffectivelyActive(snapshot, group))
+            .ToArray();
+        var activeGroupIds = activeGroups.Select(group => group.Id).ToHashSet();
+
+        var nichesByStore = activeNiches
             .GroupBy(niche => niche.StoreId)
             .ToDictionary(group => group.Key, group => group.OrderBy(niche => niche.Name, StringComparer.OrdinalIgnoreCase).ToArray());
 
-        var groupsByNiche = snapshot.Groups
+        var groupsByNiche = activeGroups
             .Where(group => group.NicheId is not null)
             .GroupBy(group => group.NicheId!.Value)
-            .ToDictionary(group => group.Key, group => group.OrderBy(topicGroup => topicGroup.Name, StringComparer.OrdinalIgnoreCase).ToArray());
+            .ToDictionary(group => group.Key, group => group.OrderBy(topicGroup => topicGroup.SortOrder).ThenBy(topicGroup => topicGroup.Name, StringComparer.OrdinalIgnoreCase).ToArray());
 
-        var groupsByParentGroup = snapshot.Groups
+        var groupsByParentGroup = activeGroups
             .Where(group => group.ParentGroupId is not null)
             .GroupBy(group => group.ParentGroupId!.Value)
-            .ToDictionary(group => group.Key, group => group.OrderBy(topicGroup => topicGroup.Name, StringComparer.OrdinalIgnoreCase).ToArray());
+            .ToDictionary(group => group.Key, group => group.OrderBy(topicGroup => topicGroup.SortOrder).ThenBy(topicGroup => topicGroup.Name, StringComparer.OrdinalIgnoreCase).ToArray());
 
         var listingsByNiche = snapshot.Listings
-            .Where(listing => listing.NicheId is not null && listing.GroupId is null)
+            .Where(listing => !listing.IsArchived && listing.NicheId is not null && listing.GroupId is null && activeNiches.Any(niche => niche.Id == listing.NicheId))
             .GroupBy(listing => listing.NicheId!.Value)
             .ToDictionary(group => group.Key, group => group.OrderBy(listing => listing.Name, StringComparer.OrdinalIgnoreCase).ToArray());
 
         var listingsByGroup = snapshot.Listings
-            .Where(listing => listing.GroupId is not null)
+            .Where(listing => !listing.IsArchived && listing.GroupId is Guid groupId && activeGroupIds.Contains(groupId))
             .GroupBy(listing => listing.GroupId!.Value)
             .ToDictionary(group => group.Key, group => group.OrderBy(listing => listing.Name, StringComparer.OrdinalIgnoreCase).ToArray());
 
-        var stores = snapshot.Stores
+        var stores = activeStores
             .OrderBy(store => store.Name, StringComparer.OrdinalIgnoreCase)
             .Select(store =>
             {
@@ -142,6 +151,8 @@ public static class WorkspaceNavigation
                 throw new InvalidOperationException("A topic cannot be moved outside its store.");
             }
 
+            EnsureActiveDestination(snapshot, niche);
+
             return snapshot with
             {
                 Groups = snapshot.Groups
@@ -157,6 +168,8 @@ public static class WorkspaceNavigation
         {
             throw new InvalidOperationException("A topic cannot be moved outside its store.");
         }
+
+        EnsureActiveDestination(snapshot, parentGroup);
 
         if (parentGroup.Id == group.Id || IsDescendantGroup(snapshot.Groups, descendantId: parentGroup.Id, ancestorId: group.Id))
         {
@@ -193,6 +206,8 @@ public static class WorkspaceNavigation
                 throw new InvalidOperationException("A listing cannot be moved outside its store.");
             }
 
+            EnsureActiveDestination(snapshot, niche);
+
             return snapshot with
             {
                 Listings = snapshot.Listings
@@ -208,6 +223,8 @@ public static class WorkspaceNavigation
         {
             throw new InvalidOperationException("A listing cannot be moved outside its store.");
         }
+
+        EnsureActiveDestination(snapshot, group);
 
         return snapshot with
         {
@@ -367,6 +384,23 @@ public static class WorkspaceNavigation
         }
 
         return false;
+    }
+
+    private static void EnsureActiveDestination(WorkspaceSnapshot snapshot, Niche niche)
+    {
+        var store = snapshot.Stores.Single(candidate => candidate.Id == niche.StoreId);
+        if (niche.IsArchived || store.IsArchived)
+        {
+            throw new InvalidOperationException("Destination topic and its ancestors must be active.");
+        }
+    }
+
+    private static void EnsureActiveDestination(WorkspaceSnapshot snapshot, TopicGroup group)
+    {
+        if (!GroupHierarchy.IsEffectivelyActive(snapshot, group))
+        {
+            throw new InvalidOperationException("Destination topic and its ancestors must be active.");
+        }
     }
 
     private static void EnsureUniqueIds(IEnumerable<Guid> ids, string collectionName)

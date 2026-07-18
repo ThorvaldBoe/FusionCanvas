@@ -182,6 +182,73 @@ public class MainWindowViewModelTests
         Assert.True(viewModel.ShouldShowFirstStorePrompt);
     }
 
+    [Fact]
+    public void GroupActions_FollowCanonicalTreeSelectionInsteadOfDocumentTabs()
+    {
+        var viewModel = new MainWindowViewModel();
+        var niche = viewModel.NavigationContexts.Single(context => context.Context.EntityKind == WorkspaceEntityKind.Niche);
+        var group = GroupContext(viewModel);
+        var nicheNode = Assert.Single(viewModel.WorkspaceTree.Roots);
+        var groupNode = viewModel.WorkspaceTree.Roots.SelectMany(root => root.Children).Single(node => node.EntityId == group.Context.Id);
+
+        viewModel.OpenFromNavigation(niche);
+        Assert.True(viewModel.CanCreateGroup);
+        Assert.False(viewModel.CanManageGroup);
+
+        viewModel.OpenFromNavigation(group);
+        Assert.True(viewModel.CanCreateGroup);
+        Assert.False(viewModel.CanManageGroup);
+
+        viewModel.WorkspaceTree.SelectNodeCommand.Execute(nicheNode);
+        Assert.False(viewModel.CanManageGroup);
+
+        viewModel.WorkspaceTree.SelectNodeCommand.Execute(groupNode);
+        Assert.True(viewModel.CanManageGroup);
+    }
+
+    [Fact]
+    public async Task GroupChanges_RefreshNavigationRevealResultsAndPreserveDocumentContextOnArchive()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
+        var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, "{}");
+        var snapshot = new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []);
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+        var viewModel = new MainWindowViewModel(
+            new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
+            new FusionCanvas.App.DocumentWindow.DocumentWindowViewModel(),
+            new ToolContextResolver(),
+            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
+            repository,
+            snapshot);
+        var nicheContext = Assert.Single(viewModel.NavigationContexts, context => context.Context.EntityKind == WorkspaceEntityKind.Niche);
+        viewModel.OpenFromNavigation(nicheContext);
+        await viewModel.GroupManagement.OpenForCreateAsync(store.Id, niche.Id, new GroupParentReference(WorkspaceEntityKind.Niche, niche.Id));
+        viewModel.GroupManagement.Name = "Campaign";
+
+        await viewModel.GroupManagement.SaveAsync();
+
+        var created = Assert.Single(repository.Snapshot.Groups);
+        Assert.Contains(viewModel.NavigationContexts, context => context.Context.Id == created.Id);
+        Assert.Equal(created.Id, viewModel.NavigationState.SelectedNodeId);
+        var groupContext = viewModel.NavigationContexts.Single(context => context.Context.Id == created.Id);
+        viewModel.OpenFromNavigation(groupContext);
+        var documentId = viewModel.DocumentWindow.ActiveContext?.Id;
+
+        viewModel.GroupManagement.TryRequestArchive();
+        await viewModel.GroupManagement.ConfirmArchiveAsync();
+
+        Assert.DoesNotContain(viewModel.NavigationContexts, context => context.Context.Id == created.Id);
+        Assert.Equal(niche.Id, viewModel.NavigationState.SelectedNodeId);
+        Assert.Equal(documentId, viewModel.DocumentWindow.ActiveContext?.Id);
+
+        var archived = Assert.Single(viewModel.GroupManagement.ArchivedGroups);
+        await viewModel.GroupManagement.TryRestoreAsync(archived);
+
+        Assert.Contains(viewModel.NavigationContexts, context => context.Context.Id == created.Id);
+        Assert.Equal(created.Id, viewModel.NavigationState.SelectedNodeId);
+    }
+
     private static NavigationDocumentContext GroupContext(MainWindowViewModel viewModel) =>
         viewModel.NavigationContexts.Single(context =>
             context.Context.EntityKind == WorkspaceEntityKind.Group &&
@@ -205,6 +272,8 @@ public class MainWindowViewModelTests
     private sealed class InMemoryWorkspaceRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
     {
         private WorkspaceSnapshot _snapshot = snapshot;
+
+        public WorkspaceSnapshot Snapshot => _snapshot;
 
         public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
         {

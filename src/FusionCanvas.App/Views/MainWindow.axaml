@@ -1,12 +1,14 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:doc="clr-namespace:FusionCanvas.App.DocumentWindow"
+        xmlns:nav="clr-namespace:FusionCanvas.App.Navigation"
         xmlns:stores="clr-namespace:FusionCanvas.App.Stores"
         xmlns:workspace="clr-namespace:FusionCanvas.App.Workspace"
         xmlns:views="clr-namespace:FusionCanvas.App.Views"
         xmlns:workflow="clr-namespace:FusionCanvas.Application.Workspace;assembly=FusionCanvas.Application"
         x:Class="FusionCanvas.App.Views.MainWindow"
         x:DataType="views:MainWindowViewModel"
+        KeyDown="OnWindowKeyDown"
         Title="FusionCanvas"
         Width="1180"
         Height="760"
@@ -103,17 +105,81 @@
           </StackPanel>
         </StackPanel>
 
-        <ItemsControl ItemsSource="{Binding NavigationContexts}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="views:NavigationDocumentContext">
-              <Button Content="{Binding Label}"
-                      Command="{Binding $parent[ItemsControl].DataContext.OpenNavigationContextCommand}"
-                      CommandParameter="{Binding}"
-                      Classes="navigation"
-                      HorizontalContentAlignment="Left" />
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
+        <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+            <Button x:Name="GroupActionsButton"
+                    Grid.Column="0"
+                    Content="+ New group"
+                    ToolTip.Tip="Create a group in the selected niche or group"
+                    Command="{Binding WorkspaceTree.BeginCreateCommand}"
+                    IsEnabled="{Binding CanCreateGroup}"
+                    Classes="storeSecondary" />
+            <Button Grid.Column="1"
+                    Content="•••"
+                    ToolTip.Tip="Edit selected group properties"
+                    Command="{Binding WorkspaceTree.EditPropertiesCommand}"
+                    IsEnabled="{Binding WorkspaceTree.CanManageSelection}"
+                    Classes="storeSecondary" />
+          </Grid>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+            <TextBox x:Name="TreeSearchBox"
+                     Text="{Binding WorkspaceTree.QueryText}"
+                     PlaceholderText="Search groups and items..."
+                     MinHeight="34" />
+            <Button Grid.Column="1"
+                    Content="Filters"
+                    IsEnabled="False"
+                    ToolTip.Tip="Status and tag filters become available when those properties are implemented."
+                    Classes="storeSecondary" />
+          </Grid>
+          <TextBlock Text="{Binding GroupActionStatus}"
+                     TextWrapping="Wrap"
+                     FontSize="11"
+                     Foreground="#687385" />
+        </StackPanel>
+
+        <TreeView x:Name="WorkspaceTreeControl"
+                  ItemsSource="{Binding WorkspaceTree.Roots}"
+                  Background="Transparent"
+                  BorderThickness="0">
+          <TreeView.ItemTemplate>
+            <TreeDataTemplate x:DataType="nav:WorkspaceTreeNodeViewModel" ItemsSource="{Binding Children}">
+              <Border Classes="treeRow"
+                      Classes.selected="{Binding IsSelected}"
+                      Classes.cut="{Binding IsCut}"
+                      Classes.dropTarget="{Binding IsDropTarget}"
+                      Classes.dropBefore="{Binding IsDropBefore}"
+                      Classes.dropAfter="{Binding IsDropAfter}"
+                      DragDrop.AllowDrop="True"
+                      PointerPressed="OnTreeNodePointerPressed"
+                      PointerMoved="OnTreeNodePointerMoved"
+                      DragDrop.DragOver="OnTreeNodeDragOver"
+                      DragDrop.DragLeave="OnTreeNodeDragLeave"
+                      DragDrop.Drop="OnTreeNodeDrop"
+                      ToolTip.Tip="Ctrl-click opens a tab; F2 renames; Ctrl+C/X/V copies or moves">
+                <Grid ColumnDefinitions="3,22,*,Auto" MinHeight="34">
+                  <Border Grid.Column="0" Background="#59A17D" CornerRadius="2" />
+                  <TextBlock Grid.Column="1" Text="{Binding Icon}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="#526173" />
+                  <Grid Grid.Column="2" Margin="4,0">
+                    <TextBlock Text="{Binding Name}"
+                               IsVisible="{Binding !IsEditing}"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBox Text="{Binding DraftName}"
+                             IsVisible="{Binding IsEditing}"
+                             AttachedToVisualTree="OnTreeEditorAttached"
+                             KeyDown="OnTreeEditorKeyDown"
+                             MinHeight="28"
+                             Padding="5,2" />
+                  </Grid>
+                  <Border Grid.Column="3" IsVisible="{Binding HasChildren}" Padding="5,1" CornerRadius="8" Background="#E8EDF3">
+                    <TextBlock Text="{Binding CountLabel}" FontSize="10" Foreground="#526173" />
+                  </Border>
+                </Grid>
+              </Border>
+            </TreeDataTemplate>
+          </TreeView.ItemTemplate>
+        </TreeView>
       </DockPanel>
     </Border>
 
@@ -296,6 +362,33 @@
                        FontSize="13"
                        Foreground="#697586" />
           </StackPanel>
+
+          <Border IsVisible="{Binding WorkspaceTree.HasSelection}"
+                  Background="#FFFFFF"
+                  Padding="4">
+            <StackPanel Spacing="14">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="{Binding WorkspaceTree.InspectorKind}" FontSize="12" FontWeight="SemiBold" Foreground="#59A17D" />
+                  <TextBlock Text="{Binding WorkspaceTree.InspectorTitle}" FontSize="26" FontWeight="SemiBold" Foreground="#1E2733" />
+                  <TextBlock Text="{Binding WorkspaceTree.InspectorPath}" FontSize="12" Foreground="#687385" />
+                </StackPanel>
+                <Button Grid.Column="1"
+                        Content="Edit properties"
+                        IsVisible="{Binding WorkspaceTree.CanManageSelection}"
+                        Command="{Binding WorkspaceTree.EditPropertiesCommand}"
+                        Classes="storeSecondary" />
+              </Grid>
+              <Border Padding="18" Background="#F7F8FA" BorderBrush="#D9DEE7" BorderThickness="1">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="Properties" FontSize="14" FontWeight="SemiBold" Foreground="#243447" />
+                  <TextBlock Text="{Binding WorkspaceTree.InspectorDescription}" TextWrapping="Wrap" Foreground="#687385" />
+                  <TextBlock Text="Selection updates this inspector without opening a tab. Ctrl-click the tree node to keep it in a tab."
+                             TextWrapping="Wrap" FontSize="12" Foreground="#7C8797" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </Border>
         </Grid>
       </Border>
     </Grid>
@@ -362,6 +455,38 @@
     </Border>
   </Grid>
   <Window.Styles>
+    <Style Selector="TreeViewItem" x:DataType="nav:WorkspaceTreeNodeViewModel">
+      <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0,1" />
+    </Style>
+    <Style Selector="Border.treeRow">
+      <Setter Property="Padding" Value="5,2" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.treeRow:pointerover">
+      <Setter Property="Background" Value="#F0F3F7" />
+    </Style>
+    <Style Selector="Border.treeRow.selected">
+      <Setter Property="Background" Value="#E2EAF2" />
+    </Style>
+    <Style Selector="Border.treeRow.cut">
+      <Setter Property="Opacity" Value="0.48" />
+    </Style>
+    <Style Selector="Border.treeRow.dropTarget">
+      <Setter Property="Background" Value="#DDF1E7" />
+      <Setter Property="BorderBrush" Value="#59A17D" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Border.treeRow.dropBefore">
+      <Setter Property="BorderBrush" Value="#3C8C69" />
+      <Setter Property="BorderThickness" Value="0,2,0,0" />
+    </Style>
+    <Style Selector="Border.treeRow.dropAfter">
+      <Setter Property="BorderBrush" Value="#3C8C69" />
+      <Setter Property="BorderThickness" Value="0,0,0,2" />
+    </Style>
     <Style Selector="Button.navigation">
       <Setter Property="HorizontalAlignment" Value="Stretch" />
       <Setter Property="Margin" Value="0,0,0,8" />

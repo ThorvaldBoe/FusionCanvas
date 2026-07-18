@@ -6,7 +6,7 @@ namespace FusionCanvas.Integration.Workspace;
 
 public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceRepository
 {
-    private const int CurrentSchemaVersion = 2;
+    private const int CurrentSchemaVersion = 3;
 
     private readonly string _databasePath = databasePath;
 
@@ -45,7 +45,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             await InsertNicheAsync(connection, transaction, niche, cancellationToken);
         }
 
-        foreach (var group in snapshot.Groups)
+        foreach (var group in OrderGroupsForInsert(snapshot.Groups))
         {
             await InsertGroupAsync(connection, transaction, group, cancellationToken);
         }
@@ -132,6 +132,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             CREATE TABLE IF NOT EXISTS stores (
                 id TEXT PRIMARY KEY,
                 workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
+                default_niche_id TEXT NULL,
                 name TEXT NOT NULL,
                 description TEXT NULL,
                 is_archived INTEGER NOT NULL,
@@ -167,6 +168,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
                 store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
                 niche_id TEXT NULL REFERENCES niches(id) ON DELETE SET NULL,
                 parent_group_id TEXT NULL REFERENCES groups(id) ON DELETE SET NULL,
+                sort_order INTEGER NOT NULL DEFAULT 0,
                 name TEXT NOT NULL,
                 description TEXT NULL,
                 is_archived INTEGER NOT NULL,
@@ -237,6 +239,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             await MigrateToVersion2Async(connection, cancellationToken);
         }
 
+        if (schemaVersion < 3)
+        {
+            await MigrateToVersion3Async(connection, cancellationToken);
+        }
+
         await SetPragmaUserVersionAsync(connection, CurrentSchemaVersion, cancellationToken);
     }
 
@@ -258,6 +265,46 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         }
 
         await ExecuteAsync(connection, null, "UPDATE stores SET workspace_id = $workspace_id WHERE workspace_id IS NULL OR workspace_id = '';", cancellationToken, ("$workspace_id", WorkspaceDefaults.DefaultWorkspaceId.ToString()));
+    }
+
+    private static async Task MigrateToVersion3Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        if (!await ColumnExistsAsync(connection, "stores", "default_niche_id", cancellationToken).ConfigureAwait(false))
+        {
+            await ExecuteAsync(connection, null, "ALTER TABLE stores ADD COLUMN default_niche_id TEXT NULL;", cancellationToken);
+        }
+
+        if (!await ColumnExistsAsync(connection, "groups", "sort_order", cancellationToken).ConfigureAwait(false))
+        {
+            await ExecuteAsync(connection, null, "ALTER TABLE groups ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;", cancellationToken);
+        }
+
+        await ExecuteAsync(connection, null, """
+            WITH ranked AS (
+                SELECT id,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY store_id, COALESCE(niche_id, ''), COALESCE(parent_group_id, '')
+                           ORDER BY name COLLATE NOCASE, id
+                       ) - 1 AS position
+                FROM groups
+            )
+            UPDATE groups
+            SET sort_order = (SELECT position FROM ranked WHERE ranked.id = groups.id);
+            """, cancellationToken);
+
+        await ExecuteAsync(connection, null, """
+            UPDATE stores
+            SET default_niche_id = (
+                SELECT MIN(niches.id)
+                FROM niches
+                WHERE niches.store_id = stores.id AND niches.is_archived = 0
+            )
+            WHERE 1 = (
+                SELECT COUNT(*)
+                FROM niches
+                WHERE niches.store_id = stores.id AND niches.is_archived = 0
+            );
+            """, cancellationToken);
     }
 
     private static async Task<bool> ColumnExistsAsync(
@@ -318,9 +365,9 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
 
     private static Task InsertStoreAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Store store, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
-            INSERT INTO stores (id, workspace_id, name, description, is_archived, created_at, updated_at, metadata_json)
-            VALUES ($id, $workspace_id, $name, $description, $is_archived, $created_at, $updated_at, $metadata_json);
-            """, cancellationToken, [.. CommonParameters(store), ("$workspace_id", store.WorkspaceId.ToString())]);
+            INSERT INTO stores (id, workspace_id, default_niche_id, name, description, is_archived, created_at, updated_at, metadata_json)
+            VALUES ($id, $workspace_id, $default_niche_id, $name, $description, $is_archived, $created_at, $updated_at, $metadata_json);
+            """, cancellationToken, [.. CommonParameters(store), ("$workspace_id", store.WorkspaceId.ToString()), ("$default_niche_id", store.DefaultNicheId?.ToString())]);
 
     private static Task InsertTagAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Tag tag, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
@@ -336,9 +383,38 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
 
     private static Task InsertGroupAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, TopicGroup group, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
-            INSERT INTO groups (id, store_id, niche_id, parent_group_id, name, description, is_archived, created_at, updated_at, metadata_json)
-            VALUES ($id, $store_id, $niche_id, $parent_group_id, $name, $description, $is_archived, $created_at, $updated_at, $metadata_json);
-            """, cancellationToken, [.. CommonParameters(group), ("$store_id", group.StoreId.ToString()), ("$niche_id", group.NicheId?.ToString()), ("$parent_group_id", group.ParentGroupId?.ToString())]);
+            INSERT INTO groups (id, store_id, niche_id, parent_group_id, sort_order, name, description, is_archived, created_at, updated_at, metadata_json)
+            VALUES ($id, $store_id, $niche_id, $parent_group_id, $sort_order, $name, $description, $is_archived, $created_at, $updated_at, $metadata_json);
+            """, cancellationToken, [.. CommonParameters(group), ("$store_id", group.StoreId.ToString()), ("$niche_id", group.NicheId?.ToString()), ("$parent_group_id", group.ParentGroupId?.ToString()), ("$sort_order", group.SortOrder)]);
+
+    private static IReadOnlyList<TopicGroup> OrderGroupsForInsert(IReadOnlyList<TopicGroup> groups)
+    {
+        var remaining = groups.ToDictionary(group => group.Id);
+        var ordered = new List<TopicGroup>(groups.Count);
+        var inserted = new HashSet<Guid>();
+
+        while (remaining.Count > 0)
+        {
+            var ready = remaining.Values
+                .Where(group => group.ParentGroupId is null || inserted.Contains(group.ParentGroupId.Value))
+                .OrderBy(group => group.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(group => group.Id)
+                .ToArray();
+            if (ready.Length == 0)
+            {
+                throw new InvalidOperationException("Group records cannot be persisted because their parent hierarchy is cyclic or incomplete.");
+            }
+
+            foreach (var group in ready)
+            {
+                ordered.Add(group);
+                inserted.Add(group.Id);
+                remaining.Remove(group.Id);
+            }
+        }
+
+        return ordered;
+    }
 
     private static Task InsertListingAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Listing listing, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
@@ -391,7 +467,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         var stores = new List<Store>();
         await foreach (var reader in ReadAsync(connection, "SELECT * FROM stores ORDER BY name;", cancellationToken))
         {
-            stores.Add(new Store(ReadGuid(reader, "id"), ReadGuid(reader, "workspace_id"), ReadString(reader, "name"), ReadNullableString(reader, "description"), ReadBool(reader, "is_archived"), ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json")));
+            stores.Add(new Store(ReadGuid(reader, "id"), ReadGuid(reader, "workspace_id"), ReadString(reader, "name"), ReadNullableString(reader, "description"), ReadBool(reader, "is_archived"), ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json"), ReadNullableGuid(reader, "default_niche_id")));
         }
 
         return stores;
@@ -422,9 +498,9 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
     private static async Task<IReadOnlyList<TopicGroup>> LoadGroupsAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
         var groups = new List<TopicGroup>();
-        await foreach (var reader in ReadAsync(connection, "SELECT * FROM groups ORDER BY name;", cancellationToken))
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM groups ORDER BY sort_order, name;", cancellationToken))
         {
-            groups.Add(new TopicGroup(ReadGuid(reader, "id"), ReadGuid(reader, "store_id"), ReadNullableGuid(reader, "niche_id"), ReadNullableGuid(reader, "parent_group_id"), ReadString(reader, "name"), ReadNullableString(reader, "description"), ReadBool(reader, "is_archived"), ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json")));
+            groups.Add(new TopicGroup(ReadGuid(reader, "id"), ReadGuid(reader, "store_id"), ReadNullableGuid(reader, "niche_id"), ReadNullableGuid(reader, "parent_group_id"), ReadString(reader, "name"), ReadNullableString(reader, "description"), ReadBool(reader, "is_archived"), ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json"), ReadInt(reader, "sort_order")));
         }
 
         return groups;
@@ -529,6 +605,12 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             if (!workspaceIds.Contains(store.WorkspaceId))
             {
                 throw new InvalidOperationException("Every store must belong to an existing workspace before saving.");
+            }
+
+            if (store.DefaultNicheId is Guid defaultNicheId &&
+                !snapshot.Niches.Any(niche => niche.Id == defaultNicheId && niche.StoreId == store.Id && !niche.IsArchived))
+            {
+                throw new InvalidOperationException("A store default niche must reference an active niche in that store.");
             }
         }
     }

@@ -26,8 +26,9 @@ public sealed record Store : WorkspaceEntity
         bool isArchived,
         DateTimeOffset createdAt,
         DateTimeOffset updatedAt,
-        string metadataJson)
-        : this(id, WorkspaceDefaults.DefaultWorkspaceId, name, description, isArchived, createdAt, updatedAt, metadataJson)
+        string metadataJson,
+        Guid? defaultNicheId = null)
+        : this(id, WorkspaceDefaults.DefaultWorkspaceId, name, description, isArchived, createdAt, updatedAt, metadataJson, defaultNicheId)
     {
     }
 
@@ -39,15 +40,21 @@ public sealed record Store : WorkspaceEntity
         bool isArchived,
         DateTimeOffset createdAt,
         DateTimeOffset updatedAt,
-        string metadataJson)
+        string metadataJson,
+        Guid? defaultNicheId = null)
         : base(id, name, description, isArchived, createdAt, updatedAt, metadataJson)
     {
         WorkspaceId = workspaceId == Guid.Empty
             ? throw new ArgumentException("Workspace identifier must not be empty.", nameof(workspaceId))
             : workspaceId;
+        DefaultNicheId = defaultNicheId == Guid.Empty
+            ? throw new ArgumentException("Default niche identifier must not be empty.", nameof(defaultNicheId))
+            : defaultNicheId;
     }
 
     public Guid WorkspaceId { get; init; }
+
+    public Guid? DefaultNicheId { get; init; }
 }
 
 public sealed record Niche(
@@ -71,7 +78,8 @@ public sealed record TopicGroup(
     bool IsArchived,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    string MetadataJson)
+    string MetadataJson,
+    int SortOrder = 0)
     : WorkspaceEntity(Id, Name, Description, IsArchived, CreatedAt, UpdatedAt, MetadataJson);
 
 public sealed record Listing(

@@ -119,6 +119,54 @@ public class NavigationTreeTests
         Assert.Throws<InvalidOperationException>(() => WorkspaceNavigation.BuildTree(orphaned));
     }
 
+    [Fact]
+    public void GroupHierarchy_ResolvesParentsNicheAncestorsDescendantsAndVisibility()
+    {
+        var sample = NavigationSample.Create();
+
+        Assert.Equal(WorkspaceEntityKind.Group, GroupHierarchy.GetDirectParentKind(sample.ChildGroup));
+        Assert.Equal(sample.ParentGroup.Id, GroupHierarchy.GetDirectParentId(sample.ChildGroup));
+        Assert.Equal(sample.Niche.Id, GroupHierarchy.GetEffectiveNiche(sample.Snapshot, sample.GrandchildGroup).Id);
+        Assert.Equal([sample.ParentGroup.Id, sample.ChildGroup.Id], GroupHierarchy.GetAncestors(sample.Snapshot, sample.GrandchildGroup).Select(group => group.Id));
+        Assert.Contains(GroupHierarchy.GetDescendants(sample.Snapshot, sample.ParentGroup), group => group.Id == sample.GrandchildGroup.Id);
+        Assert.True(GroupHierarchy.IsEffectivelyActive(sample.Snapshot, sample.GrandchildGroup));
+
+        var archived = sample.Snapshot with
+        {
+            Groups = sample.Snapshot.Groups.Select(group => group.Id == sample.ParentGroup.Id ? group with { IsArchived = true } : group).ToArray()
+        };
+        Assert.False(GroupHierarchy.IsEffectivelyActive(archived, archived.Groups.Single(group => group.Id == sample.GrandchildGroup.Id)));
+    }
+
+    [Fact]
+    public void BuildTree_HidesArchivedSubtreeAndArchivedListings()
+    {
+        var sample = NavigationSample.Create();
+        var archived = sample.Snapshot with
+        {
+            Groups = sample.Snapshot.Groups.Select(group => group.Id == sample.ParentGroup.Id ? group with { IsArchived = true } : group).ToArray()
+        };
+
+        var tree = WorkspaceNavigation.BuildTree(archived);
+
+        var niche = Assert.Single(Assert.Single(tree.Stores).Children);
+        Assert.Empty(niche.Children);
+    }
+
+    [Fact]
+    public void MoveTopic_RejectsArchivedDestinationWithoutChangingHierarchy()
+    {
+        var sample = NavigationSample.Create();
+        var destination = NewGroup(sample.Store.Id, sample.Niche.Id, null, "Archived") with { IsArchived = true };
+        var snapshot = sample.Snapshot with { Groups = [.. sample.Snapshot.Groups, destination] };
+
+        Assert.Throws<InvalidOperationException>(() => WorkspaceNavigation.MoveTopic(
+            snapshot,
+            sample.ChildGroup.Id,
+            new NavigationTopicReference(WorkspaceEntityKind.Group, destination.Id)));
+        Assert.Equal(sample.ParentGroup.Id, snapshot.Groups.Single(group => group.Id == sample.ChildGroup.Id).ParentGroupId);
+    }
+
     private static Niche NewNiche(Guid storeId, string name) =>
         new(Guid.NewGuid(), storeId, name, null, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "{}");
 
