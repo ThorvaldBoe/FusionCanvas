@@ -141,23 +141,37 @@ The planned repository structure is:
 ```text
 FusionCanvas/
 ├─ README.md
+├─ AGENTS.md
 ├─ LICENSE
-├─ CONTRIBUTING.md
-├─ ROADMAP.md
+├─ FusionCanvas.sln
 ├─ docs/
-│  ├─ product-vision.md
 │  ├─ architecture.md
+│  ├─ principles.md
+│  ├─ ui-guidelines.md
+│  ├─ ux-guidelines.md
+│  ├─ qa-review.md
+│  ├─ data-model.md
 │  ├─ design-pipeline.md
 │  ├─ plugin-model.md
-│  ├─ ai-workflow.md
-│  ├─ LifeOS/
-│  │  └─ PRD/
-│  └─ decisions/
+│  ├─ product-vision.md
+│  ├─ strategic-decisions.md
+│  ├─ roadmap.md
+│  └─ LifeOS/
+│     └─ PRD/
 ├─ openspec/
 │  ├─ project.md
 │  ├─ specs/
 │  └─ changes/
-└─ src/
+├─ src/
+│  ├─ FusionCanvas.Domain/
+│  ├─ FusionCanvas.Application/
+│  ├─ FusionCanvas.Integration/
+│  └─ FusionCanvas.App/
+└─ tests/
+   ├─ FusionCanvas.Domain.Tests/
+   ├─ FusionCanvas.Application.Tests/
+   ├─ FusionCanvas.Integration.Tests/
+   └─ FusionCanvas.App.Tests/
 ```
 
 As implementation grows, `src/` should contain the Clean Architecture projects `FusionCanvas.Domain`, `FusionCanvas.Application`, `FusionCanvas.Integration`, and `FusionCanvas.App`. Feature tests should live under `tests/` in projects that mirror the production layer, such as `FusionCanvas.Domain.Tests`, `FusionCanvas.Application.Tests`, `FusionCanvas.Integration.Tests`, and `FusionCanvas.App.Tests`.

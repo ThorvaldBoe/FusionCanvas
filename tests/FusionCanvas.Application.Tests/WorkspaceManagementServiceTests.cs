@@ -14,13 +14,13 @@ public class WorkspaceManagementServiceTests
         var workspaceId = Guid.NewGuid();
         var service = new WorkspaceManagementService(repository, () => Now, () => workspaceId);
 
-        var result = await service.CreateWorkspaceAsync(new WorkspaceManagementCreateRequest(" Client Work ", new WorkspaceContext("Retainer", "Q4")));
+        var result = await service.CreateWorkspaceAsync(new WorkspaceManagementCreateRequest(" Client Work ", new WorkspaceContext("Retainer", "Q4")), TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
         Assert.Equal(workspaceId, result.Workspace?.Id);
         Assert.Equal("Client Work", result.Workspace?.Name);
         Assert.Equal(workspaceId, result.State.ActiveWorkspaceId);
-        var workspace = Assert.Single((await repository.LoadAsync()).Workspaces);
+        var workspace = Assert.Single((await repository.LoadAsync(TestContext.Current.CancellationToken)).Workspaces);
         Assert.Equal(workspaceId, workspace.Id);
         Assert.Contains("\"notes\":\"Q4\"", workspace.MetadataJson);
     }
@@ -34,9 +34,9 @@ public class WorkspaceManagementServiceTests
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([active, archived], [store], [], [], [], [], [], [], [], []));
         var service = new WorkspaceManagementService(repository, () => Now.AddMinutes(1));
 
-        var deleteWithStore = await service.DeleteWorkspaceAsync(new WorkspaceManagementDeleteRequest(active.Id, ConfirmPermanentDeletion: true));
-        var restored = await service.RestoreWorkspaceAsync(archived.Id);
-        var archivedActive = await service.ArchiveWorkspaceAsync(active.Id);
+        var deleteWithStore = await service.DeleteWorkspaceAsync(new WorkspaceManagementDeleteRequest(active.Id, ConfirmPermanentDeletion: true), TestContext.Current.CancellationToken);
+        var restored = await service.RestoreWorkspaceAsync(archived.Id, TestContext.Current.CancellationToken);
+        var archivedActive = await service.ArchiveWorkspaceAsync(active.Id, TestContext.Current.CancellationToken);
 
         Assert.False(deleteWithStore.Succeeded);
         Assert.Contains("Type the workspace name", deleteWithStore.Error);
@@ -68,9 +68,9 @@ public class WorkspaceManagementServiceTests
             []));
         var service = new WorkspaceManagementService(repository, () => Now.AddMinutes(1));
 
-        var wrongName = await service.DeleteWorkspaceAsync(new WorkspaceManagementDeleteRequest(workspace.Id, true, "client"));
-        var deleted = await service.DeleteWorkspaceAsync(new WorkspaceManagementDeleteRequest(workspace.Id, true, workspace.Name));
-        var snapshot = await repository.LoadAsync();
+        var wrongName = await service.DeleteWorkspaceAsync(new WorkspaceManagementDeleteRequest(workspace.Id, true, "client"), TestContext.Current.CancellationToken);
+        var deleted = await service.DeleteWorkspaceAsync(new WorkspaceManagementDeleteRequest(workspace.Id, true, workspace.Name), TestContext.Current.CancellationToken);
+        var snapshot = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.False(wrongName.Succeeded);
         Assert.True(deleted.Succeeded);
@@ -90,11 +90,11 @@ public class WorkspaceManagementServiceTests
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([workspace], [], [], [], [], [], [], [], [], []));
         var service = new WorkspaceManagementService(repository, () => Now.AddMinutes(1));
 
-        var result = await service.DeleteWorkspaceAsync(new WorkspaceManagementDeleteRequest(workspace.Id, true, workspace.Name));
+        var result = await service.DeleteWorkspaceAsync(new WorkspaceManagementDeleteRequest(workspace.Id, true, workspace.Name), TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
         Assert.Contains("At least one workspace", result.Error);
-        Assert.Single((await repository.LoadAsync()).Workspaces);
+        Assert.Single((await repository.LoadAsync(TestContext.Current.CancellationToken)).Workspaces);
     }
 
     [Fact]
@@ -103,7 +103,7 @@ public class WorkspaceManagementServiceTests
         var archived = NewWorkspace("Archived") with { IsArchived = true };
         var service = new WorkspaceManagementService(new InMemoryWorkspaceRepository(new WorkspaceSnapshot([archived], [], [], [], [], [], [], [], [], [])));
 
-        var result = await service.SelectWorkspaceAsync(archived.Id);
+        var result = await service.SelectWorkspaceAsync(archived.Id, TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
         Assert.Contains("restored", result.Error);

@@ -78,8 +78,8 @@ public class SqliteWorkspaceRepositoryTests
             """{"notes":"Review later"}""");
         var snapshot = new WorkspaceSnapshot([active, archived], [], [], [], [], [], [], [], []);
 
-        await repository.SaveAsync(snapshot);
-        var loaded = await repository.LoadAsync();
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, loaded.Stores.Count);
         Assert.Equal(active, loaded.Stores.Single(store => store.Id == active.Id));
@@ -97,9 +97,9 @@ public class SqliteWorkspaceRepositoryTests
         var first = new Store(Guid.NewGuid(), "First Studio", null, false, createdAt, createdAt, "{}");
         var deleted = new Store(Guid.NewGuid(), "Deleted Studio", null, false, createdAt, createdAt, "{}");
 
-        await repository.SaveAsync(new WorkspaceSnapshot([first, deleted], [], [], [], [], [], [], [], []));
-        await repository.SaveAsync(new WorkspaceSnapshot([first], [], [], [], [], [], [], [], []));
-        var loaded = await repository.LoadAsync();
+        await repository.SaveAsync(new WorkspaceSnapshot([first, deleted], [], [], [], [], [], [], [], []), TestContext.Current.CancellationToken);
+        await repository.SaveAsync(new WorkspaceSnapshot([first], [], [], [], [], [], [], [], []), TestContext.Current.CancellationToken);
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(first.Id, Assert.Single(loaded.Stores).Id);
         Assert.DoesNotContain(loaded.Stores, store => store.Id == deleted.Id);
@@ -135,8 +135,8 @@ public class SqliteWorkspaceRepositoryTests
             """{"notes":"Review later"}""");
         var snapshot = new WorkspaceSnapshot([store], [active, archived], [], [], [], [], [], [], []);
 
-        await repository.SaveAsync(snapshot);
-        var loaded = await repository.LoadAsync();
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, loaded.Niches.Count);
         Assert.Equal(active, loaded.Niches.Single(niche => niche.Id == active.Id));
@@ -155,9 +155,9 @@ public class SqliteWorkspaceRepositoryTests
         var kept = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, createdAt, createdAt, "{}");
         var deleted = new Niche(Guid.NewGuid(), store.Id, "Deleted", null, false, createdAt, createdAt, "{}");
 
-        await repository.SaveAsync(new WorkspaceSnapshot([store], [kept, deleted], [], [], [], [], [], [], []));
-        await repository.SaveAsync(new WorkspaceSnapshot([store], [kept], [], [], [], [], [], [], []));
-        var loaded = await repository.LoadAsync();
+        await repository.SaveAsync(new WorkspaceSnapshot([store], [kept, deleted], [], [], [], [], [], [], []), TestContext.Current.CancellationToken);
+        await repository.SaveAsync(new WorkspaceSnapshot([store], [kept], [], [], [], [], [], [], []), TestContext.Current.CancellationToken);
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(kept.Id, Assert.Single(loaded.Niches).Id);
         Assert.DoesNotContain(loaded.Niches, niche => niche.Id == deleted.Id);

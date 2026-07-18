@@ -15,7 +15,7 @@ public class NicheManagementServiceTests
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
         var service = new NicheManagementService(repository, () => Now, () => nicheId);
 
-        var result = await service.CreateNicheAsync(new NicheManagementCreateRequest(store.Id, " Coffee Lovers "));
+        var result = await service.CreateNicheAsync(new NicheManagementCreateRequest(store.Id, " Coffee Lovers "), TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
         Assert.Equal(nicheId, result.Niche?.Id);
@@ -23,7 +23,7 @@ public class NicheManagementServiceTests
         Assert.Equal("Coffee Lovers", result.Niche?.Name);
         Assert.Equal(nicheId, result.State.ActiveNicheId);
         Assert.False(result.State.NeedsFirstNiche);
-        var saved = await repository.LoadAsync();
+        var saved = await repository.LoadAsync(TestContext.Current.CancellationToken);
         var niche = Assert.Single(saved.Niches);
         Assert.Equal(nicheId, niche.Id);
         Assert.Equal(store.Id, niche.StoreId);
@@ -46,11 +46,11 @@ public class NicheManagementServiceTests
             ResearchNotes: "Fall performs well",
             Notes: "Try cozy textures");
 
-        var result = await service.CreateNicheAsync(new NicheManagementCreateRequest(store.Id, "Coffee", context));
+        var result = await service.CreateNicheAsync(new NicheManagementCreateRequest(store.Id, "Coffee", context), TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
         Assert.Equal(context, result.Niche?.Context);
-        var saved = await repository.LoadAsync();
+        var saved = await repository.LoadAsync(TestContext.Current.CancellationToken);
         var metadata = Assert.Single(saved.Niches).MetadataJson;
         Assert.Contains("\"audience\":\"Coffee fans\"", metadata);
         Assert.Contains("\"humorStyle\":\"Gentle\"", metadata);
@@ -72,11 +72,11 @@ public class NicheManagementServiceTests
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([active, other, archived], [existing, sameNameOtherStore], [], [], [], [], [], [], []));
         var service = new NicheManagementService(repository);
 
-        var empty = await service.CreateNicheAsync(new NicheManagementCreateRequest(active.Id, " "));
-        var duplicate = await service.CreateNicheAsync(new NicheManagementCreateRequest(active.Id, "coffee"));
-        var reused = await service.CreateNicheAsync(new NicheManagementCreateRequest(other.Id, "Coffee 2"));
-        var archivedStore = await service.CreateNicheAsync(new NicheManagementCreateRequest(archived.Id, "Cats"));
-        var missingStore = await service.CreateNicheAsync(new NicheManagementCreateRequest(Guid.NewGuid(), "Cats"));
+        var empty = await service.CreateNicheAsync(new NicheManagementCreateRequest(active.Id, " "), TestContext.Current.CancellationToken);
+        var duplicate = await service.CreateNicheAsync(new NicheManagementCreateRequest(active.Id, "coffee"), TestContext.Current.CancellationToken);
+        var reused = await service.CreateNicheAsync(new NicheManagementCreateRequest(other.Id, "Coffee 2"), TestContext.Current.CancellationToken);
+        var archivedStore = await service.CreateNicheAsync(new NicheManagementCreateRequest(archived.Id, "Cats"), TestContext.Current.CancellationToken);
+        var missingStore = await service.CreateNicheAsync(new NicheManagementCreateRequest(Guid.NewGuid(), "Cats"), TestContext.Current.CancellationToken);
 
         Assert.False(empty.Succeeded);
         Assert.Contains("required", empty.Error);
@@ -100,13 +100,13 @@ public class NicheManagementServiceTests
         var service = new NicheManagementService(repository, () => Now.AddMinutes(5));
         var context = new NicheContext("Updated", "Baristas", "Dry", "Retro", "No logos", "Crowded", "Check Etsy", "Notes");
 
-        var result = await service.UpdateNicheAsync(new NicheManagementUpdateRequest(niche.Id, "Coffee Gifts", context));
+        var result = await service.UpdateNicheAsync(new NicheManagementUpdateRequest(niche.Id, "Coffee Gifts", context), TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
         Assert.Equal(niche.Id, result.Niche?.Id);
         Assert.Equal("Coffee Gifts", result.Niche?.Name);
         Assert.Equal(context, result.Niche?.Context);
-        var saved = await repository.LoadAsync();
+        var saved = await repository.LoadAsync(TestContext.Current.CancellationToken);
         Assert.Equal(niche.Id, Assert.Single(saved.Groups).NicheId);
         Assert.Equal(niche.Id, Assert.Single(saved.Listings).NicheId);
     }
@@ -118,11 +118,11 @@ public class NicheManagementServiceTests
         var niche = NewNiche(store.Id, "Coffee");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []));
         var service = new NicheManagementService(repository);
-        await service.SelectNicheAsync(niche.Id);
+        await service.SelectNicheAsync(niche.Id, TestContext.Current.CancellationToken);
 
-        var archived = await service.ArchiveNicheAsync(niche.Id);
-        var selectedArchived = await service.SelectNicheAsync(niche.Id);
-        var restored = await service.RestoreNicheAsync(niche.Id);
+        var archived = await service.ArchiveNicheAsync(niche.Id, TestContext.Current.CancellationToken);
+        var selectedArchived = await service.SelectNicheAsync(niche.Id, TestContext.Current.CancellationToken);
+        var restored = await service.RestoreNicheAsync(niche.Id, TestContext.Current.CancellationToken);
 
         Assert.True(archived.Succeeded);
         Assert.Empty(archived.State.ActiveNiches);
@@ -143,11 +143,11 @@ public class NicheManagementServiceTests
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [active, archived], [], [], [], [], [], [], []));
         var service = new NicheManagementService(repository);
 
-        var result = await service.RestoreNicheAsync(archived.Id);
+        var result = await service.RestoreNicheAsync(archived.Id, TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
         Assert.Contains("already uses", result.Error);
-        Assert.True((await repository.LoadAsync()).Niches.Single(niche => niche.Id == archived.Id).IsArchived);
+        Assert.True((await repository.LoadAsync(TestContext.Current.CancellationToken)).Niches.Single(niche => niche.Id == archived.Id).IsArchived);
     }
 
     [Fact]
@@ -158,13 +158,13 @@ public class NicheManagementServiceTests
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []));
         var service = new NicheManagementService(repository);
 
-        var unconfirmed = await service.DeleteNicheAsync(new NicheManagementDeleteRequest(niche.Id, ConfirmPermanentDeletion: false));
-        var confirmed = await service.DeleteNicheAsync(new NicheManagementDeleteRequest(niche.Id, ConfirmPermanentDeletion: true));
+        var unconfirmed = await service.DeleteNicheAsync(new NicheManagementDeleteRequest(niche.Id, ConfirmPermanentDeletion: false), TestContext.Current.CancellationToken);
+        var confirmed = await service.DeleteNicheAsync(new NicheManagementDeleteRequest(niche.Id, ConfirmPermanentDeletion: true), TestContext.Current.CancellationToken);
 
         Assert.False(unconfirmed.Succeeded);
         Assert.Contains("confirmation", unconfirmed.Error);
         Assert.True(confirmed.Succeeded);
-        Assert.Empty((await repository.LoadAsync()).Niches);
+        Assert.Empty((await repository.LoadAsync(TestContext.Current.CancellationToken)).Niches);
     }
 
     [Fact]
@@ -177,11 +177,11 @@ public class NicheManagementServiceTests
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [tag], [new ListingTag(listing.Id, tag.Id)], []));
         var service = new NicheManagementService(repository);
 
-        var result = await service.DeleteNicheAsync(new NicheManagementDeleteRequest(niche.Id, ConfirmPermanentDeletion: true));
+        var result = await service.DeleteNicheAsync(new NicheManagementDeleteRequest(niche.Id, ConfirmPermanentDeletion: true), TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
         Assert.Contains("connected data", result.Error);
-        Assert.Equal(niche.Id, Assert.Single((await repository.LoadAsync()).Niches).Id);
+        Assert.Equal(niche.Id, Assert.Single((await repository.LoadAsync(TestContext.Current.CancellationToken)).Niches).Id);
     }
 
     [Fact]
@@ -195,7 +195,7 @@ public class NicheManagementServiceTests
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [firstNiche, secondNiche, archived], [], [], [], [], [], [], []));
         var service = new NicheManagementService(repository);
 
-        var state = await service.LoadAsync(first.Id);
+        var state = await service.LoadAsync(first.Id, TestContext.Current.CancellationToken);
 
         Assert.Equal(first.Id, state.ActiveStoreId);
         Assert.Equal(firstNiche.Id, Assert.Single(state.ActiveNiches).Id);

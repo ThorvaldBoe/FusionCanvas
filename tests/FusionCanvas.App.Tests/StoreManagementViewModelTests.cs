@@ -17,7 +17,7 @@ public class StoreManagementViewModelTests
     {
         var viewModel = new StoreManagementViewModel(new StoreManagementService(new InMemoryWorkspaceRepository()));
 
-        await viewModel.LoadAsync();
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.True(viewModel.NeedsFirstStore);
         Assert.True(viewModel.ShouldShowFirstStorePrompt);
@@ -29,14 +29,14 @@ public class StoreManagementViewModelTests
     public async Task FirstStorePrompt_CanOpenEditorOrBeDismissed()
     {
         var viewModel = new StoreManagementViewModel(new StoreManagementService(new InMemoryWorkspaceRepository()));
-        await viewModel.LoadAsync();
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
         viewModel.DeclineFirstStorePromptCommand.Execute(null);
 
         Assert.False(viewModel.ShouldShowFirstStorePrompt);
 
         var secondViewModel = new StoreManagementViewModel(new StoreManagementService(new InMemoryWorkspaceRepository()));
-        await secondViewModel.LoadAsync();
+        await secondViewModel.LoadAsync(TestContext.Current.CancellationToken);
 
         secondViewModel.AcceptFirstStorePromptCommand.Execute(null);
 
@@ -61,7 +61,7 @@ public class StoreManagementViewModelTests
             PlanningContext = "Fall launch"
         };
 
-        await viewModel.CreateStoreAsync();
+        await viewModel.CreateStoreAsync(TestContext.Current.CancellationToken);
 
         Assert.False(viewModel.NeedsFirstStore);
         Assert.Equal(storeId, viewModel.SelectedStore?.Id);
@@ -79,7 +79,7 @@ public class StoreManagementViewModelTests
             new InMemoryWorkspaceRepository(),
             () => Now,
             () => storeId));
-        await viewModel.LoadAsync();
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
         viewModel.StartCreateStore();
 
@@ -90,7 +90,7 @@ public class StoreManagementViewModelTests
         viewModel.NewStoreName = "North Star Studio";
         viewModel.Notes = "Soft humor";
         viewModel.SelectStoreForEditing(viewModel.EditorActiveStores.Single());
-        await viewModel.SaveSelectedStoreAsync();
+        await viewModel.SaveSelectedStoreAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(storeId, viewModel.SelectedStore?.Id);
         Assert.Equal("North Star Studio", Assert.Single(viewModel.ActiveStores).Name);
@@ -102,7 +102,7 @@ public class StoreManagementViewModelTests
     public async Task NewStoreDraft_RequestsStoreNameFocus()
     {
         var viewModel = new StoreManagementViewModel(new StoreManagementService(new InMemoryWorkspaceRepository()));
-        await viewModel.LoadAsync();
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         var focusRequests = 0;
         viewModel.StoreNameFocusRequested += (_, _) => focusRequests++;
 
@@ -118,7 +118,7 @@ public class StoreManagementViewModelTests
         var archived = NewStore("Archived Studio", isArchived: true);
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
             new InMemoryWorkspaceRepository(new WorkspaceSnapshot([active, archived], [], [], [], [], [], [], [], []))));
-        await viewModel.LoadAsync();
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
         viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single(store => store.Id == active.Id));
 
@@ -153,12 +153,12 @@ public class StoreManagementViewModelTests
         var store = NewStore("North Star Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
             new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
-        await viewModel.LoadAsync();
-        await viewModel.SelectStoreAsync(viewModel.ActiveStores[0]);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        await viewModel.SelectStoreAsync(viewModel.ActiveStores[0], TestContext.Current.CancellationToken);
         viewModel.NewStoreName = "North Star Gifts";
         viewModel.Notes = "Sharper positioning";
 
-        await viewModel.SaveSelectedStoreAsync();
+        await viewModel.SaveSelectedStoreAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("North Star Gifts", viewModel.SelectedStore?.Name);
         Assert.Equal("Sharper positioning", viewModel.SelectedStore?.Context.Notes);
@@ -171,7 +171,7 @@ public class StoreManagementViewModelTests
         var second = NewStore("Second Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
             new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [], [], [], [], [], [], [], []))));
-        await viewModel.LoadAsync();
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single(store => store.Id == first.Id));
         viewModel.NewStoreName = "Unsaved name";
 
@@ -201,7 +201,7 @@ public class StoreManagementViewModelTests
         var store = NewStore("North Star Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
             new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
-        await viewModel.LoadAsync();
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         viewModel.OpenStoreEditorCommand.Execute(null);
         viewModel.NewStoreName = "Unsaved name";
 
@@ -224,8 +224,8 @@ public class StoreManagementViewModelTests
         var second = NewStore("Second Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
             new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [], [], [], [], [], [], [], []))));
-        await viewModel.LoadAsync();
-        await viewModel.SelectStoreAsync(viewModel.ActiveStores.Single(store => store.Id == second.Id));
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        await viewModel.SelectStoreAsync(viewModel.ActiveStores.Single(store => store.Id == second.Id), TestContext.Current.CancellationToken);
 
         viewModel.OpenStoreEditorCommand.Execute(null);
 
@@ -244,7 +244,7 @@ public class StoreManagementViewModelTests
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository),
             new NicheManagementService(repository));
-        await viewModel.LoadAsync();
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
         viewModel.OpenNichesTabCommand.Execute(null);
 
@@ -259,12 +259,12 @@ public class StoreManagementViewModelTests
         var store = NewStore("North Star Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
             new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
-        await viewModel.LoadAsync();
-        await viewModel.SelectStoreAsync(viewModel.ActiveStores[0]);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        await viewModel.SelectStoreAsync(viewModel.ActiveStores[0], TestContext.Current.CancellationToken);
 
-        await viewModel.ArchiveSelectedStoreAsync();
+        await viewModel.ArchiveSelectedStoreAsync(TestContext.Current.CancellationToken);
         var archived = Assert.Single(viewModel.ArchivedStores);
-        await viewModel.RestoreStoreAsync(archived);
+        await viewModel.RestoreStoreAsync(archived, TestContext.Current.CancellationToken);
 
         Assert.Empty(viewModel.ArchivedStores);
         Assert.Equal(store.Id, Assert.Single(viewModel.ActiveStores).Id);
@@ -277,8 +277,8 @@ public class StoreManagementViewModelTests
         var second = NewStore("Second Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
             new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [], [], [], [], [], [], [], []))));
-        await viewModel.LoadAsync();
-        await viewModel.SelectStoreAsync(viewModel.ActiveStores.Single(store => store.Id == first.Id));
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        await viewModel.SelectStoreAsync(viewModel.ActiveStores.Single(store => store.Id == first.Id), TestContext.Current.CancellationToken);
 
         Assert.True(viewModel.IsSelectorCompact);
         Assert.False(viewModel.IsSelectorExpanded);
@@ -293,7 +293,7 @@ public class StoreManagementViewModelTests
         Assert.Equal("▲", viewModel.SelectorToggleGlyph);
         Assert.Equal("Collapse stores", viewModel.SelectorToggleTooltip);
 
-        await viewModel.SelectStoreAsync(viewModel.ActiveStores.Single(store => store.Id == second.Id));
+        await viewModel.SelectStoreAsync(viewModel.ActiveStores.Single(store => store.Id == second.Id), TestContext.Current.CancellationToken);
 
         Assert.Contains(viewModel.SelectorStores, entry => entry.Id == second.Id && entry.IsSelected);
         Assert.DoesNotContain(viewModel.SelectorStores, entry => entry.Id == first.Id && entry.IsSelected);
@@ -305,14 +305,14 @@ public class StoreManagementViewModelTests
         var store = NewStore("Empty Studio");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
         var viewModel = new StoreManagementViewModel(new StoreManagementService(repository));
-        await viewModel.LoadAsync();
-        await viewModel.SelectStoreAsync(viewModel.ActiveStores[0]);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        await viewModel.SelectStoreAsync(viewModel.ActiveStores[0], TestContext.Current.CancellationToken);
 
         viewModel.RequestDeleteSelectedStoreCommand.Execute(null);
         viewModel.CancelDeleteStoreCommand.Execute(null);
 
         Assert.False(viewModel.DeleteWarningVisible);
-        Assert.Equal(store.Id, Assert.Single((await repository.LoadAsync()).Stores).Id);
+        Assert.Equal(store.Id, Assert.Single((await repository.LoadAsync(TestContext.Current.CancellationToken)).Stores).Id);
     }
 
     [Fact]
@@ -323,20 +323,20 @@ public class StoreManagementViewModelTests
         var niche = new Niche(Guid.NewGuid(), connected.Id, "Coffee", null, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([empty, connected], [niche], [], [], [], [], [], [], []));
         var viewModel = new StoreManagementViewModel(new StoreManagementService(repository));
-        await viewModel.LoadAsync();
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
-        await viewModel.SelectStoreAsync(viewModel.ActiveStores.Single(store => store.Id == connected.Id));
+        await viewModel.SelectStoreAsync(viewModel.ActiveStores.Single(store => store.Id == connected.Id), TestContext.Current.CancellationToken);
         viewModel.RequestDeleteSelectedStoreCommand.Execute(null);
-        await viewModel.ConfirmDeleteStoreAsync();
+        await viewModel.ConfirmDeleteStoreAsync(TestContext.Current.CancellationToken);
 
         Assert.Contains("connected data", viewModel.ErrorMessage);
-        Assert.Contains((await repository.LoadAsync()).Stores, store => store.Id == connected.Id);
+        Assert.Contains((await repository.LoadAsync(TestContext.Current.CancellationToken)).Stores, store => store.Id == connected.Id);
 
-        await viewModel.SelectStoreAsync(viewModel.ActiveStores.Single(store => store.Id == empty.Id));
+        await viewModel.SelectStoreAsync(viewModel.ActiveStores.Single(store => store.Id == empty.Id), TestContext.Current.CancellationToken);
         viewModel.RequestDeleteSelectedStoreCommand.Execute(null);
-        await viewModel.ConfirmDeleteStoreAsync();
+        await viewModel.ConfirmDeleteStoreAsync(TestContext.Current.CancellationToken);
 
-        Assert.DoesNotContain((await repository.LoadAsync()).Stores, store => store.Id == empty.Id);
+        Assert.DoesNotContain((await repository.LoadAsync(TestContext.Current.CancellationToken)).Stores, store => store.Id == empty.Id);
     }
 
     [Fact]
@@ -346,11 +346,11 @@ public class StoreManagementViewModelTests
         var second = NewStore("Second Studio");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [], [], [], [], [], [], [], []));
         var viewModel = new StoreManagementViewModel(new StoreManagementService(repository));
-        await viewModel.LoadAsync();
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single(store => store.Id == first.Id));
 
         viewModel.RequestDeleteSelectedStoreCommand.Execute(null);
-        await viewModel.ConfirmDeleteStoreAsync();
+        await viewModel.ConfirmDeleteStoreAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(second.Id, viewModel.SelectedStore?.Id);
         Assert.Equal("Second Studio", viewModel.NewStoreName);
@@ -367,7 +367,7 @@ public class StoreManagementViewModelTests
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository),
             new NicheManagementService(repository));
-        await viewModel.LoadAsync();
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.True(viewModel.IsBasicInfoTabSelected);
 
@@ -392,7 +392,7 @@ public class StoreManagementViewModelTests
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository),
             new NicheManagementService(repository, () => Now, () => nicheId));
-        await viewModel.LoadAsync();
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         viewModel.SelectNichesTabCommand.Execute(null);
 
         Assert.True(viewModel.CanSaveSelectedNiche);
@@ -400,19 +400,19 @@ public class StoreManagementViewModelTests
 
         viewModel.NicheName = "Coffee";
         viewModel.NicheAudience = "Coffee fans";
-        await viewModel.SaveSelectedNicheAsync();
+        await viewModel.SaveSelectedNicheAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(nicheId, viewModel.SelectedNiche?.Id);
         Assert.Equal("Coffee fans", viewModel.SelectedNiche?.Context.Audience);
         Assert.Single(viewModel.ActiveNiches);
 
-        await viewModel.ArchiveSelectedNicheAsync();
+        await viewModel.ArchiveSelectedNicheAsync(TestContext.Current.CancellationToken);
 
         var archived = Assert.Single(viewModel.ArchivedNiches);
         Assert.Empty(viewModel.ActiveNiches);
         Assert.True(viewModel.CanRestoreSelectedNiche);
 
-        await viewModel.RestoreNicheAsync(archived);
+        await viewModel.RestoreNicheAsync(archived, TestContext.Current.CancellationToken);
 
         Assert.Single(viewModel.ActiveNiches);
         Assert.Empty(viewModel.ArchivedNiches);
@@ -421,12 +421,12 @@ public class StoreManagementViewModelTests
         viewModel.CancelDeleteNicheCommand.Execute(null);
 
         Assert.False(viewModel.NicheDeleteWarningVisible);
-        Assert.Single((await repository.LoadAsync()).Niches);
+        Assert.Single((await repository.LoadAsync(TestContext.Current.CancellationToken)).Niches);
 
         viewModel.RequestDeleteSelectedNicheCommand.Execute(null);
-        await viewModel.ConfirmDeleteNicheAsync();
+        await viewModel.ConfirmDeleteNicheAsync(TestContext.Current.CancellationToken);
 
-        Assert.Empty((await repository.LoadAsync()).Niches);
+        Assert.Empty((await repository.LoadAsync(TestContext.Current.CancellationToken)).Niches);
     }
 
     [Fact]
@@ -439,7 +439,7 @@ public class StoreManagementViewModelTests
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository),
             new NicheManagementService(repository));
-        await viewModel.LoadAsync();
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         viewModel.SelectNichesTabCommand.Execute(null);
         viewModel.SelectNicheForEditing(viewModel.ActiveNiches.Single(niche => niche.Id == first.Id));
         viewModel.NicheName = "Unsaved";
@@ -474,7 +474,7 @@ public class StoreManagementViewModelTests
 
         var created = await service.CreateStoreAsync(new StoreManagementCreateRequest(
             "North Star Studio",
-            new StoreContext("POD brand", "Soft humor")));
+            new StoreContext("POD brand", "Soft humor")), TestContext.Current.CancellationToken);
         var reloaded = AppWorkspaceFactory.Create(tempDirectory.GetPath("workspace.db"));
 
         var store = Assert.Single(reloaded.Snapshot.Stores);
@@ -507,7 +507,7 @@ public class StoreManagementViewModelTests
         Assert.Contains(viewModel.NavigationContexts, context => context.Context.Id == firstListing.Id);
         Assert.DoesNotContain(viewModel.NavigationContexts, context => context.Context.Id == secondListing.Id);
 
-        await viewModel.StoreManagement.SelectStoreAsync(viewModel.StoreManagement.ActiveStores.Single(store => store.Id == second.Id));
+        await viewModel.StoreManagement.SelectStoreAsync(viewModel.StoreManagement.ActiveStores.Single(store => store.Id == second.Id), TestContext.Current.CancellationToken);
 
         Assert.Contains(viewModel.NavigationContexts, context => context.Context.Id == secondListing.Id);
         Assert.DoesNotContain(viewModel.NavigationContexts, context => context.Context.Id == firstListing.Id);
@@ -530,7 +530,7 @@ public class StoreManagementViewModelTests
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
             snapshot);
-        await viewModel.StoreManagement.SelectStoreAsync(viewModel.StoreManagement.ActiveStores.Single());
+        await viewModel.StoreManagement.SelectStoreAsync(viewModel.StoreManagement.ActiveStores.Single(), TestContext.Current.CancellationToken);
 
         Assert.Contains(viewModel.NavigationContexts, context =>
             context.Context.Id == activeNiche.Id &&
@@ -554,12 +554,12 @@ public class StoreManagementViewModelTests
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
             snapshot);
-        await viewModel.StoreManagement.SelectStoreAsync(viewModel.StoreManagement.ActiveStores.Single());
+        await viewModel.StoreManagement.SelectStoreAsync(viewModel.StoreManagement.ActiveStores.Single(), TestContext.Current.CancellationToken);
 
         viewModel.StoreManagement.SelectNichesTabCommand.Execute(null);
         viewModel.StoreManagement.StartCreateNiche();
         viewModel.StoreManagement.NicheName = "Coffee";
-        await viewModel.StoreManagement.SaveSelectedNicheAsync();
+        await viewModel.StoreManagement.SaveSelectedNicheAsync(TestContext.Current.CancellationToken);
 
         Assert.Contains(viewModel.NavigationContexts, context =>
             context.Context.Title == "Coffee" &&

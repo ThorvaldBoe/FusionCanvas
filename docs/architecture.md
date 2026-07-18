@@ -57,7 +57,7 @@ FusionCanvas.Domain
 FusionCanvas.Application
     Use cases, orchestration, ports, and application-facing contracts
 
-FusionCanvas.Infrastructure
+FusionCanvas.Integration
     Persistence, file system access, marketplace APIs, AI providers,
     plugin host adapters, and other external systems
 
@@ -68,10 +68,10 @@ FusionCanvas.App
 The preferred dependency direction is inward:
 
 ```text
-UI and Infrastructure -> Application -> Domain
+UI and Integration -> Application -> Domain
 ```
 
-The domain project should not reference Avalonia, persistence frameworks, marketplace SDKs, AI providers, plugin host implementations, file system adapters, or other external infrastructure. The application layer may define ports and use domain types. Infrastructure and UI projects should satisfy those contracts from the outside.
+The domain project should not reference Avalonia, persistence frameworks, marketplace SDKs, AI providers, plugin host implementations, file system adapters, or other external infrastructure. The application layer may define ports and use domain types. Integration and UI projects should satisfy those contracts from the outside.
 
 This structure should remain practical. Do not create empty projects or speculative abstractions before they have useful responsibilities, but do not place new domain or application behavior in the UI project merely because it is convenient.
 
@@ -132,9 +132,9 @@ The domain should contain the business rules that define how these objects behav
 
 The domain should have no knowledge of Avalonia, SQLite, HTTP, AI providers, Printify, Shopify, or plugin implementations.
 
-### Infrastructure Layer
+### Integration Layer
 
-Infrastructure communicates with the outside world.
+Integration communicates with the outside world.
 
 Examples include:
 
@@ -146,7 +146,7 @@ Examples include:
 - exporters
 - importers
 
-Infrastructure implements interfaces defined by the application or domain layers.
+Integration implements interfaces defined by the application or domain layers.
 
 ## Core Modules
 
