@@ -54,6 +54,60 @@ FusionCanvas specifications SHALL describe behavior and scope well enough to gui
 - **WHEN** a contributor reviews an active change
 - **THEN** the specification identifies what belongs in the change and what is out of scope
 
+### Requirement: User-facing changes receive a UX preflight
+FusionCanvas SHALL review user-facing changes against the shared UI and UX guidance before implementation.
+
+#### Scenario: Contributor proposes a user-facing change
+- **WHEN** a change adds or modifies a user-facing workflow
+- **THEN** the proposal or design identifies the primary workflow, expected action frequency, appropriate interaction surface, and acceptable workspace footprint
+- **AND** the design resolves progressive disclosure, relevant interaction states, selection, focus, unsaved changes, cancellation, and destructive actions before leaving those decisions to implementation
+
+#### Scenario: Contributor proposes a non-user-facing change
+- **WHEN** a change has no user-facing interaction
+- **THEN** the change may mark the UX preflight as not applicable
+
+### Requirement: Feedback-driven adjustments are captured
+FusionCanvas SHALL capture user feedback that invalidates an implementation or design assumption while a change is active.
+
+#### Scenario: Validation reveals an unplanned requirement or correction
+- **WHEN** user validation reveals that an assumption, interaction, requirement, or implementation behavior must change
+- **THEN** the contributor updates the relevant active specification, design, or tasks
+- **AND** records the original assumption, observed problem, approved correction, applicability, classification, and potential promotion target in the change retrospective
+
+#### Scenario: Validation reveals an ordinary implementation defect
+- **WHEN** user validation reveals a defect without establishing a reusable product or engineering rule
+- **THEN** the retrospective may classify it as an implementation defect
+- **AND** the defect is not promoted into normative guidance solely because it occurred
+
+### Requirement: Archive includes a learning review
+FusionCanvas SHALL complete a learning review before archiving a significant change.
+
+#### Scenario: Change contains reusable lessons
+- **WHEN** the learning review identifies a reusable lesson
+- **THEN** the contributor promotes it to the narrowest durable source of truth or records an explicit deferral with rationale
+- **AND** preserves the detailed evidence in `retrospective.md` with the archived change
+
+#### Scenario: Change contains no reusable lessons
+- **WHEN** the learning review identifies no reusable lesson
+- **THEN** `retrospective.md` explicitly records that result before archive
+
+#### Scenario: Git history is unavailable or incomplete
+- **WHEN** the learning review cannot reconstruct useful implementation history from Git
+- **THEN** the contributor uses recorded feedback, artifact evolution that is available, and the final approved behavior
+- **AND** does not infer lessons from a raw diff alone
+
+### Requirement: Lessons have a durable promotion target
+FusionCanvas SHALL route reusable knowledge to the narrowest authoritative project document.
+
+#### Scenario: Contributor classifies a lesson
+- **WHEN** a retrospective identifies reusable knowledge
+- **THEN** capability behavior is promoted to its accepted OpenSpec specification
+- **AND** interaction principles are promoted to UX guidance
+- **AND** visual or layout rules are promoted to UI guidance
+- **AND** structural engineering rules are promoted to architecture guidance
+- **AND** OpenSpec process rules are promoted to the OpenSpec workflow specification or repository skill instructions
+- **AND** change-specific rationale remains in the archived design and retrospective
+
 ### Requirement: Completed and superseded context is preserved
 FusionCanvas SHALL preserve completed and superseded specification context instead of casually deleting it.
 

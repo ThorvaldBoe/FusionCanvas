@@ -2,7 +2,6 @@
 name: openspec-propose
 description: Propose a new change with all artifacts generated in one step. Use when the user wants to quickly describe what they want to build and get a complete proposal with design, specs, and tasks ready for implementation.
 license: MIT
-compatibility: Requires openspec CLI.
 metadata:
   author: openspec
   version: "1.0"
@@ -48,7 +47,18 @@ When ready to implement, run /opsx:apply
    - `artifacts`: list of all artifacts with their status and dependencies
    - `planningHome`, `changeRoot`, `artifactPaths`, and `actionContext`: path and scope context. Use these instead of assuming repo-local paths.
 
-4. **Create artifacts in sequence until apply-ready**
+4. **Run the UX preflight when the change is user-facing**
+
+   Before drafting artifacts for a user-facing change:
+   - Read `docs/ui-guidelines.md` and `docs/ux-guidelines.md` when they exist in the planning home.
+   - Identify the user's primary workflow and the expected frequency of each action.
+   - Decide which actions belong in the primary workspace and which belong in a focused surface.
+   - Resolve acceptable workspace footprint, progressive disclosure, and relevant empty, loading, success, blocked, and error states.
+   - Resolve selection, keyboard focus, drafts, unsaved changes, cancellation, and destructive actions where relevant.
+
+   Capture the decisions in the proposal, design, or specification scenarios rather than copying the checklist verbatim. Ask the user only when a high-impact product preference cannot be derived from project context. For a change without user-facing interaction, record that the UX preflight is not applicable.
+
+5. **Create artifacts in sequence until apply-ready**
 
    Use the **TodoWrite tool** to track progress through the artifacts.
 
@@ -80,7 +90,7 @@ When ready to implement, run /opsx:apply
       - Use **AskUserQuestion tool** to clarify
       - Then continue with creation
 
-5. **Show final status**
+6. **Show final status**
    ```bash
    openspec status --change "<name>"
    ```
@@ -109,3 +119,4 @@ After completing all artifacts, summarize:
 - If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum
 - If a change with that name already exists, ask if user wants to continue it or create a new one
 - Verify each artifact file exists after writing before proceeding to next
+- Do not leave user-facing surface placement or core interaction-state decisions to implementation when they can be resolved during the UX preflight

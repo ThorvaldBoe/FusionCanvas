@@ -2,7 +2,6 @@
 name: openspec-apply-change
 description: Implement tasks from an OpenSpec change. Use when the user wants to start implementing, continue implementation, or work through tasks.
 license: MIT
-compatibility: Requires openspec CLI.
 metadata:
   author: openspec
   version: "1.0"
@@ -58,6 +57,7 @@ Implement tasks from an OpenSpec change.
    The files depend on the schema being used:
    - **spec-driven**: proposal, specs, design, tasks
    - Other schemas: follow the contextFiles from CLI output
+   - If `<changeRoot>/retrospective.md` already exists, read it before continuing so later feedback extends the same record.
 
 5. **Show current progress**
 
@@ -81,6 +81,28 @@ Implement tasks from an OpenSpec change.
    - Implementation reveals a design issue → suggest updating artifacts
    - Error or blocker encountered → report and wait for guidance
    - User interrupts
+
+   **Capture feedback-driven learning:**
+   - When user validation or review invalidates an assumption, first update the relevant specification, design, or tasks so the active artifacts describe the approved behavior.
+   - Create or append `<changeRoot>/retrospective.md` using the structure below. Capture the correction when it happens; do not rely on reconstructing it from Git at archive time.
+   - Record feedback-driven implementation defects too, but classify defects separately and do not promote them unless they establish a reusable rule.
+   - Do not record routine compiler failures, mechanical fixes, or implementation churn that did not change understanding.
+
+   ```markdown
+   # <Change> Retrospective
+
+   ## Outcome
+   <Current approved outcome, updated as the change evolves.>
+
+   ## Feedback-Driven Adjustments
+
+   | Initial assumption | Observed problem or feedback | Approved correction | Classification | Applicability | Promotion |
+   | --- | --- | --- | --- | --- | --- |
+   | ... | ... | ... | Missing requirement / UX / UI / architecture / implementation defect / one-off preference | Change-specific or reusable scope | Target document, deferred with rationale, or none |
+
+   ## Deferred or Change-Specific Notes
+   - ...
+   ```
 
 7. **On completion or pause, show status**
 
@@ -150,6 +172,8 @@ What would you like to do?
 - Update task checkbox immediately after completing each task
 - Pause on errors, blockers, or unclear requirements - don't guess
 - Use contextFiles from CLI output, don't assume specific file names
+- Treat user feedback and final approved behavior as stronger evidence than an inferred Git diff
+- Keep retrospectives concise and change-local; promote reusable rules to authoritative project guidance instead of turning retrospectives into a global experience log
 
 **Fluid Workflow Integration**
 
