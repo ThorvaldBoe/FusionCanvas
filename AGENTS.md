@@ -65,8 +65,10 @@ FusionCanvas.Integration ─┘
 
 - Framework: **xUnit v3** with coverlet collector. Test projects mirror production under `tests/` (`FusionCanvas.<Layer>.Tests`).
 - Every behavior change ships with focused tests per `openspec/specs/testing-baseline/spec.md`: domain rules without frameworks, application use cases with deterministic collaborators, persistence boundaries with isolated temporary resources, and UI-owned decision logic testable in code without launching the app.
-- Full UI automation, visual regression, and external-service tests are outside the baseline.
-- Baseline command — must pass before work is considered done:
+- Every new or changed user-facing feature also requires a proportional **real desktop UI verification pass** against the built Avalonia application. Derive it from accepted scenarios and cover applicable keyboard, pointer, focus/selection, validation, filtering, destructive confirmation, persistence/restart, recovery, accessibility, and tab/window behavior.
+- Desktop UI verification uses a disposable database/workspace, never the contributor's normal workspace. Record the tested build/environment, scenarios, results, isolation method, limitations, and material screenshots or automation logs in the change verification evidence.
+- Keep desktop UI verification separate from the fast deterministic baseline. External-service tests and pixel-perfect visual regression remain outside the default baseline unless a feature specifically requires them.
+- Baseline command — must pass before work is considered done, but does not replace required desktop UI verification for a user-facing change:
 
   ```powershell
   dotnet test .\FusionCanvas.sln
@@ -81,6 +83,7 @@ FusionCanvas.Integration ─┘
 ## QA Reviews
 
 - The QA playbook lives in **`docs/qa-review.md`**. When the user asks for a QA review — full or a specific area (SOLID, architecture, testing, security, spec drift) — follow that document.
+- A full QA review includes the QA-6 real desktop regression matrix for **all** accepted and implemented user-facing features. If an interactive desktop is unavailable, report QA-6 as blocked rather than passed.
 - Running QA requires no OpenSpec ceremony. Findings that would change accepted behavior are routed through the OpenSpec workflow; specification drift is reconciled via an OpenSpec change.
 
 ## Working Agreement

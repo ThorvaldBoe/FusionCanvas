@@ -193,7 +193,9 @@ Domain code must remain independent of UI frameworks, persistence technologies, 
 
 Implementation should follow SOLID principles pragmatically. Prefer focused responsibilities, explicit dependencies, and abstractions that protect real boundaries or variation points. Avoid speculative indirection, oversized classes, and broad interfaces that are not justified by current behavior.
 
-Unit testing is part of the architecture. Every feature that adds or changes behavior should include appropriate automated tests for domain rules, application use cases, integration-facing contracts, or UI-owned decision logic. Static markup and framework-owned wiring do not require superficial tests.
+Testing is part of the architecture. Every feature that adds or changes behavior should include appropriate automated tests for domain rules, application use cases, integration-facing contracts, or UI-owned decision logic. Static markup does not require superficial code-level tests, but every new or changed user-facing feature must also be exercised through the built Avalonia desktop application so framework wiring and actual interaction are verified.
+
+The real desktop pass is proportional to the feature's accepted scenarios and covers applicable keyboard, pointer, focus/selection, validation, filtering, destructive confirmation, persistence/restart, recovery, accessibility, and tab/window behavior. It must use isolated disposable application data and record the tested build, environment, scenarios, results, limitations, and material evidence. Desktop UI verification is a separate lane from the fast deterministic `dotnet test` baseline; passing one does not replace the other.
 
 Preferred test project naming should mirror the production project being tested:
 

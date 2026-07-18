@@ -147,12 +147,69 @@ public class WorkspaceTreeViewModelTests
         Assert.Contains("3 items", confirmation.WarningMessage);
     }
 
+    [Fact]
+    public void DragValidationRejectsDescendantsAndFilteredSiblingPlacementWithFeedback()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var root = Assert.Single(sample.Snapshot.Groups);
+        var child = new TopicGroup(Guid.NewGuid(), sample.Store.Id, null, root.Id, "Child", null, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Groups = [root, child] };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        var rootNode = Assert.Single(Assert.Single(viewModel.Roots).Children);
+        var childNode = Assert.Single(rootNode.Children);
+
+        var descendantAllowed = viewModel.CanDrop(root.Id, childNode, new GroupPlacement(), out var descendantError);
+        viewModel.QueryText = "Child";
+        var filteredAllowed = viewModel.CanDrop(
+            child.Id,
+            viewModel.SelectedNode ?? viewModel.Roots.Single().Children.Single().Children.Single(),
+            new GroupPlacement(GroupPlacementKind.Before, child.Id),
+            out var filteredError);
+        viewModel.ShowDropFeedback(descendantError);
+
+        Assert.False(descendantAllowed);
+        Assert.Contains("descendants", descendantError, StringComparison.OrdinalIgnoreCase);
+        Assert.False(filteredAllowed);
+        Assert.Contains("filtering", filteredError, StringComparison.OrdinalIgnoreCase);
+        Assert.True(viewModel.HasError);
+    }
+
+    [Fact]
+    public async Task MoveSaveFailureRetainsConfirmedTreeSelectionAndShowsRecoverableError()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var otherNiche = new Niche(Guid.NewGuid(), sample.Store.Id, "Other", null, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Niches = [sample.Niche, otherNiche] };
+        var repository = new TestRepository(snapshot) { FailSaves = true };
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        var source = viewModel.Roots.Single(root => root.EntityId == sample.Niche.Id).Children.Single();
+        var destination = viewModel.Roots.Single(root => root.EntityId == otherNiche.Id);
+        viewModel.SelectNodeCommand.Execute(source);
+
+        await viewModel.MoveAsync(source.EntityId, destination, new GroupPlacement());
+
+        Assert.Equal(source.EntityId, viewModel.SelectedNode!.EntityId);
+        Assert.Single(viewModel.Roots.Single(root => root.EntityId == sample.Niche.Id).Children);
+        Assert.Empty(viewModel.Roots.Single(root => root.EntityId == otherNiche.Id).Children);
+        Assert.True(viewModel.HasError);
+        Assert.Contains("could not be saved", viewModel.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class TestRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
     {
         public WorkspaceSnapshot Snapshot { get; private set; } = snapshot;
+        public bool FailSaves { get; init; }
 
         public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
         {
+            if (FailSaves)
+            {
+                throw new IOException("Test failure.");
+            }
+
             Snapshot = snapshot;
             return Task.CompletedTask;
         }

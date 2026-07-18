@@ -116,6 +116,10 @@ Right-clicking an active group selects it and opens a compact context menu conta
 
 Delete is deliberately separate from archive. It opens a focused confirmation dialog naming the group and warning that the complete descendant group structure and every contained listing/item will be permanently lost. Only explicit confirmation invokes the application command. The command resolves the subtree against the latest snapshot, removes descendant groups, contained listings, listing tags, listing-owned prompts, and links to removed entities in one repository save. Reusable asset records remain in the asset library after their deleted links are removed. On success selection falls back to the nearest surviving parent and tabs for deleted entities close; on failure the confirmed snapshot remains visible.
 
+### 12. Verify accepted interaction through the real desktop application
+
+Code-level domain, application, integration, and view-model tests protect decisions and failure paths, but do not replace an interaction pass through the built Avalonia application. FC-0103 desktop verification uses an isolated disposable workspace database and actual keyboard, pointer, and Windows UI Automation input. It covers the critical hierarchy workflow and the applicable focus/selection, validation, filtering, destructive/lifecycle, persistence/restart, recovery, accessibility, and tab behavior, with tested environment, results, and limitations recorded in `verification.md`.
+
 ## Risks / Trade-offs
 
 - **Deep trees may create visual and performance pressure** -> Bind observable hierarchical collections, avoid rebuilding unchanged branches, preserve expansion state by stable ID, and add virtualization/performance verification with representative data.

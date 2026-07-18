@@ -136,6 +136,12 @@
                      TextWrapping="Wrap"
                      FontSize="11"
                      Foreground="#687385" />
+          <TextBlock Text="{Binding WorkspaceTree.ErrorMessage}"
+                     IsVisible="{Binding WorkspaceTree.HasError}"
+                     TextWrapping="Wrap"
+                     FontSize="11"
+                     Foreground="#B42318"
+                     AutomationProperties.AutomationId="WorkspaceTreeError" />
         </StackPanel>
 
         <TreeView x:Name="WorkspaceTreeControl"
