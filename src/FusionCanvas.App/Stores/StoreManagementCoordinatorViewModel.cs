@@ -1052,6 +1052,11 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         }
 
         SelectedEditorTab = StoreManagementEditorTab.Niches;
+        if (NeedsFirstNiche && SelectedStore is { IsArchived: false } && !_isCreatingNewStore)
+        {
+            BeginCreateNicheDraft();
+        }
+
         Run(LoadNichesForSelectedStoreAsync());
     }
 

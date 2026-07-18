@@ -395,7 +395,9 @@ public class StoreManagementViewModelTests
         await viewModel.LoadAsync();
         viewModel.SelectNichesTabCommand.Execute(null);
 
-        viewModel.StartCreateNiche();
+        Assert.True(viewModel.CanSaveSelectedNiche);
+        Assert.Equal("New niche", Assert.Single(viewModel.EditorActiveNiches).Name);
+
         viewModel.NicheName = "Coffee";
         viewModel.NicheAudience = "Coffee fans";
         await viewModel.SaveSelectedNicheAsync();
