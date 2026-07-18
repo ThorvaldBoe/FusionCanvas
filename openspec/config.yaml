@@ -28,6 +28,11 @@ context: |
   - docs/LifeOS/PRD/Phase 2 - Product Creation Workflow.md for product workflow scope.
   - docs/LifeOS/PRD/PRD Audit - 2026-06-17.md for known gaps, corrections, and next actions.
 
+  For every user-facing change, also inspect docs/ui-guidelines.md and
+  docs/ux-guidelines.md. Use the UI guidelines for visual composition and control
+  presentation, and the UX guidelines for interaction behavior, workflow placement,
+  state transitions, focus, editing safety, and progressive disclosure.
+
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.
 # Example:
@@ -37,3 +42,8 @@ context: |
 #       - Always include a "Non-goals" section
 #     tasks:
 #       - Break tasks into chunks of max 2 hours
+rules:
+  proposal:
+    - For user-facing changes, identify the primary workflow, its expected frequency, and whether it belongs in the main workspace or a focused surface. For non-user-facing changes, state that UX review is not applicable.
+  design:
+    - For user-facing changes, apply docs/ui-guidelines.md and docs/ux-guidelines.md and resolve the UX preflight before implementation. Cover workspace footprint, progressive disclosure, interaction states, selection, focus, unsaved changes, cancellation, and destructive actions where relevant.

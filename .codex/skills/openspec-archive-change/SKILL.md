@@ -2,7 +2,6 @@
 name: openspec-archive-change
 description: Archive a completed change in the experimental workflow. Use when the user wants to finalize and archive a change after implementation is complete.
 license: MIT
-compatibility: Requires openspec CLI.
 metadata:
   author: openspec
   version: "1.0"
@@ -53,7 +52,48 @@ Archive a completed change in the experimental workflow.
 
    **If no tasks file exists:** Proceed without task-related warning.
 
-4. **Assess delta spec sync state**
+4. **Complete the required learning review**
+
+   Before spec sync or moving the change:
+   - Read the final proposal, design, specification deltas, tasks, and `<changeRoot>/retrospective.md` when present.
+   - Inspect useful Git history and artifact/task evolution when available, but use diffs only as supporting evidence.
+   - Prefer explicit user feedback and final approved behavior over inferred intent.
+   - Classify adjustments as missing requirements, reusable UX/UI principles, architecture lessons, ordinary implementation defects, or one-off preferences.
+
+   The retrospective is required before archive but is not a custom schema artifact. If it is missing or incomplete, draft or update `<changeRoot>/retrospective.md` with:
+
+   ```markdown
+   # <Change> Retrospective
+
+   ## Outcome
+   <Final approved outcome.>
+
+   ## Feedback-Driven Adjustments
+   <Concise table of initial assumption, evidence, correction, classification, applicability, and promotion.>
+
+   ## Learning Review
+   - Result: reusable lessons identified | no reusable lessons
+   - Evidence reviewed: ...
+   - Promotions completed: ...
+   - Deferred promotions: ... with rationale
+   ```
+
+   Route reusable lessons to the narrowest durable source:
+   - Capability-specific behavior -> accepted OpenSpec specification
+   - Change-specific rationale -> design and retrospective
+   - Interaction principles -> `docs/ux-guidelines.md`
+   - Visual/layout rules -> `docs/ui-guidelines.md`
+   - Structural engineering rules -> architecture guidance
+   - OpenSpec process rules -> OpenSpec workflow specification or repository skill instructions
+
+   Show the learning review and ask the user to confirm it. Do not proceed to spec sync or archive until the user confirms one of these outcomes:
+   - Reusable lessons have been promoted.
+   - A promotion is explicitly deferred with a rationale.
+   - No reusable lessons were found.
+
+   If Git history is unavailable or incomplete, continue with recorded feedback and final artifacts. If evidence is insufficient and confirmation cannot be obtained, STOP; do not infer a lesson from a raw diff or silently archive without a review.
+
+5. **Assess delta spec sync state**
 
    Use `artifactPaths.specs.existingOutputPaths` from status JSON to check for delta specs. If none exist, proceed without sync prompt.
 
@@ -68,7 +108,7 @@ Archive a completed change in the experimental workflow.
 
    If user chooses sync, use Task tool (subagent_type: "general-purpose", prompt: "Use Skill tool to invoke openspec-sync-specs for change '<name>'. Delta spec analysis: <include the analyzed delta spec summary>"). Proceed to archive regardless of choice.
 
-5. **Perform the archive**
+6. **Perform the archive**
 
    Create an `archive` directory under `planningHome.changesDir` if it doesn't exist:
    ```bash
@@ -85,13 +125,14 @@ Archive a completed change in the experimental workflow.
    mv "<changeRoot>" "<planningHome.changesDir>/archive/YYYY-MM-DD-<name>"
    ```
 
-6. **Display summary**
+7. **Display summary**
 
    Show archive completion summary including:
    - Change name
    - Schema that was used
    - Archive location
    - Whether specs were synced (if applicable)
+   - Learning review result and completed or deferred promotions
    - Note about any warnings (incomplete artifacts/tasks)
 
 **Output On Success**
@@ -104,7 +145,7 @@ Archive a completed change in the experimental workflow.
 **Archived to:** the archive path derived from `planningHome.changesDir`/YYYY-MM-DD-<name>/
 **Specs:** ✓ Synced to main specs (or "No delta specs" or "Sync skipped")
 
-All artifacts complete. All tasks complete.
+All artifacts complete. All tasks complete. Learning review confirmed.
 ```
 
 **Guardrails**
@@ -115,3 +156,5 @@ All artifacts complete. All tasks complete.
 - Show clear summary of what happened
 - If sync is requested, use openspec-sync-specs approach (agent-driven)
 - If delta specs exist, always run the sync assessment and show the combined summary before prompting
+- Never archive without a confirmed `retrospective.md`, even when all schema artifacts and tasks are complete
+- Keep change-specific evidence in the retrospective and promote only concise reusable rules

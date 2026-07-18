@@ -4,6 +4,8 @@
 
 These guidelines describe the preferred FusionCanvas application UI direction.
 
+Use these guidelines together with [FusionCanvas UX Guidelines](ux-guidelines.md). This document focuses on visual composition, layout, and control presentation; the UX guidelines define interaction and workflow behavior.
+
 FusionCanvas should draw inspiration from Obsidian's workspace model: a focused desktop shell, persistent navigation, tabbed working documents, fast context switching, and compact tools that stay close to the user's current work.
 
 This is inspiration, not imitation. FusionCanvas has a different job: it manages a structured Print on Demand production workflow. The UI should feel familiar to people who like Obsidian, but it should serve FusionCanvas concepts directly.
