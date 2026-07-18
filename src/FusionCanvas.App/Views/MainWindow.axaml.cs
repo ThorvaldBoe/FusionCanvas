@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using FusionCanvas.App.Groups;
 using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Stores;
@@ -175,20 +176,30 @@ public partial class MainWindow : Window
     private void OnTreeNodeDragOver(object? sender, DragEventArgs e)
     {
         ClearDropTarget();
-        if (TryGetDraggedGroupId(e, out _) &&
+        if (DataContext is MainWindowViewModel viewModel &&
+            TryGetDraggedGroupId(e, out var sourceGroupId) &&
             sender is Control { DataContext: WorkspaceTreeNodeViewModel { EntityKind: FusionCanvas.Domain.Workspace.WorkspaceEntityKind.Niche or FusionCanvas.Domain.Workspace.WorkspaceEntityKind.Group } target } control)
         {
-            _dropTarget = target;
-            var position = e.GetPosition(control).Y / Math.Max(control.Bounds.Height, 1);
-            target.IsDropBefore = target.EntityKind == FusionCanvas.Domain.Workspace.WorkspaceEntityKind.Group && position < 0.25;
-            target.IsDropAfter = target.EntityKind == FusionCanvas.Domain.Workspace.WorkspaceEntityKind.Group && position > 0.75;
-            target.IsDropTarget = !target.IsDropBefore && !target.IsDropAfter;
-            if (target.Children.Count > 0)
+            var placement = PlacementFor(target, control, e);
+            if (viewModel.WorkspaceTree.CanDrop(sourceGroupId, target, placement, out var error))
             {
-                target.IsExpanded = true;
-            }
+                viewModel.WorkspaceTree.ShowDropFeedback(null);
+                _dropTarget = target;
+                target.IsDropBefore = placement.Kind == GroupPlacementKind.Before;
+                target.IsDropAfter = placement.Kind == GroupPlacementKind.After;
+                target.IsDropTarget = placement.Kind == GroupPlacementKind.Append;
+                if (target.Children.Count > 0)
+                {
+                    target.IsExpanded = true;
+                }
 
-            e.DragEffects = DragDropEffects.Move;
+                e.DragEffects = DragDropEffects.Move;
+            }
+            else
+            {
+                viewModel.WorkspaceTree.ShowDropFeedback(error);
+                e.DragEffects = DragDropEffects.None;
+            }
         }
         else
         {
@@ -210,17 +221,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var placement = new GroupPlacement();
-        if (target.EntityKind == FusionCanvas.Domain.Workspace.WorkspaceEntityKind.Group)
-        {
-            var position = e.GetPosition(control).Y / Math.Max(control.Bounds.Height, 1);
-            placement = position switch
-            {
-                < 0.25 => new GroupPlacement(GroupPlacementKind.Before, target.EntityId),
-                > 0.75 => new GroupPlacement(GroupPlacementKind.After, target.EntityId),
-                _ => new GroupPlacement()
-            };
-        }
+        var placement = PlacementFor(target, control, e);
 
         await viewModel.WorkspaceTree.MoveAsync(sourceGroupId, target, placement);
         ClearDropTarget();
@@ -242,6 +243,25 @@ public partial class MainWindow : Window
 
     private static bool TryGetDraggedGroupId(DragEventArgs e, out Guid groupId) =>
         Guid.TryParse(e.DataTransfer.TryGetText(), out groupId);
+
+    private static GroupPlacement PlacementFor(
+        WorkspaceTreeNodeViewModel target,
+        Control control,
+        DragEventArgs e)
+    {
+        if (target.EntityKind != FusionCanvas.Domain.Workspace.WorkspaceEntityKind.Group)
+        {
+            return new GroupPlacement();
+        }
+
+        var position = e.GetPosition(control).Y / Math.Max(control.Bounds.Height, 1);
+        return position switch
+        {
+            < 0.25 => new GroupPlacement(GroupPlacementKind.Before, target.EntityId),
+            > 0.75 => new GroupPlacement(GroupPlacementKind.After, target.EntityId),
+            _ => new GroupPlacement()
+        };
+    }
 
     private void OnTreeEditorAttached(object? sender, VisualTreeAttachmentEventArgs e)
     {
@@ -288,6 +308,7 @@ public partial class MainWindow : Window
         else if (e.Key == Key.F2)
         {
             viewModel.WorkspaceTree.BeginRenameCommand.Execute(null);
+            FocusVisibleTreeEditor();
         }
         else if (e.Key == Key.C && e.KeyModifiers.HasFlag(KeyModifiers.Control))
         {
@@ -322,6 +343,7 @@ public partial class MainWindow : Window
         if (TrySelectContextGroup(sender, out var viewModel, out _))
         {
             viewModel.WorkspaceTree.BeginRename();
+            FocusVisibleTreeEditor();
         }
     }
 
@@ -377,5 +399,21 @@ public partial class MainWindow : Window
 
         viewModel.WorkspaceTree.SelectNodeCommand.Execute(node);
         return true;
+    }
+
+    private void FocusVisibleTreeEditor()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            var editor = WorkspaceTreeControl
+                .GetVisualDescendants()
+                .OfType<TextBox>()
+                .FirstOrDefault(textBox => textBox.IsVisible);
+            if (editor is not null)
+            {
+                editor.Focus();
+                editor.SelectAll();
+            }
+        }, DispatcherPriority.Input);
     }
 }

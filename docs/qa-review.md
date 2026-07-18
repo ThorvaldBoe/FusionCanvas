@@ -6,8 +6,8 @@ The durable requirements behind this process live in `openspec/specs/qa-review-b
 
 ## How to Run a QA Review
 
-- **Full review:** run all tasks QA-1 through QA-5 in order, then produce one consolidated report. Trigger example: "Run a full QA review."
-- **Partial review:** run only the requested task(s) by ID. Trigger examples: "Run QA-1 (SOLID)", "Do a security QA pass", "Check for spec drift."
+- **Full review:** run all tasks QA-1 through QA-6 in order, including the all-features real desktop regression, then produce one consolidated report. Trigger example: "Run a full QA review."
+- **Partial review:** run only the requested task(s) by ID. Trigger examples: "Run QA-1 (SOLID)", "Do a security QA pass", "Check for spec drift", "Run QA-6 (desktop UI)."
 - **Scope limiting:** a task may be limited to a layer or area (e.g. "QA-2 on the Integration layer only"). State the scope in the report.
 
 ### Review Protocol (applies to every task)
@@ -17,6 +17,7 @@ The durable requirements behind this process live in `openspec/specs/qa-review-b
 3. **Review, don't fix.** A QA run reports findings; it does not change code, specs, or docs unless the user explicitly asks for fixes. Fixing happens afterwards through the routing rules below.
 4. **Report in the standard format** (see below). Every finding cites concrete evidence: file paths, line numbers, commands, or spec references.
 5. **No findings is a valid outcome.** Report it as a pass and say what was checked.
+6. **Do not overstate unavailable verification.** If an interactive desktop or another required test environment is unavailable, mark the affected task and scenarios Blocked. A code-level test pass is not a desktop UI pass.
 
 ### Severity Scale
 
@@ -34,13 +35,19 @@ Present the report in the chat/session. If a persistent copy is useful, save it 
 
 ```markdown
 # QA Review — <date> — Scope: <full | QA-n ...>
-Build: <pass/fail> | Tests: <pass/fail, n tests> | Reviewer: <agent/tool>
+Build: <pass/fail> | Tests: <pass/fail, n tests> | Desktop UI: <pass/fail/blocked/N/A> | Reviewer: <agent/tool>
 
 ## Summary
 | Task | Result | Critical | High | Medium | Low | Info |
 |------|--------|----------|------|--------|-----|------|
 | QA-1 SOLID & Design | Issues found | 0 | 1 | 2 | 3 | 1 |
+| QA-6 Desktop UI Regression | Pass | 0 | 0 | 0 | 0 | 1 |
 | ... |
+
+## Desktop UI Feature Matrix
+| Capability | Feature / primary scenario | Interaction dimensions | Persistence / restart | Result | Evidence |
+|------------|----------------------------|------------------------|-----------------------|--------|----------|
+| `<spec>` | `<workflow>` | Keyboard, pointer, focus, ... | Pass / N/A | Pass / Fail / Blocked / N/A | `<log, screenshot, notes>` |
 
 ## Findings
 ### QA-1 — SOLID Principles & Code Design
@@ -58,6 +65,8 @@ Build: <pass/fail> | Tests: <pass/fail, n tests> | Reviewer: <agent/tool>
 | --- | --- |
 | Internal issue with no behavior change (style, structure, dead code, missing XML docs) | Fix directly as maintenance; run the test baseline after |
 | Missing tests for existing accepted behavior | Add tests directly as maintenance, unless the behavior itself is unclear or unspecified — then clarify via OpenSpec first |
+| Missing real desktop coverage for an accepted user-facing feature | Add the feature-scoped UI verification and evidence directly; use OpenSpec first only when expected behavior is unclear |
+| Desktop UI behavior contradicts an accepted spec | Report the product failure and route through OpenSpec to fix the code or amend the spec |
 | Code contradicts an accepted spec | OpenSpec change: fix the code **or** amend the spec, whichever is wrong |
 | Code implements behavior not covered by any spec | OpenSpec change: accept and document the behavior, or remove it |
 | Security finding rated Critical | Fix immediately; note the exposure in the report (never quote the secret itself) |
@@ -68,10 +77,11 @@ A QA run itself requires **no** OpenSpec ceremony, just like running the test su
 
 ### Suggested Cadence
 
-- **Full review:** after a milestone or a batch of archived changes; before any release.
+- **Full review:** after a milestone or a batch of archived changes; before any release. Every run includes a fresh QA-6 all-features desktop matrix against the current build.
 - **QA-4 (Security):** frequently — package vulnerabilities appear at any time; cheap to run.
 - **QA-3 (Testing):** after every behavior change lands (normally covered by the change workflow itself).
 - **QA-5 (Drift):** after archiving changes, to confirm specs, docs, and code stayed aligned.
+- **QA-6 (Desktop UI):** proportionally for every user-facing feature change; comprehensively for every full review.
 
 ---
 
@@ -161,7 +171,7 @@ This review judges *reasonable* application of the principles, per `openspec/spe
    - Integration tests: isolated temporary resources (temp DB/files), no shared state, clean up after themselves.
    - App tests: exercise UI-owned decision logic (view models, navigation, commands) in code without launching Avalonia; no superficial tests of static markup.
 4. **Spec-driven coverage:** behavior described by accepted spec requirements/scenarios has corresponding tests, or an explicit documented reason why not.
-5. **Scope discipline:** no slow, flaky, or external-service tests sneaking into the baseline (no UI automation, no network).
+5. **Scope discipline:** no slow, flaky, UI-driving, or external-service tests sneaking into the fast solution-level baseline. Real desktop verification is mandatory where applicable but runs separately under the feature workflow or QA-6.
 
 ---
 
@@ -223,7 +233,53 @@ Context: FusionCanvas is a local-first desktop app with no network attack surfac
 
 ---
 
+## QA-6 — Real Desktop UI Regression (All Features)
+
+**Goal:** verify the current built Avalonia application end to end across every accepted and implemented user-facing feature. In a full QA review, this is a complete feature inventory and regression matrix—not a smoke test and not a sample of recently changed features.
+
+### Required Environment and Safety
+
+1. Use an interactive desktop session capable of launching the built application and delivering actual keyboard, pointer, or accessibility-driven input. Windows UI Automation is currently suitable, but the policy does not depend on one tool.
+2. Build the current checkout before testing and record the executable/configuration, commit or working-tree identity, operating environment, and automation mechanism.
+3. Select a disposable database/workspace fixture before the first mutating interaction. Never run create, move, archive, restore, or delete scenarios against the contributor's normal workspace.
+4. Prefer stable automation identifiers and accessible names. Wait for observable UI state rather than relying on fixed sleeps. Treat missing accessibility exposure as a finding when it prevents reliable operation or evidence.
+5. If the interactive environment cannot be obtained, mark QA-6 **Blocked**, list every unexecuted matrix row, and state what environment is required. Do not infer a pass from QA-3.
+
+### Build the All-Features Inventory
+
+1. Read every accepted capability under `openspec/specs/` and identify user-facing requirements that are implemented in the current build.
+2. Cross-check the application shell, navigation surfaces, menus, dialogs, editors, inspectors, tabs/windows, and implemented workflows so UI behavior that lacks a spec is also visible as a QA-5 drift finding.
+3. Create one or more matrix rows for every implemented user-facing feature. Each row names the capability/spec requirement and its primary end-to-end workflow.
+4. Assign every row exactly one result: **Pass**, **Fail**, **Blocked**, or **Not applicable**. Explain Blocked and Not applicable. No feature may be silently omitted.
+
+### Full UI Test Specification
+
+For **every inventory row**, execute the primary happy path through the real desktop application and apply each relevant dimension below. Mark a dimension Not applicable only with an evident feature-specific reason.
+
+1. **Launch and discoverability:** the feature is reachable from the intended workspace surface; initial, empty, loading, and disabled states are coherent where applicable.
+2. **Keyboard operation:** shortcuts, traversal, Enter/Escape behavior, inline editing, and focus return work without unintended global-command leakage.
+3. **Pointer operation:** click, double-click, right-click/context menu, drag/drop, hit targets, and hover/drop feedback work where the feature exposes them.
+4. **Selection and focus:** canonical selection, multi-surface synchronization, inspector/detail updates, and focus ownership remain correct before and after the action.
+5. **Validation and errors:** invalid input is rejected visibly, editable state and user input are retained when appropriate, and recoverable failures do not leave misleading UI state.
+6. **Visibility and filtering:** search, filters, expansion/collapse, hidden selections, empty results, and restoration of pre-filter context behave correctly where applicable.
+7. **Destructive and lifecycle actions:** confirmation text accurately names impact; cancel is safe; confirmed archive/restore/delete behavior and selection fallback match the accepted spec.
+8. **Persistence and restart:** saved changes survive a real application restart with identity, hierarchy/order, selection-relevant state, and displayed properties reconstructed correctly where specified.
+9. **Recovery and atomicity:** failed persistence or interrupted operations retain or restore the last confirmed state and expose actionable feedback when the scenario can be safely induced.
+10. **Accessibility exposure:** actionable controls have stable accessible names/roles/identifiers, state changes are observable, and the feature remains operable through supported accessibility-driven input.
+11. **Tabs and windows:** normal selection versus explicit tab/window opening, activation, duplication prevention, close behavior, and unsaved-change protection work where applicable.
+12. **Cross-feature regression:** complete at least one realistic workflow that crosses the feature's upstream/downstream integrations so individually passing controls are also verified together.
+
+### Evidence and Reporting
+
+- Record the full feature matrix in the consolidated report using the standard columns above. Add columns when a feature needs more precise risk tracking.
+- For each row, record concise observed results and link or identify relevant screenshots, accessibility/automation output, or restart evidence. Evidence must establish behavior, not merely that a control existed.
+- Record the disposable fixture and confirm the normal workspace was not mutated.
+- Report product failures with severity and route them using the normal finding rules. Report test-infrastructure limitations separately so they are not confused with application defects.
+- A full QA review can pass QA-6 only when every implemented user-facing feature row passes or has a justified Not applicable result; any Failed row fails QA-6, and any Blocked row leaves QA-6 blocked.
+
+---
+
 ## Maintaining This Playbook
 
-- Update checklists and commands as the stack evolves (e.g. add integration-testing guidance when that lands).
+- Update checklists, feature-matrix columns, and commands as the stack evolves (e.g. promote repeatable scenarios into a dedicated UI harness when useful).
 - Adding/removing a QA area or changing severities' meaning changes the QA baseline requirements — propose it through OpenSpec.

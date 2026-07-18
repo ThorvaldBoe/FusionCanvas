@@ -53,10 +53,11 @@ FC-0103 was revised after user validation of the first UI implementation. Comple
 ## 6. Verification
 
 - [x] 6.1 Run the complete solution test suite and fix regressions across domain, application, integration, and Avalonia app tests.
-- [ ] 6.2 Manually verify keyboard-only rapid create, rename, cut/copy/paste, selection, inspector, Ctrl-click tabs, archive/restore, filtering, validation retention, and recoverable save failures.
-- [ ] 6.3 Manually verify drag/drop onto/before/after targets, invalid-target feedback, persistent ordering after reload, auto-expand, filtered-tree safety, and rollback after simulated persistence failure.
-- [x] 6.4 Verify representative deep/wide trees remain responsive and preserve expansion/selection state across refresh and filtering.
+- [x] 6.2 Verify through the built desktop application using disposable data and actual keyboard input: rapid create, rename, cut/copy/paste, selection, inspector, Ctrl-click tabs, archive/restore, filtering, validation retention, and recoverable save behavior.
+- [x] 6.3 Verify through the built desktop application using actual pointer input: drag/drop onto/before/after targets, invalid-target feedback, persistent ordering after reload, auto-expand, and filtered-tree safety; protect rollback behavior with deterministic fault-injection tests.
+- [x] 6.4 Verify representative deep/wide trees remain responsive in the real desktop UI and preserve expansion/selection state across refresh and filtering.
 - [x] 6.5 Confirm FC-0103 adds no item implementation, item-inclusive copy, cross-store move, batch editing, saved views, analytics, templates, automation, or production-queue behavior.
+- [x] 6.6 Record the tested build/environment, disposable-data isolation, desktop scenarios and results, code-level-only limitations, and automated regression results in `verification.md`.
 
 ## 7. Group Context Menu and Permanent Deletion
 

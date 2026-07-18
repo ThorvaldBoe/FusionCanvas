@@ -491,6 +491,53 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         StructureChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    public bool CanDrop(
+        Guid sourceGroupId,
+        WorkspaceTreeNodeViewModel target,
+        GroupPlacement placement,
+        out string? error)
+    {
+        var source = _snapshot.Groups.SingleOrDefault(group => group.Id == sourceGroupId);
+        if (source is null || !GroupHierarchy.IsEffectivelyActive(_snapshot, source))
+        {
+            error = "Only an active group can be moved.";
+            return false;
+        }
+
+        if (target.EntityKind is not (WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group))
+        {
+            error = "Drop the group onto an active niche or group.";
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(QueryText) && placement.Kind != GroupPlacementKind.Append)
+        {
+            error = "Clear filtering before positioning a group between siblings.";
+            return false;
+        }
+
+        if (target.EntityKind == WorkspaceEntityKind.Group &&
+            (target.EntityId == source.Id || GroupHierarchy.IsDescendant(_snapshot, target.EntityId, source.Id)))
+        {
+            error = "A group cannot be moved beneath itself or one of its descendants.";
+            return false;
+        }
+
+        var targetStoreId = target.EntityKind == WorkspaceEntityKind.Niche
+            ? _snapshot.Niches.SingleOrDefault(niche => niche.Id == target.EntityId && !niche.IsArchived)?.StoreId
+            : _snapshot.Groups.SingleOrDefault(group => group.Id == target.EntityId && GroupHierarchy.IsEffectivelyActive(_snapshot, group))?.StoreId;
+        if (targetStoreId is null || targetStoreId != source.StoreId)
+        {
+            error = "The destination must be active and belong to the same store.";
+            return false;
+        }
+
+        error = null;
+        return true;
+    }
+
+    public void ShowDropFeedback(string? error) => ErrorMessage = error;
+
     private void Select(WorkspaceTreeNodeViewModel? node)
     {
         if (node is null || node.IsDraft)

@@ -11,6 +11,8 @@ public sealed record AppWorkspaceRuntime(
 
 public static class AppWorkspaceFactory
 {
+    public const string WorkspaceDatabaseEnvironmentVariable = "FUSIONCANVAS_WORKSPACE_DB";
+
     public static AppWorkspaceRuntime CreateDefault()
         => Create(DefaultDatabasePath());
 
@@ -23,6 +25,12 @@ public static class AppWorkspaceFactory
 
     private static string DefaultDatabasePath()
     {
+        var overridePath = Environment.GetEnvironmentVariable(WorkspaceDatabaseEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(overridePath))
+        {
+            return Path.GetFullPath(overridePath);
+        }
+
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         return Path.Combine(appData, "FusionCanvas", "workspace.db");
     }

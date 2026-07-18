@@ -167,7 +167,7 @@ Standard process for moving ideas into specifications, review, implementation, t
 
 ### `FC-0007` Testing Baseline
 
-xUnit test project and initial coverage for domain logic, application services, and persistence boundaries.
+xUnit coverage for domain logic, application services, and persistence boundaries, plus isolated real desktop UI verification for every user-facing feature and an all-features UI regression matrix in each full QA review.
 
 ### `FC-0008` Workflow Stage Navigator
 
