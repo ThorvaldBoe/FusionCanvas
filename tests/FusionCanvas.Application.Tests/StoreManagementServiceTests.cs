@@ -14,14 +14,14 @@ public class StoreManagementServiceTests
         var storeId = Guid.NewGuid();
         var service = new StoreManagementService(repository, () => Now, () => storeId);
 
-        var result = await service.CreateStoreAsync(new StoreManagementCreateRequest(" North Star Studio "));
+        var result = await service.CreateStoreAsync(new StoreManagementCreateRequest(" North Star Studio "), TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
         Assert.Equal(storeId, result.Store?.Id);
         Assert.Equal("North Star Studio", result.Store?.Name);
         Assert.False(result.Store?.IsArchived);
         Assert.Equal(storeId, result.State.ActiveStoreId);
-        var saved = await repository.LoadAsync();
+        var saved = await repository.LoadAsync(TestContext.Current.CancellationToken);
         var store = Assert.Single(saved.Stores);
         Assert.Equal(storeId, store.Id);
         Assert.Equal("North Star Studio", store.Name);
@@ -40,11 +40,11 @@ public class StoreManagementServiceTests
             BrandDirection: "Warm vintage",
             PlanningContext: "Fall launch");
 
-        var result = await service.CreateStoreAsync(new StoreManagementCreateRequest("North Star Studio", context));
+        var result = await service.CreateStoreAsync(new StoreManagementCreateRequest("North Star Studio", context), TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
         Assert.Equal(context, result.Store?.Context);
-        var saved = await repository.LoadAsync();
+        var saved = await repository.LoadAsync(TestContext.Current.CancellationToken);
         Assert.Contains("\"notes\":\"Soft humor\"", Assert.Single(saved.Stores).MetadataJson);
         Assert.Contains("\"targetMarket\":\"Coffee fans\"", Assert.Single(saved.Stores).MetadataJson);
         Assert.Contains("\"brandDirection\":\"Warm vintage\"", Assert.Single(saved.Stores).MetadataJson);
@@ -58,14 +58,14 @@ public class StoreManagementServiceTests
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([existing], [], [], [], [], [], [], [], []));
         var service = new StoreManagementService(repository);
 
-        var empty = await service.CreateStoreAsync(new StoreManagementCreateRequest(" "));
-        var duplicate = await service.CreateStoreAsync(new StoreManagementCreateRequest("north star studio"));
+        var empty = await service.CreateStoreAsync(new StoreManagementCreateRequest(" "), TestContext.Current.CancellationToken);
+        var duplicate = await service.CreateStoreAsync(new StoreManagementCreateRequest("north star studio"), TestContext.Current.CancellationToken);
 
         Assert.False(empty.Succeeded);
         Assert.Contains("required", empty.Error);
         Assert.False(duplicate.Succeeded);
         Assert.Contains("already uses", duplicate.Error);
-        Assert.Single((await repository.LoadAsync()).Stores);
+        Assert.Single((await repository.LoadAsync(TestContext.Current.CancellationToken)).Stores);
     }
 
     [Fact]
@@ -78,13 +78,13 @@ public class StoreManagementServiceTests
         var service = new StoreManagementService(repository, () => Now.AddMinutes(5));
         var context = new StoreContext("Updated", "Notes", "Dog owners", "Playful", "Q4 plan");
 
-        var result = await service.UpdateStoreAsync(new StoreManagementUpdateRequest(store.Id, "North Star Gifts", context));
+        var result = await service.UpdateStoreAsync(new StoreManagementUpdateRequest(store.Id, "North Star Gifts", context), TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
         Assert.Equal(store.Id, result.Store?.Id);
         Assert.Equal("North Star Gifts", result.Store?.Name);
         Assert.Equal(context, result.Store?.Context);
-        var saved = await repository.LoadAsync();
+        var saved = await repository.LoadAsync(TestContext.Current.CancellationToken);
         Assert.Equal(store.Id, Assert.Single(saved.Niches).StoreId);
         Assert.Equal(store.Id, Assert.Single(saved.Listings).StoreId);
     }
@@ -95,10 +95,10 @@ public class StoreManagementServiceTests
         var store = NewStore("North Star Studio");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
         var service = new StoreManagementService(repository, () => Now.AddMinutes(1));
-        await service.SelectStoreAsync(store.Id);
+        await service.SelectStoreAsync(store.Id, TestContext.Current.CancellationToken);
 
-        var archived = await service.ArchiveStoreAsync(store.Id);
-        var restored = await service.RestoreStoreAsync(store.Id);
+        var archived = await service.ArchiveStoreAsync(store.Id, TestContext.Current.CancellationToken);
+        var restored = await service.RestoreStoreAsync(store.Id, TestContext.Current.CancellationToken);
 
         Assert.True(archived.Succeeded);
         Assert.Empty(archived.State.ActiveStores);
@@ -116,7 +116,7 @@ public class StoreManagementServiceTests
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([archivedStore], [], [], [], [], [], [], [], []));
         var service = new StoreManagementService(repository);
 
-        var result = await service.SelectStoreAsync(archivedStore.Id);
+        var result = await service.SelectStoreAsync(archivedStore.Id, TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
         Assert.Contains("restored", result.Error);
@@ -129,14 +129,14 @@ public class StoreManagementServiceTests
         var empty = NewStore("Empty Studio");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([empty], [], [], [], [], [], [], [], []));
         var service = new StoreManagementService(repository);
-        await service.SelectStoreAsync(empty.Id);
+        await service.SelectStoreAsync(empty.Id, TestContext.Current.CancellationToken);
 
-        var result = await service.DeleteStoreAsync(new StoreManagementDeleteRequest(empty.Id, ConfirmPermanentDeletion: true));
+        var result = await service.DeleteStoreAsync(new StoreManagementDeleteRequest(empty.Id, ConfirmPermanentDeletion: true), TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
         Assert.Empty(result.State.ActiveStores);
         Assert.Null(result.State.ActiveStoreId);
-        Assert.Empty((await repository.LoadAsync()).Stores);
+        Assert.Empty((await repository.LoadAsync(TestContext.Current.CancellationToken)).Stores);
     }
 
     [Fact]
@@ -146,11 +146,11 @@ public class StoreManagementServiceTests
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([empty], [], [], [], [], [], [], [], []));
         var service = new StoreManagementService(repository);
 
-        var result = await service.DeleteStoreAsync(new StoreManagementDeleteRequest(empty.Id, ConfirmPermanentDeletion: false));
+        var result = await service.DeleteStoreAsync(new StoreManagementDeleteRequest(empty.Id, ConfirmPermanentDeletion: false), TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
         Assert.Contains("confirmation", result.Error);
-        Assert.Equal(empty.Id, Assert.Single((await repository.LoadAsync()).Stores).Id);
+        Assert.Equal(empty.Id, Assert.Single((await repository.LoadAsync(TestContext.Current.CancellationToken)).Stores).Id);
     }
 
     [Fact]
@@ -161,11 +161,11 @@ public class StoreManagementServiceTests
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []));
         var service = new StoreManagementService(repository);
 
-        var result = await service.DeleteStoreAsync(new StoreManagementDeleteRequest(store.Id, ConfirmPermanentDeletion: true));
+        var result = await service.DeleteStoreAsync(new StoreManagementDeleteRequest(store.Id, ConfirmPermanentDeletion: true), TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
         Assert.Contains("connected data", result.Error);
-        Assert.Equal(store.Id, Assert.Single((await repository.LoadAsync()).Stores).Id);
+        Assert.Equal(store.Id, Assert.Single((await repository.LoadAsync(TestContext.Current.CancellationToken)).Stores).Id);
     }
 
     [Fact]
@@ -173,7 +173,7 @@ public class StoreManagementServiceTests
     {
         var service = new StoreManagementService(new InMemoryWorkspaceRepository());
 
-        var state = await service.LoadAsync();
+        var state = await service.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.True(state.NeedsFirstStore);
         Assert.Empty(state.ActiveStores);
@@ -191,9 +191,9 @@ public class StoreManagementServiceTests
         var service = new StoreManagementService(repository, () => Now, () => Guid.NewGuid());
         service.SetActiveWorkspace(client.Id);
 
-        var state = await service.LoadAsync();
-        var allowedDuplicate = await service.CreateStoreAsync(new StoreManagementCreateRequest("Shared Name"));
-        var rejectedOtherWorkspaceStore = await service.SelectStoreAsync(personalStore.Id);
+        var state = await service.LoadAsync(TestContext.Current.CancellationToken);
+        var allowedDuplicate = await service.CreateStoreAsync(new StoreManagementCreateRequest("Shared Name"), TestContext.Current.CancellationToken);
+        var rejectedOtherWorkspaceStore = await service.SelectStoreAsync(personalStore.Id, TestContext.Current.CancellationToken);
 
         Assert.Equal(clientStore.Id, Assert.Single(state.ActiveStores).Id);
         Assert.True(allowedDuplicate.Succeeded);

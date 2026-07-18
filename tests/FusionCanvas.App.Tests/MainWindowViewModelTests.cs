@@ -147,7 +147,7 @@ public class MainWindowViewModelTests
             snapshot);
 
         var clientWorkspace = viewModel.WorkspaceManagement.ActiveWorkspaces.Single(workspace => workspace.Id == client.Id);
-        await viewModel.WorkspaceManagement.SelectWorkspaceAsync(clientWorkspace);
+        await viewModel.WorkspaceManagement.SelectWorkspaceAsync(clientWorkspace, TestContext.Current.CancellationToken);
 
         Assert.Equal(client.Id, viewModel.WorkspaceManagement.SelectedWorkspace?.Id);
         Assert.DoesNotContain(viewModel.StoreManagement.ActiveStores, store => store.Id == personalStore.Id);
@@ -173,7 +173,7 @@ public class MainWindowViewModelTests
             snapshot);
 
         viewModel.WorkspaceManagement.OpenWorkspaceManagementCommand.Execute(null);
-        await viewModel.WorkspaceManagement.SelectWorkspaceAsync(viewModel.WorkspaceManagement.ActiveWorkspaces.Single(workspace => workspace.Id == client.Id));
+        await viewModel.WorkspaceManagement.SelectWorkspaceAsync(viewModel.WorkspaceManagement.ActiveWorkspaces.Single(workspace => workspace.Id == client.Id), TestContext.Current.CancellationToken);
 
         Assert.False(viewModel.ShouldShowFirstStorePrompt);
 

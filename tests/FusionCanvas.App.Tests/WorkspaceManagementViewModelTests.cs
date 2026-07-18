@@ -26,13 +26,13 @@ public class WorkspaceManagementViewModelTests
         var personal = NewWorkspace("Personal");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([personal], [], [], [], [], [], [], [], [], []));
         var viewModel = NewViewModel(repository);
-        await viewModel.LoadAsync();
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
         viewModel.StartCreateWorkspaceCommand.Execute(null);
         viewModel.WorkspaceName = "Client";
-        await viewModel.CreateWorkspaceAsync();
+        await viewModel.CreateWorkspaceAsync(TestContext.Current.CancellationToken);
         var personalSummary = viewModel.ActiveWorkspaces.Single(workspace => workspace.Id == personal.Id);
-        await viewModel.SelectWorkspaceAsync(personalSummary);
+        await viewModel.SelectWorkspaceAsync(personalSummary, TestContext.Current.CancellationToken);
 
         Assert.False(viewModel.IsCreatingNewWorkspace);
         Assert.Equal("Personal", viewModel.SelectedWorkspace?.Name);
@@ -47,17 +47,17 @@ public class WorkspaceManagementViewModelTests
         var store = new Store(Guid.NewGuid(), workspace.Id, "Client Store", null, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([workspace, personal], [store], [], [], [], [], [], [], [], []));
         var viewModel = NewViewModel(repository);
-        await viewModel.LoadAsync();
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
         viewModel.RequestDeleteSelectedWorkspace();
         viewModel.DeleteConfirmationName = "Wrong";
-        await viewModel.ConfirmDeleteWorkspaceAsync();
+        await viewModel.ConfirmDeleteWorkspaceAsync(TestContext.Current.CancellationToken);
         Assert.True(viewModel.DeleteWarningVisible);
         Assert.Contains("Type the workspace name", viewModel.ErrorMessage);
 
         viewModel.DeleteConfirmationName = "Client";
-        await viewModel.ConfirmDeleteWorkspaceAsync();
-        var snapshot = await repository.LoadAsync();
+        await viewModel.ConfirmDeleteWorkspaceAsync(TestContext.Current.CancellationToken);
+        var snapshot = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.False(viewModel.DeleteWarningVisible);
         Assert.DoesNotContain(snapshot.Workspaces, candidate => candidate.Id == workspace.Id);
