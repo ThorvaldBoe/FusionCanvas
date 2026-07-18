@@ -198,6 +198,60 @@ public class WorkspaceTreeViewModelTests
         Assert.Contains("could not be saved", viewModel.ErrorMessage, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task ListingInlineCaptureRenameAndExplicitTabFlowUseCanonicalSelection()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot);
+        var listings = new ListingManagementService(repository);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot, listings: listings);
+        var openedTabs = 0;
+        viewModel.OpenInTabRequested += (_, _) => openedTabs++;
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+
+        await viewModel.BeginCreateListingAsync();
+        Assert.True(viewModel.SelectedNode!.IsDraft);
+        Assert.Equal(WorkspaceEntityKind.Listing, viewModel.SelectedNode.EntityKind);
+        viewModel.SelectedNode.DraftName = " Zebra idea ";
+        await viewModel.CommitEditAsync();
+        Assert.Equal("Zebra idea", viewModel.SelectedNode!.Name);
+        Assert.Equal(0, openedTabs);
+
+        viewModel.BeginRename();
+        viewModel.SelectedNode.DraftName = "Alpha idea";
+        await viewModel.CommitEditAsync();
+        Assert.Equal("Alpha idea", viewModel.SelectedNode!.Name);
+        viewModel.OpenInTabCommand.Execute(viewModel.SelectedNode);
+        Assert.Equal(1, openedTabs);
+    }
+
+    [Fact]
+    public async Task ListingTypedCopyCutPasteAndDropUseTopicDestinationsAndAlphabeticalProjection()
+    {
+        var sample = Sample.Create();
+        var other = new Niche(Guid.NewGuid(), sample.Store.Id, "Other", null, false, sample.Now, sample.Now, "{}");
+        var first = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Zulu", null, ListingStatus.Draft, false, sample.Now, sample.Now, "{}");
+        var second = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Alpha", null, ListingStatus.Draft, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Niches = [sample.Niche, other], Listings = [first, second] };
+        var repository = new TestRepository(snapshot);
+        var listings = new ListingManagementService(repository);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot, listings: listings);
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        var sourceRoot = viewModel.Roots.Single(root => root.EntityId == sample.Niche.Id);
+        Assert.Equal(["Alpha", "Zulu"], sourceRoot.Children.Select(node => node.Name));
+        var source = sourceRoot.Children.Single(node => node.EntityId == first.Id);
+        var target = viewModel.Roots.Single(root => root.EntityId == other.Id);
+
+        Assert.True(viewModel.CanDrop(WorkspaceEntityKind.Listing, first.Id, target, new GroupPlacement(GroupPlacementKind.Before, second.Id), out _));
+        await viewModel.MoveAsync(WorkspaceEntityKind.Listing, first.Id, target, new GroupPlacement(GroupPlacementKind.Before, second.Id));
+        Assert.Equal(other.Id, repository.Snapshot.Listings.Single(item => item.Id == first.Id).NicheId);
+
+        viewModel.Copy();
+        viewModel.SelectNodeCommand.Execute(target);
+        await viewModel.PasteAsync();
+        Assert.Equal(3, repository.Snapshot.Listings.Count);
+    }
+
     private sealed class TestRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
     {
         public WorkspaceSnapshot Snapshot { get; private set; } = snapshot;

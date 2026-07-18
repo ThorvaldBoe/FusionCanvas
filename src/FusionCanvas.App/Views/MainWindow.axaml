@@ -106,7 +106,7 @@
         </StackPanel>
 
         <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12">
-          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+          <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
             <Button x:Name="GroupActionsButton"
                     Grid.Column="0"
                     Content="+ New group"
@@ -115,8 +115,14 @@
                     IsEnabled="{Binding CanCreateGroup}"
                     Classes="storeSecondary" />
             <Button Grid.Column="1"
+                    Content="+ New listing"
+                    ToolTip.Tip="Capture a listing under the selected topic or default niche"
+                    Command="{Binding WorkspaceTree.BeginCreateListingCommand}"
+                    IsEnabled="{Binding CanCreateGroup}"
+                    Classes="storeSecondary" />
+            <Button Grid.Column="2"
                     Content="•••"
-                    ToolTip.Tip="Edit selected group properties"
+                    ToolTip.Tip="Edit selected group or listing properties"
                     Command="{Binding WorkspaceTree.EditPropertiesCommand}"
                     IsEnabled="{Binding WorkspaceTree.CanManageSelection}"
                     Classes="storeSecondary" />
@@ -162,17 +168,20 @@
                       DragDrop.DragOver="OnTreeNodeDragOver"
                       DragDrop.DragLeave="OnTreeNodeDragLeave"
                       DragDrop.Drop="OnTreeNodeDrop"
-                      ToolTip.Tip="Right-click for group actions; Ctrl-click opens a tab; F2 renames">
+                      ToolTip.Tip="Right-click for actions; Ctrl-click opens a tab; F2 renames">
                 <Border.ContextMenu>
-                  <ContextMenu IsVisible="{Binding IsGroup}">
-                    <MenuItem Header="New group (subgroup)" Click="OnContextNewGroup" />
+                  <ContextMenu IsVisible="{Binding HasContextActions}">
+                    <MenuItem Header="New group (subgroup)" IsVisible="{Binding IsGroup}" Click="OnContextNewGroup" />
+                    <MenuItem Header="New listing" Click="OnContextNewListing" />
                     <Separator />
                     <MenuItem Header="Rename" Click="OnContextRename" />
                     <MenuItem Header="Copy" Click="OnContextCopy" />
                     <MenuItem Header="Cut" Click="OnContextCut" />
                     <MenuItem Header="Paste" IsEnabled="{Binding CanPaste}" Click="OnContextPaste" />
+                    <MenuItem Header="Duplicate" IsVisible="{Binding IsListing}" Click="OnContextDuplicate" />
+                    <MenuItem Header="Edit properties…" Click="OnContextEditProperties" />
                     <Separator />
-                    <MenuItem Header="Delete..." Click="OnContextDelete" />
+                    <MenuItem Header="Delete..." IsVisible="{Binding IsGroup}" Click="OnContextDelete" />
                   </ContextMenu>
                 </Border.ContextMenu>
                 <Grid ColumnDefinitions="3,22,*,Auto" MinHeight="34">

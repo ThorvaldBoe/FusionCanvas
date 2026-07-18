@@ -5,10 +5,12 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Groups;
+using FusionCanvas.App.Listings;
 using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Stores;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.Application.Workspace;
+using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.App.Views;
 
@@ -17,6 +19,7 @@ public partial class MainWindow : Window
     private StoreEditorWindow? _storeEditorWindow;
     private WorkspaceManagementWindow? _workspaceManagementWindow;
     private GroupEditorWindow? _groupEditorWindow;
+    private ListingEditorWindow? _listingEditorWindow;
     private PointerPressedEventArgs? _dragPointerArgs;
     private WorkspaceTreeNodeViewModel? _dragNode;
     private Avalonia.Point _dragStart;
@@ -47,10 +50,18 @@ public partial class MainWindow : Window
                 SyncGroupEditorWindow(viewModel.GroupManagement);
             }
         };
+        viewModel.ListingManagement.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(ListingManagementViewModel.IsOpen))
+            {
+                SyncListingEditorWindow(viewModel.ListingManagement);
+            }
+        };
         DataContext = viewModel;
         SyncWorkspaceManagementWindow(viewModel.WorkspaceManagement);
         SyncStoreEditorWindow(viewModel.StoreManagement);
         SyncGroupEditorWindow(viewModel.GroupManagement);
+        SyncListingEditorWindow(viewModel.ListingManagement);
     }
 
     private void SyncWorkspaceManagementWindow(WorkspaceManagementViewModel workspaceManagement)
@@ -124,6 +135,31 @@ public partial class MainWindow : Window
         }
     }
 
+    private void SyncListingEditorWindow(ListingManagementViewModel listingManagement)
+    {
+        if (listingManagement.IsOpen && _listingEditorWindow is null)
+        {
+            _listingEditorWindow = new ListingEditorWindow { DataContext = listingManagement };
+            _listingEditorWindow.Closed += (_, _) =>
+            {
+                _listingEditorWindow = null;
+                if (listingManagement.IsOpen)
+                {
+                    listingManagement.CloseCommand.Execute(null);
+                }
+
+                WorkspaceTreeControl.Focus();
+            };
+            _listingEditorWindow.Show(this);
+            return;
+        }
+
+        if (!listingManagement.IsOpen && _listingEditorWindow is not null)
+        {
+            _listingEditorWindow.Close();
+        }
+    }
+
     private void OnTreeNodePointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (sender is not Control { DataContext: WorkspaceTreeNodeViewModel node } control ||
@@ -143,7 +179,7 @@ public partial class MainWindow : Window
             viewModel.WorkspaceTree.SelectNodeCommand.Execute(node);
         }
 
-        if (node.EntityKind == FusionCanvas.Domain.Workspace.WorkspaceEntityKind.Group && point.Properties.IsLeftButtonPressed)
+        if (node.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing && point.Properties.IsLeftButtonPressed)
         {
             _dragPointerArgs = e;
             _dragNode = node;
@@ -166,7 +202,7 @@ public partial class MainWindow : Window
         }
 
         var transfer = new DataTransfer();
-        transfer.Add(DataTransferItem.CreateText(_dragNode.EntityId.ToString()));
+        transfer.Add(DataTransferItem.CreateText($"{_dragNode.EntityKind}:{_dragNode.EntityId}"));
         var pressedArgs = _dragPointerArgs;
         _dragPointerArgs = null;
         _dragNode = null;
@@ -177,11 +213,11 @@ public partial class MainWindow : Window
     {
         ClearDropTarget();
         if (DataContext is MainWindowViewModel viewModel &&
-            TryGetDraggedGroupId(e, out var sourceGroupId) &&
-            sender is Control { DataContext: WorkspaceTreeNodeViewModel { EntityKind: FusionCanvas.Domain.Workspace.WorkspaceEntityKind.Niche or FusionCanvas.Domain.Workspace.WorkspaceEntityKind.Group } target } control)
+            TryGetDraggedEntity(e, out var sourceKind, out var sourceId) &&
+            sender is Control { DataContext: WorkspaceTreeNodeViewModel { EntityKind: WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group } target } control)
         {
-            var placement = PlacementFor(target, control, e);
-            if (viewModel.WorkspaceTree.CanDrop(sourceGroupId, target, placement, out var error))
+            var placement = sourceKind == WorkspaceEntityKind.Listing ? new GroupPlacement() : PlacementFor(target, control, e);
+            if (viewModel.WorkspaceTree.CanDrop(sourceKind, sourceId, target, placement, out var error))
             {
                 viewModel.WorkspaceTree.ShowDropFeedback(null);
                 _dropTarget = target;
@@ -215,15 +251,15 @@ public partial class MainWindow : Window
     {
         if (DataContext is not MainWindowViewModel viewModel ||
             sender is not Control { DataContext: WorkspaceTreeNodeViewModel target } control ||
-            !TryGetDraggedGroupId(e, out var sourceGroupId) ||
-            sourceGroupId == target.EntityId)
+            !TryGetDraggedEntity(e, out var sourceKind, out var sourceId) ||
+            sourceId == target.EntityId)
         {
             return;
         }
 
-        var placement = PlacementFor(target, control, e);
+        var placement = sourceKind == WorkspaceEntityKind.Listing ? new GroupPlacement() : PlacementFor(target, control, e);
 
-        await viewModel.WorkspaceTree.MoveAsync(sourceGroupId, target, placement);
+        await viewModel.WorkspaceTree.MoveAsync(sourceKind, sourceId, target, placement);
         ClearDropTarget();
         e.Handled = true;
     }
@@ -241,8 +277,13 @@ public partial class MainWindow : Window
         _dropTarget = null;
     }
 
-    private static bool TryGetDraggedGroupId(DragEventArgs e, out Guid groupId) =>
-        Guid.TryParse(e.DataTransfer.TryGetText(), out groupId);
+    private static bool TryGetDraggedEntity(DragEventArgs e, out WorkspaceEntityKind kind, out Guid entityId)
+    {
+        kind = default;
+        entityId = default;
+        var parts = e.DataTransfer.TryGetText()?.Split(':', 2);
+        return parts is { Length: 2 } && Enum.TryParse(parts[0], out kind) && Guid.TryParse(parts[1], out entityId);
+    }
 
     private static GroupPlacement PlacementFor(
         WorkspaceTreeNodeViewModel target,
@@ -305,6 +346,10 @@ public partial class MainWindow : Window
         {
             viewModel.WorkspaceTree.BeginCreateCommand.Execute(null);
         }
+        else if (e.Key == Key.L && (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Shift)) == (KeyModifiers.Control | KeyModifiers.Shift))
+        {
+            viewModel.WorkspaceTree.BeginCreateListingCommand.Execute(null);
+        }
         else if (e.Key == Key.F2)
         {
             viewModel.WorkspaceTree.BeginRenameCommand.Execute(null);
@@ -338,9 +383,17 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnContextNewListing(object? sender, RoutedEventArgs e)
+    {
+        if (TrySelectContextNode(sender, out var viewModel, out _))
+        {
+            await viewModel.WorkspaceTree.BeginCreateListingAsync();
+        }
+    }
+
     private void OnContextRename(object? sender, RoutedEventArgs e)
     {
-        if (TrySelectContextGroup(sender, out var viewModel, out _))
+        if (TrySelectContextNode(sender, out var viewModel, out _))
         {
             viewModel.WorkspaceTree.BeginRename();
             FocusVisibleTreeEditor();
@@ -349,7 +402,7 @@ public partial class MainWindow : Window
 
     private void OnContextCopy(object? sender, RoutedEventArgs e)
     {
-        if (TrySelectContextGroup(sender, out var viewModel, out _))
+        if (TrySelectContextNode(sender, out var viewModel, out _))
         {
             viewModel.WorkspaceTree.Copy();
         }
@@ -357,7 +410,7 @@ public partial class MainWindow : Window
 
     private void OnContextCut(object? sender, RoutedEventArgs e)
     {
-        if (TrySelectContextGroup(sender, out var viewModel, out _))
+        if (TrySelectContextNode(sender, out var viewModel, out _))
         {
             viewModel.WorkspaceTree.Cut();
         }
@@ -365,9 +418,25 @@ public partial class MainWindow : Window
 
     private async void OnContextPaste(object? sender, RoutedEventArgs e)
     {
-        if (TrySelectContextGroup(sender, out var viewModel, out _))
+        if (TrySelectContextNode(sender, out var viewModel, out _))
         {
             await viewModel.WorkspaceTree.PasteAsync();
+        }
+    }
+
+    private async void OnContextDuplicate(object? sender, RoutedEventArgs e)
+    {
+        if (TrySelectContextNode(sender, out var viewModel, out var node) && node.IsListing)
+        {
+            await viewModel.WorkspaceTree.DuplicateAsync();
+        }
+    }
+
+    private void OnContextEditProperties(object? sender, RoutedEventArgs e)
+    {
+        if (TrySelectContextNode(sender, out var viewModel, out _))
+        {
+            viewModel.WorkspaceTree.EditPropertiesCommand.Execute(null);
         }
     }
 
@@ -393,6 +462,22 @@ public partial class MainWindow : Window
         viewModel = DataContext as MainWindowViewModel ?? null!;
         node = sender is MenuItem { DataContext: WorkspaceTreeNodeViewModel candidate } ? candidate : null!;
         if (viewModel is null || node is null || node.EntityKind != FusionCanvas.Domain.Workspace.WorkspaceEntityKind.Group)
+        {
+            return false;
+        }
+
+        viewModel.WorkspaceTree.SelectNodeCommand.Execute(node);
+        return true;
+    }
+
+    private bool TrySelectContextNode(
+        object? sender,
+        out MainWindowViewModel viewModel,
+        out WorkspaceTreeNodeViewModel node)
+    {
+        viewModel = DataContext as MainWindowViewModel ?? null!;
+        node = sender is MenuItem { DataContext: WorkspaceTreeNodeViewModel candidate } ? candidate : null!;
+        if (viewModel is null || node is null || !node.HasContextActions)
         {
             return false;
         }

@@ -7,7 +7,8 @@ namespace FusionCanvas.App.Workspace;
 public sealed record AppWorkspaceRuntime(
     IWorkspaceRepository Repository,
     WorkspaceSnapshot Snapshot,
-    IGroupManagementService GroupManagement);
+    IGroupManagementService GroupManagement,
+    IListingManagementService ListingManagement);
 
 public static class AppWorkspaceFactory
 {
@@ -20,7 +21,11 @@ public static class AppWorkspaceFactory
     {
         var repository = new SqliteWorkspaceRepository(databasePath);
         var snapshot = repository.LoadAsync().GetAwaiter().GetResult();
-        return new AppWorkspaceRuntime(repository, snapshot, new GroupManagementService(repository));
+        return new AppWorkspaceRuntime(
+            repository,
+            snapshot,
+            new GroupManagementService(repository),
+            new ListingManagementService(repository));
     }
 
     private static string DefaultDatabasePath()
