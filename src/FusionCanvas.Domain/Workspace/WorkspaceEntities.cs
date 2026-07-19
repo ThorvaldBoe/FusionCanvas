@@ -90,6 +90,7 @@ public sealed record Listing(
     string Name,
     string? Description,
     ListingStatus Status,
+    WorkflowStage Stage,
     bool IsArchived,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,

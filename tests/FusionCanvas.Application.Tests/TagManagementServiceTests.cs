@@ -90,7 +90,7 @@ public class TagManagementServiceTests
     {
         var store = NewStore();
         var tag = NewTag(store.Id, "evergreen", "#111111");
-        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Espresso", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var link = new ListingTag(listing.Id, tag.Id);
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [tag], [link], []));
         var service = new TagManagementService(repository, () => Now.AddMinutes(5));
@@ -132,7 +132,7 @@ public class TagManagementServiceTests
     {
         var store = NewStore();
         var tag = NewTag(store.Id, "seasonal");
-        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [tag], [new ListingTag(listing.Id, tag.Id)], []));
         var service = new TagManagementService(repository);
 
@@ -172,8 +172,8 @@ public class TagManagementServiceTests
     {
         var store = NewStore();
         var tag = NewTag(store.Id, "seasonal");
-        var firstListing = new Listing(Guid.NewGuid(), store.Id, null, null, "A", null, ListingStatus.Draft, false, Now, Now, "{}");
-        var secondListing = new Listing(Guid.NewGuid(), store.Id, null, null, "B", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var firstListing = new Listing(Guid.NewGuid(), store.Id, null, null, "A", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
+        var secondListing = new Listing(Guid.NewGuid(), store.Id, null, null, "B", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var otherTag = NewTag(store.Id, "evergreen");
         var links = new[]
         {
@@ -205,7 +205,7 @@ public class TagManagementServiceTests
         var other = NewStore();
         var ownTag = NewTag(store.Id, "evergreen");
         var otherTag = NewTag(other.Id, "evergreen");
-        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store, other], [], [], [listing], [], [], [ownTag, otherTag], [], []));
         var service = new TagManagementService(repository);
 
@@ -232,8 +232,8 @@ public class TagManagementServiceTests
         var store = NewStore();
         var activeNiche = new Niche(Guid.NewGuid(), store.Id, "Active", null, false, Now, Now, "{}");
         var archivedNiche = new Niche(Guid.NewGuid(), store.Id, "Archived", null, true, Now, Now, "{}");
-        var archivedListing = new Listing(Guid.NewGuid(), store.Id, activeNiche.Id, null, "ArchivedShirt", null, ListingStatus.Draft, true, Now, Now, "{}");
-        var hiddenListing = new Listing(Guid.NewGuid(), store.Id, archivedNiche.Id, null, "HiddenShirt", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var archivedListing = new Listing(Guid.NewGuid(), store.Id, activeNiche.Id, null, "ArchivedShirt", null, ListingStatus.Draft, WorkflowStage.Idea, true, Now, Now, "{}");
+        var hiddenListing = new Listing(Guid.NewGuid(), store.Id, archivedNiche.Id, null, "HiddenShirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var tag = NewTag(store.Id, "evergreen");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [activeNiche, archivedNiche], [], [archivedListing, hiddenListing], [], [], [tag], [], []));
         var service = new TagManagementService(repository);
@@ -253,8 +253,8 @@ public class TagManagementServiceTests
         var store = NewStore();
         var firstTag = NewTag(store.Id, "evergreen");
         var secondTag = NewTag(store.Id, "seasonal");
-        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, false, Now, Now, "{}");
-        var otherListing = new Listing(Guid.NewGuid(), store.Id, null, null, "Mug", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
+        var otherListing = new Listing(Guid.NewGuid(), store.Id, null, null, "Mug", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var links = new[]
         {
             new ListingTag(listing.Id, firstTag.Id),
@@ -281,7 +281,7 @@ public class TagManagementServiceTests
     public async Task ApplyOrCreateTagAsync_CreatesAndAppliesNewTag()
     {
         var store = NewStore();
-        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [], [], []));
         var service = new TagManagementService(repository, () => Now, () => Guid.NewGuid());
 
@@ -301,7 +301,7 @@ public class TagManagementServiceTests
     {
         var store = NewStore();
         var existing = NewTag(store.Id, "Coffee");
-        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [existing], [], []));
         var service = new TagManagementService(repository);
 
@@ -323,7 +323,7 @@ public class TagManagementServiceTests
     {
         var store = NewStore();
         var archived = NewTag(store.Id, "coffee") with { IsArchived = true };
-        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [archived], [], []));
         var service = new TagManagementService(repository);
 
@@ -341,7 +341,7 @@ public class TagManagementServiceTests
     public async Task ApplyOrCreateTagAsync_RejectsBlankNameAndMultilineName()
     {
         var store = NewStore();
-        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [], [], []));
         var service = new TagManagementService(repository);
 
@@ -378,7 +378,7 @@ public class TagManagementServiceTests
         var store = NewStore();
         var firstTag = NewTag(store.Id, "evergreen");
         var secondTag = NewTag(store.Id, "seasonal");
-        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [firstTag, secondTag], [new ListingTag(listing.Id, firstTag.Id)], []));
         var service = new TagManagementService(repository);
 
@@ -424,7 +424,7 @@ public class TagManagementServiceTests
     {
         var store = NewStore();
         var tag = NewTag(store.Id, "evergreen");
-        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var link = new ListingTag(listing.Id, tag.Id);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>

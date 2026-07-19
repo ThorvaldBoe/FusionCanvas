@@ -17,7 +17,7 @@ The durable requirements behind this process live in `openspec/specs/qa-review-b
 3. **Review, don't fix.** A QA run reports findings; it does not change code, specs, or docs unless the user explicitly asks for fixes. Fixing happens afterwards through the routing rules below.
 4. **Report in the standard format** (see below). Every finding cites concrete evidence: file paths, line numbers, commands, or spec references.
 5. **No findings is a valid outcome.** Report it as a pass and say what was checked.
-6. **Do not overstate unavailable verification.** If an interactive desktop or another required test environment is unavailable, mark the affected task and scenarios Blocked. A code-level test pass is not a desktop UI pass.
+6. **Do not overstate unavailable verification.** If an interactive desktop or another required test environment is unavailable, mark the affected task and scenarios **Not applicable** (for example, when running under OpenCode, which has no display) and state which environment would be required. A code-level test pass is not a desktop UI pass, but a not-applicable desktop pass does not block the rest of the review.
 
 ### Severity Scale
 
@@ -171,7 +171,7 @@ This review judges *reasonable* application of the principles, per `openspec/spe
    - Integration tests: isolated temporary resources (temp DB/files), no shared state, clean up after themselves.
    - App tests: exercise UI-owned decision logic (view models, navigation, commands) in code without launching Avalonia; no superficial tests of static markup.
 4. **Spec-driven coverage:** behavior described by accepted spec requirements/scenarios has corresponding tests, or an explicit documented reason why not.
-5. **Scope discipline:** no slow, flaky, UI-driving, or external-service tests sneaking into the fast solution-level baseline. Real desktop verification is mandatory where applicable but runs separately under the feature workflow or QA-6.
+5. **Scope discipline:** no slow, flaky, UI-driving, or external-service tests sneaking into the fast solution-level baseline. Real desktop verification is expected where applicable but runs separately under the feature workflow or QA-6, and is Not applicable when the reviewing agent has no interactive desktop (OpenCode).
 
 ---
 
@@ -243,7 +243,7 @@ Context: FusionCanvas is a local-first desktop app with no network attack surfac
 2. Build the current checkout before testing and record the executable/configuration, commit or working-tree identity, operating environment, and automation mechanism.
 3. Select a disposable database/workspace fixture before the first mutating interaction. Never run create, move, archive, restore, or delete scenarios against the contributor's normal workspace.
 4. Prefer stable automation identifiers and accessible names. Wait for observable UI state rather than relying on fixed sleeps. Treat missing accessibility exposure as a finding when it prevents reliable operation or evidence.
-5. If the interactive environment cannot be obtained, mark QA-6 **Blocked**, list every unexecuted matrix row, and state what environment is required. Do not infer a pass from QA-3.
+5. If the interactive environment cannot be obtained (for example, when running under OpenCode, which has no display), mark QA-6 **Not applicable**, list every unexecuted matrix row, and state what environment is required. Do not infer a pass from QA-3. A not-applicable QA-6 does not block the rest of the review.
 
 ### Build the All-Features Inventory
 
@@ -275,7 +275,7 @@ For **every inventory row**, execute the primary happy path through the real des
 - For each row, record concise observed results and link or identify relevant screenshots, accessibility/automation output, or restart evidence. Evidence must establish behavior, not merely that a control existed.
 - Record the disposable fixture and confirm the normal workspace was not mutated.
 - Report product failures with severity and route them using the normal finding rules. Report test-infrastructure limitations separately so they are not confused with application defects.
-- A full QA review can pass QA-6 only when every implemented user-facing feature row passes or has a justified Not applicable result; any Failed row fails QA-6, and any Blocked row leaves QA-6 blocked.
+- A full QA review can pass QA-6 when every implemented user-facing feature row passes or has a justified Not applicable result; any Failed row fails QA-6. When the reviewing agent has no interactive desktop (for example, OpenCode), QA-6 is Not applicable for the whole matrix and the rest of the review is unaffected.
 
 ---
 

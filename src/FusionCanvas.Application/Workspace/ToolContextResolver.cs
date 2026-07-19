@@ -410,7 +410,7 @@ public sealed class ToolContextResolver : IToolContextResolver
     }
 
     private static NearbyWorkState WorkState(WorkspaceEntity entity) =>
-        entity.IsArchived || entity is Listing { Status: ListingStatus.Archived }
+        entity.IsArchived || entity is Listing { Status: ListingStatus.Rejected }
             ? NearbyWorkState.RejectedOrArchived
             : NearbyWorkState.Active;
 

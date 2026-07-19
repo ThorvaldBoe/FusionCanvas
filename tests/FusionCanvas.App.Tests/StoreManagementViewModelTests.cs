@@ -491,8 +491,8 @@ public class StoreManagementViewModelTests
         var second = NewStore("Second Studio");
         var firstNiche = new Niche(Guid.NewGuid(), first.Id, "Coffee", null, false, Now, Now, "{}");
         var secondNiche = new Niche(Guid.NewGuid(), second.Id, "Cats", null, false, Now, Now, "{}");
-        var firstListing = new Listing(Guid.NewGuid(), first.Id, firstNiche.Id, null, "Espresso", null, ListingStatus.Draft, false, Now, Now, "{}");
-        var secondListing = new Listing(Guid.NewGuid(), second.Id, secondNiche.Id, null, "Whiskers", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var firstListing = new Listing(Guid.NewGuid(), first.Id, firstNiche.Id, null, "Espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
+        var secondListing = new Listing(Guid.NewGuid(), second.Id, secondNiche.Id, null, "Whiskers", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var snapshot = new WorkspaceSnapshot([first, second], [firstNiche, secondNiche], [], [firstListing, secondListing], [], [], [], [], []);
         var storeService = new StoreManagementService(new InMemoryWorkspaceRepository(snapshot));
 
@@ -519,7 +519,7 @@ public class StoreManagementViewModelTests
         var store = NewStore("North Star Studio");
         var activeNiche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, Now, Now, "{}");
         var archivedNiche = new Niche(Guid.NewGuid(), store.Id, "Dogs", null, true, Now, Now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, activeNiche.Id, null, "Espresso", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, activeNiche.Id, null, "Espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var snapshot = new WorkspaceSnapshot([store], [activeNiche, archivedNiche], [], [listing], [], [], [], [], []);
         var repository = new InMemoryWorkspaceRepository(snapshot);
 
@@ -628,7 +628,7 @@ public class StoreManagementViewModelTests
         var storeId = Guid.NewGuid();
         var store = new Store(storeId, "Studio", null, false, Now, Now, "{}");
         var niche = new Niche(Guid.NewGuid(), storeId, "Niche", null, false, Now, Now, "{}");
-        var listing = new Listing(Guid.NewGuid(), storeId, niche.Id, null, "Shirt", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), storeId, niche.Id, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var tag = new Tag(Guid.NewGuid(), storeId, "Evergreen", null, false, Now, Now, "{}", null);
         var link = new ListingTag(listing.Id, tag.Id);
         var snapshot = new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [tag], [link], []);

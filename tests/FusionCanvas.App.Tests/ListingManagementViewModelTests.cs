@@ -13,8 +13,8 @@ public class ListingManagementViewModelTests
         var nicheId = Guid.NewGuid();
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", nicheId);
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, false, now, now, "{\"notes\":\"old\"}");
-        var other = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Other", null, ListingStatus.Draft, false, now, now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{\"notes\":\"old\"}");
+        var other = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Other", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var repository = new Repository(new WorkspaceSnapshot([store], [niche], [], [listing, other], [], [], [], [], []));
         var viewModel = new ListingManagementViewModel(new ListingManagementService(repository));
         var changes = 0;
@@ -55,7 +55,7 @@ public class ListingManagementViewModelTests
         var nicheId = Guid.NewGuid();
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", nicheId);
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, false, now, now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var tag = new Tag(Guid.NewGuid(), store.Id, "Evergreen", null, false, now, now, "{}", "#1ABC9C");
         var repository = new Repository(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [tag], [], []));
         var viewModel = new ListingManagementViewModel(new ListingManagementService(repository), new TagManagementService(repository));
@@ -92,7 +92,7 @@ public class ListingManagementViewModelTests
         var nicheId = Guid.NewGuid();
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", nicheId);
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, false, now, now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var existing = new Tag(Guid.NewGuid(), store.Id, "Evergreen", null, false, now, now, "{}", null);
         var repository = new Repository(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [existing], [], []));
         var viewModel = new ListingManagementViewModel(new ListingManagementService(repository), new TagManagementService(repository, () => now, () => Guid.NewGuid()));
@@ -120,7 +120,7 @@ public class ListingManagementViewModelTests
         var nicheId = Guid.NewGuid();
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", nicheId);
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, false, now, now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var archived = new Tag(Guid.NewGuid(), store.Id, "Paused", null, true, now, now, "{}", null);
         var repository = new Repository(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [archived], [], []));
         var viewModel = new ListingManagementViewModel(new ListingManagementService(repository), new TagManagementService(repository));
@@ -144,7 +144,7 @@ public class ListingManagementViewModelTests
         var archivedNicheId = Guid.NewGuid();
         var store = new Store(storeId, "Store", null, false, now, now, "{}", archivedNicheId);
         var archivedNiche = new Niche(archivedNicheId, storeId, "Archived", null, true, now, now, "{}");
-        var listing = new Listing(Guid.NewGuid(), storeId, archivedNicheId, null, "Hidden", null, ListingStatus.Draft, false, now, now, "{}");
+        var listing = new Listing(Guid.NewGuid(), storeId, archivedNicheId, null, "Hidden", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var tag = new Tag(Guid.NewGuid(), storeId, "Evergreen", null, false, now, now, "{}", null);
         var snapshot = new WorkspaceSnapshot([store], [archivedNiche], [], [listing], [], [], [tag], [], []);
         var repository = new Repository(snapshot);
@@ -166,7 +166,7 @@ public class ListingManagementViewModelTests
         var nicheId = Guid.NewGuid();
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", nicheId);
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, false, now, now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var tag = new Tag(Guid.NewGuid(), store.Id, "Evergreen", null, false, now, now, "{}", null);
         var link = new ListingTag(listing.Id, tag.Id);
         var repository = new Repository(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [tag], [link], []));

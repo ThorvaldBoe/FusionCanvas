@@ -230,6 +230,19 @@ public sealed class DocumentWindowViewModel : INotifyPropertyChanged
         return ActiveTab;
     }
 
+    public void ReplaceActiveContext(DocumentContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        if (ActiveTab is null)
+        {
+            Open(context);
+            return;
+        }
+
+        ActiveTab.ReplaceContext(context);
+        OnActiveTabChanged();
+    }
+
     public void SelectTab(DocumentTabViewModel tab)
     {
         ArgumentNullException.ThrowIfNull(tab);

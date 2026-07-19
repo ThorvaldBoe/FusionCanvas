@@ -114,7 +114,7 @@ public class WorkspaceTreeViewModelTests
         var sample = Sample.Create(withGroup: true);
         var root = Assert.Single(sample.Snapshot.Groups);
         var child = new TopicGroup(Guid.NewGuid(), sample.Store.Id, null, root.Id, "Child", null, false, sample.Now, sample.Now, "{}");
-        var listing = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, child.Id, "Item", null, ListingStatus.Draft, false, sample.Now, sample.Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, child.Id, "Item", null, ListingStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Groups = [root, child], Listings = [listing] };
         var repository = new TestRepository(snapshot);
         var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
@@ -230,8 +230,8 @@ public class WorkspaceTreeViewModelTests
     {
         var sample = Sample.Create();
         var other = new Niche(Guid.NewGuid(), sample.Store.Id, "Other", null, false, sample.Now, sample.Now, "{}");
-        var first = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Zulu", null, ListingStatus.Draft, false, sample.Now, sample.Now, "{}");
-        var second = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Alpha", null, ListingStatus.Draft, false, sample.Now, sample.Now, "{}");
+        var first = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Zulu", null, ListingStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var second = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Alpha", null, ListingStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Niches = [sample.Niche, other], Listings = [first, second] };
         var repository = new TestRepository(snapshot);
         var listings = new ListingManagementService(repository);
@@ -253,158 +253,264 @@ public class WorkspaceTreeViewModelTests
     }
 
     [Fact]
-    public void TagFilter_ExcludesArchivedTagsAndFiltersListingsWithAndSemantics()
+    public void TagFilter_NarrowsToListingsAndGuardsSiblingPositioning()
     {
-        var sample = Sample.Create();
-        var firstTag = new Tag(Guid.NewGuid(), sample.Store.Id, "evergreen", null, false, sample.Now, sample.Now, "{}", "#1ABC9C");
-        var secondTag = new Tag(Guid.NewGuid(), sample.Store.Id, "seasonal", null, false, sample.Now, sample.Now, "{}", "#FF8800");
-        var archivedTag = new Tag(Guid.NewGuid(), sample.Store.Id, "paused", null, true, sample.Now, sample.Now, "{}", null);
-        var first = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Matching", null, ListingStatus.Draft, false, sample.Now, sample.Now, "{}");
-        var second = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Missing", null, ListingStatus.Draft, false, sample.Now, sample.Now, "{}");
+        var sample = Sample.Create(withGroup: true);
+        var tagged = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Tagged", null, ListingStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var untagged = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Untagged", null, ListingStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var tag = new Tag(Guid.NewGuid(), sample.Store.Id, "Halloween", null, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with
         {
-            Listings = [first, second],
-            Tags = [firstTag, secondTag, archivedTag],
-            ListingTags = [new ListingTag(first.Id, firstTag.Id), new ListingTag(first.Id, secondTag.Id)]
-        };
-        var viewModel = new WorkspaceTreeViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
-        viewModel.SetStore(sample.Store.Id, snapshot);
-
-        Assert.Equal(2, viewModel.AvailableTagFilters.Count);
-        Assert.DoesNotContain(viewModel.AvailableTagFilters, tag => tag.IsArchived);
-
-        viewModel.ToggleTagFilter(firstTag.Id);
-        Assert.Equal("Matching", Assert.Single(Assert.Single(viewModel.Roots).Children).Name);
-        Assert.True(viewModel.IsTagFilterActive);
-
-        viewModel.ToggleTagFilter(secondTag.Id);
-        Assert.Equal("Matching", Assert.Single(Assert.Single(viewModel.Roots).Children).Name);
-
-        viewModel.ToggleTagFilter(firstTag.Id);
-        Assert.Equal("Matching", Assert.Single(Assert.Single(viewModel.Roots).Children).Name);
-
-        viewModel.ToggleTagFilter(secondTag.Id);
-        Assert.False(viewModel.IsTagFilterActive);
-        Assert.Equal(2, Assert.Single(viewModel.Roots).Children.Count);
-    }
-
-    [Fact]
-    public void TagFilter_PreservesCanonicalSelectionAndReportsFilteredOutSelection()
-    {
-        var sample = Sample.Create();
-        var tag = new Tag(Guid.NewGuid(), sample.Store.Id, "evergreen", null, false, sample.Now, sample.Now, "{}", null);
-        var matching = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Matching", null, ListingStatus.Draft, false, sample.Now, sample.Now, "{}");
-        var hidden = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Hidden", null, ListingStatus.Draft, false, sample.Now, sample.Now, "{}");
-        var snapshot = sample.Snapshot with
-        {
-            Listings = [matching, hidden],
+            Listings = [tagged, untagged],
             Tags = [tag],
-            ListingTags = [new ListingTag(matching.Id, tag.Id)]
+            ListingTags = [new ListingTag(tagged.Id, tag.Id)]
         };
-        var viewModel = new WorkspaceTreeViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
+        var group = snapshot.Groups.Single();
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
-        viewModel.SelectEntity(hidden.Id);
-        Assert.Equal(hidden.Id, viewModel.SelectedNode!.EntityId);
+        Assert.Equal(3, viewModel.Roots.Single().Children.Count);
 
         viewModel.ToggleTagFilter(tag.Id);
-        Assert.Null(viewModel.SelectedNode);
-        Assert.True(viewModel.HasFilteredOutSelection);
-        Assert.Contains("Hidden", viewModel.FilteredOutSelectionMessage);
 
-        viewModel.ClearTagFilters();
-        Assert.False(viewModel.HasFilteredOutSelection);
-        Assert.Equal(hidden.Id, viewModel.SelectedNode!.EntityId);
+        var remaining = viewModel.Roots.Single().Children.Single();
+        Assert.Equal(tagged.Id, remaining.EntityId);
+        Assert.True(viewModel.HasActiveFilters);
+
+        viewModel.SelectNodeCommand.Execute(viewModel.Roots.Single());
+        var allowed = viewModel.CanDrop(WorkspaceEntityKind.Group, group.Id, viewModel.Roots.Single(),
+            new GroupPlacement(GroupPlacementKind.Before, Guid.NewGuid()), out var error);
+        Assert.False(allowed);
+        Assert.Contains("filtering", error, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void TagFilter_RestoresPreFilterExpansionWhenCleared()
+    public void SubtreeScope_PinsSelectedTopicAndRestrictsTree()
     {
-        var sample = Sample.Create();
-        var tag = new Tag(Guid.NewGuid(), sample.Store.Id, "evergreen", null, false, sample.Now, sample.Now, "{}", null);
-        var listing = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Tagged", null, ListingStatus.Draft, false, sample.Now, sample.Now, "{}");
-        var snapshot = sample.Snapshot with { Listings = [listing], Tags = [tag], ListingTags = [new ListingTag(listing.Id, tag.Id)] };
-        var viewModel = new WorkspaceTreeViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
+        var sample = Sample.Create(withGroup: true);
+        var otherNiche = new Niche(Guid.NewGuid(), sample.Store.Id, "Other", null, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Niches = [sample.Niche, otherNiche] };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
-        var niche = Assert.Single(viewModel.Roots);
-        niche.IsExpanded = true;
+        var nicheNode = viewModel.Roots.Single(root => root.EntityId == sample.Niche.Id);
 
-        viewModel.ToggleTagFilter(tag.Id);
-        Assert.True(Assert.Single(viewModel.Roots).IsExpanded);
+        viewModel.SelectNodeCommand.Execute(nicheNode);
+        Assert.True(viewModel.CanScopeToCurrentTopic);
 
-        viewModel.ClearTagFilters();
-        niche = Assert.Single(viewModel.Roots);
-        Assert.True(niche.IsExpanded);
-        Assert.Single(niche.Children);
+        viewModel.ScopeToCurrentTopic = true;
+
+        Assert.Equal(sample.Niche.Id, Assert.Single(viewModel.Roots).EntityId);
+        Assert.DoesNotContain(viewModel.Roots, node => node.EntityId == otherNiche.Id);
+
+        viewModel.ScopeToCurrentTopic = false;
+        Assert.Equal(2, viewModel.Roots.Count);
     }
 
     [Fact]
-    public void TagFilter_DropsTagsThatLeaveTheActiveStore()
+    public void IncludeArchived_RevealsArchivedListingWithoutMakingItCanonicalContext()
     {
         var sample = Sample.Create();
-        var tag = new Tag(Guid.NewGuid(), sample.Store.Id, "evergreen", null, false, sample.Now, sample.Now, "{}", null);
+        var archived = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Ghost", null, ListingStatus.Draft, WorkflowStage.Idea, true, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Listings = [archived] };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        Assert.Empty(viewModel.Roots.Single().Children);
+
+        viewModel.IncludeArchived = true;
+
+        var archivedNode = Assert.Single(viewModel.Roots.Single().Children);
+        Assert.True(archivedNode.IsInactive);
+        WorkspaceTreeSelection? observed = null;
+        viewModel.SelectionChanged += (_, selection) => observed = selection;
+        viewModel.SelectNodeCommand.Execute(archivedNode);
+
+        Assert.Equal(archivedNode, viewModel.SelectedNode);
+        Assert.Null(observed);
+    }
+
+    [Fact]
+    public void ClearAllFilters_ResetsEveryDimensionRestoresExpansionAndKeepsSelection()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var repository = new TestRepository(sample.Snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+        var nicheRoot = viewModel.Roots.Single();
+        var group = Assert.Single(nicheRoot.Children);
+        nicheRoot.IsExpanded = true;
+        viewModel.SelectNodeCommand.Execute(group);
+
+        viewModel.QueryText = "no matching";
+        Assert.True(viewModel.HasEmptyFilterResults);
+        Assert.True(viewModel.HasActiveFilters);
+
+        viewModel.ClearAllFilters();
+
+        Assert.False(viewModel.HasActiveFilters);
+        Assert.False(viewModel.HasEmptyFilterResults);
+        var restoredRoot = viewModel.Roots.Single();
+        Assert.True(restoredRoot.IsExpanded);
+        Assert.Equal(group.EntityId, viewModel.SelectedNode!.EntityId);
+    }
+
+    [Fact]
+    public void CanScopeToCurrentTopic_ReflectsSelectionResolvability()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var repository = new TestRepository(sample.Snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+
+        Assert.False(viewModel.CanScopeToCurrentTopic);
+
+        viewModel.SelectNodeCommand.Execute(viewModel.Roots.Single());
+        Assert.True(viewModel.CanScopeToCurrentTopic);
+
+        var group = Assert.Single(viewModel.Roots.Single().Children);
+        viewModel.SelectNodeCommand.Execute(group);
+        Assert.True(viewModel.CanScopeToCurrentTopic);
+    }
+
+    [Fact]
+    public void EmptyFilterResults_ExplainedWhenNothingMatches()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+
+        viewModel.QueryText = "zzz nothing matches";
+
+        Assert.True(viewModel.HasActiveFilters);
+        Assert.True(viewModel.HasEmptyFilterResults);
+        Assert.False(viewModel.HasVisibleResults);
+    }
+
+    [Fact]
+    public void HasNonTextFilters_ReflectsOnlyNonTextDimensions()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var tag = new Tag(Guid.NewGuid(), sample.Store.Id, "Halloween", null, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Tags = [tag] };
-        var viewModel = new WorkspaceTreeViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
-        Assert.True(viewModel.HasTagFiltersAvailable);
 
-        var otherStore = new Store(Guid.NewGuid(), "Other", null, false, sample.Now, sample.Now, "{}", Guid.NewGuid());
-        var otherNiche = new Niche(otherStore.DefaultNicheId!.Value, otherStore.Id, "OtherNiche", null, false, sample.Now, sample.Now, "{}");
-        var otherSnapshot = new WorkspaceSnapshot([otherStore], [otherNiche], [], [], [], [], [], [], []);
-        viewModel.SetStore(otherStore.Id, otherSnapshot);
+        Assert.False(viewModel.HasNonTextFilters);
 
-        Assert.Empty(viewModel.AvailableTagFilters);
-        Assert.False(viewModel.IsTagFilterActive);
+        viewModel.QueryText = "anything";
+        Assert.False(viewModel.HasNonTextFilters);
+
+        viewModel.QueryText = string.Empty;
+        viewModel.SetTagSelected(tag.Id, true);
+        Assert.True(viewModel.HasNonTextFilters);
+        Assert.Equal(1, viewModel.ActiveFilterCount);
+
+        viewModel.SetTagSelected(tag.Id, false);
+        viewModel.SelectNodeCommand.Execute(viewModel.Roots.Single());
+        viewModel.ScopeToCurrentTopic = true;
+        Assert.True(viewModel.HasNonTextFilters);
+
+        viewModel.ScopeToCurrentTopic = false;
+        viewModel.IncludeArchived = true;
+        Assert.True(viewModel.HasNonTextFilters);
     }
 
     [Fact]
-    public void ListingNodesCarryAppliedTagColorsAndOverflowAfterThree()
+    public void AvailableTags_ListsActiveStoreTagsAlphabetically()
     {
         var sample = Sample.Create();
-        var first = new Tag(Guid.NewGuid(), sample.Store.Id, "alpha", null, false, sample.Now, sample.Now, "{}", "#1abc9c");
-        var second = new Tag(Guid.NewGuid(), sample.Store.Id, "beta", null, false, sample.Now, sample.Now, "{}", "#ff8800");
-        var third = new Tag(Guid.NewGuid(), sample.Store.Id, "gamma", null, false, sample.Now, sample.Now, "{}", null);
-        var fourth = new Tag(Guid.NewGuid(), sample.Store.Id, "delta", null, false, sample.Now, sample.Now, "{}", "#ff0000");
-        var listing = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Tagged", null, ListingStatus.Draft, false, sample.Now, sample.Now, "{}");
+        var tea = new Tag(Guid.NewGuid(), sample.Store.Id, "Tea", null, false, sample.Now, sample.Now, "{}");
+        var coffee = new Tag(Guid.NewGuid(), sample.Store.Id, "Coffee", null, false, sample.Now, sample.Now, "{}");
+        var archived = new Tag(Guid.NewGuid(), sample.Store.Id, "Archived", null, true, sample.Now, sample.Now, "{}");
+        var otherStore = new Store(Guid.NewGuid(), "Other", null, false, sample.Now, sample.Now, "{}");
+        var otherNiche = new Niche(Guid.NewGuid(), otherStore.Id, "Other niche", null, false, sample.Now, sample.Now, "{}");
+        var otherTag = new Tag(Guid.NewGuid(), otherStore.Id, "Other tag", null, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with
         {
-            Listings = [listing],
-            Tags = [first, second, third, fourth],
-            ListingTags = [
-                new ListingTag(listing.Id, first.Id),
-                new ListingTag(listing.Id, second.Id),
-                new ListingTag(listing.Id, third.Id),
-                new ListingTag(listing.Id, fourth.Id)
-            ]
+            Stores = [sample.Store, otherStore],
+            Niches = [sample.Niche, otherNiche],
+            Tags = [tea, coffee, archived, otherTag]
         };
-        var viewModel = new WorkspaceTreeViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
 
-        var listingNode = viewModel.Roots.Single().Children.Single();
-        Assert.Equal(WorkspaceEntityKind.Listing, listingNode.EntityKind);
-        Assert.Equal(4, listingNode.AppliedTagColors.Count);
-        Assert.Equal(3, listingNode.VisibleTagChipCount);
-        Assert.Equal(1, listingNode.HiddenTagCount);
-        Assert.True(listingNode.HasAppliedTags);
-        Assert.True(listingNode.HasHiddenTags);
-        Assert.Equal("+1", listingNode.HiddenTagLabel);
-        Assert.Equal("#1ABC9C", listingNode.AppliedTagColors[0]);
-        Assert.Equal("#FF8800", listingNode.AppliedTagColors[1]);
-        Assert.Equal("#FF0000", listingNode.AppliedTagColors[2]);
-        Assert.Equal("#243447", listingNode.AppliedTagColors[3]);
+        Assert.Equal(["Coffee", "Tea"], viewModel.AvailableTags.Select(entry => entry.Name));
     }
 
     [Fact]
-    public void ListingNodesHaveNoAppliedTagColorsWhenUntagged()
+    public void StageFilter_NarrowsToListingsAtSelectedStage()
     {
         var sample = Sample.Create();
-        var listing = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Untagged", null, ListingStatus.Draft, false, sample.Now, sample.Now, "{}");
-        var snapshot = sample.Snapshot with { Listings = [listing] };
+        var idea = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Idea listing", null, ListingStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var design = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Design listing", null, ListingStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Listings = [idea, design] };
         var viewModel = new WorkspaceTreeViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
 
-        var listingNode = viewModel.Roots.Single().Children.Single();
-        Assert.False(listingNode.HasAppliedTags);
-        Assert.Empty(listingNode.AppliedTagColors);
+        var allListings = viewModel.Roots.SelectMany(r => r.Children).Where(n => n.IsListing).ToArray();
+        Assert.Equal(2, allListings.Length);
+
+        viewModel.StageFilterIndex = 3;
+        var designListings = viewModel.Roots.SelectMany(r => r.Children).Where(n => n.IsListing).ToArray();
+        Assert.Single(designListings);
+        Assert.Equal("Design listing", designListings[0].Name);
+
+        viewModel.StageFilterIndex = 0;
+        var restored = viewModel.Roots.SelectMany(r => r.Children).Where(n => n.IsListing).ToArray();
+        Assert.Equal(2, restored.Length);
+    }
+
+    [Fact]
+    public void StatusFilter_NarrowsToListingsWithSelectedStatus()
+    {
+        var sample = Sample.Create();
+        var draft = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Draft listing", null, ListingStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var rejected = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Rejected listing", null, ListingStatus.Rejected, WorkflowStage.Concept, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Listings = [draft, rejected] };
+        var viewModel = new WorkspaceTreeViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
+        viewModel.SetStore(sample.Store.Id, snapshot);
+
+        viewModel.StatusFilterIndex = 4;
+        var filtered = viewModel.Roots.SelectMany(r => r.Children).Where(n => n.IsListing).ToArray();
+        Assert.Single(filtered);
+        Assert.Equal("Rejected listing", filtered[0].Name);
+        Assert.True(filtered[0].IsInactive);
+    }
+
+    [Fact]
+    public void RejectedListing_MarkedInactiveInTree()
+    {
+        var sample = Sample.Create();
+        var rejected = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Rejected", null, ListingStatus.Rejected, WorkflowStage.Concept, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Listings = [rejected] };
+        var viewModel = new WorkspaceTreeViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
+        viewModel.SetStore(sample.Store.Id, snapshot);
+
+        var node = viewModel.Roots.SelectMany(r => r.Children).Single(n => n.IsListing);
+        Assert.True(node.IsInactive);
+    }
+
+    [Fact]
+    public void StageAndStatusFilters_CombineWithAnd()
+    {
+        var sample = Sample.Create();
+        var ideaDraft = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "IdeaDraft", null, ListingStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var ideaRejected = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "IdeaRejected", null, ListingStatus.Rejected, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var designDraft = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "DesignDraft", null, ListingStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Listings = [ideaDraft, ideaRejected, designDraft] };
+        var viewModel = new WorkspaceTreeViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
+        viewModel.SetStore(sample.Store.Id, snapshot);
+
+        viewModel.StageFilterIndex = 1;
+        viewModel.StatusFilterIndex = 1;
+
+        var filtered = viewModel.Roots.SelectMany(r => r.Children).Where(n => n.IsListing).ToArray();
+        Assert.Single(filtered);
+        Assert.Equal("IdeaDraft", filtered[0].Name);
     }
 
     private sealed class TestRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository

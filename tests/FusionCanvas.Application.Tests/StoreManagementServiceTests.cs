@@ -73,7 +73,7 @@ public class StoreManagementServiceTests
     {
         var store = NewStore("North Star Studio");
         var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, Now, Now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Pumpkin espresso", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Pumpkin espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [], [], []));
         var service = new StoreManagementService(repository, () => Now.AddMinutes(5));
         var context = new StoreContext("Updated", "Notes", "Dog owners", "Playful", "Q4 plan");
