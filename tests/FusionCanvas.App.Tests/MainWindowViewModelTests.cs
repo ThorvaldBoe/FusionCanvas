@@ -309,6 +309,86 @@ public class MainWindowViewModelTests
             context.Context.EntityKind == WorkspaceEntityKind.Listing &&
             context.Context.Title == "Espresso listing draft");
 
+    [Fact]
+    public void ListingInspector_LoadsForActiveListingTabAndClearsForNonItemContext()
+    {
+        var viewModel = new MainWindowViewModel();
+        var listing = ReadyListingContext(viewModel);
+        var group = GroupContext(viewModel);
+
+        viewModel.OpenFromNavigation(listing);
+
+        Assert.True(viewModel.ListingInspector.HasState);
+        Assert.Equal(listing.Context.Id, viewModel.ListingInspector.LoadedListingId);
+
+        viewModel.OpenFromNavigation(group);
+
+        Assert.False(viewModel.ListingInspector.HasState);
+    }
+
+    [Fact]
+    public void DirtyInspector_GuardsTabSwitchUntilResolved()
+    {
+        var viewModel = new MainWindowViewModel();
+        var first = viewModel.DocumentWindow.Open(ReadyListingContext(viewModel).Context);
+        var secondTab = viewModel.DocumentWindow.Open(ActiveListingContext(viewModel).Context);
+        viewModel.RequestSelectTabCommand.Execute(first);
+
+        Assert.True(viewModel.ListingInspector.HasState);
+        viewModel.ListingInspector.Title = "Edited unsaved title";
+        Assert.True(viewModel.ListingInspector.HasUnsavedChanges);
+
+        viewModel.RequestSelectTabCommand.Execute(secondTab);
+
+        Assert.Equal(first.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
+        Assert.True(viewModel.ListingInspector.DiscardPromptVisible);
+
+        viewModel.ListingInspector.KeepEditingCommand.Execute(null);
+
+        Assert.False(viewModel.ListingInspector.DiscardPromptVisible);
+        Assert.Equal(first.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
+        Assert.True(viewModel.ListingInspector.HasUnsavedChanges);
+    }
+
+    [Fact]
+    public void DirtyInspector_DiscardAndContinueProceedsWithTransition()
+    {
+        var viewModel = new MainWindowViewModel();
+        var first = viewModel.DocumentWindow.Open(ReadyListingContext(viewModel).Context);
+        var secondTab = viewModel.DocumentWindow.Open(ActiveListingContext(viewModel).Context);
+        viewModel.RequestSelectTabCommand.Execute(first);
+        viewModel.ListingInspector.Title = "Edited unsaved title";
+
+        viewModel.RequestSelectTabCommand.Execute(secondTab);
+        viewModel.ListingInspector.DiscardAndContinueCommand.Execute(null);
+
+        Assert.Equal(secondTab.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
+        Assert.False(viewModel.ListingInspector.HasUnsavedChanges);
+    }
+
+    [Fact]
+    public async Task DirtyInspector_SaveAndContinueProceedsAfterPersisting()
+    {
+        var viewModel = new MainWindowViewModel();
+        var first = viewModel.DocumentWindow.Open(ReadyListingContext(viewModel).Context);
+        var secondTab = viewModel.DocumentWindow.Open(ActiveListingContext(viewModel).Context);
+        viewModel.RequestSelectTabCommand.Execute(first);
+        viewModel.ListingInspector.Title = "Persisted title";
+        Assert.True(viewModel.ListingInspector.HasUnsavedChanges);
+
+        viewModel.RequestSelectTabCommand.Execute(secondTab);
+        viewModel.ListingInspector.SaveAndContinueCommand.Execute(null);
+        await Task.Yield();
+
+        Assert.Equal(secondTab.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
+        Assert.False(viewModel.ListingInspector.HasUnsavedChanges);
+        Assert.False(viewModel.ListingInspector.DiscardPromptVisible);
+
+        viewModel.RequestSelectTabCommand.Execute(first);
+        await Task.Yield();
+        Assert.Equal("Persisted title", viewModel.ListingInspector.Title);
+    }
+
     private sealed class InMemoryWorkspaceRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
     {
         private WorkspaceSnapshot _snapshot = snapshot;

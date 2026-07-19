@@ -1,4 +1,4 @@
-using FusionCanvas.App.DocumentWindow;
+﻿using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Groups;
 using FusionCanvas.App.Listings;
 using FusionCanvas.App.Navigation;
@@ -27,6 +27,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly IWorkspaceRepository? _workspaceRepository;
     private readonly IGroupManagementService _groupManagementService;
     private readonly IListingManagementService _listingManagementService;
+    private readonly IListingInspectorService _listingInspectorService;
     private WorkspaceSnapshot _workspaceSnapshot;
     private IReadOnlyList<NavigationDocumentContext> _navigationContexts = [];
 
@@ -68,7 +69,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.Repository,
             runtime.Snapshot,
             runtime.GroupManagement,
-            runtime.ListingManagement)
+            runtime.ListingManagement,
+            runtime.ListingInspector)
     {
     }
 
@@ -120,8 +122,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _workspaceRepository = treeRepository;
         _groupManagementService = new GroupManagementService(treeRepository);
         _listingManagementService = new ListingManagementService(treeRepository);
+        _listingInspectorService = new ListingInspectorService(treeRepository);
         GroupManagement = new GroupManagementViewModel(_groupManagementService);
         ListingManagement = new ListingManagementViewModel(_listingManagementService);
+        ListingInspector = new ListingInspectorViewModel(_listingInspectorService);
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
         _workspaceSnapshot = workspaceSnapshot;
@@ -141,6 +145,20 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 SelectWorkflowStage(stage);
             }
         });
+        RequestSelectTabCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is DocumentTabViewModel tab)
+            {
+                HandleSelectTabRequest(tab);
+            }
+        });
+        RequestCloseTabCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is DocumentTabViewModel tab)
+            {
+                HandleCloseTabRequest(tab);
+            }
+        });
         InitializeGroupIntegration();
         StoreManagement.ActiveStoreChanged += (_, store) => RebuildNavigationContexts(store);
         StoreManagement.WorkspaceStructureChanged += (_, _) => RefreshWorkspaceSnapshot();
@@ -151,6 +169,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         DocumentWindow.ActiveContextChanged += (_, context) => CoordinateActiveContext(context);
         DocumentWindow.ToolScopeChangeRequested += (_, scope) => ResolveActiveToolContext(scope);
         DocumentWindow.StageToolSelectionRequested += (_, toolId) => SelectStageTool(toolId);
+        ListingInspector.Saved += (_, _) => HandleInspectorSaved();
     }
 
     public MainWindowViewModel(
@@ -161,7 +180,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IWorkspaceRepository workspaceRepository,
         WorkspaceSnapshot workspaceSnapshot,
         IGroupManagementService? groupManagementService = null,
-        IListingManagementService? listingManagementService = null)
+        IListingManagementService? listingManagementService = null,
+        IListingInspectorService? listingInspectorService = null)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
@@ -171,8 +191,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             new NicheManagementService(workspaceRepository));
         _groupManagementService = groupManagementService ?? new GroupManagementService(workspaceRepository);
         _listingManagementService = listingManagementService ?? new ListingManagementService(workspaceRepository);
+        _listingInspectorService = listingInspectorService ?? new ListingInspectorService(workspaceRepository);
         GroupManagement = new GroupManagementViewModel(_groupManagementService);
         ListingManagement = new ListingManagementViewModel(_listingManagementService);
+        ListingInspector = new ListingInspectorViewModel(_listingInspectorService);
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
         _workspaceRepository = workspaceRepository;
@@ -193,6 +215,20 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 SelectWorkflowStage(stage);
             }
         });
+        RequestSelectTabCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is DocumentTabViewModel tab)
+            {
+                HandleSelectTabRequest(tab);
+            }
+        });
+        RequestCloseTabCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is DocumentTabViewModel tab)
+            {
+                HandleCloseTabRequest(tab);
+            }
+        });
         InitializeGroupIntegration();
         StoreManagement.ActiveStoreChanged += (_, store) => RebuildNavigationContexts(store);
         StoreManagement.WorkspaceStructureChanged += (_, _) => RefreshWorkspaceSnapshot();
@@ -203,6 +239,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         DocumentWindow.ActiveContextChanged += (_, context) => CoordinateActiveContext(context);
         DocumentWindow.ToolScopeChangeRequested += (_, scope) => ResolveActiveToolContext(scope);
         DocumentWindow.StageToolSelectionRequested += (_, toolId) => SelectStageTool(toolId);
+        ListingInspector.Saved += (_, _) => HandleInspectorSaved();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -218,6 +255,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public GroupManagementViewModel GroupManagement { get; }
 
     public ListingManagementViewModel ListingManagement { get; }
+
+    public ListingInspectorViewModel ListingInspector { get; }
 
     public WorkspaceTreeViewModel WorkspaceTree { get; }
 
@@ -260,7 +299,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         ArgumentNullException.ThrowIfNull(navigationContext);
 
-        DocumentWindow.Open(navigationContext.Context);
+        GuardActiveListingInspectorLeave(() => DocumentWindow.Open(navigationContext.Context));
     }
 
     public void SelectWorkflowStage(WorkflowStage stage)
@@ -331,6 +370,22 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         RebuildNavigationContexts(StoreManagement.SelectedStore);
     }
 
+    private void RefreshWorkspaceSnapshotAndInspector()
+    {
+        RefreshWorkspaceSnapshot();
+        RefreshActiveListingInspector();
+    }
+
+    private void RefreshActiveListingInspector()
+    {
+        if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Listing, Kind: DocumentContextKind.Item, Id: var listingId }
+            && ListingInspector.HasState
+            && !ListingInspector.HasUnsavedChanges)
+        {
+            Run(ListingInspector.LoadAsync(listingId));
+        }
+    }
+
     private void CoordinateActiveContext(DocumentContext? context)
     {
         RaiseGroupActionProperties();
@@ -339,6 +394,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             WorkflowNavigator.SetActiveItem(null);
             DocumentWindow.ApplyToolContext(null);
             DocumentWindow.ApplyStageToolHostState(null);
+            ListingInspector.Clear();
             return;
         }
 
@@ -356,6 +412,27 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             DocumentWindow.ActiveTab?.TabId ?? Guid.Empty,
             context.Workflow));
         ResolveActiveToolContext();
+        CoordinateListingInspector(context);
+    }
+
+    private void CoordinateListingInspector(DocumentContext context)
+    {
+        if (context.Kind != DocumentContextKind.Item || context.EntityKind != WorkspaceEntityKind.Listing)
+        {
+            if (ListingInspector.LoadedListingId is not null)
+            {
+                ListingInspector.Clear();
+            }
+            return;
+        }
+
+        if (ListingInspector.LoadedListingId == context.Id)
+        {
+            ListingInspector.ApplyStage(context.WorkflowStage);
+            return;
+        }
+
+        Run(ListingInspector.LoadAsync(context.Id));
     }
 
     private void InitializeGroupIntegration()
@@ -367,7 +444,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         WorkspaceTree.EditPropertiesRequested += (_, groupId) => Run(OpenManageGroupAsync(groupId));
         WorkspaceTree.EditListingPropertiesRequested += (_, listingId) => Run(OpenManageListingAsync(listingId));
         WorkspaceTree.EntitiesDeleted += (_, entityIds) => CloseDeletedEntityTabs(entityIds);
-        WorkspaceTree.StructureChanged += (_, _) => RefreshWorkspaceSnapshot();
+        WorkspaceTree.StructureChanged += (_, _) => RefreshWorkspaceSnapshotAndInspector();
         WorkspaceTree.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName is nameof(WorkspaceTreeViewModel.SelectedNode) or nameof(WorkspaceTreeViewModel.CanManageSelection))
@@ -470,7 +547,65 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             candidate.Context.EntityKind == selection.Kind && candidate.Context.Id == selection.Id);
         if (context is not null)
         {
-            DocumentWindow.OpenOrReplaceActive(context.Context);
+            GuardActiveListingInspectorLeave(() => DocumentWindow.OpenOrReplaceActive(context.Context));
+        }
+    }
+
+    private void HandleSelectTabRequest(DocumentTabViewModel tab)
+    {
+        ArgumentNullException.ThrowIfNull(tab);
+        if (ReferenceEquals(DocumentWindow.ActiveTab, tab))
+        {
+            return;
+        }
+
+        GuardActiveListingInspectorLeave(() => DocumentWindow.SelectTab(tab));
+    }
+
+    private void HandleCloseTabRequest(DocumentTabViewModel tab)
+    {
+        ArgumentNullException.ThrowIfNull(tab);
+        if (ReferenceEquals(DocumentWindow.ActiveTab, tab))
+        {
+            GuardActiveListingInspectorLeave(() => DocumentWindow.CloseTab(tab));
+            return;
+        }
+
+        DocumentWindow.CloseTab(tab);
+    }
+
+    public ICommand RequestSelectTabCommand { get; private set; } = null!;
+
+    public ICommand RequestCloseTabCommand { get; private set; } = null!;
+
+    private void GuardActiveListingInspectorLeave(Action proceed)
+    {
+        if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Listing, Kind: DocumentContextKind.Item }
+            && ListingInspector.HasState
+            && ListingInspector.HasUnsavedChanges)
+        {
+            ListingInspector.RequestLeave(proceed);
+            return;
+        }
+
+        proceed();
+    }
+
+    private void HandleInspectorSaved()
+    {
+        RefreshWorkspaceSnapshot();
+        if (DocumentWindow.ActiveContext is { } context && context.EntityKind == WorkspaceEntityKind.Listing)
+        {
+            var refreshed = NavigationContexts.SingleOrDefault(candidate => candidate.Context.Id == context.Id);
+            if (refreshed is not null)
+            {
+                DocumentWindow.ActiveTab?.ReplaceContext(refreshed.Context);
+            }
+        }
+
+        if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Listing, Id: var listingId })
+        {
+            Run(ListingInspector.LoadAsync(listingId));
         }
     }
 
