@@ -252,6 +252,195 @@ public class WorkspaceTreeViewModelTests
         Assert.Equal(3, repository.Snapshot.Listings.Count);
     }
 
+    [Fact]
+    public void TagFilter_NarrowsToListingsAndGuardsSiblingPositioning()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var tagged = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Tagged", null, ListingStatus.Draft, false, sample.Now, sample.Now, "{}");
+        var untagged = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Untagged", null, ListingStatus.Draft, false, sample.Now, sample.Now, "{}");
+        var tag = new Tag(Guid.NewGuid(), sample.Store.Id, "Halloween", null, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with
+        {
+            Listings = [tagged, untagged],
+            Tags = [tag],
+            ListingTags = [new ListingTag(tagged.Id, tag.Id)]
+        };
+        var group = snapshot.Groups.Single();
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        Assert.Equal(3, viewModel.Roots.Single().Children.Count);
+
+        viewModel.ToggleTagFilter(tag.Id);
+
+        var remaining = viewModel.Roots.Single().Children.Single();
+        Assert.Equal(tagged.Id, remaining.EntityId);
+        Assert.True(viewModel.HasActiveFilters);
+
+        viewModel.SelectNodeCommand.Execute(viewModel.Roots.Single());
+        var allowed = viewModel.CanDrop(WorkspaceEntityKind.Group, group.Id, viewModel.Roots.Single(),
+            new GroupPlacement(GroupPlacementKind.Before, Guid.NewGuid()), out var error);
+        Assert.False(allowed);
+        Assert.Contains("filtering", error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SubtreeScope_PinsSelectedTopicAndRestrictsTree()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var otherNiche = new Niche(Guid.NewGuid(), sample.Store.Id, "Other", null, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Niches = [sample.Niche, otherNiche] };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        var nicheNode = viewModel.Roots.Single(root => root.EntityId == sample.Niche.Id);
+
+        viewModel.SelectNodeCommand.Execute(nicheNode);
+        Assert.True(viewModel.CanScopeToCurrentTopic);
+
+        viewModel.ScopeToCurrentTopic = true;
+
+        Assert.Equal(sample.Niche.Id, Assert.Single(viewModel.Roots).EntityId);
+        Assert.DoesNotContain(viewModel.Roots, node => node.EntityId == otherNiche.Id);
+
+        viewModel.ScopeToCurrentTopic = false;
+        Assert.Equal(2, viewModel.Roots.Count);
+    }
+
+    [Fact]
+    public void IncludeArchived_RevealsArchivedListingWithoutMakingItCanonicalContext()
+    {
+        var sample = Sample.Create();
+        var archived = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Ghost", null, ListingStatus.Draft, true, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Listings = [archived] };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        Assert.Empty(viewModel.Roots.Single().Children);
+
+        viewModel.IncludeArchived = true;
+
+        var archivedNode = Assert.Single(viewModel.Roots.Single().Children);
+        Assert.True(archivedNode.IsInactive);
+        WorkspaceTreeSelection? observed = null;
+        viewModel.SelectionChanged += (_, selection) => observed = selection;
+        viewModel.SelectNodeCommand.Execute(archivedNode);
+
+        Assert.Equal(archivedNode, viewModel.SelectedNode);
+        Assert.Null(observed);
+    }
+
+    [Fact]
+    public void ClearAllFilters_ResetsEveryDimensionRestoresExpansionAndKeepsSelection()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var repository = new TestRepository(sample.Snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+        var nicheRoot = viewModel.Roots.Single();
+        var group = Assert.Single(nicheRoot.Children);
+        nicheRoot.IsExpanded = true;
+        viewModel.SelectNodeCommand.Execute(group);
+
+        viewModel.QueryText = "no matching";
+        Assert.True(viewModel.HasEmptyFilterResults);
+        Assert.True(viewModel.HasActiveFilters);
+
+        viewModel.ClearAllFilters();
+
+        Assert.False(viewModel.HasActiveFilters);
+        Assert.False(viewModel.HasEmptyFilterResults);
+        var restoredRoot = viewModel.Roots.Single();
+        Assert.True(restoredRoot.IsExpanded);
+        Assert.Equal(group.EntityId, viewModel.SelectedNode!.EntityId);
+    }
+
+    [Fact]
+    public void CanScopeToCurrentTopic_ReflectsSelectionResolvability()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var repository = new TestRepository(sample.Snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+
+        Assert.False(viewModel.CanScopeToCurrentTopic);
+
+        viewModel.SelectNodeCommand.Execute(viewModel.Roots.Single());
+        Assert.True(viewModel.CanScopeToCurrentTopic);
+
+        var group = Assert.Single(viewModel.Roots.Single().Children);
+        viewModel.SelectNodeCommand.Execute(group);
+        Assert.True(viewModel.CanScopeToCurrentTopic);
+    }
+
+    [Fact]
+    public void EmptyFilterResults_ExplainedWhenNothingMatches()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+
+        viewModel.QueryText = "zzz nothing matches";
+
+        Assert.True(viewModel.HasActiveFilters);
+        Assert.True(viewModel.HasEmptyFilterResults);
+        Assert.False(viewModel.HasVisibleResults);
+    }
+
+    [Fact]
+    public void HasNonTextFilters_ReflectsOnlyNonTextDimensions()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var tag = new Tag(Guid.NewGuid(), sample.Store.Id, "Halloween", null, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Tags = [tag] };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(sample.Store.Id, snapshot);
+
+        Assert.False(viewModel.HasNonTextFilters);
+
+        viewModel.QueryText = "anything";
+        Assert.False(viewModel.HasNonTextFilters);
+
+        viewModel.QueryText = string.Empty;
+        viewModel.SetTagSelected(tag.Id, true);
+        Assert.True(viewModel.HasNonTextFilters);
+        Assert.Equal(1, viewModel.ActiveFilterCount);
+
+        viewModel.SetTagSelected(tag.Id, false);
+        viewModel.SelectNodeCommand.Execute(viewModel.Roots.Single());
+        viewModel.ScopeToCurrentTopic = true;
+        Assert.True(viewModel.HasNonTextFilters);
+
+        viewModel.ScopeToCurrentTopic = false;
+        viewModel.IncludeArchived = true;
+        Assert.True(viewModel.HasNonTextFilters);
+    }
+
+    [Fact]
+    public void AvailableTags_ListsActiveStoreTagsAlphabetically()
+    {
+        var sample = Sample.Create();
+        var tea = new Tag(Guid.NewGuid(), sample.Store.Id, "Tea", null, false, sample.Now, sample.Now, "{}");
+        var coffee = new Tag(Guid.NewGuid(), sample.Store.Id, "Coffee", null, false, sample.Now, sample.Now, "{}");
+        var archived = new Tag(Guid.NewGuid(), sample.Store.Id, "Archived", null, true, sample.Now, sample.Now, "{}");
+        var otherStore = new Store(Guid.NewGuid(), "Other", null, false, sample.Now, sample.Now, "{}");
+        var otherNiche = new Niche(Guid.NewGuid(), otherStore.Id, "Other niche", null, false, sample.Now, sample.Now, "{}");
+        var otherTag = new Tag(Guid.NewGuid(), otherStore.Id, "Other tag", null, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with
+        {
+            Stores = [sample.Store, otherStore],
+            Niches = [sample.Niche, otherNiche],
+            Tags = [tea, coffee, archived, otherTag]
+        };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(sample.Store.Id, snapshot);
+
+        Assert.Equal(["Coffee", "Tea"], viewModel.AvailableTags.Select(entry => entry.Name));
+    }
+
     private sealed class TestRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
     {
         public WorkspaceSnapshot Snapshot { get; private set; } = snapshot;

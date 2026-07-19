@@ -135,13 +135,61 @@
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
             <TextBox x:Name="TreeSearchBox"
                      Text="{Binding WorkspaceTree.QueryText}"
-                     PlaceholderText="Search groups and items..."
+                     PlaceholderText="Search names, ideas, notes, tags..."
                      MinHeight="34" />
             <Button Grid.Column="1"
                     Content="Filters"
-                    IsEnabled="False"
-                    ToolTip.Tip="Status and tag filters become available when those properties are implemented."
-                    Classes="storeSecondary" />
+                    ToolTip.Tip="Filter by tag, topic scope, or archived work"
+                    Command="{Binding WorkspaceTree.ClearFiltersCommand}"
+                    Classes="storeSecondary"
+                    Classes.active="{Binding WorkspaceTree.HasNonTextFilters}">
+              <Button.Flyout>
+                <Flyout Placement="BottomEdgeAlignedLeft"
+                        ShowMode="Standard">
+                  <Border Width="260" Padding="12">
+                    <StackPanel Spacing="10">
+                      <StackPanel Spacing="6">
+                        <TextBlock Text="Scope" FontSize="12" FontWeight="SemiBold" Foreground="#243447" />
+                        <CheckBox Content="Current topic and below"
+                                  IsChecked="{Binding WorkspaceTree.ScopeToCurrentTopic}"
+                                  IsEnabled="{Binding WorkspaceTree.CanScopeToCurrentTopic}"
+                                  ToolTip.Tip="Limit the tree to the selected niche or group subtree" />
+                        <TextBlock IsVisible="{Binding WorkspaceTree.ScopeToCurrentTopic}"
+                                   Text="{Binding WorkspaceTree.ScopedTopicName, StringFormat='Current: {0}'}"
+                                   FontSize="11" Foreground="#687385" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                      <Separator Margin="0,2" />
+                      <StackPanel Spacing="6">
+                        <TextBlock Text="Tags" FontSize="12" FontWeight="SemiBold" Foreground="#243447" />
+                        <TextBlock Text="No tags yet in this store."
+                                   IsVisible="{Binding !WorkspaceTree.AvailableTags.Count}"
+                                   FontSize="11" Foreground="#8B95A3" />
+                        <ItemsControl ItemsSource="{Binding WorkspaceTree.AvailableTags}"
+                                      IsVisible="{Binding WorkspaceTree.AvailableTags.Count}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="nav:TagFilterEntryViewModel">
+                              <CheckBox Content="{Binding Name}"
+                                        IsChecked="{Binding IsSelected}"
+                                        Margin="0,1" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                      <Separator Margin="0,2" />
+                      <CheckBox Content="Include archived"
+                                IsChecked="{Binding WorkspaceTree.IncludeArchived}"
+                                ToolTip.Tip="Reveal archived topics and listings with inactive treatment" />
+                      <Separator Margin="0,2" />
+                      <Button Content="Clear all"
+                              HorizontalAlignment="Right"
+                              Command="{Binding WorkspaceTree.ClearFiltersCommand}"
+                              IsEnabled="{Binding WorkspaceTree.HasActiveFilters}"
+                              Classes="storeSecondary" />
+                    </StackPanel>
+                  </Border>
+                </Flyout>
+              </Button.Flyout>
+            </Button>
           </Grid>
           <TextBlock Text="{Binding GroupActionStatus}"
                      TextWrapping="Wrap"
@@ -155,63 +203,85 @@
                      AutomationProperties.AutomationId="WorkspaceTreeError" />
         </StackPanel>
 
-        <TreeView x:Name="WorkspaceTreeControl"
-                  ItemsSource="{Binding WorkspaceTree.Roots}"
-                  Background="Transparent"
-                  BorderThickness="0">
-          <TreeView.ItemTemplate>
-            <TreeDataTemplate x:DataType="nav:WorkspaceTreeNodeViewModel" ItemsSource="{Binding Children}">
-              <Border Classes="treeRow"
-                      Classes.selected="{Binding IsSelected}"
-                      Classes.cut="{Binding IsCut}"
-                      Classes.dropTarget="{Binding IsDropTarget}"
-                      Classes.dropBefore="{Binding IsDropBefore}"
-                      Classes.dropAfter="{Binding IsDropAfter}"
-                      DragDrop.AllowDrop="True"
-                      PointerPressed="OnTreeNodePointerPressed"
-                      PointerMoved="OnTreeNodePointerMoved"
-                      DragDrop.DragOver="OnTreeNodeDragOver"
-                      DragDrop.DragLeave="OnTreeNodeDragLeave"
-                      DragDrop.Drop="OnTreeNodeDrop"
-                      ToolTip.Tip="Right-click for actions; Ctrl-click opens a tab; F2 renames">
-                <Border.ContextMenu>
-                  <ContextMenu IsVisible="{Binding HasContextActions}">
-                    <MenuItem Header="New group (subgroup)" IsVisible="{Binding IsGroup}" Click="OnContextNewGroup" />
-                    <MenuItem Header="New listing" Click="OnContextNewListing" />
-                    <Separator />
-                    <MenuItem Header="Rename" Click="OnContextRename" />
-                    <MenuItem Header="Copy" Click="OnContextCopy" />
-                    <MenuItem Header="Cut" Click="OnContextCut" />
-                    <MenuItem Header="Paste" IsEnabled="{Binding CanPaste}" Click="OnContextPaste" />
-                    <MenuItem Header="Duplicate" IsVisible="{Binding IsListing}" Click="OnContextDuplicate" />
-                    <MenuItem Header="Edit properties…" Click="OnContextEditProperties" />
-                    <Separator />
-                    <MenuItem Header="Delete..." IsVisible="{Binding IsGroup}" Click="OnContextDelete" />
-                  </ContextMenu>
-                </Border.ContextMenu>
-                <Grid ColumnDefinitions="3,22,*,Auto" MinHeight="34">
-                  <Border Grid.Column="0" Background="#59A17D" CornerRadius="2" />
-                  <TextBlock Grid.Column="1" Text="{Binding Icon}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="#526173" />
-                  <Grid Grid.Column="2" Margin="4,0">
-                    <TextBlock Text="{Binding Name}"
-                               IsVisible="{Binding !IsEditing}"
-                               VerticalAlignment="Center"
-                               TextTrimming="CharacterEllipsis" />
-                    <TextBox Text="{Binding DraftName}"
-                             IsVisible="{Binding IsEditing}"
-                             AttachedToVisualTree="OnTreeEditorAttached"
-                             KeyDown="OnTreeEditorKeyDown"
-                             MinHeight="28"
-                             Padding="5,2" />
+        <Grid>
+          <TreeView x:Name="WorkspaceTreeControl"
+                    ItemsSource="{Binding WorkspaceTree.Roots}"
+                    Background="Transparent"
+                    BorderThickness="0">
+            <TreeView.ItemTemplate>
+              <TreeDataTemplate x:DataType="nav:WorkspaceTreeNodeViewModel" ItemsSource="{Binding Children}">
+                <Border Classes="treeRow"
+                        Classes.selected="{Binding IsSelected}"
+                        Classes.inactive="{Binding IsInactive}"
+                        Classes.cut="{Binding IsCut}"
+                        Classes.dropTarget="{Binding IsDropTarget}"
+                        Classes.dropBefore="{Binding IsDropBefore}"
+                        Classes.dropAfter="{Binding IsDropAfter}"
+                        DragDrop.AllowDrop="True"
+                        PointerPressed="OnTreeNodePointerPressed"
+                        PointerMoved="OnTreeNodePointerMoved"
+                        DragDrop.DragOver="OnTreeNodeDragOver"
+                        DragDrop.DragLeave="OnTreeNodeDragLeave"
+                        DragDrop.Drop="OnTreeNodeDrop"
+                        ToolTip.Tip="Right-click for actions; Ctrl-click opens a tab; F2 renames">
+                  <Border.ContextMenu>
+                    <ContextMenu IsVisible="{Binding HasContextActions}">
+                      <MenuItem Header="New group (subgroup)" IsVisible="{Binding IsGroup}" Click="OnContextNewGroup" />
+                      <MenuItem Header="New listing" Click="OnContextNewListing" />
+                      <Separator />
+                      <MenuItem Header="Rename" Click="OnContextRename" />
+                      <MenuItem Header="Copy" Click="OnContextCopy" />
+                      <MenuItem Header="Cut" Click="OnContextCut" />
+                      <MenuItem Header="Paste" IsEnabled="{Binding CanPaste}" Click="OnContextPaste" />
+                      <MenuItem Header="Duplicate" IsVisible="{Binding IsListing}" Click="OnContextDuplicate" />
+                      <MenuItem Header="Edit properties…" Click="OnContextEditProperties" />
+                      <Separator />
+                      <MenuItem Header="Delete..." IsVisible="{Binding IsGroup}" Click="OnContextDelete" />
+                    </ContextMenu>
+                  </Border.ContextMenu>
+                  <Grid ColumnDefinitions="3,22,*,Auto" MinHeight="34">
+                    <Border Grid.Column="0" Background="#59A17D" CornerRadius="2" />
+                    <TextBlock Grid.Column="1" Text="{Binding Icon}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="#526173" />
+                    <Grid Grid.Column="2" Margin="4,0">
+                      <TextBlock Text="{Binding Name}"
+                                 IsVisible="{Binding !IsEditing}"
+                                 VerticalAlignment="Center"
+                                 TextTrimming="CharacterEllipsis" />
+                      <TextBox Text="{Binding DraftName}"
+                               IsVisible="{Binding IsEditing}"
+                               AttachedToVisualTree="OnTreeEditorAttached"
+                               KeyDown="OnTreeEditorKeyDown"
+                               MinHeight="28"
+                               Padding="5,2" />
+                    </Grid>
+                    <Border Grid.Column="3" IsVisible="{Binding HasChildren}" Padding="5,1" CornerRadius="8" Background="#E8EDF3">
+                      <TextBlock Text="{Binding CountLabel}" FontSize="10" Foreground="#526173" />
+                    </Border>
                   </Grid>
-                  <Border Grid.Column="3" IsVisible="{Binding HasChildren}" Padding="5,1" CornerRadius="8" Background="#E8EDF3">
-                    <TextBlock Text="{Binding CountLabel}" FontSize="10" Foreground="#526173" />
-                  </Border>
-                </Grid>
-              </Border>
-            </TreeDataTemplate>
-          </TreeView.ItemTemplate>
-        </TreeView>
+                </Border>
+              </TreeDataTemplate>
+            </TreeView.ItemTemplate>
+          </TreeView>
+          <Border IsVisible="{Binding WorkspaceTree.HasEmptyFilterResults}"
+                  Background="#F7F8FA"
+                  HorizontalAlignment="Stretch"
+                  VerticalAlignment="Stretch">
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="8"
+                        MaxWidth="220">
+              <TextBlock Text="Nothing matches the current filters."
+                         TextWrapping="Wrap"
+                         TextAlignment="Center"
+                         Foreground="#526173"
+                         FontSize="12" />
+              <Button Content="Clear filters"
+                      HorizontalAlignment="Center"
+                      Command="{Binding WorkspaceTree.ClearFiltersCommand}"
+                      Classes="storeSecondary" />
+            </StackPanel>
+          </Border>
+        </Grid>
       </DockPanel>
     </Border>
 
@@ -516,6 +586,12 @@
     <Style Selector="Border.treeRow.selected">
       <Setter Property="Background" Value="#E2EAF2" />
     </Style>
+    <Style Selector="Border.treeRow.inactive">
+      <Setter Property="Opacity" Value="0.55" />
+    </Style>
+    <Style Selector="Border.treeRow.inactive:pointerover">
+      <Setter Property="Opacity" Value="0.7" />
+    </Style>
     <Style Selector="Border.treeRow.cut">
       <Setter Property="Opacity" Value="0.48" />
     </Style>
@@ -574,6 +650,12 @@
       <Setter Property="Foreground" Value="#425066" />
       <Setter Property="BorderBrush" Value="#D9DEE7" />
       <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.storeSecondary.active">
+      <Setter Property="Background" Value="#EEF6FF" />
+      <Setter Property="Foreground" Value="#204466" />
+      <Setter Property="BorderBrush" Value="#B9D7F2" />
+      <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="Button.iconButton">
       <Setter Property="Width" Value="28" />

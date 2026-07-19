@@ -92,7 +92,6 @@ public interface IListingManagementService
 
 public sealed class ListingManagementService : IListingManagementService
 {
-    private const string NotesKey = "notes";
     private const string InheritedFromPrefix = "inheritedFrom:";
 
     private readonly IWorkspaceRepository _repository;
@@ -685,7 +684,7 @@ public sealed class ListingManagementService : IListingManagementService
 
     private static void ApplyContextMetadata(Dictionary<string, string> metadata, ListingContext context, bool replaceExplicitMetadata)
     {
-        SetOptional(metadata, NotesKey, context.Notes);
+        SetOptional(metadata, ListingMetadata.NotesKey, context.Notes);
         if (context.Metadata is null)
         {
             return;
@@ -717,7 +716,7 @@ public sealed class ListingManagementService : IListingManagementService
     private static ListingContext ToContext(WorkspaceSnapshot snapshot, Listing listing)
     {
         var metadata = ParseMetadata(listing.MetadataJson);
-        metadata.Remove(NotesKey, out var notes);
+        metadata.Remove(ListingMetadata.NotesKey, out var notes);
         var explicitMetadata = metadata
             .Where(pair => !pair.Key.StartsWith(InheritedFromPrefix, StringComparison.Ordinal))
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);

@@ -14,7 +14,8 @@ public sealed record NavigationNode(
     Guid EntityId,
     string Name,
     Guid? ParentNodeId,
-    IReadOnlyList<NavigationNode> Children);
+    IReadOnlyList<NavigationNode> Children,
+    bool IsInactive = false);
 
 public sealed record NavigationTopicReference(WorkspaceEntityKind EntityKind, Guid EntityId)
 {
@@ -70,41 +71,59 @@ public sealed record NavigationTreeSnapshot(IReadOnlyList<NavigationNode> Stores
 
 public static class WorkspaceNavigation
 {
-    public static NavigationTreeSnapshot BuildTree(WorkspaceSnapshot snapshot)
+    public static NavigationTreeSnapshot BuildTree(WorkspaceSnapshot snapshot, bool includeArchived = false)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ValidateWorkspace(snapshot);
 
         var activeStores = snapshot.Stores.Where(store => !store.IsArchived).ToArray();
-        var activeNiches = snapshot.Niches
-            .Where(niche => !niche.IsArchived && activeStores.Any(store => store.Id == niche.StoreId))
-            .ToArray();
-        var activeGroups = snapshot.Groups
-            .Where(group => GroupHierarchy.IsEffectivelyActive(snapshot, group))
-            .ToArray();
-        var activeGroupIds = activeGroups.Select(group => group.Id).ToHashSet();
+        var storeIds = activeStores.Select(store => store.Id).ToHashSet();
 
-        var nichesByStore = activeNiches
+        IEnumerable<Niche> nichesQuery = snapshot.Niches.Where(niche => storeIds.Contains(niche.StoreId));
+        IEnumerable<TopicGroup> groupsQuery = snapshot.Groups.Where(group => storeIds.Contains(group.StoreId));
+        IEnumerable<Listing> listingsQuery = snapshot.Listings.Where(listing => storeIds.Contains(listing.StoreId));
+
+        if (!includeArchived)
+        {
+            nichesQuery = nichesQuery.Where(niche => !niche.IsArchived);
+            groupsQuery = groupsQuery.Where(group => GroupHierarchy.IsEffectivelyActive(snapshot, group));
+            listingsQuery = listingsQuery.Where(listing => !listing.IsArchived);
+        }
+
+        var niches = nichesQuery.ToArray();
+        var groups = groupsQuery.ToArray();
+        var groupIds = groups.Select(group => group.Id).ToHashSet();
+
+        if (!includeArchived)
+        {
+            listingsQuery = listingsQuery.Where(listing =>
+                (listing.NicheId is Guid nicheId && niches.Any(niche => niche.Id == nicheId)) ||
+                (listing.GroupId is Guid groupId && groupIds.Contains(groupId)));
+        }
+
+        var listings = listingsQuery.ToArray();
+
+        var nichesByStore = niches
             .GroupBy(niche => niche.StoreId)
             .ToDictionary(group => group.Key, group => group.OrderBy(niche => niche.Name, StringComparer.OrdinalIgnoreCase).ToArray());
 
-        var groupsByNiche = activeGroups
+        var groupsByNiche = groups
             .Where(group => group.NicheId is not null)
             .GroupBy(group => group.NicheId!.Value)
             .ToDictionary(group => group.Key, group => group.OrderBy(topicGroup => topicGroup.SortOrder).ThenBy(topicGroup => topicGroup.Name, StringComparer.OrdinalIgnoreCase).ToArray());
 
-        var groupsByParentGroup = activeGroups
+        var groupsByParentGroup = groups
             .Where(group => group.ParentGroupId is not null)
             .GroupBy(group => group.ParentGroupId!.Value)
             .ToDictionary(group => group.Key, group => group.OrderBy(topicGroup => topicGroup.SortOrder).ThenBy(topicGroup => topicGroup.Name, StringComparer.OrdinalIgnoreCase).ToArray());
 
-        var listingsByNiche = snapshot.Listings
-            .Where(listing => !listing.IsArchived && listing.NicheId is not null && listing.GroupId is null && activeNiches.Any(niche => niche.Id == listing.NicheId))
+        var listingsByNiche = listings
+            .Where(listing => listing.NicheId is not null && listing.GroupId is null)
             .GroupBy(listing => listing.NicheId!.Value)
             .ToDictionary(group => group.Key, group => group.OrderBy(listing => listing.Name, StringComparer.OrdinalIgnoreCase).ToArray());
 
-        var listingsByGroup = snapshot.Listings
-            .Where(listing => !listing.IsArchived && listing.GroupId is Guid groupId && activeGroupIds.Contains(groupId))
+        var listingsByGroup = listings
+            .Where(listing => listing.GroupId is Guid groupId)
             .GroupBy(listing => listing.GroupId!.Value)
             .ToDictionary(group => group.Key, group => group.OrderBy(listing => listing.Name, StringComparer.OrdinalIgnoreCase).ToArray());
 
@@ -113,7 +132,7 @@ public static class WorkspaceNavigation
             .Select(store =>
             {
                 var childTopics = nichesByStore.GetValueOrDefault(store.Id, [])
-                    .Select(niche => BuildNicheNode(niche, groupsByNiche, groupsByParentGroup, listingsByNiche, listingsByGroup));
+                    .Select(niche => BuildNicheNode(snapshot, niche, groupsByNiche, groupsByParentGroup, listingsByNiche, listingsByGroup, includeArchived));
 
                 return new NavigationNode(
                     store.Id,
@@ -122,7 +141,8 @@ public static class WorkspaceNavigation
                     store.Id,
                     store.Name,
                     null,
-                    childTopics.ToArray());
+                    childTopics.ToArray(),
+                    IsInactive: false);
             })
             .ToArray();
 
@@ -235,17 +255,19 @@ public static class WorkspaceNavigation
     }
 
     private static NavigationNode BuildNicheNode(
+        WorkspaceSnapshot snapshot,
         Niche niche,
         IReadOnlyDictionary<Guid, TopicGroup[]> groupsByNiche,
         IReadOnlyDictionary<Guid, TopicGroup[]> groupsByParentGroup,
         IReadOnlyDictionary<Guid, Listing[]> listingsByNiche,
-        IReadOnlyDictionary<Guid, Listing[]> listingsByGroup)
+        IReadOnlyDictionary<Guid, Listing[]> listingsByGroup,
+        bool includeArchived)
     {
         var childGroups = groupsByNiche.GetValueOrDefault(niche.Id, [])
-            .Select(group => BuildGroupNode(group, groupsByParentGroup, listingsByGroup));
+            .Select(group => BuildGroupNode(snapshot, group, groupsByParentGroup, listingsByGroup, includeArchived));
 
         var childListings = listingsByNiche.GetValueOrDefault(niche.Id, [])
-            .Select(listing => BuildListingNode(listing, niche.Id));
+            .Select(listing => BuildListingNode(snapshot, listing, niche.Id, includeArchived));
 
         return new NavigationNode(
             niche.Id,
@@ -254,19 +276,22 @@ public static class WorkspaceNavigation
             niche.Id,
             niche.Name,
             niche.StoreId,
-            childGroups.Concat(childListings).ToArray());
+            childGroups.Concat(childListings).ToArray(),
+            IsInactive: includeArchived && niche.IsArchived);
     }
 
     private static NavigationNode BuildGroupNode(
+        WorkspaceSnapshot snapshot,
         TopicGroup group,
         IReadOnlyDictionary<Guid, TopicGroup[]> groupsByParentGroup,
-        IReadOnlyDictionary<Guid, Listing[]> listingsByGroup)
+        IReadOnlyDictionary<Guid, Listing[]> listingsByGroup,
+        bool includeArchived)
     {
         var childGroups = groupsByParentGroup.GetValueOrDefault(group.Id, [])
-            .Select(childGroup => BuildGroupNode(childGroup, groupsByParentGroup, listingsByGroup));
+            .Select(childGroup => BuildGroupNode(snapshot, childGroup, groupsByParentGroup, listingsByGroup, includeArchived));
 
         var childListings = listingsByGroup.GetValueOrDefault(group.Id, [])
-            .Select(listing => BuildListingNode(listing, group.Id));
+            .Select(listing => BuildListingNode(snapshot, listing, group.Id, includeArchived));
 
         return new NavigationNode(
             group.Id,
@@ -275,10 +300,11 @@ public static class WorkspaceNavigation
             group.Id,
             group.Name,
             group.ParentGroupId ?? group.NicheId,
-            childGroups.Concat(childListings).ToArray());
+            childGroups.Concat(childListings).ToArray(),
+            IsInactive: includeArchived && !GroupHierarchy.IsEffectivelyActive(snapshot, group));
     }
 
-    private static NavigationNode BuildListingNode(Listing listing, Guid parentNodeId) =>
+    private static NavigationNode BuildListingNode(WorkspaceSnapshot snapshot, Listing listing, Guid parentNodeId, bool includeArchived) =>
         new(
             listing.Id,
             NavigationNodeRole.Item,
@@ -286,7 +312,8 @@ public static class WorkspaceNavigation
             listing.Id,
             listing.Name,
             parentNodeId,
-            []);
+            [],
+            IsInactive: includeArchived && !ListingHierarchy.IsEffectivelyActive(snapshot, listing));
 
     private static void ValidateWorkspace(WorkspaceSnapshot snapshot)
     {

@@ -82,4 +82,169 @@ public class WorkspaceTreeTests
             yield return child;
         }
     }
+
+    [Fact]
+    public void Project_TextMatchesListingDescriptionAndNotes()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
+        var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, "{}");
+        var byDescription = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Title A", "Cozy autumn mug", ListingStatus.Draft, false, now, now, "{}");
+        var byNotes = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Title B", null, ListingStatus.Draft, false, now, now, """{"notes":"remember to add a scarf"}""");
+        var noMatch = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Title C", "Plain text", ListingStatus.Draft, false, now, now, "{}");
+        var snapshot = new WorkspaceSnapshot([store], [niche], [], [byDescription, byNotes, noMatch], [], [], [], [], []);
+
+        var byDesc = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery("autumn"));
+        Assert.Single(byDesc.Roots.Single().Children, node => node.EntityId == byDescription.Id);
+
+        var byNotesResult = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery("scarf"));
+        Assert.Single(byNotesResult.Roots.Single().Children, node => node.EntityId == byNotes.Id);
+    }
+
+    [Fact]
+    public void Project_TextMatchesListingByAttachedTagName()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
+        var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Untitled", null, ListingStatus.Draft, false, now, now, "{}");
+        var tag = new Tag(Guid.NewGuid(), store.Id, "Halloween", null, false, now, now, "{}");
+        var snapshot = new WorkspaceSnapshot(
+            [store], [niche], [], [listing], [], [], [tag], [new ListingTag(listing.Id, tag.Id)], []);
+
+        var projection = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery("hallo"));
+
+        Assert.Single(projection.Roots.Single().Children, node => node.EntityId == listing.Id);
+    }
+
+    [Fact]
+    public void Project_TagFilterRequiresAllSelectedTagsAndKeepsAncestorContext()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
+        var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, "{}");
+        var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Campaign", null, false, now, now, "{}");
+        var oneTag = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "One", null, ListingStatus.Draft, false, now, now, "{}");
+        var bothTags = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Both", null, ListingStatus.Draft, false, now, now, "{}");
+        var fallTag = new Tag(Guid.NewGuid(), store.Id, "Fall", null, false, now, now, "{}");
+        var cozyTag = new Tag(Guid.NewGuid(), store.Id, "Cozy", null, false, now, now, "{}");
+        var snapshot = new WorkspaceSnapshot(
+            [store], [niche], [group], [oneTag, bothTags], [], [], [fallTag, cozyTag],
+            [new ListingTag(oneTag.Id, fallTag.Id), new ListingTag(bothTags.Id, fallTag.Id), new ListingTag(bothTags.Id, cozyTag.Id)],
+            []);
+
+        var fallOnly = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery(TagIds: new HashSet<Guid> { fallTag.Id }));
+        Assert.Equal(2, fallOnly.Roots.Single().Children.Single().Children.Count);
+
+        var both = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery(TagIds: new HashSet<Guid> { fallTag.Id, cozyTag.Id }));
+        var matchedListing = Assert.Single(both.Roots.Single().Children.Single().Children, node => node.EntityKind == WorkspaceEntityKind.Listing);
+        Assert.Equal(bothTags.Id, matchedListing.EntityId);
+    }
+
+    [Fact]
+    public void Project_SubtreeScopeRestrictsResultsToScopedTopicSubtree()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
+        var niche = new Niche(Guid.NewGuid(), store.Id, "Niche", null, false, now, now, "{}");
+        var outerGroup = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Outer", null, false, now, now, "{}");
+        var innerGroup = new TopicGroup(Guid.NewGuid(), store.Id, null, outerGroup.Id, "Inner", null, false, now, now, "{}");
+        var outerListing = new Listing(Guid.NewGuid(), store.Id, niche.Id, outerGroup.Id, "Outer listing", null, ListingStatus.Draft, false, now, now, "{}");
+        var innerListing = new Listing(Guid.NewGuid(), store.Id, niche.Id, innerGroup.Id, "Inner listing", null, ListingStatus.Draft, false, now, now, "{}");
+        var outsideListing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Outside listing", null, ListingStatus.Draft, false, now, now, "{}");
+        var snapshot = new WorkspaceSnapshot([store], [niche], [outerGroup, innerGroup], [outerListing, innerListing, outsideListing], [], [], [], [], []);
+
+        var scoped = WorkspaceTreeProjector.Project(
+            snapshot,
+            store.Id,
+            new WorkspaceTreeQuery(ScopeTopic: new NavigationTopicReference(WorkspaceEntityKind.Group, outerGroup.Id)));
+
+        var root = Assert.Single(scoped.Roots);
+        Assert.Equal(outerGroup.Id, root.EntityId);
+        Assert.All(FlattenProjection(root), node => Assert.NotEqual(outsideListing.Id, node.EntityId));
+        Assert.Contains(root.Children, node => node.EntityId == outerListing.Id);
+        var innerNode = Assert.Single(root.Children, node => node.EntityId == innerGroup.Id);
+        Assert.Contains(innerNode.Children, node => node.EntityId == innerListing.Id);
+        Assert.DoesNotContain(scoped.VisibleEntityIds, id => id == niche.Id);
+    }
+
+    private static IEnumerable<WorkspaceTreeProjectionNode> FlattenProjection(WorkspaceTreeProjectionNode node)
+    {
+        yield return node;
+        foreach (var child in node.Children.SelectMany(FlattenProjection))
+        {
+            yield return child;
+        }
+    }
+
+    [Fact]
+    public void Project_ScopeWithTextCombinesAcrossDimensions()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
+        var niche = new Niche(Guid.NewGuid(), store.Id, "Niche", null, false, now, now, "{}");
+        var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Campaign", null, false, now, now, "{}");
+        var matching = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Pumpkin", null, ListingStatus.Draft, false, now, now, "{}");
+        var other = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Pumpkin elsewhere", null, ListingStatus.Draft, false, now, now, "{}");
+        var snapshot = new WorkspaceSnapshot([store], [niche], [group], [matching, other], [], [], [], [], []);
+
+        var projection = WorkspaceTreeProjector.Project(
+            snapshot,
+            store.Id,
+            new WorkspaceTreeQuery(Text: "pumpkin", ScopeTopic: new NavigationTopicReference(WorkspaceEntityKind.Group, group.Id)));
+
+        var root = Assert.Single(projection.Roots);
+        Assert.Equal(group.Id, root.EntityId);
+        var matched = Assert.Single(root.Children, node => node.EntityKind == WorkspaceEntityKind.Listing);
+        Assert.Equal(matching.Id, matched.EntityId);
+    }
+
+    [Fact]
+    public void Project_IncludeArchivedRevealsArchivedListingInactive()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
+        var niche = new Niche(Guid.NewGuid(), store.Id, "Niche", null, false, now, now, "{}");
+        var archived = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Ghost listing", null, ListingStatus.Draft, true, now, now, "{}");
+        var snapshot = new WorkspaceSnapshot([store], [niche], [], [archived], [], [], [], [], []);
+
+        var defaultProjection = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery("ghost"));
+        Assert.Empty(defaultProjection.Roots);
+
+        var included = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery(Text: "ghost", IncludeArchived: true));
+        var listingNode = Assert.Single(included.Roots.Single().Children);
+        Assert.Equal(archived.Id, listingNode.EntityId);
+        Assert.True(listingNode.IsInactive);
+    }
+
+    [Fact]
+    public void Project_ActiveQueryWithNoMatchesProducesEmptyRoots()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
+        var niche = new Niche(Guid.NewGuid(), store.Id, "Niche", null, false, now, now, "{}");
+        var snapshot = new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []);
+
+        var projection = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery("nothing matches"));
+
+        Assert.Empty(projection.Roots);
+        Assert.True(projection.Query.IsActive);
+        Assert.False(projection.CanReorderBetweenSiblings);
+    }
+
+    [Fact]
+    public void Project_BlankTextDoesNotRestrictAndStaysInactive()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
+        var niche = new Niche(Guid.NewGuid(), store.Id, "Niche", null, false, now, now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Title", null, ListingStatus.Draft, false, now, now, "{}");
+        var snapshot = new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [], [], []);
+
+        var projection = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery("   "));
+
+        Assert.False(projection.Query.IsActive);
+        Assert.True(projection.CanReorderBetweenSiblings);
+        Assert.Single(projection.Roots);
+    }
 }
