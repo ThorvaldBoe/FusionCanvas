@@ -62,6 +62,8 @@ The navigation pane should remain visible during normal work. It should show the
 
 The active document tab should be able to reveal or highlight its item in the navigation tree.
 
+The navigation pane should be resizable within useful minimum and maximum bounds. Its common command groups must remain readable at the normal width, and resizing must not collapse the document window below a usable width.
+
 ### Tabbed Work
 
 Users should be able to keep multiple items, topics, or setup views open at once.
@@ -69,8 +71,10 @@ Users should be able to keep multiple items, topics, or setup views open at once
 Tabs should be compact and functional:
 
 - item title visible
+- long titles shortened with a single-line ellipsis
 - active tab visually clear
-- close action available
+- close action available as a small, centered, borderless affordance
+- subtle rounded upper corners and a small inset from the top edge
 - no large decorative tab treatment
 - tab activation updates workflow and navigation context
 

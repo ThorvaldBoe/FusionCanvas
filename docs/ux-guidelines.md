@@ -55,6 +55,13 @@ The interface should reflect what can happen in the current state.
 - Keep archived, inactive, unavailable, and destructive states visibly distinct from normal active work.
 - Explain why a requested action is blocked and offer the safe alternative when one exists.
 
+### Coordinate Navigation and Working Tabs
+
+- Normal tree selection should reuse one current working tab so browsing does not create tab clutter.
+- Explicit additive gestures such as Ctrl-click or Open in Tab should preserve existing tabs and open or activate the requested context without duplicates.
+- Activating a tab should select and reveal its corresponding navigation item, while synchronization code avoids feeding the same transition back through the normal-selection path.
+- After a working context has opened, keep at least one ordinary tab visible unless the underlying context is removed or the workspace changes.
+
 ## Manage Focus and Keyboard Flow
 
 After a transition, place keyboard focus where the user's next input is expected.
