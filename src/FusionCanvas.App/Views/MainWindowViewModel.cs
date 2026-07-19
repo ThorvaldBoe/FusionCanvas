@@ -342,6 +342,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             return;
         }
 
+        if (context.EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing)
+        {
+            WorkspaceTree.SelectEntity(context.Id, notifySelectionChanged: false);
+        }
+
         if (context.NavigationLocation is not null)
         {
             NavigationState.RevealPath(context.NavigationLocation.NodePath);
@@ -358,6 +363,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         CreateGroupCommand = new RelayCommand(_ => Run(WorkspaceTree.BeginCreateAsync()));
         ManageGroupCommand = new RelayCommand(_ => Run(OpenManageGroupAsync()));
         WorkspaceTree.OpenInTabRequested += (_, selection) => OpenTreeSelectionInTab(selection);
+        WorkspaceTree.SelectionChanged += (_, selection) => OpenTreeSelectionInCurrentTab(selection);
         WorkspaceTree.EditPropertiesRequested += (_, groupId) => Run(OpenManageGroupAsync(groupId));
         WorkspaceTree.EditListingPropertiesRequested += (_, listingId) => Run(OpenManageListingAsync(listingId));
         WorkspaceTree.EntitiesDeleted += (_, entityIds) => CloseDeletedEntityTabs(entityIds);
@@ -455,6 +461,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         if (context is not null)
         {
             OpenFromNavigation(context);
+        }
+    }
+
+    private void OpenTreeSelectionInCurrentTab(WorkspaceTreeSelection selection)
+    {
+        var context = NavigationContexts.SingleOrDefault(candidate =>
+            candidate.Context.EntityKind == selection.Kind && candidate.Context.Id == selection.Id);
+        if (context is not null)
+        {
+            DocumentWindow.OpenOrReplaceActive(context.Context);
         }
     }
 

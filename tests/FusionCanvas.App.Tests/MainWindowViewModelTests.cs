@@ -48,6 +48,7 @@ public class MainWindowViewModelTests
         viewModel.DocumentWindow.SelectTab(first);
 
         Assert.Equal(draft.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
+        Assert.Equal(draft.Context.Id, viewModel.WorkspaceTree.SelectedNode?.EntityId);
         Assert.Equal(draft.Context.NavigationLocation?.NodePath[^1], viewModel.NavigationState.RevealedNodeId);
         Assert.Equal(WorkflowStage.Idea, viewModel.WorkflowNavigator.ActiveViewStage);
     }
@@ -66,15 +67,37 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public void ClosingLastTab_ClearsWorkflowNavigator()
+    public void ClosingLastTab_KeepsWorkingContextAndWorkflowNavigator()
     {
         var viewModel = new MainWindowViewModel();
         var tab = viewModel.DocumentWindow.Open(DraftListingContext(viewModel).Context);
 
         viewModel.DocumentWindow.CloseTab(tab);
 
-        Assert.False(viewModel.DocumentWindow.HasActiveDocument);
-        Assert.False(viewModel.WorkflowNavigator.HasActiveItem);
+        Assert.True(viewModel.DocumentWindow.HasActiveDocument);
+        Assert.True(viewModel.WorkflowNavigator.HasActiveItem);
+    }
+
+    [Fact]
+    public void NormalTreeSelectionReusesCurrentTab_WhileControlOpenAddsAndKeepsExistingTab()
+    {
+        var viewModel = new MainWindowViewModel();
+        var nicheNode = Assert.Single(viewModel.WorkspaceTree.Roots);
+        var groupNode = nicheNode.Children.First(node => node.EntityKind == WorkspaceEntityKind.Group);
+        var listingNode = groupNode.Children.First(node => node.EntityKind == WorkspaceEntityKind.Listing);
+
+        viewModel.WorkspaceTree.SelectNodeCommand.Execute(nicheNode);
+        Assert.Single(viewModel.DocumentWindow.Tabs);
+        Assert.Equal(nicheNode.EntityId, viewModel.DocumentWindow.ActiveContext?.Id);
+
+        viewModel.WorkspaceTree.SelectNodeCommand.Execute(groupNode);
+        Assert.Single(viewModel.DocumentWindow.Tabs);
+        Assert.Equal(groupNode.EntityId, viewModel.DocumentWindow.ActiveContext?.Id);
+
+        viewModel.WorkspaceTree.OpenInTabCommand.Execute(listingNode);
+        Assert.Equal(2, viewModel.DocumentWindow.Tabs.Count);
+        Assert.Contains(viewModel.DocumentWindow.Tabs, tab => tab.Context.Id == groupNode.EntityId);
+        Assert.Equal(listingNode.EntityId, viewModel.DocumentWindow.ActiveContext?.Id);
     }
 
     [Fact]
@@ -183,7 +206,7 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public void GroupActions_FollowCanonicalTreeSelectionInsteadOfDocumentTabs()
+    public void GroupActions_FollowCanonicalSelectionCoordinatedFromTabsAndTree()
     {
         var viewModel = new MainWindowViewModel();
         var niche = viewModel.NavigationContexts.Single(context => context.Context.EntityKind == WorkspaceEntityKind.Niche);
@@ -197,7 +220,8 @@ public class MainWindowViewModelTests
 
         viewModel.OpenFromNavigation(group);
         Assert.True(viewModel.CanCreateGroup);
-        Assert.False(viewModel.CanManageGroup);
+        Assert.True(viewModel.CanManageGroup);
+        Assert.Equal(group.Context.Id, viewModel.WorkspaceTree.SelectedNode?.EntityId);
 
         viewModel.WorkspaceTree.SelectNodeCommand.Execute(nicheNode);
         Assert.False(viewModel.CanManageGroup);

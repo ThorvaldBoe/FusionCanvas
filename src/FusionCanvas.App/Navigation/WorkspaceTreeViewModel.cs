@@ -197,6 +197,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler<WorkspaceTreeSelection>? OpenInTabRequested;
+    public event EventHandler<WorkspaceTreeSelection>? SelectionChanged;
     public event EventHandler<Guid>? EditPropertiesRequested;
     public event EventHandler<Guid>? EditListingPropertiesRequested;
     public event EventHandler? StructureChanged;
@@ -297,9 +298,9 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         RefreshProjection();
     }
 
-    public void SelectEntity(Guid? entityId)
+    public void SelectEntity(Guid? entityId, bool notifySelectionChanged = true)
     {
-        Select(entityId is Guid id ? FindNode(id) : null);
+        Select(entityId is Guid id ? FindNode(id) : null, notifySelectionChanged);
     }
 
     public async Task BeginCreateAsync()
@@ -720,7 +721,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
     public void ShowDropFeedback(string? error) => ErrorMessage = error;
 
-    private void Select(WorkspaceTreeNodeViewModel? node)
+    private void Select(WorkspaceTreeNodeViewModel? node, bool notifySelectionChanged = true)
     {
         if (node is null || node.IsDraft)
         {
@@ -728,7 +729,12 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
 
         SelectedNode = node;
-        _selection.Select(new WorkspaceTreeSelection(node.EntityKind, node.EntityId));
+        var selection = new WorkspaceTreeSelection(node.EntityKind, node.EntityId);
+        _selection.Select(selection);
+        if (notifySelectionChanged)
+        {
+            SelectionChanged?.Invoke(this, selection);
+        }
     }
 
     private void OpenInTab(WorkspaceTreeNodeViewModel? node)
@@ -738,7 +744,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             return;
         }
 
-        Select(node);
+        Select(node, notifySelectionChanged: false);
         OpenInTabRequested?.Invoke(this, new WorkspaceTreeSelection(node.EntityKind, node.EntityId));
     }
 

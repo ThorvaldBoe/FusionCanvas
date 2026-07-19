@@ -80,16 +80,32 @@ public class DocumentWindowViewModelTests
     }
 
     [Fact]
-    public void CloseTab_LastTabReturnsToEmptyState()
+    public void CloseTab_LastTabIsKeptAsPersistentWorkingContext()
     {
         var viewModel = new DocumentWindowViewModel();
         var tab = viewModel.Open(NewContext("Idea", WorkflowStage.Idea));
 
         viewModel.CloseTab(tab);
 
-        Assert.Empty(viewModel.Tabs);
-        Assert.Null(viewModel.ActiveContext);
-        Assert.False(viewModel.HasActiveDocument);
+        Assert.Same(tab, Assert.Single(viewModel.Tabs));
+        Assert.Equal(tab.Context.Id, viewModel.ActiveContext?.Id);
+        Assert.True(viewModel.HasActiveDocument);
+    }
+
+    [Fact]
+    public void OpenOrReplaceActive_KeepsOneTabWhileNormalSelectionChangesContext()
+    {
+        var viewModel = new DocumentWindowViewModel();
+        var first = NewContext("First", WorkflowStage.Idea);
+        var second = NewContext("Second", WorkflowStage.Design);
+
+        var tab = viewModel.OpenOrReplaceActive(first);
+        var replaced = viewModel.OpenOrReplaceActive(second);
+
+        Assert.Same(tab, replaced);
+        Assert.Single(viewModel.Tabs);
+        Assert.Equal(second.Id, viewModel.ActiveContext?.Id);
+        Assert.Equal("Second", tab.Title);
     }
 
     [Fact]

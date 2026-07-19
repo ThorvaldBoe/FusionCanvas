@@ -56,6 +56,15 @@ public sealed class DocumentTabViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(DetailViewKey));
     }
 
+    public void ReplaceContext(DocumentContext context)
+    {
+        Context = context ?? throw new ArgumentNullException(nameof(context));
+        OnPropertyChanged(nameof(Context));
+        OnPropertyChanged(nameof(Title));
+        OnPropertyChanged(nameof(WorkflowStageLabel));
+        OnPropertyChanged(nameof(DetailViewKey));
+    }
+
     private void OnPropertyChanged(string propertyName) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }

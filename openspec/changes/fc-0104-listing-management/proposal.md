@@ -5,9 +5,9 @@ FusionCanvas now has a niche-rooted editable workspace tree and complete group-m
 ## What Changes
 
 - Add fast inline listing capture in the editable workspace tree, requiring one line of idea text and placing the listing in the selected niche/group, the selected listing's containing topic, or the store's active default niche.
-- Add inline rename, canonical tree selection, drag/drop and cut/paste movement, and copy/paste or explicit duplication for listings without automatically opening document tabs.
+- Add inline rename, canonical tree selection, drag/drop and cut/paste movement, and copy/paste or explicit duplication for listings while reusing one current working tab for normal selection.
 - Add a secondary focused listing-properties/lifecycle surface for optional core details, archived review, restore, and guarded permanent deletion.
-- Reuse FC-0103's `GroupHierarchy`, archive-aware tree projection, default-niche resolution model, canonical selection, optimistic rollback, and explicit Ctrl-click/open-tab behavior.
+- Reuse FC-0103's `GroupHierarchy`, archive-aware tree projection, default-niche resolution model, canonical selection, optimistic rollback, and extend Ctrl-click/open-tab behavior so it preserves the current tab and adds or activates another tab.
 - Preserve listing identity and related context when moving; create a distinct draft identity when duplicating and exclude asset and prompt relationships by default.
 - Allow listings to exist without assets, mockups, optimized marketplace metadata, or other later-stage records.
 - Define complete empty, validation, blocked, loading, rollback, cancellation, focus, and destructive-action behavior.
@@ -22,7 +22,7 @@ FusionCanvas now has a niche-rooted editable workspace tree and complete group-m
 
 ### Modified Capabilities
 
-None. FC-0103's navigation-tree, persistence, and tab contracts already establish the niche-rooted editable tree, default niche, canonical selection, archive-aware projection, and explicit tab-opening behavior that FC-0104 extends for listing items.
+None. FC-0103's navigation-tree and persistence contracts already establish the niche-rooted editable tree, default niche, canonical selection, and archive-aware projection. FC-0104 refines the tab contract for listing items by keeping one reusable working tab and reserving Ctrl-click/Open in Tab for additive tabs.
 
 ## Impact
 

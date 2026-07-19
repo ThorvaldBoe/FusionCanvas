@@ -1,6 +1,6 @@
 ## Context
 
-FC-0103 established the architecture FC-0104 must extend: a niche-rooted editable `WorkspaceTreeViewModel`, canonical tree selection independent of document tabs, an explicit store default niche, `GroupHierarchy` ancestry and effective-visibility helpers, inline create/rename, drag/drop and clipboard structural operations, optimistic rollback, archive-aware projection, and explicit Ctrl-click/open-tab behavior. SQLite schema version 3 persists the default niche and group sibling order. Listings already persist through `WorkspaceSnapshot` with optional niche/group references, draft status, archive state, timestamps, description, metadata, tag links, prompt links, and asset links.
+FC-0103 established the architecture FC-0104 must extend: a niche-rooted editable `WorkspaceTreeViewModel`, canonical tree selection, an explicit store default niche, `GroupHierarchy` ancestry and effective-visibility helpers, inline create/rename, drag/drop and clipboard structural operations, optimistic rollback, archive-aware projection, and explicit Ctrl-click/open-tab behavior. FC-0104 refines selection coordination so normal selection reuses one working tab while Ctrl-click preserves that tab and adds or activates another. SQLite schema version 3 persists the default niche and group sibling order. Listings already persist through `WorkspaceSnapshot` with optional niche/group references, draft status, archive state, timestamps, description, metadata, tag links, prompt links, and asset links.
 
 What remains missing is an application-owned listing workflow and listing-specific tree commands. Individual creators capture ideas and select or rename listings frequently; movement and duplication are common organizational operations; optional detail editing is less frequent; archive, restore, and permanent deletion are rare. FC-0105 and FC-0106 retain ownership of workflow/lifecycle status editing and the full document-window Listing Inspector.
 
@@ -70,8 +70,8 @@ Alternative considered: derive inherited values dynamically on every read. Rejec
 - F2/context rename through the listing service.
 - Drag/drop onto an active niche or group and cut/paste to an active topic for movement.
 - Copy/paste or Duplicate for independent listing variations.
-- Normal selection that updates reusable detail context without creating a tab.
-- Explicit Ctrl-click or Open in Tab that opens/activates a persistent document tab.
+- Normal selection that updates canonical context and opens or replaces the current working tab without accumulating tabs.
+- Explicit Ctrl-click or Open in Tab that preserves the current tab and opens/activates another persistent document tab.
 
 Listings remain alphabetically ordered after creation, rename, move, or duplication. Drops onto topic rows are valid; before/after ordering for listing rows is unavailable because FC-0104 does not add a `SortOrder` field.
 
@@ -97,11 +97,11 @@ Inline creation, rename, selection, move, and duplication belong to the tree. A 
 
 Alternative considered: permanently show the complete management form beside the tree. Rejected because FC-0106 will own the durable listing inspector and FC-0104 should not consume document workspace with a competing form.
 
-### 9. Keep tree selection and document tabs independent
+### 9. Coordinate canonical selection with a reusable working tab
 
-Successful create, rename, move, duplicate, or restore selects and reveals the listing in the tree but does not automatically open a document tab. Ctrl-click or an explicit Open in Tab command uses the existing tab coordinator. Archiving or deleting a selected listing selects a sensible adjacent active listing when possible, otherwise its active parent topic. A filtered tree retains canonical identity and ancestor context, and structural commands must not target hidden invalid destinations.
+Normal selection and successful create, rename, move, duplicate, or restore select and reveal the listing and open or replace a single current working tab. Ctrl-click or an explicit Open in Tab command preserves existing tabs and adds or activates the requested context without duplicates. The final ordinary tab remains visible instead of returning to an empty document area. Archiving or deleting a selected listing selects a sensible adjacent active listing when possible, otherwise its active parent topic. A filtered tree retains canonical identity and ancestor context, and structural commands must not target hidden invalid destinations.
 
-Alternative considered: automatically open a tab after creation. Rejected because rapid capture would create tab clutter and contradict FC-0103's accepted navigation/tab contract.
+Alternative considered: create a new tab after every selection or mutation. Rejected because rapid capture would create tab clutter; the reusable working tab preserves context without accumulating tabs.
 
 ### 10. Reuse optimistic interaction and error-state patterns
 

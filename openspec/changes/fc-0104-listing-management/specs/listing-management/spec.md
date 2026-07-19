@@ -161,7 +161,7 @@ FusionCanvas SHALL preserve a listing's topic and all related context when archi
 - **WHEN** the user restores an archived listing whose preserved topic path is active and valid
 - **THEN** FusionCanvas marks the listing active
 - **AND** returns it to normal navigation at its preserved topic with all context intact
-- **AND** selects and reveals it without automatically opening a document tab
+- **AND** selects and reveals it in the current reusable working tab without creating an additional tab
 
 #### Scenario: User restores into an unavailable parent context
 - **WHEN** the listing's preserved niche, group, group ancestor, or store is archived or unavailable
@@ -213,7 +213,7 @@ FusionCanvas SHALL provide non-persisted inline listing capture in the existing 
 - **WHEN** the user commits a valid inline listing draft
 - **THEN** FusionCanvas persists, selects, and reveals the new listing
 - **AND** preserves the current filter and expansion context
-- **AND** does not automatically open a document tab
+- **AND** opens or replaces the current reusable working tab without creating additional tabs
 
 #### Scenario: User cancels inline capture
 - **WHEN** the user presses Escape or otherwise cancels an uncommitted listing draft
@@ -225,24 +225,28 @@ FusionCanvas SHALL provide non-persisted inline listing capture in the existing 
 - **THEN** FusionCanvas blocks capture with a clear store, niche, selection, or default-niche setup path
 - **AND** does not show a misleading enabled commit action
 
-### Requirement: Canonical listing selection is independent of document tabs
-FusionCanvas SHALL make normal listing selection update canonical workspace context without automatically opening a persistent document tab, and SHALL provide an explicit action for opening or activating a listing tab.
+### Requirement: Canonical listing selection coordinates a reusable working tab
+FusionCanvas SHALL make normal listing selection update canonical workspace context and open or replace one current working tab, SHALL retain at least one tab after a context has been opened, and SHALL provide an explicit additive action for opening or activating another listing tab.
 
 #### Scenario: User selects a listing normally
 - **WHEN** the user selects a listing row in the tree
 - **THEN** that listing becomes canonical workspace selection
-- **AND** reusable detail context may update for the listing
-- **AND** no document tab is automatically created
+- **AND** the current working tab is created or reused for that listing
+- **AND** repeated normal selections do not accumulate tabs
 
 #### Scenario: User explicitly opens a listing tab
 - **WHEN** the user Ctrl-clicks a listing or invokes Open in Tab
-- **THEN** FusionCanvas opens or activates the persistent tab for that listing
+- **THEN** FusionCanvas preserves the existing working tab and opens or activates another persistent tab for that listing
 - **AND** avoids creating duplicate tabs for the same listing identity
 
 #### Scenario: Listing mutation succeeds
 - **WHEN** create, rename, move, duplicate, or restore succeeds
 - **THEN** FusionCanvas selects and reveals the resulting listing in the tree
-- **AND** leaves tab creation under explicit user control
+- **AND** updates the reusable working tab without accumulating additional tabs
+
+#### Scenario: User closes the final working tab
+- **WHEN** only one ordinary working tab remains and the user invokes Close
+- **THEN** FusionCanvas keeps that tab and its active context visible
 
 ### Requirement: Secondary listing management protects properties and lifecycle actions
 FusionCanvas SHALL provide a secondary focused surface for optional listing properties, archived review, restore, and permanent deletion while keeping inline creation, rename, move, and duplication in the tree.

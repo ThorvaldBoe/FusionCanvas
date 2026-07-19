@@ -35,7 +35,7 @@
 - [x] 4.6 Generalize typed clipboard copy/paste and Duplicate routing so listing payloads create independent variations while group subtree copy behavior remains unchanged.
 - [x] 4.7 Keep listing rows alphabetically ordered and reject or normalize before/after listing drops to topic-only destination semantics without adding persisted listing order.
 - [x] 4.8 Select and reveal listings after create, rename, move, duplicate, or restore while preserving filter, expansion, clipboard, and canonical selection state across success and rollback.
-- [x] 4.9 Keep normal listing selection independent of tabs and route Ctrl-click/Open in Tab through the existing tab coordinator without duplicate tabs.
+- [x] 4.9 Coordinate normal listing selection with one reusable working tab, keep the final tab visible, and route Ctrl-click/Open in Tab additively without losing existing or creating duplicate tabs.
 - [x] 4.10 Add view-model and app tests for destination resolution, inline drafts, keyboard flow, typed drag/drop/clipboard operations, invalid targets, filtering, rollback, selection, and explicit tab opening.
 
 ## 5. Secondary Properties and Lifecycle Surface
