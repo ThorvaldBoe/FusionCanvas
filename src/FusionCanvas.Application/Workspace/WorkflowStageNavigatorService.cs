@@ -19,7 +19,8 @@ public sealed record WorkflowStageNavigatorEntry(
     string Label,
     bool IsCurrent,
     bool IsAvailable,
-    bool CanNavigate);
+    bool CanNavigate,
+    bool IsActiveView);
 
 public sealed record WorkflowStageNavigatorState(
     bool HasActiveItem,
@@ -70,7 +71,8 @@ public sealed class WorkflowStageNavigatorService : IWorkflowStageNavigatorServi
                     WorkflowStages.GetDisplayName(stage),
                     stage == context.CurrentStage,
                     isAvailable,
-                    isAvailable);
+                    isAvailable,
+                    stage == resolvedActiveViewStage);
             })
             .ToArray();
 

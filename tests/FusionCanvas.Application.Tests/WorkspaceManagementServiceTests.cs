@@ -53,7 +53,7 @@ public class WorkspaceManagementServiceTests
         var store = new Store(Guid.NewGuid(), workspace.Id, "Client Store", null, false, Now, Now, "{}");
         var otherStore = new Store(Guid.NewGuid(), otherWorkspace.Id, "Personal Store", null, false, Now, Now, "{}");
         var niche = new Niche(Guid.NewGuid(), store.Id, "Client Niche", null, false, Now, Now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Client Listing", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Client Listing", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var tag = new Tag(Guid.NewGuid(), store.Id, "Client Tag", null, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot(
             [workspace, otherWorkspace],

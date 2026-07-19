@@ -6,7 +6,7 @@ namespace FusionCanvas.Integration.Workspace;
 
 public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceRepository
 {
-    private const int CurrentSchemaVersion = 3;
+    private const int CurrentSchemaVersion = 4;
 
     private readonly string _databasePath = databasePath;
 
@@ -185,6 +185,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
                 name TEXT NOT NULL,
                 description TEXT NULL,
                 status INTEGER NOT NULL,
+                workflow_stage INTEGER NOT NULL DEFAULT 0,
                 is_archived INTEGER NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
@@ -242,6 +243,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         if (schemaVersion < 3)
         {
             await MigrateToVersion3Async(connection, cancellationToken);
+        }
+
+        if (schemaVersion < 4)
+        {
+            await MigrateToVersion4Async(connection, cancellationToken);
         }
 
         await SetPragmaUserVersionAsync(connection, CurrentSchemaVersion, cancellationToken);
@@ -304,6 +310,43 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
                 FROM niches
                 WHERE niches.store_id = stores.id AND niches.is_archived = 0
             );
+            """, cancellationToken);
+    }
+
+    private static async Task MigrateToVersion4Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        if (!await ColumnExistsAsync(connection, "listings", "workflow_stage", cancellationToken).ConfigureAwait(false))
+        {
+            await ExecuteAsync(connection, null, "ALTER TABLE listings ADD COLUMN workflow_stage INTEGER NOT NULL DEFAULT 0;", cancellationToken);
+        }
+
+        // Old ListingStatus ints: Active=0, Draft=1, Ready=2, Published=3, Archived=4.
+        // New ListingStatus ints: Draft=0, Published=1, Paused=2, Rejected=3.
+        // WorkflowStage ints: Idea=0, Concept=1, Design=2, Listing=3.
+        // Translation never invents published state; stage is backfilled from the pre-v4 derivation;
+        // and archived-valued rows are folded onto the archive flag.
+        await ExecuteAsync(connection, null, """
+            UPDATE listings
+            SET status = CASE status
+                    WHEN 0 THEN 0
+                    WHEN 1 THEN 0
+                    WHEN 2 THEN 0
+                    WHEN 3 THEN 1
+                    WHEN 4 THEN 0
+                    ELSE 0
+                END,
+                workflow_stage = CASE status
+                    WHEN 0 THEN 3
+                    WHEN 1 THEN 0
+                    WHEN 2 THEN 2
+                    WHEN 3 THEN 3
+                    WHEN 4 THEN 0
+                    ELSE 0
+                END,
+                is_archived = CASE status
+                    WHEN 4 THEN 1
+                    ELSE is_archived
+                END;
             """, cancellationToken);
     }
 
@@ -418,9 +461,9 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
 
     private static Task InsertListingAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Listing listing, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
-            INSERT INTO listings (id, store_id, niche_id, group_id, name, description, status, is_archived, created_at, updated_at, metadata_json)
-            VALUES ($id, $store_id, $niche_id, $group_id, $name, $description, $status, $is_archived, $created_at, $updated_at, $metadata_json);
-            """, cancellationToken, [.. CommonParameters(listing), ("$store_id", listing.StoreId.ToString()), ("$niche_id", listing.NicheId?.ToString()), ("$group_id", listing.GroupId?.ToString()), ("$status", (int)listing.Status)]);
+            INSERT INTO listings (id, store_id, niche_id, group_id, name, description, status, workflow_stage, is_archived, created_at, updated_at, metadata_json)
+            VALUES ($id, $store_id, $niche_id, $group_id, $name, $description, $status, $workflow_stage, $is_archived, $created_at, $updated_at, $metadata_json);
+            """, cancellationToken, [.. CommonParameters(listing), ("$store_id", listing.StoreId.ToString()), ("$niche_id", listing.NicheId?.ToString()), ("$group_id", listing.GroupId?.ToString()), ("$status", (int)listing.Status), ("$workflow_stage", (int)listing.Stage)]);
 
     private static Task InsertAssetAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Asset asset, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
@@ -511,7 +554,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         var listings = new List<Listing>();
         await foreach (var reader in ReadAsync(connection, "SELECT * FROM listings ORDER BY name;", cancellationToken))
         {
-            listings.Add(new Listing(ReadGuid(reader, "id"), ReadGuid(reader, "store_id"), ReadNullableGuid(reader, "niche_id"), ReadNullableGuid(reader, "group_id"), ReadString(reader, "name"), ReadNullableString(reader, "description"), (ListingStatus)ReadInt(reader, "status"), ReadBool(reader, "is_archived"), ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json")));
+            listings.Add(new Listing(ReadGuid(reader, "id"), ReadGuid(reader, "store_id"), ReadNullableGuid(reader, "niche_id"), ReadNullableGuid(reader, "group_id"), ReadString(reader, "name"), ReadNullableString(reader, "description"), (ListingStatus)ReadInt(reader, "status"), (WorkflowStage)ReadInt(reader, "workflow_stage"), ReadBool(reader, "is_archived"), ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json")));
         }
 
         return listings;

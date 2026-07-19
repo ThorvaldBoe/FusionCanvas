@@ -26,6 +26,8 @@ public sealed record ListingManagementMoveRequest(Guid ListingId, ListingTopicRe
 public sealed record ListingManagementDuplicateRequest(Guid ListingId, ListingTopicReference? Destination = null);
 public sealed record ListingManagementRestoreRequest(Guid ListingId, ListingTopicReference? Destination = null);
 public sealed record ListingManagementDeleteRequest(Guid ListingId, bool ConfirmPermanentDeletion);
+public sealed record ListingManagementSetStatusRequest(Guid ListingId, ListingStatus Status);
+public sealed record ListingManagementMoveStageRequest(Guid ListingId, WorkflowStage Stage);
 
 public sealed record ListingCreationDestinationResult(ListingTopicReference? Topic, string? Error)
 {
@@ -42,6 +44,7 @@ public sealed record ListingSummary(
     string Name,
     ListingContext Context,
     ListingStatus Status,
+    WorkflowStage Stage,
     bool IsArchived,
     bool IsEffectivelyActive,
     IReadOnlyList<Guid> Path,
@@ -87,13 +90,13 @@ public interface IListingManagementService
     Task<ListingManagementResult> ArchiveListingAsync(Guid listingId, CancellationToken cancellationToken = default);
     Task<ListingManagementResult> RestoreListingAsync(ListingManagementRestoreRequest request, CancellationToken cancellationToken = default);
     Task<ListingManagementResult> DeleteListingAsync(ListingManagementDeleteRequest request, CancellationToken cancellationToken = default);
+    Task<ListingManagementResult> SetListingStatusAsync(ListingManagementSetStatusRequest request, CancellationToken cancellationToken = default);
+    Task<ListingManagementResult> MoveListingStageAsync(ListingManagementMoveStageRequest request, CancellationToken cancellationToken = default);
     Task<ListingManagementResult> SelectListingAsync(Guid listingId, CancellationToken cancellationToken = default);
 }
 
 public sealed class ListingManagementService : IListingManagementService
 {
-    private const string InheritedFromPrefix = "inheritedFrom:";
-
     private readonly IWorkspaceRepository _repository;
     private readonly IToolContextResolver _contextResolver;
     private readonly Func<DateTimeOffset> _clock;
@@ -188,8 +191,8 @@ public sealed class ListingManagementService : IListingManagementService
             return Failure(topicError!, snapshot, _activeStoreId);
         }
 
-        var name = NormalizeName(request.Name);
-        var nameError = ValidateName(name);
+        var name = ListingMetadataCodec.NormalizeName(request.Name);
+        var nameError = ListingMetadataCodec.ValidateName(name);
         if (nameError is not null)
         {
             return Failure(nameError, snapshot, storeId);
@@ -204,12 +207,13 @@ public sealed class ListingManagementService : IListingManagementService
             nicheId,
             request.Topic.Kind == WorkspaceEntityKind.Group ? request.Topic.Id : null,
             name,
-            NormalizeOptional(context.Description),
+            ListingMetadataCodec.NormalizeOptional(context.Description),
             ListingStatus.Draft,
+            WorkflowStage.Idea,
             false,
             now,
             now,
-            SerializeMetadata(metadata));
+            ListingMetadataCodec.SerializeMetadata(metadata));
 
         IReadOnlyList<Guid> tagIds;
         try
@@ -248,21 +252,21 @@ public sealed class ListingManagementService : IListingManagementService
             return Failure("Listing was not found.", snapshot, _activeStoreId);
         }
 
-        var name = NormalizeName(request.Name);
-        var nameError = ValidateName(name);
+        var name = ListingMetadataCodec.NormalizeName(request.Name);
+        var nameError = ListingMetadataCodec.ValidateName(name);
         if (nameError is not null)
         {
             return Failure(nameError, snapshot, existing.StoreId);
         }
 
         var context = request.Context ?? ToContext(snapshot, existing);
-        var metadata = ParseMetadata(existing.MetadataJson);
+        var metadata = ListingMetadataCodec.ParseMetadata(existing.MetadataJson);
         ApplyContextMetadata(metadata, context, replaceExplicitMetadata: context.Metadata is not null);
         var changed = existing with
         {
             Name = name,
-            Description = NormalizeOptional(context.Description),
-            MetadataJson = SerializeMetadata(metadata),
+            Description = ListingMetadataCodec.NormalizeOptional(context.Description),
+            MetadataJson = ListingMetadataCodec.SerializeMetadata(metadata),
             UpdatedAt = _clock()
         };
         IReadOnlyList<ListingTag> listingTags;
@@ -372,6 +376,7 @@ public sealed class ListingManagementService : IListingManagementService
             GroupId = destination.Kind == WorkspaceEntityKind.Group ? destination.Id : null,
             Name = UniqueCopyName(snapshot, source.Name),
             Status = ListingStatus.Draft,
+            Stage = WorkflowStage.Idea,
             IsArchived = false,
             CreatedAt = now,
             UpdatedAt = now
@@ -441,6 +446,83 @@ public sealed class ListingManagementService : IListingManagementService
         }
         _activeStoreId = existing.StoreId;
         return ListingManagementResult.Success(ToSummary(snapshot, existing), BuildState(updated, existing.StoreId));
+    }
+
+    public async Task<ListingManagementResult> SetListingStatusAsync(
+        ListingManagementSetStatusRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (!Enum.IsDefined(request.Status))
+        {
+            return Failure("Unknown listing lifecycle status.", await _repository.LoadAsync(cancellationToken).ConfigureAwait(false), _activeStoreId);
+        }
+
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var existing = snapshot.Listings.SingleOrDefault(candidate => candidate.Id == request.ListingId);
+        if (existing is null)
+        {
+            return Failure("Listing was not found.", snapshot, _activeStoreId);
+        }
+
+        if (existing.Status == request.Status)
+        {
+            SetSelection(existing.StoreId, existing.Id);
+            return Success(existing, snapshot);
+        }
+
+        var changed = existing with { Status = request.Status, UpdatedAt = _clock() };
+        var updated = snapshot with { Listings = snapshot.Listings.Select(candidate => candidate.Id == existing.Id ? changed : candidate).ToArray() };
+
+        var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        if (saveError is not null)
+        {
+            return Failure(saveError, snapshot, existing.StoreId);
+        }
+
+        SetSelection(existing.StoreId, existing.Id);
+        return Success(changed, updated);
+    }
+
+    public async Task<ListingManagementResult> MoveListingStageAsync(
+        ListingManagementMoveStageRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (!Enum.IsDefined(request.Stage))
+        {
+            return Failure("Unknown workflow stage.", await _repository.LoadAsync(cancellationToken).ConfigureAwait(false), _activeStoreId);
+        }
+
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var existing = snapshot.Listings.SingleOrDefault(candidate => candidate.Id == request.ListingId);
+        if (existing is null)
+        {
+            return Failure("Listing was not found.", snapshot, _activeStoreId);
+        }
+
+        if (existing.IsArchived || existing.Status == ListingStatus.Rejected)
+        {
+            return Failure("Inactive listings must be reactivated before moving workflow stages.", snapshot, existing.StoreId);
+        }
+
+        if (existing.Stage == request.Stage)
+        {
+            SetSelection(existing.StoreId, existing.Id);
+            return Success(existing, snapshot);
+        }
+
+        var changed = existing with { Stage = request.Stage, UpdatedAt = _clock() };
+        var updated = snapshot with { Listings = snapshot.Listings.Select(candidate => candidate.Id == existing.Id ? changed : candidate).ToArray() };
+
+        var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        if (saveError is not null)
+        {
+            return Failure(saveError, snapshot, existing.StoreId);
+        }
+
+        SetSelection(existing.StoreId, existing.Id);
+        return Success(changed, updated);
     }
 
     public async Task<ListingManagementResult> SelectListingAsync(Guid listingId, CancellationToken cancellationToken = default)
@@ -642,7 +724,7 @@ public sealed class ListingManagementService : IListingManagementService
             foreach (var value in _contextResolver.ResolveCreationDefaults(resolution).Metadata)
             {
                 metadata[value.Key] = value.Value;
-                metadata[$"{InheritedFromPrefix}{value.Key}"] = $"{value.Source.EntityKind}:{value.Source.EntityId}";
+                metadata[$"{ListingMetadataCodec.InheritedFromPrefix}{value.Key}"] = $"{value.Source.EntityKind}:{value.Source.EntityId}";
             }
         }
 
@@ -682,43 +764,15 @@ public sealed class ListingManagementService : IListingManagementService
         return ids;
     }
 
-    private static void ApplyContextMetadata(Dictionary<string, string> metadata, ListingContext context, bool replaceExplicitMetadata)
-    {
-        SetOptional(metadata, ListingMetadata.NotesKey, context.Notes);
-        if (context.Metadata is null)
-        {
-            return;
-        }
-
-        foreach (var pair in context.Metadata)
-        {
-            var key = pair.Key?.Trim();
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                continue;
-            }
-            var value = NormalizeOptional(pair.Value);
-            if (value is null)
-            {
-                metadata.Remove(key);
-            }
-            else
-            {
-                metadata[key] = value;
-            }
-            if (replaceExplicitMetadata)
-            {
-                metadata.Remove($"{InheritedFromPrefix}{key}");
-            }
-        }
-    }
+    private static void ApplyContextMetadata(Dictionary<string, string> metadata, ListingContext context, bool replaceExplicitMetadata) =>
+        ListingMetadataCodec.ApplyContextMetadata(metadata, context, replaceExplicitMetadata);
 
     private static ListingContext ToContext(WorkspaceSnapshot snapshot, Listing listing)
     {
-        var metadata = ParseMetadata(listing.MetadataJson);
-        metadata.Remove(ListingMetadata.NotesKey, out var notes);
+        var metadata = ListingMetadataCodec.ParseMetadata(listing.MetadataJson);
+        metadata.Remove(ListingMetadataCodec.NotesKey, out var notes);
         var explicitMetadata = metadata
-            .Where(pair => !pair.Key.StartsWith(InheritedFromPrefix, StringComparison.Ordinal))
+            .Where(pair => !pair.Key.StartsWith(ListingMetadataCodec.InheritedFromPrefix, StringComparison.Ordinal))
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
         var tagIds = snapshot.ListingTags.Where(link => link.ListingId == listing.Id).Select(link => link.TagId).ToArray();
         return new ListingContext(listing.Description, notes, explicitMetadata, tagIds);
@@ -746,6 +800,7 @@ public sealed class ListingManagementService : IListingManagementService
             listing.Name,
             ToContext(snapshot, listing),
             listing.Status,
+            listing.Stage,
             listing.IsArchived,
             ListingHierarchy.IsEffectivelyActive(snapshot, listing),
             path,
@@ -814,30 +869,4 @@ public sealed class ListingManagementService : IListingManagementService
 
     private bool StoreBelongsToActiveWorkspace(Store store) => _activeWorkspaceId is null || store.WorkspaceId == _activeWorkspaceId;
     private void SetSelection(Guid storeId, Guid listingId) { _activeStoreId = storeId; _activeListingId = listingId; }
-    private static string NormalizeName(string? value) => value?.Trim() ?? string.Empty;
-    private static string? NormalizeOptional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    private static string? ValidateName(string name) => string.IsNullOrWhiteSpace(name)
-        ? "Listing title is required."
-        : name.Contains('\n') || name.Contains('\r') ? "Listing title must be a single line." : null;
-
-    private static Dictionary<string, string> ParseMetadata(string metadataJson)
-    {
-        if (string.IsNullOrWhiteSpace(metadataJson) || metadataJson.Trim() == "{}")
-        {
-            return new(StringComparer.Ordinal);
-        }
-        using var document = JsonDocument.Parse(metadataJson);
-        return document.RootElement.ValueKind == JsonValueKind.Object
-            ? document.RootElement.EnumerateObject().ToDictionary(property => property.Name, property => property.Value.ToString(), StringComparer.Ordinal)
-            : new(StringComparer.Ordinal);
-    }
-
-    private static string SerializeMetadata(IReadOnlyDictionary<string, string> metadata) =>
-        metadata.Count == 0 ? "{}" : JsonSerializer.Serialize(metadata);
-
-    private static void SetOptional(Dictionary<string, string> metadata, string key, string? value)
-    {
-        var normalized = NormalizeOptional(value);
-        if (normalized is null) metadata.Remove(key); else metadata[key] = normalized;
-    }
 }

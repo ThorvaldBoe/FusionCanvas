@@ -6,6 +6,7 @@ public sealed record WorkspaceTreeQuery(
     string? Text = null,
     IReadOnlySet<WorkspaceEntityKind>? EntityKinds = null,
     IReadOnlySet<ListingStatus>? ListingStatuses = null,
+    IReadOnlySet<WorkflowStage>? WorkflowStages = null,
     IReadOnlySet<Guid>? TagIds = null,
     NavigationTopicReference? ScopeTopic = null,
     bool IncludeArchived = false)
@@ -14,6 +15,7 @@ public sealed record WorkspaceTreeQuery(
         !string.IsNullOrWhiteSpace(Text) ||
         EntityKinds is { Count: > 0 } ||
         ListingStatuses is { Count: > 0 } ||
+        WorkflowStages is { Count: > 0 } ||
         TagIds is { Count: > 0 } ||
         ScopeTopic is not null ||
         IncludeArchived;
@@ -116,6 +118,16 @@ public static class WorkspaceTreeProjector
             }
         }
 
+        if (query.WorkflowStages is { Count: > 0 })
+        {
+            if (node.EntityKind != WorkspaceEntityKind.Listing ||
+                context.Snapshot.Listings.SingleOrDefault(listing => listing.Id == node.EntityId) is not { } stageListing ||
+                !query.WorkflowStages.Contains(stageListing.Stage))
+            {
+                return false;
+            }
+        }
+
         if (query.TagIds is { Count: > 0 })
         {
             if (node.EntityKind != WorkspaceEntityKind.Listing)
@@ -201,7 +213,7 @@ public static class WorkspaceTreeProjector
         var listingNotes = new Dictionary<Guid, string>();
         foreach (var listing in snapshot.Listings)
         {
-            var notes = ListingMetadata.TryGetNotes(listing.MetadataJson);
+            var notes = ListingMetadataCodec.TryGetNotes(listing.MetadataJson);
             if (notes is not null)
             {
                 listingNotes[listing.Id] = notes;

@@ -161,6 +161,8 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     private NavigationTopicReference? _scopedTopic;
     private bool _scopeToCurrentTopic;
     private bool _includeArchived;
+    private int _stageFilterIndex;
+    private int _statusFilterIndex;
     private string? _errorMessage;
     private bool _isBusy;
 
@@ -336,11 +338,18 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     }
 
     public bool HasActiveFilters => BuildQuery().IsActive;
-    public bool HasNonTextFilters => _selectedTagIds.Count > 0 || _scopeToCurrentTopic || _includeArchived;
+    public bool HasNonTextFilters =>
+        _selectedTagIds.Count > 0 ||
+        _scopeToCurrentTopic ||
+        _includeArchived ||
+        _stageFilterIndex > 0 ||
+        _statusFilterIndex > 0;
     public int ActiveFilterCount =>
         (_selectedTagIds.Count > 0 ? 1 : 0) +
         (_scopeToCurrentTopic ? 1 : 0) +
-        (_includeArchived ? 1 : 0);
+        (_includeArchived ? 1 : 0) +
+        (_stageFilterIndex > 0 ? 1 : 0) +
+        (_statusFilterIndex > 0 ? 1 : 0);
     public bool HasVisibleResults => Roots.Count > 0;
     public bool HasEmptyFilterResults => HasActiveFilters && !HasVisibleResults;
     public bool IsFiltering => BuildQuery().IsActive;
@@ -372,11 +381,15 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         _scopeToCurrentTopic = false;
         _scopedTopic = null;
         _includeArchived = false;
+        _stageFilterIndex = 0;
+        _statusFilterIndex = 0;
         OnPropertyChanged(nameof(QueryText));
         OnPropertyChanged(nameof(IncludeArchived));
         OnPropertyChanged(nameof(ScopeToCurrentTopic));
         OnPropertyChanged(nameof(ScopedTopicName));
         OnPropertyChanged(nameof(SelectedTagIds));
+        OnPropertyChanged(nameof(StageFilterIndex));
+        OnPropertyChanged(nameof(StatusFilterIndex));
         if (tagIdsCleared)
         {
             RaiseAllTagSelectionsChanged();
@@ -485,8 +498,40 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         return null;
     }
 
+    public int StageFilterIndex
+    {
+        get => _stageFilterIndex;
+        set
+        {
+            if (_stageFilterIndex == value)
+            {
+                return;
+            }
+
+            SetField(ref _stageFilterIndex, value);
+            ApplyFilterTransition();
+        }
+    }
+
+    public int StatusFilterIndex
+    {
+        get => _statusFilterIndex;
+        set
+        {
+            if (_statusFilterIndex == value)
+            {
+                return;
+            }
+
+            SetField(ref _statusFilterIndex, value);
+            ApplyFilterTransition();
+        }
+    }
+
     private WorkspaceTreeQuery BuildQuery() => new(
         Text: _queryText,
+        WorkflowStages: _stageFilterIndex > 0 ? new HashSet<WorkflowStage> { WorkflowStages.Ordered[_stageFilterIndex - 1] } : null,
+        ListingStatuses: _statusFilterIndex > 0 ? new HashSet<ListingStatus> { ListingStatuses.Ordered[_statusFilterIndex - 1] } : null,
         TagIds: _selectedTagIds.Count > 0 ? _selectedTagIds : null,
         ScopeTopic: _scopeToCurrentTopic ? _scopedTopic : null,
         IncludeArchived: _includeArchived);
@@ -1083,7 +1128,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             projected.HasHiddenChildren,
             projected.Children.Count,
             projected.Children.Select(ToNode),
-            isInactive: projected.IsInactive);
+            isInactive: projected.IsInactive || (entity is Listing listing && listing.Status == ListingStatus.Rejected));
         node.IsExpanded = _expandedIds.Contains(node.EntityId) || IsFiltering;
         return node;
     }

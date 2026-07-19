@@ -95,7 +95,7 @@ public class NicheManagementServiceTests
         var store = NewStore("North Star Studio");
         var niche = NewNiche(store.Id, "Coffee");
         var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Launch", null, false, Now, Now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Pumpkin espresso", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Pumpkin espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [group], [listing], [], [], [], [], []));
         var service = new NicheManagementService(repository, () => Now.AddMinutes(5));
         var context = new NicheContext("Updated", "Baristas", "Dry", "Retro", "No logos", "Crowded", "Check Etsy", "Notes");
@@ -172,7 +172,7 @@ public class NicheManagementServiceTests
     {
         var store = NewStore("North Star Studio");
         var niche = NewNiche(store.Id, "Coffee");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Espresso", null, ListingStatus.Draft, false, Now, Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var tag = new Tag(Guid.NewGuid(), store.Id, "seasonal", null, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [tag], [new ListingTag(listing.Id, tag.Id)], []));
         var service = new NicheManagementService(repository);

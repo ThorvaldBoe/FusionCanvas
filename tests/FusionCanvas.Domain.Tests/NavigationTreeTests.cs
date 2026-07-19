@@ -251,8 +251,8 @@ public class NavigationTreeTests
             var parentGroup = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Seasonal", null, false, now, now, "{}");
             var childGroup = new TopicGroup(Guid.NewGuid(), store.Id, null, parentGroup.Id, "Autumn", null, false, now, now, "{}");
             var grandchildGroup = new TopicGroup(Guid.NewGuid(), store.Id, null, childGroup.Id, "Espresso", null, false, now, now, "{}");
-            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, parentGroup.Id, "Pumpkin espresso", "Cozy shirt", ListingStatus.Draft, false, now, now, """{"tags":["fall"]}""");
-            var deepListing = new Listing(Guid.NewGuid(), store.Id, niche.Id, grandchildGroup.Id, "Latte ghosts", "Halloween shirt", ListingStatus.Active, false, now, now, "{}");
+            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, parentGroup.Id, "Pumpkin espresso", "Cozy shirt", ListingStatus.Draft, WorkflowStage.Idea, false, now, now, """{"tags":["fall"]}""");
+            var deepListing = new Listing(Guid.NewGuid(), store.Id, niche.Id, grandchildGroup.Id, "Latte ghosts", "Halloween shirt", ListingStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
 
             return new NavigationSample(
                 new WorkspaceSnapshot(
