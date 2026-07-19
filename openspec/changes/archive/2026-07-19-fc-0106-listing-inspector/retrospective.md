@@ -6,6 +6,13 @@ The Listing Inspector is implemented end-to-end: a focused application contract 
 ## Feedback-Driven Adjustments
 None. Implementation proceeded directly from the accepted artifacts; no proposal/design/spec corrections were required.
 
+## Learning Review
+- Result: no reusable lessons
+- Evidence reviewed: final proposal, design, spec deltas (listing-inspector + tabbed-document-window), tasks.md (22/22 complete), retrospective notes, and the implementation diff (commit 9ead95d). The implementation followed existing accepted patterns throughout.
+- Promotions completed: none.
+- Deferred promotions: none.
+  - Rationale: The inspector's explicit-save + save/discard/cancel guard, stage emphasis without hiding, read-only inactive presentation, and application-service-over-snapshot pattern all follow existing guidance in `docs/ux-guidelines.md` (editing safety, progressive disclosure, state coherence) and the established FC-0104 service pattern — no new interaction, visual, or structural rules emerged that warrant promotion. The `ListingMetadataCodec` extraction is a change-specific refactor, not a reusable architecture rule. One implementation defect (an initial test assertion confused single-line `phrase` vs. multi-line `idea`/`notes` normalization) was caught by the test suite and corrected with no spec impact — classified as an ordinary implementation defect, not a reusable lesson.
+
 ## Deferred or Change-Specific Notes
 - **Real desktop UI verification (task 5.2):** Not applicable under OpenCode, which has no interactive desktop session. Per `AGENTS.md`, the desktop UI pass is optional and non-blocking when OpenCode cannot perform it. Verification relies on the fast deterministic baseline (88 application, 23 integration, 99 app, 20 domain = 230 tests, all passing) plus the view-model and coordination tests covering hosting, cross-surface synchronization, guard prompts, save/discard/cancel, and shared control guidance. A contributor with an interactive desktop session should run the recorded scenarios (browse listings, view all sections, edit/save each field, tag link/create/remove, assets empty/populated states, unsaved-change guard across selection/tab switch/close, archived listing read-only, keyboard-only save and cancel, persistence across restart) on a disposable workspace before archiving.
 - **FC-0105 sequencing:** The inspector displays `ListingStatus` and derives a `WorkflowStage` from the current status vocabulary (the pre-FC-0105 model) and adds no competing status selector. When FC-0105 (listing-lifecycle-status) lands its persisted stage and four-value status, the inspector's display will follow automatically; revalidate the synchronization scenarios after FC-0105 archives.
