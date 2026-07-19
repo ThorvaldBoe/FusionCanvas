@@ -8,7 +8,8 @@ public sealed record AppWorkspaceRuntime(
     IWorkspaceRepository Repository,
     WorkspaceSnapshot Snapshot,
     IGroupManagementService GroupManagement,
-    IListingManagementService ListingManagement);
+    IListingManagementService ListingManagement,
+    ITagManagementService TagManagement);
 
 public static class AppWorkspaceFactory
 {
@@ -25,7 +26,8 @@ public static class AppWorkspaceFactory
             repository,
             snapshot,
             new GroupManagementService(repository),
-            new ListingManagementService(repository));
+            new ListingManagementService(repository),
+            new TagManagementService(repository));
     }
 
     private static string DefaultDatabasePath()

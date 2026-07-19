@@ -95,6 +95,10 @@
                     Command="{Binding SelectNichesTabCommand}"
                     Classes="tabButton"
                     Classes.selected="{Binding IsNichesTabSelected}" />
+            <Button Content="Tags"
+                    Command="{Binding SelectTagsTabCommand}"
+                    Classes="tabButton"
+                    Classes.selected="{Binding IsTagsTabSelected}" />
           </StackPanel>
 
           <StackPanel IsVisible="{Binding IsBasicInfoTabSelected}"
@@ -259,6 +263,123 @@
                       Classes="secondary restoreAction" />
             </StackPanel>
           </Grid>
+
+          <Grid IsVisible="{Binding IsTagsTabSelected}"
+                ColumnDefinitions="220,*"
+                ColumnSpacing="16">
+            <StackPanel Grid.Column="0"
+                        Spacing="10">
+              <Button Content="New tag"
+                      Command="{Binding StartCreateTagCommand}"
+                      Classes="primary" />
+              <TextBlock Text="Active tags"
+                         FontSize="12"
+                         FontWeight="SemiBold"
+                         Foreground="#687385" />
+              <TextBlock Text="No active tags"
+                         IsVisible="{Binding !HasActiveTags}"
+                         FontSize="12"
+                         Foreground="#687385" />
+              <ItemsControl ItemsSource="{Binding EditorActiveTags}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="workflow:TagSummary">
+                    <Button Content="{Binding Name}"
+                            Command="{Binding $parent[ItemsControl].DataContext.EditTagCommand}"
+                            CommandParameter="{Binding}"
+                            Classes="listItem"
+                            HorizontalContentAlignment="Left" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <TextBlock IsVisible="{Binding HasArchivedTags}"
+                         Text="Archived tags"
+                         FontSize="12"
+                         FontWeight="SemiBold"
+                         Foreground="#687385"
+                         Margin="0,8,0,0" />
+              <ItemsControl IsVisible="{Binding HasArchivedTags}"
+                            ItemsSource="{Binding ArchivedTags}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="workflow:TagSummary">
+                    <Button Content="{Binding Name}"
+                            Command="{Binding $parent[ItemsControl].DataContext.EditTagCommand}"
+                            CommandParameter="{Binding}"
+                            Classes="listItem"
+                            HorizontalContentAlignment="Left" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1"
+                        Spacing="10">
+              <TextBlock Text="Tag details"
+                         FontSize="16"
+                         FontWeight="SemiBold"
+                         Foreground="#243447" />
+              <TextBox Text="{Binding TagName}"
+                       PlaceholderText="Tag name"
+                       Classes="field" />
+              <StackPanel Spacing="4">
+                <TextBlock Text="Color"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Foreground="#687385" />
+                <TextBox Text="{Binding TagColor}"
+                         PlaceholderText="#RRGGBB (optional)"
+                         Classes="field" />
+              </StackPanel>
+              <TextBox Text="{Binding TagDescription}"
+                       PlaceholderText="Description"
+                       Classes="field" />
+
+              <StackPanel Orientation="Horizontal"
+                          Spacing="8"
+                          Margin="0,8,0,0">
+                <Button Content="Save"
+                        Command="{Binding SaveSelectedTagCommand}"
+                        IsEnabled="{Binding CanSaveSelectedTag}"
+                        Classes="primary fixedAction" />
+                <Button Content="Archive"
+                        Command="{Binding ArchiveSelectedTagCommand}"
+                        IsEnabled="{Binding CanArchiveSelectedTag}"
+                        Classes="secondary fixedAction" />
+                <Button Content="Delete"
+                        Command="{Binding RequestDeleteSelectedTagCommand}"
+                        IsEnabled="{Binding CanDeleteSelectedTag}"
+                        Classes="danger fixedAction" />
+              </StackPanel>
+
+              <Button Content="Restore selected archived tag"
+                      IsVisible="{Binding CanRestoreSelectedTag}"
+                      Command="{Binding RestoreTagCommand}"
+                      CommandParameter="{Binding SelectedTag}"
+                      Classes="secondary restoreAction" />
+            </StackPanel>
+          </Grid>
+
+          <Border IsVisible="{Binding TagDeleteWarningVisible}"
+                  Background="#FFF7F2"
+                  BorderBrush="#DFA481"
+                  BorderThickness="1"
+                  Padding="12"
+                  Margin="0,8,0,0">
+            <StackPanel Spacing="8">
+              <TextBlock Text="{Binding TagDeleteWarningMessage}"
+                         FontSize="13"
+                         Foreground="#6B3527" />
+              <StackPanel Orientation="Horizontal"
+                          Spacing="8">
+                <Button Content="Delete permanently"
+                        Command="{Binding ConfirmDeleteTagCommand}"
+                        Classes="danger fixedDanger" />
+                <Button Content="Cancel"
+                        Command="{Binding CancelDeleteTagCommand}"
+                        Classes="secondary fixedAction" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
 
           <Border IsVisible="{Binding DeleteWarningVisible}"
                   Background="#FFF7F2"

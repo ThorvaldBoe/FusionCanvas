@@ -6,7 +6,7 @@ namespace FusionCanvas.Integration.Workspace;
 
 public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceRepository
 {
-    private const int CurrentSchemaVersion = 3;
+    private const int CurrentSchemaVersion = 4;
 
     private readonly string _databasePath = databasePath;
 
@@ -149,7 +149,8 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
                 is_archived INTEGER NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                metadata_json TEXT NOT NULL
+                metadata_json TEXT NOT NULL,
+                color TEXT NULL
             );
 
             CREATE TABLE IF NOT EXISTS niches (
@@ -244,6 +245,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             await MigrateToVersion3Async(connection, cancellationToken);
         }
 
+        if (schemaVersion < 4)
+        {
+            await MigrateToVersion4Async(connection, cancellationToken);
+        }
+
         await SetPragmaUserVersionAsync(connection, CurrentSchemaVersion, cancellationToken);
     }
 
@@ -305,6 +311,14 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
                 WHERE niches.store_id = stores.id AND niches.is_archived = 0
             );
             """, cancellationToken);
+    }
+
+    private static async Task MigrateToVersion4Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        if (!await ColumnExistsAsync(connection, "tags", "color", cancellationToken).ConfigureAwait(false))
+        {
+            await ExecuteAsync(connection, null, "ALTER TABLE tags ADD COLUMN color TEXT NULL;", cancellationToken);
+        }
     }
 
     private static async Task<bool> ColumnExistsAsync(
@@ -371,9 +385,9 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
 
     private static Task InsertTagAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Tag tag, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
-            INSERT INTO tags (id, store_id, name, description, is_archived, created_at, updated_at, metadata_json)
-            VALUES ($id, $store_id, $name, $description, $is_archived, $created_at, $updated_at, $metadata_json);
-            """, cancellationToken, [.. CommonParameters(tag), ("$store_id", tag.StoreId.ToString())]);
+            INSERT INTO tags (id, store_id, name, description, is_archived, created_at, updated_at, metadata_json, color)
+            VALUES ($id, $store_id, $name, $description, $is_archived, $created_at, $updated_at, $metadata_json, $color);
+            """, cancellationToken, [.. CommonParameters(tag), ("$store_id", tag.StoreId.ToString()), ("$color", (object?)tag.Color ?? DBNull.Value)]);
 
     private static Task InsertNicheAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Niche niche, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
@@ -478,7 +492,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         var tags = new List<Tag>();
         await foreach (var reader in ReadAsync(connection, "SELECT * FROM tags ORDER BY name;", cancellationToken))
         {
-            tags.Add(new Tag(ReadGuid(reader, "id"), ReadGuid(reader, "store_id"), ReadString(reader, "name"), ReadNullableString(reader, "description"), ReadBool(reader, "is_archived"), ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json")));
+            tags.Add(new Tag(ReadGuid(reader, "id"), ReadGuid(reader, "store_id"), ReadString(reader, "name"), ReadNullableString(reader, "description"), ReadBool(reader, "is_archived"), ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json"), ReadNullableString(reader, "color")));
         }
 
         return tags;

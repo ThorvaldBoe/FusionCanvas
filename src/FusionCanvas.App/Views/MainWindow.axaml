@@ -138,11 +138,53 @@
                      PlaceholderText="Search groups and items..."
                      MinHeight="34" />
             <Button Grid.Column="1"
-                    Content="Filters"
-                    IsEnabled="False"
-                    ToolTip.Tip="Status and tag filters become available when those properties are implemented."
+                    Content="Clear tags"
+                    IsVisible="{Binding WorkspaceTree.IsTagFilterActive}"
+                    Command="{Binding WorkspaceTree.ClearTagFiltersCommand}"
+                    ToolTip.Tip="Clear the active tag filter"
                     Classes="storeSecondary" />
           </Grid>
+          <Border DataContext="{Binding WorkspaceTree}"
+                  IsVisible="{Binding HasTagFiltersAvailable}"
+                  Padding="0,4,0,0">
+            <ItemsControl ItemsSource="{Binding AvailableTagFilters}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="workflow:TagSummary">
+                  <Button Content="{Binding Name}"
+                          Command="{Binding $parent[ItemsControl].DataContext.ToggleTagFilterCommand}"
+                          CommandParameter="{Binding Id}"
+                          ToolTip.Tip="Toggle tag filter"
+                          Margin="0,0,4,4"
+                          Padding="8,2"
+                          Background="{Binding Color, Converter={x:Static nav:TagBrushConverter.Background}, FallbackValue='#F0F2F5'}"
+                          Foreground="{Binding Color, Converter={x:Static nav:TagBrushConverter.Foreground}, FallbackValue='#243447'}"
+                          BorderBrush="{Binding Color, Converter={x:Static nav:TagBrushConverter.Border}, FallbackValue='#D9DEE7'}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Border>
+          <Border IsVisible="{Binding WorkspaceTree.HasFilteredOutSelection}"
+                  Background="#FFF4E5"
+                  BorderBrush="#D4B14F"
+                  BorderThickness="1"
+                  Padding="8,4"
+                  CornerRadius="4">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="{Binding WorkspaceTree.FilteredOutSelectionMessage}"
+                         TextWrapping="Wrap"
+                         FontSize="11"
+                         Foreground="#5F4A12" />
+              <Button Content="Clear filter"
+                      Command="{Binding WorkspaceTree.ClearTagFilterOrRevealSelectionCommand}"
+                      Classes="storeSecondary"
+                      Padding="6,2" />
+            </StackPanel>
+          </Border>
           <TextBlock Text="{Binding GroupActionStatus}"
                      TextWrapping="Wrap"
                      FontSize="11"
@@ -193,10 +235,40 @@
                   <Border Grid.Column="0" Background="#59A17D" CornerRadius="2" />
                   <TextBlock Grid.Column="1" Text="{Binding Icon}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="#526173" />
                   <Grid Grid.Column="2" Margin="4,0">
-                    <TextBlock Text="{Binding Name}"
-                               IsVisible="{Binding !IsEditing}"
-                               VerticalAlignment="Center"
-                               TextTrimming="CharacterEllipsis" />
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Name}"
+                                 IsVisible="{Binding !IsEditing}"
+                                 TextTrimming="CharacterEllipsis" />
+                      <ItemsControl IsVisible="{Binding HasAppliedTags}"
+                                    ItemsSource="{Binding VisibleTagColorSequence}"
+                                    Margin="6,0,0,0">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="3" />
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="x:String">
+                            <Border Width="10" Height="10"
+                                    CornerRadius="5"
+                                    Background="{Binding Converter={x:Static nav:TagBrushConverter.Background}, FallbackValue='#F0F2F5'}"
+                                    BorderBrush="{Binding Converter={x:Static nav:TagBrushConverter.Border}, FallbackValue='#D9DEE7'}"
+                                    BorderThickness="1"
+                                    ToolTip.Tip="Listing has this tag applied" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <Border IsVisible="{Binding HasHiddenTags}"
+                              Padding="4,0"
+                              CornerRadius="6"
+                              Background="#E8EDF3">
+                        <TextBlock Text="{Binding HiddenTagLabel}" FontSize="10" Foreground="#526173" />
+                      </Border>
+                    </StackPanel>
                     <TextBox Text="{Binding DraftName}"
                              IsVisible="{Binding IsEditing}"
                              AttachedToVisualTree="OnTreeEditorAttached"

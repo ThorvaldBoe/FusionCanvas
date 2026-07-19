@@ -30,7 +30,8 @@ public sealed class WorkspaceTreeNodeViewModel : INotifyPropertyChanged
         bool hasHiddenChildren,
         int childCount,
         IEnumerable<WorkspaceTreeNodeViewModel> children,
-        bool isDraft = false)
+        bool isDraft = false,
+        IReadOnlyList<string>? appliedTagColors = null)
     {
         NodeId = nodeId;
         EntityKind = entityKind;
@@ -41,6 +42,7 @@ public sealed class WorkspaceTreeNodeViewModel : INotifyPropertyChanged
         HasHiddenChildren = hasHiddenChildren;
         ChildCount = childCount;
         IsDraft = isDraft;
+        AppliedTagColors = appliedTagColors ?? [];
         _draftName = name;
         Children = new ObservableCollection<WorkspaceTreeNodeViewModel>(children);
     }
@@ -74,6 +76,13 @@ public sealed class WorkspaceTreeNodeViewModel : INotifyPropertyChanged
 
     public string CountLabel => ChildCount == 0 ? string.Empty : ChildCount.ToString();
     public bool HasChildren => ChildCount > 0;
+    public bool HasAppliedTags => AppliedTagColors.Count > 0;
+    public IReadOnlyList<string> AppliedTagColors { get; }
+    public int VisibleTagChipCount => Math.Min(AppliedTagColors.Count, 3);
+    public int HiddenTagCount => Math.Max(0, AppliedTagColors.Count - 3);
+    public string HiddenTagLabel => HiddenTagCount > 0 ? $"+{HiddenTagCount}" : string.Empty;
+    public bool HasHiddenTags => HiddenTagCount > 0;
+    public IEnumerable<string> VisibleTagColorSequence => AppliedTagColors.Take(3);
     public bool IsGroup => EntityKind == WorkspaceEntityKind.Group;
     public bool IsListing => EntityKind == WorkspaceEntityKind.Listing;
     public bool IsTopic => EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group;
@@ -145,6 +154,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     private readonly WorkspaceTreeSelectionCoordinator _selection;
     private readonly WorkspaceTreeClipboard _clipboard;
     private readonly HashSet<Guid> _expandedIds = [];
+    private readonly HashSet<Guid> _selectedTagFilterIds = [];
     private HashSet<Guid>? _expandedIdsBeforeFilter;
     private WorkspaceSnapshot _snapshot;
     private Guid? _storeId;
@@ -179,6 +189,13 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         CutCommand = new RelayCommand(_ => Cut());
         PasteCommand = new RelayCommand(_ => Run(PasteAsync()));
         DuplicateCommand = new RelayCommand(_ => Run(DuplicateAsync()));
+        ToggleTagFilterCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is TagSummary tag) ToggleTagFilter(tag.Id);
+            else if (parameter is Guid id) ToggleTagFilter(id);
+        });
+        ClearTagFiltersCommand = new RelayCommand(_ => ClearTagFilters());
+        ClearTagFilterOrRevealSelectionCommand = new RelayCommand(_ => ClearTagFilters());
         EditPropertiesCommand = new RelayCommand(_ =>
         {
             if (_selectedNode?.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing)
@@ -214,6 +231,19 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     public ICommand PasteCommand { get; }
     public ICommand DuplicateCommand { get; }
     public ICommand EditPropertiesCommand { get; }
+
+    public IReadOnlyList<TagSummary> AvailableTagFilters { get; private set; } = [];
+    public IReadOnlyList<Guid> SelectedTagFilterIds => [.. _selectedTagFilterIds];
+    public bool IsTagFilterActive => _selectedTagFilterIds.Count > 0;
+    public bool HasTagFiltersAvailable => AvailableTagFilters.Count > 0;
+    public bool HasFilteredOutSelection => SelectedNode is null && _selection.Selected is { } selected && HasEntityInStore(selected.Id);
+    public string? FilteredOutSelectionName => HasFilteredOutSelection ? FindEntityName(_selection.Selected!.Id) : null;
+    public string FilteredOutSelectionMessage => HasFilteredOutSelection
+        ? $"Selection '{FilteredOutSelectionName}' is hidden by the active tag filter."
+        : string.Empty;
+    public ICommand ToggleTagFilterCommand { get; }
+    public ICommand ClearTagFiltersCommand { get; }
+    public ICommand ClearTagFilterOrRevealSelectionCommand { get; }
 
     public WorkspaceTreeNodeViewModel? SelectedNode
     {
@@ -266,35 +296,107 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
                 return;
             }
 
-            var wasFiltering = !string.IsNullOrWhiteSpace(_queryText);
-            var willFilter = !string.IsNullOrWhiteSpace(value);
-            if (!wasFiltering && willFilter)
-            {
-                CaptureExpanded(Roots);
-                _expandedIdsBeforeFilter = [.. _expandedIds];
-            }
-            else if (wasFiltering && !willFilter && _expandedIdsBeforeFilter is not null)
-            {
-                _expandedIds.Clear();
-                _expandedIds.UnionWith(_expandedIdsBeforeFilter);
-                _expandedIdsBeforeFilter = null;
-            }
-
+            var wasFiltering = IsAnyFilterActive;
+            var willFilter = !string.IsNullOrWhiteSpace(value) || _selectedTagFilterIds.Count > 0;
+            CaptureOrRestoreExpanded(wasFiltering, willFilter);
             SetField(ref _queryText, value);
             RefreshProjection(captureExpanded: false);
         }
     }
 
+    public void ToggleTagFilter(Guid tagId)
+    {
+        if (tagId == Guid.Empty) return;
+        var wasFiltering = IsAnyFilterActive;
+        if (!_selectedTagFilterIds.Add(tagId)) _selectedTagFilterIds.Remove(tagId);
+        var willFilter = IsAnyFilterActive;
+        CaptureOrRestoreExpanded(wasFiltering, willFilter);
+        OnPropertyChanged(nameof(SelectedTagFilterIds));
+        OnPropertyChanged(nameof(IsTagFilterActive));
+        RefreshProjection(captureExpanded: false);
+    }
+
+    public void ClearTagFilters()
+    {
+        if (_selectedTagFilterIds.Count == 0) return;
+        var wasFiltering = IsAnyFilterActive;
+        _selectedTagFilterIds.Clear();
+        var willFilter = IsAnyFilterActive;
+        CaptureOrRestoreExpanded(wasFiltering, willFilter);
+        OnPropertyChanged(nameof(SelectedTagFilterIds));
+        OnPropertyChanged(nameof(IsTagFilterActive));
+        RefreshProjection(captureExpanded: false);
+    }
+
+    private bool IsAnyFilterActive => !string.IsNullOrWhiteSpace(_queryText) || _selectedTagFilterIds.Count > 0;
+
+    private void CaptureOrRestoreExpanded(bool wasFiltering, bool willFilter)
+    {
+        if (!wasFiltering && willFilter)
+        {
+            CaptureExpanded(Roots);
+            _expandedIdsBeforeFilter = [.. _expandedIds];
+        }
+        else if (wasFiltering && !willFilter && _expandedIdsBeforeFilter is not null)
+        {
+            _expandedIds.Clear();
+            _expandedIds.UnionWith(_expandedIdsBeforeFilter);
+            _expandedIdsBeforeFilter = null;
+        }
+    }
+
+    private void RebuildAvailableTagFilters()
+    {
+        if (_storeId is not Guid storeId)
+        {
+            AvailableTagFilters = [];
+        }
+        else
+        {
+            AvailableTagFilters = _snapshot.Tags
+                .Where(tag => tag.StoreId == storeId && !tag.IsArchived)
+                .OrderBy(tag => tag.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(tag => new TagSummary(tag.Id, tag.StoreId, tag.Name, tag.Description, tag.Color, tag.IsArchived, tag.CreatedAt, tag.UpdatedAt))
+                .ToArray();
+        }
+
+        var removed = _selectedTagFilterIds.Where(id => !AvailableTagFilters.Any(tag => tag.Id == id)).ToArray();
+        foreach (var id in removed)
+        {
+            _selectedTagFilterIds.Remove(id);
+        }
+
+        OnPropertyChanged(nameof(AvailableTagFilters));
+        OnPropertyChanged(nameof(HasTagFiltersAvailable));
+        OnPropertyChanged(nameof(SelectedTagFilterIds));
+        OnPropertyChanged(nameof(IsTagFilterActive));
+    }
+
+    private bool HasEntityInStore(Guid entityId) =>
+        _snapshot.Niches.Any(e => e.Id == entityId) ||
+        _snapshot.Groups.Any(e => e.Id == entityId) ||
+        _snapshot.Listings.Any(e => e.Id == entityId);
+
+    private string? FindEntityName(Guid entityId) =>
+        _snapshot.Listings.FirstOrDefault(e => e.Id == entityId)?.Name
+        ?? _snapshot.Groups.FirstOrDefault(e => e.Id == entityId)?.Name
+        ?? _snapshot.Niches.FirstOrDefault(e => e.Id == entityId)?.Name;
+
     public void SetStore(Guid? storeId, WorkspaceSnapshot snapshot)
     {
         _storeId = storeId;
         _snapshot = snapshot;
+        _selectedTagFilterIds.Clear();
+        RebuildAvailableTagFilters();
+        OnPropertyChanged(nameof(SelectedTagFilterIds));
+        OnPropertyChanged(nameof(IsTagFilterActive));
         RefreshProjection();
     }
 
     public async Task ReloadAsync()
     {
         _snapshot = await _repository.LoadAsync().ConfigureAwait(false);
+        RebuildAvailableTagFilters();
         RefreshProjection();
     }
 
@@ -843,7 +945,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             return;
         }
 
-        var projection = WorkspaceTreeProjector.Project(_snapshot, storeId, new WorkspaceTreeQuery(QueryText));
+        var projection = WorkspaceTreeProjector.Project(_snapshot, storeId, BuildQuery());
         foreach (var root in projection.Roots)
         {
             Roots.Add(ToNode(root));
@@ -851,11 +953,23 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
         SelectedNode = selectedId is Guid id ? FindNode(id) : null;
         ApplyClipboardState();
+        OnPropertyChanged(nameof(HasFilteredOutSelection));
+        OnPropertyChanged(nameof(FilteredOutSelectionName));
+        OnPropertyChanged(nameof(FilteredOutSelectionMessage));
+    }
+
+    private WorkspaceTreeQuery BuildQuery()
+    {
+        var tagIds = _selectedTagFilterIds.Count > 0 ? (IReadOnlySet<Guid>)_selectedTagFilterIds : null;
+        return new WorkspaceTreeQuery(_queryText, null, null, tagIds);
     }
 
     private WorkspaceTreeNodeViewModel ToNode(WorkspaceTreeProjectionNode projected)
     {
         var entity = FindEntity(projected.EntityKind, projected.EntityId);
+        var tagColors = projected.EntityKind == WorkspaceEntityKind.Listing
+            ? ResolveListingTagColors(projected.EntityId)
+            : [];
         var node = new WorkspaceTreeNodeViewModel(
             projected.NodeId,
             projected.EntityKind,
@@ -865,9 +979,24 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             projected.IsDirectMatch,
             projected.HasHiddenChildren,
             projected.Children.Count,
-            projected.Children.Select(ToNode));
-        node.IsExpanded = _expandedIds.Contains(node.EntityId) || !string.IsNullOrWhiteSpace(QueryText);
+            projected.Children.Select(ToNode),
+            isDraft: false,
+            appliedTagColors: tagColors);
+        node.IsExpanded = _expandedIds.Contains(node.EntityId) || !string.IsNullOrWhiteSpace(QueryText) || IsTagFilterActive;
         return node;
+    }
+
+    private IReadOnlyList<string> ResolveListingTagColors(Guid listingId)
+    {
+        var tagIds = _snapshot.ListingTags
+            .Where(link => link.ListingId == listingId)
+            .Select(link => link.TagId)
+            .ToHashSet();
+        return _snapshot.Tags
+            .Where(tag => tagIds.Contains(tag.Id))
+            .OrderBy(tag => tag.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(tag => tag.Color ?? "#243447")
+            .ToArray();
     }
 
     private WorkspaceEntity? FindEntity(WorkspaceEntityKind kind, Guid id) => kind switch

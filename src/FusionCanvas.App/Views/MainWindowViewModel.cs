@@ -121,7 +121,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _groupManagementService = new GroupManagementService(treeRepository);
         _listingManagementService = new ListingManagementService(treeRepository);
         GroupManagement = new GroupManagementViewModel(_groupManagementService);
-        ListingManagement = new ListingManagementViewModel(_listingManagementService);
+        ListingManagement = new ListingManagementViewModel(_listingManagementService, new TagManagementService(treeRepository));
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
         _workspaceSnapshot = workspaceSnapshot;
@@ -168,11 +168,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         WorkspaceManagement = new WorkspaceManagementViewModel(new WorkspaceManagementService(workspaceRepository));
         StoreManagement = new StoreManagementViewModel(
             new StoreManagementService(workspaceRepository),
-            new NicheManagementService(workspaceRepository));
+            new NicheManagementService(workspaceRepository),
+            new TagManagementService(workspaceRepository));
         _groupManagementService = groupManagementService ?? new GroupManagementService(workspaceRepository);
         _listingManagementService = listingManagementService ?? new ListingManagementService(workspaceRepository);
         GroupManagement = new GroupManagementViewModel(_groupManagementService);
-        ListingManagement = new ListingManagementViewModel(_listingManagementService);
+        ListingManagement = new ListingManagementViewModel(_listingManagementService, new TagManagementService(workspaceRepository));
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
         _workspaceRepository = workspaceRepository;

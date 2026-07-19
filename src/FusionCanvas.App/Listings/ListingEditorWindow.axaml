@@ -42,6 +42,66 @@
           </StackPanel>
         </Grid>
         <TextBlock Text="{Binding SelectedListing.Name}" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock Text="Tags" FontWeight="SemiBold" />
+        <StackPanel IsVisible="{Binding !CanEditTags}" Spacing="4">
+          <TextBlock Text="Restore the listing or its parent topic before editing tags." Opacity="0.65" TextWrapping="Wrap" FontSize="11" />
+        </StackPanel>
+        <StackPanel IsVisible="{Binding CanEditTags}" Spacing="6">
+          <ItemsControl ItemsSource="{Binding AppliedTags}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="workspace:TagSummary">
+                <Border Margin="0,0,4,4"
+                        Padding="8,2"
+                        CornerRadius="8"
+                        Background="{Binding Color, Converter={x:Static listings:TagEditorBrushConverter.Background}, FallbackValue='#F0F2F5'}"
+                        BorderBrush="{Binding Color, Converter={x:Static listings:TagEditorBrushConverter.Border}, FallbackValue='#D9DEE7'}"
+                        BorderThickness="1">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="{Binding Name}"
+                               Foreground="{Binding Color, Converter={x:Static listings:TagEditorBrushConverter.Foreground}, FallbackValue='#243447'}"
+                               FontSize="12" />
+                    <Button Content="✕"
+                            Padding="0"
+                            Width="18" Height="18"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="{Binding Color, Converter={x:Static listings:TagEditorBrushConverter.Foreground}, FallbackValue='#425066'}"
+                            Command="{Binding $parent[ItemsControl].((listings:ListingManagementViewModel)DataContext).RemoveTagCommand}"
+                            CommandParameter="{Binding}"
+                            ToolTip.Tip="Remove tag from listing" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBox Text="{Binding TagInput}"
+                   PlaceholderText="Add a tag…"
+                   IsEnabled="{Binding !IsBusyTags}"
+                   MinHeight="32"
+                   KeyDown="OnTagInputKeyDown" />
+          <ItemsControl ItemsSource="{Binding SuggestedTags}" IsVisible="{Binding HasSuggestions}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="workspace:TagSummary">
+                <Button Content="{Binding Name}"
+                        Command="{Binding $parent[ItemsControl].((listings:ListingManagementViewModel)DataContext).ApplyTagSuggestionCommand}"
+                        CommandParameter="{Binding}"
+                        HorizontalContentAlignment="Left"
+                        Margin="0,0,0,2"
+                        Padding="8,4"
+                        Background="{Binding Color, Converter={x:Static listings:TagEditorBrushConverter.Background}, FallbackValue='#F7F8FA'}"
+                        Foreground="{Binding Color, Converter={x:Static listings:TagEditorBrushConverter.Foreground}, FallbackValue='#243447'}"
+                        BorderBrush="{Binding Color, Converter={x:Static listings:TagEditorBrushConverter.Border}, FallbackValue='#E1E5EA'}"
+                        ToolTip.Tip="Apply this tag" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="{Binding TagErrorMessage}" IsVisible="{Binding HasTagError}" Foreground="#B42318" FontSize="11" TextWrapping="Wrap" />
+        </StackPanel>
         <TextBlock Text="Description" />
         <TextBox Text="{Binding Description}" AcceptsReturn="True" MinHeight="90" TabIndex="0" />
         <TextBlock Text="Notes" />
