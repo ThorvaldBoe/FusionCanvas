@@ -50,7 +50,7 @@ public class SqliteWorkspaceRepositoryTests
 
         await repository.SaveAsync(CreateCompleteSnapshot(), TestContext.Current.CancellationToken);
 
-        Assert.Equal(3, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(4, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -85,7 +85,7 @@ public class SqliteWorkspaceRepositoryTests
         Assert.Equal(2, loaded.Stores.Count);
         Assert.Equal(active, loaded.Stores.Single(store => store.Id == active.Id));
         Assert.Equal(archived, loaded.Stores.Single(store => store.Id == archived.Id));
-        Assert.Equal(3, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(4, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -104,7 +104,7 @@ public class SqliteWorkspaceRepositoryTests
 
         Assert.Equal(first.Id, Assert.Single(loaded.Stores).Id);
         Assert.DoesNotContain(loaded.Stores, store => store.Id == deleted.Id);
-        Assert.Equal(3, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(4, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -142,7 +142,7 @@ public class SqliteWorkspaceRepositoryTests
         Assert.Equal(2, loaded.Niches.Count);
         Assert.Equal(active, loaded.Niches.Single(niche => niche.Id == active.Id));
         Assert.Equal(archived, loaded.Niches.Single(niche => niche.Id == archived.Id));
-        Assert.Equal(3, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(4, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public class SqliteWorkspaceRepositoryTests
 
         Assert.Equal(kept.Id, Assert.Single(loaded.Niches).Id);
         Assert.DoesNotContain(loaded.Niches, niche => niche.Id == deleted.Id);
-        Assert.Equal(3, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(4, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -193,7 +193,7 @@ public class SqliteWorkspaceRepositoryTests
                 "Shirts"),
             TestContext.Current.CancellationToken);
         var withListing = await repository.LoadAsync(TestContext.Current.CancellationToken);
-        var listing = new Listing(Guid.NewGuid(), store.Id, sourceNiche.Id, child.Group!.Id, "Cozy shirt", null, ListingStatus.Draft, false, now, now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, sourceNiche.Id, child.Group!.Id, "Cozy shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         await repository.SaveAsync(withListing with { Listings = [listing] }, TestContext.Current.CancellationToken);
 
         var updated = await service.UpdateGroupAsync(
@@ -223,7 +223,7 @@ public class SqliteWorkspaceRepositoryTests
         Assert.Contains("Ready for art", loadedChild.MetadataJson);
         Assert.Equal(child.Group.Id, loadedListing.GroupId);
         Assert.Equal(destinationNiche.Id, loadedListing.NicheId);
-        Assert.Equal(3, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(4, await ReadUserVersionAsync(databasePath));
     }
 
 
@@ -238,7 +238,7 @@ public class SqliteWorkspaceRepositoryTests
 
         await repository.LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(3, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(4, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -277,10 +277,75 @@ public class SqliteWorkspaceRepositoryTests
 
         var loaded = await new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(3, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(4, await ReadUserVersionAsync(databasePath));
         Assert.Equal(nicheId, Assert.Single(loaded.Stores).DefaultNicheId);
         Assert.Equal(["Alpha", "Zulu"], loaded.Groups.OrderBy(group => group.SortOrder).Select(group => group.Name));
         Assert.Equal([0, 1], loaded.Groups.OrderBy(group => group.SortOrder).Select(group => group.SortOrder));
+    }
+
+    [Fact]
+    public async Task LoadAsync_MigratesV3LifecycleValuesToV4Vocabulary()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("workspace.db");
+        var workspaceId = WorkspaceDefaults.DefaultWorkspaceId;
+        var storeId = Guid.NewGuid();
+        var nicheId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE workspaces (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NULL, is_archived INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL);
+                CREATE TABLE stores (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, default_niche_id TEXT NULL, name TEXT NOT NULL, description TEXT NULL, is_archived INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL);
+                CREATE TABLE niches (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT NULL, is_archived INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL);
+                CREATE TABLE groups (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, niche_id TEXT NULL, parent_group_id TEXT NULL, sort_order INTEGER NOT NULL DEFAULT 0, name TEXT NOT NULL, description TEXT NULL, is_archived INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL);
+                CREATE TABLE listings (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, niche_id TEXT NULL, group_id TEXT NULL, name TEXT NOT NULL, description TEXT NULL, status INTEGER NOT NULL, is_archived INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL);
+                CREATE TABLE listing_tags (listing_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (listing_id, tag_id));
+                CREATE TABLE tags (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT NULL, is_archived INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL);
+                CREATE TABLE assets (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT NULL, kind INTEGER NOT NULL, workspace_relative_path TEXT NOT NULL, original_source_path TEXT NULL, is_missing INTEGER NOT NULL, is_archived INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL);
+                CREATE TABLE prompts (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, listing_id TEXT NULL, name TEXT NOT NULL, description TEXT NULL, text TEXT NOT NULL, is_archived INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL);
+                CREATE TABLE asset_links (asset_id TEXT NOT NULL, entity_kind INTEGER NOT NULL, entity_id TEXT NOT NULL, PRIMARY KEY (asset_id, entity_kind, entity_id));
+                INSERT INTO workspaces VALUES ($workspace_id, 'Personal', NULL, 0, $now, $now, '{}');
+                INSERT INTO stores VALUES ($store_id, $workspace_id, NULL, 'Store', NULL, 0, $now, $now, '{}');
+                INSERT INTO niches VALUES ($niche_id, $store_id, 'Niche', NULL, 0, $now, $now, '{}');
+                UPDATE stores SET default_niche_id = $niche_id WHERE id = $store_id;
+                INSERT INTO listings VALUES ($active_id, $store_id, $niche_id, NULL, 'Active', NULL, 0, 0, $now, $now, '{}');
+                INSERT INTO listings VALUES ($draft_id, $store_id, $niche_id, NULL, 'Draft', NULL, 1, 0, $now, $now, '{}');
+                INSERT INTO listings VALUES ($ready_id, $store_id, $niche_id, NULL, 'Ready', NULL, 2, 0, $now, $now, '{}');
+                INSERT INTO listings VALUES ($published_id, $store_id, $niche_id, NULL, 'Published', NULL, 3, 0, $now, $now, '{}');
+                INSERT INTO listings VALUES ($archived_id, $store_id, $niche_id, NULL, 'Archived', NULL, 4, 0, $now, $now, '{}');
+                PRAGMA user_version = 3;
+                """;
+            command.Parameters.AddWithValue("$workspace_id", workspaceId.ToString());
+            command.Parameters.AddWithValue("$store_id", storeId.ToString());
+            command.Parameters.AddWithValue("$niche_id", nicheId.ToString());
+            command.Parameters.AddWithValue("$active_id", Guid.NewGuid().ToString());
+            command.Parameters.AddWithValue("$draft_id", Guid.NewGuid().ToString());
+            command.Parameters.AddWithValue("$ready_id", Guid.NewGuid().ToString());
+            command.Parameters.AddWithValue("$published_id", Guid.NewGuid().ToString());
+            command.Parameters.AddWithValue("$archived_id", Guid.NewGuid().ToString());
+            command.Parameters.AddWithValue("$now", now.ToString("O"));
+            await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+
+        var loaded = await new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(4, await ReadUserVersionAsync(databasePath));
+        var byName = loaded.Listings.ToDictionary(listing => listing.Name);
+        Assert.Equal(ListingStatus.Draft, byName["Active"].Status);
+        Assert.Equal(WorkflowStage.Listing, byName["Active"].Stage);
+        Assert.False(byName["Active"].IsArchived);
+        Assert.Equal(ListingStatus.Draft, byName["Draft"].Status);
+        Assert.Equal(WorkflowStage.Idea, byName["Draft"].Stage);
+        Assert.Equal(ListingStatus.Draft, byName["Ready"].Status);
+        Assert.Equal(WorkflowStage.Design, byName["Ready"].Stage);
+        Assert.Equal(ListingStatus.Published, byName["Published"].Status);
+        Assert.Equal(WorkflowStage.Listing, byName["Published"].Stage);
+        Assert.Equal(ListingStatus.Draft, byName["Archived"].Status);
+        Assert.Equal(WorkflowStage.Idea, byName["Archived"].Stage);
+        Assert.True(byName["Archived"].IsArchived);
     }
 
     [Fact]
@@ -288,7 +353,7 @@ public class SqliteWorkspaceRepositoryTests
     {
         using var tempDirectory = new TemporaryDirectory();
         var databasePath = tempDirectory.GetPath("workspace.db");
-        await SetUserVersionAsync(databasePath, 4);
+        await SetUserVersionAsync(databasePath, 5);
         var repository = new SqliteWorkspaceRepository(databasePath);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -357,7 +422,7 @@ public class SqliteWorkspaceRepositoryTests
         var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", "Warm drink designs", false, createdAt, updatedAt, """{"season":"fall"}""");
         store = store with { DefaultNicheId = niche.Id };
         var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Fall launch", "Seasonal rollout", true, createdAt, updatedAt, """{"priority":2}""", 4);
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Pumpkin espresso", "Cozy shirt idea", ListingStatus.Draft, false, createdAt, updatedAt, """{"audience":"baristas"}""");
+        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Pumpkin espresso", "Cozy shirt idea", ListingStatus.Draft, WorkflowStage.Idea, false, createdAt, updatedAt, """{"audience":"baristas"}""");
         var asset = new Asset(Guid.NewGuid(), store.Id, "design.png", "Primary export", AssetKind.ExportedImage, "assets/2026/06/design.png", "C:/imports/design.png", false, false, createdAt, updatedAt, """{"width":4500}""");
         var prompt = new Prompt(Guid.NewGuid(), store.Id, listing.Id, "Listing prompt", "Phrase prompt", "Create a warm fall coffee phrase.", false, createdAt, updatedAt, """{"model":"manual"}""");
         var tag = new Tag(Guid.NewGuid(), store.Id, "seasonal", "Seasonal work", false, createdAt, updatedAt, """{"color":"orange"}""");

@@ -26,6 +26,8 @@ public sealed record ListingManagementMoveRequest(Guid ListingId, ListingTopicRe
 public sealed record ListingManagementDuplicateRequest(Guid ListingId, ListingTopicReference? Destination = null);
 public sealed record ListingManagementRestoreRequest(Guid ListingId, ListingTopicReference? Destination = null);
 public sealed record ListingManagementDeleteRequest(Guid ListingId, bool ConfirmPermanentDeletion);
+public sealed record ListingManagementSetStatusRequest(Guid ListingId, ListingStatus Status);
+public sealed record ListingManagementMoveStageRequest(Guid ListingId, WorkflowStage Stage);
 
 public sealed record ListingCreationDestinationResult(ListingTopicReference? Topic, string? Error)
 {
@@ -42,6 +44,7 @@ public sealed record ListingSummary(
     string Name,
     ListingContext Context,
     ListingStatus Status,
+    WorkflowStage Stage,
     bool IsArchived,
     bool IsEffectivelyActive,
     IReadOnlyList<Guid> Path,
@@ -87,6 +90,8 @@ public interface IListingManagementService
     Task<ListingManagementResult> ArchiveListingAsync(Guid listingId, CancellationToken cancellationToken = default);
     Task<ListingManagementResult> RestoreListingAsync(ListingManagementRestoreRequest request, CancellationToken cancellationToken = default);
     Task<ListingManagementResult> DeleteListingAsync(ListingManagementDeleteRequest request, CancellationToken cancellationToken = default);
+    Task<ListingManagementResult> SetListingStatusAsync(ListingManagementSetStatusRequest request, CancellationToken cancellationToken = default);
+    Task<ListingManagementResult> MoveListingStageAsync(ListingManagementMoveStageRequest request, CancellationToken cancellationToken = default);
     Task<ListingManagementResult> SelectListingAsync(Guid listingId, CancellationToken cancellationToken = default);
 }
 
@@ -207,6 +212,7 @@ public sealed class ListingManagementService : IListingManagementService
             name,
             NormalizeOptional(context.Description),
             ListingStatus.Draft,
+            WorkflowStage.Idea,
             false,
             now,
             now,
@@ -373,6 +379,7 @@ public sealed class ListingManagementService : IListingManagementService
             GroupId = destination.Kind == WorkspaceEntityKind.Group ? destination.Id : null,
             Name = UniqueCopyName(snapshot, source.Name),
             Status = ListingStatus.Draft,
+            Stage = WorkflowStage.Idea,
             IsArchived = false,
             CreatedAt = now,
             UpdatedAt = now
@@ -442,6 +449,83 @@ public sealed class ListingManagementService : IListingManagementService
         }
         _activeStoreId = existing.StoreId;
         return ListingManagementResult.Success(ToSummary(snapshot, existing), BuildState(updated, existing.StoreId));
+    }
+
+    public async Task<ListingManagementResult> SetListingStatusAsync(
+        ListingManagementSetStatusRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (!Enum.IsDefined(request.Status))
+        {
+            return Failure("Unknown listing lifecycle status.", await _repository.LoadAsync(cancellationToken).ConfigureAwait(false), _activeStoreId);
+        }
+
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var existing = snapshot.Listings.SingleOrDefault(candidate => candidate.Id == request.ListingId);
+        if (existing is null)
+        {
+            return Failure("Listing was not found.", snapshot, _activeStoreId);
+        }
+
+        if (existing.Status == request.Status)
+        {
+            SetSelection(existing.StoreId, existing.Id);
+            return Success(existing, snapshot);
+        }
+
+        var changed = existing with { Status = request.Status, UpdatedAt = _clock() };
+        var updated = snapshot with { Listings = snapshot.Listings.Select(candidate => candidate.Id == existing.Id ? changed : candidate).ToArray() };
+
+        var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        if (saveError is not null)
+        {
+            return Failure(saveError, snapshot, existing.StoreId);
+        }
+
+        SetSelection(existing.StoreId, existing.Id);
+        return Success(changed, updated);
+    }
+
+    public async Task<ListingManagementResult> MoveListingStageAsync(
+        ListingManagementMoveStageRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (!Enum.IsDefined(request.Stage))
+        {
+            return Failure("Unknown workflow stage.", await _repository.LoadAsync(cancellationToken).ConfigureAwait(false), _activeStoreId);
+        }
+
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var existing = snapshot.Listings.SingleOrDefault(candidate => candidate.Id == request.ListingId);
+        if (existing is null)
+        {
+            return Failure("Listing was not found.", snapshot, _activeStoreId);
+        }
+
+        if (existing.IsArchived || existing.Status == ListingStatus.Rejected)
+        {
+            return Failure("Inactive listings must be reactivated before moving workflow stages.", snapshot, existing.StoreId);
+        }
+
+        if (existing.Stage == request.Stage)
+        {
+            SetSelection(existing.StoreId, existing.Id);
+            return Success(existing, snapshot);
+        }
+
+        var changed = existing with { Stage = request.Stage, UpdatedAt = _clock() };
+        var updated = snapshot with { Listings = snapshot.Listings.Select(candidate => candidate.Id == existing.Id ? changed : candidate).ToArray() };
+
+        var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        if (saveError is not null)
+        {
+            return Failure(saveError, snapshot, existing.StoreId);
+        }
+
+        SetSelection(existing.StoreId, existing.Id);
+        return Success(changed, updated);
     }
 
     public async Task<ListingManagementResult> SelectListingAsync(Guid listingId, CancellationToken cancellationToken = default)
@@ -747,6 +831,7 @@ public sealed class ListingManagementService : IListingManagementService
             listing.Name,
             ToContext(snapshot, listing),
             listing.Status,
+            listing.Stage,
             listing.IsArchived,
             ListingHierarchy.IsEffectivelyActive(snapshot, listing),
             path,

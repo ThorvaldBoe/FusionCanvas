@@ -6,12 +6,14 @@ public sealed record WorkspaceTreeQuery(
     string? Text = null,
     IReadOnlySet<WorkspaceEntityKind>? EntityKinds = null,
     IReadOnlySet<ListingStatus>? ListingStatuses = null,
+    IReadOnlySet<WorkflowStage>? WorkflowStages = null,
     IReadOnlySet<Guid>? TagIds = null)
 {
     public bool IsActive =>
         !string.IsNullOrWhiteSpace(Text) ||
         EntityKinds is { Count: > 0 } ||
         ListingStatuses is { Count: > 0 } ||
+        WorkflowStages is { Count: > 0 } ||
         TagIds is { Count: > 0 };
 }
 
@@ -97,6 +99,16 @@ public static class WorkspaceTreeProjector
             if (node.EntityKind != WorkspaceEntityKind.Listing ||
                 snapshot.Listings.Single(listing => listing.Id == node.EntityId) is not { } listing ||
                 !query.ListingStatuses.Contains(listing.Status))
+            {
+                return false;
+            }
+        }
+
+        if (query.WorkflowStages is { Count: > 0 })
+        {
+            if (node.EntityKind != WorkspaceEntityKind.Listing ||
+                snapshot.Listings.SingleOrDefault(listing => listing.Id == node.EntityId) is not { } stageListing ||
+                !query.WorkflowStages.Contains(stageListing.Stage))
             {
                 return false;
             }

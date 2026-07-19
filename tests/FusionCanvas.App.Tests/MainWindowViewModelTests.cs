@@ -158,7 +158,7 @@ public class MainWindowViewModelTests
         var personalStore = new Store(Guid.NewGuid(), personal.Id, "Personal Store", null, false, now, now, "{}");
         var clientStore = new Store(Guid.NewGuid(), client.Id, "Client Store", null, false, now, now, "{}");
         var clientNiche = new Niche(Guid.NewGuid(), clientStore.Id, "Client Niche", null, false, now, now, "{}");
-        var clientListing = new Listing(Guid.NewGuid(), clientStore.Id, clientNiche.Id, null, "Client Listing", null, ListingStatus.Draft, false, now, now, "{}");
+        var clientListing = new Listing(Guid.NewGuid(), clientStore.Id, clientNiche.Id, null, "Client Listing", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var snapshot = new WorkspaceSnapshot([personal, client], [personalStore, clientStore], [clientNiche], [], [clientListing], [], [], [], [], []);
         var repository = new InMemoryWorkspaceRepository(snapshot);
         var viewModel = new MainWindowViewModel(
@@ -308,6 +308,73 @@ public class MainWindowViewModelTests
         viewModel.NavigationContexts.Single(context =>
             context.Context.EntityKind == WorkspaceEntityKind.Listing &&
             context.Context.Title == "Espresso listing draft");
+
+    [Fact]
+    public void StageMoveControls_ReflectActiveListingBoundaries()
+    {
+        var viewModel = new MainWindowViewModel();
+
+        viewModel.OpenFromNavigation(DraftListingContext(viewModel));
+        Assert.False(viewModel.CanMoveStageBack);
+        Assert.True(viewModel.CanMoveStageForward);
+
+        viewModel.OpenFromNavigation(ActiveListingContext(viewModel));
+        Assert.True(viewModel.CanMoveStageBack);
+        Assert.False(viewModel.CanMoveStageForward);
+    }
+
+    [Fact]
+    public async Task MoveStageForward_AdvancesStageAndUpdatesView()
+    {
+        var viewModel = new MainWindowViewModel();
+        viewModel.OpenFromNavigation(ReadyListingContext(viewModel));
+
+        viewModel.MoveStageForwardCommand.Execute(null);
+        await Task.Delay(200);
+
+        Assert.Null(viewModel.StageMoveError);
+        Assert.Equal(WorkflowStage.Listing, viewModel.DocumentWindow.ActiveContext?.WorkflowStage);
+        Assert.True(viewModel.WorkflowNavigator.Stages.Single(stage => stage.Stage == WorkflowStage.Listing).IsCurrent);
+        Assert.False(viewModel.CanMoveStageForward);
+    }
+
+    [Fact]
+    public async Task MoveStageBack_RegressesStage()
+    {
+        var viewModel = new MainWindowViewModel();
+        viewModel.OpenFromNavigation(ReadyListingContext(viewModel));
+
+        viewModel.MoveStageBackCommand.Execute(null);
+        await Task.Delay(100);
+
+        Assert.Equal(WorkflowStage.Concept, viewModel.DocumentWindow.ActiveContext?.WorkflowStage);
+        Assert.True(viewModel.WorkflowNavigator.Stages.Single(stage => stage.Stage == WorkflowStage.Concept).IsCurrent);
+    }
+
+    [Fact]
+    public async Task SetListingStatus_ChangesStatusWithoutMovingStage()
+    {
+        var viewModel = new MainWindowViewModel();
+        viewModel.OpenFromNavigation(ReadyListingContext(viewModel));
+
+        viewModel.SetListingStatusCommand.Execute(ListingStatus.Paused);
+        await Task.Delay(100);
+
+        Assert.Equal(ListingStatus.Paused, viewModel.ActiveListingStatus);
+        Assert.Equal(WorkflowStage.Design, viewModel.DocumentWindow.ActiveContext?.WorkflowStage);
+    }
+
+    [Fact]
+    public async Task StageMoveControls_DisabledForRejectedListing()
+    {
+        var viewModel = new MainWindowViewModel();
+        viewModel.OpenFromNavigation(ReadyListingContext(viewModel));
+        viewModel.SetListingStatusCommand.Execute(ListingStatus.Rejected);
+        await Task.Delay(100);
+
+        Assert.False(viewModel.CanMoveStageForward);
+        Assert.False(viewModel.CanMoveStageBack);
+    }
 
     private sealed class InMemoryWorkspaceRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
     {

@@ -78,6 +78,7 @@ public sealed class WorkspaceTreeNodeViewModel : INotifyPropertyChanged
     public bool IsListing => EntityKind == WorkspaceEntityKind.Listing;
     public bool IsTopic => EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group;
     public bool HasContextActions => EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing;
+    public bool IsInactive { get; init; }
     public ObservableCollection<WorkspaceTreeNodeViewModel> Children { get; }
 
     public bool IsExpanded
@@ -284,6 +285,42 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             RefreshProjection(captureExpanded: false);
         }
     }
+
+    private int _stageFilterIndex;
+    private int _statusFilterIndex;
+
+    public int StageFilterIndex
+    {
+        get => _stageFilterIndex;
+        set
+        {
+            if (_stageFilterIndex == value)
+            {
+                return;
+            }
+            SetField(ref _stageFilterIndex, value);
+            RefreshProjection(captureExpanded: false);
+        }
+    }
+
+    public int StatusFilterIndex
+    {
+        get => _statusFilterIndex;
+        set
+        {
+            if (_statusFilterIndex == value)
+            {
+                return;
+            }
+            SetField(ref _statusFilterIndex, value);
+            RefreshProjection(captureExpanded: false);
+        }
+    }
+
+    private WorkspaceTreeQuery BuildQuery() => new(
+        QueryText,
+        WorkflowStages: _stageFilterIndex > 0 ? new HashSet<WorkflowStage> { WorkflowStages.Ordered[_stageFilterIndex - 1] } : null,
+        ListingStatuses: _statusFilterIndex > 0 ? new HashSet<ListingStatus> { ListingStatuses.Ordered[_statusFilterIndex - 1] } : null);
 
     public void SetStore(Guid? storeId, WorkspaceSnapshot snapshot)
     {
@@ -843,7 +880,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             return;
         }
 
-        var projection = WorkspaceTreeProjector.Project(_snapshot, storeId, new WorkspaceTreeQuery(QueryText));
+        var projection = WorkspaceTreeProjector.Project(_snapshot, storeId, BuildQuery());
         foreach (var root in projection.Roots)
         {
             Roots.Add(ToNode(root));
@@ -865,7 +902,10 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             projected.IsDirectMatch,
             projected.HasHiddenChildren,
             projected.Children.Count,
-            projected.Children.Select(ToNode));
+            projected.Children.Select(ToNode))
+        {
+            IsInactive = entity is Listing listing && (listing.IsArchived || listing.Status == ListingStatus.Rejected),
+        };
         node.IsExpanded = _expandedIds.Contains(node.EntityId) || !string.IsNullOrWhiteSpace(QueryText);
         return node;
     }
