@@ -5,8 +5,8 @@
 
 ## 2. Persistence Migration (Schema v4)
 
-- [ ] 2.1 Add the `workflow_stage` column, translate persisted status integers to the new vocabulary, set the archive flag for old archive-valued rows, and backfill stage per the design mapping table; advance the schema version to 4 with a `MigrateToVersion4Async` step.
-- [ ] 2.2 Round-trip the workflow stage through listing insert and load.
+- [x] 2.1 Add the `workflow_stage` column, translate persisted status integers to the new vocabulary, set the archive flag for old archive-valued rows, and backfill stage per the design mapping table; advance the schema version to 4 with a `MigrateToVersion4Async` step.
+- [x] 2.2 Round-trip the workflow stage through listing insert and load.
 - [x] 2.3 Add integration tests with v3-format fixture databases covering every mapping row (Active/Draft/Ready/Published/Archived), stage backfill, archive-flag mapping, reload behavior, and the newer-version refusal guard.
 
 ## 3. Application Lifecycle Operations
