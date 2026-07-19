@@ -93,4 +93,40 @@ public sealed class LocalWorkspaceFileStore : IWorkspaceFileStore
         var fullPath = Path.GetFullPath(Path.Combine(WorkspaceRoot, normalizedReference));
         return fullPath.StartsWith(workspaceBoundary, StringComparison.OrdinalIgnoreCase) && File.Exists(fullPath);
     }
+
+    public bool TryDelete(string workspaceRelativePath)
+    {
+        string normalizedReference;
+        try
+        {
+            normalizedReference = WorkspaceFileReference.Normalize(workspaceRelativePath);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+
+        var workspaceBoundary = Path.EndsInDirectorySeparator(WorkspaceRoot)
+            ? WorkspaceRoot
+            : WorkspaceRoot + Path.DirectorySeparatorChar;
+        var fullPath = Path.GetFullPath(Path.Combine(WorkspaceRoot, normalizedReference));
+        if (!fullPath.StartsWith(workspaceBoundary, StringComparison.OrdinalIgnoreCase) || !File.Exists(fullPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            File.Delete(fullPath);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
 }

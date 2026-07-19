@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using FusionCanvas.App.Assets;
 using FusionCanvas.App.Groups;
 using FusionCanvas.App.Listings;
 using FusionCanvas.App.Navigation;
@@ -20,6 +21,7 @@ public partial class MainWindow : Window
     private WorkspaceManagementWindow? _workspaceManagementWindow;
     private GroupEditorWindow? _groupEditorWindow;
     private ListingEditorWindow? _listingEditorWindow;
+    private AssetsWindow? _assetsWindow;
     private PointerPressedEventArgs? _dragPointerArgs;
     private WorkspaceTreeNodeViewModel? _dragNode;
     private Avalonia.Point _dragStart;
@@ -57,11 +59,19 @@ public partial class MainWindow : Window
                 SyncListingEditorWindow(viewModel.ListingManagement);
             }
         };
+        viewModel.AssetsManagement.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(AssetsViewModel.IsOpen))
+            {
+                SyncAssetsWindow(viewModel.AssetsManagement);
+            }
+        };
         DataContext = viewModel;
         SyncWorkspaceManagementWindow(viewModel.WorkspaceManagement);
         SyncStoreEditorWindow(viewModel.StoreManagement);
         SyncGroupEditorWindow(viewModel.GroupManagement);
         SyncListingEditorWindow(viewModel.ListingManagement);
+        SyncAssetsWindow(viewModel.AssetsManagement);
     }
 
     private void SyncWorkspaceManagementWindow(WorkspaceManagementViewModel workspaceManagement)
@@ -157,6 +167,32 @@ public partial class MainWindow : Window
         if (!listingManagement.IsOpen && _listingEditorWindow is not null)
         {
             _listingEditorWindow.Close();
+        }
+    }
+
+    private void SyncAssetsWindow(AssetsViewModel assets)
+    {
+        if (assets.IsOpen && _assetsWindow is null)
+        {
+            _assetsWindow = new AssetsWindow { DataContext = assets };
+            assets.FilePicker = new AvaloniaAssetFilePicker(_assetsWindow.StorageProvider);
+            _assetsWindow.Closed += (_, _) =>
+            {
+                _assetsWindow = null;
+                if (assets.IsOpen)
+                {
+                    assets.CloseCommand.Execute(null);
+                }
+
+                WorkspaceTreeControl.Focus();
+            };
+            _assetsWindow.Show(this);
+            return;
+        }
+
+        if (!assets.IsOpen && _assetsWindow is not null)
+        {
+            _assetsWindow.Close();
         }
     }
 
@@ -437,6 +473,25 @@ public partial class MainWindow : Window
         if (TrySelectContextNode(sender, out var viewModel, out _))
         {
             viewModel.WorkspaceTree.EditPropertiesCommand.Execute(null);
+        }
+    }
+
+    private void OnContextAssets(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem { DataContext: WorkspaceTreeNodeViewModel node } &&
+            DataContext is MainWindowViewModel viewModel &&
+            node.HasAssetActions)
+        {
+            viewModel.WorkspaceTree.SelectNodeCommand.Execute(node);
+            viewModel.WorkspaceTree.ManageAssetsCommand.Execute(null);
+        }
+    }
+
+    private async void OnContextStoreAssets(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            await viewModel.OpenManageStoreAssetsAsync();
         }
     }
 

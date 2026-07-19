@@ -12,6 +12,8 @@ public interface IWorkspaceFileStore
         CancellationToken cancellationToken = default);
 
     bool Exists(string workspaceRelativePath);
+
+    bool TryDelete(string workspaceRelativePath);
 }
 
 public sealed record ManagedWorkspaceFile(

@@ -81,6 +81,8 @@
                 <MenuFlyout>
                   <MenuItem Header="Manage stores"
                             Command="{Binding StoreManagement.OpenStoreEditorCommand}" />
+                  <MenuItem Header="Store assets…"
+                            Click="OnContextStoreAssets" />
                 </MenuFlyout>
               </Button.Flyout>
             </Button>
@@ -175,16 +177,17 @@
                       DragDrop.Drop="OnTreeNodeDrop"
                       ToolTip.Tip="Right-click for actions; Ctrl-click opens a tab; F2 renames">
                 <Border.ContextMenu>
-                  <ContextMenu IsVisible="{Binding HasContextActions}">
+                  <ContextMenu IsVisible="{Binding HasAssetActions}">
                     <MenuItem Header="New group (subgroup)" IsVisible="{Binding IsGroup}" Click="OnContextNewGroup" />
                     <MenuItem Header="New listing" Click="OnContextNewListing" />
                     <Separator />
-                    <MenuItem Header="Rename" Click="OnContextRename" />
-                    <MenuItem Header="Copy" Click="OnContextCopy" />
-                    <MenuItem Header="Cut" Click="OnContextCut" />
+                    <MenuItem Header="Rename" IsVisible="{Binding HasContextActions}" Click="OnContextRename" />
+                    <MenuItem Header="Copy" IsVisible="{Binding HasContextActions}" Click="OnContextCopy" />
+                    <MenuItem Header="Cut" IsVisible="{Binding HasContextActions}" Click="OnContextCut" />
                     <MenuItem Header="Paste" IsEnabled="{Binding CanPaste}" Click="OnContextPaste" />
                     <MenuItem Header="Duplicate" IsVisible="{Binding IsListing}" Click="OnContextDuplicate" />
-                    <MenuItem Header="Edit properties…" Click="OnContextEditProperties" />
+                    <MenuItem Header="Edit properties…" IsVisible="{Binding HasContextActions}" Click="OnContextEditProperties" />
+                    <MenuItem Header="Assets…" Click="OnContextAssets" />
                     <Separator />
                     <MenuItem Header="Delete..." IsVisible="{Binding IsGroup}" Click="OnContextDelete" />
                   </ContextMenu>

@@ -78,6 +78,7 @@ public sealed class WorkspaceTreeNodeViewModel : INotifyPropertyChanged
     public bool IsListing => EntityKind == WorkspaceEntityKind.Listing;
     public bool IsTopic => EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group;
     public bool HasContextActions => EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing;
+    public bool HasAssetActions => EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing;
     public ObservableCollection<WorkspaceTreeNodeViewModel> Children { get; }
 
     public bool IsExpanded
@@ -193,6 +194,13 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
                 }
             }
         });
+        ManageAssetsCommand = new RelayCommand(_ =>
+        {
+            if (_selectedNode?.EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing)
+            {
+                ManageAssetsRequested?.Invoke(this, new WorkspaceTreeSelection(_selectedNode.EntityKind, _selectedNode.EntityId));
+            }
+        });
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -200,6 +208,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     public event EventHandler<WorkspaceTreeSelection>? SelectionChanged;
     public event EventHandler<Guid>? EditPropertiesRequested;
     public event EventHandler<Guid>? EditListingPropertiesRequested;
+    public event EventHandler<WorkspaceTreeSelection>? ManageAssetsRequested;
     public event EventHandler? StructureChanged;
     public event EventHandler<IReadOnlySet<Guid>>? EntitiesDeleted;
 
@@ -214,6 +223,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     public ICommand PasteCommand { get; }
     public ICommand DuplicateCommand { get; }
     public ICommand EditPropertiesCommand { get; }
+    public ICommand ManageAssetsCommand { get; }
 
     public WorkspaceTreeNodeViewModel? SelectedNode
     {
