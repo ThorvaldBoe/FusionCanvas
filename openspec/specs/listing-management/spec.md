@@ -255,13 +255,19 @@ FusionCanvas SHALL make normal listing selection update canonical workspace cont
 - **THEN** FusionCanvas keeps that tab and its active context visible
 
 ### Requirement: Secondary listing management protects properties and lifecycle actions
-FusionCanvas SHALL provide a secondary focused surface for optional listing properties, archived review, restore, and permanent deletion while keeping inline creation, rename, move, and duplication in the tree.
+FusionCanvas SHALL provide a secondary focused surface for optional listing properties, listing tag editing, archived review, restore, and permanent deletion while keeping inline creation, rename, move, and duplication in the tree.
 
 #### Scenario: User opens listing properties
 - **WHEN** the user invokes Edit Properties for a selected listing
 - **THEN** FusionCanvas opens the focused surface with that listing preselected
 - **AND** keeps canonical tree and document context intact
-- **AND** progressively discloses archive, restore, and permanent deletion
+- **AND** progressively discloses the listing tag editor, archived review, restore, and permanent deletion
+
+#### Scenario: User edits listing tags on the properties surface
+- **WHEN** the user applies or removes a tag through the listing tag editor on the focused surface
+- **THEN** FusionCanvas persists the tag change immediately and atomically through the tag management service
+- **AND** the tag change does not require or await the description/notes Save action
+- **AND** the description/notes draft and its explicit Save remain independent
 
 #### Scenario: User leaves meaningful unsaved properties
 - **WHEN** the focused surface contains meaningful unsaved description or notes changes and the user switches listing or closes
