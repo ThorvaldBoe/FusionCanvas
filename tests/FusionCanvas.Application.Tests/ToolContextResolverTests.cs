@@ -142,9 +142,9 @@ public class ToolContextResolverTests
             var store = new Store(Guid.NewGuid(), "North Star Studio", null, false, now, now, """{"brand":"North Star"}""");
             var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, """{"tone":"warm"}""");
             var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Autumn", null, false, now, now, """{"season":"fall"}""");
-            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Pumpkin espresso", null, ListingStatus.Draft, false, now, now, """{"phrase":"Pumpkin power"}""");
-            var otherListing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Latte leaves", null, ListingStatus.Active, false, now, now, "{}");
-            var archivedListing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Retired roast", null, ListingStatus.Archived, true, now, now, "{}");
+            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Pumpkin espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, """{"phrase":"Pumpkin power"}""");
+            var otherListing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Latte leaves", null, ListingStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
+            var archivedListing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Retired roast", null, ListingStatus.Draft, WorkflowStage.Idea, true, now, now, "{}");
             var tag = new Tag(Guid.NewGuid(), store.Id, "evergreen", null, false, now, now, "{}");
 
             return new ToolContextSample(

@@ -361,7 +361,7 @@ public class GroupManagementServiceTests
             var sample = Create();
             var root = new TopicGroup(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Seasonal", null, false, sample.Now, sample.Now, "{}");
             var child = new TopicGroup(Guid.NewGuid(), sample.Store.Id, null, root.Id, "Child", null, childArchived, sample.Now, sample.Now, "{}");
-            var listing = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, child.Id, "Listing", null, ListingStatus.Draft, false, sample.Now, sample.Now, "{}");
+            var listing = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, child.Id, "Listing", null, ListingStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
             return sample with
             {
                 Snapshot = sample.Snapshot with { Groups = [root, child], Listings = [listing] },

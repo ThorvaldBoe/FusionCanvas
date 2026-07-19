@@ -13,8 +13,8 @@ public class ListingManagementViewModelTests
         var nicheId = Guid.NewGuid();
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", nicheId);
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, false, now, now, "{\"notes\":\"old\"}");
-        var other = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Other", null, ListingStatus.Draft, false, now, now, "{}");
+        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{\"notes\":\"old\"}");
+        var other = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Other", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var repository = new Repository(new WorkspaceSnapshot([store], [niche], [], [listing, other], [], [], [], [], []));
         var viewModel = new ListingManagementViewModel(new ListingManagementService(repository));
         var changes = 0;
