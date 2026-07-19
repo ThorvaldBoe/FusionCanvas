@@ -133,16 +133,37 @@
                     IsEnabled="{Binding WorkspaceTree.CanManageSelection}"
                     Classes="storeSecondary" />
           </Grid>
-          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
             <TextBox x:Name="TreeSearchBox"
                      Text="{Binding WorkspaceTree.QueryText}"
                      PlaceholderText="Search groups and items..."
                      MinHeight="34" />
-            <Button Grid.Column="1"
-                    Content="Filters"
-                    IsEnabled="False"
-                    ToolTip.Tip="Status and tag filters become available when those properties are implemented."
-                    Classes="storeSecondary" />
+            <ComboBox Grid.Column="1"
+                      x:Name="StageFilter"
+                      SelectedIndex="{Binding WorkspaceTree.StageFilterIndex}"
+                      MinWidth="92"
+                      MinHeight="34"
+                      ToolTip.Tip="Filter listings by workflow stage"
+                      Classes="statusSelector">
+              <ComboBoxItem Content="All stages" />
+              <ComboBoxItem Content="Idea" />
+              <ComboBoxItem Content="Concept" />
+              <ComboBoxItem Content="Design" />
+              <ComboBoxItem Content="Listing" />
+            </ComboBox>
+            <ComboBox Grid.Column="2"
+                      x:Name="StatusFilter"
+                      SelectedIndex="{Binding WorkspaceTree.StatusFilterIndex}"
+                      MinWidth="92"
+                      MinHeight="34"
+                      ToolTip.Tip="Filter listings by lifecycle status"
+                      Classes="statusSelector">
+              <ComboBoxItem Content="All statuses" />
+              <ComboBoxItem Content="Draft" />
+              <ComboBoxItem Content="Published" />
+              <ComboBoxItem Content="Paused" />
+              <ComboBoxItem Content="Rejected" />
+            </ComboBox>
           </Grid>
           <TextBlock Text="{Binding GroupActionStatus}"
                      TextWrapping="Wrap"
@@ -168,6 +189,7 @@
                       Classes.dropTarget="{Binding IsDropTarget}"
                       Classes.dropBefore="{Binding IsDropBefore}"
                       Classes.dropAfter="{Binding IsDropAfter}"
+                      Classes.inactive="{Binding IsInactive}"
                       DragDrop.AllowDrop="True"
                       PointerPressed="OnTreeNodePointerPressed"
                       PointerMoved="OnTreeNodePointerMoved"
@@ -292,6 +314,7 @@
                         Classes.current="{Binding IsCurrent}"
                         Classes.available="{Binding IsAvailable}"
                         Classes.unavailable="{Binding !IsAvailable}"
+                        Classes.activeView="{Binding IsActiveView}"
                         Padding="14,8"
                         MinWidth="88" />
               </DataTemplate>
@@ -313,8 +336,8 @@
         <Grid>
           <StackPanel IsVisible="{Binding DocumentWindow.HasActiveDocument}"
                       Spacing="12">
-            <Grid ColumnDefinitions="*,Auto">
-              <StackPanel Spacing="3">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+              <StackPanel Grid.Column="0" Spacing="3">
                 <TextBlock Text="{Binding DocumentWindow.ActiveDetailTitle}"
                            FontSize="24"
                            FontWeight="SemiBold"
@@ -330,6 +353,14 @@
                          FontWeight="SemiBold"
                          Foreground="#59A17D"
                          VerticalAlignment="Center" />
+              <ComboBox Grid.Column="2"
+                         IsVisible="{Binding HasActiveListing}"
+                         ItemsSource="{Binding AvailableListingStatuses}"
+                         SelectedItem="{Binding SelectedListingStatus}"
+                         MinWidth="120"
+                         VerticalAlignment="Center"
+                         ToolTip.Tip="Lifecycle status"
+                         Classes="statusSelector" />
             </Grid>
             <Border MinHeight="360"
                     Padding="22"
@@ -652,6 +683,29 @@
                 </StackPanel>
               </ScrollViewer>
             </Border>
+
+            <Grid ColumnDefinitions="*,Auto,Auto"
+                  IsVisible="{Binding HasActiveListing}"
+                  Margin="0,4,0,0">
+              <TextBlock Grid.Column="0"
+                         Text="{Binding StageMoveError}"
+                         IsVisible="{Binding StageMoveError}"
+                         FontSize="12"
+                         Foreground="#9A4B43"
+                         VerticalAlignment="Center"
+                         TextWrapping="Wrap" />
+              <Button Grid.Column="1"
+                      Content="{Binding StageMoveBackLabel}"
+                      IsEnabled="{Binding CanMoveStageBack}"
+                      Command="{Binding MoveStageBackCommand}"
+                      Classes="stageMove"
+                      Margin="0,0,6,0" />
+              <Button Grid.Column="2"
+                      Content="{Binding StageMoveForwardLabel}"
+                      IsEnabled="{Binding CanMoveStageForward}"
+                      Command="{Binding MoveStageForwardCommand}"
+                      Classes="stageMove" />
+            </Grid>
           </StackPanel>
 
           <StackPanel IsVisible="{Binding !DocumentWindow.HasActiveDocument}"
@@ -780,6 +834,9 @@
     <Style Selector="Border.treeRow.cut">
       <Setter Property="Opacity" Value="0.48" />
     </Style>
+    <Style Selector="Border.treeRow.inactive">
+      <Setter Property="Opacity" Value="0.6" />
+    </Style>
     <Style Selector="Border.treeRow.dropTarget">
       <Setter Property="Background" Value="#DDF1E7" />
       <Setter Property="BorderBrush" Value="#59A17D" />
@@ -906,6 +963,26 @@
       <Setter Property="Background" Value="#F1F3F6" />
       <Setter Property="Foreground" Value="#8B95A3" />
       <Setter Property="BorderBrush" Value="#E1E5EA" />
+    </Style>
+    <Style Selector="Button.activeView:not(.current)">
+      <Setter Property="BorderBrush" Value="#3C8C69" />
+      <Setter Property="BorderThickness" Value="0,0,0,2" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.stageMove">
+      <Setter Property="Padding" Value="12,7" />
+      <Setter Property="MinWidth" Value="120" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="Foreground" Value="#243447" />
+      <Setter Property="BorderBrush" Value="#D9DEE7" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.stageMove:disabled">
+      <Setter Property="Opacity" Value="0.5" />
+    </Style>
+    <Style Selector="ComboBox.statusSelector">
+      <Setter Property="MinWidth" Value="120" />
+      <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style Selector="Button.toolSelector">
       <Setter Property="Padding" Value="10,6" />

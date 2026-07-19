@@ -269,7 +269,7 @@ public class ListingInspectorViewModelTests
             var root = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Root", null, false, now, now, "{}");
             var child = new TopicGroup(Guid.NewGuid(), store.Id, null, root.Id, "Child", null, false, now, now, "{}");
             var listing = new Listing(
-                Guid.NewGuid(), store.Id, niche.Id, child.Id, "Idea", "Description", ListingStatus.Ready, false, now, now,
+                Guid.NewGuid(), store.Id, niche.Id, child.Id, "Idea", "Description", ListingStatus.Draft, WorkflowStage.Design, false, now, now,
                 "{\"notes\":\"Notes\",\"idea\":\"idea-value\",\"phrase\":\"phrase-value\",\"graphicDirection\":\"graphic-value\",\"unknown\":\"kept\"}");
             var tag = new Tag(Guid.NewGuid(), store.Id, "Tag", null, false, now, now, "{}");
             var snapshot = new WorkspaceSnapshot(

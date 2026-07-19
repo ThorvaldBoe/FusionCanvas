@@ -74,6 +74,32 @@ public class WorkflowStageNavigatorViewModelTests
         Assert.DoesNotContain(viewModel.Stages, stage => stage.Label == "Rejected");
     }
 
+    [Fact]
+    public void SelectStage_MarksActiveViewWithoutMovingCurrentStage()
+    {
+        var viewModel = NewViewModel();
+        viewModel.SetActiveItem(NewContext(WorkflowStage.Design, [WorkflowStage.Idea, WorkflowStage.Concept, WorkflowStage.Design]));
+
+        viewModel.SelectStageCommand.Execute(WorkflowStage.Idea);
+
+        Assert.True(viewModel.Stages.Single(stage => stage.Stage == WorkflowStage.Design).IsCurrent);
+        Assert.False(viewModel.Stages.Single(stage => stage.Stage == WorkflowStage.Idea).IsCurrent);
+        Assert.True(viewModel.Stages.Single(stage => stage.Stage == WorkflowStage.Idea).IsActiveView);
+        Assert.False(viewModel.Stages.Single(stage => stage.Stage == WorkflowStage.Design).IsActiveView);
+        Assert.Equal(WorkflowStage.Idea, viewModel.ActiveViewStage);
+    }
+
+    [Fact]
+    public void SetActiveItem_InitializesActiveViewToCurrentStage()
+    {
+        var viewModel = NewViewModel();
+        viewModel.SetActiveItem(NewContext(WorkflowStage.Concept, [WorkflowStage.Idea, WorkflowStage.Concept]));
+
+        Assert.True(viewModel.Stages.Single(stage => stage.Stage == WorkflowStage.Concept).IsCurrent);
+        Assert.True(viewModel.Stages.Single(stage => stage.Stage == WorkflowStage.Concept).IsActiveView);
+        Assert.Equal(WorkflowStage.Concept, viewModel.ActiveViewStage);
+    }
+
     private static WorkflowStageNavigatorViewModel NewViewModel() =>
         new(new WorkflowStageNavigatorService());
 

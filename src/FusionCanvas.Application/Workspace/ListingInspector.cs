@@ -262,7 +262,6 @@ public sealed class ListingInspectorService : IListingInspectorService
             .ToArray();
 
         var displayPath = BuildDisplayPath(snapshot, listing);
-        var stage = DeriveStage(listing.Status);
 
         return new ListingInspectorState(
             listing.Id,
@@ -270,7 +269,7 @@ public sealed class ListingInspectorService : IListingInspectorService
             creative,
             notes,
             listing.Status,
-            stage,
+            listing.Stage,
             listing.IsArchived,
             ListingHierarchy.IsEffectivelyActive(snapshot, listing),
             displayPath,
@@ -297,11 +296,4 @@ public sealed class ListingInspectorService : IListingInspectorService
 
         return string.Join(" / ", names);
     }
-
-    private static WorkflowStage DeriveStage(ListingStatus status) => status switch
-    {
-        ListingStatus.Ready => WorkflowStage.Design,
-        ListingStatus.Active => WorkflowStage.Listing,
-        _ => WorkflowStage.Idea
-    };
 }
