@@ -15,7 +15,12 @@
         MinWidth="900"
         MinHeight="600"
         Background="#F7F8FA">
-  <Grid ColumnDefinitions="280,*">
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="300" MinWidth="240" MaxWidth="560" />
+      <ColumnDefinition Width="5" />
+      <ColumnDefinition Width="*" MinWidth="480" />
+    </Grid.ColumnDefinitions>
     <Border Grid.Column="0"
             Background="#FFFFFF"
             BorderBrush="#D9DEE7"
@@ -106,7 +111,7 @@
         </StackPanel>
 
         <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12">
-          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+          <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
             <Button x:Name="GroupActionsButton"
                     Grid.Column="0"
                     Content="+ New group"
@@ -115,8 +120,14 @@
                     IsEnabled="{Binding CanCreateGroup}"
                     Classes="storeSecondary" />
             <Button Grid.Column="1"
+                    Content="+ New listing"
+                    ToolTip.Tip="Capture a listing under the selected topic or default niche"
+                    Command="{Binding WorkspaceTree.BeginCreateListingCommand}"
+                    IsEnabled="{Binding CanCreateGroup}"
+                    Classes="storeSecondary" />
+            <Button Grid.Column="2"
                     Content="•••"
-                    ToolTip.Tip="Edit selected group properties"
+                    ToolTip.Tip="Edit selected group or listing properties"
                     Command="{Binding WorkspaceTree.EditPropertiesCommand}"
                     IsEnabled="{Binding WorkspaceTree.CanManageSelection}"
                     Classes="storeSecondary" />
@@ -162,17 +173,20 @@
                       DragDrop.DragOver="OnTreeNodeDragOver"
                       DragDrop.DragLeave="OnTreeNodeDragLeave"
                       DragDrop.Drop="OnTreeNodeDrop"
-                      ToolTip.Tip="Right-click for group actions; Ctrl-click opens a tab; F2 renames">
+                      ToolTip.Tip="Right-click for actions; Ctrl-click opens a tab; F2 renames">
                 <Border.ContextMenu>
-                  <ContextMenu IsVisible="{Binding IsGroup}">
-                    <MenuItem Header="New group (subgroup)" Click="OnContextNewGroup" />
+                  <ContextMenu IsVisible="{Binding HasContextActions}">
+                    <MenuItem Header="New group (subgroup)" IsVisible="{Binding IsGroup}" Click="OnContextNewGroup" />
+                    <MenuItem Header="New listing" Click="OnContextNewListing" />
                     <Separator />
                     <MenuItem Header="Rename" Click="OnContextRename" />
                     <MenuItem Header="Copy" Click="OnContextCopy" />
                     <MenuItem Header="Cut" Click="OnContextCut" />
                     <MenuItem Header="Paste" IsEnabled="{Binding CanPaste}" Click="OnContextPaste" />
+                    <MenuItem Header="Duplicate" IsVisible="{Binding IsListing}" Click="OnContextDuplicate" />
+                    <MenuItem Header="Edit properties…" Click="OnContextEditProperties" />
                     <Separator />
-                    <MenuItem Header="Delete..." Click="OnContextDelete" />
+                    <MenuItem Header="Delete..." IsVisible="{Binding IsGroup}" Click="OnContextDelete" />
                   </ContextMenu>
                 </Border.ContextMenu>
                 <Grid ColumnDefinitions="3,22,*,Auto" MinHeight="34">
@@ -201,13 +215,21 @@
       </DockPanel>
     </Border>
 
-    <Grid Grid.Column="1"
+    <GridSplitter Grid.Column="1"
+                  ResizeDirection="Columns"
+                  Background="Transparent"
+                  Cursor="SizeWestEast"
+                  ToolTip.Tip="Drag to resize navigation"
+                  AutomationProperties.Name="Resize navigation panel" />
+
+    <Grid Grid.Column="2"
           RowDefinitions="Auto,Auto,*">
       <Border Grid.Row="0"
-              Background="#FFFFFF"
+              Background="#F3F4F6"
               BorderBrush="#D9DEE7"
               BorderThickness="0,0,0,1"
-              MinHeight="48">
+              Height="40"
+              Padding="6,5,6,0">
         <ScrollViewer HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Disabled">
           <ItemsControl ItemsSource="{Binding DocumentWindow.Tabs}">
@@ -220,19 +242,24 @@
               <DataTemplate x:DataType="doc:DocumentTabViewModel">
                 <Border Classes.active="{Binding IsActive}"
                         Classes="tabFrame">
-                  <Grid ColumnDefinitions="*,Auto"
-                        MinWidth="152"
-                        MaxWidth="240">
+                  <Grid ColumnDefinitions="*,26"
+                        MinWidth="120"
+                        MaxWidth="224">
                     <Button Grid.Column="0"
-                            Content="{Binding Title}"
                             Command="{Binding $parent[ItemsControl].DataContext.DocumentWindow.SelectTabCommand}"
                             CommandParameter="{Binding}"
                             Classes="tab"
-                            Classes.active="{Binding IsActive}" />
+                            Classes.active="{Binding IsActive}">
+                      <TextBlock Text="{Binding Title}"
+                                 TextTrimming="CharacterEllipsis"
+                                 MaxLines="1"
+                                 VerticalAlignment="Center" />
+                    </Button>
                     <Button Grid.Column="1"
-                            Content="X"
+                            Content="×"
                             Command="{Binding $parent[ItemsControl].DataContext.DocumentWindow.CloseTabCommand}"
                             CommandParameter="{Binding}"
+                            ToolTip.Tip="Close tab"
                             Classes="closeTab" />
                   </Grid>
                 </Border>
@@ -560,33 +587,47 @@
       <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
     <Style Selector="Border.tabFrame">
-      <Setter Property="BorderBrush" Value="#D9DEE7" />
-      <Setter Property="BorderThickness" Value="0,0,1,0" />
+      <Setter Property="Margin" Value="0,0,4,0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="CornerRadius" Value="5,5,0,0" />
+      <Setter Property="ClipToBounds" Value="True" />
     </Style>
     <Style Selector="Border.tabFrame.active">
-      <Setter Property="Background" Value="#F7F8FA" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#D3D8E0" />
+      <Setter Property="BorderThickness" Value="1,1,1,0" />
     </Style>
     <Style Selector="Button.tab">
-      <Setter Property="Padding" Value="14,12" />
-      <Setter Property="Background" Value="#FFFFFF" />
-      <Setter Property="Foreground" Value="#425066" />
+      <Setter Property="Height" Value="34" />
+      <Setter Property="Padding" Value="10,0,4,0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="#687385" />
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="CornerRadius" Value="0" />
     </Style>
     <Style Selector="Button.tab.active">
-      <Setter Property="Background" Value="#F7F8FA" />
+      <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="#1E2733" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="Button.closeTab">
-      <Setter Property="Width" Value="32" />
-      <Setter Property="Height" Value="32" />
-      <Setter Property="Margin" Value="0,8,8,8" />
+      <Setter Property="Width" Value="22" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Margin" Value="0,6,4,6" />
       <Setter Property="Padding" Value="0" />
-      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="#687385" />
-      <Setter Property="BorderBrush" Value="#E1E5EA" />
-      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
+    <Style Selector="Button.closeTab:pointerover">
+      <Setter Property="Background" Value="#E7E9ED" />
+      <Setter Property="Foreground" Value="#1E2733" />
     </Style>
     <Style Selector="Button.available">
       <Setter Property="Background" Value="#EEF6FF" />

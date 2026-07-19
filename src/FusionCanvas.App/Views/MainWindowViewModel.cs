@@ -1,5 +1,6 @@
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Groups;
+using FusionCanvas.App.Listings;
 using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Stores;
 using FusionCanvas.App.Workspace;
@@ -25,6 +26,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly IStageToolHostService _stageToolHostService;
     private readonly IWorkspaceRepository? _workspaceRepository;
     private readonly IGroupManagementService _groupManagementService;
+    private readonly IListingManagementService _listingManagementService;
     private WorkspaceSnapshot _workspaceSnapshot;
     private IReadOnlyList<NavigationDocumentContext> _navigationContexts = [];
 
@@ -65,7 +67,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             stageToolHostService,
             runtime.Repository,
             runtime.Snapshot,
-            runtime.GroupManagement)
+            runtime.GroupManagement,
+            runtime.ListingManagement)
     {
     }
 
@@ -116,12 +119,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         StoreManagement = new StoreManagementViewModel(storeManagementService, nicheManagementService);
         _workspaceRepository = treeRepository;
         _groupManagementService = new GroupManagementService(treeRepository);
+        _listingManagementService = new ListingManagementService(treeRepository);
         GroupManagement = new GroupManagementViewModel(_groupManagementService);
+        ListingManagement = new ListingManagementViewModel(_listingManagementService);
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
         _workspaceSnapshot = workspaceSnapshot;
         NavigationState = new NavigationTreePresentationState();
-        WorkspaceTree = new WorkspaceTreeViewModel(treeRepository, _groupManagementService, workspaceSnapshot);
+        WorkspaceTree = new WorkspaceTreeViewModel(treeRepository, _groupManagementService, workspaceSnapshot, listings: _listingManagementService);
         OpenNavigationContextCommand = new RelayCommand(parameter =>
         {
             if (parameter is NavigationDocumentContext navigationContext)
@@ -155,7 +160,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IStageToolHostService stageToolHostService,
         IWorkspaceRepository workspaceRepository,
         WorkspaceSnapshot workspaceSnapshot,
-        IGroupManagementService? groupManagementService = null)
+        IGroupManagementService? groupManagementService = null,
+        IListingManagementService? listingManagementService = null)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
@@ -164,13 +170,15 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             new StoreManagementService(workspaceRepository),
             new NicheManagementService(workspaceRepository));
         _groupManagementService = groupManagementService ?? new GroupManagementService(workspaceRepository);
+        _listingManagementService = listingManagementService ?? new ListingManagementService(workspaceRepository);
         GroupManagement = new GroupManagementViewModel(_groupManagementService);
+        ListingManagement = new ListingManagementViewModel(_listingManagementService);
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
         _workspaceRepository = workspaceRepository;
         _workspaceSnapshot = workspaceSnapshot;
         NavigationState = new NavigationTreePresentationState();
-        WorkspaceTree = new WorkspaceTreeViewModel(workspaceRepository, _groupManagementService, workspaceSnapshot);
+        WorkspaceTree = new WorkspaceTreeViewModel(workspaceRepository, _groupManagementService, workspaceSnapshot, listings: _listingManagementService);
         OpenNavigationContextCommand = new RelayCommand(parameter =>
         {
             if (parameter is NavigationDocumentContext navigationContext)
@@ -208,6 +216,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public StoreManagementViewModel StoreManagement { get; }
 
     public GroupManagementViewModel GroupManagement { get; }
+
+    public ListingManagementViewModel ListingManagement { get; }
 
     public WorkspaceTreeViewModel WorkspaceTree { get; }
 
@@ -332,6 +342,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             return;
         }
 
+        if (context.EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing)
+        {
+            WorkspaceTree.SelectEntity(context.Id, notifySelectionChanged: false);
+        }
+
         if (context.NavigationLocation is not null)
         {
             NavigationState.RevealPath(context.NavigationLocation.NodePath);
@@ -348,7 +363,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         CreateGroupCommand = new RelayCommand(_ => Run(WorkspaceTree.BeginCreateAsync()));
         ManageGroupCommand = new RelayCommand(_ => Run(OpenManageGroupAsync()));
         WorkspaceTree.OpenInTabRequested += (_, selection) => OpenTreeSelectionInTab(selection);
+        WorkspaceTree.SelectionChanged += (_, selection) => OpenTreeSelectionInCurrentTab(selection);
         WorkspaceTree.EditPropertiesRequested += (_, groupId) => Run(OpenManageGroupAsync(groupId));
+        WorkspaceTree.EditListingPropertiesRequested += (_, listingId) => Run(OpenManageListingAsync(listingId));
         WorkspaceTree.EntitiesDeleted += (_, entityIds) => CloseDeletedEntityTabs(entityIds);
         WorkspaceTree.StructureChanged += (_, _) => RefreshWorkspaceSnapshot();
         WorkspaceTree.PropertyChanged += (_, args) =>
@@ -359,6 +376,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             }
         };
         GroupManagement.WorkspaceStructureChanged += (_, group) => HandleGroupStructureChanged(group);
+        ListingManagement.WorkspaceStructureChanged += (_, replacement) =>
+        {
+            RefreshWorkspaceSnapshot();
+            WorkspaceTree.SelectEntity(replacement is null
+                ? null
+                : replacement.IsEffectivelyActive ? replacement.Id : replacement.Topic.Id);
+        };
         GroupManagement.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(GroupManagementViewModel.IsOpen))
@@ -369,7 +393,22 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     }
 
     private void GroupManagementServiceSetWorkspace(Guid? workspaceId)
-        => GroupManagement.SetActiveWorkspace(workspaceId);
+    {
+        GroupManagement.SetActiveWorkspace(workspaceId);
+        ListingManagement.SetActiveWorkspace(workspaceId);
+    }
+
+    private async Task OpenManageListingAsync(Guid listingId)
+    {
+        RefreshWorkspaceSnapshot();
+        var listing = _workspaceSnapshot.Listings.SingleOrDefault(candidate => candidate.Id == listingId);
+        if (listing is null)
+        {
+            return;
+        }
+
+        await ListingManagement.OpenForEditAsync(listing.StoreId, listing.Id).ConfigureAwait(false);
+    }
 
     private async Task OpenCreateGroupAsync()
     {
@@ -422,6 +461,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         if (context is not null)
         {
             OpenFromNavigation(context);
+        }
+    }
+
+    private void OpenTreeSelectionInCurrentTab(WorkspaceTreeSelection selection)
+    {
+        var context = NavigationContexts.SingleOrDefault(candidate =>
+            candidate.Context.EntityKind == selection.Kind && candidate.Context.Id == selection.Id);
+        if (context is not null)
+        {
+            DocumentWindow.OpenOrReplaceActive(context.Context);
         }
     }
 

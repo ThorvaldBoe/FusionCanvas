@@ -210,6 +210,26 @@ public sealed class DocumentWindowViewModel : INotifyPropertyChanged
         return tab;
     }
 
+    public DocumentTabViewModel OpenOrReplaceActive(DocumentContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var existing = Tabs.SingleOrDefault(tab => tab.Context.Id == context.Id);
+        if (existing is not null)
+        {
+            SelectTab(existing);
+            return existing;
+        }
+
+        if (ActiveTab is null)
+        {
+            return Open(context);
+        }
+
+        ActiveTab.ReplaceContext(context);
+        OnActiveTabChanged();
+        return ActiveTab;
+    }
+
     public void SelectTab(DocumentTabViewModel tab)
     {
         ArgumentNullException.ThrowIfNull(tab);
@@ -229,6 +249,11 @@ public sealed class DocumentWindowViewModel : INotifyPropertyChanged
         var removedIndex = Tabs.IndexOf(tab);
 
         if (removedIndex < 0)
+        {
+            return;
+        }
+
+        if (Tabs.Count == 1)
         {
             return;
         }
