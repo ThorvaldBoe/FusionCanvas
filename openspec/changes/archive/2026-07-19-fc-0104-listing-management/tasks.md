@@ -51,5 +51,5 @@
 ## 6. Verification
 
 - [x] 6.1 Run domain, application, integration, app, and UI automation test suites and resolve listing-management and FC-0103 regressions.
-- [ ] 6.2 Manually verify keyboard-only inline create/rename, selected-listing/default-niche resolution, drag/drop, cut/copy/paste, canonical selection, explicit tab opening, property editing, archive/restore, guarded delete, filtering, rollback, and application reload.
+- [x] 6.2 Manually verify keyboard-only inline create/rename, selected-listing/default-niche resolution, drag/drop, cut/copy/paste, canonical selection, explicit tab opening, property editing, archive/restore, guarded delete, filtering, rollback, and application reload.
 - [x] 6.3 Run strict OpenSpec validation and confirm every listing-management scenario is covered by implementation or automated tests.
