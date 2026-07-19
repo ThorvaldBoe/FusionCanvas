@@ -65,10 +65,11 @@ FusionCanvas.Integration ─┘
 
 - Framework: **xUnit v3** with coverlet collector. Test projects mirror production under `tests/` (`FusionCanvas.<Layer>.Tests`).
 - Every behavior change ships with focused tests per `openspec/specs/testing-baseline/spec.md`: domain rules without frameworks, application use cases with deterministic collaborators, persistence boundaries with isolated temporary resources, and UI-owned decision logic testable in code without launching the app.
-- Every new or changed user-facing feature also requires a proportional **real desktop UI verification pass** against the built Avalonia application when the agent has an interactive desktop (e.g., Codex). Agents without an interactive desktop (e.g., OpenCode) mark the desktop verification task as not applicable to their runtime and leave it for a human or desktop-capable agent to complete; they do not block the deterministic baseline on it. Derive the pass from accepted scenarios and cover applicable keyboard, pointer, focus/selection, validation, filtering, destructive confirmation, persistence/restart, recovery, accessibility, and tab/window behavior.
+- A proportional **real desktop UI verification pass** against the built Avalonia application is expected for new or changed user-facing features **when the contributing agent can run an interactive desktop session** (e.g., Codex). Derive it from accepted scenarios and cover applicable keyboard, pointer, focus/selection, validation, filtering, destructive confirmation, persistence/restart, recovery, accessibility, and tab/window behavior.
+- **OpenCode cannot perform interactive desktop verification** (no display). When running under OpenCode, the desktop UI pass is optional and non-blocking: record it as not-applicable in the change verification evidence, state that OpenCode lacks the capability, and rely on the fast deterministic baseline plus any UI-owned decision-logic tests. Do not fake or silently skip it.
 - Desktop UI verification uses a disposable database/workspace, never the contributor's normal workspace. Record the tested build/environment, scenarios, results, isolation method, limitations, and material screenshots or automation logs in the change verification evidence.
 - Keep desktop UI verification separate from the fast deterministic baseline. External-service tests and pixel-perfect visual regression remain outside the default baseline unless a feature specifically requires them.
-- Baseline command — must pass before work is considered done. For agents with an interactive desktop it does not replace required desktop UI verification for a user-facing change; for agents without one, the deterministic baseline is the completion gate and the desktop pass is deferred:
+- Baseline command — must pass before work is considered done:
 
   ```powershell
   dotnet test .\FusionCanvas.sln
@@ -83,7 +84,7 @@ FusionCanvas.Integration ─┘
 ## QA Reviews
 
 - The QA playbook lives in **`docs/qa-review.md`**. When the user asks for a QA review — full or a specific area (SOLID, architecture, testing, security, spec drift) — follow that document.
-- A full QA review includes the QA-6 real desktop regression matrix for **all** accepted and implemented user-facing features. If the agent lacks an interactive desktop (e.g., OpenCode), report QA-6 as not applicable to the current runtime and defer it for a desktop-capable agent or human rather than marking it blocked.
+- A full QA review includes the QA-6 real desktop regression matrix for **all** accepted and implemented user-facing features. If an interactive desktop is unavailable (for example, when running under OpenCode), report QA-6 as **not applicable** rather than passed; it does not block the rest of the review.
 - Running QA requires no OpenSpec ceremony. Findings that would change accepted behavior are routed through the OpenSpec workflow; specification drift is reconciled via an OpenSpec change.
 
 ## Working Agreement
