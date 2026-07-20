@@ -361,7 +361,7 @@ Events allow plugins to react without tightly coupling components.
 
 ## Testing Strategy
 
-FusionCanvas uses complementary code-level and real-desktop test lanes. Business logic must remain testable without the UI, while user-facing behavior must also be verified through the built Avalonia application.
+FusionCanvas uses complementary code-level and real-desktop test lanes. Business logic must remain testable without the UI, while user-facing behavior should also be verified through the built Avalonia application when the contributing agent can run an interactive desktop session (e.g., Codex). OpenCode cannot perform interactive desktop verification, records that pass as not-applicable, and relies on the code-level baseline plus UI-owned decision-logic tests.
 
 FusionCanvas should maintain a high level of unit test coverage, especially for domain logic, application services, persistence boundaries, and plugin contracts. New behavior should generally include focused unit tests unless there is a clear reason another test type provides better confidence.
 
@@ -373,7 +373,7 @@ Priority should be given to testing:
 - data persistence
 - import/export functionality
 
-Every new or changed user-facing feature also requires a proportional real desktop UI pass derived from its accepted scenarios. Cover the feature's primary workflow and all applicable interaction risks: keyboard and pointer input, focus and selection, validation and filtering, destructive confirmation, persistence and restart, recovery, accessibility exposure, and tabs or windows.
+Every new or changed user-facing feature also expects a proportional real desktop UI pass derived from its accepted scenarios when an interactive desktop is available. Cover the feature's primary workflow and all applicable interaction risks: keyboard and pointer input, focus and selection, validation and filtering, destructive confirmation, persistence and restart, recovery, accessibility exposure, and tabs or windows.
 
 Desktop UI verification runs separately from `dotnet test .\FusionCanvas.sln`, uses a disposable workspace or database rather than normal user data, and records the tested build and environment, scenarios, results, isolation method, limitations, and material screenshots or automation logs. The full QA review expands this into an all-features regression matrix for the current build.
 

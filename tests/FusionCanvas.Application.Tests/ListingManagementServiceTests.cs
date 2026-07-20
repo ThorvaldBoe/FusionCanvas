@@ -172,6 +172,133 @@ public class ListingManagementServiceTests
         Assert.Null(outside.ActiveListingId);
     }
 
+    [Fact]
+    public async Task SetStatus_ChangesStatusAndPersistsAtomicallyWithoutMovingStage()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot);
+        var service = sample.Service(repository);
+
+        var result = await service.SetListingStatusAsync(new(sample.Listing.Id, ListingStatus.Paused));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(ListingStatus.Paused, result.Listing!.Status);
+        Assert.Equal(WorkflowStage.Design, result.Listing.Stage);
+        var persisted = repository.Snapshot.Listings.Single(listing => listing.Id == sample.Listing.Id);
+        Assert.Equal(ListingStatus.Paused, persisted.Status);
+        Assert.Equal(WorkflowStage.Design, persisted.Stage);
+        Assert.Equal(1, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task SetStatus_ReactivatesRejectedListingWithoutRestrictingTarget()
+    {
+        var sample = Sample.Create();
+        var rejected = sample.Listing with { Status = ListingStatus.Rejected };
+        var repository = new TestRepository(sample.Snapshot with { Listings = [rejected] });
+        var service = sample.Service(repository);
+
+        var result = await service.SetListingStatusAsync(new(rejected.Id, ListingStatus.Draft));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(ListingStatus.Draft, repository.Snapshot.Listings.Single(listing => listing.Id == rejected.Id).Status);
+    }
+
+    [Fact]
+    public async Task SetStatus_SaveFailureLeavesSnapshotUnchanged()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot) { FailSaves = true };
+        var service = sample.Service(repository);
+
+        var failed = await service.SetListingStatusAsync(new(sample.Listing.Id, ListingStatus.Published));
+
+        Assert.False(failed.Succeeded);
+        Assert.Equal(sample.Snapshot, repository.Snapshot);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task MoveStage_AdvancesAndRegressesStageWithoutChangingStatus()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot);
+        var service = sample.Service(repository);
+
+        var advanced = await service.MoveListingStageAsync(new(sample.Listing.Id, WorkflowStage.Listing));
+        var regressed = await service.MoveListingStageAsync(new(sample.Listing.Id, WorkflowStage.Concept));
+
+        Assert.True(advanced.Succeeded);
+        Assert.Equal(WorkflowStage.Listing, advanced.Listing!.Stage);
+        Assert.Equal(ListingStatus.Draft, advanced.Listing.Status);
+        Assert.True(regressed.Succeeded);
+        Assert.Equal(WorkflowStage.Concept, repository.Snapshot.Listings.Single(listing => listing.Id == sample.Listing.Id).Stage);
+        Assert.Equal(ListingStatus.Draft, repository.Snapshot.Listings.Single(listing => listing.Id == sample.Listing.Id).Status);
+        Assert.Equal(2, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task MoveStage_RejectsInactiveListings()
+    {
+        var sample = Sample.Create();
+        var rejected = sample.Listing with { Status = ListingStatus.Rejected };
+        var repository = new TestRepository(sample.Snapshot with { Listings = [rejected] });
+        var service = sample.Service(repository);
+        var before = repository.Snapshot;
+
+        var result = await service.MoveListingStageAsync(new(rejected.Id, WorkflowStage.Listing));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(before, repository.Snapshot);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task MoveStage_SaveFailureLeavesSnapshotUnchanged()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot) { FailSaves = true };
+        var service = sample.Service(repository);
+
+        var failed = await service.MoveListingStageAsync(new(sample.Listing.Id, WorkflowStage.Listing));
+
+        Assert.False(failed.Succeeded);
+        Assert.Equal(sample.Snapshot, repository.Snapshot);
+    }
+
+    [Fact]
+    public async Task Duplicate_ResetsStageToIdeaAlongsideDraftStatus()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot);
+        var duplicateId = Guid.NewGuid();
+        var advancedSource = sample.Listing with { Stage = WorkflowStage.Listing, Status = ListingStatus.Published };
+        repository.Set(sample.Snapshot with { Listings = [advancedSource] });
+
+        var result = await sample.Service(repository, duplicateId).DuplicateListingAsync(new(advancedSource.Id));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(WorkflowStage.Idea, result.Listing!.Stage);
+        Assert.Equal(ListingStatus.Draft, result.Listing.Status);
+        Assert.Equal(WorkflowStage.Listing, repository.Snapshot.Listings.Single(listing => listing.Id == advancedSource.Id).Stage);
+    }
+
+    [Fact]
+    public async Task Move_PreservesStageAndStatus()
+    {
+        var sample = Sample.Create();
+        var advanced = sample.Listing with { Stage = WorkflowStage.Listing, Status = ListingStatus.Published };
+        var repository = new TestRepository(sample.Snapshot with { Listings = [advanced] });
+        var service = sample.Service(repository);
+
+        var moved = await service.MoveListingAsync(new(advanced.Id, new(WorkspaceEntityKind.Niche, sample.Niche.Id)));
+
+        Assert.True(moved.Succeeded);
+        var persisted = repository.Snapshot.Listings.Single(listing => listing.Id == advanced.Id);
+        Assert.Equal(WorkflowStage.Listing, persisted.Stage);
+        Assert.Equal(ListingStatus.Published, persisted.Status);
+    }
+
     private sealed class TestRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
     {
         public WorkspaceSnapshot Snapshot { get; private set; } = snapshot;
@@ -201,7 +328,7 @@ public class ListingManagementServiceTests
             var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
             var root = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Root", null, false, now, now, "{}");
             var child = new TopicGroup(Guid.NewGuid(), store.Id, null, root.Id, "Child", null, false, now, now, "{}");
-            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, child.Id, "Idea", "Description", ListingStatus.Ready, false, now, now, "{\"notes\":\"Notes\",\"unknown\":\"kept\"}");
+            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, child.Id, "Idea", "Description", ListingStatus.Draft, WorkflowStage.Design, false, now, now, "{\"notes\":\"Notes\",\"unknown\":\"kept\"}");
             var tag = new Tag(Guid.NewGuid(), store.Id, "Tag", null, false, now, now, "{}");
             var prompt = new Prompt(Guid.NewGuid(), store.Id, listing.Id, "Prompt", null, "Text", false, now, now, "{}");
             var assetLink = new AssetLink(Guid.NewGuid(), WorkspaceEntityKind.Listing, listing.Id);

@@ -154,6 +154,66 @@ public class NavigationTreeTests
     }
 
     [Fact]
+    public void BuildTree_IncludeArchivedRevealsArchivedGroupSubtreeAsInactive()
+    {
+        var sample = NavigationSample.Create();
+        var archived = sample.Snapshot with
+        {
+            Groups = sample.Snapshot.Groups.Select(group => group.Id == sample.ParentGroup.Id ? group with { IsArchived = true } : group).ToArray()
+        };
+
+        var tree = WorkspaceNavigation.BuildTree(archived, includeArchived: true);
+
+        var niche = Assert.Single(Assert.Single(tree.Stores).Children);
+        Assert.False(niche.IsInactive);
+        var parent = Assert.Single(niche.Children, child => child.EntityKind == WorkspaceEntityKind.Group);
+        Assert.True(parent.IsInactive);
+        Assert.Equal(sample.ParentGroup.Id, parent.EntityId);
+        var child = Assert.Single(parent.Children, node => node.EntityKind == WorkspaceEntityKind.Group);
+        Assert.True(child.IsInactive);
+        Assert.Equal(sample.ChildGroup.Id, child.EntityId);
+        var grandchild = Assert.Single(child.Children, node => node.EntityKind == WorkspaceEntityKind.Group);
+        Assert.True(grandchild.IsInactive);
+        var deepListing = Assert.Single(grandchild.Children, node => node.EntityKind == WorkspaceEntityKind.Listing);
+        Assert.True(deepListing.IsInactive);
+        Assert.Equal(sample.DeepListing.Id, deepListing.EntityId);
+    }
+
+    [Fact]
+    public void BuildTree_IncludeArchivedRevealsArchivedListingUnderActiveParentAsInactive()
+    {
+        var sample = NavigationSample.Create();
+        var archived = sample.Snapshot with
+        {
+            Listings = sample.Snapshot.Listings.Select(listing => listing.Id == sample.Listing.Id ? listing with { IsArchived = true } : listing).ToArray()
+        };
+
+        var defaultTree = WorkspaceNavigation.BuildTree(archived);
+        var parentDefault = Assert.Single(Assert.Single(Assert.Single(defaultTree.Stores).Children).Children, node => node.EntityKind == WorkspaceEntityKind.Group);
+        Assert.DoesNotContain(parentDefault.Children, node => node.EntityId == sample.Listing.Id);
+
+        var includedTree = WorkspaceNavigation.BuildTree(archived, includeArchived: true);
+        var niche = Assert.Single(Assert.Single(includedTree.Stores).Children);
+        var parent = Assert.Single(niche.Children, node => node.EntityKind == WorkspaceEntityKind.Group);
+        Assert.False(parent.IsInactive);
+        var archivedListing = Assert.Single(parent.Children, node => node.EntityId == sample.Listing.Id);
+        Assert.True(archivedListing.IsInactive);
+    }
+
+    [Fact]
+    public void BuildTree_DefaultLeavesActiveNodesMarkedActive()
+    {
+        var sample = NavigationSample.Create();
+
+        var tree = WorkspaceNavigation.BuildTree(sample.Snapshot);
+
+        foreach (var node in tree.Flatten())
+        {
+            Assert.False(node.IsInactive);
+        }
+    }
+
+    [Fact]
     public void MoveTopic_RejectsArchivedDestinationWithoutChangingHierarchy()
     {
         var sample = NavigationSample.Create();
@@ -191,8 +251,8 @@ public class NavigationTreeTests
             var parentGroup = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Seasonal", null, false, now, now, "{}");
             var childGroup = new TopicGroup(Guid.NewGuid(), store.Id, null, parentGroup.Id, "Autumn", null, false, now, now, "{}");
             var grandchildGroup = new TopicGroup(Guid.NewGuid(), store.Id, null, childGroup.Id, "Espresso", null, false, now, now, "{}");
-            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, parentGroup.Id, "Pumpkin espresso", "Cozy shirt", ListingStatus.Draft, false, now, now, """{"tags":["fall"]}""");
-            var deepListing = new Listing(Guid.NewGuid(), store.Id, niche.Id, grandchildGroup.Id, "Latte ghosts", "Halloween shirt", ListingStatus.Active, false, now, now, "{}");
+            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, parentGroup.Id, "Pumpkin espresso", "Cozy shirt", ListingStatus.Draft, WorkflowStage.Idea, false, now, now, """{"tags":["fall"]}""");
+            var deepListing = new Listing(Guid.NewGuid(), store.Id, niche.Id, grandchildGroup.Id, "Latte ghosts", "Halloween shirt", ListingStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
 
             return new NavigationSample(
                 new WorkspaceSnapshot(

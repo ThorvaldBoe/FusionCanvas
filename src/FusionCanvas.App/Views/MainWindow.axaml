@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:doc="clr-namespace:FusionCanvas.App.DocumentWindow"
+        xmlns:listings="clr-namespace:FusionCanvas.App.Listings"
         xmlns:nav="clr-namespace:FusionCanvas.App.Navigation"
         xmlns:stores="clr-namespace:FusionCanvas.App.Stores"
         xmlns:workspace="clr-namespace:FusionCanvas.App.Workspace"
@@ -134,16 +135,96 @@
                     IsEnabled="{Binding WorkspaceTree.CanManageSelection}"
                     Classes="storeSecondary" />
           </Grid>
-          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+          <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="6">
             <TextBox x:Name="TreeSearchBox"
                      Text="{Binding WorkspaceTree.QueryText}"
-                     PlaceholderText="Search groups and items..."
+                     PlaceholderText="Search names, ideas, notes, tags..."
                      MinHeight="34" />
             <Button Grid.Column="1"
-                    Content="Filters"
-                    IsEnabled="False"
-                    ToolTip.Tip="Status and tag filters become available when those properties are implemented."
+                    Content="Clear tags"
+                    IsVisible="{Binding WorkspaceTree.IsTagFilterActive}"
+                    Command="{Binding WorkspaceTree.ClearTagFiltersCommand}"
+                    ToolTip.Tip="Clear the active tag filter"
                     Classes="storeSecondary" />
+            <ComboBox Grid.Column="2"
+                      x:Name="StageFilter"
+                      SelectedIndex="{Binding WorkspaceTree.StageFilterIndex}"
+                      MinWidth="92"
+                      MinHeight="34"
+                      ToolTip.Tip="Filter listings by workflow stage"
+                      Classes="statusSelector">
+              <ComboBoxItem Content="All stages" />
+              <ComboBoxItem Content="Idea" />
+              <ComboBoxItem Content="Concept" />
+              <ComboBoxItem Content="Design" />
+              <ComboBoxItem Content="Listing" />
+            </ComboBox>
+            <ComboBox Grid.Column="3"
+                      x:Name="StatusFilter"
+                      SelectedIndex="{Binding WorkspaceTree.StatusFilterIndex}"
+                      MinWidth="92"
+                      MinHeight="34"
+                      ToolTip.Tip="Filter listings by lifecycle status"
+                      Classes="statusSelector">
+              <ComboBoxItem Content="All statuses" />
+              <ComboBoxItem Content="Draft" />
+              <ComboBoxItem Content="Published" />
+              <ComboBoxItem Content="Paused" />
+              <ComboBoxItem Content="Rejected" />
+            </ComboBox>
+            <Button Grid.Column="4"
+                    Content="Filters"
+                    ToolTip.Tip="Filter by tag, topic scope, or archived work"
+                    Command="{Binding WorkspaceTree.ClearFiltersCommand}"
+                    Classes="storeSecondary"
+                    Classes.active="{Binding WorkspaceTree.HasNonTextFilters}">
+              <Button.Flyout>
+                <Flyout Placement="BottomEdgeAlignedRight"
+                        ShowMode="Standard">
+                  <Border Width="260" Padding="12">
+                    <StackPanel Spacing="10">
+                      <StackPanel Spacing="6">
+                        <TextBlock Text="Scope" FontSize="12" FontWeight="SemiBold" Foreground="#243447" />
+                        <CheckBox Content="Current topic and below"
+                                  IsChecked="{Binding WorkspaceTree.ScopeToCurrentTopic}"
+                                  IsEnabled="{Binding WorkspaceTree.CanScopeToCurrentTopic}"
+                                  ToolTip.Tip="Limit the tree to the selected niche or group subtree" />
+                        <TextBlock IsVisible="{Binding WorkspaceTree.ScopeToCurrentTopic}"
+                                   Text="{Binding WorkspaceTree.ScopedTopicName, StringFormat='Current: {0}'}"
+                                   FontSize="11" Foreground="#687385" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                      <Separator Margin="0,2" />
+                      <StackPanel Spacing="6">
+                        <TextBlock Text="Tags" FontSize="12" FontWeight="SemiBold" Foreground="#243447" />
+                        <TextBlock Text="No tags yet in this store."
+                                   IsVisible="{Binding !WorkspaceTree.AvailableTags.Count}"
+                                   FontSize="11" Foreground="#8B95A3" />
+                        <ItemsControl ItemsSource="{Binding WorkspaceTree.AvailableTags}"
+                                      IsVisible="{Binding WorkspaceTree.AvailableTags.Count}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="nav:TagFilterEntryViewModel">
+                              <CheckBox Content="{Binding Name}"
+                                        IsChecked="{Binding IsSelected}"
+                                        Margin="0,1" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                      <Separator Margin="0,2" />
+                      <CheckBox Content="Include archived"
+                                IsChecked="{Binding WorkspaceTree.IncludeArchived}"
+                                ToolTip.Tip="Reveal archived topics and listings with inactive treatment" />
+                      <Separator Margin="0,2" />
+                      <Button Content="Clear all"
+                              HorizontalAlignment="Right"
+                              Command="{Binding WorkspaceTree.ClearFiltersCommand}"
+                              IsEnabled="{Binding WorkspaceTree.HasActiveFilters}"
+                              Classes="storeSecondary" />
+                    </StackPanel>
+                  </Border>
+                </Flyout>
+              </Button.Flyout>
+            </Button>
           </Grid>
           <TextBlock Text="{Binding GroupActionStatus}"
                      TextWrapping="Wrap"
@@ -157,64 +238,116 @@
                      AutomationProperties.AutomationId="WorkspaceTreeError" />
         </StackPanel>
 
-        <TreeView x:Name="WorkspaceTreeControl"
-                  ItemsSource="{Binding WorkspaceTree.Roots}"
-                  Background="Transparent"
-                  BorderThickness="0">
-          <TreeView.ItemTemplate>
-            <TreeDataTemplate x:DataType="nav:WorkspaceTreeNodeViewModel" ItemsSource="{Binding Children}">
-              <Border Classes="treeRow"
-                      Classes.selected="{Binding IsSelected}"
-                      Classes.cut="{Binding IsCut}"
-                      Classes.dropTarget="{Binding IsDropTarget}"
-                      Classes.dropBefore="{Binding IsDropBefore}"
-                      Classes.dropAfter="{Binding IsDropAfter}"
-                      DragDrop.AllowDrop="True"
-                      PointerPressed="OnTreeNodePointerPressed"
-                      PointerMoved="OnTreeNodePointerMoved"
-                      DragDrop.DragOver="OnTreeNodeDragOver"
-                      DragDrop.DragLeave="OnTreeNodeDragLeave"
-                      DragDrop.Drop="OnTreeNodeDrop"
-                      ToolTip.Tip="Right-click for actions; Ctrl-click opens a tab; F2 renames">
-                <Border.ContextMenu>
-                  <ContextMenu IsVisible="{Binding HasAssetActions}">
-                    <MenuItem Header="New group (subgroup)" IsVisible="{Binding IsGroup}" Click="OnContextNewGroup" />
-                    <MenuItem Header="New listing" Click="OnContextNewListing" />
-                    <Separator />
-                    <MenuItem Header="Rename" IsVisible="{Binding HasContextActions}" Click="OnContextRename" />
-                    <MenuItem Header="Copy" IsVisible="{Binding HasContextActions}" Click="OnContextCopy" />
-                    <MenuItem Header="Cut" IsVisible="{Binding HasContextActions}" Click="OnContextCut" />
-                    <MenuItem Header="Paste" IsEnabled="{Binding CanPaste}" Click="OnContextPaste" />
-                    <MenuItem Header="Duplicate" IsVisible="{Binding IsListing}" Click="OnContextDuplicate" />
-                    <MenuItem Header="Edit properties…" IsVisible="{Binding HasContextActions}" Click="OnContextEditProperties" />
-                    <MenuItem Header="Assets…" Click="OnContextAssets" />
-                    <Separator />
-                    <MenuItem Header="Delete..." IsVisible="{Binding IsGroup}" Click="OnContextDelete" />
-                  </ContextMenu>
-                </Border.ContextMenu>
-                <Grid ColumnDefinitions="3,22,*,Auto" MinHeight="34">
-                  <Border Grid.Column="0" Background="#59A17D" CornerRadius="2" />
-                  <TextBlock Grid.Column="1" Text="{Binding Icon}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="#526173" />
-                  <Grid Grid.Column="2" Margin="4,0">
-                    <TextBlock Text="{Binding Name}"
-                               IsVisible="{Binding !IsEditing}"
-                               VerticalAlignment="Center"
-                               TextTrimming="CharacterEllipsis" />
-                    <TextBox Text="{Binding DraftName}"
-                             IsVisible="{Binding IsEditing}"
-                             AttachedToVisualTree="OnTreeEditorAttached"
-                             KeyDown="OnTreeEditorKeyDown"
-                             MinHeight="28"
-                             Padding="5,2" />
+        <Grid>
+          <TreeView x:Name="WorkspaceTreeControl"
+                    ItemsSource="{Binding WorkspaceTree.Roots}"
+                    Background="Transparent"
+                    BorderThickness="0">
+            <TreeView.ItemTemplate>
+              <TreeDataTemplate x:DataType="nav:WorkspaceTreeNodeViewModel" ItemsSource="{Binding Children}">
+                <Border Classes="treeRow"
+                        Classes.selected="{Binding IsSelected}"
+                        Classes.inactive="{Binding IsInactive}"
+                        Classes.cut="{Binding IsCut}"
+                        Classes.dropTarget="{Binding IsDropTarget}"
+                        Classes.dropBefore="{Binding IsDropBefore}"
+                        Classes.dropAfter="{Binding IsDropAfter}"
+                        DragDrop.AllowDrop="True"
+                        PointerPressed="OnTreeNodePointerPressed"
+                        PointerMoved="OnTreeNodePointerMoved"
+                        DragDrop.DragOver="OnTreeNodeDragOver"
+                        DragDrop.DragLeave="OnTreeNodeDragLeave"
+                        DragDrop.Drop="OnTreeNodeDrop"
+                        ToolTip.Tip="Right-click for actions; Ctrl-click opens a tab; F2 renames">
+                  <Border.ContextMenu>
+                    <ContextMenu IsVisible="{Binding HasAssetActions}">
+                      <MenuItem Header="New group (subgroup)" IsVisible="{Binding IsGroup}" Click="OnContextNewGroup" />
+                      <MenuItem Header="New listing" Click="OnContextNewListing" />
+                      <Separator />
+                      <MenuItem Header="Rename" IsVisible="{Binding HasContextActions}" Click="OnContextRename" />
+                      <MenuItem Header="Copy" IsVisible="{Binding HasContextActions}" Click="OnContextCopy" />
+                      <MenuItem Header="Cut" IsVisible="{Binding HasContextActions}" Click="OnContextCut" />
+                      <MenuItem Header="Paste" IsEnabled="{Binding CanPaste}" Click="OnContextPaste" />
+                      <MenuItem Header="Duplicate" IsVisible="{Binding IsListing}" Click="OnContextDuplicate" />
+                      <MenuItem Header="Edit properties…" IsVisible="{Binding HasContextActions}" Click="OnContextEditProperties" />
+                      <MenuItem Header="Assets…" Click="OnContextAssets" />
+                      <Separator />
+                      <MenuItem Header="Delete..." IsVisible="{Binding IsGroup}" Click="OnContextDelete" />
+                    </ContextMenu>
+                  </Border.ContextMenu>
+                  <Grid ColumnDefinitions="3,22,*,Auto" MinHeight="34">
+                    <Border Grid.Column="0" Background="#59A17D" CornerRadius="2" />
+                    <TextBlock Grid.Column="1" Text="{Binding Icon}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="#526173" />
+                    <Grid Grid.Column="2" Margin="4,0">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}"
+                                   IsVisible="{Binding !IsEditing}"
+                                   TextTrimming="CharacterEllipsis" />
+                        <ItemsControl IsVisible="{Binding HasAppliedTags}"
+                                      ItemsSource="{Binding VisibleTagColorSequence}"
+                                      Margin="6,0,0,0">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                              <StackPanel Orientation="Horizontal" Spacing="3" />
+                            </ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                              <Border Width="10" Height="10"
+                                      CornerRadius="5"
+                                      Background="{Binding Converter={x:Static nav:TagBrushConverter.Background}, FallbackValue='#F0F2F5'}"
+                                      BorderBrush="{Binding Converter={x:Static nav:TagBrushConverter.Border}, FallbackValue='#D9DEE7'}"
+                                      BorderThickness="1"
+                                      ToolTip.Tip="Listing has this tag applied" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Border IsVisible="{Binding HasHiddenTags}"
+                                Padding="4,0"
+                                CornerRadius="6"
+                                Background="#E8EDF3">
+                          <TextBlock Text="{Binding HiddenTagLabel}" FontSize="10" Foreground="#526173" />
+                        </Border>
+                      </StackPanel>
+                      <TextBox Text="{Binding DraftName}"
+                               IsVisible="{Binding IsEditing}"
+                               AttachedToVisualTree="OnTreeEditorAttached"
+                               KeyDown="OnTreeEditorKeyDown"
+                               MinHeight="28"
+                               Padding="5,2" />
+                    </Grid>
+                    <Border Grid.Column="3" IsVisible="{Binding HasChildren}" Padding="5,1" CornerRadius="8" Background="#E8EDF3">
+                      <TextBlock Text="{Binding CountLabel}" FontSize="10" Foreground="#526173" />
+                    </Border>
                   </Grid>
-                  <Border Grid.Column="3" IsVisible="{Binding HasChildren}" Padding="5,1" CornerRadius="8" Background="#E8EDF3">
-                    <TextBlock Text="{Binding CountLabel}" FontSize="10" Foreground="#526173" />
-                  </Border>
-                </Grid>
-              </Border>
-            </TreeDataTemplate>
-          </TreeView.ItemTemplate>
-        </TreeView>
+                </Border>
+              </TreeDataTemplate>
+            </TreeView.ItemTemplate>
+          </TreeView>
+          <Border IsVisible="{Binding WorkspaceTree.HasEmptyFilterResults}"
+                  Background="#F7F8FA"
+                  HorizontalAlignment="Stretch"
+                  VerticalAlignment="Stretch">
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="8"
+                        MaxWidth="220">
+              <TextBlock Text="Nothing matches the current filters."
+                         TextWrapping="Wrap"
+                         TextAlignment="Center"
+                         Foreground="#526173"
+                         FontSize="12" />
+              <Button Content="Clear filters"
+                      HorizontalAlignment="Center"
+                      Command="{Binding WorkspaceTree.ClearFiltersCommand}"
+                      Classes="storeSecondary" />
+            </StackPanel>
+          </Border>
+        </Grid>
       </DockPanel>
     </Border>
 
@@ -249,7 +382,7 @@
                         MinWidth="120"
                         MaxWidth="224">
                     <Button Grid.Column="0"
-                            Command="{Binding $parent[ItemsControl].DataContext.DocumentWindow.SelectTabCommand}"
+                            Command="{Binding $parent[ItemsControl].DataContext.RequestSelectTabCommand}"
                             CommandParameter="{Binding}"
                             Classes="tab"
                             Classes.active="{Binding IsActive}">
@@ -260,7 +393,7 @@
                     </Button>
                     <Button Grid.Column="1"
                             Content="×"
-                            Command="{Binding $parent[ItemsControl].DataContext.DocumentWindow.CloseTabCommand}"
+                            Command="{Binding $parent[ItemsControl].DataContext.RequestCloseTabCommand}"
                             CommandParameter="{Binding}"
                             ToolTip.Tip="Close tab"
                             Classes="closeTab" />
@@ -294,6 +427,7 @@
                         Classes.current="{Binding IsCurrent}"
                         Classes.available="{Binding IsAvailable}"
                         Classes.unavailable="{Binding !IsAvailable}"
+                        Classes.activeView="{Binding IsActiveView}"
                         Padding="14,8"
                         MinWidth="88" />
               </DataTemplate>
@@ -315,18 +449,38 @@
         <Grid>
           <StackPanel IsVisible="{Binding DocumentWindow.HasActiveDocument}"
                       Spacing="12">
-            <TextBlock Text="{Binding DocumentWindow.ActiveDetailTitle}"
-                       FontSize="24"
-                       FontWeight="SemiBold"
-                       Foreground="#1E2733" />
-            <TextBlock Text="{Binding DocumentWindow.ActiveNavigationPath}"
-                       FontSize="12"
-                       Foreground="#687385" />
+            <Grid ColumnDefinitions="*,Auto,Auto">
+              <StackPanel Grid.Column="0" Spacing="3">
+                <TextBlock Text="{Binding DocumentWindow.ActiveDetailTitle}"
+                           FontSize="24"
+                           FontWeight="SemiBold"
+                           Foreground="#1E2733" />
+                <TextBlock Text="{Binding DocumentWindow.ActiveNavigationPath}"
+                           FontSize="12"
+                           Foreground="#687385" />
+              </StackPanel>
+              <TextBlock Grid.Column="1"
+                         IsVisible="{Binding ListingInspector.HasState}"
+                         Text="{Binding ListingInspector.StageLabel}"
+                         FontSize="11"
+                         FontWeight="SemiBold"
+                         Foreground="#59A17D"
+                         VerticalAlignment="Center" />
+              <ComboBox Grid.Column="2"
+                         IsVisible="{Binding HasActiveListing}"
+                         ItemsSource="{Binding AvailableListingStatuses}"
+                         SelectedItem="{Binding SelectedListingStatus}"
+                         MinWidth="120"
+                         VerticalAlignment="Center"
+                         ToolTip.Tip="Lifecycle status"
+                         Classes="statusSelector" />
+            </Grid>
             <Border MinHeight="360"
                     Padding="22"
                     Background="#F7F8FA"
                     BorderBrush="#D9DEE7"
-                    BorderThickness="1">
+                    BorderThickness="1"
+                    IsVisible="{Binding !ListingInspector.HasState}">
               <Grid RowDefinitions="Auto,*">
                 <Grid Grid.Row="0"
                       ColumnDefinitions="*,Auto"
@@ -394,6 +548,277 @@
                 </StackPanel>
               </Grid>
             </Border>
+
+            <Border IsVisible="{Binding ListingInspector.HasState}"
+                    MinHeight="360"
+                    Padding="22"
+                    Background="#F7F8FA"
+                    BorderBrush="#D9DEE7"
+                    BorderThickness="1">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="14">
+                  <TextBlock IsVisible="{Binding ListingInspector.IsReadOnly}"
+                             Text="{Binding ListingInspector.InactiveNotice}"
+                             TextWrapping="Wrap"
+                             FontSize="12"
+                             Foreground="#9A4B43" />
+                  <TextBlock Text="{Binding ListingInspector.DisplayPath}"
+                             FontSize="12"
+                             Foreground="#687385" />
+
+                  <Border Padding="14"
+                          Background="#FFFFFF"
+                          BorderBrush="#D9DEE7"
+                          BorderThickness="1"
+                          CornerRadius="6">
+                    <StackPanel Spacing="10">
+                      <TextBlock Text="Overview"
+                                 FontSize="14"
+                                 FontWeight="SemiBold"
+                                 Foreground="#243447" />
+                      <StackPanel Spacing="6">
+                        <TextBlock Text="Working title"
+                                   FontSize="11"
+                                   Foreground="#687385" />
+                        <TextBox Text="{Binding ListingInspector.Title}"
+                                 IsReadOnly="{Binding !ListingInspector.CanEdit}"
+                                 MinHeight="32"
+                                 PlaceholderText="Working title" />
+                        <TextBlock Text="Phrase"
+                                   FontSize="11"
+                                   Foreground="#687385" />
+                        <TextBox Text="{Binding ListingInspector.Phrase}"
+                                 IsReadOnly="{Binding !ListingInspector.CanEdit}"
+                                 MinHeight="32"
+                                 PlaceholderText="Hook or on-product phrase" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+
+                  <Border Padding="14"
+                          Background="#FFFFFF"
+                          BorderBrush="#D9DEE7"
+                          BorderThickness="1"
+                          CornerRadius="6"
+                          Classes.emphasized="{Binding ListingInspector.EmphasizesIdea}">
+                    <StackPanel Spacing="10">
+                      <TextBlock Text="Idea"
+                                 FontSize="14"
+                                 FontWeight="SemiBold"
+                                 Foreground="#243447" />
+                      <TextBox Text="{Binding ListingInspector.Idea}"
+                               IsReadOnly="{Binding !ListingInspector.CanEdit}"
+                               AcceptsReturn="True"
+                               MinHeight="64"
+                               PlaceholderText="What is this product concept?" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Padding="14"
+                          Background="#FFFFFF"
+                          BorderBrush="#D9DEE7"
+                          BorderThickness="1"
+                          CornerRadius="6"
+                          Classes.emphasized="{Binding ListingInspector.EmphasizesConcept}">
+                    <StackPanel Spacing="10">
+                      <TextBlock Text="Concept"
+                                 FontSize="14"
+                                 FontWeight="SemiBold"
+                                 Foreground="#243447" />
+                      <TextBlock Text="Graphic direction"
+                                 FontSize="11"
+                                 Foreground="#687385" />
+                      <TextBox Text="{Binding ListingInspector.GraphicDirection}"
+                               IsReadOnly="{Binding !ListingInspector.CanEdit}"
+                               AcceptsReturn="True"
+                               MinHeight="64"
+                               PlaceholderText="Visual direction supporting this concept" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Padding="14"
+                          Background="#FFFFFF"
+                          BorderBrush="#D9DEE7"
+                          BorderThickness="1"
+                          CornerRadius="6">
+                    <StackPanel Spacing="10">
+                      <TextBlock Text="Notes"
+                                 FontSize="14"
+                                 FontWeight="SemiBold"
+                                 Foreground="#243447" />
+                      <TextBox Text="{Binding ListingInspector.Notes}"
+                               IsReadOnly="{Binding !ListingInspector.CanEdit}"
+                               AcceptsReturn="True"
+                               MinHeight="80"
+                               PlaceholderText="Plain-text notes" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Padding="14"
+                          Background="#FFFFFF"
+                          BorderBrush="#D9DEE7"
+                          BorderThickness="1"
+                          CornerRadius="6">
+                    <StackPanel Spacing="10">
+                      <TextBlock Text="Tags"
+                                 FontSize="14"
+                                 FontWeight="SemiBold"
+                                 Foreground="#243447" />
+                      <ItemsControl ItemsSource="{Binding ListingInspector.TagDraft}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="x:String">
+                            <Border Padding="8,3"
+                                    CornerRadius="10"
+                                    Background="#EEF6FF"
+                                    BorderBrush="#B9D7F2"
+                                    BorderThickness="1"
+                                    Margin="0,0,6,6">
+                              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <TextBlock Text="{Binding}"
+                                           FontSize="12"
+                                           Foreground="#204466"
+                                           VerticalAlignment="Center" />
+                                <Button Grid.Column="1"
+                                        Content="×"
+                                        Padding="0"
+                                        Width="18"
+                                        Height="18"
+                                        FontSize="13"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Foreground="#204466"
+                                        ToolTip.Tip="Remove tag"
+                                        Command="{Binding $parent[ItemsControl].DataContext.ListingInspector.RemoveTagCommand}"
+                                        CommandParameter="{Binding}" />
+                              </Grid>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <TextBlock IsVisible="{Binding !ListingInspector.HasTags}"
+                                 Text="No tags yet."
+                                 FontSize="12"
+                                 Foreground="#7C8797" />
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                        <TextBox Text="{Binding ListingInspector.TagInput}"
+                                 IsEnabled="{Binding ListingInspector.CanEdit}"
+                                 MinHeight="32"
+                                 PlaceholderText="Add a tag" />
+                        <Button Grid.Column="1"
+                                Content="Add"
+                                IsEnabled="{Binding ListingInspector.CanEdit}"
+                                Command="{Binding ListingInspector.AddTagCommand}"
+                                Classes="storeSecondary" />
+                      </Grid>
+                    </StackPanel>
+                  </Border>
+
+                  <Border Padding="14"
+                          Background="#FFFFFF"
+                          BorderBrush="#D9DEE7"
+                          BorderThickness="1"
+                          CornerRadius="6"
+                          Classes.emphasized="{Binding ListingInspector.EmphasizesDesign}">
+                    <StackPanel Spacing="10">
+                      <TextBlock Text="Related assets"
+                                 FontSize="14"
+                                 FontWeight="SemiBold"
+                                 Foreground="#243447" />
+                      <ItemsControl ItemsSource="{Binding ListingInspector.Assets}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="workflow:ListingInspectorAssetEntry">
+                            <StackPanel Margin="0,0,0,4" Spacing="2">
+                              <TextBlock Text="{Binding Name}" FontSize="13" Foreground="#243447" />
+                              <TextBlock Text="{Binding Kind}" FontSize="11" Foreground="#687385" />
+                              <TextBlock IsVisible="{Binding IsMissing}"
+                                         Text="Missing file"
+                                         FontSize="11"
+                                         Foreground="#9A4B43" />
+                            </StackPanel>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <TextBlock IsVisible="{Binding !ListingInspector.HasAssets}"
+                                 Text="No assets attached yet."
+                                 FontSize="12"
+                                 Foreground="#7C8797" />
+                    </StackPanel>
+                  </Border>
+
+                  <TextBlock IsVisible="{Binding ListingInspector.HasError}"
+                             Text="{Binding ListingInspector.ErrorMessage}"
+                             TextWrapping="Wrap"
+                             FontSize="12"
+                             Foreground="#9A4B43" />
+                  <StackPanel Orientation="Horizontal"
+                              Spacing="8"
+                              HorizontalAlignment="Left">
+                    <Button Content="Save"
+                            IsEnabled="{Binding ListingInspector.CanSave}"
+                            Command="{Binding ListingInspector.SaveCommand}"
+                            Classes="storeAction" />
+                    <Button Content="Revert"
+                            IsEnabled="{Binding ListingInspector.HasUnsavedChanges}"
+                            Command="{Binding ListingInspector.RevertCommand}"
+                            Classes="storeSecondary" />
+                  </StackPanel>
+
+                  <Border IsVisible="{Binding ListingInspector.DiscardPromptVisible}"
+                          Padding="14"
+                          Background="#FFFFFF"
+                          BorderBrush="#D9DEE7"
+                          BorderThickness="1"
+                          CornerRadius="6">
+                    <StackPanel Spacing="10">
+                      <TextBlock Text="Unsaved inspector changes"
+                                 FontSize="13"
+                                 FontWeight="SemiBold"
+                                 Foreground="#243447" />
+                      <TextBlock Text="Save before leaving, discard changes, or keep editing?"
+                                 TextWrapping="Wrap"
+                                 FontSize="12"
+                                 Foreground="#687385" />
+                      <StackPanel Orientation="Horizontal"
+                                  Spacing="8"
+                                  HorizontalAlignment="Left">
+                        <Button Content="Save and continue"
+                                Command="{Binding ListingInspector.SaveAndContinueCommand}"
+                                Classes="storeAction" />
+                        <Button Content="Discard and continue"
+                                Command="{Binding ListingInspector.DiscardAndContinueCommand}"
+                                Classes="storeSecondary" />
+                        <Button Content="Keep editing"
+                                Command="{Binding ListingInspector.KeepEditingCommand}"
+                                Classes="storeSecondary" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </ScrollViewer>
+            </Border>
+
+            <Grid ColumnDefinitions="*,Auto,Auto"
+                  IsVisible="{Binding HasActiveListing}"
+                  Margin="0,4,0,0">
+              <TextBlock Grid.Column="0"
+                         Text="{Binding StageMoveError}"
+                         IsVisible="{Binding StageMoveError}"
+                         FontSize="12"
+                         Foreground="#9A4B43"
+                         VerticalAlignment="Center"
+                         TextWrapping="Wrap" />
+              <Button Grid.Column="1"
+                      Content="{Binding StageMoveBackLabel}"
+                      IsEnabled="{Binding CanMoveStageBack}"
+                      Command="{Binding MoveStageBackCommand}"
+                      Classes="stageMove"
+                      Margin="0,0,6,0" />
+              <Button Grid.Column="2"
+                      Content="{Binding StageMoveForwardLabel}"
+                      IsEnabled="{Binding CanMoveStageForward}"
+                      Command="{Binding MoveStageForwardCommand}"
+                      Classes="stageMove" />
+            </Grid>
           </StackPanel>
 
           <StackPanel IsVisible="{Binding !DocumentWindow.HasActiveDocument}"
@@ -519,8 +944,17 @@
     <Style Selector="Border.treeRow.selected">
       <Setter Property="Background" Value="#E2EAF2" />
     </Style>
+    <Style Selector="Border.treeRow.inactive">
+      <Setter Property="Opacity" Value="0.55" />
+    </Style>
+    <Style Selector="Border.treeRow.inactive:pointerover">
+      <Setter Property="Opacity" Value="0.7" />
+    </Style>
     <Style Selector="Border.treeRow.cut">
       <Setter Property="Opacity" Value="0.48" />
+    </Style>
+    <Style Selector="Border.treeRow.inactive">
+      <Setter Property="Opacity" Value="0.6" />
     </Style>
     <Style Selector="Border.treeRow.dropTarget">
       <Setter Property="Background" Value="#DDF1E7" />
@@ -577,6 +1011,12 @@
       <Setter Property="Foreground" Value="#425066" />
       <Setter Property="BorderBrush" Value="#D9DEE7" />
       <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.storeSecondary.active">
+      <Setter Property="Background" Value="#EEF6FF" />
+      <Setter Property="Foreground" Value="#204466" />
+      <Setter Property="BorderBrush" Value="#B9D7F2" />
+      <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="Button.iconButton">
       <Setter Property="Width" Value="28" />
@@ -649,6 +1089,26 @@
       <Setter Property="Foreground" Value="#8B95A3" />
       <Setter Property="BorderBrush" Value="#E1E5EA" />
     </Style>
+    <Style Selector="Button.activeView:not(.current)">
+      <Setter Property="BorderBrush" Value="#3C8C69" />
+      <Setter Property="BorderThickness" Value="0,0,0,2" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.stageMove">
+      <Setter Property="Padding" Value="12,7" />
+      <Setter Property="MinWidth" Value="120" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="Foreground" Value="#243447" />
+      <Setter Property="BorderBrush" Value="#D9DEE7" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.stageMove:disabled">
+      <Setter Property="Opacity" Value="0.5" />
+    </Style>
+    <Style Selector="ComboBox.statusSelector">
+      <Setter Property="MinWidth" Value="120" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
     <Style Selector="Button.toolSelector">
       <Setter Property="Padding" Value="10,6" />
       <Setter Property="MinWidth" Value="72" />
@@ -656,6 +1116,10 @@
       <Setter Property="Foreground" Value="#243447" />
       <Setter Property="BorderBrush" Value="#D9DEE7" />
       <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Border.emphasized">
+      <Setter Property="BorderBrush" Value="#59A17D" />
+      <Setter Property="BorderThickness" Value="1.5" />
     </Style>
   </Window.Styles>
 </Window>

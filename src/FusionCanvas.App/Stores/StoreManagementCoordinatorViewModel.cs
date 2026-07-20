@@ -17,7 +17,8 @@ public sealed record StoreSelectorEntry(StoreSummary Store, bool IsSelected)
 public enum StoreManagementEditorTab
 {
     BasicInfo,
-    Niches
+    Niches,
+    Tags
 }
 
 public sealed class StoreManagementViewModel : INotifyPropertyChanged
@@ -31,7 +32,10 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         SelectNiche,
         StartNewNiche,
         SelectBasicInfoTab,
-        SelectNichesTab
+        SelectNichesTab,
+        SelectTag,
+        StartNewTag,
+        SelectTagsTab
     }
 
     private sealed record EditorState(
@@ -55,23 +59,32 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     private readonly IStoreManagementService _service;
     private readonly INicheManagementService? _nicheService;
+    private readonly ITagManagementService? _tagService;
     private bool _isSelectorExpanded;
     private bool _isStoreEditorOpen;
     private bool _firstStorePromptDismissed;
     private bool _deleteWarningVisible;
     private bool _nicheDeleteWarningVisible;
+    private bool _tagDeleteWarningVisible;
     private bool _discardChangesPromptVisible;
     private bool _isCreatingNewStore;
     private bool _isCreatingNewNiche;
+    private bool _isCreatingNewTag;
     private Guid? _draftStoreId;
     private Guid? _draftNicheId;
+    private Guid? _draftTagId;
     private StoreSummary? _pendingDeleteStore;
     private NicheSummary? _pendingDeleteNiche;
     private StoreSummary? _pendingEditorStore;
     private NicheSummary? _pendingEditorNiche;
+    private TagSummary? _pendingEditorTag;
+    private TagSummary? _pendingDeleteTag;
+    private int _pendingDeleteTagListingCount;
     private PendingEditorAction _pendingEditorAction;
     private EditorState _originalEditorState = EmptyEditorState();
     private NicheEditorState _originalNicheEditorState = EmptyNicheEditorState();
+    private sealed record TagEditorState(string Name, string? Color, string? Description);
+    private TagEditorState _originalTagEditorState = new(string.Empty, null, null);
     private StoreManagementEditorTab _selectedEditorTab;
     private string _newStoreName = string.Empty;
     private string _description = string.Empty;
@@ -88,12 +101,16 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private string _nicheRisks = string.Empty;
     private string _nicheResearchNotes = string.Empty;
     private string _nicheNotes = string.Empty;
+    private string _tagName = string.Empty;
+    private string? _tagColor;
+    private string _tagDescription = string.Empty;
     private string? _errorMessage;
 
-    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null)
+    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null, ITagManagementService? tagService = null)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _nicheService = nicheService;
+        _tagService = tagService;
         ToggleStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = !IsSelectorExpanded);
         ExpandStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = true);
         CollapseStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = false);
@@ -102,8 +119,10 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         {
             OpenNichesTab();
         });
+        OpenTagsTabCommand = new RelayCommand(_ => OpenTagsTab());
         SelectBasicInfoTabCommand = new RelayCommand(_ => SelectBasicInfoTab());
         SelectNichesTabCommand = new RelayCommand(_ => SelectNichesTab());
+        SelectTagsTabCommand = new RelayCommand(_ => SelectTagsTab());
         StartCreateStoreCommand = new RelayCommand(_ => StartCreateStore());
         StartCreateNicheCommand = new RelayCommand(_ => StartCreateNiche());
         CloseStoreEditorCommand = new RelayCommand(_ => TryCloseStoreEditor());
@@ -182,6 +201,26 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         CancelDeleteNicheCommand = new RelayCommand(_ => ClearNicheDeleteWarning());
         ConfirmDiscardChangesCommand = new RelayCommand(_ => ConfirmDiscardChanges());
         KeepEditingCommand = new RelayCommand(_ => ClearDiscardChangesPrompt());
+        EditTagCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is TagSummary tag)
+            {
+                SelectTagForEditing(tag);
+            }
+        });
+        SaveSelectedTagCommand = new RelayCommand(_ => Run(SaveSelectedTagAsync()));
+        ArchiveSelectedTagCommand = new RelayCommand(_ => Run(ArchiveSelectedTagAsync()));
+        RestoreTagCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is TagSummary tag)
+            {
+                Run(RestoreTagAsync(tag));
+            }
+        });
+        RequestDeleteSelectedTagCommand = new RelayCommand(_ => RequestDeleteSelectedTag());
+        ConfirmDeleteTagCommand = new RelayCommand(_ => Run(ConfirmDeleteTagAsync()));
+        CancelDeleteTagCommand = new RelayCommand(_ => ClearTagDeleteWarning());
+        StartCreateTagCommand = new RelayCommand(_ => StartCreateTag());
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -201,6 +240,35 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public IReadOnlyList<NicheSummary> ActiveNiches { get; private set; } = [];
 
     public IReadOnlyList<NicheSummary> ArchivedNiches { get; private set; } = [];
+
+    public IReadOnlyList<TagSummary> ActiveTags { get; private set; } = [];
+
+    public IReadOnlyList<TagSummary> ArchivedTags { get; private set; } = [];
+
+    public IReadOnlyList<TagSummary> EditorActiveTags =>
+        _isCreatingNewTag && DraftTag() is { } draft
+            ? ActiveTags.Concat([draft]).ToArray()
+            : ActiveTags;
+
+    public TagSummary? SelectedTag { get; private set; }
+
+    public bool NeedsFirstTag { get; private set; }
+
+    public bool HasActiveTags => ActiveTags.Count > 0;
+
+    public bool HasArchivedTags => ArchivedTags.Count > 0;
+
+    public bool HasSelectedTag => SelectedTag is not null;
+
+    public bool CanRestoreSelectedTag => SelectedTag is { IsArchived: true };
+
+    public bool HasUnsavedTagChanges => CurrentTagEditorState() != _originalTagEditorState;
+
+    public bool CanSaveSelectedTag => _tagService is not null && (_isCreatingNewTag || (SelectedTag is not null && HasUnsavedTagChanges));
+
+    public bool CanArchiveSelectedTag => _tagService is not null && SelectedTag is { IsArchived: false } && !_isCreatingNewTag;
+
+    public bool CanDeleteSelectedTag => _tagService is not null && SelectedTag is not null && !_isCreatingNewTag;
 
     public IReadOnlyList<NicheSummary> EditorActiveNiches =>
         _isCreatingNewNiche && DraftNiche() is { } draft
@@ -240,7 +308,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public bool HasUnsavedNicheChanges => CurrentNicheEditorState() != _originalNicheEditorState;
 
-    public bool HasAnyUnsavedChanges => HasUnsavedChanges || HasUnsavedNicheChanges;
+    public bool HasAnyUnsavedChanges => HasUnsavedChanges || HasUnsavedNicheChanges || HasUnsavedTagChanges;
 
     public bool CanSaveSelectedStore => _isCreatingNewStore || (SelectedStore is not null && HasUnsavedChanges);
 
@@ -262,6 +330,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public bool IsNichesTabSelected => SelectedEditorTab == StoreManagementEditorTab.Niches;
 
+    public bool IsTagsTabSelected => SelectedEditorTab == StoreManagementEditorTab.Tags;
+
     public StoreManagementEditorTab SelectedEditorTab
     {
         get => _selectedEditorTab;
@@ -271,6 +341,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             {
                 OnPropertyChanged(nameof(IsBasicInfoTabSelected));
                 OnPropertyChanged(nameof(IsNichesTabSelected));
+                OnPropertyChanged(nameof(IsTagsTabSelected));
             }
         }
     }
@@ -319,6 +390,12 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         private set => SetField(ref _nicheDeleteWarningVisible, value);
     }
 
+    public bool TagDeleteWarningVisible
+    {
+        get => _tagDeleteWarningVisible;
+        private set => SetField(ref _tagDeleteWarningVisible, value);
+    }
+
     public bool DiscardChangesPromptVisible
     {
         get => _discardChangesPromptVisible;
@@ -333,9 +410,18 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         ? "Permanent deletion cannot be undone."
         : $"Delete niche '{_pendingDeleteNiche.Name}' permanently? This cannot be undone.";
 
-    public string DiscardChangesMessage => HasUnsavedNicheChanges && !HasUnsavedChanges
-        ? "Discard changes? Unsaved niche edits will be lost."
-        : "Discard changes? Unsaved store or niche edits will be lost.";
+    public string TagDeleteWarningMessage => _pendingDeleteTag is null
+        ? "Permanent deletion cannot be undone."
+        : _pendingDeleteTagListingCount == 0
+            ? $"Delete tag '{_pendingDeleteTag.Name}' permanently? This cannot be undone."
+            : $"Delete tag '{_pendingDeleteTag.Name}' permanently? It will be removed from {_pendingDeleteTagListingCount} listing(s). This cannot be undone.";
+
+    public string DiscardChangesMessage =>
+        HasUnsavedTagChanges && !HasUnsavedChanges && !HasUnsavedNicheChanges
+            ? "Discard changes? Unsaved tag edits will be lost."
+            : HasUnsavedNicheChanges && !HasUnsavedChanges
+                ? "Discard changes? Unsaved niche edits will be lost."
+                : "Discard changes? Unsaved store, niche, or tag edits will be lost.";
 
     public string NewStoreName
     {
@@ -519,6 +605,43 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         }
     }
 
+    public string TagName
+    {
+        get => _tagName;
+        set
+        {
+            if (SetField(ref _tagName, value))
+            {
+                RaiseTagEditorStateProperties();
+                OnPropertyChanged(nameof(EditorActiveTags));
+            }
+        }
+    }
+
+    public string? TagColor
+    {
+        get => _tagColor;
+        set
+        {
+            if (SetField(ref _tagColor, value))
+            {
+                RaiseTagEditorStateProperties();
+            }
+        }
+    }
+
+    public string TagDescription
+    {
+        get => _tagDescription;
+        set
+        {
+            if (SetField(ref _tagDescription, value))
+            {
+                RaiseTagEditorStateProperties();
+            }
+        }
+    }
+
     public string? ErrorMessage
     {
         get => _errorMessage;
@@ -541,9 +664,13 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public ICommand OpenNichesTabCommand { get; }
 
+    public ICommand OpenTagsTabCommand { get; }
+
     public ICommand SelectBasicInfoTabCommand { get; }
 
     public ICommand SelectNichesTabCommand { get; }
+
+    public ICommand SelectTagsTabCommand { get; }
 
     public ICommand StartCreateStoreCommand { get; }
 
@@ -593,24 +720,45 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public ICommand KeepEditingCommand { get; }
 
+    public ICommand EditTagCommand { get; }
+
+    public ICommand SaveSelectedTagCommand { get; }
+
+    public ICommand ArchiveSelectedTagCommand { get; }
+
+    public ICommand RestoreTagCommand { get; }
+
+    public ICommand RequestDeleteSelectedTagCommand { get; }
+
+    public ICommand ConfirmDeleteTagCommand { get; }
+
+    public ICommand CancelDeleteTagCommand { get; }
+
+    public ICommand StartCreateTagCommand { get; }
+
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         var state = await _service.LoadAsync(cancellationToken).ConfigureAwait(false);
         ApplyState(state);
         await LoadNichesForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
+        await LoadTagsForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task SetActiveWorkspaceAsync(Guid? workspaceId, CancellationToken cancellationToken = default)
     {
         _service.SetActiveWorkspace(workspaceId);
         _nicheService?.SetActiveWorkspace(workspaceId);
+        _tagService?.SetActiveStore(null);
         _isCreatingNewStore = false;
         _isCreatingNewNiche = false;
+        _isCreatingNewTag = false;
         _draftStoreId = null;
         _draftNicheId = null;
+        _draftTagId = null;
         var state = await _service.LoadAsync(cancellationToken).ConfigureAwait(false);
         ApplyState(state);
         await LoadNichesForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
+        await LoadTagsForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task CreateStoreAsync(CancellationToken cancellationToken = default)
@@ -668,6 +816,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanRestoreSelectedStore));
         RaiseEditorActionProperties();
         Run(LoadNichesForSelectedStoreAsync());
+        Run(LoadTagsForSelectedStoreAsync());
     }
 
     public void StartCreateStore()
@@ -1148,6 +1297,381 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         ApplyNicheState(state);
     }
 
+    private async Task LoadTagsForSelectedStoreAsync(CancellationToken cancellationToken = default)
+    {
+        if (_tagService is null)
+        {
+            return;
+        }
+
+        var state = await _tagService.LoadAsync(SelectedStore is { IsArchived: false } ? SelectedStore.Id : null, cancellationToken).ConfigureAwait(false);
+        ApplyTagState(state);
+    }
+
+    private void ApplyTagState(TagManagementState state)
+    {
+        ActiveTags = state.ActiveTags;
+        ArchivedTags = state.ArchivedTags;
+        SelectedTag = _isCreatingNewTag
+            ? DraftTag()
+            : ActiveTags.FirstOrDefault(tag => tag.Id == SelectedTag?.Id)
+                ?? ArchivedTags.FirstOrDefault(tag => tag.Id == SelectedTag?.Id)
+                ?? ActiveTags.FirstOrDefault()
+                ?? ArchivedTags.FirstOrDefault();
+        NeedsFirstTag = state.NeedsFirstTag;
+        if (!_isCreatingNewTag)
+        {
+            ApplySelectedTagFields(SelectedTag);
+            CaptureOriginalTagEditorState();
+        }
+
+        OnPropertyChanged(nameof(ActiveTags));
+        OnPropertyChanged(nameof(EditorActiveTags));
+        OnPropertyChanged(nameof(ArchivedTags));
+        OnPropertyChanged(nameof(SelectedTag));
+        OnPropertyChanged(nameof(NeedsFirstTag));
+        OnPropertyChanged(nameof(HasActiveTags));
+        OnPropertyChanged(nameof(HasArchivedTags));
+        OnPropertyChanged(nameof(HasSelectedTag));
+        OnPropertyChanged(nameof(CanRestoreSelectedTag));
+        RaiseTagEditorActionProperties();
+    }
+
+    public void SelectTagForEditing(TagSummary tag)
+    {
+        ArgumentNullException.ThrowIfNull(tag);
+        if (_isCreatingNewTag && tag.Id == _draftTagId)
+        {
+            SelectedTag = DraftTag();
+            OnPropertyChanged(nameof(SelectedTag));
+            return;
+        }
+
+        if (HasUnsavedTagChanges && SelectedTag?.Id != tag.Id)
+        {
+            RequestDiscardBefore(PendingEditorAction.SelectTag, tag: tag);
+            return;
+        }
+
+        PerformSelectTagForEditing(tag);
+    }
+
+    private void PerformSelectTagForEditing(TagSummary tag)
+    {
+        _isCreatingNewTag = false;
+        _draftTagId = null;
+        SelectedTag = tag;
+        ApplySelectedTagFields(tag);
+        CaptureOriginalTagEditorState();
+        ClearTagDeleteWarning();
+        ClearDiscardChangesPrompt();
+        OnPropertyChanged(nameof(SelectedTag));
+        OnPropertyChanged(nameof(EditorActiveTags));
+        OnPropertyChanged(nameof(HasSelectedTag));
+        OnPropertyChanged(nameof(CanRestoreSelectedTag));
+        RaiseTagEditorActionProperties();
+    }
+
+    public void StartCreateTag()
+    {
+        if (SelectedStore is null || SelectedStore.IsArchived || _isCreatingNewStore)
+        {
+            ErrorMessage = "Select an active saved store before creating a tag.";
+            return;
+        }
+
+        if (HasUnsavedTagChanges)
+        {
+            RequestDiscardBefore(PendingEditorAction.StartNewTag);
+            return;
+        }
+
+        BeginCreateTagDraft();
+    }
+
+    private void BeginCreateTagDraft()
+    {
+        _isCreatingNewTag = true;
+        _draftTagId = Guid.NewGuid();
+        SelectedTag = DraftTag();
+        ErrorMessage = null;
+        ClearTagDeleteWarning();
+        ClearDiscardChangesPrompt();
+        ClearTagEditorFields();
+        CaptureOriginalTagEditorState();
+        OnPropertyChanged(nameof(SelectedTag));
+        OnPropertyChanged(nameof(EditorActiveTags));
+        OnPropertyChanged(nameof(HasSelectedTag));
+        OnPropertyChanged(nameof(CanRestoreSelectedTag));
+        RaiseTagEditorActionProperties();
+    }
+
+    public async Task SaveSelectedTagAsync(CancellationToken cancellationToken = default)
+    {
+        if (_tagService is null)
+        {
+            ErrorMessage = "Tag management is not available.";
+            return;
+        }
+
+        if (SelectedStore is null)
+        {
+            ErrorMessage = "Select a store before saving a tag.";
+            return;
+        }
+
+        if (_isCreatingNewTag)
+        {
+            var createResult = await _tagService.CreateTagAsync(
+                new TagManagementCreateRequest(SelectedStore.Id, TagName, EmptyToNull(TagDescription), TagColor),
+                cancellationToken).ConfigureAwait(false);
+
+            if (createResult.Succeeded)
+            {
+                _isCreatingNewTag = false;
+                _draftTagId = null;
+            }
+
+            ApplyTagResult(createResult);
+            return;
+        }
+
+        if (SelectedTag is null)
+        {
+            ErrorMessage = "Select a tag before saving.";
+            return;
+        }
+
+        var result = await _tagService.UpdateTagAsync(
+            new TagManagementUpdateRequest(SelectedTag.Id, TagName, EmptyToNull(TagDescription), TagColor),
+            cancellationToken).ConfigureAwait(false);
+        ApplyTagResult(result);
+    }
+
+    public async Task ArchiveSelectedTagAsync(CancellationToken cancellationToken = default)
+    {
+        if (_tagService is null)
+        {
+            ErrorMessage = "Tag management is not available.";
+            return;
+        }
+
+        if (_isCreatingNewTag)
+        {
+            ErrorMessage = "Save the new tag before archiving it.";
+            return;
+        }
+
+        if (SelectedTag is null)
+        {
+            ErrorMessage = "Select a tag before archiving.";
+            return;
+        }
+
+        var result = await _tagService.ArchiveTagAsync(SelectedTag.Id, cancellationToken).ConfigureAwait(false);
+        ApplyTagResult(result);
+    }
+
+    public async Task RestoreTagAsync(TagSummary tag, CancellationToken cancellationToken = default)
+    {
+        if (_tagService is null)
+        {
+            ErrorMessage = "Tag management is not available.";
+            return;
+        }
+
+        ArgumentNullException.ThrowIfNull(tag);
+        var result = await _tagService.RestoreTagAsync(tag.Id, cancellationToken).ConfigureAwait(false);
+        ApplyTagResult(result);
+    }
+
+    public void RequestDeleteSelectedTag()
+    {
+        if (_isCreatingNewTag)
+        {
+            ErrorMessage = "Save the new tag before deleting it.";
+            return;
+        }
+
+        if (SelectedTag is null)
+        {
+            ErrorMessage = "Select a tag before deleting.";
+            return;
+        }
+
+        _pendingDeleteTag = SelectedTag;
+        _pendingDeleteTagListingCount = 0;
+        TagDeleteWarningVisible = true;
+        OnPropertyChanged(nameof(TagDeleteWarningMessage));
+        Run(RefreshTagDeleteListingCountAsync());
+    }
+
+    private async Task RefreshTagDeleteListingCountAsync()
+    {
+        if (_tagService is null || _pendingDeleteTag is null) return;
+        try
+        {
+            _pendingDeleteTagListingCount = await _tagService.GetTagApplicationCountAsync(_pendingDeleteTag.Id, CancellationToken.None);
+            OnPropertyChanged(nameof(TagDeleteWarningMessage));
+        }
+        catch
+        {
+        }
+    }
+
+    public async Task ConfirmDeleteTagAsync(CancellationToken cancellationToken = default)
+    {
+        if (_tagService is null)
+        {
+            ErrorMessage = "Tag management is not available.";
+            return;
+        }
+
+        if (_pendingDeleteTag is null)
+        {
+            ErrorMessage = "Select a tag before deleting.";
+            return;
+        }
+
+        var result = await _tagService.DeleteTagAsync(
+            new TagManagementDeleteRequest(_pendingDeleteTag.Id, ConfirmPermanentDeletion: true),
+            cancellationToken).ConfigureAwait(false);
+        ErrorMessage = result.Error;
+        ApplyTagState(result.State);
+        if (result.Succeeded)
+        {
+            SelectDefaultTagForEditing();
+        }
+
+        ClearTagDeleteWarning();
+    }
+
+    private void SelectDefaultTagForEditing()
+    {
+        var defaultTag = ActiveTags.FirstOrDefault() ?? ArchivedTags.FirstOrDefault();
+        if (defaultTag is not null)
+        {
+            PerformSelectTagForEditing(defaultTag);
+            return;
+        }
+
+        ClearTagSelection();
+    }
+
+    private void ClearTagSelection()
+    {
+        _isCreatingNewTag = false;
+        _draftTagId = null;
+        ActiveTags = [];
+        ArchivedTags = [];
+        SelectedTag = null;
+        ClearTagEditorFields();
+        CaptureOriginalTagEditorState();
+        OnPropertyChanged(nameof(ActiveTags));
+        OnPropertyChanged(nameof(EditorActiveTags));
+        OnPropertyChanged(nameof(ArchivedTags));
+        OnPropertyChanged(nameof(SelectedTag));
+        OnPropertyChanged(nameof(HasSelectedTag));
+        OnPropertyChanged(nameof(HasActiveTags));
+        OnPropertyChanged(nameof(HasArchivedTags));
+        OnPropertyChanged(nameof(CanRestoreSelectedTag));
+        RaiseTagEditorActionProperties();
+    }
+
+    private void ApplySelectedTagFields(TagSummary? tag)
+    {
+        if (tag is null)
+        {
+            ClearTagEditorFields();
+            return;
+        }
+
+        TagName = tag.Name;
+        TagColor = tag.Color;
+        TagDescription = tag.Description ?? string.Empty;
+    }
+
+    private void ClearTagEditorFields()
+    {
+        TagName = string.Empty;
+        TagColor = null;
+        TagDescription = string.Empty;
+    }
+
+    private TagSummary? DraftTag()
+    {
+        if (!_isCreatingNewTag || _draftTagId is not { } id || SelectedStore is null)
+        {
+            return null;
+        }
+
+        var now = DateTimeOffset.Now;
+        var name = string.IsNullOrWhiteSpace(TagName) ? "New tag" : TagName.Trim();
+        return new TagSummary(id, SelectedStore.Id, name, EmptyToNull(TagDescription), TagColor, false, now, now);
+    }
+
+    private void ApplyTagResult(TagManagementResult result)
+    {
+        ErrorMessage = result.Error;
+        ApplyTagState(result.State);
+        if (result.Tag is not null && result.Succeeded)
+        {
+            PerformSelectTagForEditing(result.Tag);
+            WorkspaceStructureChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private TagEditorState CurrentTagEditorState() =>
+        new(TagName, TagColor, EmptyToNull(TagDescription));
+
+    private void CaptureOriginalTagEditorState()
+    {
+        _originalTagEditorState = CurrentTagEditorState();
+        RaiseTagEditorActionProperties();
+    }
+
+    private void RaiseTagEditorStateProperties() => RaiseTagEditorActionProperties();
+
+    private void RaiseTagEditorActionProperties()
+    {
+        OnPropertyChanged(nameof(HasUnsavedTagChanges));
+        OnPropertyChanged(nameof(HasAnyUnsavedChanges));
+        OnPropertyChanged(nameof(CanSaveSelectedTag));
+        OnPropertyChanged(nameof(CanArchiveSelectedTag));
+        OnPropertyChanged(nameof(CanDeleteSelectedTag));
+    }
+
+    private void ClearTagDeleteWarning()
+    {
+        _pendingDeleteTag = null;
+        _pendingDeleteTagListingCount = 0;
+        TagDeleteWarningVisible = false;
+        OnPropertyChanged(nameof(TagDeleteWarningMessage));
+    }
+
+    private void OpenTagsTab()
+    {
+        OpenStoreEditor();
+        SelectTagsTab();
+    }
+
+    private void SelectTagsTab()
+    {
+        if (HasUnsavedChanges || HasUnsavedNicheChanges)
+        {
+            RequestDiscardBefore(PendingEditorAction.SelectTagsTab);
+            return;
+        }
+
+        SelectedEditorTab = StoreManagementEditorTab.Tags;
+        if (NeedsFirstTag && SelectedStore is { IsArchived: false } && !_isCreatingNewStore)
+        {
+            BeginCreateTagDraft();
+        }
+
+        Run(LoadTagsForSelectedStoreAsync());
+    }
+
     private void ApplyNicheState(NicheManagementState state)
     {
         ActiveNiches = state.ActiveNiches;
@@ -1310,13 +1834,15 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         return new NicheSummary(id, SelectedStore.Id, name, CurrentNicheContext(), IsArchived: false, now, now);
     }
 
-    private void RequestDiscardBefore(PendingEditorAction action, StoreSummary? store = null, NicheSummary? niche = null)
+    private void RequestDiscardBefore(PendingEditorAction action, StoreSummary? store = null, NicheSummary? niche = null, TagSummary? tag = null)
     {
         _pendingEditorAction = action;
         _pendingEditorStore = store;
         _pendingEditorNiche = niche;
+        _pendingEditorTag = tag;
         ClearDeleteWarning();
         ClearNicheDeleteWarning();
+        ClearTagDeleteWarning();
         DiscardChangesPromptVisible = true;
         OnPropertyChanged(nameof(DiscardChangesMessage));
     }
@@ -1326,6 +1852,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         var action = _pendingEditorAction;
         var store = _pendingEditorStore;
         var niche = _pendingEditorNiche;
+        var tag = _pendingEditorTag;
         DiscardCurrentEditorChanges();
         ClearDiscardChangesPrompt();
 
@@ -1352,6 +1879,16 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             case PendingEditorAction.SelectNichesTab:
                 SelectedEditorTab = StoreManagementEditorTab.Niches;
                 Run(LoadNichesForSelectedStoreAsync());
+                break;
+            case PendingEditorAction.SelectTag when tag is not null:
+                PerformSelectTagForEditing(tag);
+                break;
+            case PendingEditorAction.StartNewTag:
+                BeginCreateTagDraft();
+                break;
+            case PendingEditorAction.SelectTagsTab:
+                SelectedEditorTab = StoreManagementEditorTab.Tags;
+                Run(LoadTagsForSelectedStoreAsync());
                 break;
         }
     }
@@ -1380,14 +1917,26 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
         ApplySelectedNicheFields(SelectedNiche);
         CaptureOriginalNicheEditorState();
+        if (_isCreatingNewTag)
+        {
+            _isCreatingNewTag = false;
+            _draftTagId = null;
+            SelectedTag = ActiveTags.FirstOrDefault(tag => tag.Id == SelectedTag?.Id) ?? ActiveTags.FirstOrDefault();
+        }
+
+        ApplySelectedTagFields(SelectedTag);
+        CaptureOriginalTagEditorState();
         OnPropertyChanged(nameof(SelectedStore));
         OnPropertyChanged(nameof(EditorActiveStores));
         OnPropertyChanged(nameof(SelectedNiche));
         OnPropertyChanged(nameof(EditorActiveNiches));
+        OnPropertyChanged(nameof(SelectedTag));
+        OnPropertyChanged(nameof(EditorActiveTags));
         OnPropertyChanged(nameof(HasSelectedStore));
         OnPropertyChanged(nameof(CanRestoreSelectedStore));
         RaiseEditorActionProperties();
         RaiseNicheEditorActionProperties();
+        RaiseTagEditorActionProperties();
     }
 
     private void ClearDiscardChangesPrompt()
@@ -1395,6 +1944,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         _pendingEditorAction = PendingEditorAction.None;
         _pendingEditorStore = null;
         _pendingEditorNiche = null;
+        _pendingEditorTag = null;
         DiscardChangesPromptVisible = false;
     }
 

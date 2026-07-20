@@ -2,11 +2,31 @@ namespace FusionCanvas.Domain.Workspace;
 
 public enum ListingStatus
 {
-    Active = 0,
-    Draft = 1,
-    Ready = 2,
-    Published = 3,
-    Archived = 4
+    Draft = 0,
+    Published = 1,
+    Paused = 2,
+    Rejected = 3
+}
+
+public static class ListingStatuses
+{
+    public static IReadOnlyList<ListingStatus> Ordered { get; } =
+    [
+        ListingStatus.Draft,
+        ListingStatus.Published,
+        ListingStatus.Paused,
+        ListingStatus.Rejected
+    ];
+
+    public static string GetDisplayName(ListingStatus status) =>
+        status switch
+        {
+            ListingStatus.Draft => "Draft",
+            ListingStatus.Published => "Published",
+            ListingStatus.Paused => "Paused",
+            ListingStatus.Rejected => "Rejected",
+            _ => throw new ArgumentOutOfRangeException(nameof(status), status, "Unsupported listing lifecycle status.")
+        };
 }
 
 public enum AssetKind

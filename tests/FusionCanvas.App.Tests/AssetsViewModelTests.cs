@@ -218,7 +218,7 @@ public class AssetsViewModelTests
             var store = new Store(Guid.NewGuid(), "North Star", null, false, now, now, "{}", nicheId);
             var niche = new Niche(nicheId, store.Id, "Coffee", null, false, now, now, "{}");
             var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Group", null, false, now, now, "{}");
-            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Idea", null, ListingStatus.Draft, false, now, now, "{}");
+            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
             var linkedAsset = new Asset(Guid.NewGuid(), store.Id, "linked.png", null, AssetKind.ExportedImage, "assets/linked.png", @"C:\imports\linked.png", false, false, now, now, "{}");
             var unlinkedAsset = new Asset(Guid.NewGuid(), store.Id, "unlinked.png", null, AssetKind.Texture, "assets/unlinked.png", @"C:\imports\unlinked.png", false, false, now, now, "{}");
             var link = new AssetLink(linkedAsset.Id, WorkspaceEntityKind.Listing, listing.Id);

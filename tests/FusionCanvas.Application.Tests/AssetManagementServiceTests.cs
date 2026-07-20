@@ -258,7 +258,7 @@ public class AssetManagementServiceTests
             var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Dogs and coffee", null, false, now, now, "{}");
             var archivedNiche = new Niche(Guid.NewGuid(), store.Id, "Archived", null, true, now, now, "{}");
             var archivedGroup = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Archived group", null, true, now, now, "{}");
-            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Idea", null, ListingStatus.Draft, false, now, now, "{}");
+            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
             var linkedAsset = new Asset(Guid.NewGuid(), store.Id, "linked.png", null, AssetKind.ExportedImage, "assets/linked.png", @"C:\imports\linked.png", false, false, now, now, "{}");
             var unlinkedAsset = new Asset(Guid.NewGuid(), store.Id, "unlinked.png", null, AssetKind.ExportedImage, "assets/unlinked.png", @"C:\imports\unlinked.png", false, false, now, now, "{}");
             var link = new AssetLink(linkedAsset.Id, WorkspaceEntityKind.Listing, listing.Id);

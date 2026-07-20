@@ -30,7 +30,9 @@ public sealed class WorkspaceTreeNodeViewModel : INotifyPropertyChanged
         bool hasHiddenChildren,
         int childCount,
         IEnumerable<WorkspaceTreeNodeViewModel> children,
-        bool isDraft = false)
+        bool isDraft = false,
+        IReadOnlyList<string>? appliedTagColors = null,
+        bool isInactive = false)
     {
         NodeId = nodeId;
         EntityKind = entityKind;
@@ -41,6 +43,8 @@ public sealed class WorkspaceTreeNodeViewModel : INotifyPropertyChanged
         HasHiddenChildren = hasHiddenChildren;
         ChildCount = childCount;
         IsDraft = isDraft;
+        AppliedTagColors = appliedTagColors ?? [];
+        IsInactive = isInactive;
         _draftName = name;
         Children = new ObservableCollection<WorkspaceTreeNodeViewModel>(children);
     }
@@ -56,6 +60,7 @@ public sealed class WorkspaceTreeNodeViewModel : INotifyPropertyChanged
     public bool HasHiddenChildren { get; }
     public int ChildCount { get; }
     public bool IsDraft { get; }
+    public bool IsInactive { get; }
     public string Icon => EntityKind switch
     {
         WorkspaceEntityKind.Niche => "◆",
@@ -74,6 +79,13 @@ public sealed class WorkspaceTreeNodeViewModel : INotifyPropertyChanged
 
     public string CountLabel => ChildCount == 0 ? string.Empty : ChildCount.ToString();
     public bool HasChildren => ChildCount > 0;
+    public bool HasAppliedTags => AppliedTagColors.Count > 0;
+    public IReadOnlyList<string> AppliedTagColors { get; }
+    public int VisibleTagChipCount => Math.Min(AppliedTagColors.Count, 3);
+    public int HiddenTagCount => Math.Max(0, AppliedTagColors.Count - 3);
+    public string HiddenTagLabel => HiddenTagCount > 0 ? $"+{HiddenTagCount}" : string.Empty;
+    public bool HasHiddenTags => HiddenTagCount > 0;
+    public IEnumerable<string> VisibleTagColorSequence => AppliedTagColors.Take(3);
     public bool IsGroup => EntityKind == WorkspaceEntityKind.Group;
     public bool IsListing => EntityKind == WorkspaceEntityKind.Listing;
     public bool IsTopic => EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group;
@@ -147,6 +159,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     private readonly WorkspaceTreeClipboard _clipboard;
     private readonly HashSet<Guid> _expandedIds = [];
     private HashSet<Guid>? _expandedIdsBeforeFilter;
+    private readonly ObservableCollection<TagFilterEntryViewModel> _availableTags = [];
     private WorkspaceSnapshot _snapshot;
     private Guid? _storeId;
     private WorkspaceTreeNodeViewModel? _selectedNode;
@@ -154,6 +167,12 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     private GroupParentReference? _creationAnchor;
     private ListingTopicReference? _listingCreationAnchor;
     private string _queryText = string.Empty;
+    private HashSet<Guid> _selectedTagIds = [];
+    private NavigationTopicReference? _scopedTopic;
+    private bool _scopeToCurrentTopic;
+    private bool _includeArchived;
+    private int _stageFilterIndex;
+    private int _statusFilterIndex;
     private string? _errorMessage;
     private bool _isBusy;
 
@@ -180,6 +199,13 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         CutCommand = new RelayCommand(_ => Cut());
         PasteCommand = new RelayCommand(_ => Run(PasteAsync()));
         DuplicateCommand = new RelayCommand(_ => Run(DuplicateAsync()));
+        ToggleTagFilterCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is TagSummary tag) ToggleTagFilter(tag.Id);
+            else if (parameter is Guid id) ToggleTagFilter(id);
+        });
+        ClearTagFiltersCommand = new RelayCommand(_ => ClearTagFilters());
+        ClearTagFilterOrRevealSelectionCommand = new RelayCommand(_ => ClearTagFilters());
         EditPropertiesCommand = new RelayCommand(_ =>
         {
             if (_selectedNode?.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing)
@@ -201,6 +227,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
                 ManageAssetsRequested?.Invoke(this, new WorkspaceTreeSelection(_selectedNode.EntityKind, _selectedNode.EntityId));
             }
         });
+        ClearFiltersCommand = new RelayCommand(_ => ClearAllFilters());
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -224,6 +251,20 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     public ICommand DuplicateCommand { get; }
     public ICommand EditPropertiesCommand { get; }
     public ICommand ManageAssetsCommand { get; }
+    public ICommand ClearFiltersCommand { get; }
+
+    public IReadOnlyList<TagSummary> AvailableTagFilters { get; private set; } = [];
+    public IReadOnlyList<Guid> SelectedTagFilterIds => [.. _selectedTagIds];
+    public bool IsTagFilterActive => _selectedTagIds.Count > 0;
+    public bool HasTagFiltersAvailable => AvailableTagFilters.Count > 0;
+    public bool HasFilteredOutSelection => SelectedNode is null && _selection.Selected is { } selected && HasEntityInStore(selected.Id);
+    public string? FilteredOutSelectionName => HasFilteredOutSelection ? FindEntityName(_selection.Selected!.Id) : null;
+    public string FilteredOutSelectionMessage => HasFilteredOutSelection
+        ? $"Selection '{FilteredOutSelectionName}' is hidden by the active tag filter."
+        : string.Empty;
+    public ICommand ToggleTagFilterCommand { get; }
+    public ICommand ClearTagFiltersCommand { get; }
+    public ICommand ClearTagFilterOrRevealSelectionCommand { get; }
 
     public WorkspaceTreeNodeViewModel? SelectedNode
     {
@@ -253,6 +294,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(InspectorKind));
             OnPropertyChanged(nameof(InspectorDescription));
             OnPropertyChanged(nameof(InspectorPath));
+            OnPropertyChanged(nameof(CanScopeToCurrentTopic));
         }
     }
 
@@ -276,35 +318,305 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
                 return;
             }
 
-            var wasFiltering = !string.IsNullOrWhiteSpace(_queryText);
-            var willFilter = !string.IsNullOrWhiteSpace(value);
-            if (!wasFiltering && willFilter)
-            {
-                CaptureExpanded(Roots);
-                _expandedIdsBeforeFilter = [.. _expandedIds];
-            }
-            else if (wasFiltering && !willFilter && _expandedIdsBeforeFilter is not null)
-            {
-                _expandedIds.Clear();
-                _expandedIds.UnionWith(_expandedIdsBeforeFilter);
-                _expandedIdsBeforeFilter = null;
-            }
-
             SetField(ref _queryText, value);
-            RefreshProjection(captureExpanded: false);
+            ApplyFilterTransition();
         }
     }
+
+    public IReadOnlySet<Guid> SelectedTagIds => _selectedTagIds;
+    public bool IncludeArchived
+    {
+        get => _includeArchived;
+        set
+        {
+            if (_includeArchived == value)
+            {
+                return;
+            }
+
+            SetField(ref _includeArchived, value);
+            ApplyFilterTransition();
+        }
+    }
+
+    public bool ScopeToCurrentTopic
+    {
+        get => _scopeToCurrentTopic;
+        set
+        {
+            if (_scopeToCurrentTopic == value)
+            {
+                return;
+            }
+
+            _scopeToCurrentTopic = value;
+            _scopedTopic = value ? ResolveScopeTopic() : null;
+            OnPropertyChanged(nameof(ScopedTopicName));
+            ApplyFilterTransition();
+        }
+    }
+
+    public bool CanScopeToCurrentTopic => ResolveScopeTopic() is not null;
+
+    public string ScopedTopicName
+    {
+        get
+        {
+            if (_scopedTopic is not { } topic)
+            {
+                return string.Empty;
+            }
+
+            return topic.EntityKind switch
+            {
+                WorkspaceEntityKind.Niche => _snapshot.Niches.SingleOrDefault(niche => niche.Id == topic.EntityId)?.Name ?? string.Empty,
+                WorkspaceEntityKind.Group => _snapshot.Groups.SingleOrDefault(group => group.Id == topic.EntityId)?.Name ?? string.Empty,
+                _ => string.Empty
+            };
+        }
+    }
+
+    public bool HasActiveFilters => BuildQuery().IsActive;
+    public bool HasNonTextFilters =>
+        _selectedTagIds.Count > 0 ||
+        _scopeToCurrentTopic ||
+        _includeArchived ||
+        _stageFilterIndex > 0 ||
+        _statusFilterIndex > 0;
+    public int ActiveFilterCount =>
+        (_selectedTagIds.Count > 0 ? 1 : 0) +
+        (_scopeToCurrentTopic ? 1 : 0) +
+        (_includeArchived ? 1 : 0) +
+        (_stageFilterIndex > 0 ? 1 : 0) +
+        (_statusFilterIndex > 0 ? 1 : 0);
+    public bool HasVisibleResults => Roots.Count > 0;
+    public bool HasEmptyFilterResults => HasActiveFilters && !HasVisibleResults;
+    public bool IsFiltering => BuildQuery().IsActive;
+
+    public ObservableCollection<TagFilterEntryViewModel> AvailableTags => _availableTags;
+
+    public bool IsTagSelected(Guid tagId) => _selectedTagIds.Contains(tagId);
+
+    public void SetTagSelected(Guid tagId, bool value)
+    {
+        var changed = value ? _selectedTagIds.Add(tagId) : _selectedTagIds.Remove(tagId);
+        if (!changed)
+        {
+            return;
+        }
+
+        RaiseTagSelectionChanged(tagId);
+        ApplyFilterTransition();
+    }
+
+    public void ToggleTagFilter(Guid tagId) => SetTagSelected(tagId, !IsTagSelected(tagId));
+
+    public void ClearTagFilters()
+    {
+        var hadTagFilters = _selectedTagIds.Count > 0;
+        _selectedTagIds.Clear();
+        OnPropertyChanged(nameof(SelectedTagFilterIds));
+        OnPropertyChanged(nameof(IsTagFilterActive));
+        RaiseAllTagSelectionsChanged();
+        if (hadTagFilters)
+        {
+            RestorePreFilterExpansion();
+        }
+        RefreshProjection(captureExpanded: false);
+    }
+
+    public bool HasEntityInStore(Guid entityId)
+    {
+        if (_storeId is not Guid storeId) return false;
+        return _snapshot.Niches.Any(n => n.Id == entityId && n.StoreId == storeId) ||
+               _snapshot.Groups.Any(g => g.Id == entityId && g.StoreId == storeId) ||
+               _snapshot.Listings.Any(l => l.Id == entityId && l.StoreId == storeId);
+    }
+
+    public string? FindEntityName(Guid entityId)
+    {
+        if (_snapshot.Niches.SingleOrDefault(n => n.Id == entityId) is { } niche) return niche.Name;
+        if (_snapshot.Groups.SingleOrDefault(g => g.Id == entityId) is { } group) return group.Name;
+        if (_snapshot.Listings.SingleOrDefault(l => l.Id == entityId) is { } listing) return listing.Name;
+        return null;
+    }
+
+    public void ClearAllFilters()
+    {
+        var hadFilters = HasActiveFilters;
+        _queryText = string.Empty;
+        var tagIdsCleared = _selectedTagIds.Count > 0;
+        _selectedTagIds.Clear();
+        _scopeToCurrentTopic = false;
+        _scopedTopic = null;
+        _includeArchived = false;
+        _stageFilterIndex = 0;
+        _statusFilterIndex = 0;
+        OnPropertyChanged(nameof(QueryText));
+        OnPropertyChanged(nameof(IncludeArchived));
+        OnPropertyChanged(nameof(ScopeToCurrentTopic));
+        OnPropertyChanged(nameof(ScopedTopicName));
+        OnPropertyChanged(nameof(SelectedTagIds));
+        OnPropertyChanged(nameof(StageFilterIndex));
+        OnPropertyChanged(nameof(StatusFilterIndex));
+        if (tagIdsCleared)
+        {
+            RaiseAllTagSelectionsChanged();
+        }
+
+        if (hadFilters)
+        {
+            RestorePreFilterExpansion();
+        }
+
+        RefreshProjection(captureExpanded: false);
+    }
+
+    private void RebuildAvailableTags()
+    {
+        _availableTags.Clear();
+        if (_storeId is not Guid storeId)
+        {
+            return;
+        }
+
+        foreach (var tag in _snapshot.Tags.Where(tag => tag.StoreId == storeId && !tag.IsArchived)
+            .OrderBy(tag => tag.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            _availableTags.Add(new TagFilterEntryViewModel(this, tag.Id, tag.Name));
+        }
+    }
+
+    private void RaiseTagSelectionChanged(Guid tagId)
+    {
+        foreach (var entry in _availableTags)
+        {
+            if (entry.Id == tagId)
+            {
+                entry.RaiseIsSelectedChanged();
+                return;
+            }
+        }
+    }
+
+    private void RaiseAllTagSelectionsChanged()
+    {
+        foreach (var entry in _availableTags)
+        {
+            entry.RaiseIsSelectedChanged();
+        }
+    }
+
+    private void ApplyFilterTransition()
+    {
+        var active = HasActiveFilters;
+        if (active && _expandedIdsBeforeFilter is null)
+        {
+            CaptureExpanded(Roots);
+            _expandedIdsBeforeFilter = [.. _expandedIds];
+        }
+        else if (!active && _expandedIdsBeforeFilter is not null)
+        {
+            RestorePreFilterExpansion();
+        }
+
+        OnPropertyChanged(nameof(HasActiveFilters));
+        OnPropertyChanged(nameof(HasNonTextFilters));
+        OnPropertyChanged(nameof(ActiveFilterCount));
+        OnPropertyChanged(nameof(IsFiltering));
+        OnPropertyChanged(nameof(CanScopeToCurrentTopic));
+        RefreshProjection(captureExpanded: false);
+    }
+
+    private void RestorePreFilterExpansion()
+    {
+        if (_expandedIdsBeforeFilter is null)
+        {
+            return;
+        }
+
+        _expandedIds.Clear();
+        _expandedIds.UnionWith(_expandedIdsBeforeFilter);
+        _expandedIdsBeforeFilter = null;
+    }
+
+    private NavigationTopicReference? ResolveScopeTopic()
+    {
+        var selection = _selection.Selected;
+        if (selection is null)
+        {
+            return null;
+        }
+
+        if (selection.Kind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group)
+        {
+            return new NavigationTopicReference(selection.Kind, selection.Id);
+        }
+
+        if (selection.Kind == WorkspaceEntityKind.Listing)
+        {
+            var listing = _snapshot.Listings.SingleOrDefault(candidate => candidate.Id == selection.Id);
+            if (listing is null || listing.IsArchived)
+            {
+                return null;
+            }
+
+            return ListingHierarchy.GetTopic(listing);
+        }
+
+        return null;
+    }
+
+    public int StageFilterIndex
+    {
+        get => _stageFilterIndex;
+        set
+        {
+            if (_stageFilterIndex == value)
+            {
+                return;
+            }
+
+            SetField(ref _stageFilterIndex, value);
+            ApplyFilterTransition();
+        }
+    }
+
+    public int StatusFilterIndex
+    {
+        get => _statusFilterIndex;
+        set
+        {
+            if (_statusFilterIndex == value)
+            {
+                return;
+            }
+
+            SetField(ref _statusFilterIndex, value);
+            ApplyFilterTransition();
+        }
+    }
+
+    private WorkspaceTreeQuery BuildQuery() => new(
+        Text: _queryText,
+        WorkflowStages: _stageFilterIndex > 0 ? new HashSet<WorkflowStage> { WorkflowStages.Ordered[_stageFilterIndex - 1] } : null,
+        ListingStatuses: _statusFilterIndex > 0 ? new HashSet<ListingStatus> { ListingStatuses.Ordered[_statusFilterIndex - 1] } : null,
+        TagIds: _selectedTagIds.Count > 0 ? _selectedTagIds : null,
+        ScopeTopic: _scopeToCurrentTopic ? _scopedTopic : null,
+        IncludeArchived: _includeArchived);
 
     public void SetStore(Guid? storeId, WorkspaceSnapshot snapshot)
     {
         _storeId = storeId;
         _snapshot = snapshot;
+        RebuildAvailableTags();
         RefreshProjection();
     }
 
     public async Task ReloadAsync()
     {
         _snapshot = await _repository.LoadAsync().ConfigureAwait(false);
+        RebuildAvailableTags();
         RefreshProjection();
     }
 
@@ -626,7 +938,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(QueryText) && placement.Kind != GroupPlacementKind.Append)
+        if (IsFiltering && placement.Kind != GroupPlacementKind.Append)
         {
             ErrorMessage = "Clear filtering before positioning a group between siblings.";
             return;
@@ -703,7 +1015,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             return false;
         }
 
-        if (!string.IsNullOrWhiteSpace(QueryText) && placement.Kind != GroupPlacementKind.Append)
+        if (IsFiltering && placement.Kind != GroupPlacementKind.Append)
         {
             error = "Clear filtering before positioning a group between siblings.";
             return false;
@@ -739,6 +1051,11 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
 
         SelectedNode = node;
+        if (node.IsInactive)
+        {
+            return;
+        }
+
         var selection = new WorkspaceTreeSelection(node.EntityKind, node.EntityId);
         _selection.Select(selection);
         if (notifySelectionChanged)
@@ -841,7 +1158,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
     private void RefreshProjection(bool captureExpanded = true)
     {
-        if (captureExpanded && string.IsNullOrWhiteSpace(QueryText))
+        if (captureExpanded && !IsFiltering)
         {
             CaptureExpanded(Roots);
         }
@@ -850,10 +1167,12 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         if (_storeId is not Guid storeId || _snapshot.Stores.All(store => store.Id != storeId || store.IsArchived))
         {
             SelectedNode = null;
+            OnPropertyChanged(nameof(HasVisibleResults));
+            OnPropertyChanged(nameof(HasEmptyFilterResults));
             return;
         }
 
-        var projection = WorkspaceTreeProjector.Project(_snapshot, storeId, new WorkspaceTreeQuery(QueryText));
+        var projection = WorkspaceTreeProjector.Project(_snapshot, storeId, BuildQuery());
         foreach (var root in projection.Roots)
         {
             Roots.Add(ToNode(root));
@@ -861,11 +1180,16 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
         SelectedNode = selectedId is Guid id ? FindNode(id) : null;
         ApplyClipboardState();
+        OnPropertyChanged(nameof(HasVisibleResults));
+        OnPropertyChanged(nameof(HasEmptyFilterResults));
     }
 
     private WorkspaceTreeNodeViewModel ToNode(WorkspaceTreeProjectionNode projected)
     {
         var entity = FindEntity(projected.EntityKind, projected.EntityId);
+        var tagColors = projected.EntityKind == WorkspaceEntityKind.Listing
+            ? ResolveListingTagColors(projected.EntityId)
+            : [];
         var node = new WorkspaceTreeNodeViewModel(
             projected.NodeId,
             projected.EntityKind,
@@ -875,9 +1199,24 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             projected.IsDirectMatch,
             projected.HasHiddenChildren,
             projected.Children.Count,
-            projected.Children.Select(ToNode));
-        node.IsExpanded = _expandedIds.Contains(node.EntityId) || !string.IsNullOrWhiteSpace(QueryText);
+            projected.Children.Select(ToNode),
+            appliedTagColors: tagColors,
+            isInactive: projected.IsInactive || (entity is Listing listing && listing.Status == ListingStatus.Rejected));
+        node.IsExpanded = _expandedIds.Contains(node.EntityId) || IsFiltering;
         return node;
+    }
+
+    private IReadOnlyList<string> ResolveListingTagColors(Guid listingId)
+    {
+        var tagIds = _snapshot.ListingTags
+            .Where(link => link.ListingId == listingId)
+            .Select(link => link.TagId)
+            .ToHashSet();
+        return _snapshot.Tags
+            .Where(tag => tagIds.Contains(tag.Id))
+            .OrderBy(tag => tag.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(tag => tag.Color ?? "#243447")
+            .ToArray();
     }
 
     private WorkspaceEntity? FindEntity(WorkspaceEntityKind kind, Guid id) => kind switch
@@ -968,3 +1307,29 @@ public sealed record GroupDeleteImpact(
     int DescendantGroupCount,
     int ItemCount,
     IReadOnlySet<Guid> DeletedEntityIds);
+
+public sealed class TagFilterEntryViewModel : INotifyPropertyChanged
+{
+    private readonly WorkspaceTreeViewModel _owner;
+
+    public TagFilterEntryViewModel(WorkspaceTreeViewModel owner, Guid id, string name)
+    {
+        _owner = owner;
+        Id = id;
+        Name = name;
+    }
+
+    public Guid Id { get; }
+    public string Name { get; }
+
+    public bool IsSelected
+    {
+        get => _owner.IsTagSelected(Id);
+        set => _owner.SetTagSelected(Id, value);
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    internal void RaiseIsSelectedChanged() =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+}
