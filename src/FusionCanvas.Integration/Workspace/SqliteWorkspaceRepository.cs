@@ -6,7 +6,7 @@ namespace FusionCanvas.Integration.Workspace;
 
 public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceRepository
 {
-    private const int CurrentSchemaVersion = 6;
+    private const int CurrentSchemaVersion = 7;
 
     private readonly string _databasePath = databasePath;
 
@@ -20,7 +20,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
 
-        foreach (var table in new[] { "asset_links", "listing_tags", "prompts", "assets", "listings", "groups", "niches", "tags", "stores", "workspaces", "concepts", "designs" })
+        foreach (var table in new[] { "asset_links", "listing_tags", "prompts", "assets", "listings", "groups", "niches", "tags", "stores", "workspaces", "concepts", "designs", "mockups" })
         {
             await ExecuteAsync(connection, transaction, $"DELETE FROM {table};", cancellationToken);
         }
@@ -75,6 +75,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             await InsertDesignAsync(connection, transaction, design, cancellationToken);
         }
 
+        foreach (var mockup in snapshot.Mockups)
+        {
+            await InsertMockupAsync(connection, transaction, mockup, cancellationToken);
+        }
+
         foreach (var listingTag in snapshot.ListingTags)
         {
             await InsertListingTagAsync(connection, transaction, listingTag, cancellationToken);
@@ -110,7 +115,8 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             await LoadListingTagsAsync(connection, cancellationToken),
             await LoadAssetLinksAsync(connection, cancellationToken),
             await LoadConceptsAsync(connection, cancellationToken),
-            await LoadDesignsAsync(connection, cancellationToken));
+            await LoadDesignsAsync(connection, cancellationToken),
+            await LoadMockupsAsync(connection, cancellationToken));
     }
 
     private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
@@ -281,6 +287,28 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
                 updated_at TEXT NOT NULL,
                 metadata_json TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS mockups (
+                id TEXT PRIMARY KEY,
+                store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                listing_id TEXT NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+                design_id TEXT NULL REFERENCES designs(id) ON DELETE SET NULL,
+                name TEXT NOT NULL,
+                description TEXT NULL,
+                source_method TEXT NULL,
+                product_type TEXT NULL,
+                vendor_product TEXT NULL,
+                template TEXT NULL,
+                color_variant TEXT NULL,
+                view TEXT NULL,
+                notes TEXT NULL,
+                intended_marketplace_use TEXT NULL,
+                regeneration_metadata_json TEXT NULL,
+                is_archived INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
             """;
 
         await ExecuteAsync(connection, null, sql, cancellationToken);
@@ -307,6 +335,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         if (schemaVersion < 6)
         {
             await MigrateToVersion6Async(connection, cancellationToken);
+        }
+
+        if (schemaVersion < 7)
+        {
+            await MigrateToVersion7Async(connection, cancellationToken);
         }
 
         await SetPragmaUserVersionAsync(connection, CurrentSchemaVersion, cancellationToken);
@@ -452,6 +485,33 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
                 source_method TEXT NULL,
                 notes TEXT NULL,
                 approval_state INTEGER NOT NULL DEFAULT 0,
+                is_archived INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
+            """, cancellationToken);
+    }
+
+    private static async Task MigrateToVersion7Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await ExecuteAsync(connection, null, """
+            CREATE TABLE IF NOT EXISTS mockups (
+                id TEXT PRIMARY KEY,
+                store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                listing_id TEXT NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+                design_id TEXT NULL REFERENCES designs(id) ON DELETE SET NULL,
+                name TEXT NOT NULL,
+                description TEXT NULL,
+                source_method TEXT NULL,
+                product_type TEXT NULL,
+                vendor_product TEXT NULL,
+                template TEXT NULL,
+                color_variant TEXT NULL,
+                view TEXT NULL,
+                notes TEXT NULL,
+                intended_marketplace_use TEXT NULL,
+                regeneration_metadata_json TEXT NULL,
                 is_archived INTEGER NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
@@ -635,6 +695,31 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             ("$updated_at", design.UpdatedAt.ToString("O")),
             ("$metadata_json", design.MetadataJson));
 
+    private static Task InsertMockupAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Mockup mockup, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO mockups (id, store_id, listing_id, design_id, name, description, source_method, product_type, vendor_product, template, color_variant, view, notes, intended_marketplace_use, regeneration_metadata_json, is_archived, created_at, updated_at, metadata_json)
+            VALUES ($id, $store_id, $listing_id, $design_id, $name, $description, $source_method, $product_type, $vendor_product, $template, $color_variant, $view, $notes, $intended_marketplace_use, $regeneration_metadata_json, $is_archived, $created_at, $updated_at, $metadata_json);
+            """, cancellationToken,
+            ("$id", mockup.Id.ToString()),
+            ("$store_id", mockup.StoreId.ToString()),
+            ("$listing_id", mockup.ListingId.ToString()),
+            ("$design_id", mockup.DesignId?.ToString()),
+            ("$name", mockup.Name),
+            ("$description", mockup.Description),
+            ("$source_method", mockup.SourceMethod),
+            ("$product_type", mockup.ProductType),
+            ("$vendor_product", mockup.VendorProduct),
+            ("$template", mockup.Template),
+            ("$color_variant", mockup.ColorVariant),
+            ("$view", mockup.View),
+            ("$notes", mockup.Notes),
+            ("$intended_marketplace_use", mockup.IntendedMarketplaceUse),
+            ("$regeneration_metadata_json", mockup.RegenerationMetadataJson),
+            ("$is_archived", mockup.IsArchived ? 1 : 0),
+            ("$created_at", mockup.CreatedAt.ToString("O")),
+            ("$updated_at", mockup.UpdatedAt.ToString("O")),
+            ("$metadata_json", mockup.MetadataJson));
+
     private static (string Name, object? Value)[] CommonParameters(WorkspaceEntity entity) =>
     [
         ("$id", entity.Id.ToString()),
@@ -806,6 +891,36 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         }
 
         return designs;
+    }
+
+    private static async Task<IReadOnlyList<Mockup>> LoadMockupsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var mockups = new List<Mockup>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM mockups ORDER BY created_at, name;", cancellationToken))
+        {
+            mockups.Add(new Mockup(
+                ReadGuid(reader, "id"),
+                ReadGuid(reader, "store_id"),
+                ReadGuid(reader, "listing_id"),
+                ReadNullableGuid(reader, "design_id"),
+                ReadString(reader, "name"),
+                ReadNullableString(reader, "description"),
+                ReadNullableString(reader, "source_method"),
+                ReadNullableString(reader, "product_type"),
+                ReadNullableString(reader, "vendor_product"),
+                ReadNullableString(reader, "template"),
+                ReadNullableString(reader, "color_variant"),
+                ReadNullableString(reader, "view"),
+                ReadNullableString(reader, "notes"),
+                ReadNullableString(reader, "intended_marketplace_use"),
+                ReadNullableString(reader, "regeneration_metadata_json"),
+                ReadBool(reader, "is_archived"),
+                ReadDate(reader, "created_at"),
+                ReadDate(reader, "updated_at"),
+                ReadString(reader, "metadata_json")));
+        }
+
+        return mockups;
     }
 
     private static async IAsyncEnumerable<SqliteDataReader> ReadAsync(

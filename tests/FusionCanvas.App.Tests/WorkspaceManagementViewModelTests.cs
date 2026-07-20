@@ -24,7 +24,7 @@ public class WorkspaceManagementViewModelTests
     public async Task CreateAndSelectWorkspace_UpdatesActiveWorkspace()
     {
         var personal = NewWorkspace("Personal");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([personal], [], [], [], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([personal], [], [], [], [], [], [], [], [], [], [], [], []));
         var viewModel = NewViewModel(repository);
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
@@ -45,7 +45,7 @@ public class WorkspaceManagementViewModelTests
         var workspace = NewWorkspace("Client");
         var personal = NewWorkspace("Personal");
         var store = new Store(Guid.NewGuid(), workspace.Id, "Client Store", null, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([workspace, personal], [store], [], [], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([workspace, personal], [store], [], [], [], [], [], [], [], [], [], [], []));
         var viewModel = NewViewModel(repository);
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 

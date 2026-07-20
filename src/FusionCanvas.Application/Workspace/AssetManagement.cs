@@ -11,9 +11,10 @@ public sealed record AssetContextReference(WorkspaceEntityKind Kind, Guid Id)
         WorkspaceEntityKind.Group or
         WorkspaceEntityKind.Store or
         WorkspaceEntityKind.Concept or
-        WorkspaceEntityKind.Design
+        WorkspaceEntityKind.Design or
+        WorkspaceEntityKind.Mockup
         ? Kind
-        : throw new ArgumentException("An asset context must be a listing, niche, group, store, concept, or design.", nameof(Kind));
+        : throw new ArgumentException("An asset context must be a listing, niche, group, store, concept, design, or mockup.", nameof(Kind));
 
     public Guid Id { get; } = Id == Guid.Empty
         ? throw new ArgumentException("Identifier must not be empty.", nameof(Id))
@@ -578,6 +579,26 @@ public sealed class AssetManagementService : IAssetManagementService
                 descriptor = new AssetContextDescriptor(store.Id, context, design.Name, "Design");
                 return true;
             }
+            case WorkspaceEntityKind.Mockup:
+            {
+                var mockup = snapshot.Mockups.SingleOrDefault(candidate => candidate.Id == context.Id);
+                if (mockup is null || mockup.IsArchived)
+                {
+                    error = "The selected mockup must exist and be active.";
+                    return false;
+                }
+
+                var store = snapshot.Stores.SingleOrDefault(candidate => candidate.Id == mockup.StoreId);
+                if (store is null || store.IsArchived || !StoreBelongsToActiveWorkspace(store))
+                {
+                    error = "The selected store must be active in the current workspace.";
+                    return false;
+                }
+
+                storeId = store.Id;
+                descriptor = new AssetContextDescriptor(store.Id, context, mockup.Name, "Mockup");
+                return true;
+            }
             default:
                 error = "The asset context is not supported.";
                 return false;
@@ -611,6 +632,10 @@ public sealed class AssetManagementService : IAssetManagementService
             case WorkspaceEntityKind.Design:
                 return snapshot.Designs.SingleOrDefault(candidate => candidate.Id == context.Id) is { } design
                     ? new AssetContextDescriptor(design.StoreId, context, design.Name, "Design")
+                    : null;
+            case WorkspaceEntityKind.Mockup:
+                return snapshot.Mockups.SingleOrDefault(candidate => candidate.Id == context.Id) is { } mockup
+                    ? new AssetContextDescriptor(mockup.StoreId, context, mockup.Name, "Mockup")
                     : null;
             default:
                 return null;

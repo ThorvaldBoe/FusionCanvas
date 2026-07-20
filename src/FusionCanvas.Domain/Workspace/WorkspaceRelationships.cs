@@ -55,7 +55,8 @@ public enum WorkspaceEntityKind
     Prompt = 5,
     Design = 6,
     FutureRelatedRecord = 7,
-    Concept = 8
+    Concept = 8,
+    Mockup = 9
 }
 
 public enum ConceptLifecycle

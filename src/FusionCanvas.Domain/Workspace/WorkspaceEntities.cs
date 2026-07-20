@@ -133,6 +133,28 @@ public sealed record Design(
     string MetadataJson)
     : WorkspaceEntity(Id, Name, Description, IsArchived, CreatedAt, UpdatedAt, MetadataJson);
 
+public sealed record Mockup(
+    Guid Id,
+    Guid StoreId,
+    Guid ListingId,
+    Guid? DesignId,
+    string Name,
+    string? Description,
+    string? SourceMethod,
+    string? ProductType,
+    string? VendorProduct,
+    string? Template,
+    string? ColorVariant,
+    string? View,
+    string? Notes,
+    string? IntendedMarketplaceUse,
+    string? RegenerationMetadataJson,
+    bool IsArchived,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    string MetadataJson)
+    : WorkspaceEntity(Id, Name, Description, IsArchived, CreatedAt, UpdatedAt, MetadataJson);
+
 public sealed record Asset : WorkspaceEntity
 {
     public Asset(

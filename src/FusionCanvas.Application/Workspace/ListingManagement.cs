@@ -426,9 +426,10 @@ public sealed class ListingManagementService : IListingManagementService
         if (snapshot.Prompts.Any(prompt => prompt.ListingId == existing.Id) ||
             snapshot.AssetLinks.Any(link => link.EntityKind == WorkspaceEntityKind.Listing && link.EntityId == existing.Id) ||
             snapshot.Concepts.Any(concept => concept.ListingId == existing.Id) ||
-            snapshot.Designs.Any(design => design.ListingId == existing.Id))
+            snapshot.Designs.Any(design => design.ListingId == existing.Id) ||
+            snapshot.Mockups.Any(mockup => mockup.ListingId == existing.Id))
         {
-            return Failure("Listing has connected concepts, designs, prompts, or assets. Detach them or archive the listing instead.", snapshot, existing.StoreId);
+            return Failure("Listing has connected concepts, designs, mockups, prompts, or assets. Detach them or archive the listing instead.", snapshot, existing.StoreId);
         }
 
         var updated = snapshot with
