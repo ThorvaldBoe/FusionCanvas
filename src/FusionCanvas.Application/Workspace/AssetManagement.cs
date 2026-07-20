@@ -9,9 +9,11 @@ public sealed record AssetContextReference(WorkspaceEntityKind Kind, Guid Id)
         WorkspaceEntityKind.Listing or
         WorkspaceEntityKind.Niche or
         WorkspaceEntityKind.Group or
-        WorkspaceEntityKind.Store
+        WorkspaceEntityKind.Store or
+        WorkspaceEntityKind.Concept or
+        WorkspaceEntityKind.Design
         ? Kind
-        : throw new ArgumentException("An asset context must be a listing, niche, group, or store.", nameof(Kind));
+        : throw new ArgumentException("An asset context must be a listing, niche, group, store, concept, or design.", nameof(Kind));
 
     public Guid Id { get; } = Id == Guid.Empty
         ? throw new ArgumentException("Identifier must not be empty.", nameof(Id))
@@ -76,6 +78,8 @@ public interface IAssetManagementService
     Task<AssetManagementResult> RelabelAssetAsync(AssetManagementRelabelRequest request, CancellationToken cancellationToken = default);
 
     Task<AssetManagementResult> RemoveAssetAsync(AssetManagementRemoveRequest request, CancellationToken cancellationToken = default);
+
+    Task<AssetManagementResult> AddContextLinkAsync(Guid assetId, AssetContextReference context, CancellationToken cancellationToken = default);
 }
 
 public static class AssetPurposePolicy
@@ -306,6 +310,46 @@ public sealed class AssetManagementService : IAssetManagementService
         return AssetManagementResult.Success(ToSummary(snapshot, existing, context is null ? null : DescribeContext(snapshot, context), includeContextLabel: context is null || context.Kind == WorkspaceEntityKind.Store, isMissing: false), BuildState(updated, context));
     }
 
+    public async Task<AssetManagementResult> AddContextLinkAsync(
+        Guid assetId,
+        AssetContextReference context,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var asset = snapshot.Assets.SingleOrDefault(a => a.Id == assetId);
+        if (asset is null)
+        {
+            return Failure("Asset was not found.", AssetManagementState.Empty);
+        }
+
+        if (!TryResolveActiveContext(snapshot, context, out var storeId, out var descriptor, out var contextError))
+        {
+            return Failure(contextError!, BuildState(snapshot, context));
+        }
+
+        if (storeId != asset.StoreId)
+        {
+            return Failure("Assets may only link within their store.", BuildState(snapshot, context));
+        }
+
+        if (snapshot.AssetLinks.Any(link => link.AssetId == assetId && link.EntityKind == context.Kind && link.EntityId == context.Id))
+        {
+            return Failure("The asset is already linked to this context.", BuildState(snapshot, context));
+        }
+
+        var newLink = new AssetLink(assetId, context.Kind, context.Id);
+        var updated = snapshot with { AssetLinks = [.. snapshot.AssetLinks, newLink] };
+
+        var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        if (saveError is not null)
+        {
+            return Failure(saveError, BuildState(snapshot, context));
+        }
+
+        return AssetManagementResult.Success(ToSummary(updated, asset, descriptor, includeContextLabel: context.Kind == WorkspaceEntityKind.Store, isMissing: !_fileStore.Exists(asset.WorkspaceRelativePath)), BuildState(updated, context));
+    }
+
     private AssetManagementState BuildState(WorkspaceSnapshot snapshot, AssetContextReference? context)
     {
         if (context is null)
@@ -494,6 +538,46 @@ public sealed class AssetManagementService : IAssetManagementService
                 descriptor = new AssetContextDescriptor(store.Id, context, listing.Name, "Listing");
                 return true;
             }
+            case WorkspaceEntityKind.Concept:
+            {
+                var concept = snapshot.Concepts.SingleOrDefault(candidate => candidate.Id == context.Id);
+                if (concept is null || concept.IsArchived)
+                {
+                    error = "The selected concept must exist and be active.";
+                    return false;
+                }
+
+                var store = snapshot.Stores.SingleOrDefault(candidate => candidate.Id == concept.StoreId);
+                if (store is null || store.IsArchived || !StoreBelongsToActiveWorkspace(store))
+                {
+                    error = "The selected store must be active in the current workspace.";
+                    return false;
+                }
+
+                storeId = store.Id;
+                descriptor = new AssetContextDescriptor(store.Id, context, concept.Name, "Concept");
+                return true;
+            }
+            case WorkspaceEntityKind.Design:
+            {
+                var design = snapshot.Designs.SingleOrDefault(candidate => candidate.Id == context.Id);
+                if (design is null || design.IsArchived)
+                {
+                    error = "The selected design must exist and be active.";
+                    return false;
+                }
+
+                var store = snapshot.Stores.SingleOrDefault(candidate => candidate.Id == design.StoreId);
+                if (store is null || store.IsArchived || !StoreBelongsToActiveWorkspace(store))
+                {
+                    error = "The selected store must be active in the current workspace.";
+                    return false;
+                }
+
+                storeId = store.Id;
+                descriptor = new AssetContextDescriptor(store.Id, context, design.Name, "Design");
+                return true;
+            }
             default:
                 error = "The asset context is not supported.";
                 return false;
@@ -519,6 +603,14 @@ public sealed class AssetManagementService : IAssetManagementService
             case WorkspaceEntityKind.Listing:
                 return snapshot.Listings.SingleOrDefault(candidate => candidate.Id == context.Id) is { } listing
                     ? new AssetContextDescriptor(listing.StoreId, context, listing.Name, "Listing")
+                    : null;
+            case WorkspaceEntityKind.Concept:
+                return snapshot.Concepts.SingleOrDefault(candidate => candidate.Id == context.Id) is { } concept
+                    ? new AssetContextDescriptor(concept.StoreId, context, concept.Name, "Concept")
+                    : null;
+            case WorkspaceEntityKind.Design:
+                return snapshot.Designs.SingleOrDefault(candidate => candidate.Id == context.Id) is { } design
+                    ? new AssetContextDescriptor(design.StoreId, context, design.Name, "Design")
                     : null;
             default:
                 return null;
