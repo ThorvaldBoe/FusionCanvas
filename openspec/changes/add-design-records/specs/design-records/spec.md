@@ -39,30 +39,26 @@ FusionCanvas SHALL allow a listing to have zero, one, or many design records, SH
 - **AND** keeps it reachable for later review without cluttering the final-selected collection
 
 ### Requirement: Design approval states are an explicit state machine
-FusionCanvas SHALL manage each design through the approval states draft, needs revision, approved, rejected, exported, and ready for export, SHALL validate state transitions, and SHALL only allow designs in the approved or ready-for-export state to be promoted as final selected artwork.
+FusionCanvas SHALL manage each design through the approval states draft, needs revision, approved, rejected, exported, and ready for export, SHALL validate state transitions, and SHALL NOT require a specific approval state for promotion to final selected artwork; final selection is marked by a `final` tag and the listing-level final-selected collection, independent of approval state.
 
 #### Scenario: Design starts as draft
 - **WHEN** the user creates a new design
 - **THEN** FusionCanvas assigns the draft state
 - **AND** the design is not part of the final-selected collection
 
-#### Scenario: Approved design can be promoted to final
-- **WHEN** the user promotes an approved or ready-for-export design as final selected artwork
-- **THEN** FusionCanvas adds the design to the listing's final-selected collection
+#### Scenario: Any design can be promoted to final
+- **WHEN** the user promotes a design variant as final selected artwork
+- **THEN** FusionCanvas adds the design to the listing's final-selected collection and marks it with a `final` tag
+- **AND** does not require the design to be in an approved or ready-for-export state first
 - **AND** does not delete other variants
 
-#### Scenario: Draft design cannot be promoted to final
-- **WHEN** the user attempts to promote a draft, needs-revision, or rejected design as final
-- **THEN** FusionCanvas blocks the promotion
-- **AND** explains that the design must be approved or ready for export first
-
-#### Scenario: Rejected design is excluded from final selection
-- **WHEN** a design is in the rejected state
-- **THEN** FusionCanvas excludes it from the final-selected collection
-- **AND** keeps it available for review
+#### Scenario: Rejected design can still be promoted to final
+- **WHEN** the user promotes a design in any approval state (including draft, needs revision, approved, rejected, exported, or ready for export) as final selected artwork
+- **THEN** FusionCanvas adds the design to the final-selected collection and marks it with a `final` tag
+- **AND** the approval state remains unchanged and independent of the final selection
 
 ### Requirement: Final selected designs are a listing-level invariant
-FusionCanvas SHALL expose the final-selected designs as a listing-level collection, SHALL enforce that only approved or ready-for-export designs are members, SHALL require at least one final-selected design before the listing may advance to the Listing stage, and SHALL preserve demoted designs without deletion.
+FusionCanvas SHALL expose the final-selected designs as a listing-level collection marked by a `final` tag on each member, SHALL require at least one final-selected design before the listing may advance to the Listing stage, SHALL NOT require a specific approval state for final membership, and SHALL preserve demoted designs without deletion.
 
 #### Scenario: Listing advances to Listing with final artwork
 - **WHEN** the user requests advancement to the Listing stage and at least one final-selected design exists
@@ -98,13 +94,13 @@ FusionCanvas SHALL associate a design with assets through the existing asset-man
 - **THEN** FusionCanvas removes the design and its asset context links
 - **AND** preserves the underlying asset records and prompt records unchanged
 
-### Requirement: Design intended use and cleanup state are documented metadata
-FusionCanvas SHALL store design intended use (dark shirts, light shirts, specific colors, product types, marketplaces, export targets) and cleanup state (needs upscale, needs transparent cleanup, cropped, print-ready) as documented design metadata and design-scoped tags, and SHALL preserve unknown metadata keys during edits.
+### Requirement: Design intended use and cleanup state are structured metadata
+FusionCanvas SHALL store design intended use (dark shirts, light shirts, specific colors, product types, marketplaces, export targets) as structured design metadata fields — not as design-scoped tags — and SHALL store cleanup state (needs upscale, needs transparent cleanup, cropped, print-ready) as documented design metadata, and SHALL preserve unknown metadata keys during edits.
 
-#### Scenario: User tags a design for dark shirts
-- **WHEN** the user tags a design for dark shirts and a specific product type
-- **THEN** FusionCanvas records the tags and metadata atomically
-- **AND** later Listing, mockup, and export tools can read them
+#### Scenario: User records intended use for dark shirts
+- **WHEN** the user records that a design targets dark shirts and a specific product type
+- **THEN** FusionCanvas stores the intended use as structured design metadata atomically
+- **AND** later Listing, mockup, and export tools can read the structured fields
 
 #### Scenario: User records cleanup state
 - **WHEN** the user marks a design as needing transparent cleanup or print-ready

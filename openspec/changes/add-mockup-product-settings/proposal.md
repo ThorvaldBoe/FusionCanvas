@@ -12,7 +12,7 @@ The Basic Listing Tool can generate mockups, but it has no store-level configura
 - Preserve exact provider color names as entered, because those names are needed when preparing Printify or another provider manually.
 - Define design-area-to-template mapping: scale the final design from the supplier design area to the placement width and place it at the configured coordinates.
 - Make active products, templates, and color variants available to the Basic Listing Tool.
-- Keep initial configuration manual and simple; defer provider catalog import, visual drag-and-drop placement, perspective warp, fabric simulation, and advanced rendering to later integrations or plugins.
+- Keep initial configuration manual and simple with numeric entry plus a visual display of the placement rectangle on the template image; defer provider catalog import, visual drag-and-drop placement editing, perspective warp, fabric simulation, and advanced rendering to later integrations or plugins.
 
 ## Capabilities
 

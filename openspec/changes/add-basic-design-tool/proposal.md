@@ -9,9 +9,9 @@ Design Records, Asset Relationships, Prompt History, and the Creative History Ti
 - Support manual design import of source files and exported artwork through the existing asset-management capability.
 - Support importing externally generated AI artwork and optionally recording the prompt or source tool through prompt-history.
 - Support in-app AI design generation when an image-generation provider is configured, building generation context from store, niche, topic path, item, selected concept, idea, phrase, graphic direction, style notes, constraints, inherited tags, and relevant sibling items.
-- Allow multiple design variants per item with name, status, notes, source method, intended use, cleanup state, related assets, and tags.
-- Allow promoting one or more variants as final selected artwork without deleting rejected, draft, or superseded variants.
-- Offer rudimentary cleanup actions through an image-processor port (crop to visible artwork, transparency inspection, transparent-border removal, upscale flag, replacement attachment) without becoming a full image editor.
+- Allow multiple design variants per item with name, status, notes, source method, intended use as structured metadata, cleanup state, related assets, and tags.
+- Allow promoting one or more variants as final selected artwork, marked by a `final` tag, regardless of approval state, without deleting rejected, draft, or superseded variants.
+- Offer rudimentary built-in cleanup actions (crop, transparency inspection, transparent-border removal, upscale flag, replacement attachment, mark needs revision) without becoming a full image editor.
 - Feed important Design-stage events into the Creative History Timeline.
 - Advance the item toward Listing once at least one final design variant is selected, through the workflow-stage-navigator.
 
@@ -28,7 +28,7 @@ None. FC-0211 reuses `design-records` for variant storage and final selection, `
 ## Impact
 
 - Adds a `BasicDesignTool` view model and Avalonia tool registered as the default Design-stage tool through the Stage Tool Host registry.
-- Defines an `IImageGenerationProvider` application port for in-app AI generation and an `IImageProcessor` port for cleanup actions; future AI-capability and plugin changes provide implementations.
+- Defines an `IImageGenerationProvider` application port for in-app AI generation; a future AI-capability change provides the implementation. Cleanup actions are built in for Phase 2 with no plugin extension point.
 - Reuses the design-records service for all persistence and the asset-management service for asset import and context links.
 - Adds app and UI tests for manual import, external AI import, in-app generation against a deterministic fake provider, variant management, final selection, cleanup actions, timeline feeding, and stage advancement.
 - No schema migration is expected; the tool reads and writes through existing services.

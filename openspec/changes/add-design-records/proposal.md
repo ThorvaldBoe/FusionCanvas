@@ -6,10 +6,10 @@ Concept work captures what a design is about, but FusionCanvas cannot yet preser
 
 - Add a Design domain entity owned by a listing, scoped to the Design stage, with stable identity, timestamps, name, version, notes, approval state, source method, intended use, cleanup state, and optional reference to the concept it implements.
 - Allow a listing to have one or more design records and preserve draft, rejected, needs-revision, and superseded variants without deletion.
-- Add design approval states: draft, needs revision, approved, rejected, exported, and ready for export.
+- Add design approval states: draft, needs revision, approved, rejected, exported, and ready for export. Approval state is independent of final selection and is used for tracking and review, not for gating final promotion.
 - Allow a design to be associated with assets through the existing asset-management capability and to reference prompt history, provider metadata, and generation settings when AI-assisted.
-- Track intended use as documented tags/metadata for dark shirts, light shirts, specific colors, product types, marketplaces, or export targets.
-- Allow one or more designs to be promoted as final selected artwork at the listing level; promotion does not delete other variants.
+- Track intended use as structured design metadata (dark shirts, light shirts, specific colors, product types, marketplaces, or export targets), not as design-scoped tags.
+- Allow one or more designs to be promoted as final selected artwork at the listing level; promotion is marked by a `final` tag and listing-level collection membership, does not require a specific approval state, and does not delete other variants.
 - Track basic cleanup or preparation state (needs upscale, needs transparent cleanup, cropped, print-ready) as design metadata.
 - Inherit store, niche, topic path, item, selected concept, tags, and metadata from the current context through the accepted context-aware boundary.
 

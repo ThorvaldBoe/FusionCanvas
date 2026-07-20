@@ -40,18 +40,18 @@ FusionCanvas SHALL require at least one selected final design variant and a sele
 - **THEN** FusionCanvas allows listing metadata editing through the listing-metadata-editor capability
 - **AND** shows a readiness warning that final artwork is missing for mockup generation
 
-### Requirement: Mockup generation composites flat mockups per color/template combination
-FusionCanvas SHALL, for each selected color/template combination, load the final design image, scale it to the supplier design area, resize it per the template placement width, place it at the configured coordinates, composite it onto the blank product template, save the output as an asset through asset-management, and create a generated mockup record through the mockup-records service linked to the listing, design, template, color variant, and output asset.
+### Requirement: Mockup generation produces placeholder outputs per color/template combination
+FusionCanvas SHALL, for each selected color/template combination, record the inputs needed to produce a mockup — the final design image reference, the mockup template image reference, the color variant (with optional color-specific template image), and the placement parameters — and SHALL create a generated mockup record through the mockup-records service linked to the listing, design, template, color variant, and a placeholder output asset. The actual flat compositing of the design onto the template image will be implemented at a later stage using an existing ImageSharp-based component; the first version stores a placeholder output that records the inputs and placement parameters so the real compositing can be wired in without re-architecting the flow.
 
 #### Scenario: User generates mockups for multiple colors
 - **WHEN** the user selects a final design, a mockup product, a template, and multiple color variants
-- **THEN** FusionCanvas generates one mockup per color/template combination
-- **AND** saves each output as an asset
+- **THEN** FusionCanvas generates one placeholder mockup per color/template combination
+- **AND** records the final design image, template image, color variant, and placement parameters as the mockup's regeneration metadata
 - **AND** creates a generated mockup record for each output with the regeneration-metadata block
 
 #### Scenario: Source design dimensions do not match the design area
 - **WHEN** the source final design has dimensions that differ from the supplier design area
-- **THEN** FusionCanvas scales the design to the supplier design area first
+- **THEN** FusionCanvas records the dimension mismatch in the mockup's metadata
 - **OR** warns the user that the design dimensions do not match the product configuration before proceeding
 
 #### Scenario: Generation produces no partial state on failure

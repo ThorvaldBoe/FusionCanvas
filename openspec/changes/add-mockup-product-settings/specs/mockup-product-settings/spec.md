@@ -34,17 +34,18 @@ FusionCanvas SHALL allow each MockupProduct to record vendor name, product name,
 - **THEN** FusionCanvas accepts positive integer pixel values
 - **AND** rejects zero, negative, or non-integer values with an actionable error
 
-### Requirement: Mockup templates carry placement mapping
-FusionCanvas SHALL allow each MockupTemplate to record name, template asset reference, view name, default color name, placement X, placement Y, placement width, optional placement height, optional placement scale, optional rotation (default 0), an active flag, and metadata, and SHALL prefer placement width over scale when both are present.
+### Requirement: Mockup templates carry placement mapping with visual display
+FusionCanvas SHALL allow each MockupTemplate to record name, template asset reference, view name, default color name, placement X, placement Y, placement width, optional placement height, optional placement scale, optional rotation (default 0), an active flag, and metadata, SHALL prefer placement width over scale when both are present, and SHALL show a visual display of the template image with the placement rectangle rendered from the current numeric values so the user can see the result of their entry without drag-and-drop editing.
 
-#### Scenario: User configures a template mapping
+#### Scenario: User configures a template mapping with visual feedback
 - **WHEN** the user edits placement X, Y, width, height, scale, or rotation
 - **THEN** FusionCanvas persists the values atomically
+- **AND** updates the visual display to show the placement rectangle on the template image
 - **AND** preserves the template's identity, color variants, and unknown metadata
 
 #### Scenario: Width preferred over scale
 - **WHEN** a template has both placement width and placement scale
-- **THEN** FusionCanvas uses placement width for generation
+- **THEN** FusionCanvas uses placement width for the visual display and for generation
 - **AND** treats scale as a fallback when width is absent
 
 #### Scenario: Rotation defaults to zero

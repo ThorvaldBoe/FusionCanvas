@@ -51,15 +51,15 @@ Alternative considered: send only the phrase. Rejected because the PRD requires 
 
 ### 5. Final selection is explicit and multi-variant
 
-Promoting a variant as final adds it to the listing's final-selected collection through the design-records service. One or more variants can be final (e.g., separate final artwork for dark and light shirts). Importing or generating an image does not automatically make it final. Demoting a final variant removes it from the collection without deleting it. The item can advance to Listing only when at least one final variant is selected.
+Promoting a variant as final adds it to the listing's final-selected collection through the design-records service and marks it with a `final` tag. Any variant may be promoted to final regardless of its approval state; the approval state machine remains independent of final selection and is used for tracking and review. One or more variants can be final (e.g., separate final artwork for dark and light shirts). Importing or generating an image does not automatically make it final. Demoting a final variant removes it from the collection and clears the `final` tag without deleting it. The item can advance to Listing only when at least one final variant is selected.
 
-Alternative considered: auto-promote the latest import. Rejected because final selection is a key Design-stage decision that must be explicit.
+Alternative considered: require an approved or ready-for-export state before final promotion. Rejected because the product owner decided final selection should use a tag rather than a status requirement.
 
-### 6. Cleanup actions go through an image-processor port
+### 6. Cleanup actions are built in
 
-Rudimentary cleanup actions (crop to visible artwork, transparency inspection, transparent-border removal, upscale flag, replacement attachment, mark needs revision) are offered through an `IImageProcessor` port. Built-in default processors may provide the simplest actions; plugins may provide advanced processors. Outcomes are recorded as asset or design metadata so later tools know whether artwork is ready. FusionCanvas does not become a full image editor.
+Rudimentary cleanup actions (crop to visible artwork, transparency inspection, transparent-border removal, upscale flag, replacement attachment, mark needs revision) are built in to the Basic Design Tool. Outcomes are recorded as asset or design metadata so later tools know whether artwork is ready. FusionCanvas does not become a full image editor; advanced cleanup remains out of scope for Phase 2 and does not expose a plugin extension point in this change. A later change may add a cleanup plugin model if needed.
 
-Alternative considered: implement all cleanup in-app. Rejected because the PRD explicitly defers advanced cleanup to plugins.
+Alternative considered: route cleanup through an image-processor port with plugin extensibility. Rejected because the product owner decided cleanup should be built in for Phase 2.
 
 ### 7. Stage advancement goes through the workflow-stage-navigator
 

@@ -23,11 +23,11 @@
 
 ## 4. Final Selection, Cleanup, and Timeline
 
-- [ ] 4.1 Implement promote-final and demote-final through the design-records service without deleting other variants; require at least one final variant before Listing advancement.
-- [ ] 4.2 Define an `IImageProcessor` port for cleanup actions (crop, transparency inspection, transparent-border removal, upscale flag, replacement attachment, mark needs revision) with built-in defaults for the simplest actions and plugin extensibility.
+- [ ] 4.1 Implement promote-final and demote-final through the design-records service, marking final membership with a `final` tag, without deleting other variants and without requiring an approved state; require at least one final variant before Listing advancement.
+- [ ] 4.2 Implement built-in cleanup actions (crop to visible artwork, transparency inspection, transparent-border removal, upscale flag, replacement attachment, mark needs revision) directly in the tool without a plugin extension point for Phase 2.
 - [ ] 4.3 Record cleanup outcomes as asset or design metadata atomically.
 - [ ] 4.4 Feed important Design-stage events (imports, generations, prompt records, variant creation/rejection, cleanup actions, final promotion, final selection changes) into the Creative History Timeline in the same atomic snapshot.
-- [ ] 4.5 Add view-model and UI tests for promote/demote, cleanup actions, timeline feeding, and metadata outcomes.
+- [ ] 4.5 Add view-model and UI tests for promote/demote (any approval state), built-in cleanup actions, timeline feeding, and metadata outcomes.
 
 ## 5. Stage Advancement and UI
 

@@ -34,9 +34,9 @@ Alternative considered: require a selected concept before any design can exist. 
 
 ### 2. Final selection is a listing-level collection with an invariant
 
-A listing exposes a final-selected-designs collection of design ids. The invariant: only designs in the approved or ready-for-export state may be promoted to final; promoting does not delete or alter other variants; at least one final design is required before the workflow-stage-navigator allows advancing the listing to the Listing stage. Demoting a final design removes it from the collection without deleting it. The collection is stored at the listing level so downstream Listing, mockup, and export tools can read it without scanning all designs.
+A listing exposes a final-selected-designs collection of design ids. The invariant: any design variant may be promoted to final regardless of its approval state; final membership is marked by a `final` tag on the design and by membership in the listing-level collection; promoting does not delete or alter other variants; at least one final design is required before the workflow-stage-navigator allows advancing the listing to the Listing stage. Demoting a final design removes it from the collection and clears the `final` tag without deleting it. The approval state machine (draft, needs revision, approved, rejected, exported, ready for export) remains independent of final selection and is used for tracking and review, not for gating final promotion. The collection is stored at the listing level so downstream Listing, mockup, and export tools can read it without scanning all designs.
 
-Alternative considered: store a boolean `isFinal` on each design. Rejected because the listing-level collection makes the "at least one final" invariant and downstream reads cheaper and less error-prone.
+Alternative considered: require approved or ready-for-export state before final promotion. Rejected because the product owner decided final selection should use a tag rather than a status requirement, so a creator can mark any variant as final without first advancing its approval state.
 
 ### 3. Approval state is a small explicit state machine
 
@@ -44,11 +44,11 @@ Designs move through draft, needs revision, approved, rejected, exported, and re
 
 Alternative considered: free-form status text. Rejected because downstream tools need to branch on approval state.
 
-### 4. Intended use and cleanup are metadata, not separate entities
+### 4. Intended use and cleanup are structured metadata, not tags
 
-Intended use (dark shirts, light shirts, specific colors, product types, marketplaces, export targets) and cleanup state (needs upscale, needs transparent cleanup, cropped, print-ready) are stored as documented design metadata keys and design-scoped tags. This reuses the accepted tag model and avoids premature structured color/product entities that the Mockup Product Settings change (FC-0213) and future product-variant work will own.
+Intended use (dark shirts, light shirts, specific colors, product types, marketplaces, export targets) is stored as structured design metadata fields, not as design-scoped tags, so downstream Listing, mockup, and export tools can read typed fields. Cleanup state (needs upscale, needs transparent cleanup, cropped, print-ready) is stored as documented design metadata. The structured MockupProduct, MockupTemplate, and MockupColorVariant entities arrive with FC-0213 (Mockup Product Settings) and are referenced by id from the mockup's regeneration-metadata block when relevant. FC-0203 does not require those entities to exist; the structured intended-use fields hold the values directly.
 
-Alternative considered: add structured color and product-type entities now. Rejected because the PRD defers provider catalog import and product-variant modeling to later integrations.
+Alternative considered: use design-scoped tags for intended use. Rejected because the product owner decided shirt color mappings should be structured metadata, not tags, so downstream tools get typed fields rather than free-form tag strings.
 
 ### 5. Designs reference assets and prompts, not own them
 

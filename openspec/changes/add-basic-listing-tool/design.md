@@ -33,15 +33,15 @@ The Basic Listing Tool is registered as the default Listing-stage tool through t
 
 Alternative considered: open the tool without an item. Rejected because the PRD and stage-tool-host require item context for Listing work.
 
-### 2. Mockup generation consumes mockup product settings and final designs
+### 2. Mockup generation records inputs and produces a placeholder output
 
-The generation flow takes a selected final design variant, a configured mockup product (vendor, product, design area), one or more mockup templates (template image, placement X/Y/width/scale/rotation), and one or more color variants per template. For each color/template combination it: loads the final design image, scales the design to the supplier design area, resizes per the template placement width, places it at the configured coordinates, composites onto the blank product template, saves the output as an asset through asset-management, and creates a generated mockup record through the mockup-records service with the regeneration-metadata block. When the source design dimensions do not match the product design area, the tool scales to the design area first or warns the user.
+The generation flow takes a selected final design variant, a configured mockup product (vendor, product, design area), one or more mockup templates (template image, placement X/Y/width/scale/rotation), and one or more color variants per template. For each color/template combination it records the inputs needed to produce a mockup — the final design image reference, the template image reference, the color variant (with optional color-specific template image), and the placement parameters — and creates a generated mockup record through the mockup-records service with a placeholder output asset and the full regeneration-metadata block. The actual flat compositing of the design onto the template image will be wired in at a later stage using an existing ImageSharp-based component the contributor already has; the first version stores a placeholder so the real compositing can be added without re-architecting the flow. When the source design dimensions do not match the product design area, the tool records the mismatch in the mockup's metadata or warns the user before proceeding.
 
-Alternative considered: delegate generation to a plugin. Rejected because the PRD wants basic local mockup generation in the default tool.
+Alternative considered: implement flat compositing now. Rejected because the contributor already has ImageSharp-based compositing code that will be wired in at a later stage, so the first version should only record the inputs and placement parameters as a placeholder.
 
-### 3. Flat compositing only; advanced rendering is plugin territory
+### 3. Advanced rendering is deferred to plugins
 
-The MVP uses simple flat compositing: scale, place, and alpha-composite the design onto the blank template. Perspective warping, fabric effects, displacement maps, shadows, and realistic print blending are deferred to plugins through the image-processor port introduced by FC-0211 or a dedicated mockup-rendering port.
+Perspective warping, fabric effects, displacement maps, shadows, and realistic print blending are deferred to plugins through a future mockup-rendering port. The first version records the inputs for a flat composite; advanced rendering remains out of scope for Phase 2.
 
 Alternative considered: implement realistic rendering now. Rejected because the PRD explicitly defers it.
 

@@ -70,24 +70,25 @@ FusionCanvas SHALL allow the user to generate design variants inside FusionCanva
 - **AND** the tool explains that an image-generation provider must be configured
 
 ### Requirement: Design variants carry full production metadata
-FusionCanvas SHALL allow each design variant to carry name, status, notes, source method, intended use, cleanup state, related assets, and tags, and SHALL preserve unknown metadata keys during edits.
+FusionCanvas SHALL allow each design variant to carry name, status, notes, source method, intended use as structured metadata, cleanup state, related assets, and tags, and SHALL preserve unknown metadata keys during edits.
 
 #### Scenario: User edits variant metadata
 - **WHEN** the user edits a variant's name, status, notes, intended use, or cleanup state
 - **THEN** FusionCanvas persists the changes through the design-records service atomically
 - **AND** preserves the variant's identity, assets, prompt references, and unknown metadata
 
-#### Scenario: User tags a variant for intended use
-- **WHEN** the user tags a variant for dark shirts, light shirts, specific colors, product types, or marketplaces
-- **THEN** FusionCanvas records the tags and metadata atomically
-- **AND** later Listing, mockup, and export tools can read them
+#### Scenario: User records intended use as structured metadata
+- **WHEN** the user records that a variant targets dark shirts, light shirts, specific colors, product types, or marketplaces
+- **THEN** FusionCanvas stores the intended use as structured design metadata atomically
+- **AND** later Listing, mockup, and export tools can read the structured fields
 
 ### Requirement: Final selection is explicit and multi-variant
-FusionCanvas SHALL allow the user to promote one or more approved or ready-for-export variants as final selected artwork, SHALL NOT delete rejected, draft, or superseded variants on promotion, and SHALL require at least one final-selected variant before advancing to Listing.
+FusionCanvas SHALL allow the user to promote one or more variants as final selected artwork regardless of their approval state, SHALL mark final membership with a `final` tag and listing-level collection membership, SHALL NOT delete rejected, draft, or superseded variants on promotion, and SHALL require at least one final-selected variant before advancing to Listing.
 
 #### Scenario: User promotes a variant as final
-- **WHEN** the user promotes an approved or ready-for-export variant as final
-- **THEN** FusionCanvas adds it to the listing's final-selected collection through the design-records service
+- **WHEN** the user promotes a variant as final, regardless of its approval state
+- **THEN** FusionCanvas adds it to the listing's final-selected collection through the design-records service and marks it with a `final` tag
+- **AND** does not require the variant to be in an approved or ready-for-export state first
 - **AND** does not delete other variants
 
 #### Scenario: Import does not auto-promote
@@ -96,21 +97,21 @@ FusionCanvas SHALL allow the user to promote one or more approved or ready-for-e
 
 #### Scenario: User demotes a final variant
 - **WHEN** the user demotes a final-selected variant
-- **THEN** FusionCanvas removes it from the final-selected collection
+- **THEN** FusionCanvas removes it from the final-selected collection and clears the `final` tag
 - **AND** leaves the variant available for review without deletion
 
-### Requirement: Cleanup actions go through an image-processor port
-FusionCanvas SHALL offer rudimentary cleanup actions — crop to visible artwork, transparency inspection, transparent-border removal, upscale flag, replacement attachment, and mark needs revision — through an image-processor port, SHALL record outcomes as asset or design metadata, and SHALL NOT become a full image editor.
+### Requirement: Cleanup actions are built in
+FusionCanvas SHALL offer rudimentary built-in cleanup actions — crop to visible artwork, transparency inspection, transparent-border removal, upscale flag, replacement attachment, and mark needs revision — SHALL record outcomes as asset or design metadata, and SHALL NOT become a full image editor.
 
 #### Scenario: User runs a cleanup action
 - **WHEN** the user invokes a cleanup action on a variant
-- **THEN** FusionCanvas routes the action through the image-processor port
+- **THEN** FusionCanvas performs the action through its built-in cleanup implementation
 - **AND** records the outcome as asset or design metadata atomically
 
-#### Scenario: Plugin provides an advanced cleanup processor
-- **WHEN** a plugin contributes an image processor for advanced cleanup
-- **THEN** the tool can select it through the image-processor port
-- **AND** built-in default processors remain available for the simplest actions
+#### Scenario: No external image editor required
+- **WHEN** the user runs a built-in cleanup action
+- **THEN** FusionCanvas does not require an external image editor or plugin
+- **AND** keeps the built-in cleanup actions available without extension points for Phase 2
 
 ### Requirement: Tool feeds the Creative History Timeline
 FusionCanvas SHALL record important Design-stage events — manual imports, external AI imports, in-app AI generations, prompt records, variant creation, variant rejection, cleanup actions, final variant promotion, and final selection changes — into the Creative History Timeline in the same atomic snapshot as the originating operation.

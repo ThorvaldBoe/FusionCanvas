@@ -6,7 +6,7 @@ Design Records, Manual Mockup Records, the Listing Metadata Editor, and Mockup P
 
 - Add the Basic Listing Tool as the default built-in Listing-stage tool, available from the Listing stage for an existing item and unavailable without one.
 - Require item context and at least one selected final design variant before generating mockups; allow metadata editing when no final design exists.
-- Generate basic local mockups from configured mockup product settings (FC-0213): for each selected color/template combination, load the final design, scale to the supplier design area, resize and place per the template mapping, composite onto the blank product template, save the output as an asset, and create a mockup record linked to the listing, design, template, color variant, and output asset.
+- Generate basic local mockups from configured mockup product settings (FC-0213): for each selected color/template combination, record the inputs needed to produce a mockup — the final design image, the mockup template image, the color variant, and the placement parameters — and create a generated mockup record with a placeholder output asset and the full regeneration-metadata block. The actual flat compositing will be wired in at a later stage using an existing ImageSharp-based component; the first version stores a placeholder so the real compositing can be added without re-architecting the flow.
 - Support manually attaching existing mockup images as mockup records.
 - Support editing title, description, price, status, notes, and marketplace preparation fields through the listing-metadata-editor capability.
 - Provide a readiness checklist for missing design, mockup, metadata, price, and marketplace preparation data.
@@ -27,7 +27,7 @@ None. FC-0212 reuses `mockup-records` for mockup storage and lifecycle, `mockup-
 ## Impact
 
 - Adds a `BasicListingTool` view model and Avalonia tool registered as the default Listing-stage tool through the Stage Tool Host registry.
-- Adds a mockup generation engine that consumes mockup product settings and final designs, composites flat mockups, stores outputs as assets, and creates mockup records through the mockup-records service.
+- Adds a mockup generation flow that consumes mockup product settings and final designs, records the inputs and placement parameters as a placeholder output, stores a placeholder output asset, and creates mockup records through the mockup-records service. The actual flat compositing will be wired in at a later stage using an existing ImageSharp-based component.
 - Adds a readiness checklist view model that reads design, mockup, metadata, price, and marketplace preparation state.
 - Reuses the listing-metadata-editor surface for metadata editing.
 - Adds app and UI tests for mockup generation against deterministic fake product settings and designs, manual attachment, metadata editing, readiness checks, timeline feeding, and marketplace-publishing refusal.

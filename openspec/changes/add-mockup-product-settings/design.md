@@ -50,7 +50,7 @@ Alternative considered: let the Basic Listing Tool read archived configuration t
 
 ### 5. Focused store settings surface with progressive disclosure
 
-The store settings surface is a focused secondary surface opened from the store, following the store-management secondary-surface pattern. It supports add, edit, archive, restore, and active-flag toggle at each level, with explicit save, dirty tracking, unsaved-change prompts, and shared desktop control guidance. The first version uses manual numeric entry for placement coordinates; a later visual mapping editor can make this easier.
+The store settings surface is a focused secondary surface opened from the store, following the store-management secondary-surface pattern. It supports add, edit, archive, restore, and active-flag toggle at each level, with explicit save, dirty tracking, unsaved-change prompts, and shared desktop control guidance. The first version uses manual numeric entry for placement coordinates, with a visual display of the template image and the placement rectangle rendered from the current numeric values so the user can see the result of their entry. A later visual drag-and-drop placement editor can make this easier; drag-and-drop editing is deferred.
 
 Alternative considered: dock configuration beside the tree permanently. Rejected because configuration is occasional setup work that should not consume primary workspace.
 
@@ -68,7 +68,7 @@ Alternative considered: store configuration as store JSON. Rejected because the 
 
 ## Risks / Trade-offs
 
-- [Manual numeric entry is error-prone] -> Accept for MVP and document a visual mapping editor as a future enhancement.
+- [Manual numeric entry is error-prone] -> Show a visual display of the template image with the placement rectangle rendered from the current numeric values so the user can see the result of their entry; defer drag-and-drop editing to a later change.
 - [Archived configuration referenced by existing mockups] -> Keep regeneration metadata on mockup records so they remain valid even after the referenced configuration is archived.
 - [Stacked asset-management modification] -> FC-0213 extends the asset context-kind set that asset-relationships and mockup-records also extend. Archive in dependency order and rebase MODIFIED blocks as needed.
 

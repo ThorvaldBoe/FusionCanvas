@@ -26,8 +26,9 @@
 - [ ] 4.1 Store template images and color-specific template images as assets through asset-management, with MockupTemplate as a valid asset context kind; preserve referenced assets on archive or removal.
 - [ ] 4.2 Add a focused store settings surface opened from the store with progressive disclosure across products, templates, and color variants.
 - [ ] 4.3 Implement add, edit, archive, restore, active-flag toggle, and reorder with explicit save, dirty tracking, unsaved-change prompts, and replacement selection.
-- [ ] 4.4 Apply compact action sizing, icon tooltips, keyboard-reachable actions, busy states, duplicate-submission prevention, and shared desktop control guidance.
-- [ ] 4.5 Add view-model and UI tests for progressive disclosure, archive/restore, active-set exposure, dirty tracking, rollback, and shared control guidance.
+- [ ] 4.4 Add a visual display of the template image with the placement rectangle rendered from the current numeric placement values, updated live as the user edits the numeric fields; defer drag-and-drop editing to a later change.
+- [ ] 4.5 Apply compact action sizing, icon tooltips, keyboard-reachable actions, busy states, duplicate-submission prevention, and shared desktop control guidance.
+- [ ] 4.6 Add view-model and UI tests for progressive disclosure, archive/restore, active-set exposure, visual placement display, dirty tracking, rollback, and shared control guidance.
 
 ## 5. Verification
 

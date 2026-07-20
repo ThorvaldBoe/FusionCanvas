@@ -5,13 +5,13 @@
 - [ ] 1.3 Receive explicit context (store, niche, topic path, item, stage, selected concept, selected final design variants, inherited tags, metadata, available mockup product settings) from the Stage Tool Host and refresh on context change.
 - [ ] 1.4 Add view-model tests for registration, context reception, empty state, and coexistence with plugin tools.
 
-## 2. Mockup Generation Engine
+## 2. Mockup Generation Flow
 
-- [ ] 2.1 Implement flat-compositing mockup generation that loads a final design, scales to the supplier design area, resizes per template placement width, places at configured coordinates, and composites onto the blank product template.
-- [ ] 2.2 For each color/template combination, save the output as an asset through asset-management and create a generated mockup record through the mockup-records service with the regeneration-metadata block.
-- [ ] 2.3 Handle source design dimension mismatch by scaling to the design area first or warning the user.
+- [ ] 2.1 Implement a placeholder mockup generation flow that records the final design image reference, template image reference, color variant (with optional color-specific template image), and placement parameters as the mockup's regeneration metadata. The actual flat compositing will be wired in at a later stage using an existing ImageSharp-based component.
+- [ ] 2.2 For each color/template combination, store a placeholder output asset through asset-management and create a generated mockup record through the mockup-records service with the regeneration-metadata block.
+- [ ] 2.3 Handle source design dimension mismatch by recording the mismatch in the mockup's metadata or warning the user before proceeding.
 - [ ] 2.4 Batch generation with per-combination progress and failure reporting; persist only successful combinations on partial failure and retain recoverable input.
-- [ ] 2.5 Add application and integration tests for generation against deterministic fake product settings and designs, dimension mismatch, partial failure, and regeneration-metadata correctness.
+- [ ] 2.5 Add application and integration tests for placeholder generation against deterministic fake product settings and designs, dimension mismatch handling, partial failure, and regeneration-metadata correctness.
 
 ## 3. Manual Attachment, Metadata, and Readiness
 
