@@ -6,7 +6,7 @@ namespace FusionCanvas.Integration.Workspace;
 
 public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceRepository
 {
-    private const int CurrentSchemaVersion = 5;
+    private const int CurrentSchemaVersion = 6;
 
     private readonly string _databasePath = databasePath;
 
@@ -20,7 +20,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
 
-        foreach (var table in new[] { "asset_links", "listing_tags", "prompts", "assets", "listings", "groups", "niches", "tags", "stores", "workspaces", "concepts" })
+        foreach (var table in new[] { "asset_links", "listing_tags", "prompts", "assets", "listings", "groups", "niches", "tags", "stores", "workspaces", "concepts", "designs" })
         {
             await ExecuteAsync(connection, transaction, $"DELETE FROM {table};", cancellationToken);
         }
@@ -70,6 +70,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             await InsertConceptAsync(connection, transaction, concept, cancellationToken);
         }
 
+        foreach (var design in snapshot.Designs)
+        {
+            await InsertDesignAsync(connection, transaction, design, cancellationToken);
+        }
+
         foreach (var listingTag in snapshot.ListingTags)
         {
             await InsertListingTagAsync(connection, transaction, listingTag, cancellationToken);
@@ -104,7 +109,8 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             await LoadTagsAsync(connection, cancellationToken),
             await LoadListingTagsAsync(connection, cancellationToken),
             await LoadAssetLinksAsync(connection, cancellationToken),
-            await LoadConceptsAsync(connection, cancellationToken));
+            await LoadConceptsAsync(connection, cancellationToken),
+            await LoadDesignsAsync(connection, cancellationToken));
     }
 
     private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
@@ -259,6 +265,22 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
                 updated_at TEXT NOT NULL,
                 metadata_json TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS designs (
+                id TEXT PRIMARY KEY,
+                store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                listing_id TEXT NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+                implemented_concept_id TEXT NULL REFERENCES concepts(id) ON DELETE SET NULL,
+                name TEXT NOT NULL,
+                description TEXT NULL,
+                source_method TEXT NULL,
+                notes TEXT NULL,
+                approval_state INTEGER NOT NULL DEFAULT 0,
+                is_archived INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
             """;
 
         await ExecuteAsync(connection, null, sql, cancellationToken);
@@ -280,6 +302,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         if (schemaVersion < 5)
         {
             await MigrateToVersion5Async(connection, cancellationToken);
+        }
+
+        if (schemaVersion < 6)
+        {
+            await MigrateToVersion6Async(connection, cancellationToken);
         }
 
         await SetPragmaUserVersionAsync(connection, CurrentSchemaVersion, cancellationToken);
@@ -404,6 +431,27 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
                 quality_notes TEXT NULL,
                 score_json TEXT NULL,
                 lifecycle INTEGER NOT NULL DEFAULT 0,
+                is_archived INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
+            """, cancellationToken);
+    }
+
+    private static async Task MigrateToVersion6Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await ExecuteAsync(connection, null, """
+            CREATE TABLE IF NOT EXISTS designs (
+                id TEXT PRIMARY KEY,
+                store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                listing_id TEXT NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+                implemented_concept_id TEXT NULL REFERENCES concepts(id) ON DELETE SET NULL,
+                name TEXT NOT NULL,
+                description TEXT NULL,
+                source_method TEXT NULL,
+                notes TEXT NULL,
+                approval_state INTEGER NOT NULL DEFAULT 0,
                 is_archived INTEGER NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
@@ -568,6 +616,25 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             ("$updated_at", concept.UpdatedAt.ToString("O")),
             ("$metadata_json", concept.MetadataJson));
 
+    private static Task InsertDesignAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Design design, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO designs (id, store_id, listing_id, implemented_concept_id, name, description, source_method, notes, approval_state, is_archived, created_at, updated_at, metadata_json)
+            VALUES ($id, $store_id, $listing_id, $implemented_concept_id, $name, $description, $source_method, $notes, $approval_state, $is_archived, $created_at, $updated_at, $metadata_json);
+            """, cancellationToken,
+            ("$id", design.Id.ToString()),
+            ("$store_id", design.StoreId.ToString()),
+            ("$listing_id", design.ListingId.ToString()),
+            ("$implemented_concept_id", design.ImplementedConceptId?.ToString()),
+            ("$name", design.Name),
+            ("$description", design.Description),
+            ("$source_method", design.SourceMethod),
+            ("$notes", design.Notes),
+            ("$approval_state", (int)design.ApprovalState),
+            ("$is_archived", design.IsArchived ? 1 : 0),
+            ("$created_at", design.CreatedAt.ToString("O")),
+            ("$updated_at", design.UpdatedAt.ToString("O")),
+            ("$metadata_json", design.MetadataJson));
+
     private static (string Name, object? Value)[] CommonParameters(WorkspaceEntity entity) =>
     [
         ("$id", entity.Id.ToString()),
@@ -715,6 +782,30 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         }
 
         return concepts;
+    }
+
+    private static async Task<IReadOnlyList<Design>> LoadDesignsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var designs = new List<Design>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM designs ORDER BY created_at, name;", cancellationToken))
+        {
+            designs.Add(new Design(
+                ReadGuid(reader, "id"),
+                ReadGuid(reader, "store_id"),
+                ReadGuid(reader, "listing_id"),
+                ReadNullableGuid(reader, "implemented_concept_id"),
+                ReadString(reader, "name"),
+                ReadNullableString(reader, "description"),
+                ReadNullableString(reader, "source_method"),
+                ReadNullableString(reader, "notes"),
+                (DesignApprovalState)ReadInt(reader, "approval_state"),
+                ReadBool(reader, "is_archived"),
+                ReadDate(reader, "created_at"),
+                ReadDate(reader, "updated_at"),
+                ReadString(reader, "metadata_json")));
+        }
+
+        return designs;
     }
 
     private static async IAsyncEnumerable<SqliteDataReader> ReadAsync(

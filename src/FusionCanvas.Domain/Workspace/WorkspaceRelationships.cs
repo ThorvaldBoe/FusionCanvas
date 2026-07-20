@@ -65,6 +65,41 @@ public enum ConceptLifecycle
     Rejected = 2
 }
 
+public enum DesignApprovalState
+{
+    Draft = 0,
+    NeedsRevision = 1,
+    Approved = 2,
+    Rejected = 3,
+    Exported = 4,
+    ReadyForExport = 5
+}
+
+public static class DesignApprovalStates
+{
+    public static IReadOnlyList<DesignApprovalState> Ordered { get; } =
+    [
+        DesignApprovalState.Draft,
+        DesignApprovalState.NeedsRevision,
+        DesignApprovalState.Approved,
+        DesignApprovalState.Rejected,
+        DesignApprovalState.Exported,
+        DesignApprovalState.ReadyForExport
+    ];
+
+    public static string GetDisplayName(DesignApprovalState state) =>
+        state switch
+        {
+            DesignApprovalState.Draft => "Draft",
+            DesignApprovalState.NeedsRevision => "Needs Revision",
+            DesignApprovalState.Approved => "Approved",
+            DesignApprovalState.Rejected => "Rejected",
+            DesignApprovalState.Exported => "Exported",
+            DesignApprovalState.ReadyForExport => "Ready for Export",
+            _ => throw new ArgumentOutOfRangeException(nameof(state), state, "Unsupported design approval state.")
+        };
+}
+
 public static class ConceptLifecycles
 {
     public static IReadOnlyList<ConceptLifecycle> Ordered { get; } =
