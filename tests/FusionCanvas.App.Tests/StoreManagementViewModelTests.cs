@@ -117,7 +117,7 @@ public class StoreManagementViewModelTests
         var active = NewStore("North Star Studio");
         var archived = NewStore("Archived Studio", isArchived: true);
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([active, archived], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([active, archived], [], [], [], [], [], [], [], []))));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
         viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single(store => store.Id == active.Id));
@@ -152,7 +152,7 @@ public class StoreManagementViewModelTests
     {
         var store = NewStore("North Star Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [], [], []))));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         await viewModel.SelectStoreAsync(viewModel.ActiveStores[0], TestContext.Current.CancellationToken);
         viewModel.NewStoreName = "North Star Gifts";
@@ -170,7 +170,7 @@ public class StoreManagementViewModelTests
         var first = NewStore("North Star Studio");
         var second = NewStore("Second Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([first, second], [], [], [], [], [], [], [], []))));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single(store => store.Id == first.Id));
         viewModel.NewStoreName = "Unsaved name";
@@ -200,7 +200,7 @@ public class StoreManagementViewModelTests
     {
         var store = NewStore("North Star Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [], [], []))));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         viewModel.OpenStoreEditorCommand.Execute(null);
         viewModel.NewStoreName = "Unsaved name";
@@ -223,7 +223,7 @@ public class StoreManagementViewModelTests
         var first = NewStore("North Star Studio");
         var second = NewStore("Second Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([first, second], [], [], [], [], [], [], [], []))));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         await viewModel.SelectStoreAsync(viewModel.ActiveStores.Single(store => store.Id == second.Id), TestContext.Current.CancellationToken);
 
@@ -240,7 +240,7 @@ public class StoreManagementViewModelTests
     {
         var store = NewStore("North Star Studio");
         var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [niche], [], [], [], [], [], [], []));
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository),
             new NicheManagementService(repository));
@@ -258,7 +258,7 @@ public class StoreManagementViewModelTests
     {
         var store = NewStore("North Star Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [], [], []))));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         await viewModel.SelectStoreAsync(viewModel.ActiveStores[0], TestContext.Current.CancellationToken);
 
@@ -276,7 +276,7 @@ public class StoreManagementViewModelTests
         var first = NewStore("North Star Studio");
         var second = NewStore("Second Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([first, second], [], [], [], [], [], [], [], []))));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         await viewModel.SelectStoreAsync(viewModel.ActiveStores.Single(store => store.Id == first.Id), TestContext.Current.CancellationToken);
 
@@ -303,7 +303,7 @@ public class StoreManagementViewModelTests
     public async Task StoreEditor_DeleteWarningCanBeCanceled()
     {
         var store = NewStore("Empty Studio");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [], [], []));
         var viewModel = new StoreManagementViewModel(new StoreManagementService(repository));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         await viewModel.SelectStoreAsync(viewModel.ActiveStores[0], TestContext.Current.CancellationToken);
@@ -321,7 +321,7 @@ public class StoreManagementViewModelTests
         var empty = NewStore("Empty Studio");
         var connected = NewStore("Connected Studio");
         var niche = new Niche(Guid.NewGuid(), connected.Id, "Coffee", null, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([empty, connected], [niche], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([empty, connected], [niche], [], [], [], [], [], [], []));
         var viewModel = new StoreManagementViewModel(new StoreManagementService(repository));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
@@ -344,7 +344,7 @@ public class StoreManagementViewModelTests
     {
         var first = NewStore("First Studio");
         var second = NewStore("Second Studio");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([first, second], [], [], [], [], [], [], [], []));
         var viewModel = new StoreManagementViewModel(new StoreManagementService(repository));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single(store => store.Id == first.Id));
@@ -363,7 +363,7 @@ public class StoreManagementViewModelTests
     {
         var store = NewStore("North Star Studio");
         var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [niche], [], [], [], [], [], [], []));
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository),
             new NicheManagementService(repository));
@@ -388,7 +388,7 @@ public class StoreManagementViewModelTests
     {
         var store = NewStore("North Star Studio");
         var nicheId = Guid.NewGuid();
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [], [], []));
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository),
             new NicheManagementService(repository, () => Now, () => nicheId));
@@ -435,7 +435,7 @@ public class StoreManagementViewModelTests
         var store = NewStore("North Star Studio");
         var first = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, Now, Now, "{}");
         var second = new Niche(Guid.NewGuid(), store.Id, "Cats", null, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [first, second], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [first, second], [], [], [], [], [], [], []));
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository),
             new NicheManagementService(repository));
@@ -493,7 +493,7 @@ public class StoreManagementViewModelTests
         var secondNiche = new Niche(Guid.NewGuid(), second.Id, "Cats", null, false, Now, Now, "{}");
         var firstListing = new Listing(Guid.NewGuid(), first.Id, firstNiche.Id, null, "Espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var secondListing = new Listing(Guid.NewGuid(), second.Id, secondNiche.Id, null, "Whiskers", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
-        var snapshot = new WorkspaceSnapshot([first, second], [firstNiche, secondNiche], [], [firstListing, secondListing], [], [], [], [], []);
+        var snapshot = WorkspaceSnapshot.FromStores([first, second], [firstNiche, secondNiche], [], [firstListing, secondListing], [], [], [], [], []);
         var storeService = new StoreManagementService(new InMemoryWorkspaceRepository(snapshot));
 
         var viewModel = new MainWindowViewModel(
@@ -520,7 +520,7 @@ public class StoreManagementViewModelTests
         var activeNiche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, Now, Now, "{}");
         var archivedNiche = new Niche(Guid.NewGuid(), store.Id, "Dogs", null, true, Now, Now, "{}");
         var listing = new Listing(Guid.NewGuid(), store.Id, activeNiche.Id, null, "Espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
-        var snapshot = new WorkspaceSnapshot([store], [activeNiche, archivedNiche], [], [listing], [], [], [], [], []);
+        var snapshot = WorkspaceSnapshot.FromStores([store], [activeNiche, archivedNiche], [], [listing], [], [], [], [], []);
         var repository = new InMemoryWorkspaceRepository(snapshot);
 
         var viewModel = new MainWindowViewModel(
@@ -545,7 +545,7 @@ public class StoreManagementViewModelTests
     public async Task MainWindowViewModel_RefreshesSidebarAfterNicheCreation()
     {
         var store = NewStore("North Star Studio");
-        var snapshot = new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []);
+        var snapshot = WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [], [], []);
         var repository = new InMemoryWorkspaceRepository(snapshot);
         var viewModel = new MainWindowViewModel(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
@@ -571,7 +571,7 @@ public class StoreManagementViewModelTests
     {
         var storeId = Guid.NewGuid();
         var store = new Store(storeId, "Studio", null, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [], [], []));
         var tagId = Guid.NewGuid();
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository),
@@ -631,7 +631,7 @@ public class StoreManagementViewModelTests
         var listing = new Listing(Guid.NewGuid(), storeId, niche.Id, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var tag = new Tag(Guid.NewGuid(), storeId, "Evergreen", null, false, Now, Now, "{}", null);
         var link = new ListingTag(listing.Id, tag.Id);
-        var snapshot = new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [tag], [link], []);
+        var snapshot = WorkspaceSnapshot.FromStores([store], [niche], [], [listing], [], [], [tag], [link], []);
         var repository = new InMemoryWorkspaceRepository(snapshot);
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository),
@@ -655,7 +655,7 @@ public class StoreManagementViewModelTests
         var store = new Store(storeId, "Studio", null, false, Now, Now, "{}");
         var first = new Tag(Guid.NewGuid(), storeId, "Alpha", null, false, Now, Now, "{}", null);
         var second = new Tag(Guid.NewGuid(), storeId, "Beta", null, false, Now, Now, "{}", null);
-        var snapshot = new WorkspaceSnapshot([store], [], [], [], [], [], [first, second], [], []);
+        var snapshot = WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [first, second], [], []);
         var repository = new InMemoryWorkspaceRepository(snapshot);
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository),

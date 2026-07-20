@@ -41,7 +41,7 @@ public class ListingHierarchyTests
             var root = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Root", null, false, now, now, "{}");
             var child = new TopicGroup(Guid.NewGuid(), store.Id, null, root.Id, "Child", null, false, now, now, "{}");
             var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, child.Id, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
-            return new(new WorkspaceSnapshot([store], [niche], [root, child], [listing], [], [], [], [], []), niche, root, child, listing);
+            return new(WorkspaceSnapshot.FromStores([store], [niche], [root, child], [listing], [], [], [], [], []), niche, root, child, listing);
         }
     }
 }

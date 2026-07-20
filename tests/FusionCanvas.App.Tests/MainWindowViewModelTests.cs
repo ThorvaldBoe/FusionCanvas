@@ -159,7 +159,7 @@ public class MainWindowViewModelTests
         var clientStore = new Store(Guid.NewGuid(), client.Id, "Client Store", null, false, now, now, "{}");
         var clientNiche = new Niche(Guid.NewGuid(), clientStore.Id, "Client Niche", null, false, now, now, "{}");
         var clientListing = new Listing(Guid.NewGuid(), clientStore.Id, clientNiche.Id, null, "Client Listing", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
-        var snapshot = new WorkspaceSnapshot([personal, client], [personalStore, clientStore], [clientNiche], [], [clientListing], [], [], [], [], [], [], [], []);
+        var snapshot = new WorkspaceSnapshot([personal, client], [personalStore, clientStore], [clientNiche], [], [clientListing], [], [], [], [], [], [], [], [], [], [], [], []);
         var repository = new InMemoryWorkspaceRepository(snapshot);
         var viewModel = new MainWindowViewModel(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
@@ -185,7 +185,7 @@ public class MainWindowViewModelTests
         var personal = new FusionCanvas.Domain.Workspace.Workspace(Guid.NewGuid(), "Alpha Personal", null, false, now, now, "{}");
         var client = new FusionCanvas.Domain.Workspace.Workspace(Guid.NewGuid(), "Zulu Client", null, false, now, now, "{}");
         var personalStore = new Store(Guid.NewGuid(), personal.Id, "Personal Store", null, false, now, now, "{}");
-        var snapshot = new WorkspaceSnapshot([personal, client], [personalStore], [], [], [], [], [], [], [], [], [], [], []);
+        var snapshot = new WorkspaceSnapshot([personal, client], [personalStore], [], [], [], [], [], [], [], [], [], [], [], [], [], [], []);
         var repository = new InMemoryWorkspaceRepository(snapshot);
         var viewModel = new MainWindowViewModel(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
@@ -252,7 +252,7 @@ public class MainWindowViewModelTests
         var now = DateTimeOffset.UtcNow;
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
         var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, "{}");
-        var snapshot = new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []);
+        var snapshot = WorkspaceSnapshot.FromStores([store], [niche], [], [], [], [], [], [], []);
         var repository = new InMemoryWorkspaceRepository(snapshot);
         var viewModel = new MainWindowViewModel(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),

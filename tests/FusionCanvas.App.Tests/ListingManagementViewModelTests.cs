@@ -15,7 +15,7 @@ public class ListingManagementViewModelTests
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
         var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{\"notes\":\"old\"}");
         var other = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Other", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
-        var repository = new Repository(new WorkspaceSnapshot([store], [niche], [], [listing, other], [], [], [], [], []));
+        var repository = new Repository(WorkspaceSnapshot.FromStores([store], [niche], [], [listing, other], [], [], [], [], []));
         var viewModel = new ListingManagementViewModel(new ListingManagementService(repository));
         var changes = 0;
         viewModel.WorkspaceStructureChanged += (_, _) => changes++;
@@ -57,7 +57,7 @@ public class ListingManagementViewModelTests
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
         var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var tag = new Tag(Guid.NewGuid(), store.Id, "Evergreen", null, false, now, now, "{}", "#1ABC9C");
-        var repository = new Repository(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [tag], [], []));
+        var repository = new Repository(WorkspaceSnapshot.FromStores([store], [niche], [], [listing], [], [], [tag], [], []));
         var viewModel = new ListingManagementViewModel(new ListingManagementService(repository), new TagManagementService(repository));
 
         await viewModel.OpenForEditAsync(store.Id, listing.Id);
@@ -94,7 +94,7 @@ public class ListingManagementViewModelTests
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
         var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var existing = new Tag(Guid.NewGuid(), store.Id, "Evergreen", null, false, now, now, "{}", null);
-        var repository = new Repository(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [existing], [], []));
+        var repository = new Repository(WorkspaceSnapshot.FromStores([store], [niche], [], [listing], [], [], [existing], [], []));
         var viewModel = new ListingManagementViewModel(new ListingManagementService(repository), new TagManagementService(repository, () => now, () => Guid.NewGuid()));
 
         await viewModel.OpenForEditAsync(store.Id, listing.Id);
@@ -122,7 +122,7 @@ public class ListingManagementViewModelTests
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
         var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var archived = new Tag(Guid.NewGuid(), store.Id, "Paused", null, true, now, now, "{}", null);
-        var repository = new Repository(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [archived], [], []));
+        var repository = new Repository(WorkspaceSnapshot.FromStores([store], [niche], [], [listing], [], [], [archived], [], []));
         var viewModel = new ListingManagementViewModel(new ListingManagementService(repository), new TagManagementService(repository));
 
         await viewModel.OpenForEditAsync(store.Id, listing.Id);
@@ -146,7 +146,7 @@ public class ListingManagementViewModelTests
         var archivedNiche = new Niche(archivedNicheId, storeId, "Archived", null, true, now, now, "{}");
         var listing = new Listing(Guid.NewGuid(), storeId, archivedNicheId, null, "Hidden", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var tag = new Tag(Guid.NewGuid(), storeId, "Evergreen", null, false, now, now, "{}", null);
-        var snapshot = new WorkspaceSnapshot([store], [archivedNiche], [], [listing], [], [], [tag], [], []);
+        var snapshot = WorkspaceSnapshot.FromStores([store], [archivedNiche], [], [listing], [], [], [tag], [], []);
         var repository = new Repository(snapshot);
         var viewModel = new ListingManagementViewModel(new ListingManagementService(repository), new TagManagementService(repository));
 
@@ -169,7 +169,7 @@ public class ListingManagementViewModelTests
         var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var tag = new Tag(Guid.NewGuid(), store.Id, "Evergreen", null, false, now, now, "{}", null);
         var link = new ListingTag(listing.Id, tag.Id);
-        var repository = new Repository(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [tag], [link], []));
+        var repository = new Repository(WorkspaceSnapshot.FromStores([store], [niche], [], [listing], [], [], [tag], [link], []));
         var viewModel = new ListingManagementViewModel(new ListingManagementService(repository), new TagManagementService(repository));
 
         await viewModel.OpenForEditAsync(store.Id, listing.Id);

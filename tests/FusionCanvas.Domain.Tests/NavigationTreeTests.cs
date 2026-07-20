@@ -255,7 +255,7 @@ public class NavigationTreeTests
             var deepListing = new Listing(Guid.NewGuid(), store.Id, niche.Id, grandchildGroup.Id, "Latte ghosts", "Halloween shirt", ListingStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
 
             return new NavigationSample(
-                new WorkspaceSnapshot(
+                WorkspaceSnapshot.FromStores(
                     [store],
                     [niche],
                     [parentGroup, childGroup, grandchildGroup],

@@ -92,7 +92,7 @@ public class PromptHistoryServiceTests
             var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", nicheId);
             var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
             var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, WorkflowStage.Concept, false, now, now, "{}");
-            var snapshot = new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [], [], []);
+            var snapshot = WorkspaceSnapshot.FromStores([store], [niche], [], [listing], [], [], [], [], []);
             return new(snapshot, now, store, listing);
         }
     }

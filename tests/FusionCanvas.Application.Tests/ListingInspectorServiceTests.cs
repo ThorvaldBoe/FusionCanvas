@@ -296,7 +296,7 @@ public class ListingInspectorServiceTests
             var asset = new Asset(
                 Guid.NewGuid(), store.Id, "Asset", null, AssetKind.SourceDesign, "assets/asset.png", null,
                 isMissing: false, isArchived: false, now, now, "{}");
-            var snapshot = new WorkspaceSnapshot(
+            var snapshot = WorkspaceSnapshot.FromStores(
                 [store], [niche], [root, child], [listing],
                 withRelationships ? [asset] : [],
                 [],

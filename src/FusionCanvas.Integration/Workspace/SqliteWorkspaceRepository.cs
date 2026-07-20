@@ -6,7 +6,7 @@ namespace FusionCanvas.Integration.Workspace;
 
 public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceRepository
 {
-    private const int CurrentSchemaVersion = 7;
+    private const int CurrentSchemaVersion = 8;
 
     private readonly string _databasePath = databasePath;
 
@@ -20,7 +20,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
 
-        foreach (var table in new[] { "asset_links", "listing_tags", "prompts", "assets", "listings", "groups", "niches", "tags", "stores", "workspaces", "concepts", "designs", "mockups" })
+        foreach (var table in new[] { "asset_links", "listing_tags", "prompts", "assets", "listings", "groups", "niches", "tags", "stores", "workspaces", "concepts", "designs", "mockups", "creative_history_events", "mockup_products", "mockup_templates", "mockup_color_variants" })
         {
             await ExecuteAsync(connection, transaction, $"DELETE FROM {table};", cancellationToken);
         }
@@ -80,6 +80,26 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             await InsertMockupAsync(connection, transaction, mockup, cancellationToken);
         }
 
+        foreach (var evt in snapshot.CreativeHistoryEvents)
+        {
+            await InsertCreativeHistoryEventAsync(connection, transaction, evt, cancellationToken);
+        }
+
+        foreach (var product in snapshot.MockupProducts)
+        {
+            await InsertMockupProductAsync(connection, transaction, product, cancellationToken);
+        }
+
+        foreach (var template in snapshot.MockupTemplates)
+        {
+            await InsertMockupTemplateAsync(connection, transaction, template, cancellationToken);
+        }
+
+        foreach (var variant in snapshot.MockupColorVariants)
+        {
+            await InsertMockupColorVariantAsync(connection, transaction, variant, cancellationToken);
+        }
+
         foreach (var listingTag in snapshot.ListingTags)
         {
             await InsertListingTagAsync(connection, transaction, listingTag, cancellationToken);
@@ -116,7 +136,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             await LoadAssetLinksAsync(connection, cancellationToken),
             await LoadConceptsAsync(connection, cancellationToken),
             await LoadDesignsAsync(connection, cancellationToken),
-            await LoadMockupsAsync(connection, cancellationToken));
+            await LoadMockupsAsync(connection, cancellationToken),
+            await LoadCreativeHistoryEventsAsync(connection, cancellationToken),
+            await LoadMockupProductsAsync(connection, cancellationToken),
+            await LoadMockupTemplatesAsync(connection, cancellationToken),
+            await LoadMockupColorVariantsAsync(connection, cancellationToken));
     }
 
     private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
@@ -309,6 +333,69 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
                 updated_at TEXT NOT NULL,
                 metadata_json TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS creative_history_events (
+                id TEXT PRIMARY KEY,
+                store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                listing_id TEXT NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+                event_kind TEXT NOT NULL,
+                summary TEXT NOT NULL,
+                related_record_kind TEXT NULL,
+                related_record_id TEXT NULL,
+                created_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS mockup_products (
+                id TEXT PRIMARY KEY,
+                store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                vendor_name TEXT NOT NULL,
+                product_name TEXT NOT NULL,
+                provider_product_name TEXT NULL,
+                product_type TEXT NULL,
+                design_area_width_px INTEGER NOT NULL,
+                design_area_height_px INTEGER NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                is_archived INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS mockup_templates (
+                id TEXT PRIMARY KEY,
+                mockup_product_id TEXT NOT NULL REFERENCES mockup_products(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                template_asset_id TEXT NULL,
+                view_name TEXT NULL,
+                default_color_name TEXT NULL,
+                placement_x REAL NOT NULL DEFAULT 0,
+                placement_y REAL NOT NULL DEFAULT 0,
+                placement_width REAL NOT NULL DEFAULT 0,
+                placement_height REAL NULL,
+                placement_scale REAL NULL,
+                rotation_degrees REAL NOT NULL DEFAULT 0,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                is_archived INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS mockup_color_variants (
+                id TEXT PRIMARY KEY,
+                mockup_template_id TEXT NOT NULL REFERENCES mockup_templates(id) ON DELETE CASCADE,
+                provider_color_name TEXT NOT NULL,
+                display_color_name TEXT NULL,
+                template_asset_id TEXT NULL,
+                swatch_hex TEXT NULL,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                is_archived INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
             """;
 
         await ExecuteAsync(connection, null, sql, cancellationToken);
@@ -340,6 +427,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         if (schemaVersion < 7)
         {
             await MigrateToVersion7Async(connection, cancellationToken);
+        }
+
+        if (schemaVersion < 8)
+        {
+            await MigrateToVersion8Async(connection, cancellationToken);
         }
 
         await SetPragmaUserVersionAsync(connection, CurrentSchemaVersion, cancellationToken);
@@ -512,6 +604,74 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
                 notes TEXT NULL,
                 intended_marketplace_use TEXT NULL,
                 regeneration_metadata_json TEXT NULL,
+                is_archived INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
+            """, cancellationToken);
+    }
+
+    private static async Task MigrateToVersion8Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await ExecuteAsync(connection, null, """
+            CREATE TABLE IF NOT EXISTS creative_history_events (
+                id TEXT PRIMARY KEY,
+                store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                listing_id TEXT NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+                event_kind TEXT NOT NULL,
+                summary TEXT NOT NULL,
+                related_record_kind TEXT NULL,
+                related_record_id TEXT NULL,
+                created_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS mockup_products (
+                id TEXT PRIMARY KEY,
+                store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                vendor_name TEXT NOT NULL,
+                product_name TEXT NOT NULL,
+                provider_product_name TEXT NULL,
+                product_type TEXT NULL,
+                design_area_width_px INTEGER NOT NULL,
+                design_area_height_px INTEGER NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                is_archived INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS mockup_templates (
+                id TEXT PRIMARY KEY,
+                mockup_product_id TEXT NOT NULL REFERENCES mockup_products(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                template_asset_id TEXT NULL,
+                view_name TEXT NULL,
+                default_color_name TEXT NULL,
+                placement_x REAL NOT NULL DEFAULT 0,
+                placement_y REAL NOT NULL DEFAULT 0,
+                placement_width REAL NOT NULL DEFAULT 0,
+                placement_height REAL NULL,
+                placement_scale REAL NULL,
+                rotation_degrees REAL NOT NULL DEFAULT 0,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                is_archived INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS mockup_color_variants (
+                id TEXT PRIMARY KEY,
+                mockup_template_id TEXT NOT NULL REFERENCES mockup_templates(id) ON DELETE CASCADE,
+                provider_color_name TEXT NOT NULL,
+                display_color_name TEXT NULL,
+                template_asset_id TEXT NULL,
+                swatch_hex TEXT NULL,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                is_active INTEGER NOT NULL DEFAULT 1,
                 is_archived INTEGER NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
@@ -720,6 +880,81 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             ("$updated_at", mockup.UpdatedAt.ToString("O")),
             ("$metadata_json", mockup.MetadataJson));
 
+    private static Task InsertCreativeHistoryEventAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, CreativeHistoryEvent evt, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO creative_history_events (id, store_id, listing_id, event_kind, summary, related_record_kind, related_record_id, created_at, metadata_json)
+            VALUES ($id, $store_id, $listing_id, $event_kind, $summary, $related_record_kind, $related_record_id, $created_at, $metadata_json);
+            """, cancellationToken,
+            ("$id", evt.Id.ToString()),
+            ("$store_id", evt.StoreId.ToString()),
+            ("$listing_id", evt.ListingId.ToString()),
+            ("$event_kind", evt.EventKind),
+            ("$summary", evt.Summary),
+            ("$related_record_kind", evt.RelatedRecordKind),
+            ("$related_record_id", evt.RelatedRecordId?.ToString()),
+            ("$created_at", evt.CreatedAt.ToString("O")),
+            ("$metadata_json", evt.MetadataJson));
+
+    private static Task InsertMockupProductAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, MockupProduct product, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO mockup_products (id, store_id, vendor_name, product_name, provider_product_name, product_type, design_area_width_px, design_area_height_px, is_active, is_archived, created_at, updated_at, metadata_json)
+            VALUES ($id, $store_id, $vendor_name, $product_name, $provider_product_name, $product_type, $design_area_width_px, $design_area_height_px, $is_active, $is_archived, $created_at, $updated_at, $metadata_json);
+            """, cancellationToken,
+            ("$id", product.Id.ToString()),
+            ("$store_id", product.StoreId.ToString()),
+            ("$vendor_name", product.VendorName),
+            ("$product_name", product.ProductName),
+            ("$provider_product_name", product.ProviderProductName),
+            ("$product_type", product.ProductType),
+            ("$design_area_width_px", product.DesignAreaWidthPx),
+            ("$design_area_height_px", product.DesignAreaHeightPx),
+            ("$is_active", product.IsActive ? 1 : 0),
+            ("$is_archived", product.IsArchived ? 1 : 0),
+            ("$created_at", product.CreatedAt.ToString("O")),
+            ("$updated_at", product.UpdatedAt.ToString("O")),
+            ("$metadata_json", product.MetadataJson));
+
+    private static Task InsertMockupTemplateAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, MockupTemplate template, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO mockup_templates (id, mockup_product_id, name, template_asset_id, view_name, default_color_name, placement_x, placement_y, placement_width, placement_height, placement_scale, rotation_degrees, is_active, is_archived, created_at, updated_at, metadata_json)
+            VALUES ($id, $mockup_product_id, $name, $template_asset_id, $view_name, $default_color_name, $placement_x, $placement_y, $placement_width, $placement_height, $placement_scale, $rotation_degrees, $is_active, $is_archived, $created_at, $updated_at, $metadata_json);
+            """, cancellationToken,
+            ("$id", template.Id.ToString()),
+            ("$mockup_product_id", template.MockupProductId.ToString()),
+            ("$name", template.Name),
+            ("$template_asset_id", template.TemplateAssetId?.ToString()),
+            ("$view_name", template.ViewName),
+            ("$default_color_name", template.DefaultColorName),
+            ("$placement_x", template.PlacementX),
+            ("$placement_y", template.PlacementY),
+            ("$placement_width", template.PlacementWidth),
+            ("$placement_height", template.PlacementHeight),
+            ("$placement_scale", template.PlacementScale),
+            ("$rotation_degrees", template.RotationDegrees),
+            ("$is_active", template.IsActive ? 1 : 0),
+            ("$is_archived", template.IsArchived ? 1 : 0),
+            ("$created_at", template.CreatedAt.ToString("O")),
+            ("$updated_at", template.UpdatedAt.ToString("O")),
+            ("$metadata_json", template.MetadataJson));
+
+    private static Task InsertMockupColorVariantAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, MockupColorVariant variant, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO mockup_color_variants (id, mockup_template_id, provider_color_name, display_color_name, template_asset_id, swatch_hex, sort_order, is_active, is_archived, created_at, updated_at, metadata_json)
+            VALUES ($id, $mockup_template_id, $provider_color_name, $display_color_name, $template_asset_id, $swatch_hex, $sort_order, $is_active, $is_archived, $created_at, $updated_at, $metadata_json);
+            """, cancellationToken,
+            ("$id", variant.Id.ToString()),
+            ("$mockup_template_id", variant.MockupTemplateId.ToString()),
+            ("$provider_color_name", variant.ProviderColorName),
+            ("$display_color_name", variant.DisplayColorName),
+            ("$template_asset_id", variant.TemplateAssetId?.ToString()),
+            ("$swatch_hex", variant.SwatchHex),
+            ("$sort_order", variant.SortOrder),
+            ("$is_active", variant.IsActive ? 1 : 0),
+            ("$is_archived", variant.IsArchived ? 1 : 0),
+            ("$created_at", variant.CreatedAt.ToString("O")),
+            ("$updated_at", variant.UpdatedAt.ToString("O")),
+            ("$metadata_json", variant.MetadataJson));
+
     private static (string Name, object? Value)[] CommonParameters(WorkspaceEntity entity) =>
     [
         ("$id", entity.Id.ToString()),
@@ -923,6 +1158,69 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         return mockups;
     }
 
+    private static async Task<IReadOnlyList<CreativeHistoryEvent>> LoadCreativeHistoryEventsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var events = new List<CreativeHistoryEvent>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM creative_history_events ORDER BY created_at DESC;", cancellationToken))
+        {
+            events.Add(new CreativeHistoryEvent(
+                ReadGuid(reader, "id"), ReadGuid(reader, "store_id"), ReadGuid(reader, "listing_id"),
+                ReadString(reader, "event_kind"), ReadString(reader, "summary"),
+                ReadNullableString(reader, "related_record_kind"), ReadNullableGuid(reader, "related_record_id"),
+                ReadDate(reader, "created_at"), ReadString(reader, "metadata_json")));
+        }
+        return events;
+    }
+
+    private static async Task<IReadOnlyList<MockupProduct>> LoadMockupProductsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var products = new List<MockupProduct>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM mockup_products ORDER BY vendor_name, product_name;", cancellationToken))
+        {
+            products.Add(new MockupProduct(
+                ReadGuid(reader, "id"), ReadGuid(reader, "store_id"),
+                ReadString(reader, "vendor_name"), ReadString(reader, "product_name"),
+                ReadNullableString(reader, "provider_product_name"), ReadNullableString(reader, "product_type"),
+                ReadInt(reader, "design_area_width_px"), ReadInt(reader, "design_area_height_px"),
+                ReadBool(reader, "is_active"), ReadBool(reader, "is_archived"),
+                ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json")));
+        }
+        return products;
+    }
+
+    private static async Task<IReadOnlyList<MockupTemplate>> LoadMockupTemplatesAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var templates = new List<MockupTemplate>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM mockup_templates ORDER BY name;", cancellationToken))
+        {
+            templates.Add(new MockupTemplate(
+                ReadGuid(reader, "id"), ReadGuid(reader, "mockup_product_id"),
+                ReadString(reader, "name"), ReadNullableGuid(reader, "template_asset_id"),
+                ReadNullableString(reader, "view_name"), ReadNullableString(reader, "default_color_name"),
+                ReadDouble(reader, "placement_x"), ReadDouble(reader, "placement_y"),
+                ReadDouble(reader, "placement_width"), ReadNullableDouble(reader, "placement_height"),
+                ReadNullableDouble(reader, "placement_scale"), ReadDouble(reader, "rotation_degrees"),
+                ReadBool(reader, "is_active"), ReadBool(reader, "is_archived"),
+                ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json")));
+        }
+        return templates;
+    }
+
+    private static async Task<IReadOnlyList<MockupColorVariant>> LoadMockupColorVariantsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var variants = new List<MockupColorVariant>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM mockup_color_variants ORDER BY sort_order, provider_color_name;", cancellationToken))
+        {
+            variants.Add(new MockupColorVariant(
+                ReadGuid(reader, "id"), ReadGuid(reader, "mockup_template_id"),
+                ReadString(reader, "provider_color_name"), ReadNullableString(reader, "display_color_name"),
+                ReadNullableGuid(reader, "template_asset_id"), ReadNullableString(reader, "swatch_hex"),
+                ReadInt(reader, "sort_order"), ReadBool(reader, "is_active"), ReadBool(reader, "is_archived"),
+                ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json")));
+        }
+        return variants;
+    }
+
     private static async IAsyncEnumerable<SqliteDataReader> ReadAsync(
         SqliteConnection connection,
         string sql,
@@ -956,6 +1254,14 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
     private static int ReadInt(SqliteDataReader reader, string name) => reader.GetInt32(reader.GetOrdinal(name));
 
     private static bool ReadBool(SqliteDataReader reader, string name) => ReadInt(reader, name) == 1;
+
+    private static double ReadDouble(SqliteDataReader reader, string name) => reader.GetDouble(reader.GetOrdinal(name));
+
+    private static double? ReadNullableDouble(SqliteDataReader reader, string name)
+    {
+        var ordinal = reader.GetOrdinal(name);
+        return reader.IsDBNull(ordinal) ? null : reader.GetDouble(ordinal);
+    }
 
     private static DateTimeOffset ReadDate(SqliteDataReader reader, string name) => DateTimeOffset.Parse(ReadString(reader, name));
 

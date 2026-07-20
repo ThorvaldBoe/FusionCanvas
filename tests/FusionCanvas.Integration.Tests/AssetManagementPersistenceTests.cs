@@ -19,7 +19,7 @@ public class AssetManagementPersistenceTests
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
         var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Group", null, false, now, now, "{}");
         var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
-        await repository.SaveAsync(new WorkspaceSnapshot([store], [niche], [group], [listing], [], [], [], [], []), TestContext.Current.CancellationToken);
+        await repository.SaveAsync(WorkspaceSnapshot.FromStores([store], [niche], [group], [listing], [], [], [], [], []), TestContext.Current.CancellationToken);
 
         var sourcePath = Path.Combine(directory.Path, "source.svg");
         await File.WriteAllTextAsync(sourcePath, "<svg />", TestContext.Current.CancellationToken);
@@ -68,7 +68,7 @@ public class AssetManagementPersistenceTests
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", nicheId);
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
         var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
-        await inner.SaveAsync(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [], [], []), TestContext.Current.CancellationToken);
+        await inner.SaveAsync(WorkspaceSnapshot.FromStores([store], [niche], [], [listing], [], [], [], [], []), TestContext.Current.CancellationToken);
         var service = new AssetManagementService(new FailingRepository(inner), fileStore);
 
         var sourcePath = Path.Combine(directory.Path, "source.png");

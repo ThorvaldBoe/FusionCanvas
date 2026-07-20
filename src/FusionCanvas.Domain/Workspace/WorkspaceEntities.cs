@@ -155,6 +155,65 @@ public sealed record Mockup(
     string MetadataJson)
     : WorkspaceEntity(Id, Name, Description, IsArchived, CreatedAt, UpdatedAt, MetadataJson);
 
+public sealed record CreativeHistoryEvent(
+    Guid Id,
+    Guid StoreId,
+    Guid ListingId,
+    string EventKind,
+    string Summary,
+    string? RelatedRecordKind,
+    Guid? RelatedRecordId,
+    DateTimeOffset CreatedAt,
+    string MetadataJson);
+
+public sealed record MockupProduct(
+    Guid Id,
+    Guid StoreId,
+    string VendorName,
+    string ProductName,
+    string? ProviderProductName,
+    string? ProductType,
+    int DesignAreaWidthPx,
+    int DesignAreaHeightPx,
+    bool IsActive,
+    bool IsArchived,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    string MetadataJson);
+
+public sealed record MockupTemplate(
+    Guid Id,
+    Guid MockupProductId,
+    string Name,
+    Guid? TemplateAssetId,
+    string? ViewName,
+    string? DefaultColorName,
+    double PlacementX,
+    double PlacementY,
+    double PlacementWidth,
+    double? PlacementHeight,
+    double? PlacementScale,
+    double RotationDegrees,
+    bool IsActive,
+    bool IsArchived,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    string MetadataJson);
+
+public sealed record MockupColorVariant(
+    Guid Id,
+    Guid MockupTemplateId,
+    string ProviderColorName,
+    string? DisplayColorName,
+    Guid? TemplateAssetId,
+    string? SwatchHex,
+    int SortOrder,
+    bool IsActive,
+    bool IsArchived,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    string MetadataJson);
+
 public sealed record Asset : WorkspaceEntity
 {
     public Asset(

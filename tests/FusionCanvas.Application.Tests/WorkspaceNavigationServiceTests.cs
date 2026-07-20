@@ -113,7 +113,7 @@ public class WorkspaceNavigationServiceTests
             var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Pumpkin espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
 
             return new NavigationSample(
-                new WorkspaceSnapshot([store], [niche], [group], [listing], [], [], [], [], []),
+                WorkspaceSnapshot.FromStores([store], [niche], [group], [listing], [], [], [], [], []),
                 store,
                 niche,
                 group,

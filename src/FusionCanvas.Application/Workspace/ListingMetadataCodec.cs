@@ -14,6 +14,13 @@ internal static class ListingMetadataCodec
     public const string IdeaVisualDirectionKey = "idea.visualDirection";
     public const string IdeaRejectedKey = "idea.rejected";
     public const string IdeaRejectedReasonKey = "idea.rejectedReason";
+    public const string ListingPriceKey = "listing.price";
+    public const string ListingCurrencyKey = "listing.currency";
+    public const string ListingMarketplaceNotesKey = "listing.marketplaceNotes";
+    public const string ListingProductTypeKey = "listing.productType";
+    public const string ListingProviderProductRefKey = "listing.providerProductRef";
+    public const string ListingShippingNotesKey = "listing.shippingNotes";
+    public const string ListingDraftKeywordsKey = "listing.draftKeywords";
 
     public static string NormalizeName(string? value) => value?.Trim() ?? string.Empty;
 

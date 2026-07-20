@@ -262,7 +262,7 @@ public class AssetManagementServiceTests
             var linkedAsset = new Asset(Guid.NewGuid(), store.Id, "linked.png", null, AssetKind.ExportedImage, "assets/linked.png", @"C:\imports\linked.png", false, false, now, now, "{}");
             var unlinkedAsset = new Asset(Guid.NewGuid(), store.Id, "unlinked.png", null, AssetKind.ExportedImage, "assets/unlinked.png", @"C:\imports\unlinked.png", false, false, now, now, "{}");
             var link = new AssetLink(linkedAsset.Id, WorkspaceEntityKind.Listing, listing.Id);
-            var snapshot = new WorkspaceSnapshot([store], [niche, archivedNiche], [group, archivedGroup], [listing], [linkedAsset, unlinkedAsset], [], [], [], [link]);
+            var snapshot = WorkspaceSnapshot.FromStores([store], [niche, archivedNiche], [group, archivedGroup], [listing], [linkedAsset, unlinkedAsset], [], [], [], [link]);
             return new(snapshot, now, store, niche, group, listing, linkedAsset, unlinkedAsset, archivedNiche, archivedGroup);
         }
     }

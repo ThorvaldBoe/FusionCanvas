@@ -18,7 +18,7 @@ public class ListingManagementPersistenceTests
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
         var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Group", null, false, now, now, "{}");
         var tag = new Tag(Guid.NewGuid(), store.Id, "Tag", null, false, now, now, "{}");
-        await repository.SaveAsync(new WorkspaceSnapshot([store], [niche], [group], [], [], [], [tag], [], []), TestContext.Current.CancellationToken);
+        await repository.SaveAsync(WorkspaceSnapshot.FromStores([store], [niche], [group], [], [], [], [tag], [], []), TestContext.Current.CancellationToken);
         var ids = new Queue<Guid>([Guid.NewGuid(), Guid.NewGuid()]);
         var service = new ListingManagementService(repository, clock: () => now.AddMinutes(1), newId: () => ids.Dequeue());
 
@@ -49,7 +49,7 @@ public class ListingManagementPersistenceTests
         var nicheId = Guid.NewGuid();
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", nicheId);
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
-        await inner.SaveAsync(new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []), TestContext.Current.CancellationToken);
+        await inner.SaveAsync(WorkspaceSnapshot.FromStores([store], [niche], [], [], [], [], [], [], []), TestContext.Current.CancellationToken);
         var service = new ListingManagementService(new FailingRepository(inner));
 
         var result = await service.CreateListingAsync(new(new(WorkspaceEntityKind.Niche, niche.Id), "Idea"), TestContext.Current.CancellationToken);

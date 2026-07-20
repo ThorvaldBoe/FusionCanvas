@@ -17,7 +17,7 @@ public class ListingInspectorPersistenceTests
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", nicheId);
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
         var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
-        await repository.SaveAsync(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [], [], []), TestContext.Current.CancellationToken);
+        await repository.SaveAsync(WorkspaceSnapshot.FromStores([store], [niche], [], [listing], [], [], [], [], []), TestContext.Current.CancellationToken);
         var service = new ListingInspectorService(repository, clock: () => now.AddMinutes(1), newId: Guid.NewGuid);
 
         var saved = await service.SaveAsync(new(
@@ -52,7 +52,7 @@ public class ListingInspectorPersistenceTests
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
         var first = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "First", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var second = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Second", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
-        await repository.SaveAsync(new WorkspaceSnapshot([store], [niche], [], [first, second], [], [], [], [], []), TestContext.Current.CancellationToken);
+        await repository.SaveAsync(WorkspaceSnapshot.FromStores([store], [niche], [], [first, second], [], [], [], [], []), TestContext.Current.CancellationToken);
         var id = new Queue<Guid>([Guid.NewGuid(), Guid.NewGuid()]);
         var service = new ListingInspectorService(repository, clock: () => now.AddMinutes(1), newId: () => id.Dequeue());
 
@@ -77,7 +77,7 @@ public class ListingInspectorPersistenceTests
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", nicheId);
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
         var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
-        await inner.SaveAsync(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [], [], []), TestContext.Current.CancellationToken);
+        await inner.SaveAsync(WorkspaceSnapshot.FromStores([store], [niche], [], [listing], [], [], [], [], []), TestContext.Current.CancellationToken);
         var service = new ListingInspectorService(new FailingRepository(inner));
 
         var result = await service.SaveAsync(new(listing.Id, "Updated", "idea", null, null, null, ["New Tag"]), TestContext.Current.CancellationToken);

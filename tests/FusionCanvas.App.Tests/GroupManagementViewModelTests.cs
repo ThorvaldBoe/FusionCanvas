@@ -155,7 +155,7 @@ public class GroupManagementViewModelTests
             var now = DateTimeOffset.UtcNow;
             var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
             var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, "{}");
-            return new Sample(new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []), store, niche);
+            return new Sample(WorkspaceSnapshot.FromStores([store], [niche], [], [], [], [], [], [], []), store, niche);
         }
 
         public static Sample CreateWithGroups()

@@ -12,7 +12,7 @@ public class NicheManagementServiceTests
     {
         var store = NewStore("North Star Studio");
         var nicheId = Guid.NewGuid();
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [], [], []));
         var service = new NicheManagementService(repository, () => Now, () => nicheId);
 
         var result = await service.CreateNicheAsync(new NicheManagementCreateRequest(store.Id, " Coffee Lovers "), TestContext.Current.CancellationToken);
@@ -34,7 +34,7 @@ public class NicheManagementServiceTests
     public async Task CreateNicheAsync_PersistsOptionalContextInMetadata()
     {
         var store = NewStore("North Star Studio");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [], [], []));
         var service = new NicheManagementService(repository, () => Now, () => Guid.NewGuid());
         var context = new NicheContext(
             Description: "Warm drink designs",
@@ -69,7 +69,7 @@ public class NicheManagementServiceTests
         var archived = NewStore("Paused Studio") with { IsArchived = true };
         var existing = NewNiche(active.Id, "Coffee");
         var sameNameOtherStore = NewNiche(other.Id, "Coffee");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([active, other, archived], [existing, sameNameOtherStore], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([active, other, archived], [existing, sameNameOtherStore], [], [], [], [], [], [], []));
         var service = new NicheManagementService(repository);
 
         var empty = await service.CreateNicheAsync(new NicheManagementCreateRequest(active.Id, " "), TestContext.Current.CancellationToken);
@@ -96,7 +96,7 @@ public class NicheManagementServiceTests
         var niche = NewNiche(store.Id, "Coffee");
         var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Launch", null, false, Now, Now, "{}");
         var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Pumpkin espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [group], [listing], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [niche], [group], [listing], [], [], [], [], []));
         var service = new NicheManagementService(repository, () => Now.AddMinutes(5));
         var context = new NicheContext("Updated", "Baristas", "Dry", "Retro", "No logos", "Crowded", "Check Etsy", "Notes");
 
@@ -116,7 +116,7 @@ public class NicheManagementServiceTests
     {
         var store = NewStore("North Star Studio");
         var niche = NewNiche(store.Id, "Coffee");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [niche], [], [], [], [], [], [], []));
         var service = new NicheManagementService(repository);
         await service.SelectNicheAsync(niche.Id, TestContext.Current.CancellationToken);
 
@@ -140,7 +140,7 @@ public class NicheManagementServiceTests
         var store = NewStore("North Star Studio");
         var active = NewNiche(store.Id, "Coffee");
         var archived = NewNiche(store.Id, "coffee") with { IsArchived = true };
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [active, archived], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [active, archived], [], [], [], [], [], [], []));
         var service = new NicheManagementService(repository);
 
         var result = await service.RestoreNicheAsync(archived.Id, TestContext.Current.CancellationToken);
@@ -155,7 +155,7 @@ public class NicheManagementServiceTests
     {
         var store = NewStore("North Star Studio");
         var niche = NewNiche(store.Id, "Coffee");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [niche], [], [], [], [], [], [], []));
         var service = new NicheManagementService(repository);
 
         var unconfirmed = await service.DeleteNicheAsync(new NicheManagementDeleteRequest(niche.Id, ConfirmPermanentDeletion: false), TestContext.Current.CancellationToken);
@@ -174,7 +174,7 @@ public class NicheManagementServiceTests
         var niche = NewNiche(store.Id, "Coffee");
         var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var tag = new Tag(Guid.NewGuid(), store.Id, "seasonal", null, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [tag], [new ListingTag(listing.Id, tag.Id)], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [niche], [], [listing], [], [], [tag], [new ListingTag(listing.Id, tag.Id)], []));
         var service = new NicheManagementService(repository);
 
         var result = await service.DeleteNicheAsync(new NicheManagementDeleteRequest(niche.Id, ConfirmPermanentDeletion: true), TestContext.Current.CancellationToken);
@@ -192,7 +192,7 @@ public class NicheManagementServiceTests
         var firstNiche = NewNiche(first.Id, "Coffee");
         var secondNiche = NewNiche(second.Id, "Cats");
         var archived = NewNiche(first.Id, "Dogs") with { IsArchived = true };
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [firstNiche, secondNiche, archived], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([first, second], [firstNiche, secondNiche, archived], [], [], [], [], [], [], []));
         var service = new NicheManagementService(repository);
 
         var state = await service.LoadAsync(first.Id, TestContext.Current.CancellationToken);

@@ -1109,7 +1109,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         var design = new Listing(DesignNodeId, store.Id, niche.Id, topic.Id, "Retro mug design", null, ListingStatus.Draft, WorkflowStage.Design, false, now, now, "{}");
         var listing = new Listing(ListingNodeId, store.Id, niche.Id, topic.Id, "Espresso listing draft", null, ListingStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
 
-        return new WorkspaceSnapshot(
+        return WorkspaceSnapshot.FromStores(
             [store],
             [niche],
             [topic],

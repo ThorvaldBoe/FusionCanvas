@@ -148,7 +148,7 @@ public class ToolContextResolverTests
             var tag = new Tag(Guid.NewGuid(), store.Id, "evergreen", null, false, now, now, "{}");
 
             return new ToolContextSample(
-                new WorkspaceSnapshot(
+                WorkspaceSnapshot.FromStores(
                     [store],
                     [niche],
                     [group],

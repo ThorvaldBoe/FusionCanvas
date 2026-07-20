@@ -353,7 +353,7 @@ public class GroupManagementServiceTests
             var now = DateTimeOffset.UtcNow;
             var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
             var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, "{}");
-            return new Sample(new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []), now, store, niche);
+            return new Sample(WorkspaceSnapshot.FromStores([store], [niche], [], [], [], [], [], [], []), now, store, niche);
         }
 
         public static Sample CreateWithGroups(bool childArchived = false)

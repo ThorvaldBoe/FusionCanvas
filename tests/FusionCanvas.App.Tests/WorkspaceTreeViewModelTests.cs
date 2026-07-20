@@ -543,7 +543,7 @@ public class WorkspaceTreeViewModelTests
             var groups = withGroup
                 ? new[] { new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Campaign", null, false, now, now, "{}") }
                 : [];
-            return new Sample(new WorkspaceSnapshot([store], [niche], groups, [], [], [], [], [], []), store, niche, now);
+            return new Sample(WorkspaceSnapshot.FromStores([store], [niche], groups, [], [], [], [], [], []), store, niche, now);
         }
     }
 }

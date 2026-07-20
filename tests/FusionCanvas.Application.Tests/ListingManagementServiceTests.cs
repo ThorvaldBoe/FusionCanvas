@@ -332,7 +332,7 @@ public class ListingManagementServiceTests
             var tag = new Tag(Guid.NewGuid(), store.Id, "Tag", null, false, now, now, "{}");
             var prompt = new Prompt(Guid.NewGuid(), store.Id, listing.Id, "Prompt", null, "Text", false, now, now, "{}");
             var assetLink = new AssetLink(Guid.NewGuid(), WorkspaceEntityKind.Listing, listing.Id);
-            var snapshot = new WorkspaceSnapshot(
+            var snapshot = WorkspaceSnapshot.FromStores(
                 [store], [niche], [root, child], [listing], [],
                 withRelationships ? [prompt] : [], [tag], [new ListingTag(listing.Id, tag.Id)],
                 withRelationships ? [assetLink] : []);

@@ -9,7 +9,7 @@ public class WorkspaceRepositoryContractTests
     public async Task WorkspaceRepositoryContract_SavesAndLoadsWorkspaceSnapshots()
     {
         IWorkspaceRepository repository = new InMemoryWorkspaceRepository();
-        var snapshot = new WorkspaceSnapshot(
+        var snapshot = WorkspaceSnapshot.FromStores(
             [new Store(Guid.NewGuid(), "North Star Studio", null, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "{}")],
             [],
             [],

@@ -12,7 +12,7 @@ public class TagManagementServiceTests
     {
         var store = NewStore();
         var tagId = Guid.NewGuid();
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [], [], []));
         var service = new TagManagementService(repository, () => Now, () => tagId);
 
         var result = await service.CreateTagAsync(new TagManagementCreateRequest(store.Id, " Evergreen ", "Always relevant", "#1Ab"), TestContext.Current.CancellationToken);
@@ -32,7 +32,7 @@ public class TagManagementServiceTests
     public async Task CreateTagAsync_AllowsNullColorAndDescription()
     {
         var store = NewStore();
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [], [], []));
         var service = new TagManagementService(repository, () => Now, () => Guid.NewGuid());
 
         var result = await service.CreateTagAsync(new TagManagementCreateRequest(store.Id, "Draft", null, null), TestContext.Current.CancellationToken);
@@ -49,7 +49,7 @@ public class TagManagementServiceTests
         var other = NewStore();
         var archived = NewStore() with { IsArchived = true };
         var existing = NewTag(active.Id, "Coffee");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([active, other, archived], [], [], [], [], [], [existing], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([active, other, archived], [], [], [], [], [], [existing], [], []));
         var service = new TagManagementService(repository);
 
         var missingStore = await service.CreateTagAsync(new TagManagementCreateRequest(Guid.NewGuid(), "Cats"), TestContext.Current.CancellationToken);
@@ -76,7 +76,7 @@ public class TagManagementServiceTests
     public async Task CreateTagAsync_RejectsInvalidColor()
     {
         var store = NewStore();
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [], [], []));
         var service = new TagManagementService(repository);
 
         var result = await service.CreateTagAsync(new TagManagementCreateRequest(store.Id, "Bad", null, "not-a-color"), TestContext.Current.CancellationToken);
@@ -92,7 +92,7 @@ public class TagManagementServiceTests
         var tag = NewTag(store.Id, "evergreen", "#111111");
         var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var link = new ListingTag(listing.Id, tag.Id);
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [tag], [link], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [listing], [], [], [tag], [link], []));
         var service = new TagManagementService(repository, () => Now.AddMinutes(5));
 
         var result = await service.UpdateTagAsync(new TagManagementUpdateRequest(tag.Id, " Evergreen ", "Updated", "#f00"), TestContext.Current.CancellationToken);
@@ -112,7 +112,7 @@ public class TagManagementServiceTests
         var store = NewStore();
         var first = NewTag(store.Id, "Coffee");
         var second = NewTag(store.Id, "Tea");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [first, second], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [first, second], [], []));
         var service = new TagManagementService(repository);
 
         var duplicate = await service.UpdateTagAsync(new TagManagementUpdateRequest(second.Id, "coffee"), TestContext.Current.CancellationToken);
@@ -133,7 +133,7 @@ public class TagManagementServiceTests
         var store = NewStore();
         var tag = NewTag(store.Id, "seasonal");
         var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [tag], [new ListingTag(listing.Id, tag.Id)], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [listing], [], [], [tag], [new ListingTag(listing.Id, tag.Id)], []));
         var service = new TagManagementService(repository);
 
         var archived = await service.ArchiveTagAsync(tag.Id, TestContext.Current.CancellationToken);
@@ -157,7 +157,7 @@ public class TagManagementServiceTests
         var store = NewStore();
         var active = NewTag(store.Id, "Coffee");
         var archived = NewTag(store.Id, "coffee") with { IsArchived = true };
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [active, archived], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [active, archived], [], []));
         var service = new TagManagementService(repository);
 
         var result = await service.RestoreTagAsync(archived.Id, TestContext.Current.CancellationToken);
@@ -181,7 +181,7 @@ public class TagManagementServiceTests
             new ListingTag(secondListing.Id, tag.Id),
             new ListingTag(firstListing.Id, otherTag.Id)
         };
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [firstListing, secondListing], [], [], [tag, otherTag], links, []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [firstListing, secondListing], [], [], [tag, otherTag], links, []));
         var service = new TagManagementService(repository);
 
         var unconfirmed = await service.DeleteTagAsync(new TagManagementDeleteRequest(tag.Id, ConfirmPermanentDeletion: false), TestContext.Current.CancellationToken);
@@ -206,7 +206,7 @@ public class TagManagementServiceTests
         var ownTag = NewTag(store.Id, "evergreen");
         var otherTag = NewTag(other.Id, "evergreen");
         var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store, other], [], [], [listing], [], [], [ownTag, otherTag], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store, other], [], [], [listing], [], [], [ownTag, otherTag], [], []));
         var service = new TagManagementService(repository);
 
         var first = await service.ApplyTagAsync(new ApplyTagRequest(listing.Id, ownTag.Id), TestContext.Current.CancellationToken);
@@ -235,7 +235,7 @@ public class TagManagementServiceTests
         var archivedListing = new Listing(Guid.NewGuid(), store.Id, activeNiche.Id, null, "ArchivedShirt", null, ListingStatus.Draft, WorkflowStage.Idea, true, Now, Now, "{}");
         var hiddenListing = new Listing(Guid.NewGuid(), store.Id, archivedNiche.Id, null, "HiddenShirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var tag = NewTag(store.Id, "evergreen");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [activeNiche, archivedNiche], [], [archivedListing, hiddenListing], [], [], [tag], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [activeNiche, archivedNiche], [], [archivedListing, hiddenListing], [], [], [tag], [], []));
         var service = new TagManagementService(repository);
 
         var archivedListingResult = await service.ApplyTagAsync(new ApplyTagRequest(archivedListing.Id, tag.Id), TestContext.Current.CancellationToken);
@@ -261,7 +261,7 @@ public class TagManagementServiceTests
             new ListingTag(listing.Id, secondTag.Id),
             new ListingTag(otherListing.Id, firstTag.Id)
         };
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing, otherListing], [], [], [firstTag, secondTag], links, []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [listing, otherListing], [], [], [firstTag, secondTag], links, []));
         var service = new TagManagementService(repository);
 
         var result = await service.RemoveTagAsync(new RemoveTagRequest(listing.Id, firstTag.Id), TestContext.Current.CancellationToken);
@@ -282,7 +282,7 @@ public class TagManagementServiceTests
     {
         var store = NewStore();
         var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [listing], [], [], [], [], []));
         var service = new TagManagementService(repository, () => Now, () => Guid.NewGuid());
 
         var result = await service.ApplyOrCreateTagAsync(new ApplyOrCreateTagRequest(listing.Id, " Brand new "), TestContext.Current.CancellationToken);
@@ -302,7 +302,7 @@ public class TagManagementServiceTests
         var store = NewStore();
         var existing = NewTag(store.Id, "Coffee");
         var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [existing], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [listing], [], [], [existing], [], []));
         var service = new TagManagementService(repository);
 
         var result = await service.ApplyOrCreateTagAsync(new ApplyOrCreateTagRequest(listing.Id, "coffee"), TestContext.Current.CancellationToken);
@@ -324,7 +324,7 @@ public class TagManagementServiceTests
         var store = NewStore();
         var archived = NewTag(store.Id, "coffee") with { IsArchived = true };
         var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [archived], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [listing], [], [], [archived], [], []));
         var service = new TagManagementService(repository);
 
         var result = await service.ApplyOrCreateTagAsync(new ApplyOrCreateTagRequest(listing.Id, "Coffee"), TestContext.Current.CancellationToken);
@@ -342,7 +342,7 @@ public class TagManagementServiceTests
     {
         var store = NewStore();
         var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [listing], [], [], [], [], []));
         var service = new TagManagementService(repository);
 
         var blank = await service.ApplyOrCreateTagAsync(new ApplyOrCreateTagRequest(listing.Id, " "), TestContext.Current.CancellationToken);
@@ -362,7 +362,7 @@ public class TagManagementServiceTests
         var firstActive = NewTag(first.Id, "Coffee");
         var firstArchived = NewTag(first.Id, "Paused") with { IsArchived = true };
         var secondActive = NewTag(second.Id, "Tea");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [], [], [], [], [], [firstActive, firstArchived, secondActive], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([first, second], [], [], [], [], [], [firstActive, firstArchived, secondActive], [], []));
         var service = new TagManagementService(repository);
 
         var firstVocabulary = await service.GetActiveTagVocabularyAsync(first.Id, TestContext.Current.CancellationToken);
@@ -379,7 +379,7 @@ public class TagManagementServiceTests
         var firstTag = NewTag(store.Id, "evergreen");
         var secondTag = NewTag(store.Id, "seasonal");
         var listing = new Listing(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [firstTag, secondTag], [new ListingTag(listing.Id, firstTag.Id)], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [listing], [], [], [firstTag, secondTag], [new ListingTag(listing.Id, firstTag.Id)], []));
         var service = new TagManagementService(repository);
 
         var tags = await service.GetListingTagsAsync(listing.Id, TestContext.Current.CancellationToken);
@@ -395,7 +395,7 @@ public class TagManagementServiceTests
         var firstActive = NewTag(first.Id, "Coffee");
         var firstArchived = NewTag(first.Id, "Paused") with { IsArchived = true };
         var secondActive = NewTag(second.Id, "Tea");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [], [], [], [], [], [firstActive, firstArchived, secondActive], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([first, second], [], [], [], [], [], [firstActive, firstArchived, secondActive], [], []));
         var service = new TagManagementService(repository);
 
         var state = await service.LoadAsync(first.Id, TestContext.Current.CancellationToken);
@@ -410,7 +410,7 @@ public class TagManagementServiceTests
     {
         var store = NewStore();
         var archived = NewTag(store.Id, "paused") with { IsArchived = true };
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [archived], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [archived], [], []));
         var service = new TagManagementService(repository);
 
         var state = await service.LoadAsync(store.Id, TestContext.Current.CancellationToken);
@@ -428,19 +428,19 @@ public class TagManagementServiceTests
         var link = new ListingTag(listing.Id, tag.Id);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new TagManagementService(new FailingWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [tag], [], [])))
+            new TagManagementService(new FailingWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [listing], [], [], [tag], [], [])))
                 .UpdateTagAsync(new TagManagementUpdateRequest(tag.Id, "renamed"), TestContext.Current.CancellationToken));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new TagManagementService(new FailingWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [tag], [], [])))
+            new TagManagementService(new FailingWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [listing], [], [], [tag], [], [])))
                 .ApplyTagAsync(new ApplyTagRequest(listing.Id, tag.Id), TestContext.Current.CancellationToken));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new TagManagementService(new FailingWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [tag], [link], [])))
+            new TagManagementService(new FailingWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [listing], [], [], [tag], [link], [])))
                 .RemoveTagAsync(new RemoveTagRequest(listing.Id, tag.Id), TestContext.Current.CancellationToken));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new TagManagementService(new FailingWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [tag], [], [])))
+            new TagManagementService(new FailingWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [listing], [], [], [tag], [], [])))
                 .ApplyOrCreateTagAsync(new ApplyOrCreateTagRequest(listing.Id, "fresh"), TestContext.Current.CancellationToken));
     }
 

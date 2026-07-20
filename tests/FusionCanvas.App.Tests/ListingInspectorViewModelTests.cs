@@ -272,7 +272,7 @@ public class ListingInspectorViewModelTests
                 Guid.NewGuid(), store.Id, niche.Id, child.Id, "Idea", "Description", ListingStatus.Draft, WorkflowStage.Design, false, now, now,
                 "{\"notes\":\"Notes\",\"idea\":\"idea-value\",\"phrase\":\"phrase-value\",\"graphicDirection\":\"graphic-value\",\"unknown\":\"kept\"}");
             var tag = new Tag(Guid.NewGuid(), store.Id, "Tag", null, false, now, now, "{}");
-            var snapshot = new WorkspaceSnapshot(
+            var snapshot = WorkspaceSnapshot.FromStores(
                 [store], [niche], [root, child], [listing], [], [], [tag],
                 [new ListingTag(listing.Id, tag.Id)], []);
             return new(snapshot, now, store, niche, root, child, listing, tag, new TestRepository(snapshot));

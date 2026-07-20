@@ -55,7 +55,7 @@ public class StoreManagementServiceTests
     public async Task CreateStoreAsync_RejectsEmptyAndDuplicateActiveNames()
     {
         var existing = NewStore("North Star Studio");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([existing], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([existing], [], [], [], [], [], [], [], []));
         var service = new StoreManagementService(repository);
 
         var empty = await service.CreateStoreAsync(new StoreManagementCreateRequest(" "), TestContext.Current.CancellationToken);
@@ -74,7 +74,7 @@ public class StoreManagementServiceTests
         var store = NewStore("North Star Studio");
         var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, Now, Now, "{}");
         var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Pumpkin espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [niche], [], [listing], [], [], [], [], []));
         var service = new StoreManagementService(repository, () => Now.AddMinutes(5));
         var context = new StoreContext("Updated", "Notes", "Dog owners", "Playful", "Q4 plan");
 
@@ -93,7 +93,7 @@ public class StoreManagementServiceTests
     public async Task ArchiveAndRestoreStoreAsync_SeparateActiveAndArchivedStores()
     {
         var store = NewStore("North Star Studio");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [], [], []));
         var service = new StoreManagementService(repository, () => Now.AddMinutes(1));
         await service.SelectStoreAsync(store.Id, TestContext.Current.CancellationToken);
 
@@ -113,7 +113,7 @@ public class StoreManagementServiceTests
     public async Task SelectStoreAsync_RejectsArchivedStore()
     {
         var archivedStore = NewStore("North Star Studio") with { IsArchived = true };
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([archivedStore], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([archivedStore], [], [], [], [], [], [], [], []));
         var service = new StoreManagementService(repository);
 
         var result = await service.SelectStoreAsync(archivedStore.Id, TestContext.Current.CancellationToken);
@@ -127,7 +127,7 @@ public class StoreManagementServiceTests
     public async Task DeleteStoreAsync_DeletesConfirmedEmptyStore()
     {
         var empty = NewStore("Empty Studio");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([empty], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([empty], [], [], [], [], [], [], [], []));
         var service = new StoreManagementService(repository);
         await service.SelectStoreAsync(empty.Id, TestContext.Current.CancellationToken);
 
@@ -143,7 +143,7 @@ public class StoreManagementServiceTests
     public async Task DeleteStoreAsync_RequiresConfirmation()
     {
         var empty = NewStore("Empty Studio");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([empty], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([empty], [], [], [], [], [], [], [], []));
         var service = new StoreManagementService(repository);
 
         var result = await service.DeleteStoreAsync(new StoreManagementDeleteRequest(empty.Id, ConfirmPermanentDeletion: false), TestContext.Current.CancellationToken);
@@ -158,7 +158,7 @@ public class StoreManagementServiceTests
     {
         var store = NewStore("North Star Studio");
         var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(WorkspaceSnapshot.FromStores([store], [niche], [], [], [], [], [], [], []));
         var service = new StoreManagementService(repository);
 
         var result = await service.DeleteStoreAsync(new StoreManagementDeleteRequest(store.Id, ConfirmPermanentDeletion: true), TestContext.Current.CancellationToken);
@@ -187,7 +187,7 @@ public class StoreManagementServiceTests
         var client = NewWorkspace("Client");
         var personalStore = NewStore("Shared Name") with { WorkspaceId = personal.Id };
         var clientStore = NewStore("Client Store") with { WorkspaceId = client.Id };
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([personal, client], [personalStore, clientStore], [], [], [], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([personal, client], [personalStore, clientStore], [], [], [], [], [], [], [], [], [], [], [], [], [], [], []));
         var service = new StoreManagementService(repository, () => Now, () => Guid.NewGuid());
         service.SetActiveWorkspace(client.Id);
 

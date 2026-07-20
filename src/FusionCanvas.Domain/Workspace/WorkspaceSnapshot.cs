@@ -13,9 +13,13 @@ public sealed record WorkspaceSnapshot(
     IReadOnlyList<AssetLink> AssetLinks,
     IReadOnlyList<Concept> Concepts,
     IReadOnlyList<Design> Designs,
-    IReadOnlyList<Mockup> Mockups)
+    IReadOnlyList<Mockup> Mockups,
+    IReadOnlyList<CreativeHistoryEvent> CreativeHistoryEvents,
+    IReadOnlyList<MockupProduct> MockupProducts,
+    IReadOnlyList<MockupTemplate> MockupTemplates,
+    IReadOnlyList<MockupColorVariant> MockupColorVariants)
 {
-    public WorkspaceSnapshot(
+    public static WorkspaceSnapshot FromStores(
         IReadOnlyList<Store> Stores,
         IReadOnlyList<Niche> Niches,
         IReadOnlyList<TopicGroup> Groups,
@@ -27,25 +31,15 @@ public sealed record WorkspaceSnapshot(
         IReadOnlyList<AssetLink> AssetLinks,
         IReadOnlyList<Concept>? Concepts = null,
         IReadOnlyList<Design>? Designs = null,
-        IReadOnlyList<Mockup>? Mockups = null)
-        : this(DefaultWorkspacesFor(Stores), Stores, Niches, Groups, Listings, Assets, Prompts, Tags, ListingTags, AssetLinks, Concepts ?? [], Designs ?? [], Mockups ?? [])
-    {
-    }
+        IReadOnlyList<Mockup>? Mockups = null,
+        IReadOnlyList<CreativeHistoryEvent>? CreativeHistoryEvents = null,
+        IReadOnlyList<MockupProduct>? MockupProducts = null,
+        IReadOnlyList<MockupTemplate>? MockupTemplates = null,
+        IReadOnlyList<MockupColorVariant>? MockupColorVariants = null)
+        => new(DefaultWorkspacesFor(Stores), Stores, Niches, Groups, Listings, Assets, Prompts, Tags, ListingTags, AssetLinks, Concepts ?? [], Designs ?? [], Mockups ?? [], CreativeHistoryEvents ?? [], MockupProducts ?? [], MockupTemplates ?? [], MockupColorVariants ?? []);
 
     public static WorkspaceSnapshot Empty { get; } = new(
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-        []);
+        [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], []);
 
     public static Workspace DefaultWorkspace(DateTimeOffset timestamp) =>
         new(

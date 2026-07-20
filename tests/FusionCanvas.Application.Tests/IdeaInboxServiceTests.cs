@@ -249,7 +249,7 @@ public class IdeaInboxServiceTests
             var root = new TopicGroup(Guid.NewGuid(), store.Id, nicheId, null, "Root", null, false, now, now, "{}");
             var child = new TopicGroup(Guid.NewGuid(), store.Id, null, root.Id, "Child", null, false, now, now, "{}");
             var listing = new Listing(Guid.NewGuid(), store.Id, nicheId, child.Id, "Idea", "Description", ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{\"unknown\":\"kept\"}");
-            var snapshot = new WorkspaceSnapshot([store], [niche], [root, child], [listing], [], [], [], [], []);
+            var snapshot = WorkspaceSnapshot.FromStores([store], [niche], [root, child], [listing], [], [], [], [], []);
             return new(snapshot, now, store, niche, root, child, listing);
         }
     }

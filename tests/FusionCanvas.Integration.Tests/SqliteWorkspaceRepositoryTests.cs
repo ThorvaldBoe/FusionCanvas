@@ -50,7 +50,7 @@ public class SqliteWorkspaceRepositoryTests
 
         await repository.SaveAsync(CreateCompleteSnapshot(), TestContext.Current.CancellationToken);
 
-        Assert.Equal(7, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(8, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public class SqliteWorkspaceRepositoryTests
             createdAt,
             updatedAt,
             """{"notes":"Review later"}""");
-        var snapshot = new WorkspaceSnapshot([active, archived], [], [], [], [], [], [], [], []);
+        var snapshot = WorkspaceSnapshot.FromStores([active, archived], [], [], [], [], [], [], [], []);
 
         await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
         var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
@@ -85,7 +85,7 @@ public class SqliteWorkspaceRepositoryTests
         Assert.Equal(2, loaded.Stores.Count);
         Assert.Equal(active, loaded.Stores.Single(store => store.Id == active.Id));
         Assert.Equal(archived, loaded.Stores.Single(store => store.Id == archived.Id));
-        Assert.Equal(7, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(8, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -98,13 +98,13 @@ public class SqliteWorkspaceRepositoryTests
         var first = new Store(Guid.NewGuid(), "First Studio", null, false, createdAt, createdAt, "{}");
         var deleted = new Store(Guid.NewGuid(), "Deleted Studio", null, false, createdAt, createdAt, "{}");
 
-        await repository.SaveAsync(new WorkspaceSnapshot([first, deleted], [], [], [], [], [], [], [], []), TestContext.Current.CancellationToken);
-        await repository.SaveAsync(new WorkspaceSnapshot([first], [], [], [], [], [], [], [], []), TestContext.Current.CancellationToken);
+        await repository.SaveAsync(WorkspaceSnapshot.FromStores([first, deleted], [], [], [], [], [], [], [], []), TestContext.Current.CancellationToken);
+        await repository.SaveAsync(WorkspaceSnapshot.FromStores([first], [], [], [], [], [], [], [], []), TestContext.Current.CancellationToken);
         var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(first.Id, Assert.Single(loaded.Stores).Id);
         Assert.DoesNotContain(loaded.Stores, store => store.Id == deleted.Id);
-        Assert.Equal(7, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(8, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -134,7 +134,7 @@ public class SqliteWorkspaceRepositoryTests
             createdAt,
             updatedAt,
             """{"notes":"Review later"}""");
-        var snapshot = new WorkspaceSnapshot([store], [active, archived], [], [], [], [], [], [], []);
+        var snapshot = WorkspaceSnapshot.FromStores([store], [active, archived], [], [], [], [], [], [], []);
 
         await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
         var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
@@ -142,7 +142,7 @@ public class SqliteWorkspaceRepositoryTests
         Assert.Equal(2, loaded.Niches.Count);
         Assert.Equal(active, loaded.Niches.Single(niche => niche.Id == active.Id));
         Assert.Equal(archived, loaded.Niches.Single(niche => niche.Id == archived.Id));
-        Assert.Equal(7, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(8, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -156,13 +156,13 @@ public class SqliteWorkspaceRepositoryTests
         var kept = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, createdAt, createdAt, "{}");
         var deleted = new Niche(Guid.NewGuid(), store.Id, "Deleted", null, false, createdAt, createdAt, "{}");
 
-        await repository.SaveAsync(new WorkspaceSnapshot([store], [kept, deleted], [], [], [], [], [], [], []), TestContext.Current.CancellationToken);
-        await repository.SaveAsync(new WorkspaceSnapshot([store], [kept], [], [], [], [], [], [], []), TestContext.Current.CancellationToken);
+        await repository.SaveAsync(WorkspaceSnapshot.FromStores([store], [kept, deleted], [], [], [], [], [], [], []), TestContext.Current.CancellationToken);
+        await repository.SaveAsync(WorkspaceSnapshot.FromStores([store], [kept], [], [], [], [], [], [], []), TestContext.Current.CancellationToken);
         var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(kept.Id, Assert.Single(loaded.Niches).Id);
         Assert.DoesNotContain(loaded.Niches, niche => niche.Id == deleted.Id);
-        Assert.Equal(7, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(8, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -176,7 +176,7 @@ public class SqliteWorkspaceRepositoryTests
         var sourceNiche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, "{}");
         var destinationNiche = new Niche(Guid.NewGuid(), store.Id, "Dogs", null, false, now, now, "{}");
         await repository.SaveAsync(
-            new WorkspaceSnapshot([store], [sourceNiche, destinationNiche], [], [], [], [], [], [], []),
+            WorkspaceSnapshot.FromStores([store], [sourceNiche, destinationNiche], [], [], [], [], [], [], []),
             TestContext.Current.CancellationToken);
         var ids = new Queue<Guid>([Guid.NewGuid(), Guid.NewGuid()]);
         var service = new GroupManagementService(repository, () => now.AddMinutes(1), () => ids.Dequeue());
@@ -223,7 +223,7 @@ public class SqliteWorkspaceRepositoryTests
         Assert.Contains("Ready for art", loadedChild.MetadataJson);
         Assert.Equal(child.Group.Id, loadedListing.GroupId);
         Assert.Equal(destinationNiche.Id, loadedListing.NicheId);
-        Assert.Equal(7, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(8, await ReadUserVersionAsync(databasePath));
     }
 
 
@@ -238,7 +238,7 @@ public class SqliteWorkspaceRepositoryTests
 
         await repository.LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(7, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(8, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -277,7 +277,7 @@ public class SqliteWorkspaceRepositoryTests
 
         var loaded = await new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(7, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(8, await ReadUserVersionAsync(databasePath));
         Assert.Equal(nicheId, Assert.Single(loaded.Stores).DefaultNicheId);
         Assert.Equal(["Alpha", "Zulu"], loaded.Groups.OrderBy(group => group.SortOrder).Select(group => group.Name));
         Assert.Equal([0, 1], loaded.Groups.OrderBy(group => group.SortOrder).Select(group => group.SortOrder));
@@ -332,7 +332,7 @@ public class SqliteWorkspaceRepositoryTests
 
         var loaded = await new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(7, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(8, await ReadUserVersionAsync(databasePath));
         var byName = loaded.Listings.ToDictionary(listing => listing.Name);
         Assert.Equal(ListingStatus.Draft, byName["Active"].Status);
         Assert.Equal(WorkflowStage.Listing, byName["Active"].Stage);
@@ -353,7 +353,7 @@ public class SqliteWorkspaceRepositoryTests
     {
         using var tempDirectory = new TemporaryDirectory();
         var databasePath = tempDirectory.GetPath("workspace.db");
-        await SetUserVersionAsync(databasePath, 8);
+        await SetUserVersionAsync(databasePath, 9);
         var repository = new SqliteWorkspaceRepository(databasePath);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -373,7 +373,7 @@ public class SqliteWorkspaceRepositoryTests
         var withColor = new Tag(Guid.NewGuid(), store.Id, "evergreen", "Always relevant", false, now, now, "{}", "#1abc9c");
         var nullColor = new Tag(Guid.NewGuid(), store.Id, "draft", null, false, now, now, "{}", null);
         var expandedColor = new Tag(Guid.NewGuid(), store.Id, "risky", null, false, now, now, "{}", "#f00");
-        var snapshot = new WorkspaceSnapshot([store], [], [], [], [], [], [withColor, nullColor, expandedColor], [], []);
+        var snapshot = WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [withColor, nullColor, expandedColor], [], []);
 
         await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
         var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
@@ -383,7 +383,7 @@ public class SqliteWorkspaceRepositoryTests
         Assert.Equal(nullColor, loaded.Tags.Single(tag => tag.Id == nullColor.Id));
         Assert.Null(loaded.Tags.Single(tag => tag.Id == nullColor.Id).Color);
         Assert.Equal("#FF0000", loaded.Tags.Single(tag => tag.Id == expandedColor.Id).Color);
-        Assert.Equal(7, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(8, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -424,7 +424,7 @@ public class SqliteWorkspaceRepositoryTests
 
         var loaded = await new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(7, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(8, await ReadUserVersionAsync(databasePath));
         var tag = Assert.Single(loaded.Tags);
         Assert.Equal(tagId, tag.Id);
         Assert.Equal(storeId, tag.StoreId);
@@ -443,7 +443,7 @@ public class SqliteWorkspaceRepositoryTests
 
         await Assert.ThrowsAsync<ArgumentException>(
             () => repository.SaveAsync(
-                new WorkspaceSnapshot([store], [], [], [], [], [], [new Tag(Guid.NewGuid(), store.Id, "bad", null, false, now, now, "{}", "not-a-color")], [], []),
+                WorkspaceSnapshot.FromStores([store], [], [], [], [], [], [new Tag(Guid.NewGuid(), store.Id, "bad", null, false, now, now, "{}", "not-a-color")], [], []),
                 TestContext.Current.CancellationToken));
     }
 
@@ -455,7 +455,7 @@ public class SqliteWorkspaceRepositoryTests
         var repository = new SqliteWorkspaceRepository(databasePath);
         var original = CreateCompleteSnapshot();
         var invalidStore = new Store(Guid.NewGuid(), "Invalid replacement", null, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "{}");
-        var invalidSnapshot = new WorkspaceSnapshot(
+        var invalidSnapshot = WorkspaceSnapshot.FromStores(
             [invalidStore],
             [],
             [],
@@ -487,7 +487,7 @@ public class SqliteWorkspaceRepositoryTests
         var client = new FusionCanvas.Domain.Workspace.Workspace(Guid.NewGuid(), "Client", "Client work", false, now, now, """{"notes":"Retainer"}""");
         var personalStore = new Store(Guid.NewGuid(), personal.Id, "Personal Store", null, false, now, now, "{}");
         var clientStore = new Store(Guid.NewGuid(), client.Id, "Client Store", null, false, now, now, "{}");
-        var snapshot = new WorkspaceSnapshot([personal, client], [personalStore, clientStore], [], [], [], [], [], [], [], [], [], [], []);
+        var snapshot = new WorkspaceSnapshot([personal, client], [personalStore, clientStore], [], [], [], [], [], [], [], [], [], [], [], [], [], [], []);
 
         await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
         var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
@@ -512,7 +512,7 @@ public class SqliteWorkspaceRepositoryTests
         var prompt = new Prompt(Guid.NewGuid(), store.Id, listing.Id, "Listing prompt", "Phrase prompt", "Create a warm fall coffee phrase.", false, createdAt, updatedAt, """{"model":"manual"}""");
         var tag = new Tag(Guid.NewGuid(), store.Id, "seasonal", "Seasonal work", false, createdAt, updatedAt, """{"color":"orange"}""");
 
-        return new WorkspaceSnapshot(
+        return WorkspaceSnapshot.FromStores(
             [store],
             [niche],
             [group],
