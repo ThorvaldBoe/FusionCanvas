@@ -1,3 +1,4 @@
+using FusionCanvas.App.Assets;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Groups;
 using FusionCanvas.App.Listings;
@@ -27,6 +28,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly IWorkspaceRepository? _workspaceRepository;
     private readonly IGroupManagementService _groupManagementService;
     private readonly IListingManagementService _listingManagementService;
+    private readonly IAssetManagementService _assetManagementService;
+    private readonly IListingInspectorService _listingInspectorService;
     private WorkspaceSnapshot _workspaceSnapshot;
     private IReadOnlyList<NavigationDocumentContext> _navigationContexts = [];
 
@@ -68,7 +71,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.Repository,
             runtime.Snapshot,
             runtime.GroupManagement,
-            runtime.ListingManagement)
+            runtime.ListingManagement,
+            runtime.AssetManagement,
+            runtime.FileStore,
+            runtime.ListingInspector)
     {
     }
 
@@ -120,8 +126,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _workspaceRepository = treeRepository;
         _groupManagementService = new GroupManagementService(treeRepository);
         _listingManagementService = new ListingManagementService(treeRepository);
+        var fileStore = new InMemoryWorkspaceFileStore();
+        _assetManagementService = new AssetManagementService(treeRepository, fileStore);
+        _listingInspectorService = new ListingInspectorService(treeRepository);
         GroupManagement = new GroupManagementViewModel(_groupManagementService);
-        ListingManagement = new ListingManagementViewModel(_listingManagementService);
+        ListingManagement = new ListingManagementViewModel(_listingManagementService, new TagManagementService(treeRepository));
+        AssetsManagement = new AssetsViewModel(_assetManagementService);
+        ListingInspector = new ListingInspectorViewModel(_listingInspectorService);
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
         _workspaceSnapshot = workspaceSnapshot;
@@ -141,6 +152,20 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 SelectWorkflowStage(stage);
             }
         });
+        RequestSelectTabCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is DocumentTabViewModel tab)
+            {
+                HandleSelectTabRequest(tab);
+            }
+        });
+        RequestCloseTabCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is DocumentTabViewModel tab)
+            {
+                HandleCloseTabRequest(tab);
+            }
+        });
         MoveStageForwardCommand = new RelayCommand(_ => Run(MoveStageForwardAsync()));
         MoveStageBackCommand = new RelayCommand(_ => Run(MoveStageBackAsync()));
         SetListingStatusCommand = new RelayCommand(parameter =>
@@ -157,9 +182,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         SubscribeToWorkspacePromptState();
         InitializeWorkspaces();
         InitializeStores();
+        AssetsManagement.WorkspaceStructureChanged += (_, _) => RefreshWorkspaceSnapshot();
+        WorkspaceTree.ManageAssetsRequested += (_, selection) => Run(OpenManageAssetsAsync(selection));
         DocumentWindow.ActiveContextChanged += (_, context) => CoordinateActiveContext(context);
         DocumentWindow.ToolScopeChangeRequested += (_, scope) => ResolveActiveToolContext(scope);
         DocumentWindow.StageToolSelectionRequested += (_, toolId) => SelectStageTool(toolId);
+        ListingInspector.Saved += (_, _) => HandleInspectorSaved();
     }
 
     public MainWindowViewModel(
@@ -170,18 +198,27 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IWorkspaceRepository workspaceRepository,
         WorkspaceSnapshot workspaceSnapshot,
         IGroupManagementService? groupManagementService = null,
-        IListingManagementService? listingManagementService = null)
+        IListingManagementService? listingManagementService = null,
+        IAssetManagementService? assetManagementService = null,
+        IWorkspaceFileStore? workspaceFileStore = null,
+        IListingInspectorService? listingInspectorService = null)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
         WorkspaceManagement = new WorkspaceManagementViewModel(new WorkspaceManagementService(workspaceRepository));
         StoreManagement = new StoreManagementViewModel(
             new StoreManagementService(workspaceRepository),
-            new NicheManagementService(workspaceRepository));
+            new NicheManagementService(workspaceRepository),
+            new TagManagementService(workspaceRepository));
         _groupManagementService = groupManagementService ?? new GroupManagementService(workspaceRepository);
         _listingManagementService = listingManagementService ?? new ListingManagementService(workspaceRepository);
+        var fileStore = workspaceFileStore ?? new InMemoryWorkspaceFileStore();
+        _assetManagementService = assetManagementService ?? new AssetManagementService(workspaceRepository, fileStore);
+        _listingInspectorService = listingInspectorService ?? new ListingInspectorService(workspaceRepository);
         GroupManagement = new GroupManagementViewModel(_groupManagementService);
-        ListingManagement = new ListingManagementViewModel(_listingManagementService);
+        ListingManagement = new ListingManagementViewModel(_listingManagementService, new TagManagementService(workspaceRepository));
+        AssetsManagement = new AssetsViewModel(_assetManagementService);
+        ListingInspector = new ListingInspectorViewModel(_listingInspectorService);
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
         _workspaceRepository = workspaceRepository;
@@ -202,6 +239,20 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 SelectWorkflowStage(stage);
             }
         });
+        RequestSelectTabCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is DocumentTabViewModel tab)
+            {
+                HandleSelectTabRequest(tab);
+            }
+        });
+        RequestCloseTabCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is DocumentTabViewModel tab)
+            {
+                HandleCloseTabRequest(tab);
+            }
+        });
         MoveStageForwardCommand = new RelayCommand(_ => Run(MoveStageForwardAsync()));
         MoveStageBackCommand = new RelayCommand(_ => Run(MoveStageBackAsync()));
         SetListingStatusCommand = new RelayCommand(parameter =>
@@ -218,9 +269,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         SubscribeToWorkspacePromptState();
         InitializeWorkspaces();
         InitializeStores();
+        AssetsManagement.WorkspaceStructureChanged += (_, _) => RefreshWorkspaceSnapshot();
+        WorkspaceTree.ManageAssetsRequested += (_, selection) => Run(OpenManageAssetsAsync(selection));
         DocumentWindow.ActiveContextChanged += (_, context) => CoordinateActiveContext(context);
         DocumentWindow.ToolScopeChangeRequested += (_, scope) => ResolveActiveToolContext(scope);
         DocumentWindow.StageToolSelectionRequested += (_, toolId) => SelectStageTool(toolId);
+        ListingInspector.Saved += (_, _) => HandleInspectorSaved();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -236,6 +290,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public GroupManagementViewModel GroupManagement { get; }
 
     public ListingManagementViewModel ListingManagement { get; }
+
+    public AssetsViewModel AssetsManagement { get; }
+
+    public ListingInspectorViewModel ListingInspector { get; }
 
     public WorkspaceTreeViewModel WorkspaceTree { get; }
 
@@ -325,7 +383,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         ArgumentNullException.ThrowIfNull(navigationContext);
 
-        DocumentWindow.Open(navigationContext.Context);
+        GuardActiveListingInspectorLeave(() => DocumentWindow.Open(navigationContext.Context));
     }
 
     public void SelectWorkflowStage(WorkflowStage stage)
@@ -495,6 +553,22 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         RaiseLifecycleProperties();
     }
 
+    private void RefreshWorkspaceSnapshotAndInspector()
+    {
+        RefreshWorkspaceSnapshot();
+        RefreshActiveListingInspector();
+    }
+
+    private void RefreshActiveListingInspector()
+    {
+        if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Listing, Kind: DocumentContextKind.Item, Id: var listingId }
+            && ListingInspector.HasState
+            && !ListingInspector.HasUnsavedChanges)
+        {
+            Run(ListingInspector.LoadAsync(listingId));
+        }
+    }
+
     private void CoordinateActiveContext(DocumentContext? context)
     {
         RaiseGroupActionProperties();
@@ -503,6 +577,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             WorkflowNavigator.SetActiveItem(null);
             DocumentWindow.ApplyToolContext(null);
             DocumentWindow.ApplyStageToolHostState(null);
+            ListingInspector.Clear();
             RaiseLifecycleProperties();
             return;
         }
@@ -521,7 +596,28 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             DocumentWindow.ActiveTab?.TabId ?? Guid.Empty,
             context.Workflow));
         ResolveActiveToolContext();
+        CoordinateListingInspector(context);
         RaiseLifecycleProperties();
+    }
+
+    private void CoordinateListingInspector(DocumentContext context)
+    {
+        if (context.Kind != DocumentContextKind.Item || context.EntityKind != WorkspaceEntityKind.Listing)
+        {
+            if (ListingInspector.LoadedListingId is not null)
+            {
+                ListingInspector.Clear();
+            }
+            return;
+        }
+
+        if (ListingInspector.LoadedListingId == context.Id)
+        {
+            ListingInspector.ApplyStage(context.WorkflowStage);
+            return;
+        }
+
+        Run(ListingInspector.LoadAsync(context.Id));
     }
 
     private void InitializeGroupIntegration()
@@ -533,7 +629,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         WorkspaceTree.EditPropertiesRequested += (_, groupId) => Run(OpenManageGroupAsync(groupId));
         WorkspaceTree.EditListingPropertiesRequested += (_, listingId) => Run(OpenManageListingAsync(listingId));
         WorkspaceTree.EntitiesDeleted += (_, entityIds) => CloseDeletedEntityTabs(entityIds);
-        WorkspaceTree.StructureChanged += (_, _) => RefreshWorkspaceSnapshot();
+        WorkspaceTree.StructureChanged += (_, _) => RefreshWorkspaceSnapshotAndInspector();
         WorkspaceTree.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName is nameof(WorkspaceTreeViewModel.SelectedNode) or nameof(WorkspaceTreeViewModel.CanManageSelection))
@@ -562,6 +658,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         GroupManagement.SetActiveWorkspace(workspaceId);
         ListingManagement.SetActiveWorkspace(workspaceId);
+        AssetsManagement.SetActiveWorkspace(workspaceId);
     }
 
     private async Task OpenManageListingAsync(Guid listingId)
@@ -574,6 +671,41 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
 
         await ListingManagement.OpenForEditAsync(listing.StoreId, listing.Id).ConfigureAwait(false);
+    }
+
+    private async Task OpenManageAssetsAsync(WorkspaceTreeSelection selection)
+    {
+        RefreshWorkspaceSnapshot();
+        var storeId = ResolveContextStoreId(selection);
+        if (storeId is null)
+        {
+            return;
+        }
+
+        await AssetsManagement.OpenForContextAsync(new AssetContextReference(selection.Kind, selection.Id)).ConfigureAwait(false);
+    }
+
+    public async Task OpenManageStoreAssetsAsync()
+    {
+        RefreshWorkspaceSnapshot();
+        if (StoreManagement.SelectedStore is not { } store)
+        {
+            return;
+        }
+
+        await AssetsManagement.OpenForContextAsync(new AssetContextReference(WorkspaceEntityKind.Store, store.Id)).ConfigureAwait(false);
+    }
+
+    private Guid? ResolveContextStoreId(WorkspaceTreeSelection selection)
+    {
+        return selection.Kind switch
+        {
+            WorkspaceEntityKind.Store => selection.Id,
+            WorkspaceEntityKind.Niche => _workspaceSnapshot.Niches.SingleOrDefault(niche => niche.Id == selection.Id)?.StoreId,
+            WorkspaceEntityKind.Group => _workspaceSnapshot.Groups.SingleOrDefault(group => group.Id == selection.Id)?.StoreId,
+            WorkspaceEntityKind.Listing => _workspaceSnapshot.Listings.SingleOrDefault(listing => listing.Id == selection.Id)?.StoreId,
+            _ => null
+        };
     }
 
     private async Task OpenCreateGroupAsync()
@@ -636,7 +768,65 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             candidate.Context.EntityKind == selection.Kind && candidate.Context.Id == selection.Id);
         if (context is not null)
         {
-            DocumentWindow.OpenOrReplaceActive(context.Context);
+            GuardActiveListingInspectorLeave(() => DocumentWindow.OpenOrReplaceActive(context.Context));
+        }
+    }
+
+    private void HandleSelectTabRequest(DocumentTabViewModel tab)
+    {
+        ArgumentNullException.ThrowIfNull(tab);
+        if (ReferenceEquals(DocumentWindow.ActiveTab, tab))
+        {
+            return;
+        }
+
+        GuardActiveListingInspectorLeave(() => DocumentWindow.SelectTab(tab));
+    }
+
+    private void HandleCloseTabRequest(DocumentTabViewModel tab)
+    {
+        ArgumentNullException.ThrowIfNull(tab);
+        if (ReferenceEquals(DocumentWindow.ActiveTab, tab))
+        {
+            GuardActiveListingInspectorLeave(() => DocumentWindow.CloseTab(tab));
+            return;
+        }
+
+        DocumentWindow.CloseTab(tab);
+    }
+
+    public ICommand RequestSelectTabCommand { get; private set; } = null!;
+
+    public ICommand RequestCloseTabCommand { get; private set; } = null!;
+
+    private void GuardActiveListingInspectorLeave(Action proceed)
+    {
+        if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Listing, Kind: DocumentContextKind.Item }
+            && ListingInspector.HasState
+            && ListingInspector.HasUnsavedChanges)
+        {
+            ListingInspector.RequestLeave(proceed);
+            return;
+        }
+
+        proceed();
+    }
+
+    private void HandleInspectorSaved()
+    {
+        RefreshWorkspaceSnapshot();
+        if (DocumentWindow.ActiveContext is { } context && context.EntityKind == WorkspaceEntityKind.Listing)
+        {
+            var refreshed = NavigationContexts.SingleOrDefault(candidate => candidate.Context.Id == context.Id);
+            if (refreshed is not null)
+            {
+                DocumentWindow.ActiveTab?.ReplaceContext(refreshed.Context);
+            }
+        }
+
+        if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Listing, Id: var listingId })
+        {
+            Run(ListingInspector.LoadAsync(listingId));
         }
     }
 
@@ -946,6 +1136,29 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(_snapshot);
+    }
+
+    private sealed class InMemoryWorkspaceFileStore : IWorkspaceFileStore
+    {
+        private readonly HashSet<string> _existing = [];
+
+        public string WorkspaceRoot => string.Empty;
+
+        public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, AssetKind kind, CancellationToken cancellationToken = default)
+        {
+            var relativePath = $"assets/{Path.GetFileName(sourcePath)}";
+            _existing.Add(relativePath);
+            return Task.FromResult(new ManagedWorkspaceFile(
+                Path.GetFileName(sourcePath),
+                kind,
+                relativePath,
+                Path.Combine("workspace", relativePath),
+                sourcePath));
+        }
+
+        public bool Exists(string workspaceRelativePath) => _existing.Contains(workspaceRelativePath.Replace('\\', '/'));
+
+        public bool TryDelete(string workspaceRelativePath) => _existing.Remove(workspaceRelativePath.Replace('\\', '/'));
     }
 }
 

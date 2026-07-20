@@ -566,12 +566,124 @@ public class StoreManagementViewModelTests
             context.Context.EntityKind == WorkspaceEntityKind.Niche);
     }
 
+    [Fact]
+    public async Task TagsTab_CreatesRenamesArchivesRestoresAndDeletesTags()
+    {
+        var storeId = Guid.NewGuid();
+        var store = new Store(storeId, "Studio", null, false, Now, Now, "{}");
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
+        var tagId = Guid.NewGuid();
+        var viewModel = new StoreManagementViewModel(
+            new StoreManagementService(repository),
+            nicheService: null,
+            new TagManagementService(repository, () => Now.AddMinutes(1), () => tagId));
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+
+        viewModel.OpenTagsTabCommand.Execute(null);
+        Assert.True(viewModel.IsTagsTabSelected);
+        Assert.True(viewModel.NeedsFirstTag);
+
+        viewModel.StartCreateTagCommand.Execute(null);
+        Assert.True(viewModel.IsTagsTabSelected);
+        viewModel.TagName = "Evergreen";
+        viewModel.TagColor = "#1ab";
+        viewModel.TagDescription = "Always relevant";
+        await viewModel.SaveSelectedTagAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(viewModel.IsStoreEditorOpen == false);
+        Assert.True(viewModel.HasActiveTags);
+        Assert.Equal("Evergreen", viewModel.SelectedTag!.Name);
+        Assert.Equal("#11AABB", viewModel.SelectedTag.Color);
+
+        viewModel.TagName = "EvergreenUpdated";
+        await viewModel.SaveSelectedTagAsync(TestContext.Current.CancellationToken);
+        Assert.Equal("EvergreenUpdated", viewModel.SelectedTag!.Name);
+
+        viewModel.ArchiveSelectedTagCommand.Execute(null);
+        await Task.Yield();
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.True(viewModel.HasArchivedTags);
+
+        viewModel.RestoreTagCommand.Execute(viewModel.ArchivedTags.Single());
+        await Task.Yield();
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.True(viewModel.HasActiveTags);
+
+        viewModel.RequestDeleteSelectedTagCommand.Execute(null);
+        Assert.True(viewModel.TagDeleteWarningVisible);
+        viewModel.CancelDeleteTagCommand.Execute(null);
+        Assert.False(viewModel.TagDeleteWarningVisible);
+        Assert.True(viewModel.HasSelectedTag);
+
+        viewModel.RequestDeleteSelectedTagCommand.Execute(null);
+        await Task.Yield();
+        await viewModel.ConfirmDeleteTagAsync(TestContext.Current.CancellationToken);
+        Assert.False(viewModel.HasSelectedTag);
+        Assert.Empty(repository.Snapshot.Tags);
+    }
+
+    [Fact]
+    public async Task TagsTab_DeleteWarningReportsListingCountFromAppliedTag()
+    {
+        var storeId = Guid.NewGuid();
+        var store = new Store(storeId, "Studio", null, false, Now, Now, "{}");
+        var niche = new Niche(Guid.NewGuid(), storeId, "Niche", null, false, Now, Now, "{}");
+        var listing = new Listing(Guid.NewGuid(), storeId, niche.Id, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
+        var tag = new Tag(Guid.NewGuid(), storeId, "Evergreen", null, false, Now, Now, "{}", null);
+        var link = new ListingTag(listing.Id, tag.Id);
+        var snapshot = new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [tag], [link], []);
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+        var viewModel = new StoreManagementViewModel(
+            new StoreManagementService(repository),
+            nicheService: null,
+            new TagManagementService(repository));
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.OpenTagsTabCommand.Execute(null);
+        viewModel.EditTagCommand.Execute(viewModel.EditorActiveTags.Single());
+
+        viewModel.RequestDeleteSelectedTagCommand.Execute(null);
+        Assert.True(viewModel.TagDeleteWarningVisible);
+        await Task.Yield();
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("1 listing", viewModel.TagDeleteWarningMessage);
+    }
+
+    [Fact]
+    public async Task TagsTab_DiscardsUnsavedChangesWhenSwitchingTagsWithConfirmation()
+    {
+        var storeId = Guid.NewGuid();
+        var store = new Store(storeId, "Studio", null, false, Now, Now, "{}");
+        var first = new Tag(Guid.NewGuid(), storeId, "Alpha", null, false, Now, Now, "{}", null);
+        var second = new Tag(Guid.NewGuid(), storeId, "Beta", null, false, Now, Now, "{}", null);
+        var snapshot = new WorkspaceSnapshot([store], [], [], [], [], [], [first, second], [], []);
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+        var viewModel = new StoreManagementViewModel(
+            new StoreManagementService(repository),
+            nicheService: null,
+            new TagManagementService(repository));
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.OpenTagsTabCommand.Execute(null);
+        viewModel.EditTagCommand.Execute(viewModel.EditorActiveTags.Single(tag => tag.Id == first.Id));
+
+        viewModel.TagName = "Renamed";
+        Assert.True(viewModel.HasUnsavedTagChanges);
+        viewModel.EditTagCommand.Execute(viewModel.EditorActiveTags.Single(tag => tag.Id == second.Id));
+        Assert.True(viewModel.DiscardChangesPromptVisible);
+
+        viewModel.ConfirmDiscardChangesCommand.Execute(null);
+        Assert.False(viewModel.DiscardChangesPromptVisible);
+        Assert.Equal("Beta", viewModel.SelectedTag!.Name);
+        Assert.False(viewModel.HasUnsavedTagChanges);
+    }
+
     private static Store NewStore(string name, bool isArchived = false) =>
         new(Guid.NewGuid(), name, null, isArchived, Now, Now, "{}");
 
     private sealed class InMemoryWorkspaceRepository(WorkspaceSnapshot? snapshot = null) : IWorkspaceRepository
     {
         private WorkspaceSnapshot _snapshot = snapshot ?? WorkspaceSnapshot.Empty;
+
+        public WorkspaceSnapshot Snapshot => _snapshot;
 
         public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
         {

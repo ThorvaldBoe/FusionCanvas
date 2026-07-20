@@ -47,5 +47,7 @@ public class WorkspaceFileStoreContractTests
         }
 
         public bool Exists(string workspaceRelativePath) => _existingReferences.Contains(workspaceRelativePath);
+
+        public bool TryDelete(string workspaceRelativePath) => _existingReferences.Remove(workspaceRelativePath);
     }
 }

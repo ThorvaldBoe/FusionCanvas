@@ -97,9 +97,6 @@ public interface IListingManagementService
 
 public sealed class ListingManagementService : IListingManagementService
 {
-    private const string NotesKey = "notes";
-    private const string InheritedFromPrefix = "inheritedFrom:";
-
     private readonly IWorkspaceRepository _repository;
     private readonly IToolContextResolver _contextResolver;
     private readonly Func<DateTimeOffset> _clock;
@@ -194,8 +191,8 @@ public sealed class ListingManagementService : IListingManagementService
             return Failure(topicError!, snapshot, _activeStoreId);
         }
 
-        var name = NormalizeName(request.Name);
-        var nameError = ValidateName(name);
+        var name = ListingMetadataCodec.NormalizeName(request.Name);
+        var nameError = ListingMetadataCodec.ValidateName(name);
         if (nameError is not null)
         {
             return Failure(nameError, snapshot, storeId);
@@ -210,13 +207,13 @@ public sealed class ListingManagementService : IListingManagementService
             nicheId,
             request.Topic.Kind == WorkspaceEntityKind.Group ? request.Topic.Id : null,
             name,
-            NormalizeOptional(context.Description),
+            ListingMetadataCodec.NormalizeOptional(context.Description),
             ListingStatus.Draft,
             WorkflowStage.Idea,
             false,
             now,
             now,
-            SerializeMetadata(metadata));
+            ListingMetadataCodec.SerializeMetadata(metadata));
 
         IReadOnlyList<Guid> tagIds;
         try
@@ -255,21 +252,21 @@ public sealed class ListingManagementService : IListingManagementService
             return Failure("Listing was not found.", snapshot, _activeStoreId);
         }
 
-        var name = NormalizeName(request.Name);
-        var nameError = ValidateName(name);
+        var name = ListingMetadataCodec.NormalizeName(request.Name);
+        var nameError = ListingMetadataCodec.ValidateName(name);
         if (nameError is not null)
         {
             return Failure(nameError, snapshot, existing.StoreId);
         }
 
         var context = request.Context ?? ToContext(snapshot, existing);
-        var metadata = ParseMetadata(existing.MetadataJson);
+        var metadata = ListingMetadataCodec.ParseMetadata(existing.MetadataJson);
         ApplyContextMetadata(metadata, context, replaceExplicitMetadata: context.Metadata is not null);
         var changed = existing with
         {
             Name = name,
-            Description = NormalizeOptional(context.Description),
-            MetadataJson = SerializeMetadata(metadata),
+            Description = ListingMetadataCodec.NormalizeOptional(context.Description),
+            MetadataJson = ListingMetadataCodec.SerializeMetadata(metadata),
             UpdatedAt = _clock()
         };
         IReadOnlyList<ListingTag> listingTags;
@@ -727,7 +724,7 @@ public sealed class ListingManagementService : IListingManagementService
             foreach (var value in _contextResolver.ResolveCreationDefaults(resolution).Metadata)
             {
                 metadata[value.Key] = value.Value;
-                metadata[$"{InheritedFromPrefix}{value.Key}"] = $"{value.Source.EntityKind}:{value.Source.EntityId}";
+                metadata[$"{ListingMetadataCodec.InheritedFromPrefix}{value.Key}"] = $"{value.Source.EntityKind}:{value.Source.EntityId}";
             }
         }
 
@@ -767,43 +764,15 @@ public sealed class ListingManagementService : IListingManagementService
         return ids;
     }
 
-    private static void ApplyContextMetadata(Dictionary<string, string> metadata, ListingContext context, bool replaceExplicitMetadata)
-    {
-        SetOptional(metadata, NotesKey, context.Notes);
-        if (context.Metadata is null)
-        {
-            return;
-        }
-
-        foreach (var pair in context.Metadata)
-        {
-            var key = pair.Key?.Trim();
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                continue;
-            }
-            var value = NormalizeOptional(pair.Value);
-            if (value is null)
-            {
-                metadata.Remove(key);
-            }
-            else
-            {
-                metadata[key] = value;
-            }
-            if (replaceExplicitMetadata)
-            {
-                metadata.Remove($"{InheritedFromPrefix}{key}");
-            }
-        }
-    }
+    private static void ApplyContextMetadata(Dictionary<string, string> metadata, ListingContext context, bool replaceExplicitMetadata) =>
+        ListingMetadataCodec.ApplyContextMetadata(metadata, context, replaceExplicitMetadata);
 
     private static ListingContext ToContext(WorkspaceSnapshot snapshot, Listing listing)
     {
-        var metadata = ParseMetadata(listing.MetadataJson);
-        metadata.Remove(NotesKey, out var notes);
+        var metadata = ListingMetadataCodec.ParseMetadata(listing.MetadataJson);
+        metadata.Remove(ListingMetadataCodec.NotesKey, out var notes);
         var explicitMetadata = metadata
-            .Where(pair => !pair.Key.StartsWith(InheritedFromPrefix, StringComparison.Ordinal))
+            .Where(pair => !pair.Key.StartsWith(ListingMetadataCodec.InheritedFromPrefix, StringComparison.Ordinal))
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
         var tagIds = snapshot.ListingTags.Where(link => link.ListingId == listing.Id).Select(link => link.TagId).ToArray();
         return new ListingContext(listing.Description, notes, explicitMetadata, tagIds);
@@ -900,30 +869,4 @@ public sealed class ListingManagementService : IListingManagementService
 
     private bool StoreBelongsToActiveWorkspace(Store store) => _activeWorkspaceId is null || store.WorkspaceId == _activeWorkspaceId;
     private void SetSelection(Guid storeId, Guid listingId) { _activeStoreId = storeId; _activeListingId = listingId; }
-    private static string NormalizeName(string? value) => value?.Trim() ?? string.Empty;
-    private static string? NormalizeOptional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    private static string? ValidateName(string name) => string.IsNullOrWhiteSpace(name)
-        ? "Listing title is required."
-        : name.Contains('\n') || name.Contains('\r') ? "Listing title must be a single line." : null;
-
-    private static Dictionary<string, string> ParseMetadata(string metadataJson)
-    {
-        if (string.IsNullOrWhiteSpace(metadataJson) || metadataJson.Trim() == "{}")
-        {
-            return new(StringComparer.Ordinal);
-        }
-        using var document = JsonDocument.Parse(metadataJson);
-        return document.RootElement.ValueKind == JsonValueKind.Object
-            ? document.RootElement.EnumerateObject().ToDictionary(property => property.Name, property => property.Value.ToString(), StringComparer.Ordinal)
-            : new(StringComparer.Ordinal);
-    }
-
-    private static string SerializeMetadata(IReadOnlyDictionary<string, string> metadata) =>
-        metadata.Count == 0 ? "{}" : JsonSerializer.Serialize(metadata);
-
-    private static void SetOptional(Dictionary<string, string> metadata, string key, string? value)
-    {
-        var normalized = NormalizeOptional(value);
-        if (normalized is null) metadata.Remove(key); else metadata[key] = normalized;
-    }
 }
