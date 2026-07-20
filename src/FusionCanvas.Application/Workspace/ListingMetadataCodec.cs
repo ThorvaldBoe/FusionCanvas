@@ -9,6 +9,11 @@ internal static class ListingMetadataCodec
     public const string PhraseKey = "phrase";
     public const string GraphicDirectionKey = "graphicDirection";
     public const string InheritedFromPrefix = "inheritedFrom:";
+    public const string IdeaAudienceKey = "idea.audience";
+    public const string IdeaPhraseFragmentsKey = "idea.phraseFragments";
+    public const string IdeaVisualDirectionKey = "idea.visualDirection";
+    public const string IdeaRejectedKey = "idea.rejected";
+    public const string IdeaRejectedReasonKey = "idea.rejectedReason";
 
     public static string NormalizeName(string? value) => value?.Trim() ?? string.Empty;
 
