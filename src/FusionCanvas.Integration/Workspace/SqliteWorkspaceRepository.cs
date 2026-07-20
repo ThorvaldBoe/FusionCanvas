@@ -6,7 +6,7 @@ namespace FusionCanvas.Integration.Workspace;
 
 public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceRepository
 {
-    private const int CurrentSchemaVersion = 4;
+    private const int CurrentSchemaVersion = 5;
 
     private readonly string _databasePath = databasePath;
 
@@ -20,7 +20,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
 
-        foreach (var table in new[] { "asset_links", "listing_tags", "prompts", "assets", "listings", "groups", "niches", "tags", "stores", "workspaces" })
+        foreach (var table in new[] { "asset_links", "listing_tags", "prompts", "assets", "listings", "groups", "niches", "tags", "stores", "workspaces", "concepts" })
         {
             await ExecuteAsync(connection, transaction, $"DELETE FROM {table};", cancellationToken);
         }
@@ -65,6 +65,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             await InsertPromptAsync(connection, transaction, prompt, cancellationToken);
         }
 
+        foreach (var concept in snapshot.Concepts)
+        {
+            await InsertConceptAsync(connection, transaction, concept, cancellationToken);
+        }
+
         foreach (var listingTag in snapshot.ListingTags)
         {
             await InsertListingTagAsync(connection, transaction, listingTag, cancellationToken);
@@ -98,7 +103,8 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             await LoadPromptsAsync(connection, cancellationToken),
             await LoadTagsAsync(connection, cancellationToken),
             await LoadListingTagsAsync(connection, cancellationToken),
-            await LoadAssetLinksAsync(connection, cancellationToken));
+            await LoadAssetLinksAsync(connection, cancellationToken),
+            await LoadConceptsAsync(connection, cancellationToken));
     }
 
     private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
@@ -233,6 +239,26 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
                 entity_id TEXT NOT NULL,
                 PRIMARY KEY (asset_id, entity_kind, entity_id)
             );
+
+            CREATE TABLE IF NOT EXISTS concepts (
+                id TEXT PRIMARY KEY,
+                store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                listing_id TEXT NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                description TEXT NULL,
+                idea TEXT NULL,
+                phrase TEXT NULL,
+                graphic_direction TEXT NULL,
+                audience_reaction TEXT NULL,
+                risks TEXT NULL,
+                quality_notes TEXT NULL,
+                score_json TEXT NULL,
+                lifecycle INTEGER NOT NULL DEFAULT 0,
+                is_archived INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
             """;
 
         await ExecuteAsync(connection, null, sql, cancellationToken);
@@ -249,6 +275,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         if (schemaVersion < 4)
         {
             await MigrateToVersion4Async(connection, cancellationToken);
+        }
+
+        if (schemaVersion < 5)
+        {
+            await MigrateToVersion5Async(connection, cancellationToken);
         }
 
         await SetPragmaUserVersionAsync(connection, CurrentSchemaVersion, cancellationToken);
@@ -353,6 +384,31 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
                     WHEN 4 THEN 1
                     ELSE is_archived
                 END;
+            """, cancellationToken);
+    }
+
+    private static async Task MigrateToVersion5Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await ExecuteAsync(connection, null, """
+            CREATE TABLE IF NOT EXISTS concepts (
+                id TEXT PRIMARY KEY,
+                store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                listing_id TEXT NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                description TEXT NULL,
+                idea TEXT NULL,
+                phrase TEXT NULL,
+                graphic_direction TEXT NULL,
+                audience_reaction TEXT NULL,
+                risks TEXT NULL,
+                quality_notes TEXT NULL,
+                score_json TEXT NULL,
+                lifecycle INTEGER NOT NULL DEFAULT 0,
+                is_archived INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
             """, cancellationToken);
     }
 
@@ -489,6 +545,29 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
     private static Task InsertAssetLinkAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, AssetLink assetLink, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, "INSERT INTO asset_links (asset_id, entity_kind, entity_id) VALUES ($asset_id, $entity_kind, $entity_id);", cancellationToken, ("$asset_id", assetLink.AssetId.ToString()), ("$entity_kind", (int)assetLink.EntityKind), ("$entity_id", assetLink.EntityId.ToString()));
 
+    private static Task InsertConceptAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Concept concept, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO concepts (id, store_id, listing_id, name, description, idea, phrase, graphic_direction, audience_reaction, risks, quality_notes, score_json, lifecycle, is_archived, created_at, updated_at, metadata_json)
+            VALUES ($id, $store_id, $listing_id, $name, $description, $idea, $phrase, $graphic_direction, $audience_reaction, $risks, $quality_notes, $score_json, $lifecycle, $is_archived, $created_at, $updated_at, $metadata_json);
+            """, cancellationToken,
+            ("$id", concept.Id.ToString()),
+            ("$store_id", concept.StoreId.ToString()),
+            ("$listing_id", concept.ListingId.ToString()),
+            ("$name", concept.Name),
+            ("$description", concept.Description),
+            ("$idea", concept.Idea),
+            ("$phrase", concept.Phrase),
+            ("$graphic_direction", concept.GraphicDirection),
+            ("$audience_reaction", concept.AudienceReaction),
+            ("$risks", concept.Risks),
+            ("$quality_notes", concept.QualityNotes),
+            ("$score_json", concept.ScoreJson),
+            ("$lifecycle", (int)concept.Lifecycle),
+            ("$is_archived", concept.IsArchived ? 1 : 0),
+            ("$created_at", concept.CreatedAt.ToString("O")),
+            ("$updated_at", concept.UpdatedAt.ToString("O")),
+            ("$metadata_json", concept.MetadataJson));
+
     private static (string Name, object? Value)[] CommonParameters(WorkspaceEntity entity) =>
     [
         ("$id", entity.Id.ToString()),
@@ -608,6 +687,34 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         }
 
         return assetLinks;
+    }
+
+    private static async Task<IReadOnlyList<Concept>> LoadConceptsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var concepts = new List<Concept>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM concepts ORDER BY created_at, name;", cancellationToken))
+        {
+            concepts.Add(new Concept(
+                ReadGuid(reader, "id"),
+                ReadGuid(reader, "store_id"),
+                ReadGuid(reader, "listing_id"),
+                ReadString(reader, "name"),
+                ReadNullableString(reader, "description"),
+                ReadNullableString(reader, "idea"),
+                ReadNullableString(reader, "phrase"),
+                ReadNullableString(reader, "graphic_direction"),
+                ReadNullableString(reader, "audience_reaction"),
+                ReadNullableString(reader, "risks"),
+                ReadNullableString(reader, "quality_notes"),
+                ReadNullableString(reader, "score_json"),
+                (ConceptLifecycle)ReadInt(reader, "lifecycle"),
+                ReadBool(reader, "is_archived"),
+                ReadDate(reader, "created_at"),
+                ReadDate(reader, "updated_at"),
+                ReadString(reader, "metadata_json")));
+        }
+
+        return concepts;
     }
 
     private static async IAsyncEnumerable<SqliteDataReader> ReadAsync(

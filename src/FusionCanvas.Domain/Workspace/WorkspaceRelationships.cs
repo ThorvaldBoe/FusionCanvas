@@ -54,7 +54,34 @@ public enum WorkspaceEntityKind
     Asset = 4,
     Prompt = 5,
     Design = 6,
-    FutureRelatedRecord = 7
+    FutureRelatedRecord = 7,
+    Concept = 8
+}
+
+public enum ConceptLifecycle
+{
+    Active = 0,
+    Superseded = 1,
+    Rejected = 2
+}
+
+public static class ConceptLifecycles
+{
+    public static IReadOnlyList<ConceptLifecycle> Ordered { get; } =
+    [
+        ConceptLifecycle.Active,
+        ConceptLifecycle.Superseded,
+        ConceptLifecycle.Rejected
+    ];
+
+    public static string GetDisplayName(ConceptLifecycle lifecycle) =>
+        lifecycle switch
+        {
+            ConceptLifecycle.Active => "Active",
+            ConceptLifecycle.Superseded => "Superseded",
+            ConceptLifecycle.Rejected => "Rejected",
+            _ => throw new ArgumentOutOfRangeException(nameof(lifecycle), lifecycle, "Unsupported concept lifecycle.")
+        };
 }
 
 public sealed record ListingTag(Guid ListingId, Guid TagId);

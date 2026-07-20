@@ -31,7 +31,7 @@ public class WorkspaceManagementServiceTests
         var active = NewWorkspace("Client");
         var archived = NewWorkspace("Personal") with { IsArchived = true };
         var store = new Store(Guid.NewGuid(), active.Id, "Client Store", null, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([active, archived], [store], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([active, archived], [store], [], [], [], [], [], [], [], [], []));
         var service = new WorkspaceManagementService(repository, () => Now.AddMinutes(1));
 
         var deleteWithStore = await service.DeleteWorkspaceAsync(new WorkspaceManagementDeleteRequest(active.Id, ConfirmPermanentDeletion: true), TestContext.Current.CancellationToken);
@@ -65,6 +65,7 @@ public class WorkspaceManagementServiceTests
             [],
             [tag],
             [new ListingTag(listing.Id, tag.Id)],
+            [],
             []));
         var service = new WorkspaceManagementService(repository, () => Now.AddMinutes(1));
 
@@ -87,7 +88,7 @@ public class WorkspaceManagementServiceTests
     public async Task DeleteWorkspaceAsync_BlocksDeletingLastWorkspace()
     {
         var workspace = NewWorkspace("Personal");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([workspace], [], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([workspace], [], [], [], [], [], [], [], [], [], []));
         var service = new WorkspaceManagementService(repository, () => Now.AddMinutes(1));
 
         var result = await service.DeleteWorkspaceAsync(new WorkspaceManagementDeleteRequest(workspace.Id, true, workspace.Name), TestContext.Current.CancellationToken);
@@ -101,7 +102,7 @@ public class WorkspaceManagementServiceTests
     public async Task SelectWorkspaceAsync_RejectsArchivedWorkspace()
     {
         var archived = NewWorkspace("Archived") with { IsArchived = true };
-        var service = new WorkspaceManagementService(new InMemoryWorkspaceRepository(new WorkspaceSnapshot([archived], [], [], [], [], [], [], [], [], [])));
+        var service = new WorkspaceManagementService(new InMemoryWorkspaceRepository(new WorkspaceSnapshot([archived], [], [], [], [], [], [], [], [], [], [])));
 
         var result = await service.SelectWorkspaceAsync(archived.Id, TestContext.Current.CancellationToken);
 

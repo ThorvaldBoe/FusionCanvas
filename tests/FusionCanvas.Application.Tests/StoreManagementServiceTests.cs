@@ -187,7 +187,7 @@ public class StoreManagementServiceTests
         var client = NewWorkspace("Client");
         var personalStore = NewStore("Shared Name") with { WorkspaceId = personal.Id };
         var clientStore = NewStore("Client Store") with { WorkspaceId = client.Id };
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([personal, client], [personalStore, clientStore], [], [], [], [], [], [], [], []));
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([personal, client], [personalStore, clientStore], [], [], [], [], [], [], [], [], []));
         var service = new StoreManagementService(repository, () => Now, () => Guid.NewGuid());
         service.SetActiveWorkspace(client.Id);
 

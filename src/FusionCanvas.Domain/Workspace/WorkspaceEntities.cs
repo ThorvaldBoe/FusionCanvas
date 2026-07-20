@@ -97,6 +97,26 @@ public sealed record Listing(
     string MetadataJson)
     : WorkspaceEntity(Id, Name, Description, IsArchived, CreatedAt, UpdatedAt, MetadataJson);
 
+public sealed record Concept(
+    Guid Id,
+    Guid StoreId,
+    Guid ListingId,
+    string Name,
+    string? Description,
+    string? Idea,
+    string? Phrase,
+    string? GraphicDirection,
+    string? AudienceReaction,
+    string? Risks,
+    string? QualityNotes,
+    string? ScoreJson,
+    ConceptLifecycle Lifecycle,
+    bool IsArchived,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    string MetadataJson)
+    : WorkspaceEntity(Id, Name, Description, IsArchived, CreatedAt, UpdatedAt, MetadataJson);
+
 public sealed record Asset : WorkspaceEntity
 {
     public Asset(

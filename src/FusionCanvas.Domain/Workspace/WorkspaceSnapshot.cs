@@ -10,7 +10,8 @@ public sealed record WorkspaceSnapshot(
     IReadOnlyList<Prompt> Prompts,
     IReadOnlyList<Tag> Tags,
     IReadOnlyList<ListingTag> ListingTags,
-    IReadOnlyList<AssetLink> AssetLinks)
+    IReadOnlyList<AssetLink> AssetLinks,
+    IReadOnlyList<Concept> Concepts)
 {
     public WorkspaceSnapshot(
         IReadOnlyList<Store> Stores,
@@ -21,12 +22,14 @@ public sealed record WorkspaceSnapshot(
         IReadOnlyList<Prompt> Prompts,
         IReadOnlyList<Tag> Tags,
         IReadOnlyList<ListingTag> ListingTags,
-        IReadOnlyList<AssetLink> AssetLinks)
-        : this(DefaultWorkspacesFor(Stores), Stores, Niches, Groups, Listings, Assets, Prompts, Tags, ListingTags, AssetLinks)
+        IReadOnlyList<AssetLink> AssetLinks,
+        IReadOnlyList<Concept>? Concepts = null)
+        : this(DefaultWorkspacesFor(Stores), Stores, Niches, Groups, Listings, Assets, Prompts, Tags, ListingTags, AssetLinks, Concepts ?? [])
     {
     }
 
     public static WorkspaceSnapshot Empty { get; } = new(
+        [],
         [],
         [],
         [],
