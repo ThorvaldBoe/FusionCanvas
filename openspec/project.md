@@ -271,11 +271,11 @@ There is no fixed feature count. Scope is justified by cohesion, uncertainty, de
 * Split scope when it contains independent outcomes, unresolved high-impact decisions, or too much cross-layer and UI risk for one reviewer to understand and diagnose.
 * Keep future opportunities lightweight. Do not create detailed specifications for later modules until the current module is verified and its lessons have informed what comes next.
 
-Module discovery is conversational. The human and planning agent resolve goals, examples, non-goals, edge cases, assumptions, dependencies, and important product or architecture decisions. The artifacts capture the conclusions. Implementation begins only after the delivery package is approved or approval is explicitly delegated.
+Module discovery is conversational. The human and planning agent resolve goals, examples, non-goals, edge cases, assumptions, dependencies, and important product or architecture decisions. Do not create a separate module-specification document by default. Once the module is understood well enough to name and bound, create or refine its OpenSpec change and capture conclusions in the appropriate authoritative artifact. Implementation begins only after the delivery package is approved or approval is explicitly delegated.
 
 Each module normally uses one OpenSpec change with these complementary parts:
 
-* `proposal.md`: outcome, included features, boundaries, dependencies, risks, and scope rationale.
+* `proposal.md`: the module-level anchor for outcome, included features, boundaries, dependencies, risks, scope rationale, and overall verification approach.
 * Delta specs: durable requirements and observable acceptance scenarios.
 * `design.md`: conceptual and functional design plus a dedicated, implementation-ready plan identifying affected layers, data and UI behavior, edge cases, sequencing, tests, migrations, and decisions the implementer must not reopen.
 * `tasks.md`: ordered, bounded, verifiable implementation steps.
