@@ -6,7 +6,6 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Assets;
 using FusionCanvas.App.Groups;
-using FusionCanvas.App.Listings;
 using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Stores;
 using FusionCanvas.App.Workspace;
@@ -19,8 +18,6 @@ public partial class MainWindow : Window
 {
     private StoreEditorWindow? _storeEditorWindow;
     private WorkspaceManagementWindow? _workspaceManagementWindow;
-    private GroupEditorWindow? _groupEditorWindow;
-    private ListingEditorWindow? _listingEditorWindow;
     private AssetsWindow? _assetsWindow;
     private PointerPressedEventArgs? _dragPointerArgs;
     private WorkspaceTreeNodeViewModel? _dragNode;
@@ -45,20 +42,6 @@ public partial class MainWindow : Window
                 SyncWorkspaceManagementWindow(viewModel.WorkspaceManagement);
             }
         };
-        viewModel.GroupManagement.PropertyChanged += (_, args) =>
-        {
-            if (args.PropertyName == nameof(GroupManagementViewModel.IsOpen))
-            {
-                SyncGroupEditorWindow(viewModel.GroupManagement);
-            }
-        };
-        viewModel.ListingManagement.PropertyChanged += (_, args) =>
-        {
-            if (args.PropertyName == nameof(ListingManagementViewModel.IsOpen))
-            {
-                SyncListingEditorWindow(viewModel.ListingManagement);
-            }
-        };
         viewModel.AssetsManagement.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(AssetsViewModel.IsOpen))
@@ -69,8 +52,6 @@ public partial class MainWindow : Window
         DataContext = viewModel;
         SyncWorkspaceManagementWindow(viewModel.WorkspaceManagement);
         SyncStoreEditorWindow(viewModel.StoreManagement);
-        SyncGroupEditorWindow(viewModel.GroupManagement);
-        SyncListingEditorWindow(viewModel.ListingManagement);
         SyncAssetsWindow(viewModel.AssetsManagement);
     }
 
@@ -117,56 +98,6 @@ public partial class MainWindow : Window
         if (!storeManagement.IsStoreEditorOpen && _storeEditorWindow is not null)
         {
             _storeEditorWindow.Close();
-        }
-    }
-
-    private void SyncGroupEditorWindow(GroupManagementViewModel groupManagement)
-    {
-        if (groupManagement.IsOpen && _groupEditorWindow is null)
-        {
-            _groupEditorWindow = new GroupEditorWindow { DataContext = groupManagement };
-            _groupEditorWindow.Closed += (_, _) =>
-            {
-                _groupEditorWindow = null;
-                if (groupManagement.IsOpen)
-                {
-                    groupManagement.CloseCommand.Execute(null);
-                }
-
-                GroupActionsButton.Focus();
-            };
-            _groupEditorWindow.Show(this);
-            return;
-        }
-
-        if (!groupManagement.IsOpen && _groupEditorWindow is not null)
-        {
-            _groupEditorWindow.Close();
-        }
-    }
-
-    private void SyncListingEditorWindow(ListingManagementViewModel listingManagement)
-    {
-        if (listingManagement.IsOpen && _listingEditorWindow is null)
-        {
-            _listingEditorWindow = new ListingEditorWindow { DataContext = listingManagement };
-            _listingEditorWindow.Closed += (_, _) =>
-            {
-                _listingEditorWindow = null;
-                if (listingManagement.IsOpen)
-                {
-                    listingManagement.CloseCommand.Execute(null);
-                }
-
-                WorkspaceTreeControl.Focus();
-            };
-            _listingEditorWindow.Show(this);
-            return;
-        }
-
-        if (!listingManagement.IsOpen && _listingEditorWindow is not null)
-        {
-            _listingEditorWindow.Close();
         }
     }
 
@@ -340,6 +271,14 @@ public partial class MainWindow : Window
         };
     }
 
+    private void OnDetailsFieldLostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.CommitActiveDetailsEdits();
+        }
+    }
+
     private void OnTreeEditorAttached(object? sender, VisualTreeAttachmentEventArgs e)
     {
         if (sender is TextBox textBox && textBox.IsVisible)
@@ -465,14 +404,6 @@ public partial class MainWindow : Window
         if (TrySelectContextNode(sender, out var viewModel, out var node) && node.IsListing)
         {
             await viewModel.WorkspaceTree.DuplicateAsync();
-        }
-    }
-
-    private void OnContextEditProperties(object? sender, RoutedEventArgs e)
-    {
-        if (TrySelectContextNode(sender, out var viewModel, out _))
-        {
-            viewModel.WorkspaceTree.EditPropertiesCommand.Execute(null);
         }
     }
 

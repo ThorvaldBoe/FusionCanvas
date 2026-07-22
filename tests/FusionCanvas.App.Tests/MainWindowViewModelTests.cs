@@ -263,29 +263,33 @@ public class MainWindowViewModelTests
             snapshot);
         var nicheContext = Assert.Single(viewModel.NavigationContexts, context => context.Context.EntityKind == WorkspaceEntityKind.Niche);
         viewModel.OpenFromNavigation(nicheContext);
-        await viewModel.GroupManagement.OpenForCreateAsync(store.Id, niche.Id, new GroupParentReference(WorkspaceEntityKind.Niche, niche.Id));
-        viewModel.GroupManagement.Name = "Campaign";
-
-        await viewModel.GroupManagement.SaveAsync();
+        await viewModel.WorkspaceTree.BeginCreateAsync();
+        viewModel.WorkspaceTree.SelectedNode!.DraftName = "Campaign";
+        await viewModel.WorkspaceTree.CommitEditAsync();
 
         var created = Assert.Single(repository.Snapshot.Groups);
         Assert.Contains(viewModel.NavigationContexts, context => context.Context.Id == created.Id);
-        Assert.Equal(created.Id, viewModel.NavigationState.SelectedNodeId);
+        Assert.Equal(created.Id, viewModel.WorkspaceTree.SelectedNode?.EntityId);
         var groupContext = viewModel.NavigationContexts.Single(context => context.Context.Id == created.Id);
         viewModel.OpenFromNavigation(groupContext);
         var documentId = viewModel.DocumentWindow.ActiveContext?.Id;
+        Assert.True(viewModel.GroupDetails.HasState);
+        Assert.False(viewModel.GroupDetails.IsReadOnly);
 
-        viewModel.GroupManagement.TryRequestArchive();
-        await viewModel.GroupManagement.ConfirmArchiveAsync();
+        viewModel.GroupDetails.RequestArchiveCommand.Execute(null);
+        viewModel.GroupDetails.ConfirmArchiveCommand.Execute(null);
 
-        Assert.DoesNotContain(viewModel.NavigationContexts, context => context.Context.Id == created.Id);
+        // Archived groups remain openable read-only but leave the active tree projection.
+        Assert.Contains(viewModel.NavigationContexts, context => context.Context.Id == created.Id);
+        Assert.DoesNotContain(viewModel.WorkspaceTree.Roots.SelectMany(root => root.Children), node => node.EntityId == created.Id);
         Assert.Equal(niche.Id, viewModel.NavigationState.SelectedNodeId);
         Assert.Equal(documentId, viewModel.DocumentWindow.ActiveContext?.Id);
+        Assert.True(viewModel.GroupDetails.IsReadOnly);
 
-        var archived = Assert.Single(viewModel.GroupManagement.ArchivedGroups);
-        await viewModel.GroupManagement.TryRestoreAsync(archived);
+        viewModel.GroupDetails.RestoreCommand.Execute(null);
 
-        Assert.Contains(viewModel.NavigationContexts, context => context.Context.Id == created.Id);
+        Assert.False(repository.Snapshot.Groups.Single().IsArchived);
+        Assert.False(viewModel.GroupDetails.IsReadOnly);
         Assert.Equal(created.Id, viewModel.NavigationState.SelectedNodeId);
     }
 
@@ -310,6 +314,36 @@ public class MainWindowViewModelTests
             context.Context.Title == "Espresso listing draft");
 
     [Fact]
+    public void DetailsPaneVisibility_FollowsActiveContextKind()
+    {
+        var viewModel = new MainWindowViewModel();
+        var niche = viewModel.NavigationContexts.Single(context => context.Context.EntityKind == WorkspaceEntityKind.Niche);
+        var group = GroupContext(viewModel);
+        var listing = ReadyListingContext(viewModel);
+
+        viewModel.OpenFromNavigation(niche);
+
+        Assert.True(viewModel.ShowSelectionSummary);
+        Assert.True(viewModel.ShowStageToolHost);
+        Assert.False(viewModel.ListingInspector.HasState);
+        Assert.False(viewModel.GroupDetails.HasState);
+
+        viewModel.OpenFromNavigation(group);
+
+        Assert.False(viewModel.ShowSelectionSummary);
+        Assert.False(viewModel.ShowStageToolHost);
+        Assert.True(viewModel.GroupDetails.HasState);
+        Assert.False(viewModel.ListingInspector.HasState);
+
+        viewModel.OpenFromNavigation(listing);
+
+        Assert.False(viewModel.ShowSelectionSummary);
+        Assert.False(viewModel.ShowStageToolHost);
+        Assert.True(viewModel.ListingInspector.HasState);
+        Assert.False(viewModel.GroupDetails.HasState);
+    }
+
+    [Fact]
     public void ListingInspector_LoadsForActiveListingTabAndClearsForNonItemContext()
     {
         var viewModel = new MainWindowViewModel();
@@ -327,7 +361,7 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public void DirtyInspector_GuardsTabSwitchUntilResolved()
+    public async Task DirtyInspector_CommitsAndProceedsWithTabSwitch()
     {
         var viewModel = new MainWindowViewModel();
         var first = viewModel.DocumentWindow.Open(ReadyListingContext(viewModel).Context);
@@ -335,58 +369,38 @@ public class MainWindowViewModelTests
         viewModel.RequestSelectTabCommand.Execute(first);
 
         Assert.True(viewModel.ListingInspector.HasState);
-        viewModel.ListingInspector.Title = "Edited unsaved title";
-        Assert.True(viewModel.ListingInspector.HasUnsavedChanges);
-
-        viewModel.RequestSelectTabCommand.Execute(secondTab);
-
-        Assert.Equal(first.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
-        Assert.True(viewModel.ListingInspector.DiscardPromptVisible);
-
-        viewModel.ListingInspector.KeepEditingCommand.Execute(null);
-
-        Assert.False(viewModel.ListingInspector.DiscardPromptVisible);
-        Assert.Equal(first.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
-        Assert.True(viewModel.ListingInspector.HasUnsavedChanges);
-    }
-
-    [Fact]
-    public void DirtyInspector_DiscardAndContinueProceedsWithTransition()
-    {
-        var viewModel = new MainWindowViewModel();
-        var first = viewModel.DocumentWindow.Open(ReadyListingContext(viewModel).Context);
-        var secondTab = viewModel.DocumentWindow.Open(ActiveListingContext(viewModel).Context);
-        viewModel.RequestSelectTabCommand.Execute(first);
-        viewModel.ListingInspector.Title = "Edited unsaved title";
-
-        viewModel.RequestSelectTabCommand.Execute(secondTab);
-        viewModel.ListingInspector.DiscardAndContinueCommand.Execute(null);
-
-        Assert.Equal(secondTab.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
-        Assert.False(viewModel.ListingInspector.HasUnsavedChanges);
-    }
-
-    [Fact]
-    public async Task DirtyInspector_SaveAndContinueProceedsAfterPersisting()
-    {
-        var viewModel = new MainWindowViewModel();
-        var first = viewModel.DocumentWindow.Open(ReadyListingContext(viewModel).Context);
-        var secondTab = viewModel.DocumentWindow.Open(ActiveListingContext(viewModel).Context);
-        viewModel.RequestSelectTabCommand.Execute(first);
         viewModel.ListingInspector.Title = "Persisted title";
         Assert.True(viewModel.ListingInspector.HasUnsavedChanges);
 
         viewModel.RequestSelectTabCommand.Execute(secondTab);
-        viewModel.ListingInspector.SaveAndContinueCommand.Execute(null);
         await Task.Yield();
 
         Assert.Equal(secondTab.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
         Assert.False(viewModel.ListingInspector.HasUnsavedChanges);
-        Assert.False(viewModel.ListingInspector.DiscardPromptVisible);
 
         viewModel.RequestSelectTabCommand.Execute(first);
         await Task.Yield();
         Assert.Equal("Persisted title", viewModel.ListingInspector.Title);
+    }
+
+    [Fact]
+    public async Task DirtyInspector_InvalidTitleRevertsAndStillProceeds()
+    {
+        var viewModel = new MainWindowViewModel();
+        var first = viewModel.DocumentWindow.Open(ReadyListingContext(viewModel).Context);
+        var secondTab = viewModel.DocumentWindow.Open(ActiveListingContext(viewModel).Context);
+        viewModel.RequestSelectTabCommand.Execute(first);
+        viewModel.ListingInspector.Title = "   ";
+
+        viewModel.RequestSelectTabCommand.Execute(secondTab);
+        await Task.Yield();
+
+        Assert.Equal(secondTab.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
+
+        viewModel.RequestSelectTabCommand.Execute(first);
+        await Task.Yield();
+        Assert.Equal("Retro mug design", viewModel.ListingInspector.Title);
+        Assert.False(viewModel.ListingInspector.HasUnsavedChanges);
     }
 
     [Fact]

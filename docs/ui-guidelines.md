@@ -290,6 +290,16 @@ Icon-only buttons should be small, square, and close to the label or object they
 
 When a compact control and an explicit button perform the same action, prefer the clearer compact control and remove the duplicate button.
 
+### Details Pane Editing
+
+Group and item (listing) information edits inline in the right details pane, not in separate editor dialogs. Selecting a group or item in the navigation tree shows its editable details in the document window.
+
+Text fields save automatically when the edited field loses focus; there is no Save button and no unsaved-changes prompt. Validation failures revert the invalid field (for example a blanked name) to its last saved value with an inline explanation while other valid edits still save. Persistence failures are reported inline and never leave partially applied changes.
+
+Deliberate or destructive actions stay explicit and confirmed: archive, restore, permanent delete, and structural moves use buttons and confirmations, not auto-save. Complex content such as images follows a natural select-upload-apply flow (the Assets surface) rather than forced one-click editing.
+
+Store, niche, and workspace setup keep dialog-based editors.
+
 ## Screenshot Concepts
 
 The current screenshot concepts live in [Visuals](Visuals/).

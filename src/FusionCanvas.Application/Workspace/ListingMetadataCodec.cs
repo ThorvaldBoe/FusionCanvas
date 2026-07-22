@@ -6,6 +6,7 @@ internal static class ListingMetadataCodec
 {
     public const string NotesKey = "notes";
     public const string IdeaKey = "idea";
+    public const string IdeaAudienceKey = "idea.audience";
     public const string PhraseKey = "phrase";
     public const string GraphicDirectionKey = "graphicDirection";
     public const string InheritedFromPrefix = "inheritedFrom:";

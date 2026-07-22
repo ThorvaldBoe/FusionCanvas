@@ -16,8 +16,10 @@ public class ListingInspectorServiceTests
 
         Assert.NotNull(state);
         Assert.Equal(sample.Listing.Name, state!.Title);
+        Assert.Equal("Description", state.Description);
         Assert.Equal("Notes", state.Notes);
         Assert.Equal("idea-value", state.Creative.Idea);
+        Assert.Equal("audience-value", state.Creative.Audience);
         Assert.Equal("phrase-value", state.Creative.Phrase);
         Assert.Equal("graphic-value", state.Creative.GraphicDirection);
         Assert.Equal(sample.Tag.Name, state.Tags.Single().Name);
@@ -55,8 +57,10 @@ public class ListingInspectorServiceTests
         var state = await service.LoadAsync(listing.Id);
 
         Assert.NotNull(state);
-        Assert.Null(state!.Notes);
+        Assert.Null(state!.Description);
+        Assert.Null(state.Notes);
         Assert.Null(state.Creative.Idea);
+        Assert.Null(state.Creative.Audience);
         Assert.Null(state.Creative.Phrase);
         Assert.Null(state.Creative.GraphicDirection);
         Assert.Empty(state.Tags);
@@ -74,7 +78,9 @@ public class ListingInspectorServiceTests
         var result = await service.SaveAsync(new(
             sample.Listing.Id,
             "  Renamed Title ",
+            "  A short description  ",
             "  A multi\nline idea  ",
+            "  Coffee lovers  ",
             "phrase one\nphrase two",
             "  Graphic direction  ",
             "  Revised notes  ",
@@ -82,16 +88,50 @@ public class ListingInspectorServiceTests
 
         Assert.True(result.Succeeded);
         Assert.Equal("Renamed Title", result.State!.Title);
+        Assert.Equal("A short description", result.State.Description);
         Assert.Equal("Revised notes", result.State.Notes);
         Assert.Equal("A multi\nline idea", result.State.Creative.Idea);
+        Assert.Equal("Coffee lovers", result.State.Creative.Audience);
         Assert.Equal("phrase one phrase two", result.State.Creative.Phrase);
         Assert.Equal("Graphic direction", result.State.Creative.GraphicDirection);
         var persisted = repository.Snapshot.Listings.Single(listing => listing.Id == sample.Listing.Id);
         Assert.Equal("Renamed Title", persisted.Name);
+        Assert.Equal("A short description", persisted.Description);
         Assert.Contains("\"idea\":\"A multi\\nline idea\"", persisted.MetadataJson);
+        Assert.Contains("\"idea.audience\":\"Coffee lovers\"", persisted.MetadataJson);
         Assert.Contains("\"phrase\":\"phrase one phrase two\"", persisted.MetadataJson);
         Assert.Contains("\"graphicDirection\":\"Graphic direction\"", persisted.MetadataJson);
         Assert.Equal(1, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task Save_OmitsAudienceWhenEmptyAndPreservesItAcrossUnrelatedEdits()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot);
+        var service = new ListingInspectorService(repository, clock: () => sample.Now.AddMinutes(1), newId: Guid.NewGuid);
+
+        var omitted = await service.SaveAsync(new(
+            sample.Listing.Id, sample.Listing.Name, null, "idea", null, null, null, null, []));
+
+        Assert.True(omitted.Succeeded);
+        Assert.DoesNotContain("\"idea.audience\"", repository.Snapshot.Listings.Single().MetadataJson);
+
+        var withAudience = await service.SaveAsync(new(
+            sample.Listing.Id, sample.Listing.Name, null, "idea", "Night-shift nurses", null, null, null, []));
+
+        Assert.True(withAudience.Succeeded);
+        Assert.Contains("\"idea.audience\":\"Night-shift nurses\"", repository.Snapshot.Listings.Single().MetadataJson);
+
+        var unrelatedEdit = await service.SaveAsync(new(
+            sample.Listing.Id, sample.Listing.Name, "desc", "idea", "Night-shift nurses", null, null, "notes", []));
+
+        Assert.True(unrelatedEdit.Succeeded);
+        var persisted = repository.Snapshot.Listings.Single();
+        Assert.Equal("desc", persisted.Description);
+        Assert.Contains("\"idea.audience\":\"Night-shift nurses\"", persisted.MetadataJson);
+        Assert.Contains("\"unknown\":\"kept\"", persisted.MetadataJson);
+        Assert.Equal("Night-shift nurses", unrelatedEdit.State!.Creative.Audience);
     }
 
     [Fact]
@@ -108,7 +148,9 @@ public class ListingInspectorServiceTests
         var result = await service.SaveAsync(new(
             listing.Id,
             listing.Name,
+            Description: null,
             Idea: "new idea",
+            Audience: null,
             Phrase: null,
             GraphicDirection: null,
             Notes: "new notes",
@@ -131,8 +173,8 @@ public class ListingInspectorServiceTests
         var repository = new TestRepository(sample.Snapshot);
         var service = new ListingInspectorService(repository);
 
-        var blank = await service.SaveAsync(new(sample.Listing.Id, "   ", null, null, null, null, []));
-        var multiLine = await service.SaveAsync(new(sample.Listing.Id, "two\nlines", null, null, null, null, []));
+        var blank = await service.SaveAsync(new(sample.Listing.Id, "   ", null, null, null, null, null, null, []));
+        var multiLine = await service.SaveAsync(new(sample.Listing.Id, "two\nlines", null, null, null, null, null, null, []));
 
         Assert.False(blank.Succeeded);
         Assert.False(multiLine.Succeeded);
@@ -147,7 +189,7 @@ public class ListingInspectorServiceTests
         var repository = new TestRepository(sample.Snapshot);
         var service = new ListingInspectorService(repository, clock: () => sample.Now.AddMinutes(1), newId: Guid.NewGuid);
 
-        var result = await service.SaveAsync(new(sample.Listing.Id, sample.Listing.Name, null, null, null, null, ["TAG", "tag"]));
+        var result = await service.SaveAsync(new(sample.Listing.Id, sample.Listing.Name, null, null, null, null, null, null, ["TAG", "tag"]));
 
         Assert.True(result.Succeeded);
         var links = repository.Snapshot.ListingTags.Where(link => link.ListingId == sample.Listing.Id).ToArray();
@@ -164,7 +206,7 @@ public class ListingInspectorServiceTests
         var newTagId = Guid.NewGuid();
         var service = new ListingInspectorService(repository, clock: () => sample.Now.AddMinutes(1), newId: () => newTagId);
 
-        var result = await service.SaveAsync(new(sample.Listing.Id, sample.Listing.Name, null, null, null, null, ["New Tag"]));
+        var result = await service.SaveAsync(new(sample.Listing.Id, sample.Listing.Name, null, null, null, null, null, null, ["New Tag"]));
 
         Assert.True(result.Succeeded);
         var created = repository.Snapshot.Tags.SingleOrDefault(tag => tag.Name == "New Tag");
@@ -181,7 +223,7 @@ public class ListingInspectorServiceTests
         var repository = new TestRepository(sample.Snapshot);
         var service = new ListingInspectorService(repository, clock: () => sample.Now.AddMinutes(1), newId: Guid.NewGuid);
 
-        var result = await service.SaveAsync(new(sample.Listing.Id, sample.Listing.Name, null, null, null, null, []));
+        var result = await service.SaveAsync(new(sample.Listing.Id, sample.Listing.Name, null, null, null, null, null, null, []));
 
         Assert.True(result.Succeeded);
         Assert.Empty(repository.Snapshot.ListingTags.Where(link => link.ListingId == sample.Listing.Id));
@@ -195,8 +237,8 @@ public class ListingInspectorServiceTests
         var repository = new TestRepository(sample.Snapshot);
         var service = new ListingInspectorService(repository);
 
-        var blank = await service.SaveAsync(new(sample.Listing.Id, sample.Listing.Name, null, null, null, null, ["   "]));
-        var multiLine = await service.SaveAsync(new(sample.Listing.Id, sample.Listing.Name, null, null, null, null, ["two\nlines"]));
+        var blank = await service.SaveAsync(new(sample.Listing.Id, sample.Listing.Name, null, null, null, null, null, null, ["   "]));
+        var multiLine = await service.SaveAsync(new(sample.Listing.Id, sample.Listing.Name, null, null, null, null, null, null, ["two\nlines"]));
 
         Assert.False(blank.Succeeded);
         Assert.False(multiLine.Succeeded);
@@ -212,7 +254,7 @@ public class ListingInspectorServiceTests
         var repository = new TestRepository(sample.Snapshot with { Listings = [archived] });
         var service = new ListingInspectorService(repository);
 
-        var result = await service.SaveAsync(new(archived.Id, archived.Name, "idea", null, null, null, []));
+        var result = await service.SaveAsync(new(archived.Id, archived.Name, null, "idea", null, null, null, null, []));
 
         Assert.False(result.Succeeded);
         Assert.Equal(0, repository.SaveCount);
@@ -225,7 +267,7 @@ public class ListingInspectorServiceTests
         var repository = new TestRepository(sample.Snapshot) { FailSaves = true };
         var service = new ListingInspectorService(repository, clock: () => sample.Now.AddMinutes(1), newId: Guid.NewGuid);
 
-        var result = await service.SaveAsync(new(sample.Listing.Id, sample.Listing.Name, "idea", null, null, null, ["New Tag"]));
+        var result = await service.SaveAsync(new(sample.Listing.Id, sample.Listing.Name, null, "idea", null, null, null, null, ["New Tag"]));
 
         Assert.False(result.Succeeded);
         Assert.Equal(sample.Snapshot, repository.Snapshot);
@@ -240,11 +282,13 @@ public class ListingInspectorServiceTests
         var repository = new TestRepository(sample.Snapshot);
         var service = new ListingInspectorService(repository, clock: () => sample.Now.AddMinutes(1), newId: Guid.NewGuid);
 
-        await service.SaveAsync(new(sample.Listing.Id, "Updated", "idea", "phrase", "graphic", "notes", []));
+        await service.SaveAsync(new(sample.Listing.Id, "Updated", "desc", "idea", "audience", "phrase", "graphic", "notes", []));
         var reloaded = await service.LoadAsync(sample.Listing.Id);
 
         Assert.Equal("Updated", reloaded!.Title);
+        Assert.Equal("desc", reloaded.Description);
         Assert.Equal("idea", reloaded.Creative.Idea);
+        Assert.Equal("audience", reloaded.Creative.Audience);
         Assert.Equal("phrase", reloaded.Creative.Phrase);
         Assert.Equal("graphic", reloaded.Creative.GraphicDirection);
         Assert.Equal("notes", reloaded.Notes);
@@ -291,7 +335,7 @@ public class ListingInspectorServiceTests
             var child = new TopicGroup(Guid.NewGuid(), store.Id, null, root.Id, "Child", null, false, now, now, "{}");
             var listing = new Listing(
                 Guid.NewGuid(), store.Id, niche.Id, child.Id, "Idea", "Description", ListingStatus.Draft, WorkflowStage.Design, false, now, now,
-                "{\"notes\":\"Notes\",\"idea\":\"idea-value\",\"phrase\":\"phrase-value\",\"graphicDirection\":\"graphic-value\",\"unknown\":\"kept\"}");
+                "{\"notes\":\"Notes\",\"idea\":\"idea-value\",\"idea.audience\":\"audience-value\",\"phrase\":\"phrase-value\",\"graphicDirection\":\"graphic-value\",\"unknown\":\"kept\"}");
             var tag = new Tag(Guid.NewGuid(), store.Id, "Tag", null, false, now, now, "{}");
             var asset = new Asset(
                 Guid.NewGuid(), store.Id, "Asset", null, AssetKind.SourceDesign, "assets/asset.png", null,

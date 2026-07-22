@@ -206,20 +206,6 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         });
         ClearTagFiltersCommand = new RelayCommand(_ => ClearTagFilters());
         ClearTagFilterOrRevealSelectionCommand = new RelayCommand(_ => ClearTagFilters());
-        EditPropertiesCommand = new RelayCommand(_ =>
-        {
-            if (_selectedNode?.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing)
-            {
-                if (_selectedNode.EntityKind == WorkspaceEntityKind.Group)
-                {
-                    EditPropertiesRequested?.Invoke(this, _selectedNode.EntityId);
-                }
-                else
-                {
-                    EditListingPropertiesRequested?.Invoke(this, _selectedNode.EntityId);
-                }
-            }
-        });
         ManageAssetsCommand = new RelayCommand(_ =>
         {
             if (_selectedNode?.EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing)
@@ -233,8 +219,6 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler<WorkspaceTreeSelection>? OpenInTabRequested;
     public event EventHandler<WorkspaceTreeSelection>? SelectionChanged;
-    public event EventHandler<Guid>? EditPropertiesRequested;
-    public event EventHandler<Guid>? EditListingPropertiesRequested;
     public event EventHandler<WorkspaceTreeSelection>? ManageAssetsRequested;
     public event EventHandler? StructureChanged;
     public event EventHandler<IReadOnlySet<Guid>>? EntitiesDeleted;
@@ -249,7 +233,6 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     public ICommand CutCommand { get; }
     public ICommand PasteCommand { get; }
     public ICommand DuplicateCommand { get; }
-    public ICommand EditPropertiesCommand { get; }
     public ICommand ManageAssetsCommand { get; }
     public ICommand ClearFiltersCommand { get; }
 
