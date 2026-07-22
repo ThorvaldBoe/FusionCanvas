@@ -12,7 +12,7 @@ Should the first MVP include AI-assisted workflows, or should it ship as a fully
 
 ### Context
 
-The PRDs describe optional AI assistance in the Idea, Concept, Design, and Listing tools. The roadmap MVP boundary includes limited AI ideation and optional AI support, but those features depend on provider abstraction and settings.
+Early product planning described optional AI assistance in the Idea, Concept, Design, and Listing tools. A minimal AI slice still depends on provider abstraction and settings, so the boundary must be chosen deliberately rather than inherited from historical planning.
 
 ### Options
 
@@ -131,7 +131,7 @@ Pros:
 
 - Clear domain model.
 - Easier to reason about business rules.
-- Fits the current PRDs and diagrams.
+- Fits the explicit domain concepts and current diagrams.
 
 Cons:
 
@@ -166,7 +166,7 @@ When a user imports or attaches an asset, should FusionCanvas copy the file into
 
 ### Context
 
-The product is local-first and depends on durable asset relationships. The PRDs also need to support existing creator folders and external tools.
+The product is local-first and depends on durable asset relationships while also needing to work with existing creator folders and external tools.
 
 ### Options
 

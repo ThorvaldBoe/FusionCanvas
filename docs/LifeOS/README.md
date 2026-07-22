@@ -1,13 +1,18 @@
-# LifeOS Planning Documents
+# Historical LifeOS Planning Documents
 
-This folder preserves LifeOS planning source material for FusionCanvas.
+This folder preserves early LifeOS planning material for historical reference.
 
-`PRD/` contains original product requirement documents. These files describe product
-intent, workflow expectations, dependencies, acceptance criteria, and open questions.
-They are not accepted OpenSpec specifications.
+`PRD/` and `Roadmap.md` capture ideas, assumptions, feature groupings, dependencies,
+acceptance text, and open questions from an earlier planning approach. They may be
+stale or conflict with the current application and accepted specifications.
 
-When creating an OpenSpec change, review the relevant PRD files here first, then
-translate the applicable behavior into the new OpenSpec proposal and spec deltas.
-Accepted behavior should continue to live under `openspec/specs` after the normal
-OpenSpec workflow is completed.
+These files are optional idea sources only. Agents and contributors do not need to
+read them before planning work and must not infer current priority, ordering, scope,
+requirements, or acceptance criteria from them. Current module discovery starts from
+the user's intent, accepted behavior under `openspec/specs`, the current application,
+recent verification and retrospectives, and `docs/roadmap.md`.
+
+If a historical idea is useful, discuss and revalidate it before placing it in a new
+OpenSpec delivery package. Preserve these files rather than updating them into a
+second current roadmap or specification set.
 

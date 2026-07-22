@@ -1,16 +1,22 @@
 ## ADDED Requirements
 
-### Requirement: User-facing features receive real desktop UI verification
-FusionCanvas SHALL require every new or changed user-facing feature to be verified through the built desktop application before the change is considered complete.
+### Requirement: User-facing delivery modules receive targeted real desktop UI verification
+FusionCanvas SHALL require every user-facing delivery module to plan targeted verification through the built desktop application before the change is considered complete, with execution required when the contributing agent has an interactive desktop environment.
 
-#### Scenario: Contributor completes a user-facing feature
-- **WHEN** a change adds or modifies behavior that a user can see or operate in the Avalonia application
-- **THEN** the change includes a real desktop UI verification pass covering the feature's important accepted workflows
+#### Scenario: Contributor completes a user-facing module
+- **WHEN** a delivery module adds or modifies behavior that a user can see or operate in the Avalonia application
+- **THEN** the change includes a real desktop UI verification plan covering the module's critical end-to-end workflow and distinct high-risk accepted behavior
 - **AND** the verification launches the built application and interacts through actual keyboard, pointer, or accessibility-driven input as applicable
 
-#### Scenario: Feature has multiple interaction risks
-- **WHEN** a user-facing feature depends on keyboard shortcuts, pointer actions, focus or selection, validation, filtering, destructive confirmation, persistence, restart, recovery, accessibility exposure, or tabs and windows
-- **THEN** its UI verification covers every applicable risk dimension and documents dimensions that are not applicable
+#### Scenario: Module has multiple interaction risks
+- **WHEN** a user-facing module depends on keyboard shortcuts, pointer actions, focus or selection, validation, filtering, destructive confirmation, persistence, restart, recovery, accessibility exposure, state synchronization, or tabs and windows
+- **THEN** its UI verification prioritizes distinct risks according to user impact, integration risk, novelty, previous failures, and information value
+- **AND** records why selected scenarios provide sufficient confidence and which equivalent low-risk variants remain covered by deterministic tests
+
+#### Scenario: Interactive desktop is unavailable
+- **WHEN** the contributing agent cannot access an interactive desktop environment
+- **THEN** it records desktop verification as not applicable rather than passed
+- **AND** preserves the targeted scenario matrix for handoff to a capable agent or human
 
 #### Scenario: Change has no user-facing path
 - **WHEN** a change affects only internal behavior with no desktop interaction or visible outcome
@@ -40,13 +46,13 @@ FusionCanvas SHALL keep real desktop UI verification separate from the fast solu
 - **WHEN** the code-level baseline passes for a user-facing change
 - **THEN** passing code-level tests does not replace the required real desktop UI verification pass
 
-### Requirement: User-facing OpenSpec changes plan UI verification
-FusionCanvas SHALL include explicit real desktop UI verification scope in every OpenSpec change that adds or modifies user-facing behavior.
+### Requirement: User-facing OpenSpec modules plan UI verification
+FusionCanvas SHALL include explicit risk-based real desktop UI verification scope in every delivery-module OpenSpec change that adds or modifies user-facing behavior.
 
 #### Scenario: User-facing change artifacts are created
 - **WHEN** proposal, design, specification, and task artifacts are prepared for a user-facing change
-- **THEN** the applicable acceptance scenarios are translated into a desktop UI verification plan and completion task
-- **AND** the plan identifies the critical workflow, applicable interaction-risk dimensions, isolation strategy, and evidence to record
+- **THEN** the critical workflow and distinct high-risk acceptance scenarios are translated into a desktop UI verification plan and completion task
+- **AND** the plan identifies its selection rationale, deterministic coverage for equivalent low-risk variants, isolation strategy, environment handoff, and evidence to record
 
 ## MODIFIED Requirements
 
@@ -56,7 +62,7 @@ FusionCanvas SHALL protect navigation decision logic with focused code-level tes
 #### Scenario: Navigation logic changes
 - **WHEN** a change adds or modifies navigation tree construction, selection behavior, ordering, or application-owned navigation decisions
 - **THEN** the change includes focused code-level tests for the decision logic without launching Avalonia
-- **AND** user-facing navigation paths are included in the change's proportional real desktop UI verification
+- **AND** critical and distinct high-risk navigation paths are included in the module's targeted real desktop UI verification
 
 ### Requirement: Testing scope remains focused
 FusionCanvas SHALL keep the fast solution-level testing baseline focused on deterministic behavior tests while running required real desktop UI verification as a separate lane.
@@ -64,4 +70,4 @@ FusionCanvas SHALL keep the fast solution-level testing baseline focused on dete
 #### Scenario: Contributor evaluates test scope
 - **WHEN** a contributor adds tests to the solution-level baseline
 - **THEN** `dotnet test .\FusionCanvas.sln` does not require a running desktop UI, complete end-to-end UI automation, visual regression infrastructure, performance benchmarking, marketplace integration access, AI provider access, or manual QA setup
-- **AND** this headless scope does not remove the separate real desktop UI verification requirement for new or changed user-facing behavior
+- **AND** this headless scope does not remove the separate targeted real desktop UI verification requirement or environment handoff for user-facing delivery modules

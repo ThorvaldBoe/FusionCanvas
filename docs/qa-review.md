@@ -10,6 +10,27 @@ The durable requirements behind this process live in `openspec/specs/qa-review-b
 - **Partial review:** run only the requested task(s) by ID. Trigger examples: "Run QA-1 (SOLID)", "Do a security QA pass", "Check for spec drift", "Run QA-6 (desktop UI)."
 - **Scope limiting:** a task may be limited to a layer or area (e.g. "QA-2 on the Integration layer only"). State the scope in the report.
 
+### Delivery-Module Completion QA
+
+Every delivery module receives a scoped completion review before it is reported complete. This is a change gate, not automatically a full repository QA review. Review the module's proposal, delta specs, design and implementation plan, tasks, code changes, and `verification.md`, then check:
+
+1. Every acceptance scenario has a planned method, final result, and material evidence or explicit not-applicable rationale.
+2. `dotnet build .\FusionCanvas.sln`, `dotnet test .\FusionCanvas.sln`, and strict validation of the active OpenSpec change pass.
+3. The implementation stayed within the approved module and did not invent unapproved product behavior or architecture decisions.
+4. Changed-scope spec/code/doc drift is absent.
+5. Relevant architecture, security, persistence, migration, and recovery risks were reviewed.
+6. A user-facing module has targeted real-desktop evidence or an explicit unavailable-environment handoff. Scenario selection prioritizes critical workflows and distinct high-risk behavior; equivalent low-risk variants may rely on deterministic tests.
+
+If a criterion or validation gate fails, return the module to correction and rerun the affected criterion plus relevant regression checks. Do not convert a failure into a limitation merely to close the change. Expand to the relevant QA tasks—or a full review—when the module affects broad shell/navigation behavior, crosses many capabilities, or creates plausible unrelated regressions.
+
+For the completion record, add an acceptance table to `verification.md`:
+
+```markdown
+| Capability / scenario | Method | Result | Evidence / limitation |
+| --- | --- | --- | --- |
+| `<requirement> / <scenario>` | Unit / integration / desktop / inspection | Pass / Fail / N/A | `<test, command, screenshot, notes>` |
+```
+
 ### Review Protocol (applies to every task)
 
 1. **Load context first.** Read `AGENTS.md`, `openspec/project.md`, and the specs relevant to the task (`architecture-guidelines`, `testing-baseline`, capability specs under review) before judging anything.
@@ -79,9 +100,9 @@ A QA run itself requires **no** OpenSpec ceremony, just like running the test su
 
 - **Full review:** after a milestone or a batch of archived changes; before any release. Every run includes a fresh QA-6 all-features desktop matrix against the current build.
 - **QA-4 (Security):** frequently — package vulnerabilities appear at any time; cheap to run.
-- **QA-3 (Testing):** after every behavior change lands (normally covered by the change workflow itself).
+- **QA-3 (Testing):** when module completion QA reveals broader test-quality or coverage uncertainty; the deterministic baseline and criterion mapping still run for every module.
 - **QA-5 (Drift):** after archiving changes, to confirm specs, docs, and code stayed aligned.
-- **QA-6 (Desktop UI):** proportionally for every user-facing feature change; comprehensively for every full review.
+- **QA-6 (Desktop UI):** targeted and risk-based for every user-facing delivery module; comprehensive at milestones, before releases, after broad cross-cutting UI changes, and in every full review.
 
 ---
 
@@ -223,7 +244,7 @@ Context: FusionCanvas is a local-first desktop app with no network attack surfac
    - No unsynced delta specs: delta `ADDED/MODIFIED/REMOVED` sections in `openspec/changes/` (non-archived) should reflect intended, not-yet-applied work only.
 3. **Docs vs. specs vs. code:**
    - `README.md`, `docs/*.md`, `openspec/project.md` agree on layer names, project structure, test commands, and workflow. (Known historical example: `docs/architecture.md` used the name "Infrastructure" while the accepted name is "Integration".)
-   - `docs/LifeOS/PRD/` content remains planning material — nothing was copied into `openspec/specs/` without going through a change.
+   - `docs/LifeOS/` remains optional historical reference; canonical documents do not treat its inventory, ordering, or acceptance text as current authority, and reused ideas still go through discovery and OpenSpec.
    - `AGENTS.md` remains consistent with this playbook and the workflow skills in `.codex/skills/`.
 4. **Archived context preserved:** archived changes exist under `openspec/changes/archive/` with their artifacts; nothing was casually deleted.
 

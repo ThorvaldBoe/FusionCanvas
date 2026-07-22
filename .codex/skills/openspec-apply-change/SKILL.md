@@ -59,7 +59,18 @@ Implement tasks from an OpenSpec change.
    - Other schemas: follow the contextFiles from CLI output
    - If `<changeRoot>/retrospective.md` already exists, read it before continuing so later feedback extends the same record.
 
-5. **Show current progress**
+5. **Run the implementation-readiness gate**
+
+   Before editing implementation files, verify from the context artifacts that:
+   - the proposal defines one coherent delivery module, its boundaries, dependencies, non-goals, and scope rationale;
+   - every requirement has observable acceptance scenarios;
+   - `design.md` contains a dedicated `## Implementation Plan` with affected layers and likely files/types, responsibility placement, data/persistence and UI behavior where relevant, algorithms and edge cases, sequencing, test locations, migration/compatibility work, and decisions not to reopen;
+   - each acceptance scenario has a planned verification method or explicit not-applicable rationale;
+   - the assigned task range, validation commands, prohibited scope expansion, and ambiguity escalation conditions are clear.
+
+   If a missing decision could materially change product behavior, UX, data, architecture, or acceptance, pause and return the ambiguity. Do not fill it in during implementation. Small mechanical details that remain within the approved plan may be resolved normally.
+
+6. **Show current progress**
 
    Display:
    - Schema being used
@@ -67,7 +78,7 @@ Implement tasks from an OpenSpec change.
    - Remaining tasks overview
    - Dynamic instruction from CLI
 
-6. **Implement tasks (loop until done or blocked)**
+7. **Implement tasks (loop until done or blocked)**
 
    For each pending task:
    - Show which task is being worked on
@@ -75,6 +86,12 @@ Implement tasks from an OpenSpec change.
    - Keep changes minimal and focused
    - Mark task complete in the tasks file: `- [ ]` → `- [x]`
    - Continue to next task
+
+   Maintain `<changeRoot>/verification.md` as verification runs. It must account for every acceptance scenario with its method, result, evidence, and limitations. An aggregate build or test result is supporting evidence, not a substitute for criterion-level accounting.
+
+   For user-facing modules, allocate the real-desktop lane by risk and information value: critical end-to-end workflow, new framework wiring, persistence, destructive actions, state synchronization, complex focus/input, recovery, accessibility, and tabs/windows. Representative low-risk variants may be sampled when deterministic tests cover the rule combinations. If no interactive desktop is available, record the lane as not applicable and preserve the targeted scenario handoff.
+
+   When a criterion fails, correct the implementation or approved artifact, rerun the affected criterion and relevant regression checks, and update the evidence. Do not mark the module complete while a required criterion is failed or unaccounted for.
 
    **Pause if:**
    - Task is unclear → ask for clarification
@@ -104,7 +121,7 @@ Implement tasks from an OpenSpec change.
    - ...
    ```
 
-7. **On completion or pause, show status**
+8. **On completion or pause, show status**
 
    Display:
    - Tasks completed this session
@@ -170,6 +187,9 @@ What would you like to do?
 - If implementation reveals issues, pause and suggest artifact updates
 - Keep code changes minimal and scoped to each task
 - Update task checkbox immediately after completing each task
+- Stay inside the approved delivery-module boundaries; do not opportunistically implement later opportunities
+- Do not invent missing product, UX, data, architecture, or acceptance decisions; escalate them
+- Do not report completion until `verification.md` accounts for every acceptance scenario and required validation gate
 - Pause on errors, blockers, or unclear requirements - don't guess
 - Use contextFiles from CLI output, don't assume specific file names
 - Treat user feedback and final approved behavior as stronger evidence than an inferred Git diff

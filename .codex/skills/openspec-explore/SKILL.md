@@ -79,6 +79,16 @@ Depending on what the user brings, you might:
 
 You have full context of the OpenSpec system. Use it naturally, don't force it.
 
+### FusionCanvas module discovery
+
+When exploration may become feature work, help the user shape only the **next delivery module** in detail. A module is a cohesive, independently verifiable feature set with one outcome; it has no fixed feature count and is not necessarily a code module.
+
+Explore the outcome, included features, dependencies, non-goals, representative workflows, edge cases, failure states, high-impact product/UX/data/architecture decisions, verification risks, and why the scope is understandable and diagnosable. Split independent outcomes; group small features when they genuinely share data, surface, fixture, and acceptance cost.
+
+Keep later opportunities as short backlog notes rather than generating proposals or specifications for them. Start from current user intent, accepted specs, current application state, verification, and retrospectives. `docs/LifeOS` is an optional, potentially stale idea archive—not required context or current ordering.
+
+When understanding crystallizes, summarize the decisions that should enter the proposal, delta specs, conceptual/functional design, detailed implementation plan, tasks, and acceptance-evidence mapping. Do not claim readiness while a high-impact ambiguity remains.
+
 ### Check for context
 
 At the start, quickly check what exists:

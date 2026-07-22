@@ -361,7 +361,7 @@ Events allow plugins to react without tightly coupling components.
 
 ## Testing Strategy
 
-FusionCanvas uses complementary code-level and real-desktop test lanes. Business logic must remain testable without the UI, while user-facing behavior should also be verified through the built Avalonia application when the contributing agent can run an interactive desktop session (e.g., Codex). OpenCode cannot perform interactive desktop verification, records that pass as not-applicable, and relies on the code-level baseline plus UI-owned decision-logic tests.
+FusionCanvas uses complementary code-level and real-desktop test lanes. Business logic must remain testable without the UI, while each user-facing delivery module receives targeted verification through the built Avalonia application when the contributing agent can run an interactive desktop session (e.g., Codex). OpenCode cannot perform interactive desktop verification, records that lane as not-applicable, preserves the targeted scenario handoff, and relies on the code-level baseline plus UI-owned decision-logic tests for its own completion evidence.
 
 FusionCanvas should maintain a high level of unit test coverage, especially for domain logic, application services, persistence boundaries, and plugin contracts. New behavior should generally include focused unit tests unless there is a clear reason another test type provides better confidence.
 
@@ -373,9 +373,9 @@ Priority should be given to testing:
 - data persistence
 - import/export functionality
 
-Every new or changed user-facing feature also expects a proportional real desktop UI pass derived from its accepted scenarios when an interactive desktop is available. Cover the feature's primary workflow and all applicable interaction risks: keyboard and pointer input, focus and selection, validation and filtering, destructive confirmation, persistence and restart, recovery, accessibility exposure, and tabs or windows.
+Desktop scenarios are selected by user impact, integration risk, novelty, prior failures, and information value. Cover the module's critical end-to-end workflow and distinct applicable risks: keyboard and pointer input, focus and selection, validation and filtering, destructive confirmation, persistence and restart, recovery, accessibility exposure, state synchronization, and tabs or windows. Equivalent low-risk variants may be sampled on the real desktop when deterministic tests cover the remaining rule combinations; the verification record explains why the chosen set is sufficient.
 
-Desktop UI verification runs separately from `dotnet test .\FusionCanvas.sln`, uses a disposable workspace or database rather than normal user data, and records the tested build and environment, scenarios, results, isolation method, limitations, and material screenshots or automation logs. The full QA review expands this into an all-features regression matrix for the current build.
+Desktop UI verification runs separately from `dotnet test .\FusionCanvas.sln`, uses a disposable workspace or database rather than normal user data, and records the tested build and environment, scenarios, results, isolation method, limitations, and material screenshots or automation logs. The full all-features regression matrix is reserved for full QA reviews, milestones, release candidates, and broad cross-cutting UI changes rather than every ordinary module.
 
 ## OpenSpec Development
 
@@ -384,15 +384,10 @@ FusionCanvas is developed using OpenSpec.
 The expected workflow is:
 
 ```text
-Idea
-Specification
-Review
-Implementation
-Testing
-Archive
+Discover → Define module → Propose → Review → Apply → Verify → Learn → Archive
 ```
 
-Specifications become part of the project's permanent knowledge base and should accurately describe the intended behavior of the system.
+Detailed planning advances one cohesive delivery module at a time. Specifications become part of the project's permanent behavioral knowledge base; change-specific conceptual design and implementation guidance live in the active/archived delivery package so they can be explicit without turning current source-file choices into permanent requirements.
 
 ## Architectural Principles
 

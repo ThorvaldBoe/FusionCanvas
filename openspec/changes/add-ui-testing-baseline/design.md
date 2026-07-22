@@ -2,14 +2,14 @@
 
 FusionCanvas currently has a fast xUnit baseline that deliberately avoids launching Avalonia. That remains valuable, but it cannot verify framework wiring, focus, keyboard and pointer interaction, native input routing, visual state, or persistence across an actual desktop restart. FC-0103 demonstrated that the built Windows application can be exercised safely through UI Automation while using a disposable workspace database.
 
-This is a cross-cutting process change affecting every future user-facing OpenSpec change and the recurring full QA review. It does not change the application runtime.
+This is a cross-cutting process change affecting every future user-facing delivery module and the recurring full QA review. It does not change the application runtime.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Make real desktop UI verification a completion criterion for every new or changed user-facing feature.
-- Define a proportional scenario-selection model so feature tests are thorough without requiring every possible input permutation.
+- Make targeted real desktop UI verification a completion criterion for every user-facing delivery module when an interactive environment is available.
+- Define a risk- and information-value-based scenario-selection model so desktop tests focus on critical workflows and distinct risks without repeating equivalent low-risk variants.
 - Keep UI verification safe, reproducible, and evidence-backed.
 - Make a full QA review inventory and exercise all implemented user-facing features.
 - Preserve the speed and determinism of the existing solution-level xUnit lane.
@@ -30,9 +30,9 @@ This is a cross-cutting process change affecting every future user-facing OpenSp
 
 Alternative considered: fold desktop automation into the solution test suite. Rejected because it would make the baseline dependent on an interactive Windows desktop and increase flakiness and runtime.
 
-### Require proportional coverage derived from acceptance behavior
+### Require risk-based coverage derived from acceptance behavior
 
-Each user-facing change identifies its critical happy path and the applicable interaction risks: keyboard, pointer, focus/selection, validation, filtering, destructive confirmation, persistence/restart, recovery, accessibility exposure, and multi-window/tab behavior. Only relevant dimensions are required, but all important acceptance scenarios must be represented.
+Each user-facing module identifies its critical end-to-end path and applicable distinct interaction risks: keyboard, pointer, focus/selection, validation, filtering, destructive confirmation, persistence/restart, recovery, accessibility exposure, state synchronization, and multi-window/tab behavior. Desktop scenarios are selected by user impact, integration risk, novelty, prior failures, and information value. Equivalent low-risk variants may be sampled when focused deterministic tests cover the remaining rule combinations; the plan records why the selected set is sufficient.
 
 Alternative considered: use one universal fixed checklist as a pass gate. Rejected because many dimensions do not apply to every feature and would encourage ceremonial rather than risk-based testing.
 
@@ -55,7 +55,7 @@ Windows UI Automation is the current practical mechanism, but the requirement is
 ## Risks / Trade-offs
 
 - [Desktop UI tests can be slower or flaky] → Keep them outside the default xUnit lane, use deterministic fixtures, wait on observable UI state rather than fixed delays, and record blocked infrastructure separately from product failures.
-- [Coverage may become inconsistent across changes] → Require a UI verification section and explicit task in every user-facing OpenSpec change, derived from its acceptance scenarios.
+- [Coverage may become inconsistent across changes] → Require a UI verification section and explicit task in every user-facing delivery module, with scenario selection and omissions justified against its acceptance scenarios and risk profile.
 - [“All features” can become ambiguous] → Build the full-QA matrix from accepted implemented capability specs and include every row in the report.
 - [UI Automation may not expose custom controls well] → Prefer stable automation identifiers and accessible names, supplement with keyboard/pointer input and screenshots, and log accessibility gaps as findings.
 - [Test data could damage a real workspace] → Require a disposable workspace/database and verify the normal workspace is not selected before destructive actions.
@@ -66,7 +66,7 @@ Windows UI Automation is the current practical mechanism, but the requirement is
 2. Update contributor, architecture, planning, and QA playbook documentation.
 3. Update active user-facing changes so their remaining verification artifacts follow the new policy.
 4. On archive, sync the delta requirements into the accepted baseline specs.
-5. Apply the requirement to all new user-facing changes; existing features are comprehensively covered by the next full QA UI regression review.
+5. Apply the requirement to all new user-facing delivery modules; existing features are comprehensively covered by the next full QA UI regression review.
 
 Rollback is documentation-only: revert the policy change and related guidance. No runtime or data migration is involved.
 

@@ -1,10 +1,4 @@
-# OpenSpec Project Workflow
-
-## Purpose
-
-Defines how FusionCanvas contributors discover and deliver one cohesive feature module at a time through reviewed specifications, implementation-ready guidance, acceptance verification, learning, and archived project history.
-
-## Requirements
+## ADDED Requirements
 
 ### Requirement: Detailed planning advances one delivery module at a time
 FusionCanvas SHALL limit detailed feature planning to the next delivery module, where a delivery module is a cohesive and independently verifiable set of features rather than a fixed feature count or code-architecture boundary.
@@ -66,16 +60,7 @@ FusionCanvas SHALL treat approved acceptance criteria as traceable pass/fail com
 - **WHEN** a contributor reports a delivery module complete
 - **THEN** verification evidence accounts for every acceptance criterion, required validation command, limitation, and deferred environment-dependent check
 
-### Requirement: OpenSpec is the feature workflow
-FusionCanvas SHALL use OpenSpec as the standard workflow for significant feature behavior changes.
-
-#### Scenario: Contributor starts a roadmap feature
-- **WHEN** a contributor begins work on a significant roadmap feature
-- **THEN** the contributor creates or continues an OpenSpec change before implementation begins
-
-#### Scenario: Contributor makes a small maintenance change
-- **WHEN** a contributor makes a small maintenance change that does not alter accepted feature behavior
-- **THEN** the contributor may avoid a full OpenSpec proposal
+## MODIFIED Requirements
 
 ### Requirement: Planning documents are source material
 FusionCanvas SHALL treat historical roadmaps and PRD documents as optional idea sources, not as required context, current plans, or accepted OpenSpec specifications.
@@ -122,68 +107,3 @@ FusionCanvas delivery packages SHALL separate durable requirements and conceptua
 #### Scenario: Implementation details change without behavior change
 - **WHEN** current type or file choices in the implementation plan become obsolete without changing accepted behavior
 - **THEN** the active design and tasks may be corrected without rewriting the behavior requirements
-
-### Requirement: User-facing changes receive a UX preflight
-FusionCanvas SHALL review user-facing changes against the shared UI and UX guidance before implementation.
-
-#### Scenario: Contributor proposes a user-facing change
-- **WHEN** a change adds or modifies a user-facing workflow
-- **THEN** the proposal or design identifies the primary workflow, expected action frequency, appropriate interaction surface, and acceptable workspace footprint
-- **AND** the design resolves progressive disclosure, relevant interaction states, selection, focus, unsaved changes, cancellation, and destructive actions before leaving those decisions to implementation
-
-#### Scenario: Contributor proposes a non-user-facing change
-- **WHEN** a change has no user-facing interaction
-- **THEN** the change may mark the UX preflight as not applicable
-
-### Requirement: Feedback-driven adjustments are captured
-FusionCanvas SHALL capture user feedback that invalidates an implementation or design assumption while a change is active.
-
-#### Scenario: Validation reveals an unplanned requirement or correction
-- **WHEN** user validation reveals that an assumption, interaction, requirement, or implementation behavior must change
-- **THEN** the contributor updates the relevant active specification, design, or tasks
-- **AND** records the original assumption, observed problem, approved correction, applicability, classification, and potential promotion target in the change retrospective
-
-#### Scenario: Validation reveals an ordinary implementation defect
-- **WHEN** user validation reveals a defect without establishing a reusable product or engineering rule
-- **THEN** the retrospective may classify it as an implementation defect
-- **AND** the defect is not promoted into normative guidance solely because it occurred
-
-### Requirement: Archive includes a learning review
-FusionCanvas SHALL complete a learning review before archiving a significant change.
-
-#### Scenario: Change contains reusable lessons
-- **WHEN** the learning review identifies a reusable lesson
-- **THEN** the contributor promotes it to the narrowest durable source of truth or records an explicit deferral with rationale
-- **AND** preserves the detailed evidence in `retrospective.md` with the archived change
-
-#### Scenario: Change contains no reusable lessons
-- **WHEN** the learning review identifies no reusable lesson
-- **THEN** `retrospective.md` explicitly records that result before archive
-
-#### Scenario: Git history is unavailable or incomplete
-- **WHEN** the learning review cannot reconstruct useful implementation history from Git
-- **THEN** the contributor uses recorded feedback, artifact evolution that is available, and the final approved behavior
-- **AND** does not infer lessons from a raw diff alone
-
-### Requirement: Lessons have a durable promotion target
-FusionCanvas SHALL route reusable knowledge to the narrowest authoritative project document.
-
-#### Scenario: Contributor classifies a lesson
-- **WHEN** a retrospective identifies reusable knowledge
-- **THEN** capability behavior is promoted to its accepted OpenSpec specification
-- **AND** interaction principles are promoted to UX guidance
-- **AND** visual or layout rules are promoted to UI guidance
-- **AND** structural engineering rules are promoted to architecture guidance
-- **AND** OpenSpec process rules are promoted to the OpenSpec workflow specification or repository skill instructions
-- **AND** change-specific rationale remains in the archived design and retrospective
-
-### Requirement: Completed and superseded context is preserved
-FusionCanvas SHALL preserve completed and superseded specification context instead of casually deleting it.
-
-#### Scenario: Change is accepted
-- **WHEN** a change is accepted and archived
-- **THEN** the project preserves the accepted behavior and supporting change context for future contributors
-
-#### Scenario: Specification is superseded
-- **WHEN** a specification is superseded by later behavior
-- **THEN** the project preserves enough context to understand the previous decision and migration path

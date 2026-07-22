@@ -1,10 +1,10 @@
 ## Why
 
-FusionCanvas can currently treat a user-facing feature as complete after code-level tests even when its real Avalonia interaction path has not been exercised. Real desktop verification has proven practical and should become a standard feature-completion requirement, with a comprehensive all-features UI regression pass in every full QA review.
+FusionCanvas can currently treat a user-facing module as complete after code-level tests even when its real Avalonia interaction path has not been exercised. Real desktop verification has proven practical and should become a targeted, risk-based module-completion requirement when an interactive environment is available, with a comprehensive all-features UI regression pass in every full QA review.
 
 ## What Changes
 
-- Require every new or changed user-facing feature to include a proportional real desktop UI test covering its important acceptance paths.
+- Require every user-facing delivery module to plan a targeted real desktop UI pass covering its critical workflow and distinct high-risk acceptance paths, while allowing equivalent low-risk variants to remain in deterministic tests.
 - Keep the fast, deterministic solution-level test suite separate from desktop UI verification so ordinary baseline runs remain reliable and headless-friendly.
 - Require UI verification to use isolated/disposable data and to cover relevant keyboard, pointer, focus, persistence, restart, destructive-action, validation, and recovery behavior.
 - Require verification evidence to identify the tested build, scenarios, environment, result, and any justified omissions.
@@ -19,7 +19,7 @@ None.
 
 ### Modified Capabilities
 
-- `testing-baseline`: Extend feature-completion testing from code-level automation to proportional real desktop UI verification for user-facing behavior.
+- `testing-baseline`: Extend module-completion testing from code-level automation to targeted, risk-based real desktop UI verification for user-facing behavior.
 - `qa-review-baseline`: Extend the full QA review with a comprehensive real desktop UI regression task covering all implemented user-facing features.
 
 ## Impact

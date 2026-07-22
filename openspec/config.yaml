@@ -11,22 +11,22 @@ schema: spec-driven
 context: |
   FusionCanvas is an OpenSpec-driven desktop application for Print-on-Demand creators.
 
-  Durable accepted behavior lives under openspec/specs. Do not treat planning PRDs as
-  accepted OpenSpec specifications.
+  Durable accepted behavior lives under openspec/specs. Detailed planning advances one
+  delivery module at a time. A module is a cohesive, independently verifiable feature
+  set with one clear outcome; it is not a fixed feature count or code boundary.
 
-  Product planning source material lives under docs/LifeOS/PRD. When proposing,
-  designing, or scoping a FusionCanvas change, inspect the relevant PRD files in
-  docs/LifeOS/PRD and docs/LifeOS/Roadmap.md before drafting OpenSpec artifacts.
-  Prefer the PRDs for product intent, workflow boundaries, acceptance criteria, and
-  feature dependencies. Convert only the relevant intent into the new OpenSpec
-  change; do not copy the whole PRD set into a proposal.
+  Start discovery from current user intent, accepted specs, current application state,
+  recent verification and retrospectives, and docs/roadmap.md. Resolve goals, examples,
+  non-goals, edge cases, assumptions, dependencies, and high-impact decisions before
+  implementation. Historical LifeOS files under docs/LifeOS are optional, potentially
+  stale idea sources only; never infer current priority, ordering, requirements, or
+  acceptance criteria from them.
 
-  Useful starting points:
-  - docs/LifeOS/Roadmap.md for phase and feature ordering.
-  - docs/LifeOS/PRD/Phase 0 - Foundation.md for foundation scope.
-  - docs/LifeOS/PRD/Phase 1 - MVP Creative Workspace.md for MVP scope.
-  - docs/LifeOS/PRD/Phase 2 - Product Creation Workflow.md for product workflow scope.
-  - docs/LifeOS/PRD/PRD Audit - 2026-06-17.md for known gaps, corrections, and next actions.
+  Each change is a delivery package: proposal and delta specs define the module and
+  observable behavior; design.md contains conceptual/functional design plus a detailed
+  implementation plan; tasks.md provides bounded steps; verification.md maps every
+  acceptance scenario to final evidence. Lower-cost implementation agents must not be
+  left to invent product or architecture decisions.
 
   For every user-facing change, also inspect docs/ui-guidelines.md and
   docs/ux-guidelines.md. Use the UI guidelines for visual composition and control
@@ -44,6 +44,12 @@ context: |
 #       - Break tasks into chunks of max 2 hours
 rules:
   proposal:
+    - Define one cohesive delivery module: outcome, included features, dependencies, non-goals, risks, verification approach, and why the scope is reviewable. Do not specify later modules in detail.
+    - Capture the important decisions from collaborative discovery and identify any unresolved high-impact questions. Implementation cannot begin while those questions remain.
     - For user-facing changes, identify the primary workflow, its expected frequency, and whether it belongs in the main workspace or a focused surface. For non-user-facing changes, state that UX review is not applicable.
   design:
     - For user-facing changes, apply docs/ui-guidelines.md and docs/ux-guidelines.md and resolve the UX preflight before implementation. Cover workspace footprint, progressive disclosure, interaction states, selection, focus, unsaved changes, cancellation, and destructive actions where relevant.
+    - Include a dedicated Implementation Plan detailed enough for the assigned agent: affected layers and likely files or types, responsibility placement, data/persistence and UI changes, algorithms and edge cases, sequencing, test locations, migration or compatibility work, and decisions not to reopen.
+    - Map each acceptance scenario to a planned verification method. Allocate real desktop scenarios by user impact, integration risk, novelty, and information value; use deterministic tests for equivalent low-risk variants.
+  tasks:
+    - Derive ordered, bounded, independently verifiable tasks from the implementation plan. Include artifact correction, criterion-level verification, strict OpenSpec validation, and the solution test baseline.

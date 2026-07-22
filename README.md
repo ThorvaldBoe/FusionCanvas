@@ -106,33 +106,29 @@ The baseline test suite uses mirrored test projects under `tests/`:
 * `FusionCanvas.Integration.Tests` protects local persistence and workspace file boundaries with isolated temporary resources.
 * `FusionCanvas.App.Tests` protects UI-owned state and navigation decisions that can be tested without full visual UI automation.
 
-New foundational behavior should include focused automated tests in the relevant layer. Static Avalonia markup, framework-owned rendering, full UI automation, visual regression infrastructure, performance benchmarking, marketplace integration access, AI provider access, and manual QA process setup are outside the Phase 0 baseline unless a later OpenSpec change accepts that scope.
+New behavior should include focused automated tests in the relevant layer. Static Avalonia markup, framework-owned rendering, full desktop automation, visual regression infrastructure, performance benchmarking, marketplace integration access, and AI provider access remain outside the fast solution-level baseline. User-facing delivery modules use a separate targeted real-desktop pass selected by risk and information value.
 
 ## Project Status
 
-FusionCanvas is currently in the initial public repository setup phase.
-
-The first milestones are:
-
-1. Define project vision and architecture documents
-2. Set up OpenSpec-based development workflow
-3. Create the initial Avalonia application shell
-4. Implement local workspace navigation
-5. Build the first version of idea and concept management
+FusionCanvas is in early active development. Current and candidate work is recorded in `docs/roadmap.md`; accepted behavior lives in `openspec/specs`, and completed change history lives under `openspec/changes/archive`.
 
 ## Development Approach
 
-FusionCanvas will use a specification-first development process.
+FusionCanvas uses a specification-first, rolling module development process.
 
-For meaningful changes, contributors should first describe the intended behavior in OpenSpec before implementing code. This helps keep the project understandable for both humans and AI-assisted development tools.
+For meaningful changes, contributors and agents first define one cohesive delivery module, build shared understanding through discussion, and create an implementation-ready OpenSpec delivery package. Detailed planning is limited to the next module so later specifications do not become stale before use.
 
 The expected workflow is:
 
 ```text
-Propose → Implement → Validate → Archive
+Discover → Define module → Propose → Review → Apply → Verify → Learn → Archive
 ```
 
-The original LifeOS product requirements are kept in `docs/LifeOS/PRD` as planning and product-intent source material. Before proposing a related OpenSpec change, review the relevant PRD files and translate only the applicable behavior into the new OpenSpec proposal and spec deltas. The PRDs should remain outside `openspec/specs` unless their behavior has gone through the OpenSpec workflow and been accepted.
+One module normally maps to one OpenSpec change. Requirements and conceptual/functional design define the expected behavior; a dedicated implementation plan gives the assigned implementation agent explicit layer, data, UI, edge-case, sequencing, and test guidance. Observable acceptance criteria are pass/fail completion gates and are mapped to evidence in `verification.md`.
+
+Higher-reasoning agents or humans handle discovery, specification, design review, and ambiguous corrections. Lower-cost agents can implement bounded tasks after the delivery package is approved and sufficiently explicit. Targeted desktop UI testing is reserved for critical workflows and distinct user risks, while deterministic tests cover equivalent low-risk variants; full all-features desktop regression runs at milestone, release, or full-QA gates.
+
+The original LifeOS planning files remain under `docs/LifeOS` as optional, potentially stale historical reference. They are not required reading, a current roadmap, or acceptance authority.
 
 ## Repository Structure
 
