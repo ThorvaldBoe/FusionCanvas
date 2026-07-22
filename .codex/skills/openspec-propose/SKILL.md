@@ -35,6 +35,8 @@ Before creating artifacts, establish enough shared understanding with the user t
 
 Ask focused questions only where the answer would materially change the module. Capture conclusions in the artifacts rather than pasting the conversation. Historical documents under `docs/LifeOS` are optional idea sources, not required context or current requirements.
 
+Do not create a separate module-specification artifact by default. Treat `proposal.md` as the module-level anchor and place each discovery conclusion directly in the proposal, delta specs, design, tasks, or verification mapping according to its responsibility. Continue refining those artifacts until the package is approved rather than maintaining a parallel source of truth.
+
 The delivery package is implementation-ready only when:
 
 - delta specs contain observable acceptance scenarios for every requirement;

@@ -26,7 +26,7 @@ The next module will be chosen collaboratively after the current module is verif
 - recent change retrospectives;
 - optional historical idea sources when useful.
 
-Before proposal work, record the module's outcome, included feature set, dependencies, non-goals, key risks, verification approach, and why it is a coherent size. A fixed feature count is not used.
+Before proposal work, understand the module's outcome, included feature set, dependencies, non-goals, key risks, verification approach, and why it is a coherent size. Capture those conclusions in the OpenSpec proposal and related artifacts rather than creating a separate module specification. A fixed feature count is not used.
 
 ## Later Opportunities
 

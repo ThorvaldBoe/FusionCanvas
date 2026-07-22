@@ -87,6 +87,8 @@ Explore the outcome, included features, dependencies, non-goals, representative 
 
 Keep later opportunities as short backlog notes rather than generating proposals or specifications for them. Start from current user intent, accepted specs, current application state, verification, and retrospectives. `docs/LifeOS` is an optional, potentially stale idea archive—not required context or current ordering.
 
+Exploration does not require a document, and FusionCanvas does not create a separate module-specification artifact by default. Once the next module is understood well enough to name and bound, flow into one OpenSpec change. Use `proposal.md` as the module-level anchor, delta specs for requirements and acceptance scenarios, `design.md` for design and the implementation plan, `tasks.md` for bounded work, and `verification.md` for criterion-level evidence. Refine those artifacts as discovery continues instead of maintaining a parallel source of truth.
+
 When understanding crystallizes, summarize the decisions that should enter the proposal, delta specs, conceptual/functional design, detailed implementation plan, tasks, and acceptance-evidence mapping. Do not claim readiness while a high-impact ambiguity remains.
 
 ### Check for context
