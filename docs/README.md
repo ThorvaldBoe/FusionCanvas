@@ -28,13 +28,13 @@ The current direction is:
 - OpenSpec-driven development
 - AI-assisted workflows as a core long-term feature
 
-The application is still in early development. The current focus is on establishing the product vision, architecture, data model, plugin model, and initial MVP.
+The application is still in early development. Work advances through one cohesive delivery module at a time; current planning lives in `docs/roadmap.md`, and accepted behavior lives in `openspec/specs`.
 
-## LifeOS PRD Source Material
+## Delivery Approach
 
-The original LifeOS product requirements live in `docs/LifeOS/PRD`. They are planning documents, not accepted OpenSpec specifications.
+FusionCanvas uses a rolling OpenSpec workflow: discover the next module collaboratively, define observable requirements and conceptual/functional design, add a detailed implementation plan for the assigned agent, implement bounded tasks, verify every acceptance criterion, learn from the result, and archive the change. Later opportunities remain lightweight until the current module is complete.
 
-When proposing or designing a related OpenSpec change, use the relevant PRD files as source material for product intent, workflow boundaries, dependencies, and acceptance criteria. Keep accepted behavior in `openspec/specs` and convert PRD intent through the normal OpenSpec proposal workflow.
+The original LifeOS planning files under `docs/LifeOS` are preserved only as optional historical idea sources. They may be stale and do not define current priorities, ordering, requirements, or acceptance criteria.
 
 ## Core Concept
 

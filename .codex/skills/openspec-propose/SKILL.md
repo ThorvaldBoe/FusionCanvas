@@ -21,6 +21,28 @@ When ready to implement, run /opsx:apply
 
 **Input**: The user's request should include a change name (kebab-case) OR a description of what they want to build.
 
+## FusionCanvas Delivery-Module Contract
+
+For FusionCanvas feature work, one change normally represents one **delivery module**: a cohesive, independently verifiable feature set with one clear outcome. There is no fixed feature count. Do not create detailed artifacts for later modules while proposing the next one.
+
+Before creating artifacts, establish enough shared understanding with the user to resolve:
+
+- the module outcome and included features;
+- dependencies, non-goals, and why the scope is coherent and reviewable;
+- representative workflows, examples, edge cases, and failure states;
+- high-impact product, UX, data, architecture, migration, and acceptance decisions;
+- the verification approach and desktop-test risks for user-facing work.
+
+Ask focused questions only where the answer would materially change the module. Capture conclusions in the artifacts rather than pasting the conversation. Historical documents under `docs/LifeOS` are optional idea sources, not required context or current requirements.
+
+The delivery package is implementation-ready only when:
+
+- delta specs contain observable acceptance scenarios for every requirement;
+- `design.md` separates conceptual/functional design from a dedicated `## Implementation Plan` detailed enough for the assigned agent, including affected layers and likely files/types, responsibility placement, data/persistence and UI behavior, algorithms and edge cases, sequencing, test locations, migration/compatibility work, and decisions not to reopen;
+- every acceptance scenario has a planned verification method or explicit not-applicable rationale;
+- `tasks.md` decomposes the implementation plan into ordered, bounded, verifiable steps and includes criterion-level verification, strict OpenSpec validation, and the solution test baseline;
+- no unresolved high-impact decision is silently delegated to implementation.
+
 **Steps**
 
 1. **If no clear input provided, ask what they want to build**
@@ -58,6 +80,8 @@ When ready to implement, run /opsx:apply
 
    Capture the decisions in the proposal, design, or specification scenarios rather than copying the checklist verbatim. Ask the user only when a high-impact product preference cannot be derived from project context. For a change without user-facing interaction, record that the UX preflight is not applicable.
 
+   Plan real-desktop verification by risk and information value. Cover the critical workflow and distinct high-risk wiring or interaction behavior; use deterministic tests for equivalent low-risk variants. Record why the selected desktop scenarios are sufficient and how an unavailable interactive environment will be handed off.
+
 5. **Create artifacts in sequence until apply-ready**
 
    Use the **TodoWrite tool** to track progress through the artifacts.
@@ -90,6 +114,13 @@ When ready to implement, run /opsx:apply
       - Use **AskUserQuestion tool** to clarify
       - Then continue with creation
 
+   d. **Apply the delivery-package readiness gate before stopping**:
+      - Confirm the proposal defines one coherent module and justifies its size.
+      - Confirm delta specs have observable acceptance scenarios.
+      - Confirm `design.md` contains the dedicated implementation plan and planned acceptance-to-verification mapping.
+      - Confirm tasks are bounded and include all required verification gates.
+      - If any high-impact decision remains unresolved, pause and ask rather than declaring the change apply-ready.
+
 6. **Show final status**
    ```bash
    openspec status --change "<name>"
@@ -115,6 +146,7 @@ After completing all artifacts, summarize:
 
 **Guardrails**
 - Create ALL artifacts needed for implementation (as defined by schema's `apply.requires`)
+- Treat the project-specific delivery-module and implementation-readiness rules above as additional constraints even when generic CLI artifact instructions are less detailed
 - Always read dependency artifacts before creating a new one
 - If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum
 - If a change with that name already exists, ask if user wants to continue it or create a new one

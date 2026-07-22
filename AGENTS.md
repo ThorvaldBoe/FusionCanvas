@@ -22,14 +22,15 @@ Read these in order; drill into detail only where the task touches them:
    - `ui-guidelines.md` — Obsidian-inspired shell, layout, dark theme.
    - `data-model.md`, `design-pipeline.md`, `plugin-model.md`, `product-vision.md`, `strategic-decisions.md`, `roadmap.md` as relevant.
    - `qa-review.md` — the QA review playbook (see below).
-5. **`docs/LifeOS/PRD/`** — product planning source material **only**. PRDs are NOT accepted specifications. Translate PRD intent into OpenSpec changes; never implement directly from a PRD without an accepted change.
+
+`docs/LifeOS/` is optional historical reference. It may contain useful ideas, but it is potentially stale and is not required context, current scope, feature ordering, or acceptance authority.
 
 ## OpenSpec Workflow (mandatory for behavior changes)
 
-Every feature that adds or changes behavior goes through OpenSpec:
+Every feature that adds or changes behavior goes through a rolling delivery-module workflow:
 
 ```text
-Propose → Review → Apply (implement) → Validate → Archive
+Discover → Define module → Propose → Review → Apply → Verify → Learn → Archive
 ```
 
 - The OpenSpec CLI (`openspec`) is installed. Key commands: `openspec list --json`, `openspec status --change <name> --json`, `openspec instructions <artifact> --change <name> --json`, `openspec validate`.
@@ -37,6 +38,23 @@ Propose → Review → Apply (implement) → Validate → Archive
 - Spec deltas use `## ADDED / MODIFIED / REMOVED / RENAMED Requirements` sections. Accepted specs live in `openspec/specs/`; active work in `openspec/changes/`; history in `openspec/changes/archive/`.
 - Never edit `openspec/specs/` directly to change behavior. Change behavior through a change's delta specs, then sync and archive through the workflow.
 - Small maintenance work that does not alter accepted behavior (bug fixes, internal refactors, docs, dependency updates) may proceed without a proposal — see `openspec/specs/openspec-project-workflow/spec.md`.
+
+### Delivery Module Rules
+
+- A **delivery module** is a cohesive, independently verifiable set of features with one clear outcome. It is a planning unit, not necessarily a code project or architecture module, and it has no fixed feature-count limit.
+- Plan only the next module in detail. Keep later opportunities lightweight until the current module is implemented, verified, and reviewed for lessons.
+- The proposal states included features, dependencies, non-goals, risks, verification approach, and why the scope is coherent and reviewable. Split it when it contains independent outcomes, unresolved high-impact decisions, or a verification surface too large to diagnose.
+- Discovery is collaborative. Capture resolved examples, edge cases, assumptions, and decisions in the artifacts. Do not begin implementation while a product, UX, data, architecture, or acceptance decision could materially change the result unless the user explicitly delegates it.
+- One module normally maps to one OpenSpec change. Delta specs contain durable requirements and acceptance scenarios. `design.md` contains conceptual/functional design plus a dedicated implementation plan. `tasks.md` decomposes that plan. `verification.md` maps every acceptance scenario to results and evidence.
+- The implementation plan must be explicit enough for the assigned agent: affected layers and likely types/files, responsibility placement, data/persistence and UI changes, algorithms and edge cases, sequencing, test locations, migration/compatibility needs, and decisions not to reopen.
+- Acceptance criteria are pass/fail gates. Map each one to a verification method before implementation. If a criterion fails, correct the implementation or approved artifacts and rerun it plus relevant regression checks; never hide it behind an aggregate test pass.
+
+### Agent Assignment and Handoffs
+
+- Assign by capability, not by assuming all agents or models are interchangeable. Use a high-reasoning agent or human for discovery, specification, design review, ambiguous corrections, and final acceptance review.
+- Lower-cost agents may implement bounded tasks only from an approved, implementation-ready delivery package. Current suggested routing is Codex for high-value planning, review, and desktop work; Kimi K3 for complex specification/review in OpenCode; and GLM 5.2 for explicit implementation tasks. Model names are operational examples and may change.
+- A handoff names the change, required artifacts, exact task range, validation commands, prohibited scope expansion, and escalation conditions.
+- If implementation exposes a missing product, UX, data, architecture, or acceptance decision, stop the affected task and return the ambiguity for review. Do not guess.
 
 ## Architecture Rules
 
@@ -65,10 +83,10 @@ FusionCanvas.Integration ─┘
 
 - Framework: **xUnit v3** with coverlet collector. Test projects mirror production under `tests/` (`FusionCanvas.<Layer>.Tests`).
 - Every behavior change ships with focused tests per `openspec/specs/testing-baseline/spec.md`: domain rules without frameworks, application use cases with deterministic collaborators, persistence boundaries with isolated temporary resources, and UI-owned decision logic testable in code without launching the app.
-- A proportional **real desktop UI verification pass** against the built Avalonia application is expected for new or changed user-facing features **when the contributing agent can run an interactive desktop session** (e.g., Codex). Derive it from accepted scenarios and cover applicable keyboard, pointer, focus/selection, validation, filtering, destructive confirmation, persistence/restart, recovery, accessibility, and tab/window behavior.
+- A targeted **real desktop UI verification pass** against the built Avalonia application is expected for each user-facing delivery module **when the contributing agent can run an interactive desktop session** (e.g., Codex). Prioritize the critical end-to-end workflow, new framework wiring, persistence, destructive actions, state synchronization, complex focus/input behavior, recovery, accessibility, and tabs/windows. Representative variants are enough when other low-risk combinations are covered deterministically; record why the chosen scenarios provide sufficient confidence.
 - **OpenCode cannot perform interactive desktop verification** (no display). When running under OpenCode, the desktop UI pass is optional and non-blocking: record it as not-applicable in the change verification evidence, state that OpenCode lacks the capability, and rely on the fast deterministic baseline plus any UI-owned decision-logic tests. Do not fake or silently skip it.
 - Desktop UI verification uses a disposable database/workspace, never the contributor's normal workspace. Record the tested build/environment, scenarios, results, isolation method, limitations, and material screenshots or automation logs in the change verification evidence.
-- Keep desktop UI verification separate from the fast deterministic baseline. External-service tests and pixel-perfect visual regression remain outside the default baseline unless a feature specifically requires them.
+- Keep desktop UI verification separate from the fast deterministic baseline. Run the full all-features desktop matrix at milestones, before releases, or after broad cross-cutting UI changes—not after every ordinary module. External-service tests and pixel-perfect visual regression remain outside the default baseline unless a feature specifically requires them.
 - Baseline command — must pass before work is considered done:
 
   ```powershell
@@ -84,6 +102,7 @@ FusionCanvas.Integration ─┘
 ## QA Reviews
 
 - The QA playbook lives in **`docs/qa-review.md`**. When the user asks for a QA review — full or a specific area (SOLID, architecture, testing, security, spec drift) — follow that document.
+- Every completed delivery module receives scoped completion QA: build and deterministic tests, strict OpenSpec validation, criterion-level evidence, changed-scope drift review, and the architecture/security/persistence/UI checks relevant to its risks. This is not automatically a full repository QA review.
 - A full QA review includes the QA-6 real desktop regression matrix for **all** accepted and implemented user-facing features. If an interactive desktop is unavailable (for example, when running under OpenCode), report QA-6 as **not applicable** rather than passed; it does not block the rest of the review.
 - Running QA requires no OpenSpec ceremony. Findings that would change accepted behavior are routed through the OpenSpec workflow; specification drift is reconciled via an OpenSpec change.
 

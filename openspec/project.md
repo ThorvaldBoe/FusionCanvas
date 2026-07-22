@@ -249,45 +249,47 @@ FusionCanvas complements existing creative tools rather than replacing them.
 
 FusionCanvas follows a specification-first development process.
 
-Significant changes should begin with an OpenSpec proposal before implementation.
+Significant changes begin with collaborative discovery and an OpenSpec delivery package before implementation.
 
 Expected workflow:
 
 ```text
-Propose
-↓
-Review
-↓
-Implement
-↓
-Validate
-↓
-Archive
+Discover → Define module → Propose → Review → Apply → Verify → Learn → Archive
 ```
 
 Specifications are considered the source of truth for intended system behavior.
 
 Code should follow specifications, not the other way around.
 
-## Product Planning References
+## Rolling Module Delivery
 
-The original LifeOS product requirements are preserved as planning source material in
-`docs/LifeOS/PRD`. These files are not accepted OpenSpec specifications and should not
-be moved under `openspec/specs` unless they are converted into accepted behavior through
-the normal OpenSpec proposal, implementation, validation, and archive process.
+Detailed planning advances one **delivery module** at a time. A delivery module is a cohesive, independently verifiable set of features that produces one clear user or platform outcome. It is a planning unit, not necessarily a code module or project boundary.
 
-When creating a new OpenSpec change, review the relevant PRD files first and use them
-to understand product intent, workflow scope, acceptance criteria, dependencies, and
-open questions. Then translate only the relevant behavior into the new proposal,
-design, tasks, and spec deltas.
+There is no fixed feature count. Scope is justified by cohesion, uncertainty, dependencies, and verification cost:
 
-Recommended entry points:
+* Group features when they share an outcome, data model, surface, fixture, and acceptance pass.
+* Split scope when it contains independent outcomes, unresolved high-impact decisions, or too much cross-layer and UI risk for one reviewer to understand and diagnose.
+* Keep future opportunities lightweight. Do not create detailed specifications for later modules until the current module is verified and its lessons have informed what comes next.
 
-* `docs/LifeOS/Roadmap.md`
-* `docs/LifeOS/PRD/Phase 0 - Foundation.md`
-* `docs/LifeOS/PRD/Phase 1 - MVP Creative Workspace.md`
-* `docs/LifeOS/PRD/Phase 2 - Product Creation Workflow.md`
-* `docs/LifeOS/PRD/PRD Audit - 2026-06-17.md`
+Module discovery is conversational. The human and planning agent resolve goals, examples, non-goals, edge cases, assumptions, dependencies, and important product or architecture decisions. The artifacts capture the conclusions. Implementation begins only after the delivery package is approved or approval is explicitly delegated.
+
+Each module normally uses one OpenSpec change with these complementary parts:
+
+* `proposal.md`: outcome, included features, boundaries, dependencies, risks, and scope rationale.
+* Delta specs: durable requirements and observable acceptance scenarios.
+* `design.md`: conceptual and functional design plus a dedicated, implementation-ready plan identifying affected layers, data and UI behavior, edge cases, sequencing, tests, migrations, and decisions the implementer must not reopen.
+* `tasks.md`: ordered, bounded, verifiable implementation steps.
+* `verification.md`: criterion-level results, commands, desktop evidence or handoff, limitations, and deferred checks.
+
+Acceptance criteria are completion gates. Every scenario is mapped to planned verification before implementation and to evidence afterwards. A failed criterion returns to implementation or specification correction and is rerun; an aggregate test-suite pass does not waive it.
+
+Agent assignments are capability-based. High-reasoning agents or humans handle discovery, specification, design review, ambiguous corrections, and final acceptance. Lower-cost agents may implement bounded approved tasks when the delivery package is explicit enough. A handoff names the change, artifacts, task range, validation commands, prohibited scope expansion, and escalation conditions. Missing product or architecture decisions are escalated rather than guessed.
+
+## Historical Planning References
+
+The original LifeOS roadmap and product requirements are preserved under `docs/LifeOS` as optional historical idea sources. They may be stale and are not required reading, current plans, feature ordering, acceptance criteria, or accepted specifications.
+
+Start module discovery from current user intent, accepted specs, the current application, recent verification and retrospectives, and `docs/roadmap.md`. Consult LifeOS material only when historical ideas or rationale would help, then revalidate anything useful through the normal discovery and OpenSpec workflow. Do not copy its inventory or assumptions into current scope by default.
 
 ---
 

@@ -52,7 +52,19 @@ Archive a completed change in the experimental workflow.
 
    **If no tasks file exists:** Proceed without task-related warning.
 
-4. **Complete the required learning review**
+4. **Check acceptance verification evidence**
+
+   For a significant FusionCanvas delivery module, read `<changeRoot>/verification.md` before the learning review. It must:
+
+   - account for every acceptance scenario in the module's delta specs;
+   - identify the verification method, result, and material evidence;
+   - record required build, test, and strict OpenSpec validation results;
+   - record targeted desktop UI results or an explicit unavailable-environment handoff for user-facing work;
+   - contain no hidden failed or unaccounted-for completion gate.
+
+   If the record is missing or incomplete, STOP and return the change to apply/verification. Do not archive based only on checked tasks or an aggregate test pass.
+
+5. **Complete the required learning review**
 
    Before spec sync or moving the change:
    - Read the final proposal, design, specification deltas, tasks, and `<changeRoot>/retrospective.md` when present.
@@ -93,7 +105,7 @@ Archive a completed change in the experimental workflow.
 
    If Git history is unavailable or incomplete, continue with recorded feedback and final artifacts. If evidence is insufficient and confirmation cannot be obtained, STOP; do not infer a lesson from a raw diff or silently archive without a review.
 
-5. **Assess delta spec sync state**
+6. **Assess delta spec sync state**
 
    Use `artifactPaths.specs.existingOutputPaths` from status JSON to check for delta specs. If none exist, proceed without sync prompt.
 
@@ -108,7 +120,7 @@ Archive a completed change in the experimental workflow.
 
    If user chooses sync, use Task tool (subagent_type: "general-purpose", prompt: "Use Skill tool to invoke openspec-sync-specs for change '<name>'. Delta spec analysis: <include the analyzed delta spec summary>"). Proceed to archive regardless of choice.
 
-6. **Perform the archive**
+7. **Perform the archive**
 
    Create an `archive` directory under `planningHome.changesDir` if it doesn't exist:
    ```bash
@@ -125,7 +137,7 @@ Archive a completed change in the experimental workflow.
    mv "<changeRoot>" "<planningHome.changesDir>/archive/YYYY-MM-DD-<name>"
    ```
 
-7. **Display summary**
+8. **Display summary**
 
    Show archive completion summary including:
    - Change name
@@ -157,4 +169,5 @@ All artifacts complete. All tasks complete. Learning review confirmed.
 - If sync is requested, use openspec-sync-specs approach (agent-driven)
 - If delta specs exist, always run the sync assessment and show the combined summary before prompting
 - Never archive without a confirmed `retrospective.md`, even when all schema artifacts and tasks are complete
+- Never archive a significant delivery module without criterion-level `verification.md` evidence
 - Keep change-specific evidence in the retrospective and promote only concise reusable rules

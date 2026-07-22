@@ -21,15 +21,15 @@ FusionCanvas SHALL include a real desktop UI regression task in every full QA re
 
 #### Scenario: Desktop environment is unavailable
 - **WHEN** the reviewer cannot access an interactive environment capable of launching the built desktop application
-- **THEN** the full QA review reports the UI regression task as blocked rather than passed
+- **THEN** the full QA review reports the UI regression task as not applicable rather than passed
 - **AND** identifies the unexecuted feature rows and required environment
 
 ### Requirement: Feature-scoped QA includes relevant desktop UI verification
-FusionCanvas SHALL include proportional real desktop UI verification when a QA review is scoped to a user-facing feature or to testing coverage for such a feature.
+FusionCanvas SHALL include targeted, risk-based real desktop UI verification when a QA review is scoped to a user-facing feature or to testing coverage for such a feature.
 
 #### Scenario: Contributor requests feature QA
 - **WHEN** a QA review targets one or more user-facing features without requesting the full review
-- **THEN** the reviewer executes the desktop UI scenarios relevant to those features and reports the scoped feature matrix
+- **THEN** the reviewer executes the critical and distinct high-risk desktop UI scenarios relevant to those features and reports the scoped feature matrix and selection rationale
 
 #### Scenario: Contributor requests code-only testing review
 - **WHEN** the requested scope explicitly excludes desktop UI verification

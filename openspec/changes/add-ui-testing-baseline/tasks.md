@@ -1,8 +1,8 @@
 ## 1. Canonical Testing Guidance
 
-- [x] 1.1 Update `AGENTS.md` and `openspec/project.md` to require proportional real desktop UI verification for every user-facing change while preserving the separate headless xUnit baseline
+- [x] 1.1 Update `AGENTS.md` and `openspec/project.md` to require targeted, risk-based real desktop UI verification for every user-facing delivery module while preserving the separate headless xUnit baseline
 - [x] 1.2 Update the architecture testing strategy and FC-0007 planning baseline to describe desktop UI coverage, isolation, interaction-risk selection, and evidence expectations
-- [x] 1.3 Update the LifeOS roadmap testing-baseline summary so feature planning explicitly includes real desktop UI verification
+- [x] 1.3 Update canonical planning guidance so module planning explicitly includes targeted real desktop UI verification
 
 ## 2. QA Review Coverage
 
