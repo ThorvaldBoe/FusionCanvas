@@ -129,10 +129,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         var fileStore = new InMemoryWorkspaceFileStore();
         _assetManagementService = new AssetManagementService(treeRepository, fileStore);
         _listingInspectorService = new ListingInspectorService(treeRepository);
-        GroupManagement = new GroupManagementViewModel(_groupManagementService);
-        ListingManagement = new ListingManagementViewModel(_listingManagementService, new TagManagementService(treeRepository));
+        GroupDetails = new GroupDetailsViewModel(_groupManagementService);
         AssetsManagement = new AssetsViewModel(_assetManagementService);
-        ListingInspector = new ListingInspectorViewModel(_listingInspectorService);
+        ListingInspector = new ListingInspectorViewModel(_listingInspectorService, _listingManagementService);
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
         _workspaceSnapshot = workspaceSnapshot;
@@ -215,10 +214,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         var fileStore = workspaceFileStore ?? new InMemoryWorkspaceFileStore();
         _assetManagementService = assetManagementService ?? new AssetManagementService(workspaceRepository, fileStore);
         _listingInspectorService = listingInspectorService ?? new ListingInspectorService(workspaceRepository);
-        GroupManagement = new GroupManagementViewModel(_groupManagementService);
-        ListingManagement = new ListingManagementViewModel(_listingManagementService, new TagManagementService(workspaceRepository));
+        GroupDetails = new GroupDetailsViewModel(_groupManagementService);
         AssetsManagement = new AssetsViewModel(_assetManagementService);
-        ListingInspector = new ListingInspectorViewModel(_listingInspectorService);
+        ListingInspector = new ListingInspectorViewModel(_listingInspectorService, _listingManagementService);
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
         _workspaceRepository = workspaceRepository;
@@ -287,9 +285,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public StoreManagementViewModel StoreManagement { get; }
 
-    public GroupManagementViewModel GroupManagement { get; }
-
-    public ListingManagementViewModel ListingManagement { get; }
+    public GroupDetailsViewModel GroupDetails { get; }
 
     public AssetsViewModel AssetsManagement { get; }
 
@@ -362,17 +358,21 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand CreateGroupCommand { get; private set; } = null!;
 
-    public ICommand ManageGroupCommand { get; private set; } = null!;
-
     public bool CanCreateGroup => StoreManagement.SelectedStore is not null;
 
     public bool CanManageGroup => WorkspaceTree.CanManageSelection;
 
     public string GroupActionStatus => CanCreateGroup
         ? CanManageGroup
-            ? "Create a child group, rename with F2, or edit properties."
+            ? "Create a child group, rename with F2, or edit details in the pane."
             : "Create under the selected topic or the store's default niche."
         : "Select an active store before creating groups.";
+
+    public bool ShowSelectionSummary =>
+        WorkspaceTree.SelectedNode is { EntityKind: WorkspaceEntityKind.Store or WorkspaceEntityKind.Niche };
+
+    public bool ShowStageToolHost =>
+        DocumentWindow.HasActiveDocument && !ListingInspector.HasState && !GroupDetails.HasState;
 
     public bool ShouldShowFirstStorePrompt =>
         !WorkspaceManagement.IsWorkspaceManagementOpen &&
@@ -578,7 +578,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             DocumentWindow.ApplyToolContext(null);
             DocumentWindow.ApplyStageToolHostState(null);
             ListingInspector.Clear();
+            GroupDetails.Clear();
             RaiseLifecycleProperties();
+            OnPropertyChanged(nameof(ShowStageToolHost));
             return;
         }
 
@@ -597,7 +599,29 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             context.Workflow));
         ResolveActiveToolContext();
         CoordinateListingInspector(context);
+        CoordinateGroupDetails(context);
         RaiseLifecycleProperties();
+        OnPropertyChanged(nameof(ShowStageToolHost));
+    }
+
+    private void CoordinateGroupDetails(DocumentContext context)
+    {
+        if (context.EntityKind == WorkspaceEntityKind.Group
+            && _workspaceSnapshot.Groups.SingleOrDefault(candidate => candidate.Id == context.Id) is { } group)
+        {
+            if (GroupDetails.Group?.Id != group.Id)
+            {
+                var nicheId = GroupHierarchy.GetEffectiveNiche(_workspaceSnapshot, group).Id;
+                Run(GroupDetails.LoadAsync(group.Id, group.StoreId, nicheId));
+            }
+
+            return;
+        }
+
+        if (GroupDetails.HasState)
+        {
+            GroupDetails.Clear();
+        }
     }
 
     private void CoordinateListingInspector(DocumentContext context)
@@ -623,11 +647,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private void InitializeGroupIntegration()
     {
         CreateGroupCommand = new RelayCommand(_ => Run(WorkspaceTree.BeginCreateAsync()));
-        ManageGroupCommand = new RelayCommand(_ => Run(OpenManageGroupAsync()));
         WorkspaceTree.OpenInTabRequested += (_, selection) => OpenTreeSelectionInTab(selection);
         WorkspaceTree.SelectionChanged += (_, selection) => OpenTreeSelectionInCurrentTab(selection);
-        WorkspaceTree.EditPropertiesRequested += (_, groupId) => Run(OpenManageGroupAsync(groupId));
-        WorkspaceTree.EditListingPropertiesRequested += (_, listingId) => Run(OpenManageListingAsync(listingId));
         WorkspaceTree.EntitiesDeleted += (_, entityIds) => CloseDeletedEntityTabs(entityIds);
         WorkspaceTree.StructureChanged += (_, _) => RefreshWorkspaceSnapshotAndInspector();
         WorkspaceTree.PropertyChanged += (_, args) =>
@@ -635,42 +656,32 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             if (args.PropertyName is nameof(WorkspaceTreeViewModel.SelectedNode) or nameof(WorkspaceTreeViewModel.CanManageSelection))
             {
                 RaiseGroupActionProperties();
+                OnPropertyChanged(nameof(ShowSelectionSummary));
             }
         };
-        GroupManagement.WorkspaceStructureChanged += (_, group) => HandleGroupStructureChanged(group);
-        ListingManagement.WorkspaceStructureChanged += (_, replacement) =>
+        GroupDetails.StructureChanged += (_, group) => HandleGroupStructureChanged(group);
+        GroupDetails.PropertyChanged += (_, args) =>
         {
-            RefreshWorkspaceSnapshot();
-            WorkspaceTree.SelectEntity(replacement is null
-                ? null
-                : replacement.IsEffectivelyActive ? replacement.Id : replacement.Topic.Id);
-        };
-        GroupManagement.PropertyChanged += (_, args) =>
-        {
-            if (args.PropertyName == nameof(GroupManagementViewModel.IsOpen))
+            if (args.PropertyName is nameof(GroupDetailsViewModel.HasState))
             {
-                OnPropertyChanged(nameof(GroupManagement));
+                OnPropertyChanged(nameof(ShowStageToolHost));
+            }
+        };
+        ListingInspector.LifecycleChanged += (_, args) => HandleListingLifecycleChanged(args);
+        ListingInspector.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName is nameof(ListingInspectorViewModel.HasState))
+            {
+                OnPropertyChanged(nameof(ShowStageToolHost));
             }
         };
     }
 
     private void GroupManagementServiceSetWorkspace(Guid? workspaceId)
     {
-        GroupManagement.SetActiveWorkspace(workspaceId);
-        ListingManagement.SetActiveWorkspace(workspaceId);
+        _groupManagementService.SetActiveWorkspace(workspaceId);
+        _listingManagementService.SetActiveWorkspace(workspaceId);
         AssetsManagement.SetActiveWorkspace(workspaceId);
-    }
-
-    private async Task OpenManageListingAsync(Guid listingId)
-    {
-        RefreshWorkspaceSnapshot();
-        var listing = _workspaceSnapshot.Listings.SingleOrDefault(candidate => candidate.Id == listingId);
-        if (listing is null)
-        {
-            return;
-        }
-
-        await ListingManagement.OpenForEditAsync(listing.StoreId, listing.Id).ConfigureAwait(false);
     }
 
     private async Task OpenManageAssetsAsync(WorkspaceTreeSelection selection)
@@ -706,50 +717,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             WorkspaceEntityKind.Listing => _workspaceSnapshot.Listings.SingleOrDefault(listing => listing.Id == selection.Id)?.StoreId,
             _ => null
         };
-    }
-
-    private async Task OpenCreateGroupAsync()
-    {
-        RefreshWorkspaceSnapshot();
-        var parent = ResolveGroupParent();
-        var store = StoreManagement.SelectedStore;
-        if (parent is null || store is null)
-        {
-            RaiseGroupActionProperties();
-            return;
-        }
-
-        var nicheId = ResolveParentNicheId(parent);
-        if (nicheId is null)
-        {
-            return;
-        }
-
-        await GroupManagement.OpenForCreateAsync(store.Id, nicheId.Value, parent).ConfigureAwait(false);
-    }
-
-    private async Task OpenManageGroupAsync()
-    {
-        if (WorkspaceTree.SelectedNode is not { EntityKind: WorkspaceEntityKind.Group } selected)
-        {
-            RaiseGroupActionProperties();
-            return;
-        }
-
-        await OpenManageGroupAsync(selected.EntityId).ConfigureAwait(false);
-    }
-
-    private async Task OpenManageGroupAsync(Guid groupId)
-    {
-        RefreshWorkspaceSnapshot();
-        var group = _workspaceSnapshot.Groups.SingleOrDefault(candidate => candidate.Id == groupId && GroupHierarchy.IsEffectivelyActive(_workspaceSnapshot, candidate));
-        if (group is null)
-        {
-            return;
-        }
-
-        var nicheId = GroupHierarchy.GetEffectiveNiche(_workspaceSnapshot, group).Id;
-        await GroupManagement.OpenForEditAsync(group.StoreId, nicheId, group.Id).ConfigureAwait(false);
     }
 
     private void OpenTreeSelectionInTab(WorkspaceTreeSelection selection)
@@ -801,15 +768,62 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     private void GuardActiveListingInspectorLeave(Action proceed)
     {
+        ArgumentNullException.ThrowIfNull(proceed);
+        var commits = new List<Task>(2);
         if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Listing, Kind: DocumentContextKind.Item }
             && ListingInspector.HasState
             && ListingInspector.HasUnsavedChanges)
         {
-            ListingInspector.RequestLeave(proceed);
+            commits.Add(ListingInspector.CommitEditsAsync());
+        }
+
+        if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Group }
+            && GroupDetails.HasState
+            && GroupDetails.HasUnsavedChanges)
+        {
+            commits.Add(GroupDetails.CommitEditsAsync());
+        }
+
+        if (commits.Count == 0)
+        {
+            proceed();
             return;
         }
 
+        Run(CommitAndProceedAsync(commits, proceed));
+    }
+
+    public void CommitActiveDetailsEdits()
+    {
+        if (ListingInspector.HasState && !ListingInspector.IsReadOnly)
+        {
+            Run(ListingInspector.CommitEditsAsync());
+        }
+
+        if (GroupDetails.HasState && !GroupDetails.IsReadOnly)
+        {
+            Run(GroupDetails.CommitEditsAsync());
+        }
+    }
+
+    private static async Task CommitAndProceedAsync(IReadOnlyCollection<Task> commits, Action proceed)
+    {
+        await Task.WhenAll(commits).ConfigureAwait(true);
         proceed();
+    }
+
+    private void HandleListingLifecycleChanged(ListingInspectorLifecycleEventArgs args)
+    {
+        var result = args.Result;
+        RefreshWorkspaceSnapshot();
+        var changed = result.Listing;
+        var replacement = args.Deleted || changed is { IsEffectivelyActive: false }
+            ? result.State.ActiveListings.FirstOrDefault() ?? changed
+            : changed;
+        WorkspaceTree.SelectEntity(replacement is null
+            ? null
+            : replacement.IsEffectivelyActive ? replacement.Id : replacement.Topic.Id);
+        RaiseLifecycleProperties();
     }
 
     private void HandleInspectorSaved()
@@ -994,12 +1008,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 [store.Id, niche.Id],
                 $"{store.Name} / {niche.Name}"));
 
-            foreach (var group in snapshot.Groups.Where(group => group.StoreId == store.Id && group.NicheId == niche.Id && group.ParentGroupId is null && !group.IsArchived))
+            foreach (var group in snapshot.Groups.Where(group => group.StoreId == store.Id && group.NicheId == niche.Id && group.ParentGroupId is null))
             {
                 AddGroupContexts(snapshot, contexts, group, [store.Id, niche.Id, group.Id], $"{store.Name} / {niche.Name} / {group.Name}");
             }
 
-            foreach (var listing in snapshot.Listings.Where(listing => listing.StoreId == store.Id && listing.NicheId == niche.Id && listing.GroupId is null && !listing.IsArchived))
+            foreach (var listing in snapshot.Listings.Where(listing => listing.StoreId == store.Id && listing.NicheId == niche.Id && listing.GroupId is null))
             {
                 contexts.Add(NewListingContext(listing, [store.Id, niche.Id, listing.Id], $"{store.Name} / {niche.Name} / {listing.Name}"));
             }
@@ -1024,12 +1038,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             nodePath,
             displayPath));
 
-        foreach (var childGroup in snapshot.Groups.Where(candidate => candidate.ParentGroupId == group.Id && !candidate.IsArchived))
+        foreach (var childGroup in snapshot.Groups.Where(candidate => candidate.ParentGroupId == group.Id))
         {
             AddGroupContexts(snapshot, contexts, childGroup, [.. nodePath, childGroup.Id], $"{displayPath} / {childGroup.Name}");
         }
 
-        foreach (var listing in snapshot.Listings.Where(listing => listing.GroupId == group.Id && !listing.IsArchived))
+        foreach (var listing in snapshot.Listings.Where(listing => listing.GroupId == group.Id))
         {
             contexts.Add(NewListingContext(listing, [.. nodePath, listing.Id], $"{displayPath} / {listing.Name}"));
         }

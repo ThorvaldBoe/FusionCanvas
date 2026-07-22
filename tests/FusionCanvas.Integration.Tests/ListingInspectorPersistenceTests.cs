@@ -21,20 +21,24 @@ public class ListingInspectorPersistenceTests
         var service = new ListingInspectorService(repository, clock: () => now.AddMinutes(1), newId: Guid.NewGuid);
 
         var saved = await service.SaveAsync(new(
-            listing.Id, "Updated", "Idea text", "Phrase text", "Graphic direction", "Notes text", ["First", "Second"]), TestContext.Current.CancellationToken);
+            listing.Id, "Updated", "Description text", "Idea text", "Audience text", "Phrase text", "Graphic direction", "Notes text", ["First", "Second"]), TestContext.Current.CancellationToken);
         var reloaded = await service.LoadAsync(listing.Id, TestContext.Current.CancellationToken);
 
         Assert.True(saved.Succeeded);
         Assert.NotNull(saved.State);
         Assert.Equal("Updated", saved.State!.Title);
+        Assert.Equal("Description text", saved.State.Description);
         Assert.Equal("Idea text", saved.State.Creative.Idea);
+        Assert.Equal("Audience text", saved.State.Creative.Audience);
         Assert.Equal("Phrase text", saved.State.Creative.Phrase);
         Assert.Equal("Graphic direction", saved.State.Creative.GraphicDirection);
         Assert.Equal("Notes text", saved.State.Notes);
         Assert.Equal(2, saved.State.Tags.Count);
 
         Assert.Equal("Updated", reloaded!.Title);
+        Assert.Equal("Description text", reloaded.Description);
         Assert.Equal("Idea text", reloaded.Creative.Idea);
+        Assert.Equal("Audience text", reloaded.Creative.Audience);
         Assert.Equal("Phrase text", reloaded.Creative.Phrase);
         Assert.Equal("Graphic direction", reloaded.Creative.GraphicDirection);
         Assert.Equal("Notes text", reloaded.Notes);
@@ -56,9 +60,9 @@ public class ListingInspectorPersistenceTests
         var id = new Queue<Guid>([Guid.NewGuid(), Guid.NewGuid()]);
         var service = new ListingInspectorService(repository, clock: () => now.AddMinutes(1), newId: () => id.Dequeue());
 
-        await service.SaveAsync(new(first.Id, first.Name, null, null, null, null, ["Shared Tag"]), TestContext.Current.CancellationToken);
-        await service.SaveAsync(new(second.Id, second.Name, null, null, null, null, ["shared tag"]), TestContext.Current.CancellationToken);
-        await service.SaveAsync(new(first.Id, first.Name, null, null, null, null, []), TestContext.Current.CancellationToken);
+        await service.SaveAsync(new(first.Id, first.Name, null, null, null, null, null, null, ["Shared Tag"]), TestContext.Current.CancellationToken);
+        await service.SaveAsync(new(second.Id, second.Name, null, null, null, null, null, null, ["shared tag"]), TestContext.Current.CancellationToken);
+        await service.SaveAsync(new(first.Id, first.Name, null, null, null, null, null, null, []), TestContext.Current.CancellationToken);
         var reloaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
         var sharedTag = reloaded.Tags.Single(tag => tag.Name == "Shared Tag");
@@ -80,7 +84,7 @@ public class ListingInspectorPersistenceTests
         await inner.SaveAsync(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [], [], []), TestContext.Current.CancellationToken);
         var service = new ListingInspectorService(new FailingRepository(inner));
 
-        var result = await service.SaveAsync(new(listing.Id, "Updated", "idea", null, null, null, ["New Tag"]), TestContext.Current.CancellationToken);
+        var result = await service.SaveAsync(new(listing.Id, "Updated", null, "idea", null, null, null, null, ["New Tag"]), TestContext.Current.CancellationToken);
         var reloaded = await inner.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);

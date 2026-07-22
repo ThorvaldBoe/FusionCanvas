@@ -3,9 +3,10 @@ using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.Application.Workspace;
 
-public sealed record ListingInspectorCreativeFields(string? Idea, string? Phrase, string? GraphicDirection)
+public sealed record ListingInspectorCreativeFields(string? Idea, string? Audience, string? Phrase, string? GraphicDirection)
 {
     public bool HasAny => !string.IsNullOrWhiteSpace(Idea)
+        || !string.IsNullOrWhiteSpace(Audience)
         || !string.IsNullOrWhiteSpace(Phrase)
         || !string.IsNullOrWhiteSpace(GraphicDirection);
 }
@@ -17,6 +18,7 @@ public sealed record ListingInspectorAssetEntry(Guid Id, string Name, AssetKind 
 public sealed record ListingInspectorState(
     Guid Id,
     string Title,
+    string? Description,
     ListingInspectorCreativeFields Creative,
     string? Notes,
     ListingStatus Status,
@@ -35,7 +37,9 @@ public sealed record ListingInspectorState(
 public sealed record ListingInspectorSaveRequest(
     Guid ListingId,
     string Title,
+    string? Description,
     string? Idea,
+    string? Audience,
     string? Phrase,
     string? GraphicDirection,
     string? Notes,
@@ -119,6 +123,7 @@ public sealed class ListingInspectorService : IListingInspectorService
         var phrase = ListingMetadataCodec.NormalizeSingleLine(request.Phrase);
         ApplyInspectorField(metadata, ListingMetadataCodec.NotesKey, request.Notes);
         ApplyInspectorField(metadata, ListingMetadataCodec.IdeaKey, request.Idea);
+        ApplyInspectorField(metadata, ListingMetadataCodec.IdeaAudienceKey, request.Audience);
         ApplyInspectorField(metadata, ListingMetadataCodec.PhraseKey, phrase);
         ApplyInspectorField(metadata, ListingMetadataCodec.GraphicDirectionKey, request.GraphicDirection);
 
@@ -127,6 +132,7 @@ public sealed class ListingInspectorService : IListingInspectorService
         var changed = existing with
         {
             Name = name,
+            Description = ListingMetadataCodec.NormalizeOptional(request.Description),
             MetadataJson = ListingMetadataCodec.SerializeMetadata(metadata),
             UpdatedAt = _clock()
         };
@@ -234,10 +240,12 @@ public sealed class ListingInspectorService : IListingInspectorService
             ? (string.IsNullOrWhiteSpace(notesValue) ? null : notesValue)
             : null;
         var idea = metadata.GetValueOrDefault(ListingMetadataCodec.IdeaKey);
+        var audience = metadata.GetValueOrDefault(ListingMetadataCodec.IdeaAudienceKey);
         var phrase = metadata.GetValueOrDefault(ListingMetadataCodec.PhraseKey);
         var graphicDirection = metadata.GetValueOrDefault(ListingMetadataCodec.GraphicDirectionKey);
         var creative = new ListingInspectorCreativeFields(
             string.IsNullOrWhiteSpace(idea) ? null : idea,
+            string.IsNullOrWhiteSpace(audience) ? null : audience,
             string.IsNullOrWhiteSpace(phrase) ? null : phrase,
             string.IsNullOrWhiteSpace(graphicDirection) ? null : graphicDirection);
 
@@ -266,6 +274,7 @@ public sealed class ListingInspectorService : IListingInspectorService
         return new ListingInspectorState(
             listing.Id,
             listing.Name,
+            listing.Description,
             creative,
             notes,
             listing.Status,

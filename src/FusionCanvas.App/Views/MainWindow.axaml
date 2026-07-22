@@ -114,7 +114,7 @@
         </StackPanel>
 
         <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12">
-          <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
             <Button x:Name="GroupActionsButton"
                     Grid.Column="0"
                     Content="+ New group"
@@ -127,12 +127,6 @@
                     ToolTip.Tip="Capture a listing under the selected topic or default niche"
                     Command="{Binding WorkspaceTree.BeginCreateListingCommand}"
                     IsEnabled="{Binding CanCreateGroup}"
-                    Classes="storeSecondary" />
-            <Button Grid.Column="2"
-                    Content="•••"
-                    ToolTip.Tip="Edit selected group or listing properties"
-                    Command="{Binding WorkspaceTree.EditPropertiesCommand}"
-                    IsEnabled="{Binding WorkspaceTree.CanManageSelection}"
                     Classes="storeSecondary" />
           </Grid>
           <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="6">
@@ -264,13 +258,12 @@
                       <MenuItem Header="New group (subgroup)" IsVisible="{Binding IsGroup}" Click="OnContextNewGroup" />
                       <MenuItem Header="New listing" Click="OnContextNewListing" />
                       <Separator />
-                      <MenuItem Header="Rename" IsVisible="{Binding HasContextActions}" Click="OnContextRename" />
-                      <MenuItem Header="Copy" IsVisible="{Binding HasContextActions}" Click="OnContextCopy" />
-                      <MenuItem Header="Cut" IsVisible="{Binding HasContextActions}" Click="OnContextCut" />
-                      <MenuItem Header="Paste" IsEnabled="{Binding CanPaste}" Click="OnContextPaste" />
-                      <MenuItem Header="Duplicate" IsVisible="{Binding IsListing}" Click="OnContextDuplicate" />
-                      <MenuItem Header="Edit properties…" IsVisible="{Binding HasContextActions}" Click="OnContextEditProperties" />
-                      <MenuItem Header="Assets…" Click="OnContextAssets" />
+              <MenuItem Header="Rename" IsVisible="{Binding HasContextActions}" Click="OnContextRename" />
+              <MenuItem Header="Copy" IsVisible="{Binding HasContextActions}" Click="OnContextCopy" />
+              <MenuItem Header="Cut" IsVisible="{Binding HasContextActions}" Click="OnContextCut" />
+              <MenuItem Header="Paste" IsEnabled="{Binding CanPaste}" Click="OnContextPaste" />
+              <MenuItem Header="Duplicate" IsVisible="{Binding IsListing}" Click="OnContextDuplicate" />
+              <MenuItem Header="Assets…" Click="OnContextAssets" />
                       <Separator />
                       <MenuItem Header="Delete..." IsVisible="{Binding IsGroup}" Click="OnContextDelete" />
                     </ContextMenu>
@@ -480,7 +473,7 @@
                     Background="#F7F8FA"
                     BorderBrush="#D9DEE7"
                     BorderThickness="1"
-                    IsVisible="{Binding !ListingInspector.HasState}">
+                    IsVisible="{Binding ShowStageToolHost}">
               <Grid RowDefinitions="Auto,*">
                 <Grid Grid.Row="0"
                       ColumnDefinitions="*,Auto"
@@ -583,14 +576,25 @@
                         <TextBox Text="{Binding ListingInspector.Title}"
                                  IsReadOnly="{Binding !ListingInspector.CanEdit}"
                                  MinHeight="32"
-                                 PlaceholderText="Working title" />
+                                 PlaceholderText="Working title"
+                                 LostFocus="OnDetailsFieldLostFocus" />
+                        <TextBlock Text="Description"
+                                   FontSize="11"
+                                   Foreground="#687385" />
+                        <TextBox Text="{Binding ListingInspector.Description}"
+                                 IsReadOnly="{Binding !ListingInspector.CanEdit}"
+                                 AcceptsReturn="True"
+                                 MinHeight="56"
+                                 PlaceholderText="Short description of this product"
+                                 LostFocus="OnDetailsFieldLostFocus" />
                         <TextBlock Text="Phrase"
                                    FontSize="11"
                                    Foreground="#687385" />
                         <TextBox Text="{Binding ListingInspector.Phrase}"
                                  IsReadOnly="{Binding !ListingInspector.CanEdit}"
                                  MinHeight="32"
-                                 PlaceholderText="Hook or on-product phrase" />
+                                 PlaceholderText="Hook or on-product phrase"
+                                 LostFocus="OnDetailsFieldLostFocus" />
                       </StackPanel>
                     </StackPanel>
                   </Border>
@@ -610,7 +614,16 @@
                                IsReadOnly="{Binding !ListingInspector.CanEdit}"
                                AcceptsReturn="True"
                                MinHeight="64"
-                               PlaceholderText="What is this product concept?" />
+                               PlaceholderText="What is this product concept?"
+                               LostFocus="OnDetailsFieldLostFocus" />
+                      <TextBlock Text="Audience"
+                                 FontSize="11"
+                                 Foreground="#687385" />
+                      <TextBox Text="{Binding ListingInspector.Audience}"
+                               IsReadOnly="{Binding !ListingInspector.CanEdit}"
+                               MinHeight="32"
+                               PlaceholderText="Who is this product for?"
+                               LostFocus="OnDetailsFieldLostFocus" />
                     </StackPanel>
                   </Border>
 
@@ -632,7 +645,8 @@
                                IsReadOnly="{Binding !ListingInspector.CanEdit}"
                                AcceptsReturn="True"
                                MinHeight="64"
-                               PlaceholderText="Visual direction supporting this concept" />
+                               PlaceholderText="Visual direction supporting this concept"
+                               LostFocus="OnDetailsFieldLostFocus" />
                     </StackPanel>
                   </Border>
 
@@ -650,7 +664,8 @@
                                IsReadOnly="{Binding !ListingInspector.CanEdit}"
                                AcceptsReturn="True"
                                MinHeight="80"
-                               PlaceholderText="Plain-text notes" />
+                               PlaceholderText="Plain-text notes"
+                               LostFocus="OnDetailsFieldLostFocus" />
                     </StackPanel>
                   </Border>
 
@@ -745,54 +760,231 @@
                     </StackPanel>
                   </Border>
 
-                  <TextBlock IsVisible="{Binding ListingInspector.HasError}"
-                             Text="{Binding ListingInspector.ErrorMessage}"
-                             TextWrapping="Wrap"
-                             FontSize="12"
-                             Foreground="#9A4B43" />
-                  <StackPanel Orientation="Horizontal"
-                              Spacing="8"
-                              HorizontalAlignment="Left">
-                    <Button Content="Save"
-                            IsEnabled="{Binding ListingInspector.CanSave}"
-                            Command="{Binding ListingInspector.SaveCommand}"
-                            Classes="storeAction" />
-                    <Button Content="Revert"
-                            IsEnabled="{Binding ListingInspector.HasUnsavedChanges}"
-                            Command="{Binding ListingInspector.RevertCommand}"
-                            Classes="storeSecondary" />
-                  </StackPanel>
-
-                  <Border IsVisible="{Binding ListingInspector.DiscardPromptVisible}"
-                          Padding="14"
+                  <Border Padding="14"
                           Background="#FFFFFF"
                           BorderBrush="#D9DEE7"
                           BorderThickness="1"
                           CornerRadius="6">
                     <StackPanel Spacing="10">
-                      <TextBlock Text="Unsaved inspector changes"
-                                 FontSize="13"
+                      <TextBlock Text="Lifecycle"
+                                 FontSize="14"
                                  FontWeight="SemiBold"
                                  Foreground="#243447" />
-                      <TextBlock Text="Save before leaving, discard changes, or keep editing?"
-                                 TextWrapping="Wrap"
-                                 FontSize="12"
-                                 Foreground="#687385" />
                       <StackPanel Orientation="Horizontal"
                                   Spacing="8"
                                   HorizontalAlignment="Left">
-                        <Button Content="Save and continue"
-                                Command="{Binding ListingInspector.SaveAndContinueCommand}"
-                                Classes="storeAction" />
-                        <Button Content="Discard and continue"
-                                Command="{Binding ListingInspector.DiscardAndContinueCommand}"
+                        <Button Content="Archive"
+                                IsVisible="{Binding ListingInspector.CanArchive}"
+                                Command="{Binding ListingInspector.RequestArchiveCommand}"
+                                ToolTip.Tip="Archive this listing without deleting it"
                                 Classes="storeSecondary" />
-                        <Button Content="Keep editing"
-                                Command="{Binding ListingInspector.KeepEditingCommand}"
+                        <Button Content="Restore"
+                                IsVisible="{Binding ListingInspector.CanRestore}"
+                                Command="{Binding ListingInspector.RestoreCommand}"
+                                ToolTip.Tip="Restore this listing to its preserved topic"
+                                Classes="storeSecondary" />
+                        <Button Content="Delete…"
+                                IsVisible="{Binding ListingInspector.HasState}"
+                                IsEnabled="{Binding ListingInspector.CanDelete}"
+                                Command="{Binding ListingInspector.RequestDeleteCommand}"
+                                ToolTip.Tip="Permanently delete this listing"
+                                Classes="storeSecondary" />
+                      </StackPanel>
+                      <Border IsVisible="{Binding ListingInspector.ArchiveConfirmationVisible}"
+                              Padding="10"
+                              Background="#FFF4E5"
+                              CornerRadius="6">
+                        <StackPanel Spacing="8">
+                          <TextBlock Text="Archive this listing? It leaves active navigation but stays recoverable."
+                                     TextWrapping="Wrap"
+                                     FontSize="12"
+                                     Foreground="#243447" />
+                          <StackPanel Orientation="Horizontal"
+                                      Spacing="8"
+                                      HorizontalAlignment="Left">
+                            <Button Content="Archive"
+                                    Command="{Binding ListingInspector.ConfirmArchiveCommand}"
+                                    Classes="storeAction" />
+                            <Button Content="Cancel"
+                                    Command="{Binding ListingInspector.CancelArchiveCommand}"
+                                    Classes="storeSecondary" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
+                      <Border IsVisible="{Binding ListingInspector.DeleteConfirmationVisible}"
+                              Padding="10"
+                              Background="#FEECEB"
+                              CornerRadius="6">
+                        <StackPanel Spacing="8">
+                          <TextBlock Text="Permanently delete this listing? Connected creative records will block deletion."
+                                     TextWrapping="Wrap"
+                                     FontSize="12"
+                                     Foreground="#243447" />
+                          <StackPanel Orientation="Horizontal"
+                                      Spacing="8"
+                                      HorizontalAlignment="Left">
+                            <Button Content="Delete permanently"
+                                    Command="{Binding ListingInspector.ConfirmDeleteCommand}"
+                                    Classes="storeAction" />
+                            <Button Content="Cancel"
+                                    Command="{Binding ListingInspector.CancelDeleteCommand}"
+                                    Classes="storeSecondary" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
+                    </StackPanel>
+                  </Border>
+
+                  <TextBlock IsVisible="{Binding ListingInspector.HasError}"
+                             Text="{Binding ListingInspector.ErrorMessage}"
+                             TextWrapping="Wrap"
+                             FontSize="12"
+                             Foreground="#9A4B43" />
+                </StackPanel>
+              </ScrollViewer>
+            </Border>
+
+            <Border IsVisible="{Binding GroupDetails.HasState}"
+                    MinHeight="360"
+                    Padding="22"
+                    Background="#F7F8FA"
+                    BorderBrush="#D9DEE7"
+                    BorderThickness="1">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="14">
+                  <TextBlock IsVisible="{Binding GroupDetails.IsReadOnly}"
+                             Text="{Binding GroupDetails.InactiveNotice}"
+                             TextWrapping="Wrap"
+                             FontSize="12"
+                             Foreground="#9A4B43" />
+                  <TextBlock Text="{Binding GroupDetails.DisplayPath}"
+                             FontSize="12"
+                             Foreground="#687385" />
+
+                  <Border Padding="14"
+                          Background="#FFFFFF"
+                          BorderBrush="#D9DEE7"
+                          BorderThickness="1"
+                          CornerRadius="6">
+                    <StackPanel Spacing="10">
+                      <TextBlock Text="Group details"
+                                 FontSize="14"
+                                 FontWeight="SemiBold"
+                                 Foreground="#243447" />
+                      <StackPanel Spacing="6">
+                        <TextBlock Text="Group name"
+                                   FontSize="11"
+                                   Foreground="#687385" />
+                        <TextBox Text="{Binding GroupDetails.Name}"
+                                 IsReadOnly="{Binding !GroupDetails.CanEdit}"
+                                 MinHeight="32"
+                                 PlaceholderText="Group name"
+                                 LostFocus="OnDetailsFieldLostFocus" />
+                        <TextBlock Text="Description"
+                                   FontSize="11"
+                                   Foreground="#687385" />
+                        <TextBox Text="{Binding GroupDetails.Description}"
+                                 IsReadOnly="{Binding !GroupDetails.CanEdit}"
+                                 MinHeight="32"
+                                 PlaceholderText="Description or purpose"
+                                 LostFocus="OnDetailsFieldLostFocus" />
+                        <TextBlock Text="Notes"
+                                   FontSize="11"
+                                   Foreground="#687385" />
+                        <TextBox Text="{Binding GroupDetails.Notes}"
+                                 IsReadOnly="{Binding !GroupDetails.CanEdit}"
+                                 AcceptsReturn="True"
+                                 MinHeight="80"
+                                 PlaceholderText="Notes and working context"
+                                 LostFocus="OnDetailsFieldLostFocus" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+
+                  <Border Padding="14"
+                          Background="#FFFFFF"
+                          BorderBrush="#D9DEE7"
+                          BorderThickness="1"
+                          CornerRadius="6">
+                    <StackPanel Spacing="10">
+                      <TextBlock Text="Location"
+                                 FontSize="14"
+                                 FontWeight="SemiBold"
+                                 Foreground="#243447" />
+                      <ComboBox ItemsSource="{Binding GroupDetails.Destinations}"
+                                SelectedItem="{Binding GroupDetails.SelectedDestination}"
+                                IsEnabled="{Binding GroupDetails.CanEdit}">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate x:DataType="workflow:GroupDestination">
+                            <TextBlock Text="{Binding DisplayPath}" TextTrimming="CharacterEllipsis" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                      <StackPanel Orientation="Horizontal"
+                                  Spacing="8"
+                                  HorizontalAlignment="Left">
+                        <Button Content="Move"
+                                IsEnabled="{Binding GroupDetails.CanMove}"
+                                Command="{Binding GroupDetails.MoveCommand}"
+                                ToolTip.Tip="Move this group and its contents to the selected location"
                                 Classes="storeSecondary" />
                       </StackPanel>
                     </StackPanel>
                   </Border>
+
+                  <Border Padding="14"
+                          Background="#FFFFFF"
+                          BorderBrush="#D9DEE7"
+                          BorderThickness="1"
+                          CornerRadius="6">
+                    <StackPanel Spacing="10">
+                      <TextBlock Text="Lifecycle"
+                                 FontSize="14"
+                                 FontWeight="SemiBold"
+                                 Foreground="#243447" />
+                      <StackPanel Orientation="Horizontal"
+                                  Spacing="8"
+                                  HorizontalAlignment="Left">
+                        <Button Content="Archive"
+                                IsVisible="{Binding GroupDetails.CanArchive}"
+                                Command="{Binding GroupDetails.RequestArchiveCommand}"
+                                ToolTip.Tip="Archive this group and its subtree without deleting them"
+                                Classes="storeSecondary" />
+                        <Button Content="Restore"
+                                IsVisible="{Binding GroupDetails.CanRestore}"
+                                Command="{Binding GroupDetails.RestoreCommand}"
+                                ToolTip.Tip="Restore this group and its subtree"
+                                Classes="storeSecondary" />
+                      </StackPanel>
+                      <Border IsVisible="{Binding GroupDetails.ArchiveConfirmationVisible}"
+                              Padding="10"
+                              Background="#FFF4E5"
+                              CornerRadius="6">
+                        <StackPanel Spacing="8">
+                          <TextBlock Text="Archive this group? The group and its subtree leave active navigation, but all child work and context remain preserved."
+                                     TextWrapping="Wrap"
+                                     FontSize="12"
+                                     Foreground="#243447" />
+                          <StackPanel Orientation="Horizontal"
+                                      Spacing="8"
+                                      HorizontalAlignment="Left">
+                            <Button Content="Archive"
+                                    Command="{Binding GroupDetails.ConfirmArchiveCommand}"
+                                    Classes="storeAction" />
+                            <Button Content="Cancel"
+                                    Command="{Binding GroupDetails.CancelArchiveCommand}"
+                                    Classes="storeSecondary" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
+                    </StackPanel>
+                  </Border>
+
+                  <TextBlock IsVisible="{Binding GroupDetails.HasError}"
+                             Text="{Binding GroupDetails.ErrorMessage}"
+                             TextWrapping="Wrap"
+                             FontSize="12"
+                             Foreground="#9A4B43" />
                 </StackPanel>
               </ScrollViewer>
             </Border>
@@ -836,22 +1028,15 @@
                        Foreground="#697586" />
           </StackPanel>
 
-          <Border IsVisible="{Binding WorkspaceTree.HasSelection}"
+          <Border IsVisible="{Binding ShowSelectionSummary}"
                   Background="#FFFFFF"
                   Padding="4">
             <StackPanel Spacing="14">
-              <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="{Binding WorkspaceTree.InspectorKind}" FontSize="12" FontWeight="SemiBold" Foreground="#59A17D" />
-                  <TextBlock Text="{Binding WorkspaceTree.InspectorTitle}" FontSize="26" FontWeight="SemiBold" Foreground="#1E2733" />
-                  <TextBlock Text="{Binding WorkspaceTree.InspectorPath}" FontSize="12" Foreground="#687385" />
-                </StackPanel>
-                <Button Grid.Column="1"
-                        Content="Edit properties"
-                        IsVisible="{Binding WorkspaceTree.CanManageSelection}"
-                        Command="{Binding WorkspaceTree.EditPropertiesCommand}"
-                        Classes="storeSecondary" />
-              </Grid>
+              <StackPanel Spacing="4">
+                <TextBlock Text="{Binding WorkspaceTree.InspectorKind}" FontSize="12" FontWeight="SemiBold" Foreground="#59A17D" />
+                <TextBlock Text="{Binding WorkspaceTree.InspectorTitle}" FontSize="26" FontWeight="SemiBold" Foreground="#1E2733" />
+                <TextBlock Text="{Binding WorkspaceTree.InspectorPath}" FontSize="12" Foreground="#687385" />
+              </StackPanel>
               <Border Padding="18" Background="#F7F8FA" BorderBrush="#D9DEE7" BorderThickness="1">
                 <StackPanel Spacing="8">
                   <TextBlock Text="Properties" FontSize="14" FontWeight="SemiBold" Foreground="#243447" />

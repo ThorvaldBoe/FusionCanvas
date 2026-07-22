@@ -283,6 +283,16 @@ Metadata example:
 }
 ```
 
+Documented listing metadata keys edited by the Listing Inspector details pane:
+
+- `idea` — the product concept or seed.
+- `idea.audience` — the optional audience the product is for (FC-0201).
+- `phrase` — the hook or on-product phrase (normalized to a single line).
+- `graphicDirection` — the visual direction supporting the concept.
+- `notes` — plain-text working notes.
+
+Inspector saves preserve unknown metadata keys and `inheritedFrom:` provenance entries unchanged.
+
 A listing behaves as an item in the navigation tree.
 
 A listing should be movable between valid topics without losing status, tags, assets, prompt history, marketplace data, or other creative context.
