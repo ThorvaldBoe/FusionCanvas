@@ -22,6 +22,7 @@ This reverses the decision recorded in `basic-product-creation-workflow/design.m
 ### Modified Capabilities
 
 - `listing-inspector`: the save model for Item text fields changes from explicit save with a Save/Discard/Cancel leave prompt to automatic save on field exit with silent commit before context transitions. "Listing inspector edits core creative fields with explicit save" becomes "…with automatic save"; "Listing inspector guards unsaved changes" becomes "Listing inspector commits pending edits when the context changes"; the shared desktop-control guidance scenario no longer references save/discard-guard actions.
+- `testing-baseline` (promoted during the learning review): a new requirement that headless view tests use isolated in-memory or disposable workspace data and never open the contributor's real on-disk workspace, generalizing the `CreateForDefaultWorkspace` defect caught during implementation.
 
 The three layout fixes carry **no spec deltas**: they alter presentation robustness, not accepted requirements. The search-filtering filter-surface requirement (persistent search box, flyout disclosure, active indication, keyboard reachability), the basic-product-workflow accessibility requirement, and the archived FC-0106 "sectioned layout in a single scroll container" design intent all remain true — the fixes bring the implementation back in line with them.
 
