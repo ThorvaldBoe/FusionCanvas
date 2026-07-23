@@ -36,9 +36,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly IAssetManagementService _assetManagementService;
     private readonly IItemInspectorService _itemInspectorService;
     private readonly ITagManagementService _tagManagementService;
-    private Action? _pendingTransition;
     private ItemStatus? _pendingStatus;
-    private bool _isUnsavedChangesPromptVisible;
     private bool _isStatusConfirmationVisible;
     private bool _isDesignRemoveConfirmationVisible;
     private WorkspaceSnapshot _workspaceSnapshot;
@@ -396,15 +394,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public bool IsUnsavedChangesPromptVisible
-    {
-        get => _isUnsavedChangesPromptVisible;
-        private set => SetField(ref _isUnsavedChangesPromptVisible, value);
-    }
-
-    public string UnsavedChangesPromptMessage =>
-        "Working title, current-stage text, or Notes have unsaved changes. Save them before continuing, discard them, or cancel to keep editing.";
-
     public bool IsStatusConfirmationVisible
     {
         get => _isStatusConfirmationVisible;
@@ -424,9 +413,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public bool ShowsDesignStageTool => DocumentWindow.ActiveContext?.WorkflowStage == WorkflowStage.Design;
     public bool ShowsListingStageTool => DocumentWindow.ActiveContext?.WorkflowStage == WorkflowStage.Listing;
 
-    public ICommand SaveAndContinueCommand { get; private set; } = null!;
-    public ICommand DiscardAndContinueCommand { get; private set; } = null!;
-    public ICommand CancelPendingTransitionCommand { get; private set; } = null!;
     public ICommand ConfirmStatusChangeCommand { get; private set; } = null!;
     public ICommand CancelStatusChangeCommand { get; private set; } = null!;
     public ICommand ConfirmDesignRemoveCommand { get; private set; } = null!;
@@ -577,9 +563,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 RequestStatusChange(status);
             }
         });
-        SaveAndContinueCommand = new RelayCommand(_ => Run(SaveAndContinueAsync()));
-        DiscardAndContinueCommand = new RelayCommand(_ => DiscardAndContinue());
-        CancelPendingTransitionCommand = new RelayCommand(_ => CancelPendingTransition());
         ConfirmStatusChangeCommand = new RelayCommand(_ => ConfirmStatusChange());
         CancelStatusChangeCommand = new RelayCommand(_ => CancelStatusChange());
         ConfirmDesignRemoveCommand = new RelayCommand(_ => Run(ConfirmDesignRemoveAsync()));
@@ -951,16 +934,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private void GuardActiveItemInspectorLeave(Action proceed)
     {
         ArgumentNullException.ThrowIfNull(proceed);
-        if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Item, Kind: DocumentContextKind.Item }
+        var commits = new List<Task>(2);
+        if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Item }
             && ItemInspector.HasState
             && ItemInspector.HasUnsavedChanges)
         {
-            _pendingTransition = proceed;
-            IsUnsavedChangesPromptVisible = true;
-            return;
+            commits.Add(ItemInspector.CommitEditsAsync());
         }
 
-        var commits = new List<Task>(1);
         if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Group }
             && GroupDetails.HasState
             && GroupDetails.HasUnsavedChanges)
@@ -977,49 +958,25 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         Run(CommitAndProceedAsync(commits, proceed));
     }
 
-    private async Task SaveAndContinueAsync()
+    private async Task CommitAndProceedAsync(IReadOnlyCollection<Task> commits, Action proceed)
     {
-        if (!IsUnsavedChangesPromptVisible)
+        await Task.WhenAll(commits).ConfigureAwait(true);
+        if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Item }
+            && ItemInspector.HasState
+            && ItemInspector.HasUnsavedChanges)
         {
+            RevertStatusSelector();
             return;
         }
 
-        await ItemInspector.CommitEditsAsync().ConfigureAwait(true);
-        if (ItemInspector.HasUnsavedChanges)
-        {
-            return;
-        }
-
-        var proceed = _pendingTransition;
-        _pendingTransition = null;
-        IsUnsavedChangesPromptVisible = false;
-        proceed?.Invoke();
+        proceed();
     }
 
-    private void DiscardAndContinue()
+    private void RevertStatusSelector()
     {
-        if (!IsUnsavedChangesPromptVisible)
-        {
-            return;
-        }
-
-        ItemInspector.DiscardChanges();
-        var proceed = _pendingTransition;
-        _pendingTransition = null;
-        IsUnsavedChangesPromptVisible = false;
-        proceed?.Invoke();
-    }
-
-    private void CancelPendingTransition()
-    {
-        _pendingTransition = null;
-        IsUnsavedChangesPromptVisible = false;
         OnPropertyChanged(nameof(SelectedItemStatus));
         OnPropertyChanged(nameof(SelectedItemStatusLabel));
         OnPropertyChanged(nameof(SelectedItemStatusOption));
-        OnPropertyChanged(nameof(AvailableItemStatuses));
-        OnPropertyChanged(nameof(AvailableItemStatusLabels));
-        OnPropertyChanged(nameof(AvailableItemStatusOptions));
     }
 
     private void ConfirmStatusChange()
@@ -1071,12 +1028,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    private static async Task CommitAndProceedAsync(IReadOnlyCollection<Task> commits, Action proceed)
-    {
-        await Task.WhenAll(commits).ConfigureAwait(true);
-        proceed();
-    }
-
     private void HandleItemLifecycleChanged(ItemInspectorLifecycleEventArgs args)
     {
         var result = args.Result;
@@ -1103,7 +1054,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             }
         }
 
-        if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Item, Id: var itemId })
+        if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Item, Id: var itemId }
+            && !ItemInspector.HasUnsavedChanges)
         {
             Run(ItemInspector.LoadAsync(itemId));
         }

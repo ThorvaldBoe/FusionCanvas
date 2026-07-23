@@ -54,12 +54,7 @@ public partial class MainWindow : Window
         };
         viewModel.PropertyChanged += (_, args) =>
         {
-            if (args.PropertyName == nameof(MainWindowViewModel.IsUnsavedChangesPromptVisible)
-                && viewModel.IsUnsavedChangesPromptVisible)
-            {
-                Dispatcher.UIThread.Post(() => CancelUnsavedTransitionButton.Focus(), DispatcherPriority.Input);
-            }
-            else if (args.PropertyName == nameof(MainWindowViewModel.IsStatusConfirmationVisible)
+            if (args.PropertyName == nameof(MainWindowViewModel.IsStatusConfirmationVisible)
                 && viewModel.IsStatusConfirmationVisible)
             {
                 Dispatcher.UIThread.Post(() => CancelStatusChangeButton.Focus(), DispatcherPriority.Input);
@@ -323,7 +318,10 @@ public partial class MainWindow : Window
             }
         }
 
-        SaveItemButton.Focus();
+        if (sender is Button importButton)
+        {
+            importButton.Focus();
+        }
     }
 
     private async void OnPreviewDesignFile(object? sender, RoutedEventArgs e)

@@ -361,7 +361,7 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task DirtyInspector_OffersSaveAndProceedsAfterSave()
+    public async Task DirtyInspector_CommitsBeforeTabSwitchWithoutPrompt()
     {
         var viewModel = new MainWindowViewModel();
         var first = viewModel.DocumentWindow.Open(ReadyItemContext(viewModel).Context);
@@ -373,41 +373,48 @@ public class MainWindowViewModelTests
         Assert.True(viewModel.ItemInspector.HasUnsavedChanges);
 
         viewModel.RequestSelectTabCommand.Execute(secondTab);
-        await Task.Yield();
-
-        Assert.True(viewModel.IsUnsavedChangesPromptVisible);
-        Assert.Equal(first.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
-
-        viewModel.SaveAndContinueCommand.Execute(null);
         await Task.Delay(50, TestContext.Current.CancellationToken);
 
+        Assert.False(viewModel.IsStatusConfirmationVisible);
         Assert.Equal(secondTab.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
         Assert.False(viewModel.ItemInspector.HasUnsavedChanges);
 
         viewModel.RequestSelectTabCommand.Execute(first);
-        await Task.Yield();
+        await Task.Delay(50, TestContext.Current.CancellationToken);
         Assert.Equal("Persisted title", viewModel.ItemInspector.Title);
     }
 
     [Fact]
-    public async Task DirtyInspector_CancelKeepsDraftContextAndSelection()
+    public async Task DirtyInspector_FailedCommitAbortsTransitionAndPreservesDraft()
     {
-        var viewModel = new MainWindowViewModel();
-        var first = viewModel.DocumentWindow.Open(ReadyItemContext(viewModel).Context);
-        var secondTab = viewModel.DocumentWindow.Open(ActiveItemContext(viewModel).Context);
-        viewModel.RequestSelectTabCommand.Execute(first);
-        viewModel.ItemInspector.Title = "draft";
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
+        var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, "{}");
+        var item = new Item(
+            Guid.NewGuid(), store.Id, niche.Id, null, "Retro mug design", null,
+            ItemStatus.Draft, WorkflowStage.Idea, false, now, now,
+            "{\"notes\":\"Notes\",\"idea\":\"idea-value\"}");
+        var snapshot = new WorkspaceSnapshot([store], [niche], [], [item], [], [], [], [], []);
+        var repository = new InMemoryWorkspaceRepository(snapshot) { FailSaves = true };
+        var viewModel = new MainWindowViewModel(
+            new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
+            new FusionCanvas.App.DocumentWindow.DocumentWindowViewModel(),
+            new ToolContextResolver(),
+            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
+            repository,
+            snapshot);
+        var itemContext = viewModel.NavigationContexts.Single(context => context.Context.Id == item.Id);
+        viewModel.OpenFromNavigation(itemContext);
+        viewModel.ItemInspector.Idea = "pending idea";
 
-        viewModel.RequestSelectTabCommand.Execute(secondTab);
-        await Task.Yield();
+        viewModel.MoveStageForwardCommand.Execute(null);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
 
-        Assert.True(viewModel.IsUnsavedChangesPromptVisible);
-        viewModel.CancelPendingTransitionCommand.Execute(null);
-
-        Assert.Equal(first.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
-        Assert.Equal("draft", viewModel.ItemInspector.Title);
         Assert.True(viewModel.ItemInspector.HasUnsavedChanges);
-        Assert.False(viewModel.IsUnsavedChangesPromptVisible);
+        Assert.Equal("pending idea", viewModel.ItemInspector.Idea);
+        Assert.True(viewModel.ItemInspector.HasError);
+        Assert.Equal(item.Id, viewModel.DocumentWindow.ActiveContext?.Id);
+        Assert.Equal(WorkflowStage.Idea, viewModel.DocumentWindow.ActiveContext?.WorkflowStage);
     }
 
     [Fact]
@@ -504,24 +511,6 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task DirtyInspector_DiscardAndContinueChangesTabWithoutSavingDraft()
-    {
-        var viewModel = new MainWindowViewModel();
-        var first = viewModel.DocumentWindow.Open(ReadyItemContext(viewModel).Context);
-        var second = viewModel.DocumentWindow.Open(ActiveItemContext(viewModel).Context);
-        viewModel.RequestSelectTabCommand.Execute(first);
-        viewModel.ItemInspector.Title = "discard me";
-
-        viewModel.RequestSelectTabCommand.Execute(second);
-        viewModel.DiscardAndContinueCommand.Execute(null);
-        await Task.Yield();
-
-        Assert.Equal(second.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
-        viewModel.RequestSelectTabCommand.Execute(first);
-        Assert.Equal("Retro mug design", viewModel.ItemInspector.Title);
-    }
-
-    [Fact]
     public void StageToolVisibility_FollowsActiveReviewStage()
     {
         var viewModel = new MainWindowViewModel();
@@ -556,8 +545,15 @@ public class MainWindowViewModelTests
 
         public WorkspaceSnapshot Snapshot => _snapshot;
 
+        public bool FailSaves { get; set; }
+
         public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
         {
+            if (FailSaves)
+            {
+                throw new IOException("save failed");
+            }
+
             _snapshot = snapshot;
             return Task.CompletedTask;
         }
