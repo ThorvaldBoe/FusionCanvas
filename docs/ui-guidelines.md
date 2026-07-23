@@ -17,7 +17,7 @@ FusionCanvas should feel like a local-first creative production workspace:
 - calm, dense, and practical
 - built for repeated daily use
 - optimized for browsing, comparing, refining, and preparing many product ideas
-- visually dark by default, with restrained accent color
+- user-selectable Light or Dark appearance, Light by default, with restrained accent color
 - context-aware without feeling magical or hidden
 - extensible without letting plugin tools make the app feel inconsistent
 
@@ -265,7 +265,8 @@ Niche setup should capture:
 
 Preferred direction:
 
-- dark desktop workspace
+- user-selectable Light or Dark workspace appearance; Light is the initial default
+- shared semantic theme resources so the selected appearance applies coherently across every window
 - neutral panels with clear borders
 - warm accent color for active state and primary commands
 - subtle green for completed or ready states

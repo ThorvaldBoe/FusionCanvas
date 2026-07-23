@@ -1,8 +1,113 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="FusionCanvas.App.App"
-             RequestedThemeVariant="Default">
+             RequestedThemeVariant="Light">
   <Application.Styles>
     <FluentTheme />
   </Application.Styles>
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+      <!-- Light is the explicit no-preference default appearance. -->
+      <ResourceDictionary x:Key="Light">
+        <SolidColorBrush x:Key="ApplicationBackgroundBrush" Color="#F7F8FA" />
+        <SolidColorBrush x:Key="ElevatedSurfaceBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="PanelSurfaceBrush" Color="#F7F8FA" />
+        <SolidColorBrush x:Key="TabBarBackgroundBrush" Color="#F3F4F6" />
+        <SolidColorBrush x:Key="OverlayScrimBrush" Color="#99000000" />
+
+        <SolidColorBrush x:Key="PrimaryTextBrush" Color="#1E2733" />
+        <SolidColorBrush x:Key="StrongTextBrush" Color="#243447" />
+        <SolidColorBrush x:Key="SecondaryTextBrush" Color="#687385" />
+        <SolidColorBrush x:Key="MutedTextBrush" Color="#7C8797" />
+        <SolidColorBrush x:Key="DisabledTextBrush" Color="#8B95A3" />
+        <SolidColorBrush x:Key="EmptyStateTextBrush" Color="#697586" />
+        <SolidColorBrush x:Key="TreeIconForegroundBrush" Color="#526173" />
+
+        <SolidColorBrush x:Key="ControlBorderBrush" Color="#D9DEE7" />
+        <SolidColorBrush x:Key="SubtleBorderBrush" Color="#E1E5EA" />
+        <SolidColorBrush x:Key="TabBorderBrush" Color="#D3D8E0" />
+
+        <SolidColorBrush x:Key="AccentBrush" Color="#59A17D" />
+        <SolidColorBrush x:Key="AccentStrongBrush" Color="#3C8C69" />
+        <SolidColorBrush x:Key="CommandBackgroundBrush" Color="#243447" />
+        <SolidColorBrush x:Key="CommandForegroundBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="CommandBorderBrush" Color="#243447" />
+        <SolidColorBrush x:Key="SecondaryButtonBackgroundBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="SecondaryButtonForegroundBrush" Color="#425066" />
+        <SolidColorBrush x:Key="IconButtonBackgroundBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="IconButtonForegroundBrush" Color="#425066" />
+
+        <SolidColorBrush x:Key="SelectionBackgroundBrush" Color="#E2EAF2" />
+        <SolidColorBrush x:Key="HoverBackgroundBrush" Color="#F0F3F7" />
+        <SolidColorBrush x:Key="DropTargetBackgroundBrush" Color="#DDF1E7" />
+        <SolidColorBrush x:Key="AccentSoftBackgroundBrush" Color="#EEF6FF" />
+        <SolidColorBrush x:Key="AccentSoftForegroundBrush" Color="#204466" />
+        <SolidColorBrush x:Key="AccentSoftBorderBrush" Color="#B9D7F2" />
+        <SolidColorBrush x:Key="UnavailableBackgroundBrush" Color="#F1F3F6" />
+        <SolidColorBrush x:Key="UnavailableForegroundBrush" Color="#8B95A3" />
+        <SolidColorBrush x:Key="CountBadgeBackgroundBrush" Color="#E8EDF3" />
+        <SolidColorBrush x:Key="CountBadgeForegroundBrush" Color="#526173" />
+        <SolidColorBrush x:Key="CloseTabHoverBackgroundBrush" Color="#E7E9ED" />
+
+        <SolidColorBrush x:Key="DangerBackgroundBrush" Color="#FEECEB" />
+        <SolidColorBrush x:Key="DangerTextBrush" Color="#9A4B43" />
+        <SolidColorBrush x:Key="DangerStrongBrush" Color="#B42318" />
+        <SolidColorBrush x:Key="DangerBorderBrush" Color="#E3B4B0" />
+        <SolidColorBrush x:Key="WarningBackgroundBrush" Color="#FFF4E5" />
+        <SolidColorBrush x:Key="WarningBorderBrush" Color="#E5B86A" />
+      </ResourceDictionary>
+
+      <!-- Dark appearance; applied when the user enables Dark mode. -->
+      <ResourceDictionary x:Key="Dark">
+        <SolidColorBrush x:Key="ApplicationBackgroundBrush" Color="#161B22" />
+        <SolidColorBrush x:Key="ElevatedSurfaceBrush" Color="#222833" />
+        <SolidColorBrush x:Key="PanelSurfaceBrush" Color="#1C222B" />
+        <SolidColorBrush x:Key="TabBarBackgroundBrush" Color="#1C222B" />
+        <SolidColorBrush x:Key="OverlayScrimBrush" Color="#99000000" />
+
+        <SolidColorBrush x:Key="PrimaryTextBrush" Color="#E6EAF0" />
+        <SolidColorBrush x:Key="StrongTextBrush" Color="#F0F3F7" />
+        <SolidColorBrush x:Key="SecondaryTextBrush" Color="#9AA4B2" />
+        <SolidColorBrush x:Key="MutedTextBrush" Color="#7C8694" />
+        <SolidColorBrush x:Key="DisabledTextBrush" Color="#5C6675" />
+        <SolidColorBrush x:Key="EmptyStateTextBrush" Color="#8A94A4" />
+        <SolidColorBrush x:Key="TreeIconForegroundBrush" Color="#9AA4B2" />
+
+        <SolidColorBrush x:Key="ControlBorderBrush" Color="#364154" />
+        <SolidColorBrush x:Key="SubtleBorderBrush" Color="#2B3445" />
+        <SolidColorBrush x:Key="TabBorderBrush" Color="#364154" />
+
+        <SolidColorBrush x:Key="AccentBrush" Color="#6FBF94" />
+        <SolidColorBrush x:Key="AccentStrongBrush" Color="#4FA37C" />
+        <SolidColorBrush x:Key="CommandBackgroundBrush" Color="#3D5A7A" />
+        <SolidColorBrush x:Key="CommandForegroundBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="CommandBorderBrush" Color="#3D5A7A" />
+        <SolidColorBrush x:Key="SecondaryButtonBackgroundBrush" Color="#222833" />
+        <SolidColorBrush x:Key="SecondaryButtonForegroundBrush" Color="#C2CAD6" />
+        <SolidColorBrush x:Key="IconButtonBackgroundBrush" Color="#222833" />
+        <SolidColorBrush x:Key="IconButtonForegroundBrush" Color="#C2CAD6" />
+
+        <SolidColorBrush x:Key="SelectionBackgroundBrush" Color="#2F4258" />
+        <SolidColorBrush x:Key="HoverBackgroundBrush" Color="#222833" />
+        <SolidColorBrush x:Key="DropTargetBackgroundBrush" Color="#23402F" />
+        <SolidColorBrush x:Key="AccentSoftBackgroundBrush" Color="#1E3A5C" />
+        <SolidColorBrush x:Key="AccentSoftForegroundBrush" Color="#B9D7F2" />
+        <SolidColorBrush x:Key="AccentSoftBorderBrush" Color="#2E5A82" />
+        <SolidColorBrush x:Key="UnavailableBackgroundBrush" Color="#1C222B" />
+        <SolidColorBrush x:Key="UnavailableForegroundBrush" Color="#5C6675" />
+        <SolidColorBrush x:Key="CountBadgeBackgroundBrush" Color="#364154" />
+        <SolidColorBrush x:Key="CountBadgeForegroundBrush" Color="#9AA4B2" />
+        <SolidColorBrush x:Key="CloseTabHoverBackgroundBrush" Color="#2B3445" />
+
+        <SolidColorBrush x:Key="DangerBackgroundBrush" Color="#3A2326" />
+        <SolidColorBrush x:Key="DangerTextBrush" Color="#E59B95" />
+        <SolidColorBrush x:Key="DangerStrongBrush" Color="#FF6B5C" />
+        <SolidColorBrush x:Key="DangerBorderBrush" Color="#7A5A5A" />
+        <SolidColorBrush x:Key="WarningBackgroundBrush" Color="#3A3220" />
+        <SolidColorBrush x:Key="WarningBorderBrush" Color="#8A6F35" />
+      </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
 </Application>

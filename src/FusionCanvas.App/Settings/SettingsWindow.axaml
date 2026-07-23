@@ -1,0 +1,120 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:settings="clr-namespace:FusionCanvas.App.Settings"
+        x:Class="FusionCanvas.App.Settings.SettingsWindow"
+        x:DataType="settings:SettingsViewModel"
+        Title="Settings"
+        Width="720"
+        Height="480"
+        MinWidth="640"
+        MinHeight="420"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ApplicationBackgroundBrush}">
+  <Grid ColumnDefinitions="180,*">
+    <Border Grid.Column="0"
+            Background="{DynamicResource PanelSurfaceBrush}"
+            BorderBrush="{DynamicResource ControlBorderBrush}"
+            BorderThickness="0,0,1,0"
+            Padding="12">
+      <StackPanel Spacing="6">
+        <TextBlock Text="Settings"
+                   FontSize="16"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource StrongTextBrush}"
+                   Margin="0,0,0,8" />
+        <ListBox x:Name="SectionSelector"
+                 ItemsSource="{Binding Sections}"
+                 SelectedItem="{Binding SelectedSection, Mode=TwoWay}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Padding="0">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="settings:SettingsSection">
+              <TextBlock Text="{Binding}" FontSize="14" Padding="6,4" />
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </StackPanel>
+    </Border>
+
+    <ScrollViewer Grid.Column="1" Padding="24">
+      <Grid>
+        <StackPanel IsVisible="{Binding IsGeneralSection}" Spacing="18">
+          <TextBlock Text="General"
+                     FontSize="20"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource PrimaryTextBrush}" />
+          <Border Padding="14"
+                  Background="{DynamicResource ElevatedSurfaceBrush}"
+                  BorderBrush="{DynamicResource ControlBorderBrush}"
+                  BorderThickness="1"
+                  CornerRadius="6">
+            <StackPanel Spacing="10">
+              <StackPanel Spacing="3">
+                <TextBlock Text="Appearance"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource StrongTextBrush}" />
+                <TextBlock Text="Choose the application-wide color appearance."
+                           FontSize="12"
+                           Foreground="{DynamicResource SecondaryTextBrush}" />
+              </StackPanel>
+              <ToggleSwitch Content="Dark mode"
+                            IsChecked="{Binding IsDarkMode, Mode=TwoWay}"
+                            OffContent="Light"
+                            OnContent="Dark"
+                            ToolTip.Tip="Switch between Light and Dark appearance" />
+              <TextBlock IsVisible="{Binding HasMessage}"
+                         Text="{Binding ErrorMessage}"
+                         TextWrapping="Wrap"
+                         FontSize="12"
+                         Foreground="{DynamicResource DangerTextBrush}" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <StackPanel IsVisible="{Binding IsWorkspaceSection}" Spacing="18">
+          <TextBlock Text="Workspace"
+                     FontSize="20"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource PrimaryTextBrush}" />
+          <Border Padding="14"
+                  Background="{DynamicResource ElevatedSurfaceBrush}"
+                  BorderBrush="{DynamicResource ControlBorderBrush}"
+                  BorderThickness="1"
+                  CornerRadius="6">
+            <StackPanel Spacing="12">
+              <StackPanel Spacing="3">
+                <TextBlock Text="Active workspace"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource SecondaryTextBrush}" />
+                <TextBlock Text="{Binding WorkspaceName}"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource PrimaryTextBrush}"
+                           TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+              <Button Content="Manage workspaces"
+                      Command="{Binding ManageWorkspacesCommand}"
+                      ToolTip.Tip="Open workspace management"
+                      HorizontalAlignment="Left"
+                      MinWidth="160"
+                      Classes="primary" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </Grid>
+    </ScrollViewer>
+  </Grid>
+  <Window.Styles>
+    <Style Selector="Button.primary">
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource CommandForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+  </Window.Styles>
+</Window>

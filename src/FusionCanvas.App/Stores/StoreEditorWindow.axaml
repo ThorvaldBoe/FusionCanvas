@@ -9,12 +9,12 @@
         Height="620"
         MinWidth="720"
         MinHeight="520"
-        Background="#F7F8FA">
+        Background="{DynamicResource ApplicationBackgroundBrush}">
   <Grid ColumnDefinitions="260,*"
         RowDefinitions="*">
     <Border Grid.Column="0"
-            Background="#FFFFFF"
-            BorderBrush="#D9DEE7"
+            Background="{DynamicResource ElevatedSurfaceBrush}"
+            BorderBrush="{DynamicResource ControlBorderBrush}"
             BorderThickness="0,0,1,0"
             Padding="16">
       <DockPanel LastChildFill="True">
@@ -24,7 +24,7 @@
           <TextBlock Text="Stores"
                      FontSize="18"
                      FontWeight="SemiBold"
-                     Foreground="#1E2733" />
+                     Foreground="{DynamicResource PrimaryTextBrush}" />
           <Button Content="New store"
                   Command="{Binding StartCreateStoreCommand}"
                   Classes="primary" />
@@ -34,7 +34,7 @@
           <TextBlock Text="Active"
                      FontSize="12"
                      FontWeight="SemiBold"
-                     Foreground="#687385" />
+                     Foreground="{DynamicResource SecondaryTextBrush}" />
           <ItemsControl ItemsSource="{Binding EditorActiveStores}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="workflow:StoreSummary">
@@ -51,7 +51,7 @@
                      Text="Archived"
                      FontSize="12"
                      FontWeight="SemiBold"
-                     Foreground="#687385"
+                     Foreground="{DynamicResource SecondaryTextBrush}"
                      Margin="0,8,0,0" />
           <ItemsControl IsVisible="{Binding HasArchivedStores}"
                         ItemsSource="{Binding ArchivedStores}">
@@ -72,19 +72,19 @@
     <Border Grid.Column="1"
             Margin="18"
             Padding="20"
-            Background="#FFFFFF"
-            BorderBrush="#D9DEE7"
+            Background="{DynamicResource ElevatedSurfaceBrush}"
+            BorderBrush="{DynamicResource ControlBorderBrush}"
             BorderThickness="1">
       <ScrollViewer>
         <StackPanel Spacing="12">
           <TextBlock Text="Store Management"
                      FontSize="22"
                      FontWeight="SemiBold"
-                     Foreground="#1E2733" />
+                     Foreground="{DynamicResource PrimaryTextBrush}" />
           <TextBlock Text="{Binding ErrorMessage}"
                      IsVisible="{Binding HasError}"
                      FontSize="12"
-                     Foreground="#9A4B43" />
+                     Foreground="{DynamicResource DangerTextBrush}" />
           <StackPanel Orientation="Horizontal"
                       Spacing="8">
             <Button Content="Basic info"
@@ -106,7 +106,7 @@
             <TextBlock Text="Basic info"
                        FontSize="16"
                        FontWeight="SemiBold"
-                       Foreground="#243447" />
+                       Foreground="{DynamicResource StrongTextBrush}" />
             <TextBox x:Name="StoreNameTextBox"
                      Text="{Binding NewStoreName}"
                      PlaceholderText="Store name"
@@ -164,11 +164,11 @@
               <TextBlock Text="Active niches"
                          FontSize="12"
                          FontWeight="SemiBold"
-                         Foreground="#687385" />
+                         Foreground="{DynamicResource SecondaryTextBrush}" />
               <TextBlock Text="No active niches"
                          IsVisible="{Binding !HasActiveNiches}"
                          FontSize="12"
-                         Foreground="#687385" />
+                         Foreground="{DynamicResource SecondaryTextBrush}" />
               <ItemsControl ItemsSource="{Binding EditorActiveNiches}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="workflow:NicheSummary">
@@ -185,7 +185,7 @@
                          Text="Archived niches"
                          FontSize="12"
                          FontWeight="SemiBold"
-                         Foreground="#687385"
+                         Foreground="{DynamicResource SecondaryTextBrush}"
                          Margin="0,8,0,0" />
               <ItemsControl IsVisible="{Binding HasArchivedNiches}"
                             ItemsSource="{Binding ArchivedNiches}">
@@ -206,7 +206,7 @@
               <TextBlock Text="Niche details"
                          FontSize="16"
                          FontWeight="SemiBold"
-                         Foreground="#243447" />
+                         Foreground="{DynamicResource StrongTextBrush}" />
               <TextBox Text="{Binding NicheName}"
                        PlaceholderText="Niche name"
                        Classes="field" />
@@ -275,11 +275,11 @@
               <TextBlock Text="Active tags"
                          FontSize="12"
                          FontWeight="SemiBold"
-                         Foreground="#687385" />
+                         Foreground="{DynamicResource SecondaryTextBrush}" />
               <TextBlock Text="No active tags"
                          IsVisible="{Binding !HasActiveTags}"
                          FontSize="12"
-                         Foreground="#687385" />
+                         Foreground="{DynamicResource SecondaryTextBrush}" />
               <ItemsControl ItemsSource="{Binding EditorActiveTags}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="workflow:TagSummary">
@@ -296,7 +296,7 @@
                          Text="Archived tags"
                          FontSize="12"
                          FontWeight="SemiBold"
-                         Foreground="#687385"
+                         Foreground="{DynamicResource SecondaryTextBrush}"
                          Margin="0,8,0,0" />
               <ItemsControl IsVisible="{Binding HasArchivedTags}"
                             ItemsSource="{Binding ArchivedTags}">
@@ -317,7 +317,7 @@
               <TextBlock Text="Tag details"
                          FontSize="16"
                          FontWeight="SemiBold"
-                         Foreground="#243447" />
+                         Foreground="{DynamicResource StrongTextBrush}" />
               <TextBox Text="{Binding TagName}"
                        PlaceholderText="Tag name"
                        Classes="field" />
@@ -325,7 +325,7 @@
                 <TextBlock Text="Color"
                            FontSize="12"
                            FontWeight="SemiBold"
-                           Foreground="#687385" />
+                           Foreground="{DynamicResource SecondaryTextBrush}" />
                 <TextBox Text="{Binding TagColor}"
                          PlaceholderText="#RRGGBB (optional)"
                          Classes="field" />
@@ -360,15 +360,15 @@
           </Grid>
 
           <Border IsVisible="{Binding TagDeleteWarningVisible}"
-                  Background="#FFF7F2"
-                  BorderBrush="#DFA481"
+                  Background="{DynamicResource DangerBackgroundBrush}"
+                  BorderBrush="{DynamicResource DangerBorderBrush}"
                   BorderThickness="1"
                   Padding="12"
                   Margin="0,8,0,0">
             <StackPanel Spacing="8">
               <TextBlock Text="{Binding TagDeleteWarningMessage}"
                          FontSize="13"
-                         Foreground="#6B3527" />
+                         Foreground="{DynamicResource DangerTextBrush}" />
               <StackPanel Orientation="Horizontal"
                           Spacing="8">
                 <Button Content="Delete permanently"
@@ -382,15 +382,15 @@
           </Border>
 
           <Border IsVisible="{Binding DeleteWarningVisible}"
-                  Background="#FFF7F2"
-                  BorderBrush="#DFA481"
+                  Background="{DynamicResource DangerBackgroundBrush}"
+                  BorderBrush="{DynamicResource DangerBorderBrush}"
                   BorderThickness="1"
                   Padding="12"
                   Margin="0,8,0,0">
             <StackPanel Spacing="8">
               <TextBlock Text="{Binding DeleteWarningMessage}"
                          FontSize="13"
-                         Foreground="#6B3527" />
+                         Foreground="{DynamicResource DangerTextBrush}" />
               <StackPanel Orientation="Horizontal"
                           Spacing="8">
                 <Button Content="Delete permanently"
@@ -404,15 +404,15 @@
           </Border>
 
           <Border IsVisible="{Binding NicheDeleteWarningVisible}"
-                  Background="#FFF7F2"
-                  BorderBrush="#DFA481"
+                  Background="{DynamicResource DangerBackgroundBrush}"
+                  BorderBrush="{DynamicResource DangerBorderBrush}"
                   BorderThickness="1"
                   Padding="12"
                   Margin="0,8,0,0">
             <StackPanel Spacing="8">
               <TextBlock Text="{Binding NicheDeleteWarningMessage}"
                          FontSize="13"
-                         Foreground="#6B3527" />
+                         Foreground="{DynamicResource DangerTextBrush}" />
               <StackPanel Orientation="Horizontal"
                           Spacing="8">
                 <Button Content="Delete permanently"
@@ -426,15 +426,15 @@
           </Border>
 
           <Border IsVisible="{Binding DiscardChangesPromptVisible}"
-                  Background="#FFF8D9"
-                  BorderBrush="#D4B14F"
+                  Background="{DynamicResource WarningBackgroundBrush}"
+                  BorderBrush="{DynamicResource WarningBorderBrush}"
                   BorderThickness="1"
                   Padding="12"
                   Margin="0,8,0,0">
             <StackPanel Spacing="8">
               <TextBlock Text="{Binding DiscardChangesMessage}"
                          FontSize="13"
-                         Foreground="#5F4A12" />
+                         Foreground="{DynamicResource StrongTextBrush}" />
               <StackPanel Orientation="Horizontal"
                           Spacing="8">
                 <Button Content="Discard changes"
@@ -453,23 +453,23 @@
   <Window.Styles>
     <Style Selector="Button.primary">
       <Setter Property="Padding" Value="10,8" />
-      <Setter Property="Background" Value="#243447" />
-      <Setter Property="Foreground" Value="#FFFFFF" />
-      <Setter Property="BorderBrush" Value="#243447" />
+      <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource CommandForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Button.secondary">
       <Setter Property="Padding" Value="10,8" />
-      <Setter Property="Background" Value="#FFFFFF" />
-      <Setter Property="Foreground" Value="#425066" />
-      <Setter Property="BorderBrush" Value="#D9DEE7" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SecondaryButtonForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Button.danger">
       <Setter Property="Padding" Value="10,8" />
-      <Setter Property="Background" Value="#8F3D31" />
-      <Setter Property="Foreground" Value="#FFFFFF" />
-      <Setter Property="BorderBrush" Value="#8F3D31" />
+      <Setter Property="Background" Value="{DynamicResource DangerStrongBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource CommandForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DangerStrongBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Button.fixedAction">
@@ -488,31 +488,31 @@
       <Setter Property="HorizontalAlignment" Value="Stretch" />
       <Setter Property="Margin" Value="0,0,0,6" />
       <Setter Property="Padding" Value="10,8" />
-      <Setter Property="Background" Value="#F7F8FA" />
-      <Setter Property="Foreground" Value="#243447" />
-      <Setter Property="BorderBrush" Value="#E1E5EA" />
+      <Setter Property="Background" Value="{DynamicResource PanelSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource StrongTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Button.tabButton">
       <Setter Property="Width" Value="116" />
       <Setter Property="Padding" Value="10,8" />
-      <Setter Property="Background" Value="#FFFFFF" />
-      <Setter Property="Foreground" Value="#425066" />
-      <Setter Property="BorderBrush" Value="#D9DEE7" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SecondaryButtonForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Button.tabButton.selected">
-      <Setter Property="Background" Value="#243447" />
-      <Setter Property="Foreground" Value="#FFFFFF" />
-      <Setter Property="BorderBrush" Value="#243447" />
+      <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource CommandForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="TextBox.field">
       <Setter Property="MinHeight" Value="36" />
       <Setter Property="Padding" Value="8,6" />
-      <Setter Property="Background" Value="#FFFFFF" />
-      <Setter Property="Foreground" Value="#243447" />
-      <Setter Property="BorderBrush" Value="#D9DEE7" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource StrongTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
   </Window.Styles>

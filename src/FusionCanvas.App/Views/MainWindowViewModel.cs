@@ -3,10 +3,12 @@ using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Groups;
 using FusionCanvas.App.Items;
 using FusionCanvas.App.Navigation;
+using FusionCanvas.App.Settings;
 using FusionCanvas.App.Stores;
 using FusionCanvas.App.StageTools;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.App.Workflow;
+using FusionCanvas.Application.Settings;
 using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
 using System.ComponentModel;
@@ -58,20 +60,22 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
     }
 
-    public static MainWindowViewModel CreateForDefaultWorkspace() =>
+    public static MainWindowViewModel CreateForDefaultWorkspace(SettingsViewModel? settings = null) =>
         new(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
             new DocumentWindowViewModel(),
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            AppWorkspaceFactory.CreateDefault());
+            AppWorkspaceFactory.CreateDefault(),
+            settings);
 
     private MainWindowViewModel(
         WorkflowStageNavigatorViewModel workflowNavigator,
         DocumentWindowViewModel documentWindow,
         IToolContextResolver toolContextResolver,
         IStageToolHostService stageToolHostService,
-        AppWorkspaceRuntime runtime)
+        AppWorkspaceRuntime runtime,
+        SettingsViewModel? settings)
         : this(
             workflowNavigator,
             documentWindow,
@@ -84,7 +88,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.AssetManagement,
             runtime.FileStore,
             runtime.ItemInspector,
-            runtime.TagManagement)
+            runtime.TagManagement,
+            settings)
     {
     }
 
@@ -132,6 +137,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
         WorkspaceManagement = new WorkspaceManagementViewModel(new WorkspaceManagementService(new InMemoryWorkspaceRepository(workspaceSnapshot)));
+        Settings = CreateSettings(null);
         StoreManagement = new StoreManagementViewModel(storeManagementService, nicheManagementService);
         _workspaceRepository = treeRepository;
         _groupManagementService = new GroupManagementService(treeRepository);
@@ -206,11 +212,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IAssetManagementService? assetManagementService = null,
         IWorkspaceFileStore? workspaceFileStore = null,
         IItemInspectorService? itemInspectorService = null,
-        ITagManagementService? tagManagementService = null)
+        ITagManagementService? tagManagementService = null,
+        SettingsViewModel? settings = null)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
         WorkspaceManagement = new WorkspaceManagementViewModel(new WorkspaceManagementService(workspaceRepository));
+        Settings = CreateSettings(settings);
         StoreManagement = new StoreManagementViewModel(
             new StoreManagementService(workspaceRepository),
             new NicheManagementService(workspaceRepository),
@@ -283,6 +291,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public DocumentWindowViewModel DocumentWindow { get; }
 
     public WorkspaceManagementViewModel WorkspaceManagement { get; }
+
+    public SettingsViewModel Settings { get; private set; } = null!;
 
     public StoreManagementViewModel StoreManagement { get; }
 
@@ -1167,6 +1177,17 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     }
 
     private static void Run(Task task) => _ = task;
+
+    private SettingsViewModel CreateSettings(SettingsViewModel? provided)
+    {
+        var settings = provided ?? new SettingsViewModel(
+            new InMemoryApplicationSettingsStore(),
+            new AvaloniaApplicationThemeController(),
+            ApplicationSettings.Default,
+            loadWarning: null);
+        settings.AttachWorkspaceManagement(WorkspaceManagement);
+        return settings;
+    }
 
     private void ResolveActiveToolContext(ToolContextScopeKind? scopeOverride = null)
     {
