@@ -83,11 +83,11 @@ FusionCanvas.Integration ─┘
 ## Testing
 
 - Framework: **xUnit v3** with coverlet collector. Test projects mirror production under `tests/` (`FusionCanvas.<Layer>.Tests`).
-- Every behavior change ships with focused tests per `openspec/specs/testing-baseline/spec.md`: domain rules without frameworks, application use cases with deterministic collaborators, persistence boundaries with isolated temporary resources, and UI-owned decision logic testable in code without launching the app.
-- A targeted **real desktop UI verification pass** against the built Avalonia application is expected for each user-facing delivery module **when the contributing agent can run an interactive desktop session** (e.g., Codex). Prioritize the critical end-to-end workflow, new framework wiring, persistence, destructive actions, state synchronization, complex focus/input behavior, recovery, accessibility, and tabs/windows. Representative variants are enough when other low-risk combinations are covered deterministically; record why the chosen scenarios provide sufficient confidence.
-- **OpenCode cannot perform interactive desktop verification** (no display). When running under OpenCode, the desktop UI pass is optional and non-blocking: record it as not-applicable in the change verification evidence, state that OpenCode lacks the capability, and rely on the fast deterministic baseline plus any UI-owned decision-logic tests. Do not fake or silently skip it.
-- Desktop UI verification uses a disposable database/workspace, never the contributor's normal workspace. Record the tested build/environment, scenarios, results, isolation method, limitations, and material screenshots or automation logs in the change verification evidence.
-- Keep desktop UI verification separate from the fast deterministic baseline. Run the full all-features desktop matrix at milestones, before releases, or after broad cross-cutting UI changes—not after every ordinary module. External-service tests and pixel-perfect visual regression remain outside the default baseline unless a feature specifically requires them.
+- Every behavior change ships with focused tests per `openspec/specs/testing-baseline/spec.md`: domain rules without frameworks, application use cases with deterministic collaborators, persistence boundaries with isolated temporary resources, and UI-owned behavior at the lowest reliable layer.
+- For user-facing changes, use **Avalonia headless view tests** when view construction, bindings, control state, routed input, focus, selection, or visual-tree behavior carries meaningful framework risk. Keep view-model and command behavior in focused framework-free tests, and do not add superficial view tests for static markup.
+- Headless view tests belong in the deterministic `dotnet test` baseline and must run without an interactive display on Codex, OpenCode, and CI.
+- Live testing through the built desktop application is optional and ad hoc, not a module-completion or QA gate. Use it when additional confidence is useful for native windows, operating-system input, assistive-technology exposure, visual judgment, platform integration, or difficult interaction defects.
+- Any optional live desktop check that mutates data uses a disposable database/workspace, never the contributor's normal workspace, and is recorded only as supplemental evidence. External-service tests and pixel-perfect visual regression remain outside the default baseline unless a feature specifically requires them.
 - Baseline command — must pass before work is considered done:
 
   ```powershell
@@ -104,7 +104,7 @@ FusionCanvas.Integration ─┘
 
 - The QA playbook lives in **`docs/qa-review.md`**. When the user asks for a QA review — full or a specific area (SOLID, architecture, testing, security, spec drift) — follow that document.
 - Every completed delivery module receives scoped completion QA: build and deterministic tests, strict OpenSpec validation, criterion-level evidence, changed-scope drift review, and the architecture/security/persistence/UI checks relevant to its risks. This is not automatically a full repository QA review.
-- A full QA review includes the QA-6 real desktop regression matrix for **all** accepted and implemented user-facing features. If an interactive desktop is unavailable (for example, when running under OpenCode), report QA-6 as **not applicable** rather than passed; it does not block the rest of the review.
+- A full QA review includes QA-6 headless UI view coverage. Every mandatory QA task must be executable without an interactive desktop; optional live desktop observations may supplement the report but do not affect the verdict.
 - Running QA requires no OpenSpec ceremony. Findings that would change accepted behavior are routed through the OpenSpec workflow; specification drift is reconciled via an OpenSpec change.
 
 ## Working Agreement

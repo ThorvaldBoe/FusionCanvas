@@ -6,8 +6,8 @@ The durable requirements behind this process live in `openspec/specs/qa-review-b
 
 ## How to Run a QA Review
 
-- **Full review:** run all tasks QA-1 through QA-6 in order, including the all-features real desktop regression, then produce one consolidated report. Trigger example: "Run a full QA review."
-- **Partial review:** run only the requested task(s) by ID. Trigger examples: "Run QA-1 (SOLID)", "Do a security QA pass", "Check for spec drift", "Run QA-6 (desktop UI)."
+- **Full review:** run all tasks QA-1 through QA-6 in order, including headless UI view coverage, then produce one consolidated report. Trigger example: "Run a full QA review."
+- **Partial review:** run only the requested task(s) by ID. Trigger examples: "Run QA-1 (SOLID)", "Do a security QA pass", "Check for spec drift", "Run QA-6 (headless views)."
 - **Scope limiting:** a task may be limited to a layer or area (e.g. "QA-2 on the Integration layer only"). State the scope in the report.
 
 ### Delivery-Module Completion QA
@@ -19,7 +19,7 @@ Every delivery module receives a scoped completion review before it is reported 
 3. The implementation stayed within the approved module and did not invent unapproved product behavior or architecture decisions.
 4. Changed-scope spec/code/doc drift is absent.
 5. Relevant architecture, security, persistence, migration, and recovery risks were reviewed.
-6. A user-facing module has targeted real-desktop evidence or an explicit unavailable-environment handoff. Scenario selection prioritizes critical workflows and distinct high-risk behavior; equivalent low-risk variants may rely on deterministic tests.
+6. A user-facing module has focused UI decision-logic tests and applicable Avalonia headless view tests for meaningful construction, binding, control-state, routed-input, focus, selection, or visual-tree behavior. Static markup needs no superficial test.
 
 If a criterion or validation gate fails, return the module to correction and rerun the affected criterion plus relevant regression checks. Do not convert a failure into a limitation merely to close the change. Expand to the relevant QA tasks—or a full review—when the module affects broad shell/navigation behavior, crosses many capabilities, or creates plausible unrelated regressions.
 
@@ -28,7 +28,7 @@ For the completion record, add an acceptance table to `verification.md`:
 ```markdown
 | Capability / scenario | Method | Result | Evidence / limitation |
 | --- | --- | --- | --- |
-| `<requirement> / <scenario>` | Unit / integration / desktop / inspection | Pass / Fail / N/A | `<test, command, screenshot, notes>` |
+| `<requirement> / <scenario>` | Unit / integration / headless view / inspection / optional live desktop | Pass / Fail / N/A | `<test, command, screenshot, notes>` |
 ```
 
 ### Review Protocol (applies to every task)
@@ -38,7 +38,7 @@ For the completion record, add an acceptance table to `verification.md`:
 3. **Review, don't fix.** A QA run reports findings; it does not change code, specs, or docs unless the user explicitly asks for fixes. Fixing happens afterwards through the routing rules below.
 4. **Report in the standard format** (see below). Every finding cites concrete evidence: file paths, line numbers, commands, or spec references.
 5. **No findings is a valid outcome.** Report it as a pass and say what was checked.
-6. **Do not overstate unavailable verification.** If an interactive desktop or another required test environment is unavailable, mark the affected task and scenarios **Not applicable** (for example, when running under OpenCode, which has no display) and state which environment would be required. A code-level test pass is not a desktop UI pass, but a not-applicable desktop pass does not block the rest of the review.
+6. **Keep mandatory verification portable.** Every required QA task must run without an interactive desktop. Optional live desktop checks may supplement a report, but their omission or environment unavailability is not a failed, blocked, or not-applicable gate.
 
 ### Severity Scale
 
@@ -56,19 +56,19 @@ Present the report in the chat/session. If a persistent copy is useful, save it 
 
 ```markdown
 # QA Review — <date> — Scope: <full | QA-n ...>
-Build: <pass/fail> | Tests: <pass/fail, n tests> | Desktop UI: <pass/fail/blocked/N/A> | Reviewer: <agent/tool>
+Build: <pass/fail> | Tests: <pass/fail, n tests> | Headless views: <pass/fail/N/A> | Reviewer: <agent/tool>
 
 ## Summary
 | Task | Result | Critical | High | Medium | Low | Info |
 |------|--------|----------|------|--------|-----|------|
 | QA-1 SOLID & Design | Issues found | 0 | 1 | 2 | 3 | 1 |
-| QA-6 Desktop UI Regression | Pass | 0 | 0 | 0 | 0 | 1 |
+| QA-6 Headless UI View Coverage | Pass | 0 | 0 | 0 | 0 | 1 |
 | ... |
 
-## Desktop UI Feature Matrix
-| Capability | Feature / primary scenario | Interaction dimensions | Persistence / restart | Result | Evidence |
-|------------|----------------------------|------------------------|-----------------------|--------|----------|
-| `<spec>` | `<workflow>` | Keyboard, pointer, focus, ... | Pass / N/A | Pass / Fail / Blocked / N/A | `<log, screenshot, notes>` |
+## Headless UI View Coverage
+| View / surface | Framework behavior | Test or rationale | Result | Evidence |
+|----------------|--------------------|-------------------|--------|----------|
+| `<view>` | Binding, control state, input, focus, selection, visual tree | `<test or omission rationale>` | Pass / Fail / N/A | `<test, command, notes>` |
 
 ## Findings
 ### QA-1 — SOLID Principles & Code Design
@@ -86,8 +86,8 @@ Build: <pass/fail> | Tests: <pass/fail, n tests> | Desktop UI: <pass/fail/blocke
 | --- | --- |
 | Internal issue with no behavior change (style, structure, dead code, missing XML docs) | Fix directly as maintenance; run the test baseline after |
 | Missing tests for existing accepted behavior | Add tests directly as maintenance, unless the behavior itself is unclear or unspecified — then clarify via OpenSpec first |
-| Missing real desktop coverage for an accepted user-facing feature | Add the feature-scoped UI verification and evidence directly; use OpenSpec first only when expected behavior is unclear |
-| Desktop UI behavior contradicts an accepted spec | Report the product failure and route through OpenSpec to fix the code or amend the spec |
+| Missing headless view coverage for meaningful accepted framework behavior | Add focused Avalonia headless tests directly; use OpenSpec first only when expected behavior is unclear |
+| Optional live desktop observation contradicts an accepted spec | Report the product failure and route through OpenSpec to fix the code or amend the spec |
 | Code contradicts an accepted spec | OpenSpec change: fix the code **or** amend the spec, whichever is wrong |
 | Code implements behavior not covered by any spec | OpenSpec change: accept and document the behavior, or remove it |
 | Security finding rated Critical | Fix immediately; note the exposure in the report (never quote the secret itself) |
@@ -98,11 +98,11 @@ A QA run itself requires **no** OpenSpec ceremony, just like running the test su
 
 ### Suggested Cadence
 
-- **Full review:** after a milestone or a batch of archived changes; before any release. Every run includes a fresh QA-6 all-features desktop matrix against the current build.
+- **Full review:** after a milestone or a batch of archived changes; before any release. Every run includes QA-6 headless UI view coverage against the current test baseline.
 - **QA-4 (Security):** frequently — package vulnerabilities appear at any time; cheap to run.
 - **QA-3 (Testing):** when module completion QA reveals broader test-quality or coverage uncertainty; the deterministic baseline and criterion mapping still run for every module.
 - **QA-5 (Drift):** after archiving changes, to confirm specs, docs, and code stayed aligned.
-- **QA-6 (Desktop UI):** targeted and risk-based for every user-facing delivery module; comprehensive at milestones, before releases, after broad cross-cutting UI changes, and in every full review.
+- **QA-6 (Headless UI views):** included in every full review and whenever module completion reveals uncertainty about view construction, bindings, control state, routed input, focus, selection, or visual-tree behavior.
 
 ---
 
@@ -190,9 +190,9 @@ This review judges *reasonable* application of the principles, per `openspec/spe
    - Domain tests: no frameworks, persistence, or file system.
    - Application tests: deterministic collaborators (fakes/stubs), no real SQLite or file system.
    - Integration tests: isolated temporary resources (temp DB/files), no shared state, clean up after themselves.
-   - App tests: exercise UI-owned decision logic (view models, navigation, commands) in code without launching Avalonia; no superficial tests of static markup.
+   - App tests: exercise UI-owned decision logic (view models, navigation, commands) without Avalonia when practical; use Avalonia headless tests for meaningful view construction, bindings, control state, routed input, focus, selection, and visual-tree behavior; do not add superficial tests of static markup.
 4. **Spec-driven coverage:** behavior described by accepted spec requirements/scenarios has corresponding tests, or an explicit documented reason why not.
-5. **Scope discipline:** no slow, flaky, UI-driving, or external-service tests sneaking into the fast solution-level baseline. Real desktop verification is expected where applicable but runs separately under the feature workflow or QA-6, and is Not applicable when the reviewing agent has no interactive desktop (OpenCode).
+5. **Scope discipline:** headless view tests remain focused and deterministic; no live-desktop automation, pixel-perfect visual regression, performance suite, or external-service dependency enters the solution-level baseline.
 
 ---
 
@@ -254,49 +254,50 @@ Context: FusionCanvas is a local-first desktop app with no network attack surfac
 
 ---
 
-## QA-6 — Real Desktop UI Regression (All Features)
+## QA-6 — Headless UI View Coverage
 
-**Goal:** verify the current built Avalonia application end to end across every accepted and implemented user-facing feature. In a full QA review, this is a complete feature inventory and regression matrix—not a smoke test and not a sample of recently changed features.
+**Goal:** verify that accepted and implemented user-facing views have proportionate automated coverage of meaningful Avalonia framework behavior, using a routine that runs without an interactive desktop.
 
-### Required Environment and Safety
+### Required Environment
 
-1. Use an interactive desktop session capable of launching the built application and delivering actual keyboard, pointer, or accessibility-driven input. Windows UI Automation is currently suitable, but the policy does not depend on one tool.
-2. Build the current checkout before testing and record the executable/configuration, commit or working-tree identity, operating environment, and automation mechanism.
-3. Select a disposable database/workspace fixture before the first mutating interaction. Never run create, move, archive, restore, or delete scenarios against the contributor's normal workspace.
-4. Prefer stable automation identifiers and accessible names. Wait for observable UI state rather than relying on fixed sleeps. Treat missing accessibility exposure as a finding when it prevents reliable operation or evidence.
-5. If the interactive environment cannot be obtained (for example, when running under OpenCode, which has no display), mark QA-6 **Not applicable**, list every unexecuted matrix row, and state what environment is required. Do not infer a pass from QA-3. A not-applicable QA-6 does not block the rest of the review.
+1. Run through the normal solution-level command: `dotnet test .\FusionCanvas.sln`.
+2. Headless view tests must not require a display, installed desktop application, network access, external services, or normal user workspace data.
+3. Use isolated deterministic fixtures for any view behavior that coordinates persistence or mutable application state.
+4. The same mandatory task must be executable under Codex, OpenCode, CI, and a normal contributor environment.
 
-### Build the All-Features Inventory
+### Build the View Inventory
 
-1. Read every accepted capability under `openspec/specs/` and identify user-facing requirements that are implemented in the current build.
-2. Cross-check the application shell, navigation surfaces, menus, dialogs, editors, inspectors, tabs/windows, and implemented workflows so UI behavior that lacks a spec is also visible as a QA-5 drift finding.
-3. Create one or more matrix rows for every implemented user-facing feature. Each row names the capability/spec requirement and its primary end-to-end workflow.
-4. Assign every row exactly one result: **Pass**, **Fail**, **Blocked**, or **Not applicable**. Explain Blocked and Not applicable. No feature may be silently omitted.
+1. Inspect Avalonia views under `src/FusionCanvas.App` and identify meaningful framework behavior: construction, bindings, control state, routed input, focus, selection, templates, or visual-tree coordination.
+2. Map each meaningful behavior to a focused headless view test, or record why a framework-free view-model/command test provides sufficient coverage.
+3. Mark static markup or framework-owned rendering **Not applicable** with a concise rationale; do not require existence-only tests.
+4. Report accepted user-facing behavior that has no suitable coverage as a finding. If expected behavior is unclear, route clarification through OpenSpec.
 
-### Full UI Test Specification
+### Review Dimensions
 
-For **every inventory row**, execute the primary happy path through the real desktop application and apply each relevant dimension below. Mark a dimension Not applicable only with an evident feature-specific reason.
+For each relevant view or surface, check:
 
-1. **Launch and discoverability:** the feature is reachable from the intended workspace surface; initial, empty, loading, and disabled states are coherent where applicable.
-2. **Keyboard operation:** shortcuts, traversal, Enter/Escape behavior, inline editing, and focus return work without unintended global-command leakage.
-3. **Pointer operation:** click, double-click, right-click/context menu, drag/drop, hit targets, and hover/drop feedback work where the feature exposes them.
-4. **Selection and focus:** canonical selection, multi-surface synchronization, inspector/detail updates, and focus ownership remain correct before and after the action.
-5. **Validation and errors:** invalid input is rejected visibly, editable state and user input are retained when appropriate, and recoverable failures do not leave misleading UI state.
-6. **Visibility and filtering:** search, filters, expansion/collapse, hidden selections, empty results, and restoration of pre-filter context behave correctly where applicable.
-7. **Destructive and lifecycle actions:** confirmation text accurately names impact; cancel is safe; confirmed archive/restore/delete behavior and selection fallback match the accepted spec.
-8. **Persistence and restart:** saved changes survive a real application restart with identity, hierarchy/order, selection-relevant state, and displayed properties reconstructed correctly where specified.
-9. **Recovery and atomicity:** failed persistence or interrupted operations retain or restore the last confirmed state and expose actionable feedback when the scenario can be safely induced.
-10. **Accessibility exposure:** actionable controls have stable accessible names/roles/identifiers, state changes are observable, and the feature remains operable through supported accessibility-driven input.
-11. **Tabs and windows:** normal selection versus explicit tab/window opening, activation, duplication prevention, close behavior, and unsaved-change protection work where applicable.
-12. **Cross-feature regression:** complete at least one realistic workflow that crosses the feature's upstream/downstream integrations so individually passing controls are also verified together.
+1. **Construction and resources:** the view initializes under the headless application fixture with required styles/resources and without binding failures that prevent use.
+2. **Bindings and control state:** accepted state reaches the intended controls, enabled/disabled and visible/hidden states are correct, and two-way updates occur where specified.
+3. **Routed input and commands:** meaningful keyboard/pointer events or command paths reach the expected handler without relying on operating-system input.
+4. **Focus and selection:** framework-owned focus, selection, and synchronization behavior is covered where it affects accepted outcomes.
+5. **Visual tree and templates:** important named controls, presenters, or generated items exist and carry the expected state when that structure is part of behavior rather than mere layout.
+6. **Test quality:** assertions describe product behavior, fixtures isolate dispatcher/application lifetime correctly, and tests avoid sleeps, pixels, incidental tree shape, or duplicated view-model assertions.
+
+### Optional Live Desktop Evidence
+
+A reviewer may launch the built application ad hoc when additional confidence is useful for native windows, operating-system input, assistive-technology exposure, visual appearance, platform integration, or a difficult interaction defect. Such a check:
+
+- is supplemental and does not change the QA-6 or full-review verdict;
+- is not required to be handed off when an interactive environment is unavailable;
+- uses a disposable workspace/database for mutating scenarios; and
+- clearly distinguishes observations from deterministic test evidence.
 
 ### Evidence and Reporting
 
-- Record the full feature matrix in the consolidated report using the standard columns above. Add columns when a feature needs more precise risk tracking.
-- For each row, record concise observed results and link or identify relevant screenshots, accessibility/automation output, or restart evidence. Evidence must establish behavior, not merely that a control existed.
-- Record the disposable fixture and confirm the normal workspace was not mutated.
-- Report product failures with severity and route them using the normal finding rules. Report test-infrastructure limitations separately so they are not confused with application defects.
-- A full QA review can pass QA-6 when every implemented user-facing feature row passes or has a justified Not applicable result; any Failed row fails QA-6. When the reviewing agent has no interactive desktop (for example, OpenCode), QA-6 is Not applicable for the whole matrix and the rest of the review is unaffected.
+- Record the view coverage table using the standard columns above.
+- Cite test classes/methods, omission rationales, and the solution test result.
+- Any failed required headless test fails QA-6. A justified Not applicable row does not.
+- Until a headless harness exists, QA-6 should report the missing harness and representative view coverage as a test-gap finding; it must not substitute live desktop evidence for the missing deterministic lane.
 
 ---
 
