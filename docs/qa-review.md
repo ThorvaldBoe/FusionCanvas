@@ -18,8 +18,9 @@ Every delivery module receives a scoped completion review before it is reported 
 2. `dotnet build .\FusionCanvas.sln`, `dotnet test .\FusionCanvas.sln`, and strict validation of the active OpenSpec change pass.
 3. The implementation stayed within the approved module and did not invent unapproved product behavior or architecture decisions.
 4. Changed-scope spec/code/doc drift is absent.
-5. Relevant architecture, security, persistence, migration, and recovery risks were reviewed.
-6. A user-facing module has focused UI decision-logic tests and applicable Avalonia headless view tests for meaningful construction, binding, control-state, routed-input, focus, selection, or visual-tree behavior. Static markup needs no superficial test.
+5. Changed and newly added C# code conforms to `docs/coding-standard.md`, including correct layer and capability placement, one primary top-level production type per file, namespace and naming consistency, explicit dependencies, nullability, cancellation, and error handling.
+6. Relevant architecture, security, persistence, migration, and recovery risks were reviewed.
+7. A user-facing module has focused UI decision-logic tests and applicable Avalonia headless view tests for meaningful construction, binding, control-state, routed-input, focus, selection, or visual-tree behavior. Static markup needs no superficial test.
 
 If a criterion or validation gate fails, return the module to correction and rerun the affected criterion plus relevant regression checks. Do not convert a failure into a limitation merely to close the change. Expand to the relevant QA tasks—or a full review—when the module affects broad shell/navigation behavior, crosses many capabilities, or creates plausible unrelated regressions.
 
@@ -33,7 +34,7 @@ For the completion record, add an acceptance table to `verification.md`:
 
 ### Review Protocol (applies to every task)
 
-1. **Load context first.** Read `AGENTS.md`, `openspec/project.md`, and the specs relevant to the task (`architecture-guidelines`, `testing-baseline`, capability specs under review) before judging anything.
+1. **Load context first.** Read `AGENTS.md`, `openspec/project.md`, `docs/coding-standard.md`, and the specs relevant to the task (`architecture-guidelines`, `testing-baseline`, capability specs under review) before judging anything. Apply coding-standard checks to the reviewed C# scope; do not report untouched legacy code outside a scope-limited review unless it creates a material risk to that scope.
 2. **Establish the build state.** Run `dotnet build .\FusionCanvas.sln` early. A broken build is itself a Critical finding; note it and continue the review where practical.
 3. **Review, don't fix.** A QA run reports findings; it does not change code, specs, or docs unless the user explicitly asks for fixes. Fixing happens afterwards through the routing rules below.
 4. **Report in the standard format** (see below). Every finding cites concrete evidence: file paths, line numbers, commands, or spec references.
@@ -128,11 +129,17 @@ This review judges *reasonable* application of the principles, per `openspec/spe
    - New variation should not require editing stable core code each time (e.g. stage tools, future plugins/AI providers should be addable via extension points).
    - Inheritance is rare and correct; composition preferred.
 5. **Duplication:** repeated logic blocks that should be shared, and conversely, premature shared helpers coupling unrelated features.
+6. **Coding-standard conformance:**
+   - Check changed or reviewed production code against `docs/coding-standard.md`.
+   - Verify one primary top-level production type per correctly named file. Flag catch-all files such as `Models.cs`, `Entities.cs`, `Contracts.cs`, `Helpers.cs`, or `Common.cs`.
+   - Verify cohesive capability folders and matching namespaces rather than allowing broad namespaces such as `Workspace` to accumulate unrelated concerns.
+   - Check the applicable naming, source-layout, nullability, async/cancellation, exception, dependency-injection, MVVM, persistence, and test-code rules.
+   - Treat existing violations as migration debt and recommend bounded adoption; do not demand an unrelated repository-wide rewrite.
 
 ### Method
 
 - Read the production code under `src/`, layer by layer. Use file size and structure as triage, then read the suspicious types fully.
-- Cross-check against `docs/architecture.md` ("Architectural Principles") and the architecture-guidelines spec.
+- Cross-check against `docs/coding-standard.md`, `docs/architecture.md` ("Architectural Principles"), and the architecture-guidelines spec.
 
 ---
 
@@ -161,11 +168,11 @@ This review judges *reasonable* application of the principles, per `openspec/spe
    - Presentation state, navigation, commands → App. Flag views/view models owning domain decisions.
 4. **Contracts point the right way:** interfaces consumed by Application use cases are *defined* in Application (or Domain), implemented in Integration — not the reverse.
 5. **UI layer discipline:** view models contain no persistence calls; code-behind limited to view concerns; bindings follow compiled-binding conventions already in use.
-6. **Naming and structure consistency:** project names, namespaces, and folder layout match the accepted architecture (note: the layer is `Integration`; flag docs that say otherwise via QA-5).
+6. **Naming and structure consistency:** project names, capability folders, namespaces, file/type layout, and composition-root placement conform to `docs/coding-standard.md` and the accepted architecture (note: the layer is `Integration`; flag docs that say otherwise via QA-5).
 
 ### Method
 
-- Run the reference commands, then grep/read code for the purity checks. Compare actual placement against `docs/architecture.md` and the architecture-guidelines spec.
+- Run the reference commands, then grep/read code for the purity checks. Compare actual placement against `docs/coding-standard.md`, `docs/architecture.md`, and the architecture-guidelines spec.
 
 ---
 
@@ -244,6 +251,7 @@ Context: FusionCanvas is a local-first desktop app with no network attack surfac
    - No unsynced delta specs: delta `ADDED/MODIFIED/REMOVED` sections in `openspec/changes/` (non-archived) should reflect intended, not-yet-applied work only.
 3. **Docs vs. specs vs. code:**
    - `README.md`, `docs/*.md`, `openspec/project.md` agree on layer names, project structure, test commands, and workflow. (Known historical example: `docs/architecture.md` used the name "Infrastructure" while the accepted name is "Integration".)
+   - `docs/coding-standard.md` remains consistent with the architecture-guidelines and testing-baseline specs, `docs/architecture.md`, the actual toolchain, and this QA playbook.
    - `docs/LifeOS/` remains optional historical reference; canonical documents do not treat its inventory, ordering, or acceptance text as current authority, and reused ideas still go through discovery and OpenSpec.
    - `AGENTS.md` remains consistent with this playbook and the workflow skills in `.codex/skills/`.
 4. **Archived context preserved:** archived changes exist under `openspec/changes/archive/` with their artifacts; nothing was casually deleted.

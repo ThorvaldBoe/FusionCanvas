@@ -198,6 +198,8 @@ FusionCanvas is in an early stage, so contributions should start with discussion
 
 Large changes should be proposed through OpenSpec before implementation.
 
+All new and substantially modified C# code should follow the repository's [`docs/coding-standard.md`](docs/coding-standard.md).
+
 ## Name
 
 FusionCanvas represents the fusion of ideas, graphics, product workflows, automation, and creative decision-making into one workspace.
