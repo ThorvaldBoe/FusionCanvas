@@ -361,7 +361,7 @@ Events allow plugins to react without tightly coupling components.
 
 ## Testing Strategy
 
-FusionCanvas uses complementary code-level and real-desktop test lanes. Business logic must remain testable without the UI, while each user-facing delivery module receives targeted verification through the built Avalonia application when the contributing agent can run an interactive desktop session (e.g., Codex). OpenCode cannot perform interactive desktop verification, records that lane as not-applicable, preserves the targeted scenario handoff, and relies on the code-level baseline plus UI-owned decision-logic tests for its own completion evidence.
+FusionCanvas uses a lowest-reliable-layer testing strategy. Business logic remains testable without the UI framework, UI-owned decision logic is covered through focused view-model and coordinator tests, and meaningful Avalonia framework behavior is covered through deterministic headless view tests that require no interactive display.
 
 FusionCanvas should maintain a high level of unit test coverage, especially for domain logic, application services, persistence boundaries, and plugin contracts. New behavior should generally include focused unit tests unless there is a clear reason another test type provides better confidence.
 
@@ -373,9 +373,11 @@ Priority should be given to testing:
 - data persistence
 - import/export functionality
 
-Desktop scenarios are selected by user impact, integration risk, novelty, prior failures, and information value. Cover the module's critical end-to-end workflow and distinct applicable risks: keyboard and pointer input, focus and selection, validation and filtering, destructive confirmation, persistence and restart, recovery, accessibility exposure, state synchronization, and tabs or windows. Equivalent low-risk variants may be sampled on the real desktop when deterministic tests cover the remaining rule combinations; the verification record explains why the chosen set is sufficient.
+Use Avalonia headless tests when view construction, bindings, control state, routed input, focus, selection, or visual-tree behavior carries meaningful risk. Avoid superficial tests of static markup or framework implementation details. These tests belong in `dotnet test .\FusionCanvas.sln` and must run consistently under Codex, OpenCode, CI, and normal contributor environments.
 
-Desktop UI verification runs separately from `dotnet test .\FusionCanvas.sln`, uses a disposable workspace or database rather than normal user data, and records the tested build and environment, scenarios, results, isolation method, limitations, and material screenshots or automation logs. The full all-features regression matrix is reserved for full QA reviews, milestones, release candidates, and broad cross-cutting UI changes rather than every ordinary module.
+FusionCanvas does not yet have an Avalonia headless package, harness, or view tests; the current `FusionCanvas.App.Tests` project covers view models, commands, navigation state, and UI coordination only. Establishing the harness and representative view coverage is follow-up work.
+
+Live desktop testing is optional and ad hoc. It can supplement deterministic evidence for native-window behavior, operating-system input, assistive-technology exposure, platform integration, visual judgment, or difficult interaction defects. Any mutating live check uses a disposable workspace or database and never becomes a standing module-completion or QA requirement.
 
 ## OpenSpec Development
 

@@ -89,7 +89,7 @@ Implement tasks from an OpenSpec change.
 
    Maintain `<changeRoot>/verification.md` as verification runs. It must account for every acceptance scenario with its method, result, evidence, and limitations. An aggregate build or test result is supporting evidence, not a substitute for criterion-level accounting.
 
-   For user-facing modules, allocate the real-desktop lane by risk and information value: critical end-to-end workflow, new framework wiring, persistence, destructive actions, state synchronization, complex focus/input, recovery, accessibility, and tabs/windows. Representative low-risk variants may be sampled when deterministic tests cover the rule combinations. If no interactive desktop is available, record the lane as not applicable and preserve the targeted scenario handoff.
+   For user-facing modules, implement focused Avalonia headless view tests when construction, bindings, control state, routed input, focus, selection, or visual-tree behavior is material. Keep decision logic at the lowest reliable framework-free layer and avoid superficial static-markup tests. Live desktop checks are optional supplemental evidence and are never required solely because a change is user-facing.
 
    When a criterion fails, correct the implementation or approved artifact, rerun the affected criterion and relevant regression checks, and update the evidence. Do not mark the module complete while a required criterion is failed or unaccounted for.
 

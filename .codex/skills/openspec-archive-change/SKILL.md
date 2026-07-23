@@ -59,7 +59,7 @@ Archive a completed change in the experimental workflow.
    - account for every acceptance scenario in the module's delta specs;
    - identify the verification method, result, and material evidence;
    - record required build, test, and strict OpenSpec validation results;
-   - record targeted desktop UI results or an explicit unavailable-environment handoff for user-facing work;
+   - record applicable Avalonia headless view-test results for user-facing work, with any live desktop checks treated as optional supplemental evidence;
    - contain no hidden failed or unaccounted-for completion gate.
 
    If the record is missing or incomplete, STOP and return the change to apply/verification. Do not archive based only on checked tasks or an aggregate test pass.

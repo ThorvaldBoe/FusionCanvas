@@ -104,9 +104,9 @@ The baseline test suite uses mirrored test projects under `tests/`:
 * `FusionCanvas.Domain.Tests` protects domain rules, entity relationships, invariants, workflow decisions, and persistence-neutral boundaries.
 * `FusionCanvas.Application.Tests` protects use-case orchestration and application contracts with deterministic collaborators.
 * `FusionCanvas.Integration.Tests` protects local persistence and workspace file boundaries with isolated temporary resources.
-* `FusionCanvas.App.Tests` protects UI-owned state and navigation decisions that can be tested without full visual UI automation.
+* `FusionCanvas.App.Tests` protects UI-owned state and navigation decisions and is the intended home for focused Avalonia headless view tests.
 
-New behavior should include focused automated tests in the relevant layer. Static Avalonia markup, framework-owned rendering, full desktop automation, visual regression infrastructure, performance benchmarking, marketplace integration access, and AI provider access remain outside the fast solution-level baseline. User-facing delivery modules use a separate targeted real-desktop pass selected by risk and information value.
+New behavior should include focused automated tests in the relevant layer. Use framework-free tests for UI decision logic and Avalonia headless tests for meaningful view construction, binding, control-state, input, focus, selection, or visual-tree behavior. Static markup, full live-desktop automation, visual regression infrastructure, performance benchmarking, marketplace integration access, and AI provider access remain outside the routine baseline. The headless harness has not been added yet; current app tests cover view models and coordination rather than instantiated views.
 
 ## Project Status
 
@@ -128,7 +128,7 @@ Discover → Define module → Propose → Review → Apply → Verify → Learn
 
 One module normally maps to one OpenSpec change. Requirements and conceptual/functional design define the expected behavior; a dedicated implementation plan gives the assigned implementation agent explicit layer, data, UI, edge-case, sequencing, and test guidance. Observable acceptance criteria are pass/fail completion gates and are mapped to evidence in `verification.md`.
 
-Higher-reasoning agents or humans handle discovery, specification, design review, and ambiguous corrections. Lower-cost agents can implement bounded tasks after the delivery package is approved and sufficiently explicit. Targeted desktop UI testing is reserved for critical workflows and distinct user risks, while deterministic tests cover equivalent low-risk variants; full all-features desktop regression runs at milestone, release, or full-QA gates.
+Higher-reasoning agents or humans handle discovery, specification, design review, and ambiguous corrections. Lower-cost agents can implement bounded tasks after the delivery package is approved and sufficiently explicit. Deterministic tests, including applicable Avalonia headless view tests, are the routine verification path on every agent. Live desktop testing is optional and may be used ad hoc for platform-specific or visual risks.
 
 The original LifeOS planning files remain under `docs/LifeOS` as optional, potentially stale historical reference. They are not required reading, a current roadmap, or acceptance authority.
 

@@ -31,7 +31,7 @@ Before creating artifacts, establish enough shared understanding with the user t
 - dependencies, non-goals, and why the scope is coherent and reviewable;
 - representative workflows, examples, edge cases, and failure states;
 - high-impact product, UX, data, architecture, migration, and acceptance decisions;
-- the verification approach and desktop-test risks for user-facing work.
+- the verification approach and meaningful Avalonia headless view-test risks for user-facing work.
 
 Ask focused questions only where the answer would materially change the module. Capture conclusions in the artifacts rather than pasting the conversation. Historical documents under `docs/LifeOS` are optional idea sources, not required context or current requirements.
 
@@ -82,7 +82,7 @@ The delivery package is implementation-ready only when:
 
    Capture the decisions in the proposal, design, or specification scenarios rather than copying the checklist verbatim. Ask the user only when a high-impact product preference cannot be derived from project context. For a change without user-facing interaction, record that the UX preflight is not applicable.
 
-   Plan real-desktop verification by risk and information value. Cover the critical workflow and distinct high-risk wiring or interaction behavior; use deterministic tests for equivalent low-risk variants. Record why the selected desktop scenarios are sufficient and how an unavailable interactive environment will be handed off.
+   Plan deterministic Avalonia headless view tests when construction, bindings, control state, routed input, focus, selection, or visual-tree behavior is material. Keep decision logic at a lower framework-free test layer when practical, and avoid superficial tests of static markup. Live desktop checks are optional and ad hoc; include one only when it addresses a specific platform, native-window, assistive-technology, visual, or diagnostic risk.
 
 5. **Create artifacts in sequence until apply-ready**
 
