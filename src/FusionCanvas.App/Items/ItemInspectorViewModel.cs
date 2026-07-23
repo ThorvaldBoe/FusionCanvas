@@ -36,6 +36,8 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
     private bool _isBusy;
     private bool _archiveConfirmationVisible;
     private bool _deleteConfirmationVisible;
+    private Task? _inFlightCommit;
+    private bool _commitAgainRequested;
 
     private string _originalTitle = string.Empty;
     private string _originalDescription = string.Empty;
@@ -54,8 +56,6 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _itemManagement = itemManagement ?? throw new ArgumentNullException(nameof(itemManagement));
         _tagManagement = tagManagement;
-        SaveCommand = new RelayCommand(_ => Run(CommitEditsAsync()));
-        DiscardCommand = new RelayCommand(_ => DiscardChanges());
         AddTagCommand = new RelayCommand(_ => Run(AddTagAsync()));
         RemoveTagCommand = new RelayCommand(parameter =>
         {
@@ -346,8 +346,6 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
     public bool EmphasizesDesign => _currentStage == WorkflowStage.Design;
     public bool EmphasizesListing => _currentStage == WorkflowStage.Listing;
 
-    public ICommand SaveCommand { get; }
-    public ICommand DiscardCommand { get; }
     public ICommand AddTagCommand { get; }
     public ICommand RemoveTagCommand { get; }
     public ICommand RequestArchiveCommand { get; }
@@ -404,25 +402,82 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         RaiseStageProperties();
     }
 
-    public async Task CommitEditsAsync(CancellationToken cancellationToken = default)
+    public Task CommitEditsAsync(CancellationToken cancellationToken = default)
+    {
+        if (_state is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (_inFlightCommit is not null)
+        {
+            _commitAgainRequested = true;
+            return _inFlightCommit;
+        }
+
+        if (!HasUnsavedChanges || !CanEditShared)
+        {
+            return Task.CompletedTask;
+        }
+
+        var completion = new TaskCompletionSource();
+        _inFlightCommit = completion.Task;
+        _commitAgainRequested = false;
+        _ = RunCommitDrainAsync(cancellationToken, completion);
+        return completion.Task;
+    }
+
+    private async Task RunCommitDrainAsync(CancellationToken cancellationToken, TaskCompletionSource completion)
+    {
+        try
+        {
+            do
+            {
+                _commitAgainRequested = false;
+                await CommitOnceAsync(cancellationToken).ConfigureAwait(true);
+            }
+            while (_commitAgainRequested && _state is not null && CanEditShared && HasUnsavedChanges);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            ErrorMessage = exception.Message;
+        }
+        finally
+        {
+            _inFlightCommit = null;
+            completion.SetResult();
+        }
+    }
+
+    private async Task CommitOnceAsync(CancellationToken cancellationToken)
     {
         if (_state is not { } state || IsBusy || !CanEditShared || !HasUnsavedChanges)
         {
             return;
         }
 
-        var normalizedTitle = Title.Trim();
-        if (normalizedTitle.Contains('\n') || normalizedTitle.Contains('\r'))
+        var snapshot = CaptureCommitSnapshot();
+        var titleToSend = snapshot.Title;
+        if (snapshot.TitleHasLineBreaks)
         {
-            ErrorMessage = "The working title must be a single line.";
-            return;
+            Title = _originalTitle;
+            ErrorMessage = "The working title must be a single line; it was reverted. Other edits were saved.";
+            titleToSend = _originalTitle;
+            if (!HasUnsavedChanges)
+            {
+                return;
+            }
+        }
+        else
+        {
+            ErrorMessage = null;
         }
 
         IsBusy = true;
         var result = await _service.SaveStageAsync(new ItemStageAwareSaveRequest(
             state.Id,
             state.Stage,
-            Title,
+            titleToSend,
             Notes,
             CreateStagePayload(state.Stage),
             [.. TagDraft]), cancellationToken).ConfigureAwait(true);
@@ -434,23 +489,68 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
             return;
         }
 
-        ApplyState(result.State!);
-        ErrorMessage = null;
+        ApplySavedStatePreservingEdits(result.State!, snapshot);
+        if (!snapshot.TitleHasLineBreaks)
+        {
+            ErrorMessage = null;
+        }
         Saved?.Invoke(this, EventArgs.Empty);
     }
 
-    public void DiscardChanges()
+    private CommitSnapshot CaptureCommitSnapshot()
     {
-        Title = _originalTitle;
-        Description = _originalDescription;
-        Idea = _originalIdea;
-        ConceptIdea = _originalConceptIdea;
-        Phrase = _originalPhrase;
-        GraphicDirection = _originalGraphicDirection;
-        Notes = _originalNotes;
-        ErrorMessage = null;
-        RaiseDirty();
+        var trimmed = Title.Trim();
+        var hasLineBreaks = trimmed.Contains('\n') || trimmed.Contains('\r');
+        return new CommitSnapshot(
+            Title, Notes, Idea, ConceptIdea, Phrase, GraphicDirection, [.. TagDraft], hasLineBreaks);
     }
+
+    private void ApplySavedStatePreservingEdits(ItemInspectorState state, CommitSnapshot snapshot)
+    {
+        State = state;
+        _currentStage = state.Stage;
+        Title = Title == snapshot.Title ? state.Title : Title;
+        Description = state.Description ?? string.Empty;
+        Idea = Idea == snapshot.Idea ? (state.Creative.Idea ?? string.Empty) : Idea;
+        Audience = state.Creative.Audience ?? string.Empty;
+        ConceptIdea = ConceptIdea == snapshot.ConceptIdea ? (state.Creative.ConceptIdea ?? string.Empty) : ConceptIdea;
+        Phrase = Phrase == snapshot.Phrase ? (state.Creative.Phrase ?? string.Empty) : Phrase;
+        GraphicDirection = GraphicDirection == snapshot.GraphicDirection
+            ? (state.Creative.GraphicDirection ?? string.Empty)
+            : GraphicDirection;
+        Notes = Notes == snapshot.Notes ? (state.Notes ?? string.Empty) : Notes;
+        if (TagDraft.SequenceEqual(snapshot.TagDraft))
+        {
+            TagDraft.Clear();
+            foreach (var tag in state.Tags)
+            {
+                TagDraft.Add(tag.Name);
+            }
+        }
+        TagInput = string.Empty;
+        ArchiveConfirmationVisible = false;
+        DeleteConfirmationVisible = false;
+        _originalTitle = state.Title;
+        _originalDescription = state.Description ?? string.Empty;
+        _originalIdea = state.Creative.Idea ?? string.Empty;
+        _originalConceptIdea = state.Creative.ConceptIdea ?? string.Empty;
+        _originalPhrase = state.Creative.Phrase ?? string.Empty;
+        _originalGraphicDirection = state.Creative.GraphicDirection ?? string.Empty;
+        _originalNotes = state.Notes ?? string.Empty;
+        _originalTagNames = [.. TagDraft];
+        RaiseDirty();
+        RaiseStageProperties();
+    }
+
+    private sealed record CommitSnapshot(
+        string Title,
+        string Notes,
+        string Idea,
+        string ConceptIdea,
+        string Phrase,
+        string GraphicDirection,
+        IReadOnlyList<string> TagDraft,
+        bool TitleHasLineBreaks);
 
     private void ApplyState(ItemInspectorState state)
     {

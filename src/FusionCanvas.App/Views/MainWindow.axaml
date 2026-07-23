@@ -130,97 +130,103 @@
                     IsEnabled="{Binding CanCreateGroup}"
                     Classes="storeSecondary" />
           </Grid>
-          <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="6">
+          <StackPanel Spacing="6">
             <TextBox x:Name="TreeSearchBox"
                      Text="{Binding WorkspaceTree.QueryText}"
                      PlaceholderText="Search names, ideas, notes, tags..."
                      MinHeight="34" />
-            <Button Grid.Column="1"
-                    Content="Clear tags"
-                    IsVisible="{Binding WorkspaceTree.IsTagFilterActive}"
-                    Command="{Binding WorkspaceTree.ClearTagFiltersCommand}"
-                    ToolTip.Tip="Clear the active tag filter"
-                    Classes="storeSecondary" />
-            <ComboBox Grid.Column="2"
-                      x:Name="StageFilter"
-                      SelectedIndex="{Binding WorkspaceTree.StageFilterIndex}"
-                      MinWidth="92"
-                      MinHeight="34"
-                      ToolTip.Tip="Filter Items by workflow stage"
-                      Classes="statusSelector">
-              <ComboBoxItem Content="All stages" />
-              <ComboBoxItem Content="Idea" />
-              <ComboBoxItem Content="Concept" />
-              <ComboBoxItem Content="Design" />
-              <ComboBoxItem Content="Listing" />
-            </ComboBox>
-            <ComboBox Grid.Column="3"
-                      x:Name="StatusFilter"
-                      SelectedIndex="{Binding WorkspaceTree.StatusFilterIndex}"
-                      MinWidth="92"
-                      MinHeight="34"
-                      ToolTip.Tip="Filter Items by lifecycle status"
-                      Classes="statusSelector">
-              <ComboBoxItem Content="All statuses" />
-              <ComboBoxItem Content="Draft" />
-              <ComboBoxItem Content="Published" />
-              <ComboBoxItem Content="Paused" />
-              <ComboBoxItem Content="Rejected" />
-            </ComboBox>
-            <Button Grid.Column="4"
-                    Content="Filters"
-                    ToolTip.Tip="Filter by tag, topic scope, or archived work"
-                    Command="{Binding WorkspaceTree.ClearFiltersCommand}"
-                    Classes="storeSecondary"
-                    Classes.active="{Binding WorkspaceTree.HasNonTextFilters}">
-              <Button.Flyout>
-                <Flyout Placement="BottomEdgeAlignedRight"
-                        ShowMode="Standard">
-                  <Border Width="260" Padding="12">
-                    <StackPanel Spacing="10">
-                      <StackPanel Spacing="6">
-                        <TextBlock Text="Scope" FontSize="12" FontWeight="SemiBold" Foreground="#243447" />
-                        <CheckBox Content="Current topic and below"
-                                  IsChecked="{Binding WorkspaceTree.ScopeToCurrentTopic}"
-                                  IsEnabled="{Binding WorkspaceTree.CanScopeToCurrentTopic}"
-                                  ToolTip.Tip="Limit the tree to the selected niche or group subtree" />
-                        <TextBlock IsVisible="{Binding WorkspaceTree.ScopeToCurrentTopic}"
-                                   Text="{Binding WorkspaceTree.ScopedTopicName, StringFormat='Current: {0}'}"
-                                   FontSize="11" Foreground="#687385" TextTrimming="CharacterEllipsis" />
+            <WrapPanel Orientation="Horizontal">
+              <Button Content="Clear tags"
+                      IsVisible="{Binding WorkspaceTree.IsTagFilterActive}"
+                      Command="{Binding WorkspaceTree.ClearTagFiltersCommand}"
+                      ToolTip.Tip="Clear the active tag filter"
+                      Classes="storeSecondary"
+                      HorizontalAlignment="Left"
+                      Margin="0,0,6,6" />
+              <ComboBox x:Name="StageFilter"
+                        SelectedIndex="{Binding WorkspaceTree.StageFilterIndex}"
+                        MinWidth="92"
+                        MinHeight="34"
+                        HorizontalAlignment="Left"
+                        ToolTip.Tip="Filter Items by workflow stage"
+                        Classes="statusSelector"
+                        Margin="0,0,6,6">
+                <ComboBoxItem Content="All stages" />
+                <ComboBoxItem Content="Idea" />
+                <ComboBoxItem Content="Concept" />
+                <ComboBoxItem Content="Design" />
+                <ComboBoxItem Content="Listing" />
+              </ComboBox>
+              <ComboBox x:Name="StatusFilter"
+                        SelectedIndex="{Binding WorkspaceTree.StatusFilterIndex}"
+                        MinWidth="92"
+                        MinHeight="34"
+                        HorizontalAlignment="Left"
+                        ToolTip.Tip="Filter Items by lifecycle status"
+                        Classes="statusSelector"
+                        Margin="0,0,6,6">
+                <ComboBoxItem Content="All statuses" />
+                <ComboBoxItem Content="Draft" />
+                <ComboBoxItem Content="Published" />
+                <ComboBoxItem Content="Paused" />
+                <ComboBoxItem Content="Rejected" />
+              </ComboBox>
+              <Button Content="Filters"
+                      ToolTip.Tip="Filter by tag, topic scope, or archived work"
+                      Command="{Binding WorkspaceTree.ClearFiltersCommand}"
+                      Classes="storeSecondary"
+                      Classes.active="{Binding WorkspaceTree.HasNonTextFilters}"
+                      HorizontalAlignment="Left"
+                      Margin="0,0,0,6">
+                <Button.Flyout>
+                  <Flyout Placement="BottomEdgeAlignedRight"
+                          ShowMode="Standard">
+                    <Border Width="260" Padding="12">
+                      <StackPanel Spacing="10">
+                        <StackPanel Spacing="6">
+                          <TextBlock Text="Scope" FontSize="12" FontWeight="SemiBold" Foreground="#243447" />
+                          <CheckBox Content="Current topic and below"
+                                    IsChecked="{Binding WorkspaceTree.ScopeToCurrentTopic}"
+                                    IsEnabled="{Binding WorkspaceTree.CanScopeToCurrentTopic}"
+                                    ToolTip.Tip="Limit the tree to the selected niche or group subtree" />
+                          <TextBlock IsVisible="{Binding WorkspaceTree.ScopeToCurrentTopic}"
+                                     Text="{Binding WorkspaceTree.ScopedTopicName, StringFormat='Current: {0}'}"
+                                     FontSize="11" Foreground="#687385" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <Separator Margin="0,2" />
+                        <StackPanel Spacing="6">
+                          <TextBlock Text="Tags" FontSize="12" FontWeight="SemiBold" Foreground="#243447" />
+                          <TextBlock Text="No tags yet in this store."
+                                     IsVisible="{Binding !WorkspaceTree.AvailableTags.Count}"
+                                     FontSize="11" Foreground="#8B95A3" />
+                          <ItemsControl ItemsSource="{Binding WorkspaceTree.AvailableTags}"
+                                        IsVisible="{Binding WorkspaceTree.AvailableTags.Count}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="nav:TagFilterEntryViewModel">
+                                <CheckBox Content="{Binding Name}"
+                                          IsChecked="{Binding IsSelected}"
+                                          Margin="0,1" />
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                        <Separator Margin="0,2" />
+                        <CheckBox Content="Include archived"
+                                  IsChecked="{Binding WorkspaceTree.IncludeArchived}"
+                                  ToolTip.Tip="Reveal archived topics and Items with inactive treatment" />
+                        <Separator Margin="0,2" />
+                        <Button Content="Clear all"
+                                HorizontalAlignment="Right"
+                                Command="{Binding WorkspaceTree.ClearFiltersCommand}"
+                                IsEnabled="{Binding WorkspaceTree.HasActiveFilters}"
+                                Classes="storeSecondary" />
                       </StackPanel>
-                      <Separator Margin="0,2" />
-                      <StackPanel Spacing="6">
-                        <TextBlock Text="Tags" FontSize="12" FontWeight="SemiBold" Foreground="#243447" />
-                        <TextBlock Text="No tags yet in this store."
-                                   IsVisible="{Binding !WorkspaceTree.AvailableTags.Count}"
-                                   FontSize="11" Foreground="#8B95A3" />
-                        <ItemsControl ItemsSource="{Binding WorkspaceTree.AvailableTags}"
-                                      IsVisible="{Binding WorkspaceTree.AvailableTags.Count}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="nav:TagFilterEntryViewModel">
-                              <CheckBox Content="{Binding Name}"
-                                        IsChecked="{Binding IsSelected}"
-                                        Margin="0,1" />
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                      </StackPanel>
-                      <Separator Margin="0,2" />
-                      <CheckBox Content="Include archived"
-                                IsChecked="{Binding WorkspaceTree.IncludeArchived}"
-                                ToolTip.Tip="Reveal archived topics and Items with inactive treatment" />
-                      <Separator Margin="0,2" />
-                      <Button Content="Clear all"
-                              HorizontalAlignment="Right"
-                              Command="{Binding WorkspaceTree.ClearFiltersCommand}"
-                              IsEnabled="{Binding WorkspaceTree.HasActiveFilters}"
-                              Classes="storeSecondary" />
-                    </StackPanel>
-                  </Border>
-                </Flyout>
-              </Button.Flyout>
-            </Button>
-          </Grid>
+                    </Border>
+                  </Flyout>
+                </Button.Flyout>
+              </Button>
+            </WrapPanel>
+          </StackPanel>
           <TextBlock Text="{Binding GroupActionStatus}"
                      TextWrapping="Wrap"
                      FontSize="11"
@@ -441,9 +447,11 @@
               BorderBrush="#D9DEE7"
               BorderThickness="1">
         <Grid>
-          <StackPanel IsVisible="{Binding DocumentWindow.HasActiveDocument}"
-                      Spacing="12">
-            <Grid ColumnDefinitions="*,Auto,Auto">
+          <ScrollViewer IsVisible="{Binding DocumentWindow.HasActiveDocument}"
+                        VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="12">
+            <Grid ColumnDefinitions="*,Auto,Auto"
+                  ColumnSpacing="8">
               <StackPanel Grid.Column="0" Spacing="3">
                 <TextBlock Text="{Binding DocumentWindow.ActiveDetailTitle}"
                            FontSize="24"
@@ -557,7 +565,6 @@
                     Background="#F7F8FA"
                     BorderBrush="#D9DEE7"
                     BorderThickness="1">
-              <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Spacing="14">
                   <TextBlock IsVisible="{Binding ItemInspector.IsReadOnly}"
                              Text="{Binding ItemInspector.InactiveNotice}"
@@ -586,7 +593,8 @@
                                  IsReadOnly="{Binding !ItemInspector.CanEditShared}"
                                  MinHeight="32"
                                  PlaceholderText="Optional working title"
-                                 AutomationProperties.Name="Item working title" />
+                                 AutomationProperties.Name="Item working title"
+                                 LostFocus="OnDetailsFieldLostFocus" />
                       </StackPanel>
                     </StackPanel>
                   </Border>
@@ -608,7 +616,8 @@
                                AcceptsReturn="True"
                                MinHeight="64"
                                PlaceholderText="What is the original product idea?"
-                               AutomationProperties.Name="Original idea" />
+                               AutomationProperties.Name="Original idea"
+                               LostFocus="OnDetailsFieldLostFocus" />
                       <TextBlock IsVisible="{Binding !ItemInspector.CanEditStage}"
                                  Text="{Binding ItemInspector.StageReadOnlyReason}"
                                  TextWrapping="Wrap"
@@ -637,7 +646,8 @@
                                AcceptsReturn="True"
                                MinHeight="64"
                                PlaceholderText="Refine the original idea"
-                               AutomationProperties.Name="Concept idea" />
+                               AutomationProperties.Name="Concept idea"
+                               LostFocus="OnDetailsFieldLostFocus" />
                       <TextBlock Text="Phrase"
                                  FontSize="11"
                                  Foreground="#687385" />
@@ -645,7 +655,8 @@
                                IsReadOnly="{Binding !ItemInspector.CanEditStage}"
                                MinHeight="32"
                                PlaceholderText="Single-line on-product phrase"
-                               AutomationProperties.Name="Concept phrase" />
+                               AutomationProperties.Name="Concept phrase"
+                               LostFocus="OnDetailsFieldLostFocus" />
                       <TextBlock Text="Graphic direction"
                                  FontSize="11"
                                  Foreground="#687385" />
@@ -654,7 +665,8 @@
                                AcceptsReturn="True"
                                MinHeight="64"
                                PlaceholderText="Visual direction supporting this concept"
-                               AutomationProperties.Name="Graphics description" />
+                               AutomationProperties.Name="Graphics description"
+                               LostFocus="OnDetailsFieldLostFocus" />
                       <TextBlock IsVisible="{Binding !ItemInspector.CanEditStage}"
                                  Text="{Binding ItemInspector.StageReadOnlyReason}"
                                  TextWrapping="Wrap"
@@ -678,7 +690,8 @@
                                AcceptsReturn="True"
                                MinHeight="80"
                                PlaceholderText="Plain-text notes"
-                               AutomationProperties.Name="Item notes" />
+                               AutomationProperties.Name="Item notes"
+                               LostFocus="OnDetailsFieldLostFocus" />
                     </StackPanel>
                   </Border>
 
@@ -848,23 +861,6 @@
                     </StackPanel>
                   </Border>
 
-                  <StackPanel Orientation="Horizontal"
-                              Spacing="8"
-                              HorizontalAlignment="Left">
-                    <Button x:Name="SaveItemButton"
-                            Content="Save"
-                            IsEnabled="{Binding ItemInspector.HasUnsavedChanges}"
-                            Command="{Binding ItemInspector.SaveCommand}"
-                            ToolTip.Tip="Save working title, current-stage text, and Notes"
-                            AutomationProperties.Name="Save Item changes"
-                            Classes="storeAction" />
-                    <Button Content="Discard"
-                            IsEnabled="{Binding ItemInspector.HasUnsavedChanges}"
-                            Command="{Binding ItemInspector.DiscardCommand}"
-                            ToolTip.Tip="Discard unsaved Item text changes"
-                            Classes="storeSecondary" />
-                  </StackPanel>
-
                   <Border Padding="14"
                           Background="#FFFFFF"
                           BorderBrush="#D9DEE7"
@@ -977,33 +973,6 @@
                              FontSize="12"
                              Foreground="#9A4B43" />
                 </StackPanel>
-              </ScrollViewer>
-            </Border>
-
-            <Border IsVisible="{Binding IsUnsavedChangesPromptVisible}"
-                    Padding="12"
-                    Background="#FFF4E5"
-                    BorderBrush="#E5B86A"
-                    BorderThickness="1"
-                    CornerRadius="6">
-              <StackPanel Spacing="8">
-                <TextBlock Text="Save Item changes?"
-                           FontWeight="SemiBold" />
-                <TextBlock Text="{Binding UnsavedChangesPromptMessage}"
-                           TextWrapping="Wrap" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Content="Save"
-                          Command="{Binding SaveAndContinueCommand}"
-                          Classes="storeAction" />
-                  <Button Content="Discard"
-                          Command="{Binding DiscardAndContinueCommand}"
-                          Classes="storeSecondary" />
-                  <Button x:Name="CancelUnsavedTransitionButton"
-                          Content="Cancel"
-                          Command="{Binding CancelPendingTransitionCommand}"
-                          Classes="storeSecondary" />
-                </StackPanel>
-              </StackPanel>
             </Border>
 
             <Border IsVisible="{Binding IsStatusConfirmationVisible}"
@@ -1035,7 +1004,6 @@
                     Background="#F7F8FA"
                     BorderBrush="#D9DEE7"
                     BorderThickness="1">
-              <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Spacing="14">
                   <TextBlock IsVisible="{Binding GroupDetails.IsReadOnly}"
                              Text="{Binding GroupDetails.InactiveNotice}"
@@ -1171,7 +1139,6 @@
                              FontSize="12"
                              Foreground="#9A4B43" />
                 </StackPanel>
-              </ScrollViewer>
             </Border>
 
             <Grid ColumnDefinitions="*,Auto,Auto"
@@ -1197,6 +1164,7 @@
                       Classes="stageMove" />
             </Grid>
           </StackPanel>
+          </ScrollViewer>
 
           <StackPanel IsVisible="{Binding !DocumentWindow.HasActiveDocument}"
                       HorizontalAlignment="Center"

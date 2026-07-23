@@ -133,7 +133,27 @@ public class ItemInspectorViewModelTests
     }
 
     [Fact]
-    public async Task Commit_MultiLineTitleKeepsRecoverableDraftAndSkipsSave()
+    public async Task Commit_MultiLineTitleRevertsTitleAndPersistsOtherEdits()
+    {
+        var sample = Sample.Create();
+        var viewModel = sample.CreateViewModel(clock: () => sample.Now.AddMinutes(1));
+        await viewModel.LoadAsync(sample.Item.Id);
+        viewModel.Notes = "kept notes";
+
+        viewModel.Title = "line one\nline two";
+        await viewModel.CommitEditsAsync();
+
+        Assert.True(viewModel.HasError);
+        Assert.Equal(sample.Item.Name, viewModel.Title);
+        Assert.False(viewModel.HasUnsavedChanges);
+        var persisted = sample.Repository.Snapshot.Items.Single(listing => listing.Id == sample.Item.Id);
+        Assert.Equal(sample.Item.Name, persisted.Name);
+        Assert.Contains("\"notes\":\"kept notes\"", persisted.MetadataJson);
+        Assert.Equal(1, sample.Repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task Commit_MultiLineOnlyTitleSkipsSaveButReportsRevert()
     {
         var sample = Sample.Create();
         var viewModel = sample.CreateViewModel();
@@ -143,10 +163,49 @@ public class ItemInspectorViewModelTests
         await viewModel.CommitEditsAsync();
 
         Assert.True(viewModel.HasError);
-        Assert.Equal("line one\nline two", viewModel.Title);
-        Assert.True(viewModel.HasUnsavedChanges);
+        Assert.Equal(sample.Item.Name, viewModel.Title);
+        Assert.False(viewModel.HasUnsavedChanges);
         Assert.Equal(0, sample.Repository.SaveCount);
-        Assert.Equal(sample.Snapshot, sample.Repository.Snapshot);
+    }
+
+    [Fact]
+    public async Task Commit_SerializedDrainPersistsLatestEditAndNoStaleOverwrite()
+    {
+        var sample = Sample.Create();
+        sample.Repository.SaveDelay = TimeSpan.FromMilliseconds(150);
+        var viewModel = sample.CreateViewModel(clock: () => sample.Now.AddMinutes(1));
+        await viewModel.LoadAsync(sample.Item.Id);
+
+        viewModel.Notes = "first";
+        var firstCommit = viewModel.CommitEditsAsync();
+        viewModel.Notes = "second";
+        var secondCommit = viewModel.CommitEditsAsync();
+
+        await Task.WhenAll(firstCommit, secondCommit);
+
+        Assert.False(viewModel.HasError);
+        Assert.False(viewModel.HasUnsavedChanges);
+        Assert.Equal("second", viewModel.Notes);
+        var persisted = sample.Repository.Snapshot.Items.Single(listing => listing.Id == sample.Item.Id);
+        Assert.Contains("\"notes\":\"second\"", persisted.MetadataJson);
+        Assert.Equal(2, sample.Repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task Commit_MidFlightEditIsPreservedAcrossSave()
+    {
+        var sample = Sample.Create();
+        sample.Repository.SaveDelay = TimeSpan.FromMilliseconds(150);
+        var viewModel = sample.CreateViewModel(clock: () => sample.Now.AddMinutes(1));
+        await viewModel.LoadAsync(sample.Item.Id);
+
+        viewModel.Notes = "first";
+        var commit = viewModel.CommitEditsAsync();
+        viewModel.Notes = "second";
+        await commit;
+
+        Assert.Equal("second", viewModel.Notes);
+        Assert.True(viewModel.HasUnsavedChanges);
     }
 
     [Fact]
@@ -342,10 +401,16 @@ public class ItemInspectorViewModelTests
         public WorkspaceSnapshot Snapshot { get; private set; } = snapshot;
         public int SaveCount { get; private set; }
         public bool FailSaves { get; set; }
+        public TimeSpan? SaveDelay { get; set; }
         public void Set(WorkspaceSnapshot value) => Snapshot = value;
         public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(Snapshot);
-        public Task SaveAsync(WorkspaceSnapshot value, CancellationToken cancellationToken = default)
+        public async Task SaveAsync(WorkspaceSnapshot value, CancellationToken cancellationToken = default)
         {
+            if (SaveDelay is { } delay)
+            {
+                await Task.Delay(delay, cancellationToken);
+            }
+
             if (FailSaves)
             {
                 throw new IOException("save failed");
@@ -353,7 +418,6 @@ public class ItemInspectorViewModelTests
 
             Snapshot = value;
             SaveCount++;
-            return Task.CompletedTask;
         }
     }
 
