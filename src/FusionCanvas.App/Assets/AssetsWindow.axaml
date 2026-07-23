@@ -9,40 +9,40 @@
         Height="620"
         MinWidth="560"
         MinHeight="440"
-        Background="#F7F8FA">
+        Background="{DynamicResource ApplicationBackgroundBrush}">
   <Grid RowDefinitions="Auto,*,Auto" Margin="20">
     <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,14">
-      <TextBlock Text="{Binding ContextKindLabel}" FontSize="12" FontWeight="SemiBold" Foreground="#59A17D" />
-      <TextBlock Text="{Binding ContextTitle}" FontSize="22" FontWeight="SemiBold" Foreground="#1E2733" />
-      <TextBlock Text="Import files to attach them to this context and preserve their managed workspace copy." TextWrapping="Wrap" FontSize="11" Foreground="#687385" />
+      <TextBlock Text="{Binding ContextKindLabel}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+      <TextBlock Text="{Binding ContextTitle}" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+      <TextBlock Text="Import files to attach them to this context and preserve their managed workspace copy." TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
     </StackPanel>
 
     <ScrollViewer Grid.Row="1" Margin="0,0,0,14">
       <StackPanel Spacing="10">
-        <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" TextWrapping="Wrap" FontSize="12" Foreground="#9A4B43" />
+        <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource DangerTextBrush}" />
 
         <Border IsVisible="{Binding IsEmpty}"
                 Padding="18"
-                Background="#F7F8FA"
-                BorderBrush="#D9DEE7"
+                Background="{DynamicResource PanelSurfaceBrush}"
+                BorderBrush="{DynamicResource ControlBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="6">
           <StackPanel Spacing="6">
-            <TextBlock Text="No assets yet" FontSize="14" FontWeight="SemiBold" Foreground="#243447" />
-            <TextBlock Text="Import a design source, export, mockup, reference, texture, brush, or font to attach it here." TextWrapping="Wrap" FontSize="12" Foreground="#687385" />
+            <TextBlock Text="No assets yet" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
+            <TextBlock Text="Import a design source, export, mockup, reference, texture, brush, or font to attach it here." TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
           </StackPanel>
         </Border>
 
         <ItemsControl ItemsSource="{Binding Assets}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="assets:AssetRowViewModel">
-              <Border Padding="12" Background="#FFFFFF" BorderBrush="#D9DEE7" BorderThickness="1" CornerRadius="6" Margin="0,0,0,8">
+              <Border Padding="12" Background="{DynamicResource ElevatedSurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,0,0,8">
                 <Grid ColumnDefinitions="*,180,Auto" ColumnSpacing="10">
                   <StackPanel Grid.Column="0" Spacing="2">
-                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Foreground="#1E2733" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding ManagedFileName}" FontSize="11" Foreground="#687385" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="Missing managed file" IsVisible="{Binding IsMissing}" FontSize="11" Foreground="#9A4B43" />
-                    <TextBlock Text="{Binding ContextLabel}" IsVisible="{Binding ContextLabel, Converter={x:Static ObjectConverters.IsNotNull}}" FontSize="11" Foreground="#59A17D" />
+                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding ManagedFileName}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="Missing managed file" IsVisible="{Binding IsMissing}" FontSize="11" Foreground="{DynamicResource DangerTextBrush}" />
+                    <TextBlock Text="{Binding ContextLabel}" IsVisible="{Binding ContextLabel, Converter={x:Static ObjectConverters.IsNotNull}}" FontSize="11" Foreground="{DynamicResource AccentBrush}" />
                   </StackPanel>
                   <ComboBox Grid.Column="1"
                             ItemsSource="{Binding Parent.AvailablePurposes}"
@@ -65,15 +65,15 @@
 
         <Border IsVisible="{Binding HasImportPending}"
                 Padding="14"
-                Background="#EEF6FF"
-                BorderBrush="#B9D7F2"
+                Background="{DynamicResource AccentSoftBackgroundBrush}"
+                BorderBrush="{DynamicResource AccentSoftBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="6">
           <StackPanel Spacing="8">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
               <StackPanel Grid.Column="0" Spacing="2">
-                <TextBlock Text="Confirm import" FontSize="13" FontWeight="SemiBold" Foreground="#204466" />
-                <TextBlock Text="{Binding PendingImportFileName}" FontSize="11" Foreground="#687385" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="Confirm import" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentSoftForegroundBrush}" />
+                <TextBlock Text="{Binding PendingImportFileName}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" />
               </StackPanel>
               <ComboBox Grid.Column="1"
                         ItemsSource="{Binding AvailablePurposes}"
@@ -92,12 +92,12 @@
 
         <Border IsVisible="{Binding RemovalConfirmationVisible}"
                 Padding="14"
-                Background="#FEECEB"
-                BorderBrush="#E3B4B0"
+                Background="{DynamicResource DangerBackgroundBrush}"
+                BorderBrush="{DynamicResource DangerBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="6">
           <StackPanel Spacing="8">
-            <TextBlock Text="{Binding RemovalPromptMessage}" TextWrapping="Wrap" FontSize="13" Foreground="#9A4B43" />
+            <TextBlock Text="{Binding RemovalPromptMessage}" TextWrapping="Wrap" FontSize="13" Foreground="{DynamicResource DangerTextBrush}" />
             <StackPanel Orientation="Horizontal" Spacing="8">
               <Button Content="Remove permanently" Command="{Binding ConfirmRemoveCommand}" Classes="danger" />
               <Button Content="Cancel" Command="{Binding CancelRemoveCommand}" Classes="secondary" />
@@ -109,7 +109,7 @@
 
     <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
       <Button Grid.Column="0" Content="Import…" Command="{Binding ImportCommand}" IsEnabled="{Binding CanImport}" ToolTip.Tip="Choose a file to import" Classes="primary" />
-      <TextBlock Grid.Column="1" Text="Loading…" IsVisible="{Binding IsBusy}" FontSize="12" Foreground="#687385" VerticalAlignment="Center" />
+      <TextBlock Grid.Column="1" Text="Loading…" IsVisible="{Binding IsBusy}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
       <Button Grid.Column="2" Content="Close" Command="{Binding CloseCommand}" Classes="secondary" />
     </Grid>
   </Grid>
@@ -117,23 +117,23 @@
   <Window.Styles>
     <Style Selector="Button.primary">
       <Setter Property="Padding" Value="10,8" />
-      <Setter Property="Background" Value="#243447" />
-      <Setter Property="Foreground" Value="#FFFFFF" />
-      <Setter Property="BorderBrush" Value="#243447" />
+      <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource CommandForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Button.secondary">
       <Setter Property="Padding" Value="10,8" />
-      <Setter Property="Background" Value="#FFFFFF" />
-      <Setter Property="Foreground" Value="#425066" />
-      <Setter Property="BorderBrush" Value="#D9DEE7" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SecondaryButtonForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Button.danger">
       <Setter Property="Padding" Value="10,8" />
-      <Setter Property="Background" Value="#9A4B43" />
-      <Setter Property="Foreground" Value="#FFFFFF" />
-      <Setter Property="BorderBrush" Value="#9A4B43" />
+      <Setter Property="Background" Value="{DynamicResource DangerStrongBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource CommandForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DangerStrongBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
   </Window.Styles>

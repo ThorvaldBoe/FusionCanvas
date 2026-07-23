@@ -9,11 +9,11 @@
         Height="560"
         MinWidth="680"
         MinHeight="500"
-        Background="#F7F8FA">
+        Background="{DynamicResource ApplicationBackgroundBrush}">
   <Grid ColumnDefinitions="240,*">
     <Border Grid.Column="0"
-            Background="#FFFFFF"
-            BorderBrush="#D9DEE7"
+            Background="{DynamicResource ElevatedSurfaceBrush}"
+            BorderBrush="{DynamicResource ControlBorderBrush}"
             BorderThickness="0,0,1,0"
             Padding="16">
       <DockPanel LastChildFill="True">
@@ -23,7 +23,7 @@
           <TextBlock Text="Workspaces"
                      FontSize="18"
                      FontWeight="SemiBold"
-                     Foreground="#1E2733" />
+                     Foreground="{DynamicResource PrimaryTextBrush}" />
           <Button Content="New workspace"
                   Command="{Binding StartCreateWorkspaceCommand}"
                   Classes="primary" />
@@ -34,7 +34,7 @@
             <TextBlock Text="Active"
                        FontSize="12"
                        FontWeight="SemiBold"
-                       Foreground="#687385" />
+                       Foreground="{DynamicResource SecondaryTextBrush}" />
             <ItemsControl ItemsSource="{Binding ActiveWorkspaces}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="workflow:WorkspaceSummary">
@@ -51,7 +51,7 @@
                        Text="Archived"
                        FontSize="12"
                        FontWeight="SemiBold"
-                       Foreground="#687385"
+                       Foreground="{DynamicResource SecondaryTextBrush}"
                        Margin="0,8,0,0" />
             <ItemsControl IsVisible="{Binding HasArchivedWorkspaces}"
                           ItemsSource="{Binding ArchivedWorkspaces}">
@@ -73,19 +73,19 @@
     <Border Grid.Column="1"
             Margin="18"
             Padding="20"
-            Background="#FFFFFF"
-            BorderBrush="#D9DEE7"
+            Background="{DynamicResource ElevatedSurfaceBrush}"
+            BorderBrush="{DynamicResource ControlBorderBrush}"
             BorderThickness="1">
       <ScrollViewer>
         <StackPanel Spacing="12">
           <TextBlock Text="Workspace Management"
                      FontSize="22"
                      FontWeight="SemiBold"
-                     Foreground="#1E2733" />
+                     Foreground="{DynamicResource PrimaryTextBrush}" />
           <TextBlock Text="{Binding ErrorMessage}"
                      IsVisible="{Binding HasError}"
                      FontSize="12"
-                     Foreground="#9A4B43" />
+                     Foreground="{DynamicResource DangerTextBrush}" />
 
           <TextBox Text="{Binding WorkspaceName}"
                    PlaceholderText="Workspace name"
@@ -126,11 +126,11 @@
           <TextBlock IsVisible="{Binding HasArchivedWorkspaces}"
                      Text="Select an archived workspace in the list to restore it."
                      FontSize="12"
-                     Foreground="#687385" />
+                     Foreground="{DynamicResource SecondaryTextBrush}" />
 
           <Border IsVisible="{Binding DeleteWarningVisible}"
-                  Background="#FFF7F2"
-                  BorderBrush="#DFA481"
+                  Background="{DynamicResource DangerBackgroundBrush}"
+                  BorderBrush="{DynamicResource DangerBorderBrush}"
                   BorderThickness="1"
                   Padding="12"
                   Margin="0,8,0,0">
@@ -138,12 +138,12 @@
               <TextBlock Text="{Binding DeleteWarningMessage}"
                          TextWrapping="Wrap"
                          FontSize="13"
-                         Foreground="#6B3527" />
+                         Foreground="{DynamicResource DangerTextBrush}" />
               <TextBox Text="{Binding DeleteConfirmationName}"
-                       PlaceholderText="Type workspace name"
-                       Classes="field" />
+                        PlaceholderText="Type workspace name"
+                        Classes="field" />
               <StackPanel Orientation="Horizontal"
-                          Spacing="8">
+                           Spacing="8">
                 <Button Content="Delete permanently"
                         Command="{Binding ConfirmDeleteWorkspaceCommand}"
                         IsEnabled="{Binding CanConfirmDeleteWorkspace}"
@@ -161,32 +161,32 @@
   <Window.Styles>
     <Style Selector="Button.primary">
       <Setter Property="Padding" Value="10,8" />
-      <Setter Property="Background" Value="#243447" />
-      <Setter Property="Foreground" Value="#FFFFFF" />
-      <Setter Property="BorderBrush" Value="#243447" />
+      <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource CommandForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Button.secondary">
       <Setter Property="Padding" Value="10,8" />
-      <Setter Property="Background" Value="#FFFFFF" />
-      <Setter Property="Foreground" Value="#425066" />
-      <Setter Property="BorderBrush" Value="#D9DEE7" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SecondaryButtonForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Button.danger">
       <Setter Property="Padding" Value="10,8" />
-      <Setter Property="Background" Value="#8F3D31" />
-      <Setter Property="Foreground" Value="#FFFFFF" />
-      <Setter Property="BorderBrush" Value="#8F3D31" />
+      <Setter Property="Background" Value="{DynamicResource DangerStrongBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource CommandForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DangerStrongBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Button.listItem">
       <Setter Property="HorizontalAlignment" Value="Stretch" />
       <Setter Property="Margin" Value="0,0,0,6" />
       <Setter Property="Padding" Value="10,8" />
-      <Setter Property="Background" Value="#F7F8FA" />
-      <Setter Property="Foreground" Value="#243447" />
-      <Setter Property="BorderBrush" Value="#E1E5EA" />
+      <Setter Property="Background" Value="{DynamicResource PanelSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource StrongTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="TextBox.field">

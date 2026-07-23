@@ -9,6 +9,7 @@ using Avalonia.VisualTree;
 using FusionCanvas.App.Assets;
 using FusionCanvas.App.Groups;
 using FusionCanvas.App.Navigation;
+using FusionCanvas.App.Settings;
 using FusionCanvas.App.Stores;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.Application.Workspace;
@@ -20,6 +21,7 @@ public partial class MainWindow : Window
 {
     private StoreEditorWindow? _storeEditorWindow;
     private WorkspaceManagementWindow? _workspaceManagementWindow;
+    private SettingsWindow? _settingsWindow;
     private AssetsWindow? _assetsWindow;
     private Window? _designPreviewWindow;
     private PointerPressedEventArgs? _dragPointerArgs;
@@ -27,10 +29,12 @@ public partial class MainWindow : Window
     private Avalonia.Point _dragStart;
     private WorkspaceTreeNodeViewModel? _dropTarget;
 
-    public MainWindow()
+    public MainWindow() : this(settings: null) { }
+
+    public MainWindow(SettingsViewModel? settings)
     {
         InitializeComponent();
-        var viewModel = MainWindowViewModel.CreateForDefaultWorkspace();
+        var viewModel = MainWindowViewModel.CreateForDefaultWorkspace(settings);
         viewModel.StoreManagement.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(StoreManagementViewModel.IsStoreEditorOpen))
@@ -60,10 +64,46 @@ public partial class MainWindow : Window
                 Dispatcher.UIThread.Post(() => CancelStatusChangeButton.Focus(), DispatcherPriority.Input);
             }
         };
+        viewModel.Settings.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(SettingsViewModel.IsOpen))
+            {
+                SyncSettingsWindow(viewModel.Settings);
+            }
+        };
         DataContext = viewModel;
+        SyncSettingsWindow(viewModel.Settings);
         SyncWorkspaceManagementWindow(viewModel.WorkspaceManagement);
         SyncStoreEditorWindow(viewModel.StoreManagement);
         SyncAssetsWindow(viewModel.AssetsManagement);
+    }
+
+    private void SyncSettingsWindow(SettingsViewModel settings)
+    {
+        if (settings.IsOpen && _settingsWindow is null)
+        {
+            _settingsWindow = new SettingsWindow { DataContext = settings };
+            _settingsWindow.Closed += (_, _) =>
+            {
+                _settingsWindow = null;
+                if (settings.IsOpen)
+                {
+                    settings.CloseCommand.Execute(null);
+                }
+
+                if (CanFocusOwner(this))
+                {
+                    this.Activate();
+                }
+            };
+            _settingsWindow.Show(this);
+            return;
+        }
+
+        if (!settings.IsOpen && _settingsWindow is not null)
+        {
+            _settingsWindow.Close();
+        }
     }
 
     private void SyncWorkspaceManagementWindow(WorkspaceManagementViewModel workspaceManagement)
@@ -78,8 +118,13 @@ public partial class MainWindow : Window
                 {
                     workspaceManagement.CloseWorkspaceManagementCommand.Execute(null);
                 }
+
+                if (_settingsWindow is { } settings && settings.IsVisible)
+                {
+                    settings.Activate();
+                }
             };
-            _workspaceManagementWindow.Show(this);
+            _workspaceManagementWindow.Show((Window?)_settingsWindow ?? this);
             return;
         }
 
@@ -87,6 +132,12 @@ public partial class MainWindow : Window
         {
             _workspaceManagementWindow.Close();
         }
+    }
+
+    private static bool CanFocusOwner(Window window)
+    {
+        try { return window.IsVisible; }
+        catch { return false; }
     }
 
     private void SyncStoreEditorWindow(StoreManagementViewModel storeManagement)

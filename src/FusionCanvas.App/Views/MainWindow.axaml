@@ -16,7 +16,7 @@
         Height="760"
         MinWidth="900"
         MinHeight="600"
-        Background="#F7F8FA">
+        Background="{DynamicResource ApplicationBackgroundBrush}">
   <Grid>
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="300" MinWidth="240" MaxWidth="560" />
@@ -24,41 +24,44 @@
       <ColumnDefinition Width="*" MinWidth="480" />
     </Grid.ColumnDefinitions>
     <Border Grid.Column="0"
-            Background="#FFFFFF"
-            BorderBrush="#D9DEE7"
+            Background="{DynamicResource ElevatedSurfaceBrush}"
+            BorderBrush="{DynamicResource ControlBorderBrush}"
             BorderThickness="0,0,1,0"
             Padding="18">
       <DockPanel LastChildFill="True">
-        <StackPanel DockPanel.Dock="Top"
-                    Spacing="4"
-                    Margin="0,0,0,18">
-          <TextBlock Text="FusionCanvas"
+        <Grid DockPanel.Dock="Top"
+              ColumnDefinitions="Auto,*,Auto,Auto"
+              ColumnSpacing="8"
+              Margin="0,0,0,18">
+          <TextBlock Grid.Column="0"
+                     Text="FusionCanvas"
                      FontSize="20"
                      FontWeight="SemiBold"
-                     Foreground="#1E2733" />
-        </StackPanel>
-
-        <StackPanel DockPanel.Dock="Top"
-                    Spacing="4"
-                    Margin="0,0,0,18">
-          <Grid ColumnDefinitions="*,Auto"
-                ColumnSpacing="6">
-            <TextBlock Text="Workspaces"
-                       VerticalAlignment="Center"
-                       FontSize="13"
-                       FontWeight="SemiBold"
-                       Foreground="#243447" />
-            <Button Grid.Column="1"
-                    Content="⚙"
-                    ToolTip.Tip="Manage workspaces"
-                    Command="{Binding WorkspaceManagement.OpenWorkspaceManagementCommand}"
-                    Classes="iconButton" />
-          </Grid>
-          <TextBlock Text="{Binding WorkspaceManagement.SelectedWorkspace.Name}"
-                     FontSize="11"
-                     Foreground="#687385"
-                     TextTrimming="CharacterEllipsis" />
-        </StackPanel>
+                     Foreground="{DynamicResource PrimaryTextBrush}"
+                     VerticalAlignment="Center" />
+          <Border Grid.Column="2"
+                  ToolTip.Tip="Manage workspaces in settings"
+                  VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="M3,5 H10 L12,7 H21 V19 H3 Z"
+                        Width="16" Height="16"
+                        Foreground="{DynamicResource SecondaryTextBrush}"
+                        VerticalAlignment="Center" />
+              <TextBlock Text="{Binding Settings.WorkspaceName}"
+                         MaxWidth="120"
+                         TextTrimming="CharacterEllipsis"
+                         FontSize="12"
+                         Foreground="{DynamicResource SecondaryTextBrush}"
+                         VerticalAlignment="Center" />
+            </StackPanel>
+          </Border>
+          <Button Grid.Column="3"
+                  Content="⚙"
+                  ToolTip.Tip="Settings"
+                  Command="{Binding Settings.OpenCommand}"
+                  Classes="iconButton"
+                  AutomationProperties.Name="Settings" />
+        </Grid>
 
         <StackPanel DockPanel.Dock="Top"
                     Spacing="8"
@@ -69,7 +72,7 @@
                        VerticalAlignment="Center"
                        FontSize="13"
                        FontWeight="SemiBold"
-                       Foreground="#243447" />
+                       Foreground="{DynamicResource StrongTextBrush}" />
             <Button Grid.Column="1"
                     Content="{Binding StoreManagement.SelectorToggleGlyph}"
                     ToolTip.Tip="{Binding StoreManagement.SelectorToggleTooltip}"
@@ -184,21 +187,21 @@
                     <Border Width="260" Padding="12">
                       <StackPanel Spacing="10">
                         <StackPanel Spacing="6">
-                          <TextBlock Text="Scope" FontSize="12" FontWeight="SemiBold" Foreground="#243447" />
+                          <TextBlock Text="Scope" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
                           <CheckBox Content="Current topic and below"
                                     IsChecked="{Binding WorkspaceTree.ScopeToCurrentTopic}"
                                     IsEnabled="{Binding WorkspaceTree.CanScopeToCurrentTopic}"
                                     ToolTip.Tip="Limit the tree to the selected niche or group subtree" />
                           <TextBlock IsVisible="{Binding WorkspaceTree.ScopeToCurrentTopic}"
                                      Text="{Binding WorkspaceTree.ScopedTopicName, StringFormat='Current: {0}'}"
-                                     FontSize="11" Foreground="#687385" TextTrimming="CharacterEllipsis" />
+                                     FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                         <Separator Margin="0,2" />
                         <StackPanel Spacing="6">
-                          <TextBlock Text="Tags" FontSize="12" FontWeight="SemiBold" Foreground="#243447" />
+                          <TextBlock Text="Tags" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
                           <TextBlock Text="No tags yet in this store."
                                      IsVisible="{Binding !WorkspaceTree.AvailableTags.Count}"
-                                     FontSize="11" Foreground="#8B95A3" />
+                                     FontSize="11" Foreground="{DynamicResource UnavailableForegroundBrush}" />
                           <ItemsControl ItemsSource="{Binding WorkspaceTree.AvailableTags}"
                                         IsVisible="{Binding WorkspaceTree.AvailableTags.Count}">
                             <ItemsControl.ItemTemplate>
@@ -230,12 +233,12 @@
           <TextBlock Text="{Binding GroupActionStatus}"
                      TextWrapping="Wrap"
                      FontSize="11"
-                     Foreground="#687385" />
+                     Foreground="{DynamicResource SecondaryTextBrush}" />
           <TextBlock Text="{Binding WorkspaceTree.ErrorMessage}"
                      IsVisible="{Binding WorkspaceTree.HasError}"
                      TextWrapping="Wrap"
                      FontSize="11"
-                     Foreground="#B42318"
+                     Foreground="{DynamicResource DangerStrongBrush}"
                      AutomationProperties.AutomationId="WorkspaceTreeError" />
         </StackPanel>
 
@@ -276,8 +279,8 @@
                     </ContextMenu>
                   </Border.ContextMenu>
                   <Grid ColumnDefinitions="3,22,*,Auto" MinHeight="34">
-                    <Border Grid.Column="0" Background="#59A17D" CornerRadius="2" />
-                    <TextBlock Grid.Column="1" Text="{Binding Icon}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="#526173" />
+                    <Border Grid.Column="0" Background="{DynamicResource AccentBrush}" CornerRadius="2" />
+                    <TextBlock Grid.Column="1" Text="{Binding Icon}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{DynamicResource TreeIconForegroundBrush}" />
                     <Grid Grid.Column="2" Margin="4,0">
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -309,8 +312,8 @@
                         <Border IsVisible="{Binding HasHiddenTags}"
                                 Padding="4,0"
                                 CornerRadius="6"
-                                Background="#E8EDF3">
-                          <TextBlock Text="{Binding HiddenTagLabel}" FontSize="10" Foreground="#526173" />
+                                Background="{DynamicResource CountBadgeBackgroundBrush}">
+                          <TextBlock Text="{Binding HiddenTagLabel}" FontSize="10" Foreground="{DynamicResource TreeIconForegroundBrush}" />
                         </Border>
                       </StackPanel>
                       <TextBox Text="{Binding DraftName}"
@@ -320,8 +323,8 @@
                                MinHeight="28"
                                Padding="5,2" />
                     </Grid>
-                    <Border Grid.Column="3" IsVisible="{Binding HasChildren}" Padding="5,1" CornerRadius="8" Background="#E8EDF3">
-                      <TextBlock Text="{Binding CountLabel}" FontSize="10" Foreground="#526173" />
+                    <Border Grid.Column="3" IsVisible="{Binding HasChildren}" Padding="5,1" CornerRadius="8" Background="{DynamicResource CountBadgeBackgroundBrush}">
+                      <TextBlock Text="{Binding CountLabel}" FontSize="10" Foreground="{DynamicResource TreeIconForegroundBrush}" />
                     </Border>
                   </Grid>
                 </Border>
@@ -329,7 +332,7 @@
             </TreeView.ItemTemplate>
           </TreeView>
           <Border IsVisible="{Binding WorkspaceTree.HasEmptyFilterResults}"
-                  Background="#F7F8FA"
+                  Background="{DynamicResource PanelSurfaceBrush}"
                   HorizontalAlignment="Stretch"
                   VerticalAlignment="Stretch">
             <StackPanel HorizontalAlignment="Center"
@@ -339,7 +342,7 @@
               <TextBlock Text="Nothing matches the current filters."
                          TextWrapping="Wrap"
                          TextAlignment="Center"
-                         Foreground="#526173"
+                         Foreground="{DynamicResource TreeIconForegroundBrush}"
                          FontSize="12" />
               <Button Content="Clear filters"
                       HorizontalAlignment="Center"
@@ -361,8 +364,8 @@
     <Grid Grid.Column="2"
           RowDefinitions="Auto,Auto,*">
       <Border Grid.Row="0"
-              Background="#F3F4F6"
-              BorderBrush="#D9DEE7"
+              Background="{DynamicResource TabBarBackgroundBrush}"
+              BorderBrush="{DynamicResource ControlBorderBrush}"
               BorderThickness="0,0,0,1"
               Height="40"
               Padding="6,5,6,0">
@@ -408,8 +411,8 @@
       <Border Grid.Row="1"
               IsVisible="{Binding WorkflowNavigator.HasActiveItem}"
               Padding="20,14"
-              Background="#FFFFFF"
-              BorderBrush="#D9DEE7"
+              Background="{DynamicResource ElevatedSurfaceBrush}"
+              BorderBrush="{DynamicResource ControlBorderBrush}"
               BorderThickness="0,0,0,1">
         <StackPanel Spacing="10">
           <ItemsControl ItemsSource="{Binding WorkflowNavigator.Stages}">
@@ -436,15 +439,15 @@
           <TextBlock IsVisible="{Binding WorkflowNavigator.ShowsInactiveState}"
                      Text="{Binding WorkflowNavigator.InactiveLabel}"
                      FontSize="12"
-                     Foreground="#687385" />
+                     Foreground="{DynamicResource SecondaryTextBrush}" />
         </StackPanel>
       </Border>
 
       <Border Grid.Row="2"
               Margin="20"
               Padding="24"
-              Background="#FFFFFF"
-              BorderBrush="#D9DEE7"
+              Background="{DynamicResource ElevatedSurfaceBrush}"
+              BorderBrush="{DynamicResource ControlBorderBrush}"
               BorderThickness="1">
         <Grid>
           <ScrollViewer IsVisible="{Binding DocumentWindow.HasActiveDocument}"
@@ -456,17 +459,17 @@
                 <TextBlock Text="{Binding DocumentWindow.ActiveDetailTitle}"
                            FontSize="24"
                            FontWeight="SemiBold"
-                           Foreground="#1E2733" />
+                           Foreground="{DynamicResource PrimaryTextBrush}" />
                 <TextBlock Text="{Binding DocumentWindow.ActiveNavigationPath}"
                            FontSize="12"
-                           Foreground="#687385" />
+                           Foreground="{DynamicResource SecondaryTextBrush}" />
               </StackPanel>
               <TextBlock Grid.Column="1"
                          IsVisible="{Binding ItemInspector.HasState}"
                          Text="{Binding ItemInspector.StageLabel}"
                          FontSize="11"
                          FontWeight="SemiBold"
-                         Foreground="#59A17D"
+                         Foreground="{DynamicResource AccentBrush}"
                          VerticalAlignment="Center" />
               <ComboBox Grid.Column="2"
                          IsVisible="{Binding HasActiveItem}"
@@ -487,8 +490,8 @@
             </Grid>
             <Border MinHeight="360"
                     Padding="22"
-                    Background="#F7F8FA"
-                    BorderBrush="#D9DEE7"
+                    Background="{DynamicResource PanelSurfaceBrush}"
+                    BorderBrush="{DynamicResource ControlBorderBrush}"
                     BorderThickness="1"
                     IsVisible="{Binding ShowStageToolHost}">
               <Grid RowDefinitions="Auto,*">
@@ -499,10 +502,10 @@
                     <TextBlock Text="{Binding DocumentWindow.ActiveStageToolName}"
                                FontSize="16"
                                FontWeight="SemiBold"
-                               Foreground="#243447" />
+                               Foreground="{DynamicResource StrongTextBrush}" />
                     <TextBlock Text="{Binding DocumentWindow.ActiveStageToolDescription}"
                                FontSize="13"
-                               Foreground="#687385" />
+                               Foreground="{DynamicResource SecondaryTextBrush}" />
                   </StackPanel>
                   <ItemsControl Grid.Column="1"
                                 IsVisible="{Binding DocumentWindow.HasMultipleStageTools}"
@@ -528,31 +531,31 @@
                   <TextBlock Text="{Binding DocumentWindow.ActiveWorkflowStageLabel}"
                              FontSize="14"
                              FontWeight="SemiBold"
-                             Foreground="#243447" />
+                             Foreground="{DynamicResource StrongTextBrush}" />
                   <TextBlock Text="{Binding DocumentWindow.ActiveDetailViewKey}"
                              FontSize="13"
-                             Foreground="#687385" />
+                             Foreground="{DynamicResource SecondaryTextBrush}" />
                 <Border Margin="0,10,0,0"
                         Padding="12"
-                        Background="#FFFFFF"
-                        BorderBrush="#D9DEE7"
+                        Background="{DynamicResource ElevatedSurfaceBrush}"
+                        BorderBrush="{DynamicResource ControlBorderBrush}"
                         BorderThickness="1">
                   <StackPanel Spacing="4">
                     <TextBlock Text="{Binding DocumentWindow.ActiveToolScopeLabel}"
                                FontSize="13"
                                FontWeight="SemiBold"
-                               Foreground="#243447" />
+                               Foreground="{DynamicResource StrongTextBrush}" />
                     <TextBlock Text="{Binding DocumentWindow.ActiveToolScopeDescription}"
                                FontSize="12"
-                               Foreground="#687385" />
+                               Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBlock IsVisible="{Binding !DocumentWindow.CanRunActiveTool}"
                                Text="{Binding DocumentWindow.ActiveToolUnavailableMessage}"
                                FontSize="12"
-                               Foreground="#9A4B43" />
+                               Foreground="{DynamicResource DangerTextBrush}" />
                     <TextBlock IsVisible="{Binding !DocumentWindow.CanRunActiveTool}"
                                Text="{Binding DocumentWindow.ActiveStageToolUnavailableMessage}"
                                FontSize="12"
-                               Foreground="#9A4B43" />
+                               Foreground="{DynamicResource DangerTextBrush}" />
                   </StackPanel>
                 </Border>
                 </StackPanel>
@@ -562,33 +565,33 @@
             <Border IsVisible="{Binding ItemInspector.HasState}"
                     MinHeight="360"
                     Padding="22"
-                    Background="#F7F8FA"
-                    BorderBrush="#D9DEE7"
+                    Background="{DynamicResource PanelSurfaceBrush}"
+                    BorderBrush="{DynamicResource ControlBorderBrush}"
                     BorderThickness="1">
                 <StackPanel Spacing="14">
                   <TextBlock IsVisible="{Binding ItemInspector.IsReadOnly}"
                              Text="{Binding ItemInspector.InactiveNotice}"
                              TextWrapping="Wrap"
                              FontSize="12"
-                             Foreground="#9A4B43" />
+                             Foreground="{DynamicResource DangerTextBrush}" />
                   <TextBlock Text="{Binding ItemInspector.DisplayPath}"
                              FontSize="12"
-                             Foreground="#687385" />
+                             Foreground="{DynamicResource SecondaryTextBrush}" />
 
                   <Border Padding="14"
-                          Background="#FFFFFF"
-                          BorderBrush="#D9DEE7"
+                          Background="{DynamicResource ElevatedSurfaceBrush}"
+                          BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
                     <StackPanel Spacing="10">
                       <TextBlock Text="Overview"
                                  FontSize="14"
                                  FontWeight="SemiBold"
-                                 Foreground="#243447" />
+                                 Foreground="{DynamicResource StrongTextBrush}" />
                       <StackPanel Spacing="6">
                         <TextBlock Text="Working title"
                                    FontSize="11"
-                                   Foreground="#687385" />
+                                   Foreground="{DynamicResource SecondaryTextBrush}" />
                         <TextBox Text="{Binding ItemInspector.Title}"
                                  IsReadOnly="{Binding !ItemInspector.CanEditShared}"
                                  MinHeight="32"
@@ -600,8 +603,8 @@
                   </Border>
 
                   <Border Padding="14"
-                          Background="#FFFFFF"
-                          BorderBrush="#D9DEE7"
+                          Background="{DynamicResource ElevatedSurfaceBrush}"
+                          BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6"
                           IsVisible="{Binding ShowsIdeaStageTool}"
@@ -610,7 +613,7 @@
                       <TextBlock Text="Idea"
                                  FontSize="14"
                                  FontWeight="SemiBold"
-                                 Foreground="#243447" />
+                                 Foreground="{DynamicResource StrongTextBrush}" />
                       <TextBox Text="{Binding ItemInspector.Idea}"
                                IsReadOnly="{Binding !ItemInspector.CanEditStage}"
                                AcceptsReturn="True"
@@ -622,13 +625,13 @@
                                  Text="{Binding ItemInspector.StageReadOnlyReason}"
                                  TextWrapping="Wrap"
                                  FontSize="12"
-                                 Foreground="#9A4B43" />
+                                 Foreground="{DynamicResource DangerTextBrush}" />
                     </StackPanel>
                   </Border>
 
                   <Border Padding="14"
-                          Background="#FFFFFF"
-                          BorderBrush="#D9DEE7"
+                          Background="{DynamicResource ElevatedSurfaceBrush}"
+                          BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6"
                           IsVisible="{Binding ShowsConceptStageTool}"
@@ -637,10 +640,10 @@
                       <TextBlock Text="Concept"
                                  FontSize="14"
                                  FontWeight="SemiBold"
-                                 Foreground="#243447" />
+                                 Foreground="{DynamicResource StrongTextBrush}" />
                       <TextBlock Text="Concept idea"
                                  FontSize="11"
-                                 Foreground="#687385" />
+                                 Foreground="{DynamicResource SecondaryTextBrush}" />
                       <TextBox Text="{Binding ItemInspector.ConceptIdea}"
                                IsReadOnly="{Binding !ItemInspector.CanEditStage}"
                                AcceptsReturn="True"
@@ -650,7 +653,7 @@
                                LostFocus="OnDetailsFieldLostFocus" />
                       <TextBlock Text="Phrase"
                                  FontSize="11"
-                                 Foreground="#687385" />
+                                 Foreground="{DynamicResource SecondaryTextBrush}" />
                       <TextBox Text="{Binding ItemInspector.Phrase}"
                                IsReadOnly="{Binding !ItemInspector.CanEditStage}"
                                MinHeight="32"
@@ -659,7 +662,7 @@
                                LostFocus="OnDetailsFieldLostFocus" />
                       <TextBlock Text="Graphic direction"
                                  FontSize="11"
-                                 Foreground="#687385" />
+                                 Foreground="{DynamicResource SecondaryTextBrush}" />
                       <TextBox Text="{Binding ItemInspector.GraphicDirection}"
                                IsReadOnly="{Binding !ItemInspector.CanEditStage}"
                                AcceptsReturn="True"
@@ -671,20 +674,20 @@
                                  Text="{Binding ItemInspector.StageReadOnlyReason}"
                                  TextWrapping="Wrap"
                                  FontSize="12"
-                                 Foreground="#9A4B43" />
+                                 Foreground="{DynamicResource DangerTextBrush}" />
                     </StackPanel>
                   </Border>
 
                   <Border Padding="14"
-                          Background="#FFFFFF"
-                          BorderBrush="#D9DEE7"
+                          Background="{DynamicResource ElevatedSurfaceBrush}"
+                          BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
                     <StackPanel Spacing="10">
                       <TextBlock Text="Notes"
                                  FontSize="14"
                                  FontWeight="SemiBold"
-                                 Foreground="#243447" />
+                                 Foreground="{DynamicResource StrongTextBrush}" />
                       <TextBox Text="{Binding ItemInspector.Notes}"
                                IsReadOnly="{Binding !ItemInspector.CanEditShared}"
                                AcceptsReturn="True"
@@ -696,28 +699,28 @@
                   </Border>
 
                   <Border Padding="14"
-                          Background="#FFFFFF"
-                          BorderBrush="#D9DEE7"
+                          Background="{DynamicResource ElevatedSurfaceBrush}"
+                          BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
                     <StackPanel Spacing="10">
                       <TextBlock Text="Tags"
                                  FontSize="14"
                                  FontWeight="SemiBold"
-                                 Foreground="#243447" />
+                                 Foreground="{DynamicResource StrongTextBrush}" />
                       <ItemsControl ItemsSource="{Binding ItemInspector.TagDraft}">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="x:String">
                             <Border Padding="8,3"
                                     CornerRadius="10"
-                                    Background="#EEF6FF"
-                                    BorderBrush="#B9D7F2"
+                                    Background="{DynamicResource AccentSoftBackgroundBrush}"
+                                    BorderBrush="{DynamicResource AccentSoftBorderBrush}"
                                     BorderThickness="1"
                                     Margin="0,0,6,6">
                               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                                 <TextBlock Text="{Binding}"
                                            FontSize="12"
-                                           Foreground="#204466"
+                                           Foreground="{DynamicResource AccentSoftForegroundBrush}"
                                            VerticalAlignment="Center" />
                                 <Button Grid.Column="1"
                                         Content="×"
@@ -727,7 +730,7 @@
                                         FontSize="13"
                                         Background="Transparent"
                                         BorderThickness="0"
-                                        Foreground="#204466"
+                                        Foreground="{DynamicResource AccentSoftForegroundBrush}"
                                         ToolTip.Tip="Remove tag"
                                         Command="{Binding $parent[ItemsControl].DataContext.ItemInspector.RemoveTagCommand}"
                                         CommandParameter="{Binding}" />
@@ -739,7 +742,7 @@
                       <TextBlock IsVisible="{Binding !ItemInspector.HasTags}"
                                  Text="No tags yet."
                                  FontSize="12"
-                                 Foreground="#7C8797" />
+                                 Foreground="{DynamicResource MutedTextBrush}" />
                       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                         <TextBox Text="{Binding ItemInspector.TagInput}"
                                  IsEnabled="{Binding ItemInspector.CanEditShared}"
@@ -756,8 +759,8 @@
 
                   <Border IsVisible="{Binding ShowsDesignStageTool}"
                           Padding="14"
-                          Background="#FFFFFF"
-                          BorderBrush="#D9DEE7"
+                          Background="{DynamicResource ElevatedSurfaceBrush}"
+                          BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6"
                           Classes.emphasized="{Binding ItemInspector.EmphasizesDesign}">
@@ -765,10 +768,10 @@
                       <TextBlock Text="Design"
                                  FontSize="14"
                                  FontWeight="SemiBold"
-                                 Foreground="#243447" />
+                                 Foreground="{DynamicResource StrongTextBrush}" />
                       <TextBlock Text="Managed PNG Design files"
                                  FontSize="12"
-                                 Foreground="#687385" />
+                                 Foreground="{DynamicResource SecondaryTextBrush}" />
                       <ListBox ItemsSource="{Binding DesignTool.Files}"
                                SelectedItem="{Binding DesignTool.SelectedFile}"
                                MinHeight="72"
@@ -780,7 +783,7 @@
                               <TextBlock Grid.Column="1"
                                          IsVisible="{Binding IsMissing}"
                                          Text="Missing"
-                                         Foreground="#9A4B43" />
+                                         Foreground="{DynamicResource DangerTextBrush}" />
                             </Grid>
                           </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -788,12 +791,12 @@
                       <TextBlock Text="{Binding DesignTool.EmptyState}"
                                  TextWrapping="Wrap"
                                  FontSize="12"
-                                 Foreground="#7C8797" />
+                                 Foreground="{DynamicResource MutedTextBrush}" />
                       <TextBlock IsVisible="{Binding DesignTool.IsReadOnly}"
                                  Text="{Binding DesignTool.ReadOnlyReason}"
                                  TextWrapping="Wrap"
                                  FontSize="12"
-                                 Foreground="#9A4B43" />
+                                 Foreground="{DynamicResource DangerTextBrush}" />
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Content="Import PNG…"
                                 IsEnabled="{Binding !DesignTool.IsReadOnly}"
@@ -817,7 +820,7 @@
                       </StackPanel>
                       <Border IsVisible="{Binding IsDesignRemoveConfirmationVisible}"
                               Padding="10"
-                              Background="#FEECEB"
+                              Background="{DynamicResource DangerBackgroundBrush}"
                               CornerRadius="6">
                         <StackPanel Spacing="8">
                           <TextBlock Text="Remove this Design file and its managed copy permanently?"
@@ -835,52 +838,52 @@
                       <TextBlock IsVisible="{Binding DesignTool.ErrorMessage}"
                                  Text="{Binding DesignTool.ErrorMessage}"
                                  TextWrapping="Wrap"
-                                 Foreground="#9A4B43" />
+                                 Foreground="{DynamicResource DangerTextBrush}" />
                     </StackPanel>
                   </Border>
 
                   <Border IsVisible="{Binding ShowsListingStageTool}"
                           Padding="14"
-                          Background="#FFFFFF"
-                          BorderBrush="#D9DEE7"
+                          Background="{DynamicResource ElevatedSurfaceBrush}"
+                          BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
                     <StackPanel Spacing="8">
                       <TextBlock Text="Listing"
                                  FontSize="14"
                                  FontWeight="SemiBold"
-                                 Foreground="#243447" />
+                                 Foreground="{DynamicResource StrongTextBrush}" />
                       <TextBlock Text="{Binding ListingTool.StatusSummary}"
                                  TextWrapping="Wrap"
                                  FontSize="12"
-                                 Foreground="#687385" />
+                                 Foreground="{DynamicResource SecondaryTextBrush}" />
                       <TextBlock Text="Marketplace fields, mockups, and external publishing are outside this basic local workflow."
                                  TextWrapping="Wrap"
                                  FontSize="12"
-                                 Foreground="#687385" />
+                                 Foreground="{DynamicResource SecondaryTextBrush}" />
                     </StackPanel>
                   </Border>
 
                   <Border Padding="14"
-                          Background="#FFFFFF"
-                          BorderBrush="#D9DEE7"
+                          Background="{DynamicResource ElevatedSurfaceBrush}"
+                          BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
                     <StackPanel Spacing="10">
                       <TextBlock Text="Related assets"
                                  FontSize="14"
                                  FontWeight="SemiBold"
-                                 Foreground="#243447" />
+                                 Foreground="{DynamicResource StrongTextBrush}" />
                       <ItemsControl ItemsSource="{Binding ItemInspector.Assets}">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="workflow:ItemInspectorAssetEntry">
                             <StackPanel Margin="0,0,0,4" Spacing="2">
-                              <TextBlock Text="{Binding Name}" FontSize="13" Foreground="#243447" />
-                              <TextBlock Text="{Binding Kind}" FontSize="11" Foreground="#687385" />
+                              <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{DynamicResource StrongTextBrush}" />
+                              <TextBlock Text="{Binding Kind}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
                               <TextBlock IsVisible="{Binding IsMissing}"
                                          Text="Missing file"
                                          FontSize="11"
-                                         Foreground="#9A4B43" />
+                                         Foreground="{DynamicResource DangerTextBrush}" />
                             </StackPanel>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -888,20 +891,20 @@
                       <TextBlock IsVisible="{Binding !ItemInspector.HasAssets}"
                                  Text="No assets attached yet."
                                  FontSize="12"
-                                 Foreground="#7C8797" />
+                                 Foreground="{DynamicResource MutedTextBrush}" />
                     </StackPanel>
                   </Border>
 
                   <Border Padding="14"
-                          Background="#FFFFFF"
-                          BorderBrush="#D9DEE7"
+                          Background="{DynamicResource ElevatedSurfaceBrush}"
+                          BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
                     <StackPanel Spacing="10">
                       <TextBlock Text="Lifecycle"
                                  FontSize="14"
                                  FontWeight="SemiBold"
-                                 Foreground="#243447" />
+                                 Foreground="{DynamicResource StrongTextBrush}" />
                       <StackPanel Orientation="Horizontal"
                                   Spacing="8"
                                   HorizontalAlignment="Left">
@@ -924,13 +927,13 @@
                       </StackPanel>
                       <Border IsVisible="{Binding ItemInspector.ArchiveConfirmationVisible}"
                               Padding="10"
-                              Background="#FFF4E5"
+                              Background="{DynamicResource WarningBackgroundBrush}"
                               CornerRadius="6">
                         <StackPanel Spacing="8">
                           <TextBlock Text="Archive this Item? It leaves active navigation but stays recoverable."
                                      TextWrapping="Wrap"
                                      FontSize="12"
-                                     Foreground="#243447" />
+                                     Foreground="{DynamicResource StrongTextBrush}" />
                           <StackPanel Orientation="Horizontal"
                                       Spacing="8"
                                       HorizontalAlignment="Left">
@@ -945,13 +948,13 @@
                       </Border>
                       <Border IsVisible="{Binding ItemInspector.DeleteConfirmationVisible}"
                               Padding="10"
-                              Background="#FEECEB"
+                              Background="{DynamicResource DangerBackgroundBrush}"
                               CornerRadius="6">
                         <StackPanel Spacing="8">
                           <TextBlock Text="Permanently delete this Item? Connected creative records will block deletion."
                                      TextWrapping="Wrap"
                                      FontSize="12"
-                                     Foreground="#243447" />
+                                     Foreground="{DynamicResource StrongTextBrush}" />
                           <StackPanel Orientation="Horizontal"
                                       Spacing="8"
                                       HorizontalAlignment="Left">
@@ -971,14 +974,14 @@
                              Text="{Binding ItemInspector.ErrorMessage}"
                              TextWrapping="Wrap"
                              FontSize="12"
-                             Foreground="#9A4B43" />
+                             Foreground="{DynamicResource DangerTextBrush}" />
                 </StackPanel>
             </Border>
 
             <Border IsVisible="{Binding IsStatusConfirmationVisible}"
                     Padding="12"
-                    Background="#FFF4E5"
-                    BorderBrush="#E5B86A"
+                    Background="{DynamicResource WarningBackgroundBrush}"
+                    BorderBrush="{DynamicResource WarningBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="6">
               <StackPanel Spacing="8">
@@ -1001,33 +1004,33 @@
             <Border IsVisible="{Binding GroupDetails.HasState}"
                     MinHeight="360"
                     Padding="22"
-                    Background="#F7F8FA"
-                    BorderBrush="#D9DEE7"
+                    Background="{DynamicResource PanelSurfaceBrush}"
+                    BorderBrush="{DynamicResource ControlBorderBrush}"
                     BorderThickness="1">
                 <StackPanel Spacing="14">
                   <TextBlock IsVisible="{Binding GroupDetails.IsReadOnly}"
                              Text="{Binding GroupDetails.InactiveNotice}"
                              TextWrapping="Wrap"
                              FontSize="12"
-                             Foreground="#9A4B43" />
+                             Foreground="{DynamicResource DangerTextBrush}" />
                   <TextBlock Text="{Binding GroupDetails.DisplayPath}"
                              FontSize="12"
-                             Foreground="#687385" />
+                             Foreground="{DynamicResource SecondaryTextBrush}" />
 
                   <Border Padding="14"
-                          Background="#FFFFFF"
-                          BorderBrush="#D9DEE7"
+                          Background="{DynamicResource ElevatedSurfaceBrush}"
+                          BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
                     <StackPanel Spacing="10">
                       <TextBlock Text="Group details"
                                  FontSize="14"
                                  FontWeight="SemiBold"
-                                 Foreground="#243447" />
+                                 Foreground="{DynamicResource StrongTextBrush}" />
                       <StackPanel Spacing="6">
                         <TextBlock Text="Group name"
                                    FontSize="11"
-                                   Foreground="#687385" />
+                                   Foreground="{DynamicResource SecondaryTextBrush}" />
                         <TextBox Text="{Binding GroupDetails.Name}"
                                  IsReadOnly="{Binding !GroupDetails.CanEdit}"
                                  MinHeight="32"
@@ -1035,7 +1038,7 @@
                                  LostFocus="OnDetailsFieldLostFocus" />
                         <TextBlock Text="Description"
                                    FontSize="11"
-                                   Foreground="#687385" />
+                                   Foreground="{DynamicResource SecondaryTextBrush}" />
                         <TextBox Text="{Binding GroupDetails.Description}"
                                  IsReadOnly="{Binding !GroupDetails.CanEdit}"
                                  MinHeight="32"
@@ -1043,7 +1046,7 @@
                                  LostFocus="OnDetailsFieldLostFocus" />
                         <TextBlock Text="Notes"
                                    FontSize="11"
-                                   Foreground="#687385" />
+                                   Foreground="{DynamicResource SecondaryTextBrush}" />
                         <TextBox Text="{Binding GroupDetails.Notes}"
                                  IsReadOnly="{Binding !GroupDetails.CanEdit}"
                                  AcceptsReturn="True"
@@ -1055,15 +1058,15 @@
                   </Border>
 
                   <Border Padding="14"
-                          Background="#FFFFFF"
-                          BorderBrush="#D9DEE7"
+                          Background="{DynamicResource ElevatedSurfaceBrush}"
+                          BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
                     <StackPanel Spacing="10">
                       <TextBlock Text="Location"
                                  FontSize="14"
                                  FontWeight="SemiBold"
-                                 Foreground="#243447" />
+                                 Foreground="{DynamicResource StrongTextBrush}" />
                       <ComboBox ItemsSource="{Binding GroupDetails.Destinations}"
                                 SelectedItem="{Binding GroupDetails.SelectedDestination}"
                                 IsEnabled="{Binding GroupDetails.CanEdit}">
@@ -1086,15 +1089,15 @@
                   </Border>
 
                   <Border Padding="14"
-                          Background="#FFFFFF"
-                          BorderBrush="#D9DEE7"
+                          Background="{DynamicResource ElevatedSurfaceBrush}"
+                          BorderBrush="{DynamicResource ControlBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="6">
                     <StackPanel Spacing="10">
                       <TextBlock Text="Lifecycle"
                                  FontSize="14"
                                  FontWeight="SemiBold"
-                                 Foreground="#243447" />
+                                 Foreground="{DynamicResource StrongTextBrush}" />
                       <StackPanel Orientation="Horizontal"
                                   Spacing="8"
                                   HorizontalAlignment="Left">
@@ -1111,13 +1114,13 @@
                       </StackPanel>
                       <Border IsVisible="{Binding GroupDetails.ArchiveConfirmationVisible}"
                               Padding="10"
-                              Background="#FFF4E5"
+                              Background="{DynamicResource WarningBackgroundBrush}"
                               CornerRadius="6">
                         <StackPanel Spacing="8">
                           <TextBlock Text="Archive this group? The group and its subtree leave active navigation, but all child work and context remain preserved."
                                      TextWrapping="Wrap"
                                      FontSize="12"
-                                     Foreground="#243447" />
+                                     Foreground="{DynamicResource StrongTextBrush}" />
                           <StackPanel Orientation="Horizontal"
                                       Spacing="8"
                                       HorizontalAlignment="Left">
@@ -1137,7 +1140,7 @@
                              Text="{Binding GroupDetails.ErrorMessage}"
                              TextWrapping="Wrap"
                              FontSize="12"
-                             Foreground="#9A4B43" />
+                             Foreground="{DynamicResource DangerTextBrush}" />
                 </StackPanel>
             </Border>
 
@@ -1148,7 +1151,7 @@
                          Text="{Binding StageMoveError}"
                          IsVisible="{Binding StageMoveError}"
                          FontSize="12"
-                         Foreground="#9A4B43"
+                         Foreground="{DynamicResource DangerTextBrush}"
                          VerticalAlignment="Center"
                          TextWrapping="Wrap" />
               <Button Grid.Column="1"
@@ -1174,28 +1177,28 @@
                        HorizontalAlignment="Center"
                        FontSize="28"
                        FontWeight="SemiBold"
-                       Foreground="#1E2733" />
+                       Foreground="{DynamicResource PrimaryTextBrush}" />
             <TextBlock Text="{Binding DocumentWindow.EmptyStateMessage}"
                        HorizontalAlignment="Center"
                        FontSize="13"
-                       Foreground="#697586" />
+                       Foreground="{DynamicResource EmptyStateTextBrush}" />
           </StackPanel>
 
           <Border IsVisible="{Binding ShowSelectionSummary}"
-                  Background="#FFFFFF"
+                  Background="{DynamicResource ElevatedSurfaceBrush}"
                   Padding="4">
             <StackPanel Spacing="14">
               <StackPanel Spacing="4">
-                <TextBlock Text="{Binding WorkspaceTree.InspectorKind}" FontSize="12" FontWeight="SemiBold" Foreground="#59A17D" />
-                <TextBlock Text="{Binding WorkspaceTree.InspectorTitle}" FontSize="26" FontWeight="SemiBold" Foreground="#1E2733" />
-                <TextBlock Text="{Binding WorkspaceTree.InspectorPath}" FontSize="12" Foreground="#687385" />
+                <TextBlock Text="{Binding WorkspaceTree.InspectorKind}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+                <TextBlock Text="{Binding WorkspaceTree.InspectorTitle}" FontSize="26" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                <TextBlock Text="{Binding WorkspaceTree.InspectorPath}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
               </StackPanel>
-              <Border Padding="18" Background="#F7F8FA" BorderBrush="#D9DEE7" BorderThickness="1">
+              <Border Padding="18" Background="{DynamicResource PanelSurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1">
                 <StackPanel Spacing="8">
-                  <TextBlock Text="Properties" FontSize="14" FontWeight="SemiBold" Foreground="#243447" />
-                  <TextBlock Text="{Binding WorkspaceTree.InspectorDescription}" TextWrapping="Wrap" Foreground="#687385" />
+                  <TextBlock Text="Properties" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
+                  <TextBlock Text="{Binding WorkspaceTree.InspectorDescription}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
                   <TextBlock Text="Selection updates this inspector without opening a tab. Ctrl-click the tree node to keep it in a tab."
-                             TextWrapping="Wrap" FontSize="12" Foreground="#7C8797" />
+                             TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" />
                 </StackPanel>
               </Border>
             </StackPanel>
@@ -1205,23 +1208,23 @@
     </Grid>
     <Border Grid.ColumnSpan="2"
             IsVisible="{Binding WorkspaceManagement.ShouldShowNoWorkspaceState}"
-            Background="#99000000">
+            Background="{DynamicResource OverlayScrimBrush}">
       <Border Width="420"
               HorizontalAlignment="Center"
               VerticalAlignment="Center"
               Padding="20"
-              Background="#FFFFFF"
-              BorderBrush="#D9DEE7"
+              Background="{DynamicResource ElevatedSurfaceBrush}"
+              BorderBrush="{DynamicResource ControlBorderBrush}"
               BorderThickness="1">
         <StackPanel Spacing="12">
           <TextBlock Text="Create your first workspace?"
                      FontSize="22"
                      FontWeight="SemiBold"
-                     Foreground="#1E2733" />
+                     Foreground="{DynamicResource PrimaryTextBrush}" />
           <TextBlock Text="FusionCanvas needs a workspace before stores can be organized."
                      TextWrapping="Wrap"
                      FontSize="13"
-                     Foreground="#687385" />
+                     Foreground="{DynamicResource SecondaryTextBrush}" />
           <StackPanel Orientation="Horizontal"
                       HorizontalAlignment="Right"
                       Spacing="8">
@@ -1234,23 +1237,23 @@
     </Border>
     <Border Grid.ColumnSpan="2"
             IsVisible="{Binding ShouldShowFirstStorePrompt}"
-            Background="#99000000">
+            Background="{DynamicResource OverlayScrimBrush}">
       <Border Width="420"
               HorizontalAlignment="Center"
               VerticalAlignment="Center"
               Padding="20"
-              Background="#FFFFFF"
-              BorderBrush="#D9DEE7"
+              Background="{DynamicResource ElevatedSurfaceBrush}"
+              BorderBrush="{DynamicResource ControlBorderBrush}"
               BorderThickness="1">
         <StackPanel Spacing="12">
           <TextBlock Text="Create your first store?"
                      FontSize="22"
                      FontWeight="SemiBold"
-                     Foreground="#1E2733" />
+                     Foreground="{DynamicResource PrimaryTextBrush}" />
           <TextBlock Text="FusionCanvas needs a store before workspace content can be organized."
                      TextWrapping="Wrap"
                      FontSize="13"
-                     Foreground="#687385" />
+                     Foreground="{DynamicResource SecondaryTextBrush}" />
           <StackPanel Orientation="Horizontal"
                       HorizontalAlignment="Right"
                       Spacing="8">
@@ -1277,10 +1280,10 @@
       <Setter Property="Background" Value="Transparent" />
     </Style>
     <Style Selector="Border.treeRow:pointerover">
-      <Setter Property="Background" Value="#F0F3F7" />
+      <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}" />
     </Style>
     <Style Selector="Border.treeRow.selected">
-      <Setter Property="Background" Value="#E2EAF2" />
+      <Setter Property="Background" Value="{DynamicResource SelectionBackgroundBrush}" />
     </Style>
     <Style Selector="Border.treeRow.inactive">
       <Setter Property="Opacity" Value="0.55" />
@@ -1295,47 +1298,47 @@
       <Setter Property="Opacity" Value="0.6" />
     </Style>
     <Style Selector="Border.treeRow.dropTarget">
-      <Setter Property="Background" Value="#DDF1E7" />
-      <Setter Property="BorderBrush" Value="#59A17D" />
+      <Setter Property="Background" Value="{DynamicResource DropTargetBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Border.treeRow.dropBefore">
-      <Setter Property="BorderBrush" Value="#3C8C69" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
       <Setter Property="BorderThickness" Value="0,2,0,0" />
     </Style>
     <Style Selector="Border.treeRow.dropAfter">
-      <Setter Property="BorderBrush" Value="#3C8C69" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
       <Setter Property="BorderThickness" Value="0,0,0,2" />
     </Style>
     <Style Selector="Button.navigation">
       <Setter Property="HorizontalAlignment" Value="Stretch" />
       <Setter Property="Margin" Value="0,0,0,8" />
       <Setter Property="Padding" Value="12,10" />
-      <Setter Property="Background" Value="#F7F8FA" />
-      <Setter Property="Foreground" Value="#243447" />
-      <Setter Property="BorderBrush" Value="#E1E5EA" />
+      <Setter Property="Background" Value="{DynamicResource PanelSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource StrongTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Button.storeSelector">
       <Setter Property="HorizontalAlignment" Value="Stretch" />
       <Setter Property="Margin" Value="0,0,0,6" />
       <Setter Property="Padding" Value="10,8" />
-      <Setter Property="Background" Value="#EEF6FF" />
-      <Setter Property="Foreground" Value="#204466" />
-      <Setter Property="BorderBrush" Value="#B9D7F2" />
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentSoftForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentSoftBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Button.storeSelector.selected">
-      <Setter Property="Background" Value="#243447" />
-      <Setter Property="Foreground" Value="#FFFFFF" />
-      <Setter Property="BorderBrush" Value="#243447" />
+      <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource CommandForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="Button.storeAction">
       <Setter Property="Padding" Value="10,8" />
-      <Setter Property="Background" Value="#243447" />
-      <Setter Property="Foreground" Value="#FFFFFF" />
-      <Setter Property="BorderBrush" Value="#243447" />
+      <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource CommandForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Button.fixedDialog">
@@ -1345,24 +1348,24 @@
     <Style Selector="Button.storeSecondary">
       <Setter Property="HorizontalAlignment" Value="Stretch" />
       <Setter Property="Padding" Value="10,8" />
-      <Setter Property="Background" Value="#FFFFFF" />
-      <Setter Property="Foreground" Value="#425066" />
-      <Setter Property="BorderBrush" Value="#D9DEE7" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SecondaryButtonForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Button.storeSecondary.active">
-      <Setter Property="Background" Value="#EEF6FF" />
-      <Setter Property="Foreground" Value="#204466" />
-      <Setter Property="BorderBrush" Value="#B9D7F2" />
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentSoftForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentSoftBorderBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="Button.iconButton">
       <Setter Property="Width" Value="28" />
       <Setter Property="Height" Value="28" />
       <Setter Property="Padding" Value="0" />
-      <Setter Property="Background" Value="#FFFFFF" />
-      <Setter Property="Foreground" Value="#425066" />
-      <Setter Property="BorderBrush" Value="#D9DEE7" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SecondaryButtonForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -1374,15 +1377,15 @@
       <Setter Property="ClipToBounds" Value="True" />
     </Style>
     <Style Selector="Border.tabFrame.active">
-      <Setter Property="Background" Value="#FFFFFF" />
-      <Setter Property="BorderBrush" Value="#D3D8E0" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource TabBorderBrush}" />
       <Setter Property="BorderThickness" Value="1,1,1,0" />
     </Style>
     <Style Selector="Button.tab">
       <Setter Property="Height" Value="34" />
       <Setter Property="Padding" Value="10,0,4,0" />
       <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="#687385" />
+      <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="HorizontalContentAlignment" Value="Left" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -1390,7 +1393,7 @@
     </Style>
     <Style Selector="Button.tab.active">
       <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="#1E2733" />
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="Button.closeTab">
@@ -1399,7 +1402,7 @@
       <Setter Property="Margin" Value="0,6,4,6" />
       <Setter Property="Padding" Value="0" />
       <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="#687385" />
+      <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="FontSize" Value="16" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
@@ -1407,37 +1410,37 @@
       <Setter Property="CornerRadius" Value="4" />
     </Style>
     <Style Selector="Button.closeTab:pointerover">
-      <Setter Property="Background" Value="#E7E9ED" />
-      <Setter Property="Foreground" Value="#1E2733" />
+      <Setter Property="Background" Value="{DynamicResource CloseTabHoverBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
     </Style>
     <Style Selector="Button.available">
-      <Setter Property="Background" Value="#EEF6FF" />
-      <Setter Property="Foreground" Value="#204466" />
-      <Setter Property="BorderBrush" Value="#B9D7F2" />
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentSoftForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentSoftBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Button.current">
-      <Setter Property="Background" Value="#243447" />
-      <Setter Property="Foreground" Value="#FFFFFF" />
-      <Setter Property="BorderBrush" Value="#243447" />
+      <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource CommandForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="Button.unavailable">
-      <Setter Property="Background" Value="#F1F3F6" />
-      <Setter Property="Foreground" Value="#8B95A3" />
-      <Setter Property="BorderBrush" Value="#E1E5EA" />
+      <Setter Property="Background" Value="{DynamicResource UnavailableBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource UnavailableForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
     </Style>
     <Style Selector="Button.activeView:not(.current)">
-      <Setter Property="BorderBrush" Value="#3C8C69" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
       <Setter Property="BorderThickness" Value="0,0,0,2" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="Button.stageMove">
       <Setter Property="Padding" Value="12,7" />
       <Setter Property="MinWidth" Value="120" />
-      <Setter Property="Background" Value="#FFFFFF" />
-      <Setter Property="Foreground" Value="#243447" />
-      <Setter Property="BorderBrush" Value="#D9DEE7" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource StrongTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Button.stageMove:disabled">
@@ -1450,13 +1453,13 @@
     <Style Selector="Button.toolSelector">
       <Setter Property="Padding" Value="10,6" />
       <Setter Property="MinWidth" Value="72" />
-      <Setter Property="Background" Value="#FFFFFF" />
-      <Setter Property="Foreground" Value="#243447" />
-      <Setter Property="BorderBrush" Value="#D9DEE7" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource StrongTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Border.emphasized">
-      <Setter Property="BorderBrush" Value="#59A17D" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
       <Setter Property="BorderThickness" Value="1.5" />
     </Style>
   </Window.Styles>
