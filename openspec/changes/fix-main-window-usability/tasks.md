@@ -2,8 +2,8 @@
 
 ## 0. Headless view-test harness
 
-- [x] 0.1 Add `Avalonia.Headless.XUnit` 12.0.4 (matching the app's Avalonia 12.0.4) to `tests/FusionCanvas.App.Tests`, add a test-app fixture reusing `Program.BuildAvaloniaApp()` with `UseHeadless()` and `WithInterFont()`, and a smoke `AvaloniaFact` test that instantiates `MainWindow`.
-- [x] 0.2 Verify `dotnet test` runs headless view tests without an interactive desktop and the smoke test passes.
+- [x] 0.1 Add `Avalonia.Headless.XUnit` 12.0.4 (matching the app's Avalonia 12.0.4) to `tests/FusionCanvas.App.Tests`, add a test-app fixture reusing `Program.BuildAvaloniaApp()` with `UseHeadless()` and `WithInterFont()`, add a reusable per-test `MainWindowFixture` (build/show/layout/teardown with in-memory workspace), and representative production-view tests covering construction, compiled bindings, layout/control state across item/group/niche/stage states, and keyboard/pointer focus/input.
+- [x] 0.2 Verify `dotnet test` runs headless view tests without an interactive desktop and the representative tests pass.
 
 ## 1. Item inspector commit semantics
 
