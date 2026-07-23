@@ -38,8 +38,12 @@
 
 | Concern | Method | Result | Evidence |
 | --- | --- | --- | --- |
-| Headless view tests run without an interactive desktop | Command | Pass | `dotnet test .\FusionCanvas.sln` executes `MainWindowLayoutTests` and `HeadlessHarnessTests` headlessly |
+| Headless view tests run without an interactive desktop | Command | Pass | `dotnet test .\FusionCanvas.sln` executes `MainWindowConstructionTests`, `MainWindowLayoutTests`, and `MainWindowInputTests` headlessly |
 | Headless harness reuses the real app builder | Code inspection | Pass | `HeadlessTestApp.BuildAvaloniaApp` calls `Program.BuildAvaloniaApp().UseHeadless(...)` with `WithInterFont()` and the `App` Fluent theme |
+| Reusable per-test fixture with in-memory workspace | Code inspection + tests | Pass | `MainWindowFixture` builds/shows/layouts/tears-down `MainWindow` + `MainWindowViewModel` (in-memory sample); all view tests use it |
+| Construction and compiled bindings | Headless view test | Pass | `MainWindowConstructionTests.MainWindow_ConstructsAndLoadsViewsWithInMemoryWorkspace`, `MainWindow_CompiledBindingsResolveWithoutErrors`, `OpeningItem_EnablesInspectorAndStatusSelector` |
+| Layout and control state across major view states | Headless view test | Pass | `OpeningGroup_EnablesGroupDetailsPane`, `NicheSelection_ShowsSelectionSummaryNotInspector`, `WorkflowStageNavigation_ShowsCorrectStageTool`, plus the three no-delta layout tests |
+| Focus and keyboard/pointer input | Headless view test | Pass | `MainWindowInputTests.ItemTextField_TypedTextAndLostFocusCommitsEdit` (LostFocus commit), `ItemTitle_KeyTextInputUpdatesDraft` (KeyTextInput), `SearchBox_TypedTextUpdatesQuery` (KeyTextInput), `NewItemButton_ClickOpensCreateItemEditor` (command + editor) |
 
 ## Validation Commands
 
@@ -47,7 +51,7 @@
 | --- | --- | --- |
 | `openspec validate fix-main-window-usability --strict` | Pass | Change is valid |
 | `openspec validate --all --strict` | Pass | 30 changes/specs passed, 0 failed |
-| `dotnet test .\FusionCanvas.sln` | Pass | 437 passed, 0 failed (96 domain, 150 application, 37 integration, 154 app — includes 7 new headless/view-model tests) |
+| `dotnet test .\FusionCanvas.sln` | Pass | 445 passed, 0 failed (96 domain, 150 application, 37 integration, 162 app — includes 13 headless/view-model harness and feature tests) |
 
 ## Data isolation note
 
@@ -59,5 +63,5 @@ Headless view tests construct `new MainWindowViewModel()`, which uses the in-mem
 
 ## Limitations and Follow-up
 
-- `adopt-headless-view-testing` was a process/specs-only change and intentionally added no harness; this change adds the minimal harness (`Avalonia.Headless.XUnit` + `HeadlessTestApp`) and four representative view tests. Broader view coverage (every inspector interaction, drag/drop, file pickers) remains a follow-up, not a gate for this batch.
+- `adopt-headless-view-testing` was a process/specs-only change and intentionally added no harness; this change adds the harness (`Avalonia.Headless.XUnit` + `HeadlessTestApp` + reusable `MainWindowFixture`) and 13 representative view tests covering construction, compiled bindings, layout/control state across item/group/niche/stage states, and keyboard/pointer focus/input. Drag/drop, file-picker, and OS-level interactions remain follow-up coverage, not a gate for this batch.
 - Live desktop verification is optional and ad hoc; it was not needed to verify these deterministic, framework-testable fixes.
