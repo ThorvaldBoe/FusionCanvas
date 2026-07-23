@@ -14,14 +14,14 @@ public class AssetManagementServiceTests
         fileStore.MarkMissing(sample.LinkedAsset.WorkspaceRelativePath);
         var service = sample.Service(repository, fileStore);
 
-        var listingState = await service.LoadAsync(sample.ListingContext);
+        var listingState = await service.LoadAsync(sample.ItemContext);
         var storeState = await service.LoadAsync(sample.StoreContext);
         var archivedGroupState = await service.LoadAsync(new AssetContextReference(WorkspaceEntityKind.Group, sample.ArchivedGroup.Id));
 
         Assert.Single(listingState.Assets);
         Assert.True(listingState.Assets.Single().IsMissing);
         Assert.Null(listingState.Assets.Single().ContextLabel);
-        Assert.Equal("Listing: Idea", storeState.Assets.Single(a => a.Id == sample.LinkedAsset.Id).ContextLabel);
+        Assert.Equal("Item: Idea", storeState.Assets.Single(a => a.Id == sample.LinkedAsset.Id).ContextLabel);
         Assert.Equal("—", storeState.Assets.Single(a => a.Id == sample.UnlinkedAsset.Id).ContextLabel);
         Assert.Equal(2, storeState.Assets.Count);
         Assert.Null(archivedGroupState.Context);
@@ -38,14 +38,14 @@ public class AssetManagementServiceTests
         var assetId = Guid.NewGuid();
         var service = sample.Service(repository, fileStore, nextId: assetId);
 
-        var result = await service.ImportAssetAsync(new(sample.ListingContext, @"C:\imports\design.svg", AssetKind.Svg));
+        var result = await service.ImportAssetAsync(new(sample.ItemContext, @"C:\imports\design.svg", AssetKind.Svg));
 
         Assert.True(result.Succeeded);
         Assert.Equal(assetId, result.Asset!.Id);
         Assert.Equal(AssetKind.Svg, result.Asset.Kind);
         var stored = repository.Snapshot.Assets.Single(asset => asset.Id == assetId);
         Assert.Equal(sample.Store.Id, stored.StoreId);
-        Assert.Contains(repository.Snapshot.AssetLinks, link => link.AssetId == assetId && link.EntityKind == WorkspaceEntityKind.Listing && link.EntityId == sample.Listing.Id);
+        Assert.Contains(repository.Snapshot.AssetLinks, link => link.AssetId == assetId && link.EntityKind == WorkspaceEntityKind.Item && link.EntityId == sample.Item.Id);
         Assert.Equal("design.svg", stored.Name);
         Assert.Equal("assets/design.svg", stored.WorkspaceRelativePath);
         Assert.Equal(2, result.State.Assets.Count);
@@ -64,7 +64,7 @@ public class AssetManagementServiceTests
         var fileStore = new FakeFileStore().WithMissingSource();
         var service = sample.Service(repository, fileStore);
 
-        var result = await service.ImportAssetAsync(new(sample.ListingContext, sourcePath, kind));
+        var result = await service.ImportAssetAsync(new(sample.ItemContext, sourcePath, kind));
 
         Assert.False(result.Succeeded);
         Assert.Equal(expectedError, result.Error);
@@ -80,7 +80,7 @@ public class AssetManagementServiceTests
         var fileStore = new FakeFileStore();
         var service = sample.Service(repository, fileStore);
 
-        var result = await service.ImportAssetAsync(new(sample.ListingContext, @"C:\imports\design.svg", AssetKind.Svg));
+        var result = await service.ImportAssetAsync(new(sample.ItemContext, @"C:\imports\design.svg", AssetKind.Svg));
 
         Assert.False(result.Succeeded);
         Assert.Single(fileStore.Imports);
@@ -97,7 +97,7 @@ public class AssetManagementServiceTests
         var service = sample.Service(repository, fileStore);
 
         var archivedNiche = await service.ImportAssetAsync(new(new AssetContextReference(WorkspaceEntityKind.Niche, sample.ArchivedNiche.Id), @"C:\imports\design.svg", AssetKind.Svg));
-        var missingListing = await service.ImportAssetAsync(new(new AssetContextReference(WorkspaceEntityKind.Listing, Guid.NewGuid()), @"C:\imports\design.svg", AssetKind.Svg));
+        var missingListing = await service.ImportAssetAsync(new(new AssetContextReference(WorkspaceEntityKind.Item, Guid.NewGuid()), @"C:\imports\design.svg", AssetKind.Svg));
 
         Assert.False(archivedNiche.Succeeded);
         Assert.False(missingListing.Succeeded);
@@ -229,6 +229,11 @@ public class AssetManagementServiceTests
         public bool Exists(string workspaceRelativePath) => _existing.Contains(workspaceRelativePath.Replace('\\', '/'));
 
         public bool TryDelete(string workspaceRelativePath) => _existing.Remove(workspaceRelativePath.Replace('\\', '/'));
+
+        public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default) =>
+            Task.FromResult<Stream>(new MemoryStream());
+
+        public Task ExportCopyAsync(string workspaceRelativePath, string destinationPath, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed record Sample(
@@ -237,13 +242,13 @@ public class AssetManagementServiceTests
         Store Store,
         Niche Niche,
         TopicGroup Group,
-        Listing Listing,
+        Item Item,
         Asset LinkedAsset,
         Asset UnlinkedAsset,
         Niche ArchivedNiche,
         TopicGroup ArchivedGroup)
     {
-        public AssetContextReference ListingContext => new(WorkspaceEntityKind.Listing, Listing.Id);
+        public AssetContextReference ItemContext => new(WorkspaceEntityKind.Item, Item.Id);
         public AssetContextReference StoreContext => new(WorkspaceEntityKind.Store, Store.Id);
 
         public AssetManagementService Service(TestRepository repository, FakeFileStore fileStore, Guid? nextId = null) =>
@@ -258,10 +263,10 @@ public class AssetManagementServiceTests
             var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Dogs and coffee", null, false, now, now, "{}");
             var archivedNiche = new Niche(Guid.NewGuid(), store.Id, "Archived", null, true, now, now, "{}");
             var archivedGroup = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Archived group", null, true, now, now, "{}");
-            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+            var listing = new Item(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Idea", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
             var linkedAsset = new Asset(Guid.NewGuid(), store.Id, "linked.png", null, AssetKind.ExportedImage, "assets/linked.png", @"C:\imports\linked.png", false, false, now, now, "{}");
             var unlinkedAsset = new Asset(Guid.NewGuid(), store.Id, "unlinked.png", null, AssetKind.ExportedImage, "assets/unlinked.png", @"C:\imports\unlinked.png", false, false, now, now, "{}");
-            var link = new AssetLink(linkedAsset.Id, WorkspaceEntityKind.Listing, listing.Id);
+            var link = new AssetLink(linkedAsset.Id, WorkspaceEntityKind.Item, listing.Id);
             var snapshot = new WorkspaceSnapshot([store], [niche, archivedNiche], [group, archivedGroup], [listing], [linkedAsset, unlinkedAsset], [], [], [], [link]);
             return new(snapshot, now, store, niche, group, listing, linkedAsset, unlinkedAsset, archivedNiche, archivedGroup);
         }

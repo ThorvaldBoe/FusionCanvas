@@ -5,7 +5,7 @@ namespace FusionCanvas.Application.Workspace;
 public sealed record WorkspaceTreeQuery(
     string? Text = null,
     IReadOnlySet<WorkspaceEntityKind>? EntityKinds = null,
-    IReadOnlySet<ListingStatus>? ListingStatuses = null,
+    IReadOnlySet<ItemStatus>? ItemStatuses = null,
     IReadOnlySet<WorkflowStage>? WorkflowStages = null,
     IReadOnlySet<Guid>? TagIds = null,
     NavigationTopicReference? ScopeTopic = null,
@@ -14,7 +14,7 @@ public sealed record WorkspaceTreeQuery(
     public bool IsActive =>
         !string.IsNullOrWhiteSpace(Text) ||
         EntityKinds is { Count: > 0 } ||
-        ListingStatuses is { Count: > 0 } ||
+        ItemStatuses is { Count: > 0 } ||
         WorkflowStages is { Count: > 0 } ||
         TagIds is { Count: > 0 } ||
         ScopeTopic is not null ||
@@ -108,11 +108,11 @@ public static class WorkspaceTreeProjector
             return false;
         }
 
-        if (query.ListingStatuses is { Count: > 0 })
+        if (query.ItemStatuses is { Count: > 0 })
         {
-            if (node.EntityKind != WorkspaceEntityKind.Listing ||
-                context.Snapshot.Listings.SingleOrDefault(listing => listing.Id == node.EntityId) is not { } listing ||
-                !query.ListingStatuses.Contains(listing.Status))
+            if (node.EntityKind != WorkspaceEntityKind.Item ||
+                context.Snapshot.Items.SingleOrDefault(listing => listing.Id == node.EntityId) is not { } listing ||
+                !query.ItemStatuses.Contains(listing.Status))
             {
                 return false;
             }
@@ -120,8 +120,8 @@ public static class WorkspaceTreeProjector
 
         if (query.WorkflowStages is { Count: > 0 })
         {
-            if (node.EntityKind != WorkspaceEntityKind.Listing ||
-                context.Snapshot.Listings.SingleOrDefault(listing => listing.Id == node.EntityId) is not { } stageListing ||
+            if (node.EntityKind != WorkspaceEntityKind.Item ||
+                context.Snapshot.Items.SingleOrDefault(listing => listing.Id == node.EntityId) is not { } stageListing ||
                 !query.WorkflowStages.Contains(stageListing.Stage))
             {
                 return false;
@@ -130,13 +130,13 @@ public static class WorkspaceTreeProjector
 
         if (query.TagIds is { Count: > 0 })
         {
-            if (node.EntityKind != WorkspaceEntityKind.Listing)
+            if (node.EntityKind != WorkspaceEntityKind.Item)
             {
                 return false;
             }
 
-            var listingTags = context.Snapshot.ListingTags
-                .Where(link => link.ListingId == node.EntityId)
+            var listingTags = context.Snapshot.ItemTags
+                .Where(link => link.ItemId == node.EntityId)
                 .Select(link => link.TagId)
                 .ToHashSet();
             if (!query.TagIds.All(listingTags.Contains))
@@ -155,12 +155,12 @@ public static class WorkspaceTreeProjector
             return true;
         }
 
-        if (node.EntityKind != WorkspaceEntityKind.Listing)
+        if (node.EntityKind != WorkspaceEntityKind.Item)
         {
             return false;
         }
 
-        var listing = context.Snapshot.Listings.SingleOrDefault(candidate => candidate.Id == node.EntityId);
+        var listing = context.Snapshot.Items.SingleOrDefault(candidate => candidate.Id == node.EntityId);
         if (listing is null)
         {
             return false;
@@ -211,9 +211,9 @@ public static class WorkspaceTreeProjector
         var trimmed = string.IsNullOrWhiteSpace(query.Text) ? null : query.Text.Trim();
 
         var listingNotes = new Dictionary<Guid, string>();
-        foreach (var listing in snapshot.Listings)
+        foreach (var listing in snapshot.Items)
         {
-            var notes = ListingMetadataCodec.TryGetNotes(listing.MetadataJson);
+            var notes = ItemMetadataCodec.TryGetNotes(listing.MetadataJson);
             if (notes is not null)
             {
                 listingNotes[listing.Id] = notes;
@@ -222,7 +222,7 @@ public static class WorkspaceTreeProjector
 
         var tagNamesByTagId = snapshot.Tags.ToDictionary(tag => tag.Id, tag => tag.Name);
         var tagNamesByListing = new Dictionary<Guid, IReadOnlyList<string>>();
-        foreach (var group in snapshot.ListingTags.GroupBy(link => link.ListingId))
+        foreach (var group in snapshot.ItemTags.GroupBy(link => link.ItemId))
         {
             var names = group
                 .Select(link => tagNamesByTagId.GetValueOrDefault(link.TagId, string.Empty))

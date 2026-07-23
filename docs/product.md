@@ -77,7 +77,7 @@ This gives the creator a constant answer to three questions:
 
 FusionCanvas should use a tabbed document window inspired by Obsidian.
 
-The left side of the application is the navigation pane. The right side is the document window. The document window should support multiple tabs so creators can work across several ideas, concepts, designs, or listings without losing their place.
+The left side of the application is the navigation pane. The right side is the document window. The document window should support multiple tabs so creators can work across several Items without losing their place.
 
 When a tab becomes active, the navigation pane should update to show where the active item lives in the store, niche, topic, and item hierarchy.
 
@@ -129,7 +129,7 @@ This information becomes increasingly valuable over time.
 
 ### Groups
 
-Groups organize listings.
+Groups organize Items.
 
 Groups may represent:
 
@@ -142,13 +142,13 @@ Groups may represent:
 
 Groups may contain subgroups.
 
-### Listings
+### Items
 
-Listings are the primary working objects.
+Items are the primary working objects.
 
-A listing represents a product concept rather than simply an image.
+An Item represents a product concept rather than simply an image. Listing is its final workflow stage and may later own marketplace-specific preparation data.
 
-A listing may contain:
+An Item may contain:
 
 - idea
 - phrase
@@ -175,9 +175,9 @@ By default, the top-level folders inside a store are niches. A niche may contain
 FusionCanvas should distinguish between two navigation object types:
 
 - A topic is a folder-like grouping of related ideas, concepts, listings, campaigns, experiments, or work areas.
-- An item is a single idea, concept, listing, or other concrete unit of work.
+- An Item is the universal stage-agnostic concrete unit of work.
 
-In the current product language, niches and groups are topics, while listings are items. Future workflows may introduce other item types, such as raw ideas, concepts, prompts, or reusable phrase entries, but the navigation behavior should remain consistent.
+In the current product language, niches and groups are topics, while Items are concrete work records that move through Idea, Concept, Design, and Listing. Marketplace listings remain later, stage-specific data rather than the universal record.
 
 Users should be able to create a topic or item from the current navigation context with minimal friction. The chosen parent should be obvious, and newly created objects should appear where the user expects them.
 
@@ -281,13 +281,13 @@ Assets may include:
 - supplier product and color configuration
 - references
 
-Every asset should remain connected to the listing it belongs to.
+Every asset should remain connected to the Item it belongs to.
 
 Design assets should also remain connected to the design variant they support, such as a source file, a transparent PNG export, an AI-generated draft, an upscaled replacement, or a cleaned final file for dark or light shirts.
 
 ## Batch Workflow
 
-FusionCanvas is optimized for working with many listings simultaneously.
+FusionCanvas is optimized for working with many Items simultaneously.
 
 Examples include:
 
@@ -296,7 +296,7 @@ Examples include:
 - publishing products
 - updating metadata
 - running AI operations
-- organizing listings
+- organizing Items
 
 Batch operations should be first-class features.
 

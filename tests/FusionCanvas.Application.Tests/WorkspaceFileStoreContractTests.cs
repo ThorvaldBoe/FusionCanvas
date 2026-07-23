@@ -49,5 +49,10 @@ public class WorkspaceFileStoreContractTests
         public bool Exists(string workspaceRelativePath) => _existingReferences.Contains(workspaceRelativePath);
 
         public bool TryDelete(string workspaceRelativePath) => _existingReferences.Remove(workspaceRelativePath);
+
+        public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default) =>
+            Task.FromResult<Stream>(new MemoryStream());
+
+        public Task ExportCopyAsync(string workspaceRelativePath, string destinationPath, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

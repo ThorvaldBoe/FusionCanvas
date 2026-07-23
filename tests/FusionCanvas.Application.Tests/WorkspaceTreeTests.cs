@@ -89,9 +89,9 @@ public class WorkspaceTreeTests
         var now = DateTimeOffset.UtcNow;
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
         var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, "{}");
-        var byDescription = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Title A", "Cozy autumn mug", ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
-        var byNotes = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Title B", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, """{"notes":"remember to add a scarf"}""");
-        var noMatch = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Title C", "Plain text", ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var byDescription = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Title A", "Cozy autumn mug", ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var byNotes = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Title B", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, """{"notes":"remember to add a scarf"}""");
+        var noMatch = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Title C", "Plain text", ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var snapshot = new WorkspaceSnapshot([store], [niche], [], [byDescription, byNotes, noMatch], [], [], [], [], []);
 
         var byDesc = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery("autumn"));
@@ -107,10 +107,10 @@ public class WorkspaceTreeTests
         var now = DateTimeOffset.UtcNow;
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
         var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Untitled", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var listing = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Untitled", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var tag = new Tag(Guid.NewGuid(), store.Id, "Halloween", null, false, now, now, "{}");
         var snapshot = new WorkspaceSnapshot(
-            [store], [niche], [], [listing], [], [], [tag], [new ListingTag(listing.Id, tag.Id)], []);
+            [store], [niche], [], [listing], [], [], [tag], [new ItemTag(listing.Id, tag.Id)], []);
 
         var projection = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery("hallo"));
 
@@ -124,20 +124,20 @@ public class WorkspaceTreeTests
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
         var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, "{}");
         var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Campaign", null, false, now, now, "{}");
-        var oneTag = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "One", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
-        var bothTags = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Both", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var oneTag = new Item(Guid.NewGuid(), store.Id, niche.Id, group.Id, "One", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var bothTags = new Item(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Both", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var fallTag = new Tag(Guid.NewGuid(), store.Id, "Fall", null, false, now, now, "{}");
         var cozyTag = new Tag(Guid.NewGuid(), store.Id, "Cozy", null, false, now, now, "{}");
         var snapshot = new WorkspaceSnapshot(
             [store], [niche], [group], [oneTag, bothTags], [], [], [fallTag, cozyTag],
-            [new ListingTag(oneTag.Id, fallTag.Id), new ListingTag(bothTags.Id, fallTag.Id), new ListingTag(bothTags.Id, cozyTag.Id)],
+            [new ItemTag(oneTag.Id, fallTag.Id), new ItemTag(bothTags.Id, fallTag.Id), new ItemTag(bothTags.Id, cozyTag.Id)],
             []);
 
         var fallOnly = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery(TagIds: new HashSet<Guid> { fallTag.Id }));
         Assert.Equal(2, fallOnly.Roots.Single().Children.Single().Children.Count);
 
         var both = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery(TagIds: new HashSet<Guid> { fallTag.Id, cozyTag.Id }));
-        var matchedListing = Assert.Single(both.Roots.Single().Children.Single().Children, node => node.EntityKind == WorkspaceEntityKind.Listing);
+        var matchedListing = Assert.Single(both.Roots.Single().Children.Single().Children, node => node.EntityKind == WorkspaceEntityKind.Item);
         Assert.Equal(bothTags.Id, matchedListing.EntityId);
     }
 
@@ -149,9 +149,9 @@ public class WorkspaceTreeTests
         var niche = new Niche(Guid.NewGuid(), store.Id, "Niche", null, false, now, now, "{}");
         var outerGroup = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Outer", null, false, now, now, "{}");
         var innerGroup = new TopicGroup(Guid.NewGuid(), store.Id, null, outerGroup.Id, "Inner", null, false, now, now, "{}");
-        var outerListing = new Listing(Guid.NewGuid(), store.Id, niche.Id, outerGroup.Id, "Outer listing", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
-        var innerListing = new Listing(Guid.NewGuid(), store.Id, niche.Id, innerGroup.Id, "Inner listing", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
-        var outsideListing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Outside listing", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var outerListing = new Item(Guid.NewGuid(), store.Id, niche.Id, outerGroup.Id, "Outer listing", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var innerListing = new Item(Guid.NewGuid(), store.Id, niche.Id, innerGroup.Id, "Inner listing", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var outsideListing = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Outside listing", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var snapshot = new WorkspaceSnapshot([store], [niche], [outerGroup, innerGroup], [outerListing, innerListing, outsideListing], [], [], [], [], []);
 
         var scoped = WorkspaceTreeProjector.Project(
@@ -184,8 +184,8 @@ public class WorkspaceTreeTests
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
         var niche = new Niche(Guid.NewGuid(), store.Id, "Niche", null, false, now, now, "{}");
         var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Campaign", null, false, now, now, "{}");
-        var matching = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Pumpkin", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
-        var other = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Pumpkin elsewhere", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var matching = new Item(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Pumpkin", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var other = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Pumpkin elsewhere", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var snapshot = new WorkspaceSnapshot([store], [niche], [group], [matching, other], [], [], [], [], []);
 
         var projection = WorkspaceTreeProjector.Project(
@@ -195,7 +195,7 @@ public class WorkspaceTreeTests
 
         var root = Assert.Single(projection.Roots);
         Assert.Equal(group.Id, root.EntityId);
-        var matched = Assert.Single(root.Children, node => node.EntityKind == WorkspaceEntityKind.Listing);
+        var matched = Assert.Single(root.Children, node => node.EntityKind == WorkspaceEntityKind.Item);
         Assert.Equal(matching.Id, matched.EntityId);
     }
 
@@ -205,7 +205,7 @@ public class WorkspaceTreeTests
         var now = DateTimeOffset.UtcNow;
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
         var niche = new Niche(Guid.NewGuid(), store.Id, "Niche", null, false, now, now, "{}");
-        var archived = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Ghost listing", null, ListingStatus.Draft, WorkflowStage.Idea, true, now, now, "{}");
+        var archived = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Ghost listing", null, ItemStatus.Draft, WorkflowStage.Idea, true, now, now, "{}");
         var snapshot = new WorkspaceSnapshot([store], [niche], [], [archived], [], [], [], [], []);
 
         var defaultProjection = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery("ghost"));
@@ -238,7 +238,7 @@ public class WorkspaceTreeTests
         var now = DateTimeOffset.UtcNow;
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
         var niche = new Niche(Guid.NewGuid(), store.Id, "Niche", null, false, now, now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Title", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var listing = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Title", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var snapshot = new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [], [], []);
 
         var projection = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery("   "));

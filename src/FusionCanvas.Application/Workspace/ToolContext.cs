@@ -123,7 +123,7 @@ public sealed record ToolContext(
     Niche? ActiveNiche,
     IReadOnlyList<ToolContextEntityReference> TopicPath,
     ToolContextEntityReference? SelectedTopic,
-    Listing? SelectedItem,
+    Item? SelectedItem,
     WorkflowStage? WorkflowStage,
     ToolContextScopeKind ScopeKind,
     ToolContextScopeSummary ScopeSummary,

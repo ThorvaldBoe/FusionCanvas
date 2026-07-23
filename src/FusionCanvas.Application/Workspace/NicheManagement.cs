@@ -388,18 +388,18 @@ public sealed class NicheManagementService : INicheManagementService
 
     private static bool HasConnectedData(WorkspaceSnapshot snapshot, Guid nicheId)
     {
-        var listingIds = snapshot.Listings.Where(listing => listing.NicheId == nicheId).Select(listing => listing.Id).ToHashSet();
+        var itemIds = snapshot.Items.Where(listing => listing.NicheId == nicheId).Select(listing => listing.Id).ToHashSet();
         var assetIds = snapshot.AssetLinks
             .Where(link => IsNicheScopedAssetTarget(snapshot, link, nicheId))
             .Select(link => link.AssetId)
             .ToHashSet();
 
         return snapshot.Groups.Any(group => group.NicheId == nicheId)
-            || snapshot.Listings.Any(listing => listing.NicheId == nicheId)
-            || snapshot.Prompts.Any(prompt => prompt.ListingId is Guid listingId && listingIds.Contains(listingId))
+            || snapshot.Items.Any(listing => listing.NicheId == nicheId)
+            || snapshot.Prompts.Any(prompt => prompt.ItemId is Guid itemId && itemIds.Contains(itemId))
             || snapshot.AssetLinks.Any(link => IsNicheScopedAssetTarget(snapshot, link, nicheId))
             || snapshot.Assets.Any(asset => assetIds.Contains(asset.Id))
-            || snapshot.ListingTags.Any(link => listingIds.Contains(link.ListingId));
+            || snapshot.ItemTags.Any(link => itemIds.Contains(link.ItemId));
     }
 
     private static bool IsNicheScopedAssetTarget(WorkspaceSnapshot snapshot, AssetLink link, Guid nicheId) =>
@@ -407,8 +407,8 @@ public sealed class NicheManagementService : INicheManagementService
         {
             WorkspaceEntityKind.Niche => link.EntityId == nicheId,
             WorkspaceEntityKind.Group => snapshot.Groups.Any(group => group.Id == link.EntityId && group.NicheId == nicheId),
-            WorkspaceEntityKind.Listing => snapshot.Listings.Any(listing => listing.Id == link.EntityId && listing.NicheId == nicheId),
-            WorkspaceEntityKind.Prompt => snapshot.Prompts.Any(prompt => prompt.Id == link.EntityId && prompt.ListingId is Guid listingId && snapshot.Listings.Any(listing => listing.Id == listingId && listing.NicheId == nicheId)),
+            WorkspaceEntityKind.Item => snapshot.Items.Any(listing => listing.Id == link.EntityId && listing.NicheId == nicheId),
+            WorkspaceEntityKind.Prompt => snapshot.Prompts.Any(prompt => prompt.Id == link.EntityId && prompt.ItemId is Guid itemId && snapshot.Items.Any(listing => listing.Id == itemId && listing.NicheId == nicheId)),
             _ => false
         };
 

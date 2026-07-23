@@ -3,7 +3,7 @@ using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.Application.Workspace;
 
-public sealed record ListingTopicReference(WorkspaceEntityKind Kind, Guid Id)
+public sealed record ItemTopicReference(WorkspaceEntityKind Kind, Guid Id)
 {
     public WorkspaceEntityKind Kind { get; } = Kind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group
         ? Kind
@@ -14,36 +14,36 @@ public sealed record ListingTopicReference(WorkspaceEntityKind Kind, Guid Id)
         : Id;
 }
 
-public sealed record ListingContext(
+public sealed record ItemContext(
     string? Description = null,
     string? Notes = null,
     IReadOnlyDictionary<string, string>? Metadata = null,
     IReadOnlyList<Guid>? TagIds = null);
 
-public sealed record ListingManagementCreateRequest(ListingTopicReference Topic, string Name, ListingContext? Context = null);
-public sealed record ListingManagementUpdateRequest(Guid ListingId, string Name, ListingContext? Context = null);
-public sealed record ListingManagementMoveRequest(Guid ListingId, ListingTopicReference Destination);
-public sealed record ListingManagementDuplicateRequest(Guid ListingId, ListingTopicReference? Destination = null);
-public sealed record ListingManagementRestoreRequest(Guid ListingId, ListingTopicReference? Destination = null);
-public sealed record ListingManagementDeleteRequest(Guid ListingId, bool ConfirmPermanentDeletion);
-public sealed record ListingManagementSetStatusRequest(Guid ListingId, ListingStatus Status);
-public sealed record ListingManagementMoveStageRequest(Guid ListingId, WorkflowStage Stage);
+public sealed record ItemManagementCreateRequest(ItemTopicReference Topic, string Name, ItemContext? Context = null);
+public sealed record ItemManagementUpdateRequest(Guid ItemId, string Name, ItemContext? Context = null);
+public sealed record ItemManagementMoveRequest(Guid ItemId, ItemTopicReference Destination);
+public sealed record ItemManagementDuplicateRequest(Guid ItemId, ItemTopicReference? Destination = null);
+public sealed record ItemManagementRestoreRequest(Guid ItemId, ItemTopicReference? Destination = null);
+public sealed record ItemManagementDeleteRequest(Guid ItemId, bool ConfirmPermanentDeletion);
+public sealed record ItemManagementSetStatusRequest(Guid ItemId, ItemStatus Status, bool ConfirmProtectedTransition = false);
+public sealed record ItemManagementMoveStageRequest(Guid ItemId, WorkflowStage Stage);
 
-public sealed record ListingCreationDestinationResult(ListingTopicReference? Topic, string? Error)
+public sealed record ItemCreationDestinationResult(ItemTopicReference? Topic, string? Error)
 {
     public bool Succeeded => Topic is not null;
 }
 
-public sealed record ListingDestination(ListingTopicReference Topic, Guid StoreId, Guid NicheId, string DisplayPath);
+public sealed record ItemDestination(ItemTopicReference Topic, Guid StoreId, Guid NicheId, string DisplayPath);
 
-public sealed record ListingSummary(
+public sealed record ItemSummary(
     Guid Id,
     Guid StoreId,
     Guid NicheId,
-    ListingTopicReference Topic,
+    ItemTopicReference Topic,
     string Name,
-    ListingContext Context,
-    ListingStatus Status,
+    ItemContext Context,
+    ItemStatus Status,
     WorkflowStage Stage,
     bool IsArchived,
     bool IsEffectivelyActive,
@@ -52,93 +52,102 @@ public sealed record ListingSummary(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-public sealed record ListingManagementState(
+public sealed record ItemManagementState(
     Guid? ActiveStoreId,
-    Guid? ActiveListingId,
-    ListingSummary? ActiveListing,
-    IReadOnlyList<ListingSummary> ActiveListings,
-    IReadOnlyList<ListingSummary> ArchivedListings,
-    IReadOnlyList<ListingDestination> ValidDestinations,
+    Guid? ActiveItemId,
+    ItemSummary? ActiveItem,
+    IReadOnlyList<ItemSummary> ActiveItems,
+    IReadOnlyList<ItemSummary> ArchivedListings,
+    IReadOnlyList<ItemDestination> ValidDestinations,
     bool NeedsFirstListing);
 
-public sealed record ListingManagementResult(
+public sealed record ItemManagementResult(
     bool Succeeded,
     string? Error,
-    ListingSummary? Listing,
-    ListingManagementState State)
+    ItemSummary? Item,
+    ItemManagementState State)
 {
-    public static ListingManagementResult Success(ListingSummary? listing, ListingManagementState state) =>
+    public static ItemManagementResult Success(ItemSummary? listing, ItemManagementState state) =>
         new(true, null, listing, state);
 
-    public static ListingManagementResult Failure(string error, ListingManagementState state) =>
+    public static ItemManagementResult Failure(string error, ItemManagementState state) =>
         new(false, string.IsNullOrWhiteSpace(error) ? "Listing operation failed." : error, null, state);
 }
 
-public interface IListingManagementService
+public interface IItemManagementService
 {
     Guid? ActiveWorkspaceId { get; }
     Guid? ActiveStoreId { get; }
-    Guid? ActiveListingId { get; }
+    Guid? ActiveItemId { get; }
 
     void SetActiveWorkspace(Guid? workspaceId);
-    Task<ListingManagementState> LoadAsync(Guid? storeId, CancellationToken cancellationToken = default);
-    Task<ListingCreationDestinationResult> ResolveCreateTopicAsync(Guid storeId, WorkspaceTreeSelection? selection, CancellationToken cancellationToken = default);
-    Task<ListingManagementResult> CreateListingAsync(ListingManagementCreateRequest request, CancellationToken cancellationToken = default);
-    Task<ListingManagementResult> UpdateListingAsync(ListingManagementUpdateRequest request, CancellationToken cancellationToken = default);
-    Task<ListingManagementResult> MoveListingAsync(ListingManagementMoveRequest request, CancellationToken cancellationToken = default);
-    Task<ListingManagementResult> DuplicateListingAsync(ListingManagementDuplicateRequest request, CancellationToken cancellationToken = default);
-    Task<ListingManagementResult> ArchiveListingAsync(Guid listingId, CancellationToken cancellationToken = default);
-    Task<ListingManagementResult> RestoreListingAsync(ListingManagementRestoreRequest request, CancellationToken cancellationToken = default);
-    Task<ListingManagementResult> DeleteListingAsync(ListingManagementDeleteRequest request, CancellationToken cancellationToken = default);
-    Task<ListingManagementResult> SetListingStatusAsync(ListingManagementSetStatusRequest request, CancellationToken cancellationToken = default);
-    Task<ListingManagementResult> MoveListingStageAsync(ListingManagementMoveStageRequest request, CancellationToken cancellationToken = default);
-    Task<ListingManagementResult> SelectListingAsync(Guid listingId, CancellationToken cancellationToken = default);
+    Task<ItemManagementState> LoadAsync(Guid? storeId, CancellationToken cancellationToken = default);
+    Task<ItemCreationDestinationResult> ResolveCreateTopicAsync(Guid storeId, WorkspaceTreeSelection? selection, CancellationToken cancellationToken = default);
+    Task<ItemManagementResult> CreateItemAsync(ItemManagementCreateRequest request, CancellationToken cancellationToken = default);
+    Task<ItemManagementResult> UpdateItemAsync(ItemManagementUpdateRequest request, CancellationToken cancellationToken = default);
+    Task<ItemManagementResult> MoveItemAsync(ItemManagementMoveRequest request, CancellationToken cancellationToken = default);
+    Task<ItemManagementResult> DuplicateItemAsync(ItemManagementDuplicateRequest request, CancellationToken cancellationToken = default);
+    Task<ItemManagementResult> ArchiveItemAsync(Guid itemId, CancellationToken cancellationToken = default);
+    Task<ItemManagementResult> RestoreItemAsync(ItemManagementRestoreRequest request, CancellationToken cancellationToken = default);
+    Task<ItemManagementResult> DeleteItemAsync(ItemManagementDeleteRequest request, CancellationToken cancellationToken = default);
+    Task<ItemManagementResult> SetItemStatusAsync(ItemManagementSetStatusRequest request, CancellationToken cancellationToken = default);
+    Task<ItemManagementResult> MoveItemStageAsync(ItemManagementMoveStageRequest request, CancellationToken cancellationToken = default);
+    Task<ItemManagementResult> SelectItemAsync(Guid itemId, CancellationToken cancellationToken = default);
 }
 
-public sealed class ListingManagementService : IListingManagementService
+public sealed class ItemManagementService : IItemManagementService
 {
     private readonly IWorkspaceRepository _repository;
     private readonly IToolContextResolver _contextResolver;
     private readonly Func<DateTimeOffset> _clock;
-    private readonly Func<Guid> _newId;
+    private readonly IItemIdGenerator _idGenerator;
     private Guid? _activeWorkspaceId;
     private Guid? _activeStoreId;
-    private Guid? _activeListingId;
+    private Guid? _activeItemId;
 
-    public ListingManagementService(
+    public ItemManagementService(
         IWorkspaceRepository repository,
         IToolContextResolver? contextResolver = null,
         Func<DateTimeOffset>? clock = null,
         Func<Guid>? newId = null)
+        : this(repository, contextResolver, clock, newId is null ? null : new DelegateItemIdGenerator(newId))
+    {
+    }
+
+    public ItemManagementService(
+        IWorkspaceRepository repository,
+        IToolContextResolver? contextResolver,
+        Func<DateTimeOffset>? clock,
+        IItemIdGenerator? idGenerator)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _contextResolver = contextResolver ?? new ToolContextResolver();
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
-        _newId = newId ?? Guid.NewGuid;
+        _idGenerator = idGenerator ?? new GuidItemIdGenerator();
     }
 
     public Guid? ActiveWorkspaceId => _activeWorkspaceId;
     public Guid? ActiveStoreId => _activeStoreId;
-    public Guid? ActiveListingId => _activeListingId;
+    public Guid? ActiveItemId => _activeItemId;
 
     public void SetActiveWorkspace(Guid? workspaceId)
     {
         if (_activeWorkspaceId != workspaceId)
         {
             _activeStoreId = null;
-            _activeListingId = null;
+            _activeItemId = null;
         }
 
         _activeWorkspaceId = workspaceId;
     }
 
-    public async Task<ListingManagementState> LoadAsync(Guid? storeId, CancellationToken cancellationToken = default)
+    public async Task<ItemManagementState> LoadAsync(Guid? storeId, CancellationToken cancellationToken = default)
     {
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
         return BuildState(snapshot, storeId);
     }
 
-    public async Task<ListingCreationDestinationResult> ResolveCreateTopicAsync(
+    public async Task<ItemCreationDestinationResult> ResolveCreateTopicAsync(
         Guid storeId,
         WorkspaceTreeSelection? selection,
         CancellationToken cancellationToken = default)
@@ -154,9 +163,9 @@ public sealed class ListingManagementService : IListingManagementService
         {
             var selectedTopic = selection.Kind switch
             {
-                WorkspaceEntityKind.Niche => new ListingTopicReference(WorkspaceEntityKind.Niche, selection.Id),
-                WorkspaceEntityKind.Group => new ListingTopicReference(WorkspaceEntityKind.Group, selection.Id),
-                WorkspaceEntityKind.Listing => snapshot.Listings.SingleOrDefault(candidate => candidate.Id == selection.Id) is { } listing
+                WorkspaceEntityKind.Niche => new ItemTopicReference(WorkspaceEntityKind.Niche, selection.Id),
+                WorkspaceEntityKind.Group => new ItemTopicReference(WorkspaceEntityKind.Group, selection.Id),
+                WorkspaceEntityKind.Item => snapshot.Items.SingleOrDefault(candidate => candidate.Id == selection.Id) is { } listing
                     ? ToTopic(listing)
                     : null,
                 _ => null
@@ -177,11 +186,11 @@ public sealed class ListingManagementService : IListingManagementService
             ? new(null, activeNiches.Length == 0
                 ? "Create an active niche before creating listings."
                 : "Select a topic or configure the store's default niche before creating listings.")
-            : new(new ListingTopicReference(WorkspaceEntityKind.Niche, defaultNiche.Id), null);
+            : new(new ItemTopicReference(WorkspaceEntityKind.Niche, defaultNiche.Id), null);
     }
 
-    public async Task<ListingManagementResult> CreateListingAsync(
-        ListingManagementCreateRequest request,
+    public async Task<ItemManagementResult> CreateItemAsync(
+        ItemManagementCreateRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -191,29 +200,35 @@ public sealed class ListingManagementService : IListingManagementService
             return Failure(topicError!, snapshot, _activeStoreId);
         }
 
-        var name = ListingMetadataCodec.NormalizeName(request.Name);
-        var nameError = ListingMetadataCodec.ValidateName(name);
+        var name = ItemMetadataCodec.NormalizeName(request.Name);
+        var nameError = ItemMetadataCodec.ValidateName(name);
         if (nameError is not null)
         {
             return Failure(nameError, snapshot, storeId);
         }
 
         var now = _clock();
-        var context = request.Context ?? new ListingContext();
+        var context = request.Context ?? new ItemContext();
         var metadata = ResolveCreationMetadata(snapshot, request.Topic, context);
-        var listing = new Listing(
-            _newId(),
+        var itemId = _idGenerator.NewId();
+        if (itemId == Guid.Empty)
+        {
+            return Failure("Item identity could not be generated. Try creating the item again.", snapshot, storeId);
+        }
+
+        var listing = new Item(
+            itemId,
             storeId,
             nicheId,
             request.Topic.Kind == WorkspaceEntityKind.Group ? request.Topic.Id : null,
             name,
-            ListingMetadataCodec.NormalizeOptional(context.Description),
-            ListingStatus.Draft,
+            ItemMetadataCodec.NormalizeOptional(context.Description),
+            ItemStatus.Draft,
             WorkflowStage.Idea,
             false,
             now,
             now,
-            ListingMetadataCodec.SerializeMetadata(metadata));
+            ItemMetadataCodec.SerializeMetadata(metadata));
 
         IReadOnlyList<Guid> tagIds;
         try
@@ -226,8 +241,8 @@ public sealed class ListingManagementService : IListingManagementService
         }
         var updated = snapshot with
         {
-            Listings = [.. snapshot.Listings, listing],
-            ListingTags = [.. snapshot.ListingTags, .. tagIds.Select(tagId => new ListingTag(listing.Id, tagId))]
+            Items = [.. snapshot.Items, listing],
+            ItemTags = [.. snapshot.ItemTags, .. tagIds.Select(tagId => new ItemTag(listing.Id, tagId))]
         };
 
         var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
@@ -240,41 +255,41 @@ public sealed class ListingManagementService : IListingManagementService
         return Success(listing, updated);
     }
 
-    public async Task<ListingManagementResult> UpdateListingAsync(
-        ListingManagementUpdateRequest request,
+    public async Task<ItemManagementResult> UpdateItemAsync(
+        ItemManagementUpdateRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var existing = snapshot.Listings.SingleOrDefault(candidate => candidate.Id == request.ListingId);
+        var existing = snapshot.Items.SingleOrDefault(candidate => candidate.Id == request.ItemId);
         if (existing is null)
         {
             return Failure("Listing was not found.", snapshot, _activeStoreId);
         }
 
-        var name = ListingMetadataCodec.NormalizeName(request.Name);
-        var nameError = ListingMetadataCodec.ValidateName(name);
+        var name = ItemMetadataCodec.NormalizeName(request.Name);
+        var nameError = ItemMetadataCodec.ValidateName(name);
         if (nameError is not null)
         {
             return Failure(nameError, snapshot, existing.StoreId);
         }
 
         var context = request.Context ?? ToContext(snapshot, existing);
-        var metadata = ListingMetadataCodec.ParseMetadata(existing.MetadataJson);
+        var metadata = ItemMetadataCodec.ParseMetadata(existing.MetadataJson);
         ApplyContextMetadata(metadata, context, replaceExplicitMetadata: context.Metadata is not null);
         var changed = existing with
         {
             Name = name,
-            Description = ListingMetadataCodec.NormalizeOptional(context.Description),
-            MetadataJson = ListingMetadataCodec.SerializeMetadata(metadata),
+            Description = ItemMetadataCodec.NormalizeOptional(context.Description),
+            MetadataJson = ItemMetadataCodec.SerializeMetadata(metadata),
             UpdatedAt = _clock()
         };
-        IReadOnlyList<ListingTag> listingTags;
+        IReadOnlyList<ItemTag> listingTags;
         try
         {
             listingTags = context.TagIds is null
-                ? snapshot.ListingTags
-                : [.. snapshot.ListingTags.Where(link => link.ListingId != existing.Id), .. ValidateTagIds(snapshot, existing.StoreId, context.TagIds).Select(tagId => new ListingTag(existing.Id, tagId))];
+                ? snapshot.ItemTags
+                : [.. snapshot.ItemTags.Where(link => link.ItemId != existing.Id), .. ValidateTagIds(snapshot, existing.StoreId, context.TagIds).Select(tagId => new ItemTag(existing.Id, tagId))];
         }
         catch (InvalidOperationException exception)
         {
@@ -282,8 +297,8 @@ public sealed class ListingManagementService : IListingManagementService
         }
         var updated = snapshot with
         {
-            Listings = snapshot.Listings.Select(candidate => candidate.Id == existing.Id ? changed : candidate).ToArray(),
-            ListingTags = listingTags
+            Items = snapshot.Items.Select(candidate => candidate.Id == existing.Id ? changed : candidate).ToArray(),
+            ItemTags = listingTags
         };
 
         var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
@@ -296,19 +311,19 @@ public sealed class ListingManagementService : IListingManagementService
         return Success(changed, updated);
     }
 
-    public async Task<ListingManagementResult> MoveListingAsync(
-        ListingManagementMoveRequest request,
+    public async Task<ItemManagementResult> MoveItemAsync(
+        ItemManagementMoveRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var existing = snapshot.Listings.SingleOrDefault(candidate => candidate.Id == request.ListingId);
+        var existing = snapshot.Items.SingleOrDefault(candidate => candidate.Id == request.ItemId);
         if (existing is null)
         {
             return Failure("Listing was not found.", snapshot, _activeStoreId);
         }
 
-        if (!ListingHierarchy.IsEffectivelyActive(snapshot, existing))
+        if (!ItemHierarchy.IsEffectivelyActive(snapshot, existing))
         {
             return Failure("Archived listings or listings beneath inactive topics must be restored before moving.", snapshot, existing.StoreId);
         }
@@ -329,7 +344,7 @@ public sealed class ListingManagementService : IListingManagementService
             GroupId = request.Destination.Kind == WorkspaceEntityKind.Group ? request.Destination.Id : null,
             UpdatedAt = _clock()
         };
-        var updated = snapshot with { Listings = snapshot.Listings.Select(candidate => candidate.Id == existing.Id ? changed : candidate).ToArray() };
+        var updated = snapshot with { Items = snapshot.Items.Select(candidate => candidate.Id == existing.Id ? changed : candidate).ToArray() };
         var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
         if (saveError is not null)
         {
@@ -340,19 +355,19 @@ public sealed class ListingManagementService : IListingManagementService
         return Success(changed, updated);
     }
 
-    public async Task<ListingManagementResult> DuplicateListingAsync(
-        ListingManagementDuplicateRequest request,
+    public async Task<ItemManagementResult> DuplicateItemAsync(
+        ItemManagementDuplicateRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var source = snapshot.Listings.SingleOrDefault(candidate => candidate.Id == request.ListingId);
+        var source = snapshot.Items.SingleOrDefault(candidate => candidate.Id == request.ItemId);
         if (source is null)
         {
             return Failure("Listing was not found.", snapshot, _activeStoreId);
         }
 
-        if (!ListingHierarchy.IsEffectivelyActive(snapshot, source))
+        if (!ItemHierarchy.IsEffectivelyActive(snapshot, source))
         {
             return Failure("Archived listings or listings beneath inactive topics must be restored before duplication.", snapshot, source.StoreId);
         }
@@ -371,21 +386,21 @@ public sealed class ListingManagementService : IListingManagementService
         var now = _clock();
         var duplicate = source with
         {
-            Id = _newId(),
+            Id = _idGenerator.NewId(),
             NicheId = nicheId,
             GroupId = destination.Kind == WorkspaceEntityKind.Group ? destination.Id : null,
             Name = UniqueCopyName(snapshot, source.Name),
-            Status = ListingStatus.Draft,
+            Status = ItemStatus.Draft,
             Stage = WorkflowStage.Idea,
             IsArchived = false,
             CreatedAt = now,
             UpdatedAt = now
         };
-        var sourceTagIds = snapshot.ListingTags.Where(link => link.ListingId == source.Id).Select(link => link.TagId);
+        var sourceTagIds = snapshot.ItemTags.Where(link => link.ItemId == source.Id).Select(link => link.TagId);
         var updated = snapshot with
         {
-            Listings = [.. snapshot.Listings, duplicate],
-            ListingTags = [.. snapshot.ListingTags, .. sourceTagIds.Select(tagId => new ListingTag(duplicate.Id, tagId))]
+            Items = [.. snapshot.Items, duplicate],
+            ItemTags = [.. snapshot.ItemTags, .. sourceTagIds.Select(tagId => new ItemTag(duplicate.Id, tagId))]
         };
         var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
         if (saveError is not null)
@@ -397,22 +412,22 @@ public sealed class ListingManagementService : IListingManagementService
         return Success(duplicate, updated);
     }
 
-    public Task<ListingManagementResult> ArchiveListingAsync(Guid listingId, CancellationToken cancellationToken = default) =>
-        SetArchiveStateAsync(listingId, true, destination: null, cancellationToken);
+    public Task<ItemManagementResult> ArchiveItemAsync(Guid itemId, CancellationToken cancellationToken = default) =>
+        SetArchiveStateAsync(itemId, true, destination: null, cancellationToken);
 
-    public Task<ListingManagementResult> RestoreListingAsync(ListingManagementRestoreRequest request, CancellationToken cancellationToken = default)
+    public Task<ItemManagementResult> RestoreItemAsync(ItemManagementRestoreRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return SetArchiveStateAsync(request.ListingId, false, request.Destination, cancellationToken);
+        return SetArchiveStateAsync(request.ItemId, false, request.Destination, cancellationToken);
     }
 
-    public async Task<ListingManagementResult> DeleteListingAsync(
-        ListingManagementDeleteRequest request,
+    public async Task<ItemManagementResult> DeleteItemAsync(
+        ItemManagementDeleteRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var existing = snapshot.Listings.SingleOrDefault(candidate => candidate.Id == request.ListingId);
+        var existing = snapshot.Items.SingleOrDefault(candidate => candidate.Id == request.ItemId);
         if (existing is null)
         {
             return Failure("Listing was not found.", snapshot, _activeStoreId);
@@ -423,16 +438,16 @@ public sealed class ListingManagementService : IListingManagementService
             return Failure("Permanent deletion requires confirmation.", snapshot, existing.StoreId);
         }
 
-        if (snapshot.Prompts.Any(prompt => prompt.ListingId == existing.Id) ||
-            snapshot.AssetLinks.Any(link => link.EntityKind == WorkspaceEntityKind.Listing && link.EntityId == existing.Id))
+        if (snapshot.Prompts.Any(prompt => prompt.ItemId == existing.Id) ||
+            snapshot.AssetLinks.Any(link => link.EntityKind == WorkspaceEntityKind.Item && link.EntityId == existing.Id))
         {
             return Failure("Listing has connected prompts or assets. Detach them or archive the listing instead.", snapshot, existing.StoreId);
         }
 
         var updated = snapshot with
         {
-            Listings = snapshot.Listings.Where(candidate => candidate.Id != existing.Id).ToArray(),
-            ListingTags = snapshot.ListingTags.Where(link => link.ListingId != existing.Id).ToArray()
+            Items = snapshot.Items.Where(candidate => candidate.Id != existing.Id).ToArray(),
+            ItemTags = snapshot.ItemTags.Where(link => link.ItemId != existing.Id).ToArray()
         };
         var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
         if (saveError is not null)
@@ -440,16 +455,16 @@ public sealed class ListingManagementService : IListingManagementService
             return Failure(saveError, snapshot, existing.StoreId);
         }
 
-        if (_activeListingId == existing.Id)
+        if (_activeItemId == existing.Id)
         {
-            _activeListingId = null;
+            _activeItemId = null;
         }
         _activeStoreId = existing.StoreId;
-        return ListingManagementResult.Success(ToSummary(snapshot, existing), BuildState(updated, existing.StoreId));
+        return ItemManagementResult.Success(ToSummary(snapshot, existing), BuildState(updated, existing.StoreId));
     }
 
-    public async Task<ListingManagementResult> SetListingStatusAsync(
-        ListingManagementSetStatusRequest request,
+    public async Task<ItemManagementResult> SetItemStatusAsync(
+        ItemManagementSetStatusRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -459,10 +474,10 @@ public sealed class ListingManagementService : IListingManagementService
         }
 
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var existing = snapshot.Listings.SingleOrDefault(candidate => candidate.Id == request.ListingId);
+        var existing = snapshot.Items.SingleOrDefault(candidate => candidate.Id == request.ItemId);
         if (existing is null)
         {
-            return Failure("Listing was not found.", snapshot, _activeStoreId);
+            return Failure("Item was not found.", snapshot, _activeStoreId);
         }
 
         if (existing.Status == request.Status)
@@ -471,8 +486,19 @@ public sealed class ListingManagementService : IListingManagementService
             return Success(existing, snapshot);
         }
 
+        var decision = ItemWorkflowPolicy.DecideTransition(existing.Status, existing.Stage, request.Status);
+        if (!decision.IsAllowed)
+        {
+            return Failure(decision.Reason, snapshot, existing.StoreId);
+        }
+
+        if (decision.RequiresConfirmation && !request.ConfirmProtectedTransition)
+        {
+            return Failure($"{decision.Reason} Confirm the protected status change to continue.", snapshot, existing.StoreId);
+        }
+
         var changed = existing with { Status = request.Status, UpdatedAt = _clock() };
-        var updated = snapshot with { Listings = snapshot.Listings.Select(candidate => candidate.Id == existing.Id ? changed : candidate).ToArray() };
+        var updated = snapshot with { Items = snapshot.Items.Select(candidate => candidate.Id == existing.Id ? changed : candidate).ToArray() };
 
         var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
         if (saveError is not null)
@@ -484,8 +510,8 @@ public sealed class ListingManagementService : IListingManagementService
         return Success(changed, updated);
     }
 
-    public async Task<ListingManagementResult> MoveListingStageAsync(
-        ListingManagementMoveStageRequest request,
+    public async Task<ItemManagementResult> MoveItemStageAsync(
+        ItemManagementMoveStageRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -495,15 +521,16 @@ public sealed class ListingManagementService : IListingManagementService
         }
 
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var existing = snapshot.Listings.SingleOrDefault(candidate => candidate.Id == request.ListingId);
+        var existing = snapshot.Items.SingleOrDefault(candidate => candidate.Id == request.ItemId);
         if (existing is null)
         {
-            return Failure("Listing was not found.", snapshot, _activeStoreId);
+            return Failure("Item was not found.", snapshot, _activeStoreId);
         }
 
-        if (existing.IsArchived || existing.Status == ListingStatus.Rejected)
+        var movementDecision = ItemWorkflowPolicy.CanPerformOperation(existing, ItemOperationKind.StageMovement);
+        if (!movementDecision.IsAllowed)
         {
-            return Failure("Inactive listings must be reactivated before moving workflow stages.", snapshot, existing.StoreId);
+            return Failure(movementDecision.Reason, snapshot, existing.StoreId);
         }
 
         if (existing.Stage == request.Stage)
@@ -512,8 +539,13 @@ public sealed class ListingManagementService : IListingManagementService
             return Success(existing, snapshot);
         }
 
+        if (!ItemWorkflowPolicy.CanMoveAdjacent(existing.Stage, request.Stage))
+        {
+            return Failure("Stage movement is only allowed between adjacent workflow stages.", snapshot, existing.StoreId);
+        }
+
         var changed = existing with { Stage = request.Stage, UpdatedAt = _clock() };
-        var updated = snapshot with { Listings = snapshot.Listings.Select(candidate => candidate.Id == existing.Id ? changed : candidate).ToArray() };
+        var updated = snapshot with { Items = snapshot.Items.Select(candidate => candidate.Id == existing.Id ? changed : candidate).ToArray() };
 
         var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
         if (saveError is not null)
@@ -525,16 +557,16 @@ public sealed class ListingManagementService : IListingManagementService
         return Success(changed, updated);
     }
 
-    public async Task<ListingManagementResult> SelectListingAsync(Guid listingId, CancellationToken cancellationToken = default)
+    public async Task<ItemManagementResult> SelectItemAsync(Guid itemId, CancellationToken cancellationToken = default)
     {
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var listing = snapshot.Listings.SingleOrDefault(candidate => candidate.Id == listingId);
+        var listing = snapshot.Items.SingleOrDefault(candidate => candidate.Id == itemId);
         if (listing is null)
         {
             return Failure("Listing was not found.", snapshot, _activeStoreId);
         }
 
-        if (!ListingHierarchy.IsEffectivelyActive(snapshot, listing) || !StoreBelongsToActiveWorkspace(snapshot.Stores.Single(store => store.Id == listing.StoreId)))
+        if (!ItemHierarchy.IsEffectivelyActive(snapshot, listing) || !StoreBelongsToActiveWorkspace(snapshot.Stores.Single(store => store.Id == listing.StoreId)))
         {
             return Failure("Archived listings or listings beneath inactive topics cannot become active context.", snapshot, listing.StoreId);
         }
@@ -543,14 +575,14 @@ public sealed class ListingManagementService : IListingManagementService
         return Success(listing, snapshot);
     }
 
-    private async Task<ListingManagementResult> SetArchiveStateAsync(
-        Guid listingId,
+    private async Task<ItemManagementResult> SetArchiveStateAsync(
+        Guid itemId,
         bool archived,
-        ListingTopicReference? destination,
+        ItemTopicReference? destination,
         CancellationToken cancellationToken)
     {
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var existing = snapshot.Listings.SingleOrDefault(candidate => candidate.Id == listingId);
+        var existing = snapshot.Items.SingleOrDefault(candidate => candidate.Id == itemId);
         if (existing is null)
         {
             return Failure("Listing was not found.", snapshot, _activeStoreId);
@@ -572,7 +604,7 @@ public sealed class ListingManagementService : IListingManagementService
         }
         else
         {
-            nicheId = ListingHierarchy.GetEffectiveNiche(snapshot, existing).Id;
+            nicheId = ItemHierarchy.GetEffectiveNiche(snapshot, existing).Id;
         }
 
         var changed = existing with
@@ -582,7 +614,7 @@ public sealed class ListingManagementService : IListingManagementService
             IsArchived = archived,
             UpdatedAt = _clock()
         };
-        var updated = snapshot with { Listings = snapshot.Listings.Select(candidate => candidate.Id == existing.Id ? changed : candidate).ToArray() };
+        var updated = snapshot with { Items = snapshot.Items.Select(candidate => candidate.Id == existing.Id ? changed : candidate).ToArray() };
         var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
         if (saveError is not null)
         {
@@ -591,9 +623,9 @@ public sealed class ListingManagementService : IListingManagementService
 
         if (archived)
         {
-            if (_activeListingId == existing.Id)
+            if (_activeItemId == existing.Id)
             {
-                _activeListingId = null;
+                _activeItemId = null;
             }
             _activeStoreId = existing.StoreId;
         }
@@ -605,7 +637,7 @@ public sealed class ListingManagementService : IListingManagementService
         return Success(changed, updated);
     }
 
-    private ListingManagementState BuildState(WorkspaceSnapshot snapshot, Guid? storeId)
+    private ItemManagementState BuildState(WorkspaceSnapshot snapshot, Guid? storeId)
     {
         if (storeId is Guid requestedStoreId)
         {
@@ -619,31 +651,31 @@ public sealed class ListingManagementService : IListingManagementService
             _activeStoreId = null;
         }
 
-        if (_activeListingId is Guid activeListingId &&
-            snapshot.Listings.SingleOrDefault(candidate => candidate.Id == activeListingId) is not { } activeListing ||
-            _activeListingId is Guid selectedId && snapshot.Listings.SingleOrDefault(candidate => candidate.Id == selectedId) is { } selected &&
-            (_activeStoreId != selected.StoreId || !ListingHierarchy.IsEffectivelyActive(snapshot, selected)))
+        if (_activeItemId is Guid activeItemId &&
+            snapshot.Items.SingleOrDefault(candidate => candidate.Id == activeItemId) is not { } activeListing ||
+            _activeItemId is Guid selectedId && snapshot.Items.SingleOrDefault(candidate => candidate.Id == selectedId) is { } selected &&
+            (_activeStoreId != selected.StoreId || !ItemHierarchy.IsEffectivelyActive(snapshot, selected)))
         {
-            _activeListingId = null;
+            _activeItemId = null;
         }
 
         var storeListings = _activeStoreId is Guid id
-            ? snapshot.Listings.Where(listing => listing.StoreId == id).ToArray()
+            ? snapshot.Items.Where(listing => listing.StoreId == id).ToArray()
             : [];
         var active = storeListings
-            .Where(listing => ListingHierarchy.IsEffectivelyActive(snapshot, listing))
+            .Where(listing => ItemHierarchy.IsEffectivelyActive(snapshot, listing))
             .OrderBy(listing => listing.Name, StringComparer.OrdinalIgnoreCase)
             .Select(listing => ToSummary(snapshot, listing))
             .ToArray();
         var archived = storeListings
-            .Where(listing => !ListingHierarchy.IsEffectivelyActive(snapshot, listing))
+            .Where(listing => !ItemHierarchy.IsEffectivelyActive(snapshot, listing))
             .OrderBy(listing => listing.Name, StringComparer.OrdinalIgnoreCase)
             .Select(listing => ToSummary(snapshot, listing))
             .ToArray();
-        var selectedSummary = _activeListingId is Guid listingId ? active.SingleOrDefault(listing => listing.Id == listingId) : null;
-        return new ListingManagementState(
+        var selectedSummary = _activeItemId is Guid itemId ? active.SingleOrDefault(listing => listing.Id == itemId) : null;
+        return new ItemManagementState(
             _activeStoreId,
-            _activeListingId,
+            _activeItemId,
             selectedSummary,
             active,
             archived,
@@ -651,15 +683,15 @@ public sealed class ListingManagementService : IListingManagementService
             _activeStoreId is not null && active.Length == 0);
     }
 
-    private ListingManagementResult Success(Listing listing, WorkspaceSnapshot snapshot) =>
-        ListingManagementResult.Success(ToSummary(snapshot, listing), BuildState(snapshot, listing.StoreId));
+    private ItemManagementResult Success(Item listing, WorkspaceSnapshot snapshot) =>
+        ItemManagementResult.Success(ToSummary(snapshot, listing), BuildState(snapshot, listing.StoreId));
 
-    private ListingManagementResult Failure(string error, WorkspaceSnapshot snapshot, Guid? storeId) =>
-        ListingManagementResult.Failure(error, BuildState(snapshot, storeId));
+    private ItemManagementResult Failure(string error, WorkspaceSnapshot snapshot, Guid? storeId) =>
+        ItemManagementResult.Failure(error, BuildState(snapshot, storeId));
 
     private bool TryResolveActiveTopic(
         WorkspaceSnapshot snapshot,
-        ListingTopicReference topic,
+        ItemTopicReference topic,
         out Guid storeId,
         out Guid nicheId,
         out string? error)
@@ -710,8 +742,8 @@ public sealed class ListingManagementService : IListingManagementService
 
     private Dictionary<string, string> ResolveCreationMetadata(
         WorkspaceSnapshot snapshot,
-        ListingTopicReference topic,
-        ListingContext context)
+        ItemTopicReference topic,
+        ItemContext context)
     {
         var resolution = _contextResolver.Resolve(new ToolContextResolveRequest(
             snapshot,
@@ -724,7 +756,7 @@ public sealed class ListingManagementService : IListingManagementService
             foreach (var value in _contextResolver.ResolveCreationDefaults(resolution).Metadata)
             {
                 metadata[value.Key] = value.Value;
-                metadata[$"{ListingMetadataCodec.InheritedFromPrefix}{value.Key}"] = $"{value.Source.EntityKind}:{value.Source.EntityId}";
+                metadata[$"{ItemMetadataCodec.InheritedFromPrefix}{value.Key}"] = $"{value.Source.EntityKind}:{value.Source.EntityId}";
             }
         }
 
@@ -735,8 +767,8 @@ public sealed class ListingManagementService : IListingManagementService
     private IReadOnlyList<Guid> ResolveTagIds(
         WorkspaceSnapshot snapshot,
         Guid storeId,
-        ListingTopicReference topic,
-        ListingContext context)
+        ItemTopicReference topic,
+        ItemContext context)
     {
         var ids = context.TagIds is null ? new HashSet<Guid>() : ValidateTagIds(snapshot, storeId, context.TagIds).ToHashSet();
         var resolution = _contextResolver.Resolve(new ToolContextResolveRequest(snapshot, ToolContextSelectionKind.Topic, topic.Kind, topic.Id));
@@ -764,24 +796,24 @@ public sealed class ListingManagementService : IListingManagementService
         return ids;
     }
 
-    private static void ApplyContextMetadata(Dictionary<string, string> metadata, ListingContext context, bool replaceExplicitMetadata) =>
-        ListingMetadataCodec.ApplyContextMetadata(metadata, context, replaceExplicitMetadata);
+    private static void ApplyContextMetadata(Dictionary<string, string> metadata, ItemContext context, bool replaceExplicitMetadata) =>
+        ItemMetadataCodec.ApplyContextMetadata(metadata, context, replaceExplicitMetadata);
 
-    private static ListingContext ToContext(WorkspaceSnapshot snapshot, Listing listing)
+    private static ItemContext ToContext(WorkspaceSnapshot snapshot, Item listing)
     {
-        var metadata = ListingMetadataCodec.ParseMetadata(listing.MetadataJson);
-        metadata.Remove(ListingMetadataCodec.NotesKey, out var notes);
+        var metadata = ItemMetadataCodec.ParseMetadata(listing.MetadataJson);
+        metadata.Remove(ItemMetadataCodec.NotesKey, out var notes);
         var explicitMetadata = metadata
-            .Where(pair => !pair.Key.StartsWith(ListingMetadataCodec.InheritedFromPrefix, StringComparison.Ordinal))
+            .Where(pair => !pair.Key.StartsWith(ItemMetadataCodec.InheritedFromPrefix, StringComparison.Ordinal))
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
-        var tagIds = snapshot.ListingTags.Where(link => link.ListingId == listing.Id).Select(link => link.TagId).ToArray();
-        return new ListingContext(listing.Description, notes, explicitMetadata, tagIds);
+        var tagIds = snapshot.ItemTags.Where(link => link.ItemId == listing.Id).Select(link => link.TagId).ToArray();
+        return new ItemContext(listing.Description, notes, explicitMetadata, tagIds);
     }
 
-    private static ListingSummary ToSummary(WorkspaceSnapshot snapshot, Listing listing)
+    private static ItemSummary ToSummary(WorkspaceSnapshot snapshot, Item listing)
     {
         var topic = ToTopic(listing);
-        var niche = ListingHierarchy.GetEffectiveNiche(snapshot, listing);
+        var niche = ItemHierarchy.GetEffectiveNiche(snapshot, listing);
         var groupPath = listing.GroupId is Guid groupId
             ? GroupHierarchy.GetAncestors(snapshot, snapshot.Groups.Single(group => group.Id == groupId))
                 .Select(group => group.Id)
@@ -792,7 +824,7 @@ public sealed class ListingManagementService : IListingManagementService
         var names = new[] { niche.Name }
             .Concat(groupPath.Select(id => snapshot.Groups.Single(group => group.Id == id).Name))
             .Append(listing.Name);
-        return new ListingSummary(
+        return new ItemSummary(
             listing.Id,
             listing.StoreId,
             niche.Id,
@@ -802,43 +834,43 @@ public sealed class ListingManagementService : IListingManagementService
             listing.Status,
             listing.Stage,
             listing.IsArchived,
-            ListingHierarchy.IsEffectivelyActive(snapshot, listing),
+            ItemHierarchy.IsEffectivelyActive(snapshot, listing),
             path,
             string.Join(" / ", names),
             listing.CreatedAt,
             listing.UpdatedAt);
     }
 
-    private static IReadOnlyList<ListingDestination> BuildDestinations(WorkspaceSnapshot snapshot, Guid? storeId)
+    private static IReadOnlyList<ItemDestination> BuildDestinations(WorkspaceSnapshot snapshot, Guid? storeId)
     {
         if (storeId is not Guid id)
         {
             return [];
         }
 
-        var destinations = new List<ListingDestination>();
+        var destinations = new List<ItemDestination>();
         foreach (var niche in snapshot.Niches.Where(candidate => candidate.StoreId == id && !candidate.IsArchived).OrderBy(candidate => candidate.Name, StringComparer.OrdinalIgnoreCase))
         {
-            destinations.Add(new ListingDestination(new ListingTopicReference(WorkspaceEntityKind.Niche, niche.Id), id, niche.Id, niche.Name));
+            destinations.Add(new ItemDestination(new ItemTopicReference(WorkspaceEntityKind.Niche, niche.Id), id, niche.Id, niche.Name));
             foreach (var group in snapshot.Groups.Where(candidate => candidate.StoreId == id && GroupHierarchy.IsEffectivelyActive(snapshot, candidate) && GroupHierarchy.GetEffectiveNiche(snapshot, candidate).Id == niche.Id))
             {
                 var path = GroupHierarchy.GetAncestors(snapshot, group).Select(ancestor => ancestor.Name).Append(group.Name);
-                destinations.Add(new ListingDestination(new ListingTopicReference(WorkspaceEntityKind.Group, group.Id), id, niche.Id, $"{niche.Name} / {string.Join(" / ", path)}"));
+                destinations.Add(new ItemDestination(new ItemTopicReference(WorkspaceEntityKind.Group, group.Id), id, niche.Id, $"{niche.Name} / {string.Join(" / ", path)}"));
             }
         }
         return destinations.OrderBy(destination => destination.DisplayPath, StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
-    private static ListingTopicReference ToTopic(Listing listing) =>
+    private static ItemTopicReference ToTopic(Item listing) =>
         listing.GroupId is Guid groupId
-            ? new ListingTopicReference(WorkspaceEntityKind.Group, groupId)
+            ? new ItemTopicReference(WorkspaceEntityKind.Group, groupId)
             : listing.NicheId is Guid nicheId
-                ? new ListingTopicReference(WorkspaceEntityKind.Niche, nicheId)
+                ? new ItemTopicReference(WorkspaceEntityKind.Niche, nicheId)
                 : throw new InvalidOperationException("A listing must belong beneath a niche or group.");
 
     private static string UniqueCopyName(WorkspaceSnapshot snapshot, string sourceName)
     {
-        var names = snapshot.Listings.Select(listing => listing.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var names = snapshot.Items.Select(listing => listing.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var candidate = $"{sourceName} Copy";
         if (!names.Contains(candidate))
         {
@@ -868,5 +900,5 @@ public sealed class ListingManagementService : IListingManagementService
     }
 
     private bool StoreBelongsToActiveWorkspace(Store store) => _activeWorkspaceId is null || store.WorkspaceId == _activeWorkspaceId;
-    private void SetSelection(Guid storeId, Guid listingId) { _activeStoreId = storeId; _activeListingId = listingId; }
+    private void SetSelection(Guid storeId, Guid itemId) { _activeStoreId = storeId; _activeItemId = itemId; }
 }

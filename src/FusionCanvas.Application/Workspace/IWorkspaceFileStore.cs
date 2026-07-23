@@ -14,6 +14,10 @@ public interface IWorkspaceFileStore
     bool Exists(string workspaceRelativePath);
 
     bool TryDelete(string workspaceRelativePath);
+
+    Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default);
+
+    Task ExportCopyAsync(string workspaceRelativePath, string destinationPath, CancellationToken cancellationToken = default);
 }
 
 public sealed record ManagedWorkspaceFile(

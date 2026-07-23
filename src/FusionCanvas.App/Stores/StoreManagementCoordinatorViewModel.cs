@@ -79,7 +79,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private NicheSummary? _pendingEditorNiche;
     private TagSummary? _pendingEditorTag;
     private TagSummary? _pendingDeleteTag;
-    private int _pendingDeleteTagListingCount;
+    private int _pendingDeleteTagItemCount;
     private PendingEditorAction _pendingEditorAction;
     private EditorState _originalEditorState = EmptyEditorState();
     private NicheEditorState _originalNicheEditorState = EmptyNicheEditorState();
@@ -412,9 +412,9 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public string TagDeleteWarningMessage => _pendingDeleteTag is null
         ? "Permanent deletion cannot be undone."
-        : _pendingDeleteTagListingCount == 0
+        : _pendingDeleteTagItemCount == 0
             ? $"Delete tag '{_pendingDeleteTag.Name}' permanently? This cannot be undone."
-            : $"Delete tag '{_pendingDeleteTag.Name}' permanently? It will be removed from {_pendingDeleteTagListingCount} listing(s). This cannot be undone.";
+            : $"Delete tag '{_pendingDeleteTag.Name}' permanently? It will be removed from {_pendingDeleteTagItemCount} Item(s). This cannot be undone.";
 
     public string DiscardChangesMessage =>
         HasUnsavedTagChanges && !HasUnsavedChanges && !HasUnsavedNicheChanges
@@ -1500,18 +1500,18 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         }
 
         _pendingDeleteTag = SelectedTag;
-        _pendingDeleteTagListingCount = 0;
+        _pendingDeleteTagItemCount = 0;
         TagDeleteWarningVisible = true;
         OnPropertyChanged(nameof(TagDeleteWarningMessage));
-        Run(RefreshTagDeleteListingCountAsync());
+        Run(RefreshTagDeleteItemCountAsync());
     }
 
-    private async Task RefreshTagDeleteListingCountAsync()
+    private async Task RefreshTagDeleteItemCountAsync()
     {
         if (_tagService is null || _pendingDeleteTag is null) return;
         try
         {
-            _pendingDeleteTagListingCount = await _tagService.GetTagApplicationCountAsync(_pendingDeleteTag.Id, CancellationToken.None);
+            _pendingDeleteTagItemCount = await _tagService.GetTagApplicationCountAsync(_pendingDeleteTag.Id, CancellationToken.None);
             OnPropertyChanged(nameof(TagDeleteWarningMessage));
         }
         catch
@@ -1644,7 +1644,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private void ClearTagDeleteWarning()
     {
         _pendingDeleteTag = null;
-        _pendingDeleteTagListingCount = 0;
+        _pendingDeleteTagItemCount = 0;
         TagDeleteWarningVisible = false;
         OnPropertyChanged(nameof(TagDeleteWarningMessage));
     }

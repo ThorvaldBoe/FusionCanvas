@@ -6,25 +6,27 @@ using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
 
-namespace FusionCanvas.App.Listings;
+namespace FusionCanvas.App.Items;
 
-public sealed class ListingInspectorLifecycleEventArgs(ListingManagementResult result, bool deleted) : EventArgs
+public sealed class ItemInspectorLifecycleEventArgs(ItemManagementResult result, bool deleted) : EventArgs
 {
-    public ListingManagementResult Result { get; } = result;
+    public ItemManagementResult Result { get; } = result;
     public bool Deleted { get; } = deleted;
 }
 
-public sealed class ListingInspectorViewModel : INotifyPropertyChanged
+public sealed class ItemInspectorViewModel : INotifyPropertyChanged
 {
-    private readonly IListingInspectorService _service;
-    private readonly IListingManagementService _listingManagement;
-    private ListingInspectorState? _state;
-    private Guid? _loadedListingId;
+    private readonly IItemInspectorService _service;
+    private readonly IItemManagementService _itemManagement;
+    private readonly ITagManagementService? _tagManagement;
+    private ItemInspectorState? _state;
+    private Guid? _loadedItemId;
     private WorkflowStage _currentStage = WorkflowStage.Idea;
 
     private string _title = string.Empty;
     private string _description = string.Empty;
     private string _idea = string.Empty;
+    private string _conceptIdea = string.Empty;
     private string _audience = string.Empty;
     private string _phrase = string.Empty;
     private string _graphicDirection = string.Empty;
@@ -38,22 +40,28 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
     private string _originalTitle = string.Empty;
     private string _originalDescription = string.Empty;
     private string _originalIdea = string.Empty;
-    private string _originalAudience = string.Empty;
+    private string _originalConceptIdea = string.Empty;
     private string _originalPhrase = string.Empty;
     private string _originalGraphicDirection = string.Empty;
     private string _originalNotes = string.Empty;
     private IReadOnlyList<string> _originalTagNames = [];
 
-    public ListingInspectorViewModel(IListingInspectorService service, IListingManagementService listingManagement)
+    public ItemInspectorViewModel(
+        IItemInspectorService service,
+        IItemManagementService itemManagement,
+        ITagManagementService? tagManagement = null)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
-        _listingManagement = listingManagement ?? throw new ArgumentNullException(nameof(listingManagement));
-        AddTagCommand = new RelayCommand(_ => AddTag());
+        _itemManagement = itemManagement ?? throw new ArgumentNullException(nameof(itemManagement));
+        _tagManagement = tagManagement;
+        SaveCommand = new RelayCommand(_ => Run(CommitEditsAsync()));
+        DiscardCommand = new RelayCommand(_ => DiscardChanges());
+        AddTagCommand = new RelayCommand(_ => Run(AddTagAsync()));
         RemoveTagCommand = new RelayCommand(parameter =>
         {
             if (parameter is string name)
             {
-                RemoveTag(name);
+                Run(RemoveTagAsync(name));
             }
         });
         RequestArchiveCommand = new RelayCommand(_ => ArchiveConfirmationVisible = true, () => CanArchive);
@@ -69,11 +77,13 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
 
     public event EventHandler? Saved;
 
-    public event EventHandler<ListingInspectorLifecycleEventArgs>? LifecycleChanged;
+    public event EventHandler? TagsChanged;
+
+    public event EventHandler<ItemInspectorLifecycleEventArgs>? LifecycleChanged;
 
     public ObservableCollection<string> TagDraft { get; } = [];
 
-    public ListingInspectorState? State
+    public ItemInspectorState? State
     {
         get => _state;
         private set
@@ -93,25 +103,57 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(HasAssets));
                 OnPropertyChanged(nameof(HasCreativeFields));
                 OnPropertyChanged(nameof(CanEdit));
+                OnPropertyChanged(nameof(CanEditShared));
+                OnPropertyChanged(nameof(CanEditStage));
+                OnPropertyChanged(nameof(StageReadOnlyReason));
                 RaiseActionProperties();
             }
         }
     }
 
-    public Guid? LoadedListingId
+    public Guid? LoadedItemId
     {
-        get => _loadedListingId;
-        private set => SetField(ref _loadedListingId, value);
+        get => _loadedItemId;
+        private set => SetField(ref _loadedItemId, value);
     }
 
     public bool HasState => _state is not null;
 
     public bool IsReadOnly => _state is { IsReadOnly: true };
 
-    public bool CanEdit => _state is not null && !IsReadOnly && !IsBusy;
+    public bool CanEdit => CanEditShared;
+
+    public bool CanEditShared => _state is { IsEffectivelyActive: true } && !IsBusy;
+
+    public bool CanEditStage =>
+        _state is { IsEffectivelyActive: true } state
+        && !IsBusy
+        && state.Stage == _currentStage
+        && state.Status is not (ItemStatus.Published or ItemStatus.Rejected);
+
+    public string StageReadOnlyReason
+    {
+        get
+        {
+            if (_state is not { } state)
+            {
+                return string.Empty;
+            }
+
+            if (!state.IsEffectivelyActive)
+            {
+                return "Restore the item before editing its content.";
+            }
+
+            return ItemWorkflowPolicy.CanEditStage(
+                new Item(state.Id, Guid.Empty, null, null, state.Title, state.Description, state.Status, state.Stage,
+                    state.IsArchived, state.UpdatedAt, state.UpdatedAt, "{}"),
+                _currentStage).Reason;
+        }
+    }
 
     public string InactiveNotice => IsReadOnly
-        ? "This listing is archived or inactive. Restore it to edit its details."
+        ? "This item is archived or inactive. Restore it to edit its details."
         : string.Empty;
 
     public string StatusLabel => _state?.Status.ToString() ?? "No status";
@@ -120,9 +162,9 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
 
     public string DisplayPath => _state?.DisplayPath ?? string.Empty;
 
-    public IReadOnlyList<ListingInspectorTagEntry> Tags => _state?.Tags ?? [];
+    public IReadOnlyList<ItemInspectorTagEntry> Tags => _state?.Tags ?? [];
 
-    public IReadOnlyList<ListingInspectorAssetEntry> Assets => _state?.Assets ?? [];
+    public IReadOnlyList<ItemInspectorAssetEntry> Assets => _state?.Assets ?? [];
 
     public IReadOnlyList<string> AvailableTagNames => _state?.AvailableTagNames ?? [];
 
@@ -162,6 +204,18 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
         set
         {
             if (SetField(ref _idea, value))
+            {
+                RaiseDirty();
+            }
+        }
+    }
+
+    public string ConceptIdea
+    {
+        get => _conceptIdea;
+        set
+        {
+            if (SetField(ref _conceptIdea, value))
             {
                 RaiseDirty();
             }
@@ -244,6 +298,8 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
             if (SetField(ref _isBusy, value))
             {
                 OnPropertyChanged(nameof(CanEdit));
+                OnPropertyChanged(nameof(CanEditShared));
+                OnPropertyChanged(nameof(CanEditStage));
                 RaiseDirty();
                 RaiseActionProperties();
             }
@@ -264,13 +320,20 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
 
     public bool HasUnsavedChanges =>
         Title != _originalTitle
-        || Description != _originalDescription
-        || Idea != _originalIdea
-        || Audience != _originalAudience
-        || Phrase != _originalPhrase
-        || GraphicDirection != _originalGraphicDirection
         || Notes != _originalNotes
-        || !TagDraft.SequenceEqual(_originalTagNames);
+        || HasCurrentStageDraftChanges;
+
+    private bool HasCurrentStageDraftChanges =>
+        _state?.Stage == _currentStage
+        && _currentStage switch
+        {
+            WorkflowStage.Idea => Idea != _originalIdea,
+            WorkflowStage.Concept => ConceptIdea != _originalConceptIdea
+                || Phrase != _originalPhrase
+                || GraphicDirection != _originalGraphicDirection,
+            WorkflowStage.Design or WorkflowStage.Listing => false,
+            _ => false
+        };
 
     public bool CanArchive => _state is { IsArchived: false, IsEffectivelyActive: true } && !IsBusy;
 
@@ -283,6 +346,8 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
     public bool EmphasizesDesign => _currentStage == WorkflowStage.Design;
     public bool EmphasizesListing => _currentStage == WorkflowStage.Listing;
 
+    public ICommand SaveCommand { get; }
+    public ICommand DiscardCommand { get; }
     public ICommand AddTagCommand { get; }
     public ICommand RemoveTagCommand { get; }
     public ICommand RequestArchiveCommand { get; }
@@ -293,9 +358,9 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
     public ICommand ConfirmDeleteCommand { get; }
     public ICommand CancelDeleteCommand { get; }
 
-    public async Task LoadAsync(Guid listingId, CancellationToken cancellationToken = default)
+    public async Task LoadAsync(Guid itemId, CancellationToken cancellationToken = default)
     {
-        var state = await _service.LoadAsync(listingId, cancellationToken).ConfigureAwait(false);
+        var state = await _service.LoadAsync(itemId, cancellationToken).ConfigureAwait(true);
         if (state is null)
         {
             Clear();
@@ -303,7 +368,7 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
         }
 
         ApplyState(state);
-        LoadedListingId = listingId;
+        LoadedItemId = itemId;
     }
 
     public void ApplyStage(WorkflowStage stage)
@@ -320,11 +385,12 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
     public void Clear()
     {
         State = null;
-        LoadedListingId = null;
+        LoadedItemId = null;
         _currentStage = WorkflowStage.Idea;
         Title = string.Empty;
         Description = string.Empty;
         Idea = string.Empty;
+        ConceptIdea = string.Empty;
         Audience = string.Empty;
         Phrase = string.Empty;
         GraphicDirection = string.Empty;
@@ -340,35 +406,26 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
 
     public async Task CommitEditsAsync(CancellationToken cancellationToken = default)
     {
-        if (_state is not { } state || IsBusy || IsReadOnly || !HasUnsavedChanges)
+        if (_state is not { } state || IsBusy || !CanEditShared || !HasUnsavedChanges)
         {
             return;
         }
 
-        string? titleError = null;
         var normalizedTitle = Title.Trim();
-        if (normalizedTitle.Length == 0 || normalizedTitle.Contains('\n') || normalizedTitle.Contains('\r'))
+        if (normalizedTitle.Contains('\n') || normalizedTitle.Contains('\r'))
         {
-            Title = _originalTitle;
-            titleError = "The working title must be a non-empty single line. It was reverted to its last saved value.";
-            if (!HasUnsavedChanges)
-            {
-                ErrorMessage = titleError;
-                return;
-            }
+            ErrorMessage = "The working title must be a single line.";
+            return;
         }
 
         IsBusy = true;
-        var result = await _service.SaveAsync(new ListingInspectorSaveRequest(
+        var result = await _service.SaveStageAsync(new ItemStageAwareSaveRequest(
             state.Id,
+            state.Stage,
             Title,
-            Description,
-            Idea,
-            Audience,
-            Phrase,
-            GraphicDirection,
             Notes,
-            [.. TagDraft]), cancellationToken).ConfigureAwait(false);
+            CreateStagePayload(state.Stage),
+            [.. TagDraft]), cancellationToken).ConfigureAwait(true);
         IsBusy = false;
 
         if (!result.Succeeded)
@@ -378,11 +435,24 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
         }
 
         ApplyState(result.State!);
-        ErrorMessage = titleError;
+        ErrorMessage = null;
         Saved?.Invoke(this, EventArgs.Empty);
     }
 
-    private void ApplyState(ListingInspectorState state)
+    public void DiscardChanges()
+    {
+        Title = _originalTitle;
+        Description = _originalDescription;
+        Idea = _originalIdea;
+        ConceptIdea = _originalConceptIdea;
+        Phrase = _originalPhrase;
+        GraphicDirection = _originalGraphicDirection;
+        Notes = _originalNotes;
+        ErrorMessage = null;
+        RaiseDirty();
+    }
+
+    private void ApplyState(ItemInspectorState state)
     {
         State = state;
         _currentStage = state.Stage;
@@ -390,6 +460,7 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
         Description = state.Description ?? string.Empty;
         Idea = state.Creative.Idea ?? string.Empty;
         Audience = state.Creative.Audience ?? string.Empty;
+        ConceptIdea = state.Creative.ConceptIdea ?? string.Empty;
         Phrase = state.Creative.Phrase ?? string.Empty;
         GraphicDirection = state.Creative.GraphicDirection ?? string.Empty;
         Notes = state.Notes ?? string.Empty;
@@ -411,7 +482,7 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
         _originalTitle = Title;
         _originalDescription = Description;
         _originalIdea = Idea;
-        _originalAudience = Audience;
+        _originalConceptIdea = ConceptIdea;
         _originalPhrase = Phrase;
         _originalGraphicDirection = GraphicDirection;
         _originalNotes = Notes;
@@ -419,9 +490,9 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
         RaiseDirty();
     }
 
-    private void AddTag()
+    private async Task AddTagAsync()
     {
-        if (!CanEdit)
+        if (!CanEditShared || _state is not { } state)
         {
             return;
         }
@@ -433,27 +504,68 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
             return;
         }
 
-        if (!TagDraft.Contains(name, StringComparer.OrdinalIgnoreCase))
+        if (_tagManagement is null)
         {
-            TagDraft.Add(name);
+            if (!TagDraft.Contains(name, StringComparer.OrdinalIgnoreCase))
+            {
+                TagDraft.Add(name);
+            }
+            TagInput = string.Empty;
+            await CommitLegacyTagChangeAsync().ConfigureAwait(true);
+            return;
         }
 
+        IsBusy = true;
+        var result = await _tagManagement.ApplyOrCreateTagAsync(
+            new ApplyOrCreateTagRequest(state.Id, name)).ConfigureAwait(true);
+        IsBusy = false;
+        if (!result.Succeeded)
+        {
+            ErrorMessage = result.Error;
+            return;
+        }
+
+        await RefreshTagsPreservingDraftAsync(state.Id).ConfigureAwait(true);
         TagInput = string.Empty;
         ErrorMessage = null;
-        Run(CommitEditsAsync());
+        TagsChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void RemoveTag(string name)
+    private async Task RemoveTagAsync(string name)
     {
-        if (!CanEdit)
+        if (!CanEditShared || _state is not { } state)
         {
             return;
         }
 
-        if (TagDraft.Remove(name))
+        if (_tagManagement is null)
         {
-            Run(CommitEditsAsync());
+            if (TagDraft.Remove(name))
+            {
+                await CommitLegacyTagChangeAsync().ConfigureAwait(true);
+            }
+            return;
         }
+
+        var tag = state.Tags.FirstOrDefault(candidate =>
+            string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (tag is null)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        var result = await _tagManagement.RemoveTagAsync(new RemoveTagRequest(state.Id, tag.Id)).ConfigureAwait(true);
+        IsBusy = false;
+        if (!result.Succeeded)
+        {
+            ErrorMessage = result.Error;
+            return;
+        }
+
+        await RefreshTagsPreservingDraftAsync(state.Id).ConfigureAwait(true);
+        ErrorMessage = null;
+        TagsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private async Task ConfirmArchiveAsync()
@@ -465,7 +577,7 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
 
         ArchiveConfirmationVisible = false;
         IsBusy = true;
-        var result = await _listingManagement.ArchiveListingAsync(state.Id).ConfigureAwait(false);
+        var result = await _itemManagement.ArchiveItemAsync(state.Id).ConfigureAwait(true);
         IsBusy = false;
         ApplyLifecycleResult(result, deleted: false);
     }
@@ -478,7 +590,7 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
         }
 
         IsBusy = true;
-        var result = await _listingManagement.RestoreListingAsync(new ListingManagementRestoreRequest(state.Id)).ConfigureAwait(false);
+        var result = await _itemManagement.RestoreItemAsync(new ItemManagementRestoreRequest(state.Id)).ConfigureAwait(true);
         IsBusy = false;
         ApplyLifecycleResult(result, deleted: false);
     }
@@ -492,13 +604,13 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
 
         DeleteConfirmationVisible = false;
         IsBusy = true;
-        var result = await _listingManagement.DeleteListingAsync(
-            new ListingManagementDeleteRequest(state.Id, ConfirmPermanentDeletion: true)).ConfigureAwait(false);
+        var result = await _itemManagement.DeleteItemAsync(
+            new ItemManagementDeleteRequest(state.Id, ConfirmPermanentDeletion: true)).ConfigureAwait(true);
         IsBusy = false;
         ApplyLifecycleResult(result, deleted: result.Succeeded);
     }
 
-    private void ApplyLifecycleResult(ListingManagementResult result, bool deleted)
+    private void ApplyLifecycleResult(ItemManagementResult result, bool deleted)
     {
         if (!result.Succeeded)
         {
@@ -507,7 +619,7 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
         }
 
         ErrorMessage = null;
-        LifecycleChanged?.Invoke(this, new ListingInspectorLifecycleEventArgs(result, deleted));
+        LifecycleChanged?.Invoke(this, new ItemInspectorLifecycleEventArgs(result, deleted));
     }
 
     private void RaiseStageProperties()
@@ -517,6 +629,8 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(EmphasizesConcept));
         OnPropertyChanged(nameof(EmphasizesDesign));
         OnPropertyChanged(nameof(EmphasizesListing));
+        OnPropertyChanged(nameof(CanEditStage));
+        OnPropertyChanged(nameof(StageReadOnlyReason));
     }
 
     private void RaiseActionProperties()
@@ -547,4 +661,57 @@ public sealed class ListingInspectorViewModel : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new(name));
 
     private static void Run(Task task) => _ = task;
+
+    private ItemStageSavePayload CreateStagePayload(WorkflowStage stage) =>
+        stage switch
+        {
+            WorkflowStage.Idea => new(stage, Idea, null, null, null),
+            WorkflowStage.Concept => new(stage, null, ConceptIdea, Phrase, GraphicDirection),
+            WorkflowStage.Design or WorkflowStage.Listing => new(stage, null, null, null, null),
+            _ => throw new ArgumentOutOfRangeException(nameof(stage), stage, "Unsupported workflow stage.")
+        };
+
+    private async Task RefreshTagsPreservingDraftAsync(Guid itemId)
+    {
+        var state = await _service.LoadAsync(itemId).ConfigureAwait(true);
+        if (state is null)
+        {
+            return;
+        }
+
+        State = state;
+        TagDraft.Clear();
+        foreach (var tag in state.Tags)
+        {
+            TagDraft.Add(tag.Name);
+        }
+        _originalTagNames = [.. TagDraft];
+        OnPropertyChanged(nameof(HasTags));
+    }
+
+    private async Task CommitLegacyTagChangeAsync()
+    {
+        if (_state is not { } state)
+        {
+            return;
+        }
+
+        var result = await _service.SaveStageAsync(new ItemStageAwareSaveRequest(
+            state.Id,
+            state.Stage,
+            _originalTitle,
+            _originalNotes,
+            CreateStagePayload(state.Stage),
+            [.. TagDraft])).ConfigureAwait(true);
+        if (result.Succeeded)
+        {
+            _originalTagNames = [.. TagDraft];
+            State = result.State;
+            ErrorMessage = null;
+        }
+        else
+        {
+            ErrorMessage = result.Error;
+        }
+    }
 }

@@ -386,17 +386,17 @@ public sealed class StoreManagementService : IStoreManagementService
 
     private static bool HasConnectedData(WorkspaceSnapshot snapshot, Guid storeId)
     {
-        var listingIds = snapshot.Listings.Where(listing => listing.StoreId == storeId).Select(listing => listing.Id).ToHashSet();
+        var itemIds = snapshot.Items.Where(listing => listing.StoreId == storeId).Select(listing => listing.Id).ToHashSet();
         var tagIds = snapshot.Tags.Where(tag => tag.StoreId == storeId).Select(tag => tag.Id).ToHashSet();
         var assetIds = snapshot.Assets.Where(asset => asset.StoreId == storeId).Select(asset => asset.Id).ToHashSet();
 
         return snapshot.Niches.Any(niche => niche.StoreId == storeId)
             || snapshot.Groups.Any(group => group.StoreId == storeId)
-            || snapshot.Listings.Any(listing => listing.StoreId == storeId)
+            || snapshot.Items.Any(listing => listing.StoreId == storeId)
             || snapshot.Assets.Any(asset => asset.StoreId == storeId)
             || snapshot.Prompts.Any(prompt => prompt.StoreId == storeId)
             || snapshot.Tags.Any(tag => tag.StoreId == storeId)
-            || snapshot.ListingTags.Any(link => listingIds.Contains(link.ListingId) || tagIds.Contains(link.TagId))
+            || snapshot.ItemTags.Any(link => itemIds.Contains(link.ItemId) || tagIds.Contains(link.TagId))
             || snapshot.AssetLinks.Any(link => assetIds.Contains(link.AssetId) || IsStoreScopedAssetTarget(snapshot, link, storeId));
     }
 
@@ -406,7 +406,7 @@ public sealed class StoreManagementService : IStoreManagementService
             WorkspaceEntityKind.Store => link.EntityId == storeId,
             WorkspaceEntityKind.Niche => snapshot.Niches.Any(niche => niche.Id == link.EntityId && niche.StoreId == storeId),
             WorkspaceEntityKind.Group => snapshot.Groups.Any(group => group.Id == link.EntityId && group.StoreId == storeId),
-            WorkspaceEntityKind.Listing => snapshot.Listings.Any(listing => listing.Id == link.EntityId && listing.StoreId == storeId),
+            WorkspaceEntityKind.Item => snapshot.Items.Any(listing => listing.Id == link.EntityId && listing.StoreId == storeId),
             WorkspaceEntityKind.Asset => snapshot.Assets.Any(asset => asset.Id == link.EntityId && asset.StoreId == storeId),
             WorkspaceEntityKind.Prompt => snapshot.Prompts.Any(prompt => prompt.Id == link.EntityId && prompt.StoreId == storeId),
             _ => false

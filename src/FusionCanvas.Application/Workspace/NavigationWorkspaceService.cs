@@ -6,7 +6,7 @@ public enum NavigationTargetKind
 {
     Store = 0,
     Topic = 1,
-    Listing = 2
+    Item = 2
 }
 
 public sealed record NavigationTarget(NavigationTargetKind Kind, WorkspaceEntityKind EntityKind, Guid EntityId)
@@ -22,7 +22,7 @@ public sealed record NavigationTarget(NavigationTargetKind Kind, WorkspaceEntity
         {
             NavigationTargetKind.Store when entityKind == WorkspaceEntityKind.Store => entityKind,
             NavigationTargetKind.Topic when entityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group => entityKind,
-            NavigationTargetKind.Listing when entityKind == WorkspaceEntityKind.Listing => entityKind,
+            NavigationTargetKind.Item when entityKind == WorkspaceEntityKind.Item => entityKind,
             _ => throw new ArgumentException("Navigation target kind does not match the workspace entity kind.", nameof(entityKind))
         };
 }
@@ -39,7 +39,7 @@ public interface IWorkspaceNavigationService
 
     WorkspaceSnapshot MoveTopic(WorkspaceSnapshot snapshot, Guid groupId, NavigationTopicReference destinationTopic);
 
-    WorkspaceSnapshot MoveListing(WorkspaceSnapshot snapshot, Guid listingId, NavigationTopicReference destinationTopic);
+    WorkspaceSnapshot MoveItem(WorkspaceSnapshot snapshot, Guid itemId, NavigationTopicReference destinationTopic);
 
     IReadOnlyList<Guid> RevealPath(WorkspaceSnapshot snapshot, NavigationTarget target);
 }
@@ -74,7 +74,7 @@ public sealed class WorkspaceNavigationService : IWorkspaceNavigationService
         {
             NavigationTargetKind.Store => ResolveStoreScope(snapshot, activeTarget.EntityId),
             NavigationTargetKind.Topic => ResolveTopicScope(snapshot, activeTarget.EntityKind, activeTarget.EntityId),
-            NavigationTargetKind.Listing => ResolveListingScope(snapshot, activeTarget.EntityId),
+            NavigationTargetKind.Item => ResolveItemScope(snapshot, activeTarget.EntityId),
             _ => throw new InvalidOperationException("Unsupported navigation target.")
         };
     }
@@ -85,11 +85,11 @@ public sealed class WorkspaceNavigationService : IWorkspaceNavigationService
         NavigationTopicReference destinationTopic) =>
         WorkspaceNavigation.MoveTopic(snapshot, groupId, destinationTopic);
 
-    public WorkspaceSnapshot MoveListing(
+    public WorkspaceSnapshot MoveItem(
         WorkspaceSnapshot snapshot,
-        Guid listingId,
+        Guid itemId,
         NavigationTopicReference destinationTopic) =>
-        WorkspaceNavigation.MoveListing(snapshot, listingId, destinationTopic);
+        WorkspaceNavigation.MoveItem(snapshot, itemId, destinationTopic);
 
     public IReadOnlyList<Guid> RevealPath(WorkspaceSnapshot snapshot, NavigationTarget target)
     {
@@ -132,9 +132,9 @@ public sealed class WorkspaceNavigationService : IWorkspaceNavigationService
         return new NavigationCreationScope(group.StoreId, group.Id, WorkspaceEntityKind.Group);
     }
 
-    private static NavigationCreationScope ResolveListingScope(WorkspaceSnapshot snapshot, Guid listingId)
+    private static NavigationCreationScope ResolveItemScope(WorkspaceSnapshot snapshot, Guid itemId)
     {
-        var listing = snapshot.Listings.SingleOrDefault(candidate => candidate.Id == listingId)
+        var listing = snapshot.Items.SingleOrDefault(candidate => candidate.Id == itemId)
             ?? throw new InvalidOperationException("Listing was not found.");
 
         if (listing.GroupId is Guid groupId)

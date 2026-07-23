@@ -246,14 +246,14 @@ public sealed class WorkspaceManagementService : IWorkspaceManagementService
 
         var nicheIds = snapshot.Niches.Where(niche => storeIds.Contains(niche.StoreId)).Select(niche => niche.Id).ToHashSet();
         var groupIds = snapshot.Groups.Where(group => storeIds.Contains(group.StoreId)).Select(group => group.Id).ToHashSet();
-        var listingIds = snapshot.Listings.Where(listing => storeIds.Contains(listing.StoreId)).Select(listing => listing.Id).ToHashSet();
+        var itemIds = snapshot.Items.Where(listing => storeIds.Contains(listing.StoreId)).Select(listing => listing.Id).ToHashSet();
         var assetIds = snapshot.Assets.Where(asset => storeIds.Contains(asset.StoreId)).Select(asset => asset.Id).ToHashSet();
         var promptIds = snapshot.Prompts.Where(prompt => storeIds.Contains(prompt.StoreId)).Select(prompt => prompt.Id).ToHashSet();
         var tagIds = snapshot.Tags.Where(tag => storeIds.Contains(tag.StoreId)).Select(tag => tag.Id).ToHashSet();
         var removedEntityIds = new HashSet<Guid>(storeIds);
         removedEntityIds.UnionWith(nicheIds);
         removedEntityIds.UnionWith(groupIds);
-        removedEntityIds.UnionWith(listingIds);
+        removedEntityIds.UnionWith(itemIds);
         removedEntityIds.UnionWith(assetIds);
         removedEntityIds.UnionWith(promptIds);
         removedEntityIds.UnionWith(tagIds);
@@ -264,12 +264,12 @@ public sealed class WorkspaceManagementService : IWorkspaceManagementService
             Stores = snapshot.Stores.Where(store => store.WorkspaceId != existing.Id).ToArray(),
             Niches = snapshot.Niches.Where(niche => !storeIds.Contains(niche.StoreId)).ToArray(),
             Groups = snapshot.Groups.Where(group => !storeIds.Contains(group.StoreId)).ToArray(),
-            Listings = snapshot.Listings.Where(listing => !storeIds.Contains(listing.StoreId)).ToArray(),
+            Items = snapshot.Items.Where(listing => !storeIds.Contains(listing.StoreId)).ToArray(),
             Assets = snapshot.Assets.Where(asset => !storeIds.Contains(asset.StoreId)).ToArray(),
             Prompts = snapshot.Prompts.Where(prompt => !storeIds.Contains(prompt.StoreId)).ToArray(),
             Tags = snapshot.Tags.Where(tag => !storeIds.Contains(tag.StoreId)).ToArray(),
-            ListingTags = snapshot.ListingTags
-                .Where(listingTag => !listingIds.Contains(listingTag.ListingId) && !tagIds.Contains(listingTag.TagId))
+            ItemTags = snapshot.ItemTags
+                .Where(listingTag => !itemIds.Contains(listingTag.ItemId) && !tagIds.Contains(listingTag.TagId))
                 .ToArray(),
             AssetLinks = snapshot.AssetLinks
                 .Where(assetLink => !assetIds.Contains(assetLink.AssetId) && !removedEntityIds.Contains(assetLink.EntityId))

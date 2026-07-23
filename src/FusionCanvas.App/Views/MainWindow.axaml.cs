@@ -2,6 +2,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Assets;
@@ -19,6 +21,7 @@ public partial class MainWindow : Window
     private StoreEditorWindow? _storeEditorWindow;
     private WorkspaceManagementWindow? _workspaceManagementWindow;
     private AssetsWindow? _assetsWindow;
+    private Window? _designPreviewWindow;
     private PointerPressedEventArgs? _dragPointerArgs;
     private WorkspaceTreeNodeViewModel? _dragNode;
     private Avalonia.Point _dragStart;
@@ -47,6 +50,19 @@ public partial class MainWindow : Window
             if (args.PropertyName == nameof(AssetsViewModel.IsOpen))
             {
                 SyncAssetsWindow(viewModel.AssetsManagement);
+            }
+        };
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(MainWindowViewModel.IsUnsavedChangesPromptVisible)
+                && viewModel.IsUnsavedChangesPromptVisible)
+            {
+                Dispatcher.UIThread.Post(() => CancelUnsavedTransitionButton.Focus(), DispatcherPriority.Input);
+            }
+            else if (args.PropertyName == nameof(MainWindowViewModel.IsStatusConfirmationVisible)
+                && viewModel.IsStatusConfirmationVisible)
+            {
+                Dispatcher.UIThread.Post(() => CancelStatusChangeButton.Focus(), DispatcherPriority.Input);
             }
         };
         DataContext = viewModel;
@@ -146,7 +162,7 @@ public partial class MainWindow : Window
             viewModel.WorkspaceTree.SelectNodeCommand.Execute(node);
         }
 
-        if (node.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing && point.Properties.IsLeftButtonPressed)
+        if (node.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Item && point.Properties.IsLeftButtonPressed)
         {
             _dragPointerArgs = e;
             _dragNode = node;
@@ -183,7 +199,7 @@ public partial class MainWindow : Window
             TryGetDraggedEntity(e, out var sourceKind, out var sourceId) &&
             sender is Control { DataContext: WorkspaceTreeNodeViewModel { EntityKind: WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group } target } control)
         {
-            var placement = sourceKind == WorkspaceEntityKind.Listing ? new GroupPlacement() : PlacementFor(target, control, e);
+            var placement = sourceKind == WorkspaceEntityKind.Item ? new GroupPlacement() : PlacementFor(target, control, e);
             if (viewModel.WorkspaceTree.CanDrop(sourceKind, sourceId, target, placement, out var error))
             {
                 viewModel.WorkspaceTree.ShowDropFeedback(null);
@@ -224,7 +240,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var placement = sourceKind == WorkspaceEntityKind.Listing ? new GroupPlacement() : PlacementFor(target, control, e);
+        var placement = sourceKind == WorkspaceEntityKind.Item ? new GroupPlacement() : PlacementFor(target, control, e);
 
         await viewModel.WorkspaceTree.MoveAsync(sourceKind, sourceId, target, placement);
         ClearDropTarget();
@@ -279,6 +295,100 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnImportDesignFiles(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel
+            || viewModel.ItemInspector.LoadedItemId is not Guid itemId
+            || !StorageProvider.CanOpen)
+        {
+            return;
+        }
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import PNG Design files",
+            AllowMultiple = true,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("PNG images") { Patterns = ["*.png"] },
+                FilePickerFileTypes.All
+            ]
+        });
+
+        foreach (var file in files)
+        {
+            if (file.TryGetLocalPath() is { } path)
+            {
+                await viewModel.DesignTool.ImportAsync(itemId, path);
+            }
+        }
+
+        SaveItemButton.Focus();
+    }
+
+    private async void OnPreviewDesignFile(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        await using var stream = await viewModel.DesignTool.PreviewAsync();
+        if (stream is null)
+        {
+            return;
+        }
+
+        var bitmap = new Bitmap(stream);
+        _designPreviewWindow?.Close();
+        _designPreviewWindow = new Window
+        {
+            Title = viewModel.DesignTool.SelectedFile?.Name ?? "Design preview",
+            Width = Math.Clamp(bitmap.PixelSize.Width + 32, 320, 1000),
+            Height = Math.Clamp(bitmap.PixelSize.Height + 48, 240, 800),
+            Content = new Image
+            {
+                Source = bitmap,
+                Stretch = Avalonia.Media.Stretch.Uniform,
+                Margin = new Thickness(12)
+            }
+        };
+        _designPreviewWindow.Closed += (_, _) =>
+        {
+            bitmap.Dispose();
+            _designPreviewWindow = null;
+        };
+        _designPreviewWindow.Show(this);
+    }
+
+    private async void OnExportDesignFile(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel || !StorageProvider.CanSave)
+        {
+            return;
+        }
+
+        var destination = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export Design file copy",
+            SuggestedFileName = viewModel.DesignTool.SelectedFile?.Name ?? "design.png",
+            FileTypeChoices = [new FilePickerFileType("PNG image") { Patterns = ["*.png"] }]
+        });
+
+        if (destination?.TryGetLocalPath() is { } path)
+        {
+            await viewModel.DesignTool.ExportAsync(path);
+        }
+    }
+
+    private void OnRequestRemoveDesignFile(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel { DesignTool.SelectedFile: not null } viewModel)
+        {
+            viewModel.IsDesignRemoveConfirmationVisible = true;
+        }
+    }
+
     private void OnTreeEditorAttached(object? sender, VisualTreeAttachmentEventArgs e)
     {
         if (sender is TextBox textBox && textBox.IsVisible)
@@ -323,7 +433,7 @@ public partial class MainWindow : Window
         }
         else if (e.Key == Key.L && (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Shift)) == (KeyModifiers.Control | KeyModifiers.Shift))
         {
-            viewModel.WorkspaceTree.BeginCreateListingCommand.Execute(null);
+            viewModel.WorkspaceTree.BeginCreateItemCommand.Execute(null);
         }
         else if (e.Key == Key.F2)
         {
@@ -358,11 +468,11 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void OnContextNewListing(object? sender, RoutedEventArgs e)
+    private async void OnContextNewItem(object? sender, RoutedEventArgs e)
     {
         if (TrySelectContextNode(sender, out var viewModel, out _))
         {
-            await viewModel.WorkspaceTree.BeginCreateListingAsync();
+            await viewModel.WorkspaceTree.BeginCreateItemAsync();
         }
     }
 
@@ -401,7 +511,7 @@ public partial class MainWindow : Window
 
     private async void OnContextDuplicate(object? sender, RoutedEventArgs e)
     {
-        if (TrySelectContextNode(sender, out var viewModel, out var node) && node.IsListing)
+        if (TrySelectContextNode(sender, out var viewModel, out var node) && node.IsItem)
         {
             await viewModel.WorkspaceTree.DuplicateAsync();
         }

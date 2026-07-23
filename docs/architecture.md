@@ -101,8 +101,8 @@ Business rules should remain in the application layer.
 
 The application layer coordinates use cases such as:
 
-- Create Listing
-- Move Listing
+- Create Item
+- Move Item
 - Generate Mockups
 - Publish Products
 - Run AI Prompt
@@ -120,7 +120,7 @@ It contains concepts such as:
 - Store
 - Niche
 - Group
-- Listing
+- Item
 - Design
 - Idea
 - Phrase
@@ -292,7 +292,7 @@ FusionCanvas uses SQLite as its primary data store.
 Structured information should be stored in relational tables. Flexible or evolving information should be stored as JSON.
 
 ```text
-Listing
+Item
 --------
 Id
 Name
@@ -338,7 +338,7 @@ User actions should be implemented as commands where practical.
 
 Examples:
 
-- Create Listing
+- Create Item
 - Rename Group
 - Delete Asset
 - Publish Product
@@ -351,7 +351,7 @@ The application should gradually move toward an event-driven internal architectu
 
 Examples:
 
-- ListingCreated
+- ItemCreated
 - IdeaRejected
 - AssetImported
 - MockupGenerated

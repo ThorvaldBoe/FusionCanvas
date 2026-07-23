@@ -65,7 +65,7 @@ public sealed class WorkspaceTreeNodeViewModel : INotifyPropertyChanged
     {
         WorkspaceEntityKind.Niche => "◆",
         WorkspaceEntityKind.Group => "▣",
-        WorkspaceEntityKind.Listing => "●",
+        WorkspaceEntityKind.Item => "●",
         _ => "•"
     };
 
@@ -73,7 +73,7 @@ public sealed class WorkspaceTreeNodeViewModel : INotifyPropertyChanged
     {
         WorkspaceEntityKind.Niche => "Niche",
         WorkspaceEntityKind.Group => "Group",
-        WorkspaceEntityKind.Listing => "Item",
+        WorkspaceEntityKind.Item => "Item",
         _ => EntityKind.ToString()
     };
 
@@ -87,10 +87,10 @@ public sealed class WorkspaceTreeNodeViewModel : INotifyPropertyChanged
     public bool HasHiddenTags => HiddenTagCount > 0;
     public IEnumerable<string> VisibleTagColorSequence => AppliedTagColors.Take(3);
     public bool IsGroup => EntityKind == WorkspaceEntityKind.Group;
-    public bool IsListing => EntityKind == WorkspaceEntityKind.Listing;
+    public bool IsItem => EntityKind == WorkspaceEntityKind.Item;
     public bool IsTopic => EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group;
-    public bool HasContextActions => EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing;
-    public bool HasAssetActions => EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing;
+    public bool HasContextActions => EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Item;
+    public bool HasAssetActions => EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group or WorkspaceEntityKind.Item;
     public ObservableCollection<WorkspaceTreeNodeViewModel> Children { get; }
 
     public bool IsExpanded
@@ -154,7 +154,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 {
     private readonly IWorkspaceRepository _repository;
     private readonly IGroupManagementService _groups;
-    private readonly IListingManagementService _listings;
+    private readonly IItemManagementService _items;
     private readonly WorkspaceTreeSelectionCoordinator _selection;
     private readonly WorkspaceTreeClipboard _clipboard;
     private readonly HashSet<Guid> _expandedIds = [];
@@ -165,7 +165,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     private WorkspaceTreeNodeViewModel? _selectedNode;
     private WorkspaceTreeNodeViewModel? _editingNode;
     private GroupParentReference? _creationAnchor;
-    private ListingTopicReference? _listingCreationAnchor;
+    private ItemTopicReference? _itemCreationAnchor;
     private string _queryText = string.Empty;
     private HashSet<Guid> _selectedTagIds = [];
     private NavigationTopicReference? _scopedTopic;
@@ -182,18 +182,18 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         WorkspaceSnapshot snapshot,
         WorkspaceTreeSelectionCoordinator? selection = null,
         WorkspaceTreeClipboard? clipboard = null,
-        IListingManagementService? listings = null)
+        IItemManagementService? items = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _groups = groups ?? throw new ArgumentNullException(nameof(groups));
-        _listings = listings ?? new ListingManagementService(repository);
+        _items = items ?? new ItemManagementService(repository);
         _snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
         _selection = selection ?? new WorkspaceTreeSelectionCoordinator();
         _clipboard = clipboard ?? new WorkspaceTreeClipboard();
         SelectNodeCommand = new RelayCommand(parameter => Select(parameter as WorkspaceTreeNodeViewModel));
         OpenInTabCommand = new RelayCommand(parameter => OpenInTab(parameter as WorkspaceTreeNodeViewModel));
         BeginCreateCommand = new RelayCommand(_ => Run(BeginCreateAsync()));
-        BeginCreateListingCommand = new RelayCommand(_ => Run(BeginCreateListingAsync()));
+        BeginCreateItemCommand = new RelayCommand(_ => Run(BeginCreateItemAsync()));
         BeginRenameCommand = new RelayCommand(_ => BeginRename());
         CopyCommand = new RelayCommand(_ => Copy());
         CutCommand = new RelayCommand(_ => Cut());
@@ -208,7 +208,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         ClearTagFilterOrRevealSelectionCommand = new RelayCommand(_ => ClearTagFilters());
         ManageAssetsCommand = new RelayCommand(_ =>
         {
-            if (_selectedNode?.EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing)
+            if (_selectedNode?.EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group or WorkspaceEntityKind.Item)
             {
                 ManageAssetsRequested?.Invoke(this, new WorkspaceTreeSelection(_selectedNode.EntityKind, _selectedNode.EntityId));
             }
@@ -227,7 +227,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     public ICommand SelectNodeCommand { get; }
     public ICommand OpenInTabCommand { get; }
     public ICommand BeginCreateCommand { get; }
-    public ICommand BeginCreateListingCommand { get; }
+    public ICommand BeginCreateItemCommand { get; }
     public ICommand BeginRenameCommand { get; }
     public ICommand CopyCommand { get; }
     public ICommand CutCommand { get; }
@@ -282,7 +282,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     }
 
     public bool HasSelection => SelectedNode is not null;
-    public bool CanManageSelection => SelectedNode?.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing;
+    public bool CanManageSelection => SelectedNode?.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Item;
     public bool IsBusy { get => _isBusy; private set => SetField(ref _isBusy, value); }
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
     public string? ErrorMessage { get => _errorMessage; private set { SetField(ref _errorMessage, value); OnPropertyChanged(nameof(HasError)); } }
@@ -413,14 +413,14 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         if (_storeId is not Guid storeId) return false;
         return _snapshot.Niches.Any(n => n.Id == entityId && n.StoreId == storeId) ||
                _snapshot.Groups.Any(g => g.Id == entityId && g.StoreId == storeId) ||
-               _snapshot.Listings.Any(l => l.Id == entityId && l.StoreId == storeId);
+               _snapshot.Items.Any(l => l.Id == entityId && l.StoreId == storeId);
     }
 
     public string? FindEntityName(Guid entityId)
     {
         if (_snapshot.Niches.SingleOrDefault(n => n.Id == entityId) is { } niche) return niche.Name;
         if (_snapshot.Groups.SingleOrDefault(g => g.Id == entityId) is { } group) return group.Name;
-        if (_snapshot.Listings.SingleOrDefault(l => l.Id == entityId) is { } listing) return listing.Name;
+        if (_snapshot.Items.SingleOrDefault(l => l.Id == entityId) is { } item) return item.Name;
         return null;
     }
 
@@ -536,15 +536,15 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             return new NavigationTopicReference(selection.Kind, selection.Id);
         }
 
-        if (selection.Kind == WorkspaceEntityKind.Listing)
+        if (selection.Kind == WorkspaceEntityKind.Item)
         {
-            var listing = _snapshot.Listings.SingleOrDefault(candidate => candidate.Id == selection.Id);
-            if (listing is null || listing.IsArchived)
+            var item = _snapshot.Items.SingleOrDefault(candidate => candidate.Id == selection.Id);
+            if (item is null || item.IsArchived)
             {
                 return null;
             }
 
-            return ListingHierarchy.GetTopic(listing);
+            return ItemHierarchy.GetTopic(item);
         }
 
         return null;
@@ -583,7 +583,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     private WorkspaceTreeQuery BuildQuery() => new(
         Text: _queryText,
         WorkflowStages: _stageFilterIndex > 0 ? new HashSet<WorkflowStage> { WorkflowStages.Ordered[_stageFilterIndex - 1] } : null,
-        ListingStatuses: _statusFilterIndex > 0 ? new HashSet<ListingStatus> { ListingStatuses.Ordered[_statusFilterIndex - 1] } : null,
+        ItemStatuses: _statusFilterIndex > 0 ? new HashSet<ItemStatus> { ItemStatuses.Ordered[_statusFilterIndex - 1] } : null,
         TagIds: _selectedTagIds.Count > 0 ? _selectedTagIds : null,
         ScopeTopic: _scopeToCurrentTopic ? _scopedTopic : null,
         IncludeArchived: _includeArchived);
@@ -628,29 +628,29 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         InsertDraft(destination.Parent!);
     }
 
-    public async Task BeginCreateListingAsync()
+    public async Task BeginCreateItemAsync()
     {
         if (_storeId is not Guid storeId || IsBusy)
         {
-            ErrorMessage = "Select an active store before creating listings.";
+            ErrorMessage = "Select an active store before creating items.";
             return;
         }
 
         var selected = SelectedNode is null ? _selection.Selected : new WorkspaceTreeSelection(SelectedNode.EntityKind, SelectedNode.EntityId);
-        var destination = await _listings.ResolveCreateTopicAsync(storeId, selected).ConfigureAwait(false);
+        var destination = await _items.ResolveCreateTopicAsync(storeId, selected).ConfigureAwait(false);
         if (!destination.Succeeded)
         {
             ErrorMessage = destination.Error;
             return;
         }
 
-        _listingCreationAnchor = destination.Topic;
-        InsertListingDraft(destination.Topic!);
+        _itemCreationAnchor = destination.Topic;
+        InsertItemDraft(destination.Topic!);
     }
 
     public void BeginRename()
     {
-        if (SelectedNode is not { EntityKind: WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing } node || IsBusy)
+        if (SelectedNode is not { EntityKind: WorkspaceEntityKind.Group or WorkspaceEntityKind.Item } node || IsBusy)
         {
             return;
         }
@@ -674,9 +674,9 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         Guid selectedId;
         if (editing.IsDraft)
         {
-            if (editing.EntityKind == WorkspaceEntityKind.Listing)
+            if (editing.EntityKind == WorkspaceEntityKind.Item)
             {
-                var result = await _listings.CreateListingAsync(new ListingManagementCreateRequest(_listingCreationAnchor!, editing.DraftName)).ConfigureAwait(false);
+                var result = await _items.CreateItemAsync(new ItemManagementCreateRequest(_itemCreationAnchor!, editing.DraftName)).ConfigureAwait(false);
                 if (!result.Succeeded)
                 {
                     IsBusy = false;
@@ -684,7 +684,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
                     editing.IsEditing = true;
                     return;
                 }
-                selectedId = result.Listing!.Id;
+                selectedId = result.Item!.Id;
             }
             else
             {
@@ -699,10 +699,10 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
                 selectedId = result.Group!.Id;
             }
         }
-        else if (editing.EntityKind == WorkspaceEntityKind.Listing)
+        else if (editing.EntityKind == WorkspaceEntityKind.Item)
         {
-            var listing = _snapshot.Listings.Single(candidate => candidate.Id == editing.EntityId);
-            var result = await _listings.UpdateListingAsync(new ListingManagementUpdateRequest(listing.Id, editing.DraftName)).ConfigureAwait(false);
+            var item = _snapshot.Items.Single(candidate => candidate.Id == editing.EntityId);
+            var result = await _items.UpdateItemAsync(new ItemManagementUpdateRequest(item.Id, editing.DraftName)).ConfigureAwait(false);
             if (!result.Succeeded)
             {
                 IsBusy = false;
@@ -710,7 +710,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
                 editing.IsEditing = true;
                 return;
             }
-            selectedId = result.Listing!.Id;
+            selectedId = result.Item!.Id;
         }
         else
         {
@@ -731,9 +731,9 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         await ReloadAsync().ConfigureAwait(false);
         Select(FindNode(selectedId));
         StructureChanged?.Invoke(this, EventArgs.Empty);
-        if (addAnotherSibling && editing.EntityKind == WorkspaceEntityKind.Listing && _listingCreationAnchor is not null)
+        if (addAnotherSibling && editing.EntityKind == WorkspaceEntityKind.Item && _itemCreationAnchor is not null)
         {
-            InsertListingDraft(_listingCreationAnchor);
+            InsertItemDraft(_itemCreationAnchor);
         }
         else if (addAnotherSibling && _creationAnchor is not null)
         {
@@ -755,7 +755,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
     public void Copy()
     {
-        if (SelectedNode is { EntityKind: WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing } node)
+        if (SelectedNode is { EntityKind: WorkspaceEntityKind.Group or WorkspaceEntityKind.Item } node)
         {
             _clipboard.Set(new WorkspaceTreeClipboardPayload(WorkspaceTreeClipboardMode.Copy, node.EntityKind, node.EntityId));
             ApplyClipboardState();
@@ -764,7 +764,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
     public void Cut()
     {
-        if (SelectedNode is { EntityKind: WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing } node)
+        if (SelectedNode is { EntityKind: WorkspaceEntityKind.Group or WorkspaceEntityKind.Item } node)
         {
             _clipboard.Set(new WorkspaceTreeClipboardPayload(WorkspaceTreeClipboardMode.Cut, node.EntityKind, node.EntityId));
             ApplyClipboardState();
@@ -773,10 +773,10 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
     public async Task PasteAsync()
     {
-        if (_clipboard.Payload is not { Kind: WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing } payload ||
+        if (_clipboard.Payload is not { Kind: WorkspaceEntityKind.Group or WorkspaceEntityKind.Item } payload ||
             SelectedNode is not { EntityKind: WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group } destination)
         {
-            ErrorMessage = "Copy or cut a group or listing, then select a niche or group destination.";
+            ErrorMessage = "Copy or cut a group or item, then select a niche or group destination.";
             return;
         }
 
@@ -784,15 +784,15 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         Guid selectedId;
         bool succeeded;
         string? error;
-        if (payload.Kind == WorkspaceEntityKind.Listing)
+        if (payload.Kind == WorkspaceEntityKind.Item)
         {
-            var topic = new ListingTopicReference(destination.EntityKind, destination.EntityId);
+            var topic = new ItemTopicReference(destination.EntityKind, destination.EntityId);
             var result = payload.Mode == WorkspaceTreeClipboardMode.Copy
-                ? await _listings.DuplicateListingAsync(new ListingManagementDuplicateRequest(payload.EntityId, topic)).ConfigureAwait(false)
-                : await _listings.MoveListingAsync(new ListingManagementMoveRequest(payload.EntityId, topic)).ConfigureAwait(false);
+                ? await _items.DuplicateItemAsync(new ItemManagementDuplicateRequest(payload.EntityId, topic)).ConfigureAwait(false)
+                : await _items.MoveItemAsync(new ItemManagementMoveRequest(payload.EntityId, topic)).ConfigureAwait(false);
             succeeded = result.Succeeded;
             error = result.Error;
-            selectedId = result.Listing?.Id ?? payload.EntityId;
+            selectedId = result.Item?.Id ?? payload.EntityId;
         }
         else
         {
@@ -823,13 +823,13 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
     public async Task DuplicateAsync()
     {
-        if (SelectedNode is not { EntityKind: WorkspaceEntityKind.Listing } node || IsBusy)
+        if (SelectedNode is not { EntityKind: WorkspaceEntityKind.Item } node || IsBusy)
         {
             return;
         }
 
         IsBusy = true;
-        var result = await _listings.DuplicateListingAsync(new ListingManagementDuplicateRequest(node.EntityId)).ConfigureAwait(false);
+        var result = await _items.DuplicateItemAsync(new ItemManagementDuplicateRequest(node.EntityId)).ConfigureAwait(false);
         IsBusy = false;
         if (!result.Succeeded)
         {
@@ -838,7 +838,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
 
         await ReloadAsync().ConfigureAwait(false);
-        Select(FindNode(result.Listing!.Id));
+        Select(FindNode(result.Item!.Id));
         StructureChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -849,17 +849,17 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             .Select(candidate => candidate.Id)
             .Append(group.Id)
             .ToHashSet();
-        var listingIds = _snapshot.Listings
-            .Where(listing => listing.GroupId is Guid id && groupIds.Contains(id))
-            .Select(listing => listing.Id)
+        var itemIds = _snapshot.Items
+            .Where(item => item.GroupId is Guid id && groupIds.Contains(id))
+            .Select(item => item.Id)
             .ToHashSet();
         var promptIds = _snapshot.Prompts
-            .Where(prompt => prompt.ListingId is Guid id && listingIds.Contains(id))
+            .Where(prompt => prompt.ItemId is Guid id && itemIds.Contains(id))
             .Select(prompt => prompt.Id);
         var entityIds = new HashSet<Guid>(groupIds);
-        entityIds.UnionWith(listingIds);
+        entityIds.UnionWith(itemIds);
         entityIds.UnionWith(promptIds);
-        return new GroupDeleteImpact(group.Id, group.Name, groupIds.Count - 1, listingIds.Count, entityIds);
+        return new GroupDeleteImpact(group.Id, group.Name, groupIds.Count - 1, itemIds.Count, entityIds);
     }
 
     public async Task DeleteGroupAsync(Guid groupId, bool ConfirmPermanentDeletion)
@@ -902,16 +902,16 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             return;
         }
 
-        if (sourceKind == WorkspaceEntityKind.Listing)
+        if (sourceKind == WorkspaceEntityKind.Item)
         {
             IsBusy = true;
-            var listingResult = await _listings.MoveListingAsync(new ListingManagementMoveRequest(
+            var itemResult = await _items.MoveItemAsync(new ItemManagementMoveRequest(
                 sourceId,
-                new ListingTopicReference(target.EntityKind, target.EntityId))).ConfigureAwait(false);
+                new ItemTopicReference(target.EntityKind, target.EntityId))).ConfigureAwait(false);
             IsBusy = false;
-            if (!listingResult.Succeeded)
+            if (!itemResult.Succeeded)
             {
-                ErrorMessage = listingResult.Error;
+                ErrorMessage = itemResult.Error;
                 return;
             }
 
@@ -957,25 +957,25 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         GroupPlacement placement,
         out string? error)
     {
-        if (sourceKind == WorkspaceEntityKind.Listing)
+        if (sourceKind == WorkspaceEntityKind.Item)
         {
-            var listing = _snapshot.Listings.SingleOrDefault(candidate => candidate.Id == sourceId);
-            if (listing is null || !ListingHierarchy.IsEffectivelyActive(_snapshot, listing))
+            var item = _snapshot.Items.SingleOrDefault(candidate => candidate.Id == sourceId);
+            if (item is null || !ItemHierarchy.IsEffectivelyActive(_snapshot, item))
             {
-                error = "Only an active listing can be moved.";
+                error = "Only an active item can be moved.";
                 return false;
             }
 
             if (target.EntityKind is not (WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group))
             {
-                error = "Drop the listing onto an active niche or group.";
+                error = "Drop the item onto an active niche or group.";
                 return false;
             }
 
             var listingTargetStoreId = target.EntityKind == WorkspaceEntityKind.Niche
                 ? _snapshot.Niches.SingleOrDefault(niche => niche.Id == target.EntityId && !niche.IsArchived)?.StoreId
                 : _snapshot.Groups.SingleOrDefault(group => group.Id == target.EntityId && GroupHierarchy.IsEffectivelyActive(_snapshot, group))?.StoreId;
-            if (listingTargetStoreId != listing.StoreId)
+            if (listingTargetStoreId != item.StoreId)
             {
                 error = "The destination must be active and belong to the same store.";
                 return false;
@@ -1081,21 +1081,21 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         ErrorMessage = null;
     }
 
-    private void InsertListingDraft(ListingTopicReference topic)
+    private void InsertItemDraft(ItemTopicReference topic)
     {
         CancelEdit();
         var parentNode = FindNode(topic.Id);
         if (parentNode is null)
         {
-            ErrorMessage = "The selected listing destination is not visible in the current tree.";
+            ErrorMessage = "The selected item destination is not visible in the current tree.";
             return;
         }
 
         var draft = new WorkspaceTreeNodeViewModel(
             Guid.NewGuid(),
-            WorkspaceEntityKind.Listing,
+            WorkspaceEntityKind.Item,
             Guid.NewGuid(),
-            "New listing",
+            "New Item",
             null,
             true,
             false,
@@ -1170,8 +1170,8 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     private WorkspaceTreeNodeViewModel ToNode(WorkspaceTreeProjectionNode projected)
     {
         var entity = FindEntity(projected.EntityKind, projected.EntityId);
-        var tagColors = projected.EntityKind == WorkspaceEntityKind.Listing
-            ? ResolveListingTagColors(projected.EntityId)
+        var tagColors = projected.EntityKind == WorkspaceEntityKind.Item
+            ? ResolveItemTagColors(projected.EntityId)
             : [];
         var node = new WorkspaceTreeNodeViewModel(
             projected.NodeId,
@@ -1184,15 +1184,15 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             projected.Children.Count,
             projected.Children.Select(ToNode),
             appliedTagColors: tagColors,
-            isInactive: projected.IsInactive || (entity is Listing listing && listing.Status == ListingStatus.Rejected));
+            isInactive: projected.IsInactive || (entity is Item item && item.Status == ItemStatus.Rejected));
         node.IsExpanded = _expandedIds.Contains(node.EntityId) || IsFiltering;
         return node;
     }
 
-    private IReadOnlyList<string> ResolveListingTagColors(Guid listingId)
+    private IReadOnlyList<string> ResolveItemTagColors(Guid itemId)
     {
-        var tagIds = _snapshot.ListingTags
-            .Where(link => link.ListingId == listingId)
+        var tagIds = _snapshot.ItemTags
+            .Where(link => link.ItemId == itemId)
             .Select(link => link.TagId)
             .ToHashSet();
         return _snapshot.Tags
@@ -1206,7 +1206,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     {
         WorkspaceEntityKind.Niche => _snapshot.Niches.SingleOrDefault(entity => entity.Id == id),
         WorkspaceEntityKind.Group => _snapshot.Groups.SingleOrDefault(entity => entity.Id == id),
-        WorkspaceEntityKind.Listing => _snapshot.Listings.SingleOrDefault(entity => entity.Id == id),
+        WorkspaceEntityKind.Item => _snapshot.Items.SingleOrDefault(entity => entity.Id == id),
         _ => null
     };
 
@@ -1262,7 +1262,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         {
             node.IsCut = _clipboard.Payload is { Mode: WorkspaceTreeClipboardMode.Cut } payload && payload.EntityId == node.EntityId;
             node.CanPaste = node.EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group &&
-                            _clipboard.Payload is { Kind: WorkspaceEntityKind.Group or WorkspaceEntityKind.Listing };
+                            _clipboard.Payload is { Kind: WorkspaceEntityKind.Group or WorkspaceEntityKind.Item };
         }
     }
 

@@ -6,7 +6,7 @@ namespace FusionCanvas.Application.Workspace;
 public sealed record AssetContextReference(WorkspaceEntityKind Kind, Guid Id)
 {
     public WorkspaceEntityKind Kind { get; } = Kind is
-        WorkspaceEntityKind.Listing or
+        WorkspaceEntityKind.Item or
         WorkspaceEntityKind.Niche or
         WorkspaceEntityKind.Group or
         WorkspaceEntityKind.Store
@@ -377,8 +377,8 @@ public sealed class AssetManagementService : IAssetManagementService
 
         return link.EntityKind switch
         {
-            WorkspaceEntityKind.Listing => snapshot.Listings.SingleOrDefault(candidate => candidate.Id == link.EntityId) is { } listing
-                ? $"Listing: {listing.Name}"
+            WorkspaceEntityKind.Item => snapshot.Items.SingleOrDefault(candidate => candidate.Id == link.EntityId) is { } listing
+                ? $"Item: {listing.Name}"
                 : "—",
             WorkspaceEntityKind.Niche => snapshot.Niches.SingleOrDefault(candidate => candidate.Id == link.EntityId) is { } niche
                 ? $"Niche: {niche.Name}"
@@ -400,7 +400,7 @@ public sealed class AssetManagementService : IAssetManagementService
         }
 
         return link.EntityKind is
-            WorkspaceEntityKind.Listing or
+            WorkspaceEntityKind.Item or
             WorkspaceEntityKind.Niche or
             WorkspaceEntityKind.Group or
             WorkspaceEntityKind.Store
@@ -474,10 +474,10 @@ public sealed class AssetManagementService : IAssetManagementService
                 descriptor = new AssetContextDescriptor(store.Id, context, group.Name, "Group");
                 return true;
             }
-            case WorkspaceEntityKind.Listing:
+            case WorkspaceEntityKind.Item:
             {
-                var listing = snapshot.Listings.SingleOrDefault(candidate => candidate.Id == context.Id);
-                if (listing is null || !ListingHierarchy.IsEffectivelyActive(snapshot, listing))
+                var listing = snapshot.Items.SingleOrDefault(candidate => candidate.Id == context.Id);
+                if (listing is null || !ItemHierarchy.IsEffectivelyActive(snapshot, listing))
                 {
                     error = "The selected listing and its complete parent path must be active.";
                     return false;
@@ -491,7 +491,7 @@ public sealed class AssetManagementService : IAssetManagementService
                 }
 
                 storeId = store.Id;
-                descriptor = new AssetContextDescriptor(store.Id, context, listing.Name, "Listing");
+                descriptor = new AssetContextDescriptor(store.Id, context, listing.Name, "Item");
                 return true;
             }
             default:
@@ -516,9 +516,9 @@ public sealed class AssetManagementService : IAssetManagementService
                 return snapshot.Groups.SingleOrDefault(candidate => candidate.Id == context.Id) is { } group
                     ? new AssetContextDescriptor(group.StoreId, context, group.Name, "Group")
                     : null;
-            case WorkspaceEntityKind.Listing:
-                return snapshot.Listings.SingleOrDefault(candidate => candidate.Id == context.Id) is { } listing
-                    ? new AssetContextDescriptor(listing.StoreId, context, listing.Name, "Listing")
+            case WorkspaceEntityKind.Item:
+                return snapshot.Items.SingleOrDefault(candidate => candidate.Id == context.Id) is { } listing
+                    ? new AssetContextDescriptor(listing.StoreId, context, listing.Name, "Item")
                     : null;
             default:
                 return null;

@@ -73,7 +73,7 @@ public class StoreManagementServiceTests
     {
         var store = NewStore("North Star Studio");
         var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, Now, Now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Pumpkin espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
+        var listing = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Pumpkin espresso", null, ItemStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [], [], []));
         var service = new StoreManagementService(repository, () => Now.AddMinutes(5));
         var context = new StoreContext("Updated", "Notes", "Dog owners", "Playful", "Q4 plan");
@@ -86,7 +86,7 @@ public class StoreManagementServiceTests
         Assert.Equal(context, result.Store?.Context);
         var saved = await repository.LoadAsync(TestContext.Current.CancellationToken);
         Assert.Equal(store.Id, Assert.Single(saved.Niches).StoreId);
-        Assert.Equal(store.Id, Assert.Single(saved.Listings).StoreId);
+        Assert.Equal(store.Id, Assert.Single(saved.Items).StoreId);
     }
 
     [Fact]

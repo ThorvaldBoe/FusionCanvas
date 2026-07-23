@@ -9,10 +9,10 @@ public sealed record AppWorkspaceRuntime(
     IWorkspaceFileStore FileStore,
     WorkspaceSnapshot Snapshot,
     IGroupManagementService GroupManagement,
-    IListingManagementService ListingManagement,
+    IItemManagementService ItemManagement,
     IAssetManagementService AssetManagement,
     ITagManagementService TagManagement,
-    IListingInspectorService ListingInspector);
+    IItemInspectorService ItemInspector);
 
 public static class AppWorkspaceFactory
 {
@@ -35,10 +35,10 @@ public static class AppWorkspaceFactory
             fileStore,
             snapshot,
             new GroupManagementService(repository),
-            new ListingManagementService(repository),
+            new ItemManagementService(repository),
             new AssetManagementService(repository, fileStore),
             new TagManagementService(repository),
-            new ListingInspectorService(repository));
+            new ItemInspectorService(repository));
     }
 
     private static string DefaultDatabasePath()

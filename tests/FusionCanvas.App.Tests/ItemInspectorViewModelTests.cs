@@ -1,10 +1,10 @@
-using FusionCanvas.App.Listings;
+using FusionCanvas.App.Items;
 using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.App.Tests;
 
-public class ListingInspectorViewModelTests
+public class ItemInspectorViewModelTests
 {
     [Fact]
     public async Task Load_PopulatesFieldsFromStateAndClearsDirty()
@@ -12,10 +12,10 @@ public class ListingInspectorViewModelTests
         var sample = Sample.Create(withRelationships: true);
         var viewModel = sample.CreateViewModel();
 
-        await viewModel.LoadAsync(sample.Listing.Id);
+        await viewModel.LoadAsync(sample.Item.Id);
 
         Assert.True(viewModel.HasState);
-        Assert.Equal(sample.Listing.Name, viewModel.Title);
+        Assert.Equal(sample.Item.Name, viewModel.Title);
         Assert.Equal("Description", viewModel.Description);
         Assert.Equal("idea-value", viewModel.Idea);
         Assert.Equal("audience-value", viewModel.Audience);
@@ -28,7 +28,7 @@ public class ListingInspectorViewModelTests
     }
 
     [Fact]
-    public async Task Load_MissingListingClearsState()
+    public async Task Load_MissingItemClearsState()
     {
         var sample = Sample.Create();
         var viewModel = sample.CreateViewModel();
@@ -41,11 +41,11 @@ public class ListingInspectorViewModelTests
     }
 
     [Fact]
-    public async Task Load_ArchivedListingIsReadOnlyWithNoticeAndRestore()
+    public async Task Load_ArchivedItemIsReadOnlyWithNoticeAndRestore()
     {
         var sample = Sample.Create();
-        var archived = sample.Listing with { IsArchived = true };
-        sample.Repository.Set(sample.Snapshot with { Listings = [archived] });
+        var archived = sample.Item with { IsArchived = true };
+        sample.Repository.Set(sample.Snapshot with { Items = [archived] });
         var viewModel = sample.CreateViewModel();
 
         await viewModel.LoadAsync(archived.Id);
@@ -62,7 +62,7 @@ public class ListingInspectorViewModelTests
     {
         var sample = Sample.Create();
         var viewModel = sample.CreateViewModel();
-        await viewModel.LoadAsync(sample.Listing.Id);
+        await viewModel.LoadAsync(sample.Item.Id);
 
         viewModel.Title = "Changed";
         viewModel.Idea = "new idea";
@@ -77,7 +77,7 @@ public class ListingInspectorViewModelTests
     {
         var sample = Sample.Create();
         var viewModel = sample.CreateViewModel();
-        await viewModel.LoadAsync(sample.Listing.Id);
+        await viewModel.LoadAsync(sample.Item.Id);
 
         await viewModel.CommitEditsAsync();
 
@@ -86,62 +86,65 @@ public class ListingInspectorViewModelTests
     }
 
     [Fact]
-    public async Task Commit_PersistsAndRefreshesBaseline()
+    public async Task Commit_DesignStagePersistsSharedFieldsWithoutChangingUpstreamMetadata()
     {
         var sample = Sample.Create();
         var viewModel = sample.CreateViewModel(clock: () => sample.Now.AddMinutes(1));
-        await viewModel.LoadAsync(sample.Listing.Id);
+        await viewModel.LoadAsync(sample.Item.Id);
 
         viewModel.Title = "Renamed";
         viewModel.Idea = "new idea";
         viewModel.Audience = "coffee lovers";
         viewModel.Description = "new description";
+        viewModel.Notes = "new notes";
         await viewModel.CommitEditsAsync();
 
         Assert.False(viewModel.HasError);
         Assert.False(viewModel.HasUnsavedChanges);
         Assert.Equal("Renamed", viewModel.Title);
-        Assert.Equal("new idea", viewModel.Idea);
-        Assert.Equal("coffee lovers", viewModel.Audience);
-        var persisted = sample.Repository.Snapshot.Listings.Single(listing => listing.Id == sample.Listing.Id);
+        Assert.Equal("idea-value", viewModel.Idea);
+        Assert.Equal("audience-value", viewModel.Audience);
+        var persisted = sample.Repository.Snapshot.Items.Single(listing => listing.Id == sample.Item.Id);
         Assert.Equal("Renamed", persisted.Name);
-        Assert.Equal("new description", persisted.Description);
-        Assert.Contains("\"idea\":\"new idea\"", persisted.MetadataJson);
-        Assert.Contains("\"idea.audience\":\"coffee lovers\"", persisted.MetadataJson);
+        Assert.Equal("Description", persisted.Description);
+        Assert.Contains("\"idea\":\"idea-value\"", persisted.MetadataJson);
+        Assert.Contains("\"idea.audience\":\"audience-value\"", persisted.MetadataJson);
+        Assert.Contains("\"notes\":\"new notes\"", persisted.MetadataJson);
         Assert.Contains("\"unknown\":\"kept\"", persisted.MetadataJson);
     }
 
     [Fact]
-    public async Task Commit_InvalidTitleRevertsTitleButSavesOtherEdits()
+    public async Task Commit_BlankOptionalTitleSavesWithOtherEdits()
     {
         var sample = Sample.Create();
         var viewModel = sample.CreateViewModel(clock: () => sample.Now.AddMinutes(1));
-        await viewModel.LoadAsync(sample.Listing.Id);
+        await viewModel.LoadAsync(sample.Item.Id);
 
         viewModel.Title = "   ";
         viewModel.Notes = "changed notes";
         await viewModel.CommitEditsAsync();
 
-        Assert.True(viewModel.HasError);
-        Assert.Equal(sample.Listing.Name, viewModel.Title);
+        Assert.False(viewModel.HasError);
+        Assert.Equal(string.Empty, viewModel.Title);
         Assert.False(viewModel.HasUnsavedChanges);
-        var persisted = sample.Repository.Snapshot.Listings.Single(listing => listing.Id == sample.Listing.Id);
-        Assert.Equal(sample.Listing.Name, persisted.Name);
+        var persisted = sample.Repository.Snapshot.Items.Single(listing => listing.Id == sample.Item.Id);
+        Assert.Equal(string.Empty, persisted.Name);
         Assert.Contains("\"notes\":\"changed notes\"", persisted.MetadataJson);
     }
 
     [Fact]
-    public async Task Commit_InvalidTitleAsOnlyChangeSkipsSave()
+    public async Task Commit_MultiLineTitleKeepsRecoverableDraftAndSkipsSave()
     {
         var sample = Sample.Create();
         var viewModel = sample.CreateViewModel();
-        await viewModel.LoadAsync(sample.Listing.Id);
+        await viewModel.LoadAsync(sample.Item.Id);
 
-        viewModel.Title = "   ";
+        viewModel.Title = "line one\nline two";
         await viewModel.CommitEditsAsync();
 
         Assert.True(viewModel.HasError);
-        Assert.Equal(sample.Listing.Name, viewModel.Title);
+        Assert.Equal("line one\nline two", viewModel.Title);
+        Assert.True(viewModel.HasUnsavedChanges);
         Assert.Equal(0, sample.Repository.SaveCount);
         Assert.Equal(sample.Snapshot, sample.Repository.Snapshot);
     }
@@ -152,7 +155,7 @@ public class ListingInspectorViewModelTests
         var sample = Sample.Create();
         sample.Repository.FailSaves = true;
         var viewModel = sample.CreateViewModel();
-        await viewModel.LoadAsync(sample.Listing.Id);
+        await viewModel.LoadAsync(sample.Item.Id);
 
         viewModel.Notes = "changed notes";
         await viewModel.CommitEditsAsync();
@@ -164,11 +167,34 @@ public class ListingInspectorViewModelTests
     }
 
     [Fact]
+    public async Task TagChange_PersistsImmediatelyWithoutReplacingTextDraft()
+    {
+        var sample = Sample.Create();
+        var viewModel = new ItemInspectorViewModel(
+            new ItemInspectorService(sample.Repository),
+            new ItemManagementService(sample.Repository),
+            new TagManagementService(sample.Repository));
+        await viewModel.LoadAsync(sample.Item.Id, TestContext.Current.CancellationToken);
+        viewModel.Title = "pending title";
+        viewModel.TagInput = "Immediate";
+
+        viewModel.AddTagCommand.Execute(null);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+
+        Assert.Equal("pending title", viewModel.Title);
+        Assert.True(viewModel.HasUnsavedChanges);
+        Assert.Contains("Immediate", viewModel.TagDraft);
+        Assert.Contains(sample.Repository.Snapshot.ItemTags, link =>
+            link.ItemId == sample.Item.Id
+            && sample.Repository.Snapshot.Tags.Single(tag => tag.Id == link.TagId).Name == "Immediate");
+    }
+
+    [Fact]
     public async Task Commit_RaisesSavedEvent()
     {
         var sample = Sample.Create();
         var viewModel = sample.CreateViewModel(clock: () => sample.Now.AddMinutes(1));
-        await viewModel.LoadAsync(sample.Listing.Id);
+        await viewModel.LoadAsync(sample.Item.Id);
         var raised = 0;
         viewModel.Saved += (_, _) => raised++;
 
@@ -183,7 +209,7 @@ public class ListingInspectorViewModelTests
     {
         var sample = Sample.Create();
         var viewModel = sample.CreateViewModel(clock: () => sample.Now.AddMinutes(1));
-        await viewModel.LoadAsync(sample.Listing.Id);
+        await viewModel.LoadAsync(sample.Item.Id);
 
         viewModel.TagInput = "New Tag";
         viewModel.AddTagCommand.Execute(null);
@@ -200,7 +226,7 @@ public class ListingInspectorViewModelTests
     {
         var sample = Sample.Create();
         var viewModel = sample.CreateViewModel();
-        await viewModel.LoadAsync(sample.Listing.Id);
+        await viewModel.LoadAsync(sample.Item.Id);
 
         viewModel.TagInput = "   ";
         viewModel.AddTagCommand.Execute(null);
@@ -214,13 +240,13 @@ public class ListingInspectorViewModelTests
     {
         var sample = Sample.Create();
         var viewModel = sample.CreateViewModel(clock: () => sample.Now.AddMinutes(1));
-        await viewModel.LoadAsync(sample.Listing.Id);
+        await viewModel.LoadAsync(sample.Item.Id);
 
         viewModel.RemoveTagCommand.Execute(sample.Tag.Name);
 
         Assert.False(viewModel.HasError);
         Assert.Empty(viewModel.TagDraft);
-        Assert.Empty(sample.Repository.Snapshot.ListingTags.Where(link => link.ListingId == sample.Listing.Id));
+        Assert.Empty(sample.Repository.Snapshot.ItemTags.Where(link => link.ItemId == sample.Item.Id));
         Assert.Contains(sample.Repository.Snapshot.Tags, tag => tag.Id == sample.Tag.Id);
     }
 
@@ -229,7 +255,7 @@ public class ListingInspectorViewModelTests
     {
         var sample = Sample.Create();
         var viewModel = sample.CreateViewModel();
-        await viewModel.LoadAsync(sample.Listing.Id);
+        await viewModel.LoadAsync(sample.Item.Id);
 
         viewModel.ApplyStage(WorkflowStage.Concept);
 
@@ -243,8 +269,8 @@ public class ListingInspectorViewModelTests
     {
         var sample = Sample.Create();
         var viewModel = sample.CreateViewModel(clock: () => sample.Now.AddMinutes(1));
-        await viewModel.LoadAsync(sample.Listing.Id);
-        ListingInspectorLifecycleEventArgs? raised = null;
+        await viewModel.LoadAsync(sample.Item.Id);
+        ItemInspectorLifecycleEventArgs? raised = null;
         viewModel.LifecycleChanged += (_, args) => raised = args;
 
         viewModel.RequestArchiveCommand.Execute(null);
@@ -255,26 +281,26 @@ public class ListingInspectorViewModelTests
         Assert.False(viewModel.ArchiveConfirmationVisible);
         Assert.NotNull(raised);
         Assert.False(raised!.Deleted);
-        Assert.True(sample.Repository.Snapshot.Listings.Single().IsArchived);
+        Assert.True(sample.Repository.Snapshot.Items.Single().IsArchived);
     }
 
     [Fact]
-    public async Task Restore_RestoresArchivedListingAndRaisesLifecycleChanged()
+    public async Task Restore_RestoresArchivedItemAndRaisesLifecycleChanged()
     {
         var sample = Sample.Create();
         var viewModel = sample.CreateViewModel(clock: () => sample.Now.AddMinutes(1));
-        await viewModel.LoadAsync(sample.Listing.Id);
+        await viewModel.LoadAsync(sample.Item.Id);
         viewModel.RequestArchiveCommand.Execute(null);
         viewModel.ConfirmArchiveCommand.Execute(null);
-        await viewModel.LoadAsync(sample.Listing.Id);
-        ListingInspectorLifecycleEventArgs? raised = null;
+        await viewModel.LoadAsync(sample.Item.Id);
+        ItemInspectorLifecycleEventArgs? raised = null;
         viewModel.LifecycleChanged += (_, args) => raised = args;
 
         viewModel.RestoreCommand.Execute(null);
 
         Assert.False(viewModel.HasError);
         Assert.NotNull(raised);
-        Assert.False(sample.Repository.Snapshot.Listings.Single().IsArchived);
+        Assert.False(sample.Repository.Snapshot.Items.Single().IsArchived);
     }
 
     [Fact]
@@ -282,8 +308,8 @@ public class ListingInspectorViewModelTests
     {
         var sample = Sample.Create();
         var viewModel = sample.CreateViewModel(clock: () => sample.Now.AddMinutes(1));
-        await viewModel.LoadAsync(sample.Listing.Id);
-        ListingInspectorLifecycleEventArgs? raised = null;
+        await viewModel.LoadAsync(sample.Item.Id);
+        ItemInspectorLifecycleEventArgs? raised = null;
         viewModel.LifecycleChanged += (_, args) => raised = args;
 
         viewModel.RequestDeleteCommand.Execute(null);
@@ -293,22 +319,22 @@ public class ListingInspectorViewModelTests
         Assert.False(viewModel.HasError);
         Assert.NotNull(raised);
         Assert.True(raised!.Deleted);
-        Assert.Empty(sample.Repository.Snapshot.Listings);
+        Assert.Empty(sample.Repository.Snapshot.Items);
     }
 
     [Fact]
-    public async Task Delete_PersistenceFailureReportsErrorAndKeepsListing()
+    public async Task Delete_PersistenceFailureReportsErrorAndKeepsItem()
     {
         var sample = Sample.Create();
         var viewModel = sample.CreateViewModel();
-        await viewModel.LoadAsync(sample.Listing.Id);
+        await viewModel.LoadAsync(sample.Item.Id);
         sample.Repository.FailSaves = true;
 
         viewModel.RequestDeleteCommand.Execute(null);
         viewModel.ConfirmDeleteCommand.Execute(null);
 
         Assert.True(viewModel.HasError);
-        Assert.Single(sample.Repository.Snapshot.Listings);
+        Assert.Single(sample.Repository.Snapshot.Items);
     }
 
     private sealed class TestRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
@@ -331,12 +357,12 @@ public class ListingInspectorViewModelTests
         }
     }
 
-    private sealed record Sample(WorkspaceSnapshot Snapshot, DateTimeOffset Now, Store Store, Niche Niche, TopicGroup Root, TopicGroup Child, Listing Listing, Tag Tag, TestRepository Repository)
+    private sealed record Sample(WorkspaceSnapshot Snapshot, DateTimeOffset Now, Store Store, Niche Niche, TopicGroup Root, TopicGroup Child, Item Item, Tag Tag, TestRepository Repository)
     {
-        public ListingInspectorViewModel CreateViewModel(Func<DateTimeOffset>? clock = null) =>
+        public ItemInspectorViewModel CreateViewModel(Func<DateTimeOffset>? clock = null) =>
             new(
-                new ListingInspectorService(Repository, clock: clock, newId: Guid.NewGuid),
-                new ListingManagementService(Repository, clock: clock, newId: Guid.NewGuid));
+                new ItemInspectorService(Repository, clock: clock, newId: Guid.NewGuid),
+                new ItemManagementService(Repository, clock: clock, newId: Guid.NewGuid));
 
         public static Sample Create(bool withRelationships = false)
         {
@@ -346,13 +372,13 @@ public class ListingInspectorViewModelTests
             var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
             var root = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Root", null, false, now, now, "{}");
             var child = new TopicGroup(Guid.NewGuid(), store.Id, null, root.Id, "Child", null, false, now, now, "{}");
-            var listing = new Listing(
-                Guid.NewGuid(), store.Id, niche.Id, child.Id, "Idea", "Description", ListingStatus.Draft, WorkflowStage.Design, false, now, now,
+            var listing = new Item(
+                Guid.NewGuid(), store.Id, niche.Id, child.Id, "Idea", "Description", ItemStatus.Draft, WorkflowStage.Design, false, now, now,
                 "{\"notes\":\"Notes\",\"idea\":\"idea-value\",\"idea.audience\":\"audience-value\",\"phrase\":\"phrase-value\",\"graphicDirection\":\"graphic-value\",\"unknown\":\"kept\"}");
             var tag = new Tag(Guid.NewGuid(), store.Id, "Tag", null, false, now, now, "{}");
             var snapshot = new WorkspaceSnapshot(
                 [store], [niche], [root, child], [listing], [], [], [tag],
-                [new ListingTag(listing.Id, tag.Id)], []);
+                [new ItemTag(listing.Id, tag.Id)], []);
             return new(snapshot, now, store, niche, root, child, listing, tag, new TestRepository(snapshot));
         }
     }

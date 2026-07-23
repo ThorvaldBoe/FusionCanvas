@@ -123,12 +123,12 @@ public sealed class ToolContextResolver : IToolContextResolver
 
     private static ToolContextResolution ResolveItem(ToolContextResolveRequest request, ToolContextScopeKind scopeKind)
     {
-        if (request.SelectedEntityKind != WorkspaceEntityKind.Listing)
+        if (request.SelectedEntityKind != WorkspaceEntityKind.Item)
         {
             return ToolContextResolution.Unavailable("Item context requires a listing selection.");
         }
 
-        var listing = request.Snapshot.Listings.SingleOrDefault(candidate => candidate.Id == request.SelectedEntityId);
+        var listing = request.Snapshot.Items.SingleOrDefault(candidate => candidate.Id == request.SelectedEntityId);
         if (listing is null)
         {
             return ToolContextResolution.Unavailable("Selected item was not found.");
@@ -150,7 +150,7 @@ public sealed class ToolContextResolver : IToolContextResolver
             listing,
             request.WorkflowStage,
             scopeKind,
-            ScopeSummary(scopeKind, listing.Name, PathDescription(path)),
+            ScopeSummary(scopeKind, ItemDisplayNameFormatter.Format(listing), PathDescription(path)),
             InheritedMetadata(request.Snapshot, metadataSources.Where(source => source.EntityId != listing.Id)),
             MetadataValues(listing, inherited: false),
             [],
@@ -208,7 +208,7 @@ public sealed class ToolContextResolver : IToolContextResolver
         return null;
     }
 
-    private static NavigationTopicReference ListingTopic(Listing listing)
+    private static NavigationTopicReference ListingTopic(Item listing)
     {
         if (listing.GroupId is Guid groupId)
         {
@@ -282,7 +282,7 @@ public sealed class ToolContextResolver : IToolContextResolver
         Store store,
         Niche? niche,
         IReadOnlyList<ToolContextEntityReference> topicPath,
-        Listing? selectedItem)
+        Item? selectedItem)
     {
         yield return Reference(store, WorkspaceEntityKind.Store);
 
@@ -298,7 +298,7 @@ public sealed class ToolContextResolver : IToolContextResolver
 
         if (selectedItem is not null)
         {
-            yield return Reference(selectedItem, WorkspaceEntityKind.Listing);
+            yield return Reference(selectedItem with { Name = ItemDisplayNameFormatter.Format(selectedItem) }, WorkspaceEntityKind.Item);
         }
     }
 
@@ -332,7 +332,7 @@ public sealed class ToolContextResolver : IToolContextResolver
             WorkspaceEntityKind.Store => snapshot.Stores.SingleOrDefault(candidate => candidate.Id == source.EntityId),
             WorkspaceEntityKind.Niche => snapshot.Niches.SingleOrDefault(candidate => candidate.Id == source.EntityId),
             WorkspaceEntityKind.Group => snapshot.Groups.SingleOrDefault(candidate => candidate.Id == source.EntityId),
-            WorkspaceEntityKind.Listing => snapshot.Listings.SingleOrDefault(candidate => candidate.Id == source.EntityId),
+            WorkspaceEntityKind.Item => snapshot.Items.SingleOrDefault(candidate => candidate.Id == source.EntityId),
             _ => null
         };
 
@@ -358,14 +358,14 @@ public sealed class ToolContextResolver : IToolContextResolver
             .ToArray();
     }
 
-    private static IReadOnlyList<ToolContextInheritedValue> ExplicitListingTags(WorkspaceSnapshot snapshot, Listing listing)
+    private static IReadOnlyList<ToolContextInheritedValue> ExplicitListingTags(WorkspaceSnapshot snapshot, Item listing)
     {
-        var tagIds = snapshot.ListingTags
-            .Where(link => link.ListingId == listing.Id)
+        var tagIds = snapshot.ItemTags
+            .Where(link => link.ItemId == listing.Id)
             .Select(link => link.TagId)
             .ToHashSet();
 
-        var source = Reference(listing, WorkspaceEntityKind.Listing);
+        var source = Reference(listing with { Name = ItemDisplayNameFormatter.Format(listing) }, WorkspaceEntityKind.Item);
 
         return snapshot.Tags
             .Where(tag => tagIds.Contains(tag.Id))
@@ -386,7 +386,7 @@ public sealed class ToolContextResolver : IToolContextResolver
         WorkspaceEntityKind topicKind,
         Guid topicId,
         int limit,
-        Guid? selectedListingId = null)
+        Guid? selectedItemId = null)
     {
         var childGroups = snapshot.Groups
             .Where(group => topicKind == WorkspaceEntityKind.Niche
@@ -394,12 +394,12 @@ public sealed class ToolContextResolver : IToolContextResolver
                 : group.ParentGroupId == topicId)
             .Select(group => new ToolContextNearbyWorkSummary(WorkspaceEntityKind.Group, group.Id, group.Name, WorkState(group), true));
 
-        var childListings = snapshot.Listings
-            .Where(listing => selectedListingId is null || listing.Id != selectedListingId)
+        var childListings = snapshot.Items
+            .Where(listing => selectedItemId is null || listing.Id != selectedItemId)
             .Where(listing => topicKind == WorkspaceEntityKind.Niche
                 ? listing.NicheId == topicId && listing.GroupId is null
                 : listing.GroupId == topicId)
-            .Select(listing => new ToolContextNearbyWorkSummary(WorkspaceEntityKind.Listing, listing.Id, listing.Name, WorkState(listing), true));
+            .Select(listing => new ToolContextNearbyWorkSummary(WorkspaceEntityKind.Item, listing.Id, ItemDisplayNameFormatter.Format(listing), WorkState(listing), true));
 
         return childGroups
             .Concat(childListings)
@@ -410,7 +410,7 @@ public sealed class ToolContextResolver : IToolContextResolver
     }
 
     private static NearbyWorkState WorkState(WorkspaceEntity entity) =>
-        entity.IsArchived || entity is Listing { Status: ListingStatus.Rejected }
+        entity.IsArchived || entity is Item { Status: ItemStatus.Rejected }
             ? NearbyWorkState.RejectedOrArchived
             : NearbyWorkState.Active;
 
@@ -423,7 +423,7 @@ public sealed class ToolContextResolver : IToolContextResolver
             Store => WorkspaceEntityKind.Store,
             Niche => WorkspaceEntityKind.Niche,
             TopicGroup => WorkspaceEntityKind.Group,
-            Listing => WorkspaceEntityKind.Listing,
+            Item => WorkspaceEntityKind.Item,
             Asset => WorkspaceEntityKind.Asset,
             Prompt => WorkspaceEntityKind.Prompt,
             _ => throw new ArgumentOutOfRangeException(nameof(entity), entity, "Unsupported workspace entity.")

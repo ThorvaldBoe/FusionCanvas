@@ -6,7 +6,7 @@ The goal is to help creators move from scattered ideas and manual production ste
 
 FusionCanvas is especially focused on:
 
-- organizing stores, niches, listings, concepts, designs, mockups, and metadata
+- organizing stores, niches, Items, concepts, designs, mockups, and metadata
 - supporting batch-oriented production workflows
 - helping creators refine ideas using the Design Triangle: idea, phrase, and graphic
 - preparing designs and listings for platforms such as Shopify, Printify, Etsy, and other marketplaces
@@ -85,7 +85,7 @@ FusionCanvas should help evaluate whether these three elements support each othe
 
 After a concept is clear, the Design stage turns it into final shirt artwork. FusionCanvas should support manual design work in external tools, imported AI-generated artwork, and in-app AI generation where configured. The important product behavior is preserving variants, related assets, source context, and final selection decisions for the current item.
 
-## Stores, Niches, Groups, and Listings
+## Stores, Niches, Groups, and Items
 
 FusionCanvas should support multiple stores.
 
@@ -95,7 +95,7 @@ Inside a store, the user can organize work into a flexible navigation tree of to
 
 A topic is a folder-like grouping of related ideas, concepts, listings, campaigns, experiments, or work areas. The top-level topics inside a store are niches by default. Topics can contain any number of nested topics.
 
-An item is a single idea, concept, listing, or other concrete unit of work. Listings are the primary item type and may eventually become products.
+An Item is the universal stage-agnostic concrete unit of work. Items move through Idea, Concept, Design, and Listing and may eventually become marketplace products.
 
 A niche is more than a folder. It can contain important knowledge about audience, style, humor, constraints, popular themes, legal risks, successful patterns, and AI guidance.
 

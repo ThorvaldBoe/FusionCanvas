@@ -33,11 +33,11 @@ public sealed record TagManagementUpdateRequest(
 
 public sealed record TagManagementDeleteRequest(Guid TagId, bool ConfirmPermanentDeletion);
 
-public sealed record ApplyTagRequest(Guid ListingId, Guid TagId);
+public sealed record ApplyTagRequest(Guid ItemId, Guid TagId);
 
-public sealed record RemoveTagRequest(Guid ListingId, Guid TagId);
+public sealed record RemoveTagRequest(Guid ItemId, Guid TagId);
 
-public sealed record ApplyOrCreateTagRequest(Guid ListingId, string Name);
+public sealed record ApplyOrCreateTagRequest(Guid ItemId, string Name);
 
 public sealed record TagApplicationResult(
     bool Succeeded,
@@ -60,7 +60,7 @@ public sealed record TagManagementResult(
     bool Succeeded,
     string? Error,
     TagSummary? Tag,
-    int AffectedListingCount,
+    int AffectedItemCount,
     TagManagementState State)
 {
     public static TagManagementResult Success(TagSummary? tag, TagManagementState state, int affectedListingCount = 0) =>
@@ -96,7 +96,7 @@ public interface ITagManagementService
 
     Task<IReadOnlyList<TagSummary>> GetActiveTagVocabularyAsync(Guid storeId, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<Guid>> GetListingTagsAsync(Guid listingId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Guid>> GetItemTagsAsync(Guid itemId, CancellationToken cancellationToken = default);
 
     Task<int> GetTagApplicationCountAsync(Guid tagId, CancellationToken cancellationToken = default);
 }
@@ -273,12 +273,12 @@ public sealed class TagManagementService : ITagManagementService
             return TagManagementResult.Failure("Permanent deletion requires confirmation.", BuildState(snapshot, existing.StoreId));
         }
 
-        var affectedListingCount = snapshot.ListingTags.Count(link => link.TagId == existing.Id);
+        var affectedListingCount = snapshot.ItemTags.Count(link => link.TagId == existing.Id);
 
         var updated = snapshot with
         {
             Tags = snapshot.Tags.Where(tag => tag.Id != existing.Id).ToArray(),
-            ListingTags = snapshot.ListingTags.Where(link => link.TagId != existing.Id).ToArray()
+            ItemTags = snapshot.ItemTags.Where(link => link.TagId != existing.Id).ToArray()
         };
         await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
 
@@ -290,7 +290,7 @@ public sealed class TagManagementService : ITagManagementService
     {
         ArgumentNullException.ThrowIfNull(request);
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var listing = snapshot.Listings.SingleOrDefault(candidate => candidate.Id == request.ListingId);
+        var listing = snapshot.Items.SingleOrDefault(candidate => candidate.Id == request.ItemId);
         if (listing is null)
         {
             return TagApplicationResult.Failure("Listing was not found.", BuildState(snapshot, _activeStoreId));
@@ -301,7 +301,7 @@ public sealed class TagManagementService : ITagManagementService
             return TagApplicationResult.Failure("Archived listings cannot have tags applied.", BuildState(snapshot, _activeStoreId));
         }
 
-        if (IsListingEffectivelyHidden(snapshot, listing))
+        if (IsItemEffectivelyHidden(snapshot, listing))
         {
             return TagApplicationResult.Failure("Restore the listing or its parent topic before editing tags.", BuildState(snapshot, _activeStoreId));
         }
@@ -317,14 +317,14 @@ public sealed class TagManagementService : ITagManagementService
             return TagApplicationResult.Failure("Tags can only be applied to listings in the same store.", BuildState(snapshot, _activeStoreId));
         }
 
-        if (snapshot.ListingTags.Any(link => link.ListingId == listing.Id && link.TagId == tag.Id))
+        if (snapshot.ItemTags.Any(link => link.ItemId == listing.Id && link.TagId == tag.Id))
         {
             return TagApplicationResult.Applied(ToSummary(tag), createdNewTag: false, BuildState(snapshot, tag.StoreId));
         }
 
         var updated = snapshot with
         {
-            ListingTags = [.. snapshot.ListingTags, new ListingTag(listing.Id, tag.Id)]
+            ItemTags = [.. snapshot.ItemTags, new ItemTag(listing.Id, tag.Id)]
         };
         await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
 
@@ -336,7 +336,7 @@ public sealed class TagManagementService : ITagManagementService
     {
         ArgumentNullException.ThrowIfNull(request);
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var listing = snapshot.Listings.SingleOrDefault(candidate => candidate.Id == request.ListingId);
+        var listing = snapshot.Items.SingleOrDefault(candidate => candidate.Id == request.ItemId);
         if (listing is null)
         {
             return TagManagementResult.Failure("Listing was not found.", BuildState(snapshot, _activeStoreId));
@@ -347,12 +347,12 @@ public sealed class TagManagementService : ITagManagementService
             return TagManagementResult.Failure("Archived listings cannot have tags removed.", BuildState(snapshot, _activeStoreId));
         }
 
-        if (IsListingEffectivelyHidden(snapshot, listing))
+        if (IsItemEffectivelyHidden(snapshot, listing))
         {
             return TagManagementResult.Failure("Restore the listing or its parent topic before editing tags.", BuildState(snapshot, _activeStoreId));
         }
 
-        var link = snapshot.ListingTags.SingleOrDefault(candidate => candidate.ListingId == request.ListingId && candidate.TagId == request.TagId);
+        var link = snapshot.ItemTags.SingleOrDefault(candidate => candidate.ItemId == request.ItemId && candidate.TagId == request.TagId);
         if (link is null)
         {
             return TagManagementResult.Success(null, BuildState(snapshot, _activeStoreId));
@@ -360,7 +360,7 @@ public sealed class TagManagementService : ITagManagementService
 
         var updated = snapshot with
         {
-            ListingTags = snapshot.ListingTags.Where(candidate => !(candidate.ListingId == request.ListingId && candidate.TagId == request.TagId)).ToArray()
+            ItemTags = snapshot.ItemTags.Where(candidate => !(candidate.ItemId == request.ItemId && candidate.TagId == request.TagId)).ToArray()
         };
         await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
 
@@ -371,7 +371,7 @@ public sealed class TagManagementService : ITagManagementService
     {
         ArgumentNullException.ThrowIfNull(request);
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var listing = snapshot.Listings.SingleOrDefault(candidate => candidate.Id == request.ListingId);
+        var listing = snapshot.Items.SingleOrDefault(candidate => candidate.Id == request.ItemId);
         if (listing is null)
         {
             return TagApplicationResult.Failure("Listing was not found.", BuildState(snapshot, _activeStoreId));
@@ -382,7 +382,7 @@ public sealed class TagManagementService : ITagManagementService
             return TagApplicationResult.Failure("Archived listings cannot have tags applied.", BuildState(snapshot, _activeStoreId));
         }
 
-        if (IsListingEffectivelyHidden(snapshot, listing))
+        if (IsItemEffectivelyHidden(snapshot, listing))
         {
             return TagApplicationResult.Failure("Restore the listing or its parent topic before editing tags.", BuildState(snapshot, _activeStoreId));
         }
@@ -400,12 +400,12 @@ public sealed class TagManagementService : ITagManagementService
             string.Equals(tag.Name, normalizedName, StringComparison.OrdinalIgnoreCase));
         if (activeMatch is not null)
         {
-            if (snapshot.ListingTags.Any(link => link.ListingId == listing.Id && link.TagId == activeMatch.Id))
+            if (snapshot.ItemTags.Any(link => link.ItemId == listing.Id && link.TagId == activeMatch.Id))
             {
                 return TagApplicationResult.Applied(ToSummary(activeMatch), createdNewTag: false, BuildState(snapshot, listing.StoreId));
             }
 
-            var updatedWithLink = snapshot with { ListingTags = [.. snapshot.ListingTags, new ListingTag(listing.Id, activeMatch.Id)] };
+            var updatedWithLink = snapshot with { ItemTags = [.. snapshot.ItemTags, new ItemTag(listing.Id, activeMatch.Id)] };
             await _repository.SaveAsync(updatedWithLink, cancellationToken).ConfigureAwait(false);
             _activeStoreId = listing.StoreId;
             return TagApplicationResult.Applied(ToSummary(activeMatch), createdNewTag: false, BuildState(updatedWithLink, listing.StoreId));
@@ -425,7 +425,7 @@ public sealed class TagManagementService : ITagManagementService
         var updated = snapshot with
         {
             Tags = [.. snapshot.Tags, newTag],
-            ListingTags = [.. snapshot.ListingTags, new ListingTag(listing.Id, newTag.Id)]
+            ItemTags = [.. snapshot.ItemTags, new ItemTag(listing.Id, newTag.Id)]
         };
         await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
 
@@ -443,11 +443,11 @@ public sealed class TagManagementService : ITagManagementService
             .ToArray();
     }
 
-    public async Task<IReadOnlyList<Guid>> GetListingTagsAsync(Guid listingId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Guid>> GetItemTagsAsync(Guid itemId, CancellationToken cancellationToken = default)
     {
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        return snapshot.ListingTags
-            .Where(link => link.ListingId == listingId)
+        return snapshot.ItemTags
+            .Where(link => link.ItemId == itemId)
             .Select(link => link.TagId)
             .ToArray();
     }
@@ -455,7 +455,7 @@ public sealed class TagManagementService : ITagManagementService
     public async Task<int> GetTagApplicationCountAsync(Guid tagId, CancellationToken cancellationToken = default)
     {
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        return snapshot.ListingTags.Count(link => link.TagId == tagId);
+        return snapshot.ItemTags.Count(link => link.TagId == tagId);
     }
 
     private TagManagementState BuildState(WorkspaceSnapshot snapshot, Guid? storeId)
@@ -538,7 +538,7 @@ public sealed class TagManagementService : ITagManagementService
         return null;
     }
 
-    private static bool IsListingEffectivelyHidden(WorkspaceSnapshot snapshot, Listing listing)
+    private static bool IsItemEffectivelyHidden(WorkspaceSnapshot snapshot, Item listing)
     {
         var store = snapshot.Stores.SingleOrDefault(candidate => candidate.Id == listing.StoreId);
         if (store is null || store.IsArchived)

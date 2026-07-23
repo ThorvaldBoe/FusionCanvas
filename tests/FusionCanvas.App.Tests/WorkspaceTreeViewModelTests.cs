@@ -114,8 +114,8 @@ public class WorkspaceTreeViewModelTests
         var sample = Sample.Create(withGroup: true);
         var root = Assert.Single(sample.Snapshot.Groups);
         var child = new TopicGroup(Guid.NewGuid(), sample.Store.Id, null, root.Id, "Child", null, false, sample.Now, sample.Now, "{}");
-        var listing = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, child.Id, "Item", null, ListingStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
-        var snapshot = sample.Snapshot with { Groups = [root, child], Listings = [listing] };
+        var listing = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, child.Id, "Item", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Groups = [root, child], Items = [listing] };
         var repository = new TestRepository(snapshot);
         var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
@@ -199,19 +199,19 @@ public class WorkspaceTreeViewModelTests
     }
 
     [Fact]
-    public async Task ListingInlineCaptureRenameAndExplicitTabFlowUseCanonicalSelection()
+    public async Task ItemInlineCaptureRenameAndExplicitTabFlowUseCanonicalSelection()
     {
         var sample = Sample.Create();
         var repository = new TestRepository(sample.Snapshot);
-        var listings = new ListingManagementService(repository);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot, listings: listings);
+        var items = new ItemManagementService(repository);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot, items: items);
         var openedTabs = 0;
         viewModel.OpenInTabRequested += (_, _) => openedTabs++;
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
 
-        await viewModel.BeginCreateListingAsync();
+        await viewModel.BeginCreateItemAsync();
         Assert.True(viewModel.SelectedNode!.IsDraft);
-        Assert.Equal(WorkspaceEntityKind.Listing, viewModel.SelectedNode.EntityKind);
+        Assert.Equal(WorkspaceEntityKind.Item, viewModel.SelectedNode.EntityKind);
         viewModel.SelectedNode.DraftName = " Zebra idea ";
         await viewModel.CommitEditAsync();
         Assert.Equal("Zebra idea", viewModel.SelectedNode!.Name);
@@ -226,44 +226,44 @@ public class WorkspaceTreeViewModelTests
     }
 
     [Fact]
-    public async Task ListingTypedCopyCutPasteAndDropUseTopicDestinationsAndAlphabeticalProjection()
+    public async Task ItemTypedCopyCutPasteAndDropUseTopicDestinationsAndAlphabeticalProjection()
     {
         var sample = Sample.Create();
         var other = new Niche(Guid.NewGuid(), sample.Store.Id, "Other", null, false, sample.Now, sample.Now, "{}");
-        var first = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Zulu", null, ListingStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
-        var second = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Alpha", null, ListingStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
-        var snapshot = sample.Snapshot with { Niches = [sample.Niche, other], Listings = [first, second] };
+        var first = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Zulu", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var second = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Alpha", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Niches = [sample.Niche, other], Items = [first, second] };
         var repository = new TestRepository(snapshot);
-        var listings = new ListingManagementService(repository);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot, listings: listings);
+        var items = new ItemManagementService(repository);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot, items: items);
         viewModel.SetStore(sample.Store.Id, snapshot);
         var sourceRoot = viewModel.Roots.Single(root => root.EntityId == sample.Niche.Id);
         Assert.Equal(["Alpha", "Zulu"], sourceRoot.Children.Select(node => node.Name));
         var source = sourceRoot.Children.Single(node => node.EntityId == first.Id);
         var target = viewModel.Roots.Single(root => root.EntityId == other.Id);
 
-        Assert.True(viewModel.CanDrop(WorkspaceEntityKind.Listing, first.Id, target, new GroupPlacement(GroupPlacementKind.Before, second.Id), out _));
-        await viewModel.MoveAsync(WorkspaceEntityKind.Listing, first.Id, target, new GroupPlacement(GroupPlacementKind.Before, second.Id));
-        Assert.Equal(other.Id, repository.Snapshot.Listings.Single(item => item.Id == first.Id).NicheId);
+        Assert.True(viewModel.CanDrop(WorkspaceEntityKind.Item, first.Id, target, new GroupPlacement(GroupPlacementKind.Before, second.Id), out _));
+        await viewModel.MoveAsync(WorkspaceEntityKind.Item, first.Id, target, new GroupPlacement(GroupPlacementKind.Before, second.Id));
+        Assert.Equal(other.Id, repository.Snapshot.Items.Single(item => item.Id == first.Id).NicheId);
 
         viewModel.Copy();
         viewModel.SelectNodeCommand.Execute(target);
         await viewModel.PasteAsync();
-        Assert.Equal(3, repository.Snapshot.Listings.Count);
+        Assert.Equal(3, repository.Snapshot.Items.Count);
     }
 
     [Fact]
-    public void TagFilter_NarrowsToListingsAndGuardsSiblingPositioning()
+    public void TagFilter_NarrowsToItemsAndGuardsSiblingPositioning()
     {
         var sample = Sample.Create(withGroup: true);
-        var tagged = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Tagged", null, ListingStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
-        var untagged = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Untagged", null, ListingStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var tagged = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Tagged", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var untagged = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Untagged", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
         var tag = new Tag(Guid.NewGuid(), sample.Store.Id, "Halloween", null, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with
         {
-            Listings = [tagged, untagged],
+            Items = [tagged, untagged],
             Tags = [tag],
-            ListingTags = [new ListingTag(tagged.Id, tag.Id)]
+            ItemTags = [new ItemTag(tagged.Id, tag.Id)]
         };
         var group = snapshot.Groups.Single();
         var repository = new TestRepository(snapshot);
@@ -308,11 +308,11 @@ public class WorkspaceTreeViewModelTests
     }
 
     [Fact]
-    public void IncludeArchived_RevealsArchivedListingWithoutMakingItCanonicalContext()
+    public void IncludeArchived_RevealsArchivedItemWithoutMakingItCanonicalContext()
     {
         var sample = Sample.Create();
-        var archived = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Ghost", null, ListingStatus.Draft, WorkflowStage.Idea, true, sample.Now, sample.Now, "{}");
-        var snapshot = sample.Snapshot with { Listings = [archived] };
+        var archived = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Ghost", null, ItemStatus.Draft, WorkflowStage.Idea, true, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Items = [archived] };
         var repository = new TestRepository(snapshot);
         var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
@@ -442,55 +442,55 @@ public class WorkspaceTreeViewModelTests
     }
 
     [Fact]
-    public void StageFilter_NarrowsToListingsAtSelectedStage()
+    public void StageFilter_NarrowsToItemsAtSelectedStage()
     {
         var sample = Sample.Create();
-        var idea = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Idea listing", null, ListingStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
-        var design = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Design listing", null, ListingStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}");
-        var snapshot = sample.Snapshot with { Listings = [idea, design] };
+        var idea = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Idea listing", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var design = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Design listing", null, ItemStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Items = [idea, design] };
         var viewModel = new WorkspaceTreeViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
 
-        var allListings = viewModel.Roots.SelectMany(r => r.Children).Where(n => n.IsListing).ToArray();
-        Assert.Equal(2, allListings.Length);
+        var allItems = viewModel.Roots.SelectMany(r => r.Children).Where(n => n.IsItem).ToArray();
+        Assert.Equal(2, allItems.Length);
 
         viewModel.StageFilterIndex = 3;
-        var designListings = viewModel.Roots.SelectMany(r => r.Children).Where(n => n.IsListing).ToArray();
-        Assert.Single(designListings);
-        Assert.Equal("Design listing", designListings[0].Name);
+        var designItems = viewModel.Roots.SelectMany(r => r.Children).Where(n => n.IsItem).ToArray();
+        Assert.Single(designItems);
+        Assert.Equal("Design listing", designItems[0].Name);
 
         viewModel.StageFilterIndex = 0;
-        var restored = viewModel.Roots.SelectMany(r => r.Children).Where(n => n.IsListing).ToArray();
+        var restored = viewModel.Roots.SelectMany(r => r.Children).Where(n => n.IsItem).ToArray();
         Assert.Equal(2, restored.Length);
     }
 
     [Fact]
-    public void StatusFilter_NarrowsToListingsWithSelectedStatus()
+    public void StatusFilter_NarrowsToItemsWithSelectedStatus()
     {
         var sample = Sample.Create();
-        var draft = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Draft listing", null, ListingStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
-        var rejected = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Rejected listing", null, ListingStatus.Rejected, WorkflowStage.Concept, false, sample.Now, sample.Now, "{}");
-        var snapshot = sample.Snapshot with { Listings = [draft, rejected] };
+        var draft = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Draft listing", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var rejected = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Rejected listing", null, ItemStatus.Rejected, WorkflowStage.Concept, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Items = [draft, rejected] };
         var viewModel = new WorkspaceTreeViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
 
         viewModel.StatusFilterIndex = 4;
-        var filtered = viewModel.Roots.SelectMany(r => r.Children).Where(n => n.IsListing).ToArray();
+        var filtered = viewModel.Roots.SelectMany(r => r.Children).Where(n => n.IsItem).ToArray();
         Assert.Single(filtered);
         Assert.Equal("Rejected listing", filtered[0].Name);
         Assert.True(filtered[0].IsInactive);
     }
 
     [Fact]
-    public void RejectedListing_MarkedInactiveInTree()
+    public void RejectedItem_MarkedInactiveInTree()
     {
         var sample = Sample.Create();
-        var rejected = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Rejected", null, ListingStatus.Rejected, WorkflowStage.Concept, false, sample.Now, sample.Now, "{}");
-        var snapshot = sample.Snapshot with { Listings = [rejected] };
+        var rejected = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Rejected", null, ItemStatus.Rejected, WorkflowStage.Concept, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Items = [rejected] };
         var viewModel = new WorkspaceTreeViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
 
-        var node = viewModel.Roots.SelectMany(r => r.Children).Single(n => n.IsListing);
+        var node = viewModel.Roots.SelectMany(r => r.Children).Single(n => n.IsItem);
         Assert.True(node.IsInactive);
     }
 
@@ -498,17 +498,17 @@ public class WorkspaceTreeViewModelTests
     public void StageAndStatusFilters_CombineWithAnd()
     {
         var sample = Sample.Create();
-        var ideaDraft = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "IdeaDraft", null, ListingStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
-        var ideaRejected = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "IdeaRejected", null, ListingStatus.Rejected, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
-        var designDraft = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "DesignDraft", null, ListingStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}");
-        var snapshot = sample.Snapshot with { Listings = [ideaDraft, ideaRejected, designDraft] };
+        var ideaDraft = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "IdeaDraft", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var ideaRejected = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "IdeaRejected", null, ItemStatus.Rejected, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var designDraft = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "DesignDraft", null, ItemStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Items = [ideaDraft, ideaRejected, designDraft] };
         var viewModel = new WorkspaceTreeViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
 
         viewModel.StageFilterIndex = 1;
         viewModel.StatusFilterIndex = 1;
 
-        var filtered = viewModel.Roots.SelectMany(r => r.Children).Where(n => n.IsListing).ToArray();
+        var filtered = viewModel.Roots.SelectMany(r => r.Children).Where(n => n.IsItem).ToArray();
         Assert.Single(filtered);
         Assert.Equal("IdeaDraft", filtered[0].Name);
     }

@@ -128,7 +128,7 @@ Creators should spend their time making creative decisions, not performing repet
 
 Automation is only valuable when the underlying information is well organized.
 
-FusionCanvas should encourage users to build structured knowledge about their stores, niches, listings, and assets before attempting advanced automation.
+FusionCanvas should encourage users to build structured knowledge about their stores, niches, Items, and assets before attempting advanced automation.
 
 Good organization makes better automation possible.
 

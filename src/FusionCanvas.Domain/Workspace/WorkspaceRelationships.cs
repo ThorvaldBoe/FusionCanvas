@@ -1,6 +1,6 @@
 namespace FusionCanvas.Domain.Workspace;
 
-public enum ListingStatus
+public enum ItemStatus
 {
     Draft = 0,
     Published = 1,
@@ -8,24 +8,24 @@ public enum ListingStatus
     Rejected = 3
 }
 
-public static class ListingStatuses
+public static class ItemStatuses
 {
-    public static IReadOnlyList<ListingStatus> Ordered { get; } =
+    public static IReadOnlyList<ItemStatus> Ordered { get; } =
     [
-        ListingStatus.Draft,
-        ListingStatus.Published,
-        ListingStatus.Paused,
-        ListingStatus.Rejected
+        ItemStatus.Draft,
+        ItemStatus.Published,
+        ItemStatus.Paused,
+        ItemStatus.Rejected
     ];
 
-    public static string GetDisplayName(ListingStatus status) =>
+    public static string GetDisplayName(ItemStatus status) =>
         status switch
         {
-            ListingStatus.Draft => "Draft",
-            ListingStatus.Published => "Published",
-            ListingStatus.Paused => "Paused",
-            ListingStatus.Rejected => "Rejected",
-            _ => throw new ArgumentOutOfRangeException(nameof(status), status, "Unsupported listing lifecycle status.")
+            ItemStatus.Draft => "Draft",
+            ItemStatus.Published => "Published",
+            ItemStatus.Paused => "Paused",
+            ItemStatus.Rejected => "Rejected",
+            _ => throw new ArgumentOutOfRangeException(nameof(status), status, "Unsupported item lifecycle status.")
         };
 }
 
@@ -50,14 +50,14 @@ public enum WorkspaceEntityKind
     Store = 0,
     Niche = 1,
     Group = 2,
-    Listing = 3,
+    Item = 3,
     Asset = 4,
     Prompt = 5,
     Design = 6,
     FutureRelatedRecord = 7
 }
 
-public sealed record ListingTag(Guid ListingId, Guid TagId);
+public sealed record ItemTag(Guid ItemId, Guid TagId);
 
 public sealed record AssetLink(Guid AssetId, WorkspaceEntityKind EntityKind, Guid EntityId)
 {

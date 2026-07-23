@@ -81,13 +81,13 @@ public static class WorkspaceNavigation
 
         IEnumerable<Niche> nichesQuery = snapshot.Niches.Where(niche => storeIds.Contains(niche.StoreId));
         IEnumerable<TopicGroup> groupsQuery = snapshot.Groups.Where(group => storeIds.Contains(group.StoreId));
-        IEnumerable<Listing> listingsQuery = snapshot.Listings.Where(listing => storeIds.Contains(listing.StoreId));
+        IEnumerable<Item> itemsQuery = snapshot.Items.Where(item => storeIds.Contains(item.StoreId));
 
         if (!includeArchived)
         {
             nichesQuery = nichesQuery.Where(niche => !niche.IsArchived);
             groupsQuery = groupsQuery.Where(group => GroupHierarchy.IsEffectivelyActive(snapshot, group));
-            listingsQuery = listingsQuery.Where(listing => !listing.IsArchived);
+            itemsQuery = itemsQuery.Where(item => !item.IsArchived);
         }
 
         var niches = nichesQuery.ToArray();
@@ -96,12 +96,12 @@ public static class WorkspaceNavigation
 
         if (!includeArchived)
         {
-            listingsQuery = listingsQuery.Where(listing =>
-                (listing.NicheId is Guid nicheId && niches.Any(niche => niche.Id == nicheId)) ||
-                (listing.GroupId is Guid groupId && groupIds.Contains(groupId)));
+            itemsQuery = itemsQuery.Where(item =>
+                (item.NicheId is Guid nicheId && niches.Any(niche => niche.Id == nicheId)) ||
+                (item.GroupId is Guid groupId && groupIds.Contains(groupId)));
         }
 
-        var listings = listingsQuery.ToArray();
+        var items = itemsQuery.ToArray();
 
         var nichesByStore = niches
             .GroupBy(niche => niche.StoreId)
@@ -117,22 +117,22 @@ public static class WorkspaceNavigation
             .GroupBy(group => group.ParentGroupId!.Value)
             .ToDictionary(group => group.Key, group => group.OrderBy(topicGroup => topicGroup.SortOrder).ThenBy(topicGroup => topicGroup.Name, StringComparer.OrdinalIgnoreCase).ToArray());
 
-        var listingsByNiche = listings
-            .Where(listing => listing.NicheId is not null && listing.GroupId is null)
-            .GroupBy(listing => listing.NicheId!.Value)
-            .ToDictionary(group => group.Key, group => group.OrderBy(listing => listing.Name, StringComparer.OrdinalIgnoreCase).ToArray());
+        var itemsByNiche = items
+            .Where(item => item.NicheId is not null && item.GroupId is null)
+            .GroupBy(item => item.NicheId!.Value)
+            .ToDictionary(group => group.Key, group => group.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToArray());
 
-        var listingsByGroup = listings
-            .Where(listing => listing.GroupId is Guid groupId)
-            .GroupBy(listing => listing.GroupId!.Value)
-            .ToDictionary(group => group.Key, group => group.OrderBy(listing => listing.Name, StringComparer.OrdinalIgnoreCase).ToArray());
+        var itemsByGroup = items
+            .Where(item => item.GroupId is Guid groupId)
+            .GroupBy(item => item.GroupId!.Value)
+            .ToDictionary(group => group.Key, group => group.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToArray());
 
         var stores = activeStores
             .OrderBy(store => store.Name, StringComparer.OrdinalIgnoreCase)
             .Select(store =>
             {
                 var childTopics = nichesByStore.GetValueOrDefault(store.Id, [])
-                    .Select(niche => BuildNicheNode(snapshot, niche, groupsByNiche, groupsByParentGroup, listingsByNiche, listingsByGroup, includeArchived));
+                    .Select(niche => BuildNicheNode(snapshot, niche, groupsByNiche, groupsByParentGroup, itemsByNiche, itemsByGroup, includeArchived));
 
                 return new NavigationNode(
                     store.Id,
@@ -204,34 +204,34 @@ public static class WorkspaceNavigation
         };
     }
 
-    public static WorkspaceSnapshot MoveListing(
+    public static WorkspaceSnapshot MoveItem(
         WorkspaceSnapshot snapshot,
-        Guid listingId,
+        Guid itemId,
         NavigationTopicReference destinationTopic)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(destinationTopic);
         ValidateWorkspace(snapshot);
 
-        var listing = snapshot.Listings.SingleOrDefault(candidate => candidate.Id == listingId)
-            ?? throw new InvalidOperationException("Listing was not found.");
+        var item = snapshot.Items.SingleOrDefault(candidate => candidate.Id == itemId)
+            ?? throw new InvalidOperationException("Item was not found.");
 
         if (destinationTopic.EntityKind == WorkspaceEntityKind.Niche)
         {
             var niche = snapshot.Niches.SingleOrDefault(candidate => candidate.Id == destinationTopic.EntityId)
                 ?? throw new InvalidOperationException("Destination niche was not found.");
 
-            if (niche.StoreId != listing.StoreId)
+            if (niche.StoreId != item.StoreId)
             {
-                throw new InvalidOperationException("A listing cannot be moved outside its store.");
+                throw new InvalidOperationException("An item cannot be moved outside its store.");
             }
 
             EnsureActiveDestination(snapshot, niche);
 
             return snapshot with
             {
-                Listings = snapshot.Listings
-                    .Select(candidate => candidate.Id == listingId ? candidate with { NicheId = niche.Id, GroupId = null } : candidate)
+                Items = snapshot.Items
+                    .Select(candidate => candidate.Id == itemId ? candidate with { NicheId = niche.Id, GroupId = null } : candidate)
                     .ToArray()
             };
         }
@@ -239,17 +239,17 @@ public static class WorkspaceNavigation
         var group = snapshot.Groups.SingleOrDefault(candidate => candidate.Id == destinationTopic.EntityId)
             ?? throw new InvalidOperationException("Destination group was not found.");
 
-        if (group.StoreId != listing.StoreId)
+        if (group.StoreId != item.StoreId)
         {
-            throw new InvalidOperationException("A listing cannot be moved outside its store.");
+            throw new InvalidOperationException("An item cannot be moved outside its store.");
         }
 
         EnsureActiveDestination(snapshot, group);
 
         return snapshot with
         {
-            Listings = snapshot.Listings
-                .Select(candidate => candidate.Id == listingId ? candidate with { NicheId = group.NicheId, GroupId = group.Id } : candidate)
+            Items = snapshot.Items
+                .Select(candidate => candidate.Id == itemId ? candidate with { NicheId = group.NicheId, GroupId = group.Id } : candidate)
                 .ToArray()
         };
     }
@@ -259,15 +259,15 @@ public static class WorkspaceNavigation
         Niche niche,
         IReadOnlyDictionary<Guid, TopicGroup[]> groupsByNiche,
         IReadOnlyDictionary<Guid, TopicGroup[]> groupsByParentGroup,
-        IReadOnlyDictionary<Guid, Listing[]> listingsByNiche,
-        IReadOnlyDictionary<Guid, Listing[]> listingsByGroup,
+        IReadOnlyDictionary<Guid, Item[]> itemsByNiche,
+        IReadOnlyDictionary<Guid, Item[]> itemsByGroup,
         bool includeArchived)
     {
         var childGroups = groupsByNiche.GetValueOrDefault(niche.Id, [])
-            .Select(group => BuildGroupNode(snapshot, group, groupsByParentGroup, listingsByGroup, includeArchived));
+            .Select(group => BuildGroupNode(snapshot, group, groupsByParentGroup, itemsByGroup, includeArchived));
 
-        var childListings = listingsByNiche.GetValueOrDefault(niche.Id, [])
-            .Select(listing => BuildListingNode(snapshot, listing, niche.Id, includeArchived));
+        var childItems = itemsByNiche.GetValueOrDefault(niche.Id, [])
+            .Select(item => BuildItemNode(snapshot, item, niche.Id, includeArchived));
 
         return new NavigationNode(
             niche.Id,
@@ -276,7 +276,7 @@ public static class WorkspaceNavigation
             niche.Id,
             niche.Name,
             niche.StoreId,
-            childGroups.Concat(childListings).ToArray(),
+            childGroups.Concat(childItems).ToArray(),
             IsInactive: includeArchived && niche.IsArchived);
     }
 
@@ -284,14 +284,14 @@ public static class WorkspaceNavigation
         WorkspaceSnapshot snapshot,
         TopicGroup group,
         IReadOnlyDictionary<Guid, TopicGroup[]> groupsByParentGroup,
-        IReadOnlyDictionary<Guid, Listing[]> listingsByGroup,
+        IReadOnlyDictionary<Guid, Item[]> itemsByGroup,
         bool includeArchived)
     {
         var childGroups = groupsByParentGroup.GetValueOrDefault(group.Id, [])
-            .Select(childGroup => BuildGroupNode(snapshot, childGroup, groupsByParentGroup, listingsByGroup, includeArchived));
+            .Select(childGroup => BuildGroupNode(snapshot, childGroup, groupsByParentGroup, itemsByGroup, includeArchived));
 
-        var childListings = listingsByGroup.GetValueOrDefault(group.Id, [])
-            .Select(listing => BuildListingNode(snapshot, listing, group.Id, includeArchived));
+        var childItems = itemsByGroup.GetValueOrDefault(group.Id, [])
+            .Select(item => BuildItemNode(snapshot, item, group.Id, includeArchived));
 
         return new NavigationNode(
             group.Id,
@@ -300,27 +300,27 @@ public static class WorkspaceNavigation
             group.Id,
             group.Name,
             group.ParentGroupId ?? group.NicheId,
-            childGroups.Concat(childListings).ToArray(),
+            childGroups.Concat(childItems).ToArray(),
             IsInactive: includeArchived && !GroupHierarchy.IsEffectivelyActive(snapshot, group));
     }
 
-    private static NavigationNode BuildListingNode(WorkspaceSnapshot snapshot, Listing listing, Guid parentNodeId, bool includeArchived) =>
+    private static NavigationNode BuildItemNode(WorkspaceSnapshot snapshot, Item item, Guid parentNodeId, bool includeArchived) =>
         new(
-            listing.Id,
+            item.Id,
             NavigationNodeRole.Item,
-            WorkspaceEntityKind.Listing,
-            listing.Id,
-            listing.Name,
+            WorkspaceEntityKind.Item,
+            item.Id,
+            item.Name,
             parentNodeId,
             [],
-            IsInactive: includeArchived && !ListingHierarchy.IsEffectivelyActive(snapshot, listing));
+            IsInactive: includeArchived && !ItemHierarchy.IsEffectivelyActive(snapshot, item));
 
     private static void ValidateWorkspace(WorkspaceSnapshot snapshot)
     {
         EnsureUniqueIds(snapshot.Stores.Select(store => store.Id), "stores");
         EnsureUniqueIds(snapshot.Niches.Select(niche => niche.Id), "niches");
         EnsureUniqueIds(snapshot.Groups.Select(group => group.Id), "groups");
-        EnsureUniqueIds(snapshot.Listings.Select(listing => listing.Id), "listings");
+        EnsureUniqueIds(snapshot.Items.Select(item => item.Id), "items");
 
         var storeIds = snapshot.Stores.Select(store => store.Id).ToHashSet();
         var nicheIds = snapshot.Niches.Select(niche => niche.Id).ToHashSet();
@@ -365,26 +365,26 @@ public static class WorkspaceNavigation
             }
         }
 
-        foreach (var listing in snapshot.Listings)
+        foreach (var item in snapshot.Items)
         {
-            if (!storeIds.Contains(listing.StoreId))
+            if (!storeIds.Contains(item.StoreId))
             {
-                throw new InvalidOperationException("A listing must belong to an existing store.");
+                throw new InvalidOperationException("An item must belong to an existing store.");
             }
 
-            if (listing.NicheId is null && listing.GroupId is null)
+            if (item.NicheId is null && item.GroupId is null)
             {
-                throw new InvalidOperationException("A listing must belong under a niche or group.");
+                throw new InvalidOperationException("An item must belong under a niche or group.");
             }
 
-            if (listing.NicheId is Guid nicheId && !nicheIds.Contains(nicheId))
+            if (item.NicheId is Guid nicheId && !nicheIds.Contains(nicheId))
             {
-                throw new InvalidOperationException("A listing niche parent must exist.");
+                throw new InvalidOperationException("An item niche parent must exist.");
             }
 
-            if (listing.GroupId is Guid groupId && !groupIds.Contains(groupId))
+            if (item.GroupId is Guid groupId && !groupIds.Contains(groupId))
             {
-                throw new InvalidOperationException("A listing group parent must exist.");
+                throw new InvalidOperationException("An item group parent must exist.");
             }
         }
     }

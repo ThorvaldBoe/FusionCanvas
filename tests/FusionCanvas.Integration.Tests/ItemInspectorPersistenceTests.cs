@@ -5,7 +5,7 @@ using Microsoft.Data.Sqlite;
 
 namespace FusionCanvas.Integration.Tests;
 
-public class ListingInspectorPersistenceTests
+public class ItemInspectorPersistenceTests
 {
     [Fact]
     public async Task InspectorSave_RoundTripsCreativeFieldsNotesAndTagsThroughExistingSchema()
@@ -16,9 +16,9 @@ public class ListingInspectorPersistenceTests
         var nicheId = Guid.NewGuid();
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", nicheId);
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var listing = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         await repository.SaveAsync(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [], [], []), TestContext.Current.CancellationToken);
-        var service = new ListingInspectorService(repository, clock: () => now.AddMinutes(1), newId: Guid.NewGuid);
+        var service = new ItemInspectorService(repository, clock: () => now.AddMinutes(1), newId: Guid.NewGuid);
 
         var saved = await service.SaveAsync(new(
             listing.Id, "Updated", "Description text", "Idea text", "Audience text", "Phrase text", "Graphic direction", "Notes text", ["First", "Second"]), TestContext.Current.CancellationToken);
@@ -54,11 +54,11 @@ public class ListingInspectorPersistenceTests
         var nicheId = Guid.NewGuid();
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", nicheId);
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
-        var first = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "First", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
-        var second = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Second", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var first = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "First", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var second = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Second", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         await repository.SaveAsync(new WorkspaceSnapshot([store], [niche], [], [first, second], [], [], [], [], []), TestContext.Current.CancellationToken);
         var id = new Queue<Guid>([Guid.NewGuid(), Guid.NewGuid()]);
-        var service = new ListingInspectorService(repository, clock: () => now.AddMinutes(1), newId: () => id.Dequeue());
+        var service = new ItemInspectorService(repository, clock: () => now.AddMinutes(1), newId: () => id.Dequeue());
 
         await service.SaveAsync(new(first.Id, first.Name, null, null, null, null, null, null, ["Shared Tag"]), TestContext.Current.CancellationToken);
         await service.SaveAsync(new(second.Id, second.Name, null, null, null, null, null, null, ["shared tag"]), TestContext.Current.CancellationToken);
@@ -66,8 +66,8 @@ public class ListingInspectorPersistenceTests
         var reloaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
         var sharedTag = reloaded.Tags.Single(tag => tag.Name == "Shared Tag");
-        Assert.DoesNotContain(reloaded.ListingTags, link => link.ListingId == first.Id);
-        Assert.Contains(reloaded.ListingTags, link => link.ListingId == second.Id && link.TagId == sharedTag.Id);
+        Assert.DoesNotContain(reloaded.ItemTags, link => link.ItemId == first.Id);
+        Assert.Contains(reloaded.ItemTags, link => link.ItemId == second.Id && link.TagId == sharedTag.Id);
         Assert.Single(reloaded.Tags);
     }
 
@@ -80,17 +80,17 @@ public class ListingInspectorPersistenceTests
         var nicheId = Guid.NewGuid();
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", nicheId);
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var listing = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         await inner.SaveAsync(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [], [], []), TestContext.Current.CancellationToken);
-        var service = new ListingInspectorService(new FailingRepository(inner));
+        var service = new ItemInspectorService(new FailingRepository(inner));
 
         var result = await service.SaveAsync(new(listing.Id, "Updated", null, "idea", null, null, null, null, ["New Tag"]), TestContext.Current.CancellationToken);
         var reloaded = await inner.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
-        Assert.Equal("Idea", reloaded.Listings.Single().Name);
+        Assert.Equal("Idea", reloaded.Items.Single().Name);
         Assert.Empty(reloaded.Tags);
-        Assert.Empty(reloaded.ListingTags);
+        Assert.Empty(reloaded.ItemTags);
     }
 
     private sealed class FailingRepository(IWorkspaceRepository inner) : IWorkspaceRepository
