@@ -19,6 +19,7 @@ Read these in order; drill into detail only where the task touches them:
 4. **`docs/`** — background and direction:
    - `principles.md` — durable product principles; evaluate decisions against them.
    - `architecture.md` — Clean Architecture, modules, testing strategy.
+   - `coding-standard.md` — concrete C# organization, file structure, naming, async, error-handling, and test rules.
    - `ui-guidelines.md` — Obsidian-inspired shell, layout, dark theme.
    - `data-model.md`, `design-pipeline.md`, `plugin-model.md`, `product-vision.md`, `strategic-decisions.md`, `roadmap.md` as relevant.
    - `qa-review.md` — the QA review playbook (see below).
