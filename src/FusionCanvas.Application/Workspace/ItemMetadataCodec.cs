@@ -2,10 +2,11 @@ using System.Text.Json;
 
 namespace FusionCanvas.Application.Workspace;
 
-internal static class ListingMetadataCodec
+internal static class ItemMetadataCodec
 {
     public const string NotesKey = "notes";
     public const string IdeaKey = "idea";
+    public const string ConceptIdeaKey = "concept.idea";
     public const string IdeaAudienceKey = "idea.audience";
     public const string PhraseKey = "phrase";
     public const string GraphicDirectionKey = "graphicDirection";
@@ -15,9 +16,9 @@ internal static class ListingMetadataCodec
 
     public static string? NormalizeOptional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    public static string? ValidateName(string name) => string.IsNullOrWhiteSpace(name)
-        ? "Listing title is required."
-        : name.Contains('\n') || name.Contains('\r') ? "Listing title must be a single line." : null;
+    public static string? ValidateName(string name) => name.Contains('\n') || name.Contains('\r')
+        ? "Item title must be a single line."
+        : null;
 
     public static string NormalizeSingleLine(string? value)
     {
@@ -84,7 +85,7 @@ internal static class ListingMetadataCodec
         }
     }
 
-    public static void ApplyContextMetadata(Dictionary<string, string> metadata, ListingContext context, bool replaceExplicitMetadata)
+    public static void ApplyContextMetadata(Dictionary<string, string> metadata, ItemContext context, bool replaceExplicitMetadata)
     {
         SetOptional(metadata, NotesKey, context.Notes);
         if (context.Metadata is null)

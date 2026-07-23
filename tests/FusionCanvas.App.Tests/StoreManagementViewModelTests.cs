@@ -491,9 +491,9 @@ public class StoreManagementViewModelTests
         var second = NewStore("Second Studio");
         var firstNiche = new Niche(Guid.NewGuid(), first.Id, "Coffee", null, false, Now, Now, "{}");
         var secondNiche = new Niche(Guid.NewGuid(), second.Id, "Cats", null, false, Now, Now, "{}");
-        var firstListing = new Listing(Guid.NewGuid(), first.Id, firstNiche.Id, null, "Espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
-        var secondListing = new Listing(Guid.NewGuid(), second.Id, secondNiche.Id, null, "Whiskers", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
-        var snapshot = new WorkspaceSnapshot([first, second], [firstNiche, secondNiche], [], [firstListing, secondListing], [], [], [], [], []);
+        var firstItem = new Item(Guid.NewGuid(), first.Id, firstNiche.Id, null, "Espresso", null, ItemStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
+        var secondItem = new Item(Guid.NewGuid(), second.Id, secondNiche.Id, null, "Whiskers", null, ItemStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
+        var snapshot = new WorkspaceSnapshot([first, second], [firstNiche, secondNiche], [], [firstItem, secondItem], [], [], [], [], []);
         var storeService = new StoreManagementService(new InMemoryWorkspaceRepository(snapshot));
 
         var viewModel = new MainWindowViewModel(
@@ -504,13 +504,13 @@ public class StoreManagementViewModelTests
             storeService,
             snapshot);
 
-        Assert.Contains(viewModel.NavigationContexts, context => context.Context.Id == firstListing.Id);
-        Assert.DoesNotContain(viewModel.NavigationContexts, context => context.Context.Id == secondListing.Id);
+        Assert.Contains(viewModel.NavigationContexts, context => context.Context.Id == firstItem.Id);
+        Assert.DoesNotContain(viewModel.NavigationContexts, context => context.Context.Id == secondItem.Id);
 
         await viewModel.StoreManagement.SelectStoreAsync(viewModel.StoreManagement.ActiveStores.Single(store => store.Id == second.Id), TestContext.Current.CancellationToken);
 
-        Assert.Contains(viewModel.NavigationContexts, context => context.Context.Id == secondListing.Id);
-        Assert.DoesNotContain(viewModel.NavigationContexts, context => context.Context.Id == firstListing.Id);
+        Assert.Contains(viewModel.NavigationContexts, context => context.Context.Id == secondItem.Id);
+        Assert.DoesNotContain(viewModel.NavigationContexts, context => context.Context.Id == firstItem.Id);
     }
 
     [Fact]
@@ -519,7 +519,7 @@ public class StoreManagementViewModelTests
         var store = NewStore("North Star Studio");
         var activeNiche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, Now, Now, "{}");
         var archivedNiche = new Niche(Guid.NewGuid(), store.Id, "Dogs", null, true, Now, Now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, activeNiche.Id, null, "Espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
+        var listing = new Item(Guid.NewGuid(), store.Id, activeNiche.Id, null, "Espresso", null, ItemStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var snapshot = new WorkspaceSnapshot([store], [activeNiche, archivedNiche], [], [listing], [], [], [], [], []);
         var repository = new InMemoryWorkspaceRepository(snapshot);
 
@@ -623,15 +623,15 @@ public class StoreManagementViewModelTests
     }
 
     [Fact]
-    public async Task TagsTab_DeleteWarningReportsListingCountFromAppliedTag()
+    public async Task TagsTab_DeleteWarningReportsItemCountFromAppliedTag()
     {
         var storeId = Guid.NewGuid();
         var store = new Store(storeId, "Studio", null, false, Now, Now, "{}");
         var niche = new Niche(Guid.NewGuid(), storeId, "Niche", null, false, Now, Now, "{}");
-        var listing = new Listing(Guid.NewGuid(), storeId, niche.Id, null, "Shirt", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
+        var item = new Item(Guid.NewGuid(), storeId, niche.Id, null, "Shirt", null, ItemStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var tag = new Tag(Guid.NewGuid(), storeId, "Evergreen", null, false, Now, Now, "{}", null);
-        var link = new ListingTag(listing.Id, tag.Id);
-        var snapshot = new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [tag], [link], []);
+        var link = new ItemTag(item.Id, tag.Id);
+        var snapshot = new WorkspaceSnapshot([store], [niche], [], [item], [], [], [tag], [link], []);
         var repository = new InMemoryWorkspaceRepository(snapshot);
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository),
@@ -645,7 +645,7 @@ public class StoreManagementViewModelTests
         Assert.True(viewModel.TagDeleteWarningVisible);
         await Task.Yield();
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
-        Assert.Contains("1 listing", viewModel.TagDeleteWarningMessage);
+        Assert.Contains("1 item", viewModel.TagDeleteWarningMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

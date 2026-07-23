@@ -3,7 +3,7 @@ using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.Application.Tests;
 
-public class ListingManagementServiceTests
+public class ItemManagementServiceTests
 {
     [Fact]
     public async Task ResolveCreateTopic_UsesSelectionListingParentAndDefaultWithoutGuessing()
@@ -12,10 +12,10 @@ public class ListingManagementServiceTests
         var service = sample.Service();
 
         var group = await service.ResolveCreateTopicAsync(sample.Store.Id, new WorkspaceTreeSelection(WorkspaceEntityKind.Group, sample.Child.Id));
-        var listing = await service.ResolveCreateTopicAsync(sample.Store.Id, new WorkspaceTreeSelection(WorkspaceEntityKind.Listing, sample.Listing.Id));
+        var listing = await service.ResolveCreateTopicAsync(sample.Store.Id, new WorkspaceTreeSelection(WorkspaceEntityKind.Item, sample.Item.Id));
         var fallback = await service.ResolveCreateTopicAsync(sample.Store.Id, null);
         var ambiguousStore = sample.Store with { DefaultNicheId = null };
-        var ambiguous = await new ListingManagementService(new TestRepository(sample.Snapshot with
+        var ambiguous = await new ItemManagementService(new TestRepository(sample.Snapshot with
         {
             Stores = [ambiguousStore],
             Niches = [.. sample.Snapshot.Niches, new Niche(Guid.NewGuid(), sample.Store.Id, "Other", null, false, sample.Now, sample.Now, "{}")]
@@ -35,23 +35,23 @@ public class ListingManagementServiceTests
         var id = Guid.NewGuid();
         var service = sample.Service(repository, id);
 
-        var created = await service.CreateListingAsync(new ListingManagementCreateRequest(
-            new ListingTopicReference(WorkspaceEntityKind.Group, sample.Child.Id),
+        var created = await service.CreateItemAsync(new ItemManagementCreateRequest(
+            new ItemTopicReference(WorkspaceEntityKind.Group, sample.Child.Id),
             " Idea ",
-            new ListingContext(" Description ", " Notes ", new Dictionary<string, string> { ["unknown"] = "kept" }, [sample.Tag.Id])));
-        var updated = await service.UpdateListingAsync(new ListingManagementUpdateRequest(
+            new ItemContext(" Description ", " Notes ", new Dictionary<string, string> { ["unknown"] = "kept" }, [sample.Tag.Id])));
+        var updated = await service.UpdateItemAsync(new ItemManagementUpdateRequest(
             id,
             " Renamed ",
-            created.Listing!.Context with { Description = " Changed ", Notes = " Revised " }));
+            created.Item!.Context with { Description = " Changed ", Notes = " Revised " }));
 
         Assert.True(created.Succeeded);
         Assert.True(updated.Succeeded);
-        Assert.Equal(ListingStatus.Draft, created.Listing.Status);
-        Assert.Equal("Renamed", updated.Listing!.Name);
-        Assert.Equal("Changed", updated.Listing.Context.Description);
-        Assert.Equal("Revised", updated.Listing.Context.Notes);
-        Assert.Equal("kept", updated.Listing.Context.Metadata!["unknown"]);
-        Assert.Contains(repository.Snapshot.ListingTags, link => link.ListingId == id && link.TagId == sample.Tag.Id);
+        Assert.Equal(ItemStatus.Draft, created.Item.Status);
+        Assert.Equal("Renamed", updated.Item!.Name);
+        Assert.Equal("Changed", updated.Item.Context.Description);
+        Assert.Equal("Revised", updated.Item.Context.Notes);
+        Assert.Equal("kept", updated.Item.Context.Metadata!["unknown"]);
+        Assert.Contains(repository.Snapshot.ItemTags, link => link.ItemId == id && link.TagId == sample.Tag.Id);
         Assert.Equal(2, repository.SaveCount);
     }
 
@@ -62,10 +62,10 @@ public class ListingManagementServiceTests
         var repository = new TestRepository(sample.Snapshot) { FailSaves = true };
         var service = sample.Service(repository);
 
-        var invalid = await service.CreateListingAsync(new ListingManagementCreateRequest(
-            new ListingTopicReference(WorkspaceEntityKind.Niche, sample.Niche.Id), "two\nlines"));
-        var failed = await service.CreateListingAsync(new ListingManagementCreateRequest(
-            new ListingTopicReference(WorkspaceEntityKind.Niche, sample.Niche.Id), "Valid"));
+        var invalid = await service.CreateItemAsync(new ItemManagementCreateRequest(
+            new ItemTopicReference(WorkspaceEntityKind.Niche, sample.Niche.Id), "two\nlines"));
+        var failed = await service.CreateItemAsync(new ItemManagementCreateRequest(
+            new ItemTopicReference(WorkspaceEntityKind.Niche, sample.Niche.Id), "Valid"));
 
         Assert.False(invalid.Succeeded);
         Assert.False(failed.Succeeded);
@@ -82,18 +82,18 @@ public class ListingManagementServiceTests
         var repository = new TestRepository(sample.Snapshot with { Stores = [sample.Store, otherStore], Niches = [sample.Niche, otherNiche] });
         var service = sample.Service(repository);
 
-        var crossStore = await service.MoveListingAsync(new(sample.Listing.Id, new(WorkspaceEntityKind.Niche, otherNiche.Id)));
+        var crossStore = await service.MoveItemAsync(new(sample.Item.Id, new(WorkspaceEntityKind.Niche, otherNiche.Id)));
         var inactiveSnapshot = repository.Snapshot with
         {
             Groups = repository.Snapshot.Groups.Select(group => group.Id == sample.Root.Id ? group with { IsArchived = true } : group).ToArray()
         };
         repository.Set(inactiveSnapshot);
-        var inactive = await service.MoveListingAsync(new(sample.Listing.Id, new(WorkspaceEntityKind.Niche, sample.Niche.Id)));
+        var inactive = await service.MoveItemAsync(new(sample.Item.Id, new(WorkspaceEntityKind.Niche, sample.Niche.Id)));
 
         Assert.False(crossStore.Succeeded);
         Assert.False(inactive.Succeeded);
-        Assert.Equal(sample.Child.Id, repository.Snapshot.Listings.Single(listing => listing.Id == sample.Listing.Id).GroupId);
-        Assert.Single(repository.Snapshot.ListingTags);
+        Assert.Equal(sample.Child.Id, repository.Snapshot.Items.Single(listing => listing.Id == sample.Item.Id).GroupId);
+        Assert.Single(repository.Snapshot.ItemTags);
     }
 
     [Fact]
@@ -102,14 +102,14 @@ public class ListingManagementServiceTests
         var sample = Sample.Create(withRelationships: true);
         var repository = new TestRepository(sample.Snapshot);
         var duplicateId = Guid.NewGuid();
-        var result = await sample.Service(repository, duplicateId).DuplicateListingAsync(new(sample.Listing.Id));
+        var result = await sample.Service(repository, duplicateId).DuplicateItemAsync(new(sample.Item.Id));
 
         Assert.True(result.Succeeded);
-        Assert.Equal(duplicateId, result.Listing!.Id);
-        Assert.Equal("Idea Copy", result.Listing.Name);
-        Assert.Equal(ListingStatus.Draft, result.Listing.Status);
-        Assert.Contains(repository.Snapshot.ListingTags, link => link.ListingId == duplicateId);
-        Assert.DoesNotContain(repository.Snapshot.Prompts, prompt => prompt.ListingId == duplicateId);
+        Assert.Equal(duplicateId, result.Item!.Id);
+        Assert.Equal("Idea Copy", result.Item.Name);
+        Assert.Equal(ItemStatus.Draft, result.Item.Status);
+        Assert.Contains(repository.Snapshot.ItemTags, link => link.ItemId == duplicateId);
+        Assert.DoesNotContain(repository.Snapshot.Prompts, prompt => prompt.ItemId == duplicateId);
         Assert.DoesNotContain(repository.Snapshot.AssetLinks, link => link.EntityId == duplicateId);
     }
 
@@ -120,21 +120,21 @@ public class ListingManagementServiceTests
         var repository = new TestRepository(sample.Snapshot);
         var service = sample.Service(repository);
 
-        var archived = await service.ArchiveListingAsync(sample.Listing.Id);
-        var restored = await service.RestoreListingAsync(new(sample.Listing.Id));
-        await service.ArchiveListingAsync(sample.Listing.Id);
+        var archived = await service.ArchiveItemAsync(sample.Item.Id);
+        var restored = await service.RestoreItemAsync(new(sample.Item.Id));
+        await service.ArchiveItemAsync(sample.Item.Id);
         repository.Set(repository.Snapshot with
         {
             Groups = repository.Snapshot.Groups.Select(group => group.Id == sample.Root.Id ? group with { IsArchived = true } : group).ToArray()
         });
-        var blocked = await service.RestoreListingAsync(new(sample.Listing.Id));
+        var blocked = await service.RestoreItemAsync(new(sample.Item.Id));
 
         Assert.True(archived.Succeeded);
         Assert.Single(archived.State.ArchivedListings);
         Assert.True(restored.Succeeded);
-        Assert.Single(restored.State.ActiveListings);
+        Assert.Single(restored.State.ActiveItems);
         Assert.False(blocked.Succeeded);
-        Assert.True(repository.Snapshot.Listings.Single().IsArchived);
+        Assert.True(repository.Snapshot.Items.Single().IsArchived);
     }
 
     [Fact]
@@ -144,14 +144,14 @@ public class ListingManagementServiceTests
         var repository = new TestRepository(sample.Snapshot);
         var service = sample.Service(repository);
 
-        Assert.False((await service.DeleteListingAsync(new(sample.Listing.Id, false))).Succeeded);
-        Assert.False((await service.DeleteListingAsync(new(sample.Listing.Id, true))).Succeeded);
+        Assert.False((await service.DeleteItemAsync(new(sample.Item.Id, false))).Succeeded);
+        Assert.False((await service.DeleteItemAsync(new(sample.Item.Id, true))).Succeeded);
         repository.Set(repository.Snapshot with { Prompts = [], AssetLinks = [] });
-        var deleted = await service.DeleteListingAsync(new(sample.Listing.Id, true));
+        var deleted = await service.DeleteItemAsync(new(sample.Item.Id, true));
 
         Assert.True(deleted.Succeeded);
-        Assert.Empty(repository.Snapshot.Listings);
-        Assert.Empty(repository.Snapshot.ListingTags);
+        Assert.Empty(repository.Snapshot.Items);
+        Assert.Empty(repository.Snapshot.ItemTags);
         Assert.Single(repository.Snapshot.Tags);
     }
 
@@ -162,14 +162,14 @@ public class ListingManagementServiceTests
         var service = sample.Service();
         service.SetActiveWorkspace(sample.Store.WorkspaceId);
 
-        Assert.True((await service.SelectListingAsync(sample.Listing.Id)).Succeeded);
+        Assert.True((await service.SelectItemAsync(sample.Item.Id)).Succeeded);
         var state = await service.LoadAsync(sample.Store.Id);
         service.SetActiveWorkspace(Guid.NewGuid());
         var outside = await service.LoadAsync(sample.Store.Id);
 
-        Assert.Equal(sample.Listing.Id, state.ActiveListingId);
+        Assert.Equal(sample.Item.Id, state.ActiveItemId);
         Assert.Null(outside.ActiveStoreId);
-        Assert.Null(outside.ActiveListingId);
+        Assert.Null(outside.ActiveItemId);
     }
 
     [Fact]
@@ -179,29 +179,55 @@ public class ListingManagementServiceTests
         var repository = new TestRepository(sample.Snapshot);
         var service = sample.Service(repository);
 
-        var result = await service.SetListingStatusAsync(new(sample.Listing.Id, ListingStatus.Paused));
+        var result = await service.SetItemStatusAsync(new(sample.Item.Id, ItemStatus.Rejected, ConfirmProtectedTransition: true));
 
         Assert.True(result.Succeeded);
-        Assert.Equal(ListingStatus.Paused, result.Listing!.Status);
-        Assert.Equal(WorkflowStage.Design, result.Listing.Stage);
-        var persisted = repository.Snapshot.Listings.Single(listing => listing.Id == sample.Listing.Id);
-        Assert.Equal(ListingStatus.Paused, persisted.Status);
+        Assert.Equal(ItemStatus.Rejected, result.Item!.Status);
+        Assert.Equal(WorkflowStage.Design, result.Item.Stage);
+        var persisted = repository.Snapshot.Items.Single(listing => listing.Id == sample.Item.Id);
+        Assert.Equal(ItemStatus.Rejected, persisted.Status);
         Assert.Equal(WorkflowStage.Design, persisted.Stage);
         Assert.Equal(1, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task SetStatus_RequiresConfirmationForProtectedTransitions()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot);
+        var service = sample.Service(repository);
+
+        var unconfirmed = await service.SetItemStatusAsync(new(sample.Item.Id, ItemStatus.Rejected, ConfirmProtectedTransition: false));
+
+        Assert.False(unconfirmed.Succeeded);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task SetStatus_RejectsDisallowedDirectTransition()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot);
+        var service = sample.Service(repository);
+
+        var result = await service.SetItemStatusAsync(new(sample.Item.Id, ItemStatus.Paused, ConfirmProtectedTransition: true));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(0, repository.SaveCount);
     }
 
     [Fact]
     public async Task SetStatus_ReactivatesRejectedListingWithoutRestrictingTarget()
     {
         var sample = Sample.Create();
-        var rejected = sample.Listing with { Status = ListingStatus.Rejected };
-        var repository = new TestRepository(sample.Snapshot with { Listings = [rejected] });
+        var rejected = sample.Item with { Status = ItemStatus.Rejected };
+        var repository = new TestRepository(sample.Snapshot with { Items = [rejected] });
         var service = sample.Service(repository);
 
-        var result = await service.SetListingStatusAsync(new(rejected.Id, ListingStatus.Draft));
+        var result = await service.SetItemStatusAsync(new(rejected.Id, ItemStatus.Draft));
 
         Assert.True(result.Succeeded);
-        Assert.Equal(ListingStatus.Draft, repository.Snapshot.Listings.Single(listing => listing.Id == rejected.Id).Status);
+        Assert.Equal(ItemStatus.Draft, repository.Snapshot.Items.Single(listing => listing.Id == rejected.Id).Status);
     }
 
     [Fact]
@@ -211,7 +237,7 @@ public class ListingManagementServiceTests
         var repository = new TestRepository(sample.Snapshot) { FailSaves = true };
         var service = sample.Service(repository);
 
-        var failed = await service.SetListingStatusAsync(new(sample.Listing.Id, ListingStatus.Published));
+        var failed = await service.SetItemStatusAsync(new(sample.Item.Id, ItemStatus.Published));
 
         Assert.False(failed.Succeeded);
         Assert.Equal(sample.Snapshot, repository.Snapshot);
@@ -225,28 +251,46 @@ public class ListingManagementServiceTests
         var repository = new TestRepository(sample.Snapshot);
         var service = sample.Service(repository);
 
-        var advanced = await service.MoveListingStageAsync(new(sample.Listing.Id, WorkflowStage.Listing));
-        var regressed = await service.MoveListingStageAsync(new(sample.Listing.Id, WorkflowStage.Concept));
+        var advanced = await service.MoveItemStageAsync(new(sample.Item.Id, WorkflowStage.Listing));
+        var regressed = await service.MoveItemStageAsync(new(sample.Item.Id, WorkflowStage.Design));
 
         Assert.True(advanced.Succeeded);
-        Assert.Equal(WorkflowStage.Listing, advanced.Listing!.Stage);
-        Assert.Equal(ListingStatus.Draft, advanced.Listing.Status);
+        Assert.Equal(WorkflowStage.Listing, advanced.Item!.Stage);
+        Assert.Equal(ItemStatus.Draft, advanced.Item.Status);
         Assert.True(regressed.Succeeded);
-        Assert.Equal(WorkflowStage.Concept, repository.Snapshot.Listings.Single(listing => listing.Id == sample.Listing.Id).Stage);
-        Assert.Equal(ListingStatus.Draft, repository.Snapshot.Listings.Single(listing => listing.Id == sample.Listing.Id).Status);
+        Assert.Equal(WorkflowStage.Design, repository.Snapshot.Items.Single(listing => listing.Id == sample.Item.Id).Stage);
+        Assert.Equal(ItemStatus.Draft, repository.Snapshot.Items.Single(listing => listing.Id == sample.Item.Id).Status);
         Assert.Equal(2, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task MoveStage_RejectsNonAdjacentMovement()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot);
+        var service = sample.Service(repository);
+
+        var result = await service.MoveItemStageAsync(new(sample.Item.Id, WorkflowStage.Listing));
+
+        Assert.True(result.Succeeded);
+
+        var nonAdjacent = await service.MoveItemStageAsync(new(sample.Item.Id, WorkflowStage.Concept));
+
+        Assert.False(nonAdjacent.Succeeded);
+        Assert.Equal(WorkflowStage.Listing, repository.Snapshot.Items.Single(listing => listing.Id == sample.Item.Id).Stage);
+        Assert.Equal(1, repository.SaveCount);
     }
 
     [Fact]
     public async Task MoveStage_RejectsInactiveListings()
     {
         var sample = Sample.Create();
-        var rejected = sample.Listing with { Status = ListingStatus.Rejected };
-        var repository = new TestRepository(sample.Snapshot with { Listings = [rejected] });
+        var rejected = sample.Item with { Status = ItemStatus.Rejected };
+        var repository = new TestRepository(sample.Snapshot with { Items = [rejected] });
         var service = sample.Service(repository);
         var before = repository.Snapshot;
 
-        var result = await service.MoveListingStageAsync(new(rejected.Id, WorkflowStage.Listing));
+        var result = await service.MoveItemStageAsync(new(rejected.Id, WorkflowStage.Listing));
 
         Assert.False(result.Succeeded);
         Assert.Equal(before, repository.Snapshot);
@@ -260,7 +304,7 @@ public class ListingManagementServiceTests
         var repository = new TestRepository(sample.Snapshot) { FailSaves = true };
         var service = sample.Service(repository);
 
-        var failed = await service.MoveListingStageAsync(new(sample.Listing.Id, WorkflowStage.Listing));
+        var failed = await service.MoveItemStageAsync(new(sample.Item.Id, WorkflowStage.Listing));
 
         Assert.False(failed.Succeeded);
         Assert.Equal(sample.Snapshot, repository.Snapshot);
@@ -272,31 +316,31 @@ public class ListingManagementServiceTests
         var sample = Sample.Create();
         var repository = new TestRepository(sample.Snapshot);
         var duplicateId = Guid.NewGuid();
-        var advancedSource = sample.Listing with { Stage = WorkflowStage.Listing, Status = ListingStatus.Published };
-        repository.Set(sample.Snapshot with { Listings = [advancedSource] });
+        var advancedSource = sample.Item with { Stage = WorkflowStage.Listing, Status = ItemStatus.Published };
+        repository.Set(sample.Snapshot with { Items = [advancedSource] });
 
-        var result = await sample.Service(repository, duplicateId).DuplicateListingAsync(new(advancedSource.Id));
+        var result = await sample.Service(repository, duplicateId).DuplicateItemAsync(new(advancedSource.Id));
 
         Assert.True(result.Succeeded);
-        Assert.Equal(WorkflowStage.Idea, result.Listing!.Stage);
-        Assert.Equal(ListingStatus.Draft, result.Listing.Status);
-        Assert.Equal(WorkflowStage.Listing, repository.Snapshot.Listings.Single(listing => listing.Id == advancedSource.Id).Stage);
+        Assert.Equal(WorkflowStage.Idea, result.Item!.Stage);
+        Assert.Equal(ItemStatus.Draft, result.Item.Status);
+        Assert.Equal(WorkflowStage.Listing, repository.Snapshot.Items.Single(listing => listing.Id == advancedSource.Id).Stage);
     }
 
     [Fact]
     public async Task Move_PreservesStageAndStatus()
     {
         var sample = Sample.Create();
-        var advanced = sample.Listing with { Stage = WorkflowStage.Listing, Status = ListingStatus.Published };
-        var repository = new TestRepository(sample.Snapshot with { Listings = [advanced] });
+        var advanced = sample.Item with { Stage = WorkflowStage.Listing, Status = ItemStatus.Published };
+        var repository = new TestRepository(sample.Snapshot with { Items = [advanced] });
         var service = sample.Service(repository);
 
-        var moved = await service.MoveListingAsync(new(advanced.Id, new(WorkspaceEntityKind.Niche, sample.Niche.Id)));
+        var moved = await service.MoveItemAsync(new(advanced.Id, new(WorkspaceEntityKind.Niche, sample.Niche.Id)));
 
         Assert.True(moved.Succeeded);
-        var persisted = repository.Snapshot.Listings.Single(listing => listing.Id == advanced.Id);
+        var persisted = repository.Snapshot.Items.Single(listing => listing.Id == advanced.Id);
         Assert.Equal(WorkflowStage.Listing, persisted.Stage);
-        Assert.Equal(ListingStatus.Published, persisted.Status);
+        Assert.Equal(ItemStatus.Published, persisted.Status);
     }
 
     private sealed class TestRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
@@ -315,9 +359,9 @@ public class ListingManagementServiceTests
         }
     }
 
-    private sealed record Sample(WorkspaceSnapshot Snapshot, DateTimeOffset Now, Store Store, Niche Niche, TopicGroup Root, TopicGroup Child, Listing Listing, Tag Tag)
+    private sealed record Sample(WorkspaceSnapshot Snapshot, DateTimeOffset Now, Store Store, Niche Niche, TopicGroup Root, TopicGroup Child, Item Item, Tag Tag)
     {
-        public ListingManagementService Service(TestRepository? repository = null, Guid? nextId = null) =>
+        public ItemManagementService Service(TestRepository? repository = null, Guid? nextId = null) =>
             new(repository ?? new TestRepository(Snapshot), clock: () => Now.AddMinutes(1), newId: () => nextId ?? Guid.NewGuid());
 
         public static Sample Create(bool withRelationships = false)
@@ -328,13 +372,13 @@ public class ListingManagementServiceTests
             var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
             var root = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Root", null, false, now, now, "{}");
             var child = new TopicGroup(Guid.NewGuid(), store.Id, null, root.Id, "Child", null, false, now, now, "{}");
-            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, child.Id, "Idea", "Description", ListingStatus.Draft, WorkflowStage.Design, false, now, now, "{\"notes\":\"Notes\",\"unknown\":\"kept\"}");
+            var listing = new Item(Guid.NewGuid(), store.Id, niche.Id, child.Id, "Idea", "Description", ItemStatus.Draft, WorkflowStage.Design, false, now, now, "{\"notes\":\"Notes\",\"unknown\":\"kept\"}");
             var tag = new Tag(Guid.NewGuid(), store.Id, "Tag", null, false, now, now, "{}");
             var prompt = new Prompt(Guid.NewGuid(), store.Id, listing.Id, "Prompt", null, "Text", false, now, now, "{}");
-            var assetLink = new AssetLink(Guid.NewGuid(), WorkspaceEntityKind.Listing, listing.Id);
+            var assetLink = new AssetLink(Guid.NewGuid(), WorkspaceEntityKind.Item, listing.Id);
             var snapshot = new WorkspaceSnapshot(
                 [store], [niche], [root, child], [listing], [],
-                withRelationships ? [prompt] : [], [tag], [new ListingTag(listing.Id, tag.Id)],
+                withRelationships ? [prompt] : [], [tag], [new ItemTag(listing.Id, tag.Id)],
                 withRelationships ? [assetLink] : []);
             return new(snapshot, now, store, niche, root, child, listing, tag);
         }

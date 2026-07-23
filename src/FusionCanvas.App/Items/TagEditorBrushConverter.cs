@@ -2,7 +2,7 @@ using System.Globalization;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 
-namespace FusionCanvas.App.Listings;
+namespace FusionCanvas.App.Items;
 
 public static class TagEditorBrushConverter
 {

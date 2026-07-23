@@ -5,24 +5,24 @@ public sealed record WorkspaceSnapshot(
     IReadOnlyList<Store> Stores,
     IReadOnlyList<Niche> Niches,
     IReadOnlyList<TopicGroup> Groups,
-    IReadOnlyList<Listing> Listings,
+    IReadOnlyList<Item> Items,
     IReadOnlyList<Asset> Assets,
     IReadOnlyList<Prompt> Prompts,
     IReadOnlyList<Tag> Tags,
-    IReadOnlyList<ListingTag> ListingTags,
+    IReadOnlyList<ItemTag> ItemTags,
     IReadOnlyList<AssetLink> AssetLinks)
 {
     public WorkspaceSnapshot(
         IReadOnlyList<Store> Stores,
         IReadOnlyList<Niche> Niches,
         IReadOnlyList<TopicGroup> Groups,
-        IReadOnlyList<Listing> Listings,
+        IReadOnlyList<Item> Items,
         IReadOnlyList<Asset> Assets,
         IReadOnlyList<Prompt> Prompts,
         IReadOnlyList<Tag> Tags,
-        IReadOnlyList<ListingTag> ListingTags,
+        IReadOnlyList<ItemTag> ItemTags,
         IReadOnlyList<AssetLink> AssetLinks)
-        : this(DefaultWorkspacesFor(Stores), Stores, Niches, Groups, Listings, Assets, Prompts, Tags, ListingTags, AssetLinks)
+        : this(DefaultWorkspacesFor(Stores), Stores, Niches, Groups, Items, Assets, Prompts, Tags, ItemTags, AssetLinks)
     {
     }
 

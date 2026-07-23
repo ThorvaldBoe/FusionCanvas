@@ -11,7 +11,7 @@ public class MainWindowViewModelTests
     public void OpenFromNavigation_OpensTabAndCoordinatesNavigationAndWorkflow()
     {
         var viewModel = new MainWindowViewModel();
-        var navigationContext = ReadyListingContext(viewModel);
+        var navigationContext = ReadyItemContext(viewModel);
 
         viewModel.OpenFromNavigation(navigationContext);
 
@@ -26,8 +26,8 @@ public class MainWindowViewModelTests
     public void OpenFromNavigation_DoesNotDiscardExistingTabs()
     {
         var viewModel = new MainWindowViewModel();
-        var first = DraftListingContext(viewModel);
-        var second = ActiveListingContext(viewModel);
+        var first = DraftItemContext(viewModel);
+        var second = ActiveItemContext(viewModel);
 
         viewModel.OpenFromNavigation(first);
         viewModel.OpenFromNavigation(second);
@@ -40,8 +40,8 @@ public class MainWindowViewModelTests
     public void SelectingOpenTab_RecoordinatesNavigationAndWorkflow()
     {
         var viewModel = new MainWindowViewModel();
-        var draft = DraftListingContext(viewModel);
-        var active = ActiveListingContext(viewModel);
+        var draft = DraftItemContext(viewModel);
+        var active = ActiveItemContext(viewModel);
         var first = viewModel.DocumentWindow.Open(draft.Context);
         viewModel.DocumentWindow.Open(active.Context);
 
@@ -57,7 +57,7 @@ public class MainWindowViewModelTests
     public void SelectWorkflowStage_UpdatesDocumentAndNavigator()
     {
         var viewModel = new MainWindowViewModel();
-        viewModel.OpenFromNavigation(DraftListingContext(viewModel));
+        viewModel.OpenFromNavigation(DraftItemContext(viewModel));
 
         viewModel.SelectWorkflowStage(WorkflowStage.Listing);
 
@@ -70,7 +70,7 @@ public class MainWindowViewModelTests
     public void ClosingLastTab_KeepsWorkingContextAndWorkflowNavigator()
     {
         var viewModel = new MainWindowViewModel();
-        var tab = viewModel.DocumentWindow.Open(DraftListingContext(viewModel).Context);
+        var tab = viewModel.DocumentWindow.Open(DraftItemContext(viewModel).Context);
 
         viewModel.DocumentWindow.CloseTab(tab);
 
@@ -84,7 +84,7 @@ public class MainWindowViewModelTests
         var viewModel = new MainWindowViewModel();
         var nicheNode = Assert.Single(viewModel.WorkspaceTree.Roots);
         var groupNode = nicheNode.Children.First(node => node.EntityKind == WorkspaceEntityKind.Group);
-        var listingNode = groupNode.Children.First(node => node.EntityKind == WorkspaceEntityKind.Listing);
+        var listingNode = groupNode.Children.First(node => node.EntityKind == WorkspaceEntityKind.Item);
 
         viewModel.WorkspaceTree.SelectNodeCommand.Execute(nicheNode);
         Assert.Single(viewModel.DocumentWindow.Tabs);
@@ -128,7 +128,7 @@ public class MainWindowViewModelTests
     public void SelectWorkflowStage_RefreshesStageToolHost()
     {
         var viewModel = new MainWindowViewModel();
-        viewModel.OpenFromNavigation(DraftListingContext(viewModel));
+        viewModel.OpenFromNavigation(DraftItemContext(viewModel));
 
         viewModel.SelectWorkflowStage(WorkflowStage.Design);
 
@@ -158,8 +158,8 @@ public class MainWindowViewModelTests
         var personalStore = new Store(Guid.NewGuid(), personal.Id, "Personal Store", null, false, now, now, "{}");
         var clientStore = new Store(Guid.NewGuid(), client.Id, "Client Store", null, false, now, now, "{}");
         var clientNiche = new Niche(Guid.NewGuid(), clientStore.Id, "Client Niche", null, false, now, now, "{}");
-        var clientListing = new Listing(Guid.NewGuid(), clientStore.Id, clientNiche.Id, null, "Client Listing", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
-        var snapshot = new WorkspaceSnapshot([personal, client], [personalStore, clientStore], [clientNiche], [], [clientListing], [], [], [], [], []);
+        var clientItem = new Item(Guid.NewGuid(), clientStore.Id, clientNiche.Id, null, "Client Item", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var snapshot = new WorkspaceSnapshot([personal, client], [personalStore, clientStore], [clientNiche], [], [clientItem], [], [], [], [], []);
         var repository = new InMemoryWorkspaceRepository(snapshot);
         var viewModel = new MainWindowViewModel(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
@@ -175,7 +175,7 @@ public class MainWindowViewModelTests
         Assert.Equal(client.Id, viewModel.WorkspaceManagement.SelectedWorkspace?.Id);
         Assert.DoesNotContain(viewModel.StoreManagement.ActiveStores, store => store.Id == personalStore.Id);
         Assert.Contains(viewModel.StoreManagement.ActiveStores, store => store.Id == clientStore.Id);
-        Assert.Contains(viewModel.NavigationContexts, context => context.Context.Title == "Client Listing");
+        Assert.Contains(viewModel.NavigationContexts, context => context.Context.Title == "Client Item");
     }
 
     [Fact]
@@ -298,19 +298,19 @@ public class MainWindowViewModelTests
             context.Context.EntityKind == WorkspaceEntityKind.Group &&
             context.Context.Title == "Dogs and coffee");
 
-    private static NavigationDocumentContext DraftListingContext(MainWindowViewModel viewModel) =>
+    private static NavigationDocumentContext DraftItemContext(MainWindowViewModel viewModel) =>
         viewModel.NavigationContexts.Single(context =>
-            context.Context.EntityKind == WorkspaceEntityKind.Listing &&
+            context.Context.EntityKind == WorkspaceEntityKind.Item &&
             context.Context.Title == "Morning coffee idea");
 
-    private static NavigationDocumentContext ReadyListingContext(MainWindowViewModel viewModel) =>
+    private static NavigationDocumentContext ReadyItemContext(MainWindowViewModel viewModel) =>
         viewModel.NavigationContexts.Single(context =>
-            context.Context.EntityKind == WorkspaceEntityKind.Listing &&
+            context.Context.EntityKind == WorkspaceEntityKind.Item &&
             context.Context.Title == "Retro mug design");
 
-    private static NavigationDocumentContext ActiveListingContext(MainWindowViewModel viewModel) =>
+    private static NavigationDocumentContext ActiveItemContext(MainWindowViewModel viewModel) =>
         viewModel.NavigationContexts.Single(context =>
-            context.Context.EntityKind == WorkspaceEntityKind.Listing &&
+            context.Context.EntityKind == WorkspaceEntityKind.Item &&
             context.Context.Title == "Espresso listing draft");
 
     [Fact]
@@ -319,13 +319,13 @@ public class MainWindowViewModelTests
         var viewModel = new MainWindowViewModel();
         var niche = viewModel.NavigationContexts.Single(context => context.Context.EntityKind == WorkspaceEntityKind.Niche);
         var group = GroupContext(viewModel);
-        var listing = ReadyListingContext(viewModel);
+        var listing = ReadyItemContext(viewModel);
 
         viewModel.OpenFromNavigation(niche);
 
         Assert.True(viewModel.ShowSelectionSummary);
         Assert.True(viewModel.ShowStageToolHost);
-        Assert.False(viewModel.ListingInspector.HasState);
+        Assert.False(viewModel.ItemInspector.HasState);
         Assert.False(viewModel.GroupDetails.HasState);
 
         viewModel.OpenFromNavigation(group);
@@ -333,86 +333,93 @@ public class MainWindowViewModelTests
         Assert.False(viewModel.ShowSelectionSummary);
         Assert.False(viewModel.ShowStageToolHost);
         Assert.True(viewModel.GroupDetails.HasState);
-        Assert.False(viewModel.ListingInspector.HasState);
+        Assert.False(viewModel.ItemInspector.HasState);
 
         viewModel.OpenFromNavigation(listing);
 
         Assert.False(viewModel.ShowSelectionSummary);
         Assert.False(viewModel.ShowStageToolHost);
-        Assert.True(viewModel.ListingInspector.HasState);
+        Assert.True(viewModel.ItemInspector.HasState);
         Assert.False(viewModel.GroupDetails.HasState);
     }
 
     [Fact]
-    public void ListingInspector_LoadsForActiveListingTabAndClearsForNonItemContext()
+    public void ItemInspector_LoadsForActiveItemTabAndClearsForNonItemContext()
     {
         var viewModel = new MainWindowViewModel();
-        var listing = ReadyListingContext(viewModel);
+        var listing = ReadyItemContext(viewModel);
         var group = GroupContext(viewModel);
 
         viewModel.OpenFromNavigation(listing);
 
-        Assert.True(viewModel.ListingInspector.HasState);
-        Assert.Equal(listing.Context.Id, viewModel.ListingInspector.LoadedListingId);
+        Assert.True(viewModel.ItemInspector.HasState);
+        Assert.Equal(listing.Context.Id, viewModel.ItemInspector.LoadedItemId);
 
         viewModel.OpenFromNavigation(group);
 
-        Assert.False(viewModel.ListingInspector.HasState);
+        Assert.False(viewModel.ItemInspector.HasState);
     }
 
     [Fact]
-    public async Task DirtyInspector_CommitsAndProceedsWithTabSwitch()
+    public async Task DirtyInspector_OffersSaveAndProceedsAfterSave()
     {
         var viewModel = new MainWindowViewModel();
-        var first = viewModel.DocumentWindow.Open(ReadyListingContext(viewModel).Context);
-        var secondTab = viewModel.DocumentWindow.Open(ActiveListingContext(viewModel).Context);
+        var first = viewModel.DocumentWindow.Open(ReadyItemContext(viewModel).Context);
+        var secondTab = viewModel.DocumentWindow.Open(ActiveItemContext(viewModel).Context);
         viewModel.RequestSelectTabCommand.Execute(first);
 
-        Assert.True(viewModel.ListingInspector.HasState);
-        viewModel.ListingInspector.Title = "Persisted title";
-        Assert.True(viewModel.ListingInspector.HasUnsavedChanges);
+        Assert.True(viewModel.ItemInspector.HasState);
+        viewModel.ItemInspector.Title = "Persisted title";
+        Assert.True(viewModel.ItemInspector.HasUnsavedChanges);
 
         viewModel.RequestSelectTabCommand.Execute(secondTab);
         await Task.Yield();
 
+        Assert.True(viewModel.IsUnsavedChangesPromptVisible);
+        Assert.Equal(first.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
+
+        viewModel.SaveAndContinueCommand.Execute(null);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+
         Assert.Equal(secondTab.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
-        Assert.False(viewModel.ListingInspector.HasUnsavedChanges);
+        Assert.False(viewModel.ItemInspector.HasUnsavedChanges);
 
         viewModel.RequestSelectTabCommand.Execute(first);
         await Task.Yield();
-        Assert.Equal("Persisted title", viewModel.ListingInspector.Title);
+        Assert.Equal("Persisted title", viewModel.ItemInspector.Title);
     }
 
     [Fact]
-    public async Task DirtyInspector_InvalidTitleRevertsAndStillProceeds()
+    public async Task DirtyInspector_CancelKeepsDraftContextAndSelection()
     {
         var viewModel = new MainWindowViewModel();
-        var first = viewModel.DocumentWindow.Open(ReadyListingContext(viewModel).Context);
-        var secondTab = viewModel.DocumentWindow.Open(ActiveListingContext(viewModel).Context);
+        var first = viewModel.DocumentWindow.Open(ReadyItemContext(viewModel).Context);
+        var secondTab = viewModel.DocumentWindow.Open(ActiveItemContext(viewModel).Context);
         viewModel.RequestSelectTabCommand.Execute(first);
-        viewModel.ListingInspector.Title = "   ";
+        viewModel.ItemInspector.Title = "draft";
 
         viewModel.RequestSelectTabCommand.Execute(secondTab);
         await Task.Yield();
 
-        Assert.Equal(secondTab.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
+        Assert.True(viewModel.IsUnsavedChangesPromptVisible);
+        viewModel.CancelPendingTransitionCommand.Execute(null);
 
-        viewModel.RequestSelectTabCommand.Execute(first);
-        await Task.Yield();
-        Assert.Equal("Retro mug design", viewModel.ListingInspector.Title);
-        Assert.False(viewModel.ListingInspector.HasUnsavedChanges);
+        Assert.Equal(first.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
+        Assert.Equal("draft", viewModel.ItemInspector.Title);
+        Assert.True(viewModel.ItemInspector.HasUnsavedChanges);
+        Assert.False(viewModel.IsUnsavedChangesPromptVisible);
     }
 
     [Fact]
-    public void StageMoveControls_ReflectActiveListingBoundaries()
+    public void StageMoveControls_ReflectActiveItemBoundaries()
     {
         var viewModel = new MainWindowViewModel();
 
-        viewModel.OpenFromNavigation(DraftListingContext(viewModel));
+        viewModel.OpenFromNavigation(DraftItemContext(viewModel));
         Assert.False(viewModel.CanMoveStageBack);
         Assert.True(viewModel.CanMoveStageForward);
 
-        viewModel.OpenFromNavigation(ActiveListingContext(viewModel));
+        viewModel.OpenFromNavigation(ActiveItemContext(viewModel));
         Assert.True(viewModel.CanMoveStageBack);
         Assert.False(viewModel.CanMoveStageForward);
     }
@@ -421,7 +428,7 @@ public class MainWindowViewModelTests
     public async Task MoveStageForward_AdvancesStageAndUpdatesView()
     {
         var viewModel = new MainWindowViewModel();
-        viewModel.OpenFromNavigation(ReadyListingContext(viewModel));
+        viewModel.OpenFromNavigation(ReadyItemContext(viewModel));
 
         viewModel.MoveStageForwardCommand.Execute(null);
         await Task.Delay(200);
@@ -430,13 +437,18 @@ public class MainWindowViewModelTests
         Assert.Equal(WorkflowStage.Listing, viewModel.DocumentWindow.ActiveContext?.WorkflowStage);
         Assert.True(viewModel.WorkflowNavigator.Stages.Single(stage => stage.Stage == WorkflowStage.Listing).IsCurrent);
         Assert.False(viewModel.CanMoveStageForward);
+        Assert.True(viewModel.ItemInspector.CanEditStage);
+
+        viewModel.SelectWorkflowStage(WorkflowStage.Design);
+
+        Assert.False(viewModel.ItemInspector.CanEditStage);
     }
 
     [Fact]
     public async Task MoveStageBack_RegressesStage()
     {
         var viewModel = new MainWindowViewModel();
-        viewModel.OpenFromNavigation(ReadyListingContext(viewModel));
+        viewModel.OpenFromNavigation(ReadyItemContext(viewModel));
 
         viewModel.MoveStageBackCommand.Execute(null);
         await Task.Delay(100);
@@ -446,25 +458,93 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task SetListingStatus_ChangesStatusWithoutMovingStage()
+    public async Task SetItemStatus_ChangesStatusWithoutMovingStage()
     {
         var viewModel = new MainWindowViewModel();
-        viewModel.OpenFromNavigation(ReadyListingContext(viewModel));
+        viewModel.OpenFromNavigation(ReadyItemContext(viewModel));
 
-        viewModel.SetListingStatusCommand.Execute(ListingStatus.Paused);
-        await Task.Delay(100);
+        viewModel.SetItemStatusCommand.Execute(ItemStatus.Rejected);
+        Assert.True(viewModel.IsStatusConfirmationVisible);
+        Assert.Equal(ItemStatus.Draft, viewModel.ActiveItemStatus);
+        viewModel.ConfirmStatusChangeCommand.Execute(null);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
-        Assert.Equal(ListingStatus.Paused, viewModel.ActiveListingStatus);
+        Assert.Equal(ItemStatus.Rejected, viewModel.ActiveItemStatus);
         Assert.Equal(WorkflowStage.Design, viewModel.DocumentWindow.ActiveContext?.WorkflowStage);
     }
 
     [Fact]
-    public async Task StageMoveControls_DisabledForRejectedListing()
+    public void StatusSelector_OffersOnlyCurrentAndAllowedDirectTargets()
     {
         var viewModel = new MainWindowViewModel();
-        viewModel.OpenFromNavigation(ReadyListingContext(viewModel));
-        viewModel.SetListingStatusCommand.Execute(ListingStatus.Rejected);
-        await Task.Delay(100);
+        viewModel.OpenFromNavigation(ReadyItemContext(viewModel));
+
+        Assert.Equal([ItemStatus.Draft, ItemStatus.Rejected], viewModel.AvailableItemStatuses);
+        Assert.Equal(["Draft", "Rejected"], viewModel.AvailableItemStatusLabels);
+        Assert.Equal("Draft", viewModel.SelectedItemStatusLabel);
+        Assert.Equal(["Draft", "Rejected"], viewModel.AvailableItemStatusOptions.Select(option => option.Label));
+        Assert.Equal(ItemStatus.Draft, viewModel.SelectedItemStatusOption?.Status);
+    }
+
+    [Fact]
+    public void StatusConfirmation_CancelKeepsAuthoritativeStatusAndSelection()
+    {
+        var viewModel = new MainWindowViewModel();
+        var context = ReadyItemContext(viewModel);
+        viewModel.OpenFromNavigation(context);
+
+        viewModel.SetItemStatusCommand.Execute(ItemStatus.Rejected);
+        Assert.True(viewModel.IsStatusConfirmationVisible);
+
+        viewModel.CancelStatusChangeCommand.Execute(null);
+
+        Assert.False(viewModel.IsStatusConfirmationVisible);
+        Assert.Equal(ItemStatus.Draft, viewModel.ActiveItemStatus);
+        Assert.Equal(context.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
+    }
+
+    [Fact]
+    public async Task DirtyInspector_DiscardAndContinueChangesTabWithoutSavingDraft()
+    {
+        var viewModel = new MainWindowViewModel();
+        var first = viewModel.DocumentWindow.Open(ReadyItemContext(viewModel).Context);
+        var second = viewModel.DocumentWindow.Open(ActiveItemContext(viewModel).Context);
+        viewModel.RequestSelectTabCommand.Execute(first);
+        viewModel.ItemInspector.Title = "discard me";
+
+        viewModel.RequestSelectTabCommand.Execute(second);
+        viewModel.DiscardAndContinueCommand.Execute(null);
+        await Task.Yield();
+
+        Assert.Equal(second.Context.Id, viewModel.DocumentWindow.ActiveContext?.Id);
+        viewModel.RequestSelectTabCommand.Execute(first);
+        Assert.Equal("Retro mug design", viewModel.ItemInspector.Title);
+    }
+
+    [Fact]
+    public void StageToolVisibility_FollowsActiveReviewStage()
+    {
+        var viewModel = new MainWindowViewModel();
+        viewModel.OpenFromNavigation(ReadyItemContext(viewModel));
+
+        Assert.True(viewModel.ShowsDesignStageTool);
+        Assert.False(viewModel.ShowsIdeaStageTool);
+
+        viewModel.SelectWorkflowStage(WorkflowStage.Idea);
+
+        Assert.True(viewModel.ShowsIdeaStageTool);
+        Assert.False(viewModel.ShowsDesignStageTool);
+        Assert.False(viewModel.ItemInspector.CanEditStage);
+    }
+
+    [Fact]
+    public async Task StageMoveControls_DisabledForRejectedItem()
+    {
+        var viewModel = new MainWindowViewModel();
+        viewModel.OpenFromNavigation(ReadyItemContext(viewModel));
+        viewModel.SetItemStatusCommand.Execute(ItemStatus.Rejected);
+        viewModel.ConfirmStatusChangeCommand.Execute(null);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         Assert.False(viewModel.CanMoveStageForward);
         Assert.False(viewModel.CanMoveStageBack);

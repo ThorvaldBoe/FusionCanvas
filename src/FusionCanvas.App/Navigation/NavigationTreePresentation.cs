@@ -113,9 +113,9 @@ public sealed class NavigationTreeViewModel
         Refresh();
     }
 
-    public void MoveListing(Guid listingId, NavigationTopicReference destinationTopic)
+    public void MoveItem(Guid itemId, NavigationTopicReference destinationTopic)
     {
-        _snapshot = _navigationService.MoveListing(_snapshot, listingId, destinationTopic);
+        _snapshot = _navigationService.MoveItem(_snapshot, itemId, destinationTopic);
         Refresh();
     }
 

@@ -309,7 +309,7 @@ public sealed class GroupManagementService : IGroupManagementService
         var updated = snapshot with
         {
             Groups = reorderedGroups,
-            Listings = snapshot.Listings.Select(listing =>
+            Items = snapshot.Items.Select(listing =>
                 listing.GroupId is Guid groupId && subtreeIds.Contains(groupId)
                     ? listing with { NicheId = destinationNicheId }
                     : listing).ToArray()
@@ -452,16 +452,16 @@ public sealed class GroupManagementService : IGroupManagementService
             .Select(group => group.Id)
             .Append(existing.Id)
             .ToHashSet();
-        var deletedListingIds = snapshot.Listings
+        var deletedItemIds = snapshot.Items
             .Where(listing => listing.GroupId is Guid groupId && deletedGroupIds.Contains(groupId))
             .Select(listing => listing.Id)
             .ToHashSet();
         var deletedPromptIds = snapshot.Prompts
-            .Where(prompt => prompt.ListingId is Guid listingId && deletedListingIds.Contains(listingId))
+            .Where(prompt => prompt.ItemId is Guid itemId && deletedItemIds.Contains(itemId))
             .Select(prompt => prompt.Id)
             .ToHashSet();
         var deletedEntityIds = new HashSet<Guid>(deletedGroupIds);
-        deletedEntityIds.UnionWith(deletedListingIds);
+        deletedEntityIds.UnionWith(deletedItemIds);
         deletedEntityIds.UnionWith(deletedPromptIds);
 
         var remainingGroups = snapshot.Groups
@@ -471,9 +471,9 @@ public sealed class GroupManagementService : IGroupManagementService
         var updated = snapshot with
         {
             Groups = normalizedGroups,
-            Listings = snapshot.Listings.Where(listing => !deletedListingIds.Contains(listing.Id)).ToArray(),
+            Items = snapshot.Items.Where(listing => !deletedItemIds.Contains(listing.Id)).ToArray(),
             Prompts = snapshot.Prompts.Where(prompt => !deletedPromptIds.Contains(prompt.Id)).ToArray(),
-            ListingTags = snapshot.ListingTags.Where(link => !deletedListingIds.Contains(link.ListingId)).ToArray(),
+            ItemTags = snapshot.ItemTags.Where(link => !deletedItemIds.Contains(link.ItemId)).ToArray(),
             AssetLinks = snapshot.AssetLinks.Where(link => !deletedEntityIds.Contains(link.EntityId)).ToArray()
         };
         var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
@@ -592,8 +592,8 @@ public sealed class GroupManagementService : IGroupManagementService
                 return new GroupCreationDestinationResult(new GroupParentReference(WorkspaceEntityKind.Group, group.Id), null);
             }
 
-            if (selection.Kind == WorkspaceEntityKind.Listing &&
-                snapshot.Listings.SingleOrDefault(listing => listing.Id == selection.Id && listing.StoreId == store.Id && !listing.IsArchived) is { } listing)
+            if (selection.Kind == WorkspaceEntityKind.Item &&
+                snapshot.Items.SingleOrDefault(listing => listing.Id == selection.Id && listing.StoreId == store.Id && !listing.IsArchived) is { } listing)
             {
                 if (listing.GroupId is Guid groupId && snapshot.Groups.Any(group => group.Id == groupId && GroupHierarchy.IsEffectivelyActive(snapshot, group)))
                 {

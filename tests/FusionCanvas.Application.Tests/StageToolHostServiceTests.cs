@@ -129,7 +129,7 @@ public class StageToolHostServiceTests
             sourceKind,
             FailureMessage: failureMessage);
 
-    private sealed record StageToolSample(WorkspaceSnapshot Snapshot, Store Store, Niche Niche, TopicGroup Group, Listing Listing)
+    private sealed record StageToolSample(WorkspaceSnapshot Snapshot, Store Store, Niche Niche, TopicGroup Group, Item Item)
     {
         public StageToolHostRequest TopicRequest(WorkflowStage stage) =>
             new(
@@ -143,8 +143,8 @@ public class StageToolHostServiceTests
             new(
                 Snapshot,
                 ToolContextSelectionKind.Item,
-                WorkspaceEntityKind.Listing,
-                Listing.Id,
+                WorkspaceEntityKind.Item,
+                Item.Id,
                 stage);
 
         public static StageToolSample Create()
@@ -153,7 +153,7 @@ public class StageToolHostServiceTests
             var store = new Store(Guid.NewGuid(), "North Star Studio", null, false, now, now, "{}");
             var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, "{}");
             var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Autumn", null, false, now, now, "{}");
-            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Pumpkin espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+            var listing = new Item(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Pumpkin espresso", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
 
             return new StageToolSample(
                 new WorkspaceSnapshot(

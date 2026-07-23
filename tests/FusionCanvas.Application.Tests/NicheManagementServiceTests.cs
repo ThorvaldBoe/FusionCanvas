@@ -95,7 +95,7 @@ public class NicheManagementServiceTests
         var store = NewStore("North Star Studio");
         var niche = NewNiche(store.Id, "Coffee");
         var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Launch", null, false, Now, Now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Pumpkin espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
+        var listing = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Pumpkin espresso", null, ItemStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [group], [listing], [], [], [], [], []));
         var service = new NicheManagementService(repository, () => Now.AddMinutes(5));
         var context = new NicheContext("Updated", "Baristas", "Dry", "Retro", "No logos", "Crowded", "Check Etsy", "Notes");
@@ -108,7 +108,7 @@ public class NicheManagementServiceTests
         Assert.Equal(context, result.Niche?.Context);
         var saved = await repository.LoadAsync(TestContext.Current.CancellationToken);
         Assert.Equal(niche.Id, Assert.Single(saved.Groups).NicheId);
-        Assert.Equal(niche.Id, Assert.Single(saved.Listings).NicheId);
+        Assert.Equal(niche.Id, Assert.Single(saved.Items).NicheId);
     }
 
     [Fact]
@@ -172,9 +172,9 @@ public class NicheManagementServiceTests
     {
         var store = NewStore("North Star Studio");
         var niche = NewNiche(store.Id, "Coffee");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
+        var listing = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Espresso", null, ItemStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var tag = new Tag(Guid.NewGuid(), store.Id, "seasonal", null, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [tag], [new ListingTag(listing.Id, tag.Id)], []));
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [tag], [new ItemTag(listing.Id, tag.Id)], []));
         var service = new NicheManagementService(repository);
 
         var result = await service.DeleteNicheAsync(new NicheManagementDeleteRequest(niche.Id, ConfirmPermanentDeletion: true), TestContext.Current.CancellationToken);

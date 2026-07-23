@@ -39,6 +39,30 @@ public class DocumentWindowViewModelTests
     }
 
     [Fact]
+    public void OpenAdditional_AllowsSameItemAndRefreshContextsUpdatesEveryMatchingTab()
+    {
+        var viewModel = new DocumentWindowViewModel();
+        var original = NewContext("Original", WorkflowStage.Idea);
+        var first = viewModel.Open(original);
+        var second = viewModel.OpenAdditional(original);
+        var refreshed = original with
+        {
+            Title = "Updated",
+            Workflow = original.Workflow with { CurrentStage = WorkflowStage.Concept },
+            WorkflowStage = WorkflowStage.Concept,
+            DetailViewKey = DocumentWindowViewModel.GetDefaultDetailViewKey(WorkflowStage.Concept)
+        };
+
+        viewModel.RefreshContexts(original.Id, WorkspaceEntityKind.Item, refreshed);
+
+        Assert.Equal(2, viewModel.Tabs.Count);
+        Assert.NotEqual(first.TabId, second.TabId);
+        Assert.All(viewModel.Tabs, tab => Assert.Equal("Updated", tab.Title));
+        Assert.All(viewModel.Tabs, tab => Assert.Equal(WorkflowStage.Concept, tab.Context.WorkflowStage));
+        Assert.Equal(WorkflowStage.Concept, viewModel.ActiveContext?.WorkflowStage);
+    }
+
+    [Fact]
     public void SelectTab_UpdatesActiveDocumentContext()
     {
         var viewModel = new DocumentWindowViewModel();

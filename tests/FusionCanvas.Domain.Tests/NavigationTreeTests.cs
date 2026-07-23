@@ -5,7 +5,7 @@ namespace FusionCanvas.Domain.Tests;
 public class NavigationTreeTests
 {
     [Fact]
-    public void BuildTree_RepresentsStoreNicheGroupAndListingHierarchy()
+    public void BuildTree_RepresentsStoreNicheGroupAndItemHierarchy()
     {
         var sample = NavigationSample.Create();
 
@@ -17,8 +17,8 @@ public class NavigationTreeTests
         Assert.Equal(WorkspaceEntityKind.Niche, niche.EntityKind);
         var group = Assert.Single(niche.Children, child => child.EntityKind == WorkspaceEntityKind.Group);
         Assert.Equal(sample.ParentGroup.Id, group.EntityId);
-        var listing = Assert.Single(group.Children, child => child.EntityKind == WorkspaceEntityKind.Listing);
-        Assert.Equal(sample.Listing.Id, listing.EntityId);
+        var item = Assert.Single(group.Children, child => child.EntityKind == WorkspaceEntityKind.Item);
+        Assert.Equal(sample.Item.Id, item.EntityId);
     }
 
     [Fact]
@@ -31,7 +31,7 @@ public class NavigationTreeTests
         Assert.Equal(sample.Store.WorkspaceId, workspace.Id);
         Assert.Equal(workspace.Id, sample.Store.WorkspaceId);
         Assert.Equal(sample.Store.Id, sample.Niche.StoreId);
-        Assert.Equal(sample.Store.Id, sample.Listing.StoreId);
+        Assert.Equal(sample.Store.Id, sample.Item.StoreId);
     }
 
     [Fact]
@@ -41,9 +41,9 @@ public class NavigationTreeTests
 
         var tree = WorkspaceNavigation.BuildTree(sample.Snapshot);
 
-        var path = tree.GetPath(sample.DeepListing.Id);
+        var path = tree.GetPath(sample.DeepItem.Id);
         Assert.Equal(
-            [sample.Store.Id, sample.Niche.Id, sample.ParentGroup.Id, sample.ChildGroup.Id, sample.GrandchildGroup.Id, sample.DeepListing.Id],
+            [sample.Store.Id, sample.Niche.Id, sample.ParentGroup.Id, sample.ChildGroup.Id, sample.GrandchildGroup.Id, sample.DeepItem.Id],
             path);
     }
 
@@ -60,29 +60,29 @@ public class NavigationTreeTests
             new NavigationTopicReference(WorkspaceEntityKind.Niche, otherNiche.Id));
 
         var tree = WorkspaceNavigation.BuildTree(moved);
-        var movedPath = tree.GetPath(sample.DeepListing.Id);
-        Assert.Equal([sample.Store.Id, otherNiche.Id, sample.ChildGroup.Id, sample.GrandchildGroup.Id, sample.DeepListing.Id], movedPath);
+        var movedPath = tree.GetPath(sample.DeepItem.Id);
+        Assert.Equal([sample.Store.Id, otherNiche.Id, sample.ChildGroup.Id, sample.GrandchildGroup.Id, sample.DeepItem.Id], movedPath);
         Assert.Contains(moved.Groups, group => group.Id == sample.GrandchildGroup.Id && group.ParentGroupId == sample.ChildGroup.Id);
     }
 
     [Fact]
-    public void MoveListing_PreservesListingIdentityAndContext()
+    public void MoveItem_PreservesItemIdentityAndContext()
     {
         var sample = NavigationSample.Create();
         var otherGroup = NewGroup(sample.Store.Id, sample.Niche.Id, null, "Ready");
 
         var snapshot = sample.Snapshot with { Groups = [.. sample.Snapshot.Groups, otherGroup] };
 
-        var moved = WorkspaceNavigation.MoveListing(
+        var moved = WorkspaceNavigation.MoveItem(
             snapshot,
-            sample.Listing.Id,
+            sample.Item.Id,
             new NavigationTopicReference(WorkspaceEntityKind.Group, otherGroup.Id));
 
-        var listing = Assert.Single(moved.Listings, candidate => candidate.Id == sample.Listing.Id);
-        Assert.Equal(otherGroup.Id, listing.GroupId);
-        Assert.Equal(sample.Listing.Status, listing.Status);
-        Assert.Equal(sample.Listing.Description, listing.Description);
-        Assert.Equal(sample.Listing.MetadataJson, listing.MetadataJson);
+        var item = Assert.Single(moved.Items, candidate => candidate.Id == sample.Item.Id);
+        Assert.Equal(otherGroup.Id, item.GroupId);
+        Assert.Equal(sample.Item.Status, item.Status);
+        Assert.Equal(sample.Item.Description, item.Description);
+        Assert.Equal(sample.Item.MetadataJson, item.MetadataJson);
     }
 
     [Fact]
@@ -101,14 +101,14 @@ public class NavigationTreeTests
     }
 
     [Fact]
-    public void BuildTree_RejectsOrphanedListing()
+    public void BuildTree_RejectsOrphanedItem()
     {
         var sample = NavigationSample.Create();
         var orphaned = sample.Snapshot with
         {
-            Listings =
+            Items =
             [
-                sample.Listing with
+                sample.Item with
                 {
                     NicheId = null,
                     GroupId = null
@@ -139,7 +139,7 @@ public class NavigationTreeTests
     }
 
     [Fact]
-    public void BuildTree_HidesArchivedSubtreeAndArchivedListings()
+    public void BuildTree_HidesArchivedSubtreeAndArchivedItems()
     {
         var sample = NavigationSample.Create();
         var archived = sample.Snapshot with
@@ -174,30 +174,30 @@ public class NavigationTreeTests
         Assert.Equal(sample.ChildGroup.Id, child.EntityId);
         var grandchild = Assert.Single(child.Children, node => node.EntityKind == WorkspaceEntityKind.Group);
         Assert.True(grandchild.IsInactive);
-        var deepListing = Assert.Single(grandchild.Children, node => node.EntityKind == WorkspaceEntityKind.Listing);
-        Assert.True(deepListing.IsInactive);
-        Assert.Equal(sample.DeepListing.Id, deepListing.EntityId);
+        var deepItem = Assert.Single(grandchild.Children, node => node.EntityKind == WorkspaceEntityKind.Item);
+        Assert.True(deepItem.IsInactive);
+        Assert.Equal(sample.DeepItem.Id, deepItem.EntityId);
     }
 
     [Fact]
-    public void BuildTree_IncludeArchivedRevealsArchivedListingUnderActiveParentAsInactive()
+    public void BuildTree_IncludeArchivedRevealsArchivedItemUnderActiveParentAsInactive()
     {
         var sample = NavigationSample.Create();
         var archived = sample.Snapshot with
         {
-            Listings = sample.Snapshot.Listings.Select(listing => listing.Id == sample.Listing.Id ? listing with { IsArchived = true } : listing).ToArray()
+            Items = sample.Snapshot.Items.Select(item => item.Id == sample.Item.Id ? item with { IsArchived = true } : item).ToArray()
         };
 
         var defaultTree = WorkspaceNavigation.BuildTree(archived);
         var parentDefault = Assert.Single(Assert.Single(Assert.Single(defaultTree.Stores).Children).Children, node => node.EntityKind == WorkspaceEntityKind.Group);
-        Assert.DoesNotContain(parentDefault.Children, node => node.EntityId == sample.Listing.Id);
+        Assert.DoesNotContain(parentDefault.Children, node => node.EntityId == sample.Item.Id);
 
         var includedTree = WorkspaceNavigation.BuildTree(archived, includeArchived: true);
         var niche = Assert.Single(Assert.Single(includedTree.Stores).Children);
         var parent = Assert.Single(niche.Children, node => node.EntityKind == WorkspaceEntityKind.Group);
         Assert.False(parent.IsInactive);
-        var archivedListing = Assert.Single(parent.Children, node => node.EntityId == sample.Listing.Id);
-        Assert.True(archivedListing.IsInactive);
+        var archivedItem = Assert.Single(parent.Children, node => node.EntityId == sample.Item.Id);
+        Assert.True(archivedItem.IsInactive);
     }
 
     [Fact]
@@ -240,8 +240,8 @@ public class NavigationTreeTests
         TopicGroup ParentGroup,
         TopicGroup ChildGroup,
         TopicGroup GrandchildGroup,
-        Listing Listing,
-        Listing DeepListing)
+        Item Item,
+        Item DeepItem)
     {
         public static NavigationSample Create()
         {
@@ -251,15 +251,15 @@ public class NavigationTreeTests
             var parentGroup = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Seasonal", null, false, now, now, "{}");
             var childGroup = new TopicGroup(Guid.NewGuid(), store.Id, null, parentGroup.Id, "Autumn", null, false, now, now, "{}");
             var grandchildGroup = new TopicGroup(Guid.NewGuid(), store.Id, null, childGroup.Id, "Espresso", null, false, now, now, "{}");
-            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, parentGroup.Id, "Pumpkin espresso", "Cozy shirt", ListingStatus.Draft, WorkflowStage.Idea, false, now, now, """{"tags":["fall"]}""");
-            var deepListing = new Listing(Guid.NewGuid(), store.Id, niche.Id, grandchildGroup.Id, "Latte ghosts", "Halloween shirt", ListingStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
+            var item = new Item(Guid.NewGuid(), store.Id, niche.Id, parentGroup.Id, "Pumpkin espresso", "Cozy shirt", ItemStatus.Draft, WorkflowStage.Idea, false, now, now, """{"tags":["fall"]}""");
+            var deepItem = new Item(Guid.NewGuid(), store.Id, niche.Id, grandchildGroup.Id, "Latte ghosts", "Halloween shirt", ItemStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
 
             return new NavigationSample(
                 new WorkspaceSnapshot(
                     [store],
                     [niche],
                     [parentGroup, childGroup, grandchildGroup],
-                    [listing, deepListing],
+                    [item, deepItem],
                     [],
                     [],
                     [],
@@ -270,8 +270,8 @@ public class NavigationTreeTests
                 parentGroup,
                 childGroup,
                 grandchildGroup,
-                listing,
-                deepListing);
+                item,
+                deepItem);
         }
     }
 }

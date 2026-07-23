@@ -55,7 +55,7 @@ public class GroupManagementServiceTests
     }
 
     [Fact]
-    public async Task MoveGroupAsync_MovesAcrossNichesAndPreservesSubtreeAndListingContext()
+    public async Task MoveGroupAsync_MovesAcrossNichesAndPreservesSubtreeAndItemContext()
     {
         var sample = Sample.CreateWithGroups();
         var otherNiche = new Niche(Guid.NewGuid(), sample.Store.Id, "Dogs", null, false, sample.Now, sample.Now, "{}");
@@ -70,7 +70,7 @@ public class GroupManagementServiceTests
         Assert.True(result.Succeeded);
         var root = repository.Snapshot.Groups.Single(group => group.Id == sample.RootGroup.Id);
         var child = repository.Snapshot.Groups.Single(group => group.Id == sample.ChildGroup!.Id);
-        var listing = Assert.Single(repository.Snapshot.Listings);
+        var listing = Assert.Single(repository.Snapshot.Items);
         Assert.Equal(otherNiche.Id, root.NicheId);
         Assert.Equal(root.Id, child.ParentGroupId);
         Assert.Equal(child.Id, listing.GroupId);
@@ -215,7 +215,7 @@ public class GroupManagementServiceTests
         Assert.Equal("Seasonal copy", result.Group.Name);
         var copiedChild = repository.Snapshot.Groups.Single(group => group.Id == copiedChildId);
         Assert.Equal(copiedRootId, copiedChild.ParentGroupId);
-        Assert.Single(repository.Snapshot.Listings);
+        Assert.Single(repository.Snapshot.Items);
     }
 
     [Fact]
@@ -255,7 +255,7 @@ public class GroupManagementServiceTests
         Assert.Contains("confirmation", result.Error, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(0, repository.SaveCount);
         Assert.Equal(2, repository.Snapshot.Groups.Count);
-        Assert.Single(repository.Snapshot.Listings);
+        Assert.Single(repository.Snapshot.Items);
     }
 
     [Fact]
@@ -265,21 +265,21 @@ public class GroupManagementServiceTests
         var child = sample.ChildGroup! with { SortOrder = 0 };
         var sibling = new TopicGroup(Guid.NewGuid(), sample.Store.Id, null, sample.RootGroup!.Id, "Sibling", null, false, sample.Now, sample.Now, "{}", 3);
         var grandchild = new TopicGroup(Guid.NewGuid(), sample.Store.Id, null, child.Id, "Grandchild", null, false, sample.Now, sample.Now, "{}", 0);
-        var listing = sample.Snapshot.Listings.Single() with { GroupId = grandchild.Id };
+        var listing = sample.Snapshot.Items.Single() with { GroupId = grandchild.Id };
         var prompt = new Prompt(Guid.NewGuid(), sample.Store.Id, listing.Id, "Prompt", null, "Text", false, sample.Now, sample.Now, "{}");
         var tag = new Tag(Guid.NewGuid(), sample.Store.Id, "Tag", null, false, sample.Now, sample.Now, "{}");
         var asset = new Asset(Guid.NewGuid(), sample.Store.Id, "Asset", null, AssetKind.SourceDesign, "assets/source.png", null, false, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with
         {
             Groups = [sample.RootGroup, child, sibling, grandchild],
-            Listings = [listing],
+            Items = [listing],
             Prompts = [prompt],
             Tags = [tag],
-            ListingTags = [new ListingTag(listing.Id, tag.Id)],
+            ItemTags = [new ItemTag(listing.Id, tag.Id)],
             Assets = [asset],
             AssetLinks =
             [
-                new AssetLink(asset.Id, WorkspaceEntityKind.Listing, listing.Id),
+                new AssetLink(asset.Id, WorkspaceEntityKind.Item, listing.Id),
                 new AssetLink(asset.Id, WorkspaceEntityKind.Group, sample.RootGroup.Id)
             ]
         };
@@ -294,9 +294,9 @@ public class GroupManagementServiceTests
         Assert.True(result.Succeeded, result.Error);
         Assert.Equal([sample.RootGroup.Id, sibling.Id], repository.Snapshot.Groups.Select(group => group.Id));
         Assert.Equal(0, repository.Snapshot.Groups.Single(group => group.Id == sibling.Id).SortOrder);
-        Assert.Empty(repository.Snapshot.Listings);
+        Assert.Empty(repository.Snapshot.Items);
         Assert.Empty(repository.Snapshot.Prompts);
-        Assert.Empty(repository.Snapshot.ListingTags);
+        Assert.Empty(repository.Snapshot.ItemTags);
         Assert.Single(repository.Snapshot.Assets);
         Assert.Equal(sample.RootGroup.Id, Assert.Single(repository.Snapshot.AssetLinks).EntityId);
         Assert.Equal(sample.RootGroup.Id, result.State.ActiveGroupId);
@@ -361,10 +361,10 @@ public class GroupManagementServiceTests
             var sample = Create();
             var root = new TopicGroup(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Seasonal", null, false, sample.Now, sample.Now, "{}");
             var child = new TopicGroup(Guid.NewGuid(), sample.Store.Id, null, root.Id, "Child", null, childArchived, sample.Now, sample.Now, "{}");
-            var listing = new Listing(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, child.Id, "Listing", null, ListingStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+            var listing = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, child.Id, "Listing", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
             return sample with
             {
-                Snapshot = sample.Snapshot with { Groups = [root, child], Listings = [listing] },
+                Snapshot = sample.Snapshot with { Groups = [root, child], Items = [listing] },
                 RootGroup = root,
                 ChildGroup = child
             };

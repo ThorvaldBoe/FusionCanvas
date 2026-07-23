@@ -82,14 +82,14 @@ public sealed record TopicGroup(
     int SortOrder = 0)
     : WorkspaceEntity(Id, Name, Description, IsArchived, CreatedAt, UpdatedAt, MetadataJson);
 
-public sealed record Listing(
+public sealed record Item(
     Guid Id,
     Guid StoreId,
     Guid? NicheId,
     Guid? GroupId,
     string Name,
     string? Description,
-    ListingStatus Status,
+    ItemStatus Status,
     WorkflowStage Stage,
     bool IsArchived,
     DateTimeOffset CreatedAt,
@@ -135,7 +135,7 @@ public sealed record Asset : WorkspaceEntity
 public sealed record Prompt(
     Guid Id,
     Guid StoreId,
-    Guid? ListingId,
+    Guid? ItemId,
     string Name,
     string? Description,
     string Text,

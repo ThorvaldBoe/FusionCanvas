@@ -13,11 +13,11 @@ public class AssetsViewModelTests
         var service = sample.Service();
         var viewModel = new AssetsViewModel(service, new FakeFilePicker());
 
-        await viewModel.OpenForContextAsync(sample.ListingContext);
+        await viewModel.OpenForContextAsync(sample.ItemContext);
 
         Assert.True(viewModel.IsOpen);
         Assert.Equal("Idea", viewModel.ContextTitle);
-        Assert.Equal("Listing", viewModel.ContextKindLabel);
+        Assert.Equal("Item", viewModel.ContextKindLabel);
         Assert.Single(viewModel.Assets);
         Assert.False(viewModel.HasImportPending);
         Assert.True(viewModel.CanImport);
@@ -31,7 +31,7 @@ public class AssetsViewModelTests
         var picker = new FakeFilePicker().WithFile(@"C:\imports\design.svg");
         var viewModel = new AssetsViewModel(service, picker);
 
-        await viewModel.OpenForContextAsync(sample.ListingContext);
+        await viewModel.OpenForContextAsync(sample.ItemContext);
         viewModel.ImportCommand.Execute(null);
         await WaitForAsync(() => viewModel.HasImportPending);
 
@@ -57,7 +57,7 @@ public class AssetsViewModelTests
         var picker = new FakeFilePicker().WithFile(@"C:\imports\design.svg");
         var viewModel = new AssetsViewModel(service, picker);
 
-        await viewModel.OpenForContextAsync(sample.ListingContext);
+        await viewModel.OpenForContextAsync(sample.ItemContext);
         viewModel.ImportCommand.Execute(null);
         await WaitForAsync(() => viewModel.HasImportPending);
         viewModel.CancelImportCommand.Execute(null);
@@ -74,7 +74,7 @@ public class AssetsViewModelTests
         var picker = new FakeFilePicker();
         var viewModel = new AssetsViewModel(service, picker);
 
-        await viewModel.OpenForContextAsync(sample.ListingContext);
+        await viewModel.OpenForContextAsync(sample.ItemContext);
         viewModel.ImportCommand.Execute(null);
         await WaitForAsync(() => !viewModel.IsBusy);
 
@@ -90,7 +90,7 @@ public class AssetsViewModelTests
         var service = sample.Service(repository);
         var viewModel = new AssetsViewModel(service, new FakeFilePicker());
 
-        await viewModel.OpenForContextAsync(sample.ListingContext);
+        await viewModel.OpenForContextAsync(sample.ItemContext);
         var row = viewModel.Assets.Single();
         Assert.Equal(AssetKind.ExportedImage, row.Purpose);
 
@@ -118,7 +118,7 @@ public class AssetsViewModelTests
         var service = sample.Service(repository);
         var viewModel = new AssetsViewModel(service, new FakeFilePicker());
 
-        await viewModel.OpenForContextAsync(sample.ListingContext);
+        await viewModel.OpenForContextAsync(sample.ItemContext);
         var row = viewModel.Assets.Single();
 
         viewModel.RequestRemoveCommand.Execute(row);
@@ -147,7 +147,7 @@ public class AssetsViewModelTests
         await viewModel.OpenForContextAsync(sample.StoreContext);
 
         Assert.Equal(2, viewModel.Assets.Count);
-        Assert.Equal("Listing: Idea", viewModel.Assets.Single(row => row.Id == sample.LinkedAsset.Id).ContextLabel);
+        Assert.Equal("Item: Idea", viewModel.Assets.Single(row => row.Id == sample.LinkedAsset.Id).ContextLabel);
         Assert.Equal("—", viewModel.Assets.Single(row => row.Id == sample.UnlinkedAsset.Id).ContextLabel);
     }
 
@@ -201,11 +201,16 @@ public class AssetsViewModelTests
 
         public bool Exists(string workspaceRelativePath) => _existing.Contains(workspaceRelativePath.Replace('\\', '/'));
         public bool TryDelete(string workspaceRelativePath) => _existing.Remove(workspaceRelativePath.Replace('\\', '/'));
+
+        public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default) =>
+            Task.FromResult<Stream>(new MemoryStream());
+
+        public Task ExportCopyAsync(string workspaceRelativePath, string destinationPath, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
-    private sealed record Sample(WorkspaceSnapshot Snapshot, DateTimeOffset Now, Store Store, Listing Listing, Asset LinkedAsset, Asset UnlinkedAsset)
+    private sealed record Sample(WorkspaceSnapshot Snapshot, DateTimeOffset Now, Store Store, Item Item, Asset LinkedAsset, Asset UnlinkedAsset)
     {
-        public AssetContextReference ListingContext => new(WorkspaceEntityKind.Listing, Listing.Id);
+        public AssetContextReference ItemContext => new(WorkspaceEntityKind.Item, Item.Id);
         public AssetContextReference StoreContext => new(WorkspaceEntityKind.Store, Store.Id);
 
         public AssetManagementService Service(Repository? repository = null, Guid? nextId = null) =>
@@ -218,10 +223,10 @@ public class AssetsViewModelTests
             var store = new Store(Guid.NewGuid(), "North Star", null, false, now, now, "{}", nicheId);
             var niche = new Niche(nicheId, store.Id, "Coffee", null, false, now, now, "{}");
             var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Group", null, false, now, now, "{}");
-            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+            var listing = new Item(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Idea", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
             var linkedAsset = new Asset(Guid.NewGuid(), store.Id, "linked.png", null, AssetKind.ExportedImage, "assets/linked.png", @"C:\imports\linked.png", false, false, now, now, "{}");
             var unlinkedAsset = new Asset(Guid.NewGuid(), store.Id, "unlinked.png", null, AssetKind.Texture, "assets/unlinked.png", @"C:\imports\unlinked.png", false, false, now, now, "{}");
-            var link = new AssetLink(linkedAsset.Id, WorkspaceEntityKind.Listing, listing.Id);
+            var link = new AssetLink(linkedAsset.Id, WorkspaceEntityKind.Item, listing.Id);
             var snapshot = new WorkspaceSnapshot([store], [niche], [group], [listing], [linkedAsset, unlinkedAsset], [], [], [], [link]);
             return new(snapshot, now, store, listing, linkedAsset, unlinkedAsset);
         }

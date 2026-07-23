@@ -51,7 +51,7 @@ public class WorkspaceNavigationServiceTests
 
         var scope = service.ResolveCreationScope(
             sample.Snapshot,
-            new NavigationTarget(NavigationTargetKind.Listing, WorkspaceEntityKind.Listing, sample.Listing.Id));
+            new NavigationTarget(NavigationTargetKind.Item, WorkspaceEntityKind.Item, sample.Item.Id));
 
         Assert.Equal(sample.Store.Id, scope.StoreId);
         Assert.Equal(sample.Group.Id, scope.TopicId);
@@ -66,12 +66,12 @@ public class WorkspaceNavigationServiceTests
         var snapshot = sample.Snapshot with { Groups = [.. sample.Snapshot.Groups, secondGroup] };
         IWorkspaceNavigationService service = new WorkspaceNavigationService();
 
-        var moved = service.MoveListing(
+        var moved = service.MoveItem(
             snapshot,
-            sample.Listing.Id,
+            sample.Item.Id,
             new NavigationTopicReference(WorkspaceEntityKind.Group, secondGroup.Id));
 
-        Assert.Equal(secondGroup.Id, Assert.Single(moved.Listings).GroupId);
+        Assert.Equal(secondGroup.Id, Assert.Single(moved.Items).GroupId);
     }
 
     [Fact]
@@ -82,9 +82,9 @@ public class WorkspaceNavigationServiceTests
 
         var path = service.RevealPath(
             sample.Snapshot,
-            new NavigationTarget(NavigationTargetKind.Listing, WorkspaceEntityKind.Listing, sample.Listing.Id));
+            new NavigationTarget(NavigationTargetKind.Item, WorkspaceEntityKind.Item, sample.Item.Id));
 
-        Assert.Equal([sample.Store.Id, sample.Niche.Id, sample.Group.Id, sample.Listing.Id], path);
+        Assert.Equal([sample.Store.Id, sample.Niche.Id, sample.Group.Id, sample.Item.Id], path);
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public class WorkspaceNavigationServiceTests
     private static TopicGroup NewGroup(Guid storeId, Guid? nicheId, Guid? parentGroupId, string name) =>
         new(Guid.NewGuid(), storeId, nicheId, parentGroupId, name, null, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "{}");
 
-    private sealed record NavigationSample(WorkspaceSnapshot Snapshot, Store Store, Niche Niche, TopicGroup Group, Listing Listing)
+    private sealed record NavigationSample(WorkspaceSnapshot Snapshot, Store Store, Niche Niche, TopicGroup Group, Item Item)
     {
         public static NavigationSample Create()
         {
@@ -110,7 +110,7 @@ public class WorkspaceNavigationServiceTests
             var store = new Store(Guid.NewGuid(), "North Star Studio", null, false, now, now, "{}");
             var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, "{}");
             var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Seasonal", null, false, now, now, "{}");
-            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Pumpkin espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+            var listing = new Item(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Pumpkin espresso", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
 
             return new NavigationSample(
                 new WorkspaceSnapshot([store], [niche], [group], [listing], [], [], [], [], []),

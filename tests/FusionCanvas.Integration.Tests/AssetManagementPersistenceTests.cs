@@ -18,7 +18,7 @@ public class AssetManagementPersistenceTests
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", nicheId);
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
         var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Group", null, false, now, now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var listing = new Item(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Idea", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         await repository.SaveAsync(new WorkspaceSnapshot([store], [niche], [group], [listing], [], [], [], [], []), TestContext.Current.CancellationToken);
 
         var sourcePath = Path.Combine(directory.Path, "source.svg");
@@ -26,7 +26,7 @@ public class AssetManagementPersistenceTests
         var assetId = Guid.NewGuid();
         var service = new AssetManagementService(repository, fileStore, clock: () => now.AddMinutes(1), newId: () => assetId);
 
-        var context = new AssetContextReference(WorkspaceEntityKind.Listing, listing.Id);
+        var context = new AssetContextReference(WorkspaceEntityKind.Item, listing.Id);
         var imported = await service.ImportAssetAsync(new(context, sourcePath, AssetKind.Svg), TestContext.Current.CancellationToken);
         var reloadedAfterImport = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
@@ -67,13 +67,13 @@ public class AssetManagementPersistenceTests
         var nicheId = Guid.NewGuid();
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", nicheId);
         var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
-        var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var listing = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Idea", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         await inner.SaveAsync(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [], [], []), TestContext.Current.CancellationToken);
         var service = new AssetManagementService(new FailingRepository(inner), fileStore);
 
         var sourcePath = Path.Combine(directory.Path, "source.png");
         await File.WriteAllTextAsync(sourcePath, "bytes", TestContext.Current.CancellationToken);
-        var result = await service.ImportAssetAsync(new(new AssetContextReference(WorkspaceEntityKind.Listing, listing.Id), sourcePath, AssetKind.ExportedImage), TestContext.Current.CancellationToken);
+        var result = await service.ImportAssetAsync(new(new AssetContextReference(WorkspaceEntityKind.Item, listing.Id), sourcePath, AssetKind.ExportedImage), TestContext.Current.CancellationToken);
         var reloaded = await inner.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);

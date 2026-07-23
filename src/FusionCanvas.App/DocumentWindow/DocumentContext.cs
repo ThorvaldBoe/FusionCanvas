@@ -46,7 +46,7 @@ public sealed record DocumentContext
         ActiveItemWorkflowContext? workflow,
         WorkflowStage workflowStage,
         string detailViewKey,
-        WorkspaceEntityKind entityKind = WorkspaceEntityKind.Listing)
+        WorkspaceEntityKind entityKind = WorkspaceEntityKind.Item)
     {
         Id = id == Guid.Empty
             ? throw new ArgumentException("Identifier must not be empty.", nameof(id))

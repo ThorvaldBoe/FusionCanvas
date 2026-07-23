@@ -81,6 +81,92 @@ public class LocalWorkspaceFileStoreTests
         Assert.True(File.Exists(imported.FullPath));
     }
 
+    [Fact]
+    public async Task OpenReadAsync_ReturnsReadableStreamWithinWorkspaceBoundary()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var sourcePath = tempDirectory.GetPath("source.png");
+        var workspaceRoot = tempDirectory.GetPath("workspace");
+        await File.WriteAllTextAsync(sourcePath, "preview-bytes", TestContext.Current.CancellationToken);
+        var store = new LocalWorkspaceFileStore(workspaceRoot);
+        var imported = await store.ImportAsync(sourcePath, AssetKind.ExportedImage, TestContext.Current.CancellationToken);
+
+        await using var stream = await store.OpenReadAsync(imported.WorkspaceRelativePath, TestContext.Current.CancellationToken);
+
+        using var reader = new StreamReader(stream);
+        Assert.Equal("preview-bytes", await reader.ReadToEndAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task OpenReadAsync_ReleasesFileHandleWhenStreamDisposed()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var sourcePath = tempDirectory.GetPath("source.png");
+        var workspaceRoot = tempDirectory.GetPath("workspace");
+        await File.WriteAllTextAsync(sourcePath, "preview-bytes", TestContext.Current.CancellationToken);
+        var store = new LocalWorkspaceFileStore(workspaceRoot);
+        var imported = await store.ImportAsync(sourcePath, AssetKind.ExportedImage, TestContext.Current.CancellationToken);
+
+        {
+            await using var stream = await store.OpenReadAsync(imported.WorkspaceRelativePath, TestContext.Current.CancellationToken);
+        }
+
+        Assert.True(store.TryDelete(imported.WorkspaceRelativePath));
+    }
+
+    [Fact]
+    public async Task OpenReadAsync_RejectsTraversalAttempt()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var workspaceRoot = tempDirectory.GetPath("workspace");
+        var store = new LocalWorkspaceFileStore(workspaceRoot);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => store.OpenReadAsync("../escape.png", TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task OpenReadAsync_ReportsMissingSource()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var workspaceRoot = tempDirectory.GetPath("workspace");
+        var store = new LocalWorkspaceFileStore(workspaceRoot);
+
+        await Assert.ThrowsAsync<FileNotFoundException>(
+            () => store.OpenReadAsync("assets/missing.png", TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ExportCopyAsync_CopiesIdenticalBytesAndLeavesSourceUnchanged()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var sourcePath = tempDirectory.GetPath("source.png");
+        var destinationPath = tempDirectory.GetPath("export.png");
+        var workspaceRoot = tempDirectory.GetPath("workspace");
+        await File.WriteAllTextAsync(sourcePath, "export-bytes", TestContext.Current.CancellationToken);
+        var store = new LocalWorkspaceFileStore(workspaceRoot);
+        var imported = await store.ImportAsync(sourcePath, AssetKind.ExportedImage, TestContext.Current.CancellationToken);
+
+        await store.ExportCopyAsync(imported.WorkspaceRelativePath, destinationPath, TestContext.Current.CancellationToken);
+
+        Assert.Equal("export-bytes", await File.ReadAllTextAsync(destinationPath, TestContext.Current.CancellationToken));
+        Assert.True(store.Exists(imported.WorkspaceRelativePath));
+    }
+
+    [Fact]
+    public async Task ExportCopyAsync_RejectsSameSourceAndDestination()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var sourcePath = tempDirectory.GetPath("source.png");
+        var workspaceRoot = tempDirectory.GetPath("workspace");
+        await File.WriteAllTextAsync(sourcePath, "export-bytes", TestContext.Current.CancellationToken);
+        var store = new LocalWorkspaceFileStore(workspaceRoot);
+        var imported = await store.ImportAsync(sourcePath, AssetKind.ExportedImage, TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => store.ExportCopyAsync(imported.WorkspaceRelativePath, imported.FullPath, TestContext.Current.CancellationToken));
+    }
+
     private sealed class TemporaryDirectory : IDisposable
     {
         private readonly DirectoryInfo _directory = Directory.CreateTempSubdirectory();

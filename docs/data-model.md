@@ -12,7 +12,7 @@ FusionCanvas should use a hybrid model:
 - JSON metadata fields for flexible, evolving information
 - managed workspace file paths for large assets such as images, source files, and mockups
 
-The data model should preserve creative context, workflow state, and relationships between workspaces, stores, niches, listings, designs, and assets.
+The data model should preserve creative context, workflow state, and relationships between workspaces, stores, niches, Items, designs, and assets.
 
 ## Core Principles
 
@@ -73,12 +73,12 @@ Workspace
         Mockup Color Variant
     Niche
       Group
-        Listing
+        Item
           Concept
           Design
           Asset
           Mockup
-          Listing Metadata
+          Item Metadata
           Performance Data
 ```
 
@@ -89,7 +89,7 @@ The navigable workspace should be understood as a topic/item tree:
 - A topic is a folder-like grouping node.
 - An item is a concrete unit of work.
 
-In the initial model, `Niche` and `Group` behave as topics, and `Listing` behaves as an item. The top-level topics inside a store are niches by default. Groups provide arbitrary-depth subtopics beneath a niche.
+In the current model, `Niche` and `Group` behave as topics, and `Item` is the universal stage-agnostic unit of work. `Listing` names the final workflow stage and future marketplace-specific records. The top-level topics inside a store are niches by default. Groups provide arbitrary-depth subtopics beneath a niche.
 
 The data model should support browsing, filtering, moving, and converting between topic and item roles without requiring users to understand the underlying table structure.
 
@@ -194,7 +194,7 @@ Metadata example:
 
 ## Group
 
-A group organizes listings inside a niche.
+A group organizes Items inside a niche.
 
 Groups may represent folders, collections, campaigns, experiments, or temporary work areas. Groups may contain subgroups, allowing an arbitrary number of nested topic levels beneath a niche.
 
@@ -215,32 +215,30 @@ Group
 - MetadataJson
 ```
 
-Groups should support moving within the same store and niche tree where the move does not create a cycle. Moving a group moves its full subtree, including child groups and listings.
+Groups should support moving within the same store and niche tree where the move does not create a cycle. Moving a group moves its full subtree, including child groups and Items.
 
-An empty group may be converted into a listing or another item type if it has no child groups and no child items. A non-empty group must remain a topic until its children are moved, deleted, archived elsewhere, or otherwise resolved.
+An empty group may be converted into an Item if it has no child groups and no child items. A non-empty group must remain a topic until its children are moved, deleted, archived elsewhere, or otherwise resolved.
 
-## Listing
+## Item
 
-A listing is the central working object in FusionCanvas.
+An Item is the central working object in FusionCanvas.
 
-A listing represents a product concept, not merely an image file. A listing may eventually become one or more marketplace products.
+An Item represents a product concept, not merely an image file. It may eventually become one or more marketplace products after reaching the Listing stage.
 
 Suggested fields:
 
 ```text
-Listing
+Item
 - Id
 - StoreId
 - NicheId
 - GroupId
-- Title
-- WorkingTitle
+- WorkingTitle (optional)
 - WorkflowStage
 - Status
 - CreatedAt
 - UpdatedAt
-- PublishedAt
-- ArchivedAt
+- IsArchived
 - MetadataJson
 ```
 
@@ -283,7 +281,7 @@ Metadata example:
 }
 ```
 
-Documented listing metadata keys edited by the Listing Inspector details pane:
+Documented Item metadata keys edited by the stage-aware Item document:
 
 - `idea` — the product concept or seed.
 - `idea.audience` — the optional audience the product is for (FC-0201).
@@ -291,21 +289,21 @@ Documented listing metadata keys edited by the Listing Inspector details pane:
 - `graphicDirection` — the visual direction supporting the concept.
 - `notes` — plain-text working notes.
 
-Inspector saves preserve unknown metadata keys and `inheritedFrom:` provenance entries unchanged.
+Explicit Item saves preserve generic Description, hidden Audience, unknown metadata keys, and `inheritedFrom:` provenance entries unchanged. Working title, current-stage text, and Notes save together; Tags persist independently and immediately.
 
-A listing behaves as an item in the navigation tree.
+An Item is the concrete unit of work in the navigation tree.
 
-A listing should be movable between valid topics without losing status, tags, assets, prompt history, marketplace data, or other creative context.
+An Item should be movable between valid topics without losing status, Tags, Assets, Prompt history, marketplace data, or other creative context.
 
-A listing may be converted into a topic at any time. The resulting topic should preserve the listing's name, relevant metadata, tags, and history where practical, and should be able to contain new child topics or items.
+An Item may be converted into a topic at any time. The resulting topic should preserve the Item's name, relevant metadata, Tags, and history where practical, and should be able to contain new child topics or Items.
 
 ## Concept
 
-A concept captures the creative reasoning behind a listing.
+A concept captures the creative reasoning behind an Item.
 
-A listing may have multiple concepts over time, especially during ideation. Concepts should preserve abandoned ideas as well as accepted ones.
+An Item may have multiple concepts over time, especially during ideation. Concepts should preserve abandoned ideas as well as accepted ones.
 
-Concept work is always attached to a listing or other concrete item. There is no standalone concept outside the navigation structure. The selected concept version supplies the design triangle values used by the Concept-stage tool.
+Concept work is always attached to an Item. There is no standalone concept outside the navigation structure. The selected concept version supplies the design triangle values used by the Concept-stage tool.
 
 Suggested fields:
 
@@ -350,7 +348,7 @@ Metadata example:
 
 A design represents a concrete visual implementation of a concept.
 
-A listing may have multiple designs or design versions.
+An Item may have multiple designs or design versions.
 
 A design may be created manually in an external design tool, imported from an external AI tool, generated inside FusionCanvas, or produced by a plugin. FusionCanvas should preserve the creative and production context regardless of the source.
 
@@ -387,7 +385,7 @@ SelectedFinal
 
 ## Asset
 
-An asset is a file or external resource used by a listing, design, concept, or store.
+An asset is a file or external resource used by an Item, design, concept, or store.
 
 Examples:
 
@@ -559,9 +557,9 @@ Template
 
 An idea captures the emotional, situational, or conceptual seed behind a design.
 
-Ideas may exist before they become listings.
+Ideas may exist before they become Items.
 
-For the MVP, a captured idea may be represented directly as a listing in the Idea stage when that keeps the workflow simpler. The separate Idea entity remains useful for raw inbox capture, rejected generated suggestions, or later workflows that need ideas before listing creation.
+For the MVP, a captured idea may be represented directly as an Item in the Idea stage when that keeps the workflow simpler. The separate Idea entity remains useful for raw inbox capture, rejected generated suggestions, or later workflows that need ideas before Item creation.
 
 Suggested fields:
 
@@ -723,7 +721,7 @@ This allows plugin-specific extensions while keeping the core schema stable.
 
 Tags provide flexible classification across entities.
 
-Tags may be attached to listings, topics, assets, phrases, ideas, or other entities.
+Tags may be attached to Items, topics, assets, phrases, ideas, or other entities.
 
 Suggested fields:
 
@@ -778,7 +776,7 @@ Store
 - belongs to Workspace
 - has many Niches
 - has many Groups
-- has many Listings
+- has many Items
 - has many Assets
 - has many Tags
 - has many MockupProducts
@@ -790,7 +788,7 @@ Niche relationships:
 Niche
 - belongs to Store
 - has many Groups
-- has many Listings
+- has many Items
 - has many Ideas
 - has many Phrases
 - behaves as a top-level Topic in navigation
@@ -804,14 +802,14 @@ Group
 - belongs to Niche
 - may belong to ParentGroup
 - has many ChildGroups
-- has many Listings
+- has many Items
 - behaves as a nested Topic in navigation
 ```
 
-Listing relationships:
+Item relationships:
 
 ```text
-Listing
+Item
 - belongs to Store
 - belongs to Niche
 - belongs to Group
@@ -844,10 +842,10 @@ MockupColorVariant
 
 ## Open Questions
 
-- Should Idea and Phrase be independent entities from the beginning, or should they initially live inside Listing metadata?
+- Should Idea and Phrase become independent entities later, or remain Item metadata?
 - Should prompts be stored in full, or should large prompt outputs be stored as external files?
 - Should performance data be imported manually first before building marketplace integrations?
-- Should assets be linked to multiple listings?
+- Should assets be linked to multiple Items?
 - Should global phrase libraries exist outside stores?
 - Should niches be allowed to exist across multiple stores?
 - Should JSON metadata be indexed for selected fields?
@@ -863,7 +861,7 @@ For the basic working MVP, keep the model simple but complete enough to support 
 Store
 Niche
 Group
-Listing
+Item
 Concept
 Design
 Asset
@@ -877,7 +875,7 @@ MockupColorVariant
 
 Use JSON metadata for everything else until the need for dedicated tables becomes clear.
 
-Raw `Idea` and reusable `Phrase` records can remain listing metadata in the first implementation unless the Idea Inbox or phrase library workflow proves they need separate tables. Marketplace products, performance data, experiments, automation records, and plugin-specific data can wait until their later phases.
+Raw `Idea` and reusable `Phrase` records can remain Item metadata in the first implementation unless the Idea Inbox or phrase library workflow proves they need separate tables. Marketplace products, performance data, experiments, automation records, and plugin-specific data can wait until their later phases.
 
 The MVP should keep `WorkflowStage` and `Status` conceptually separate:
 

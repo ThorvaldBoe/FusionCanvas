@@ -122,7 +122,7 @@ Primary elements:
 
 The tree should distinguish topic-like nodes from item-like nodes without requiring heavy visual decoration.
 
-Niches are the default top-level topics inside a store. Groups and subgroups are nested topics. Listings and ideas are item-like work objects.
+Niches are the default top-level topics inside a store. Groups and subgroups are nested topics. Items are stage-agnostic work objects; Listing remains the final workflow stage.
 
 ## Workflow Stage Navigator
 
@@ -292,13 +292,19 @@ When a compact control and an explicit button perform the same action, prefer th
 
 ### Details Pane Editing
 
-Group and item (listing) information edits inline in the right details pane, not in separate editor dialogs. Selecting a group or item in the navigation tree shows its editable details in the document window.
+Group and Item information edits inline in the right details pane, not in separate editor dialogs. Selecting a group or Item in the navigation tree shows its editable details in the document window.
 
 Text fields save automatically when the edited field loses focus; there is no Save button and no unsaved-changes prompt. Validation failures revert the invalid field (for example a blanked name) to its last saved value with an inline explanation while other valid edits still save. Persistence failures are reported inline and never leave partially applied changes.
 
 Deliberate or destructive actions stay explicit and confirmed: archive, restore, permanent delete, and structural moves use buttons and confirmations, not auto-save. Complex content such as images follows a natural select-upload-apply flow (the Assets surface) rather than forced one-click editing.
 
 Store, niche, and workspace setup keep dialog-based editors.
+
+### Item workflow explicit Save exception
+
+The Item document surface is an approved exception to the blur-autosave rule above. The Item working title, current-stage text (Idea, Concept idea/Phrase/Graphics description, and the basic Listing tool's local content), and Notes use **explicit Save** because a multi-field creative stage benefits from one coherent intentional commit rather than field-by-field auto-save. Switching Item, tab, active view stage, or lifecycle state with unsaved working title, current-stage text, or Notes prompts Save, Discard, and Cancel; Cancel retains the draft, context, selection, and focus. A failed Save leaves no partial change and keeps the recoverable draft available.
+
+This exception is scoped to the Item workflow fields listed above. **Tags remain independently immediate** — apply, create, and remove Tag operations persist immediately and atomically even while an Item text draft is unsaved, without dismissing the pending text draft. Unrelated blur-autosave surfaces (group/item name edits outside the Item document surface, and other details-pane fields) keep their existing immediate-save behavior unchanged.
 
 ## Screenshot Concepts
 

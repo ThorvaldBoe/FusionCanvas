@@ -106,11 +106,8 @@ public sealed class LocalWorkspaceFileStore : IWorkspaceFileStore
             return false;
         }
 
-        var workspaceBoundary = Path.EndsInDirectorySeparator(WorkspaceRoot)
-            ? WorkspaceRoot
-            : WorkspaceRoot + Path.DirectorySeparatorChar;
-        var fullPath = Path.GetFullPath(Path.Combine(WorkspaceRoot, normalizedReference));
-        if (!fullPath.StartsWith(workspaceBoundary, StringComparison.OrdinalIgnoreCase) || !File.Exists(fullPath))
+        var fullPath = ResolveWithinWorkspace(normalizedReference);
+        if (fullPath is null || !File.Exists(fullPath))
         {
             return false;
         }
@@ -128,5 +125,61 @@ public sealed class LocalWorkspaceFileStore : IWorkspaceFileStore
         {
             return false;
         }
+    }
+
+    public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default)
+    {
+        var fullPath = ResolveWithinWorkspaceOrThrow(workspaceRelativePath);
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException("The managed workspace file was not found.", fullPath);
+        }
+
+        return Task.FromResult<Stream>(File.OpenRead(fullPath));
+    }
+
+    public async Task ExportCopyAsync(string workspaceRelativePath, string destinationPath, CancellationToken cancellationToken = default)
+    {
+        var fullPath = ResolveWithinWorkspaceOrThrow(workspaceRelativePath);
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException("The managed workspace file was not found.", fullPath);
+        }
+
+        var normalizedDestination = Path.GetFullPath(destinationPath);
+        if (string.Equals(normalizedDestination, fullPath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Export copy destination must differ from the managed source.");
+        }
+
+        await using var source = File.OpenRead(fullPath);
+        await using var destination = File.Create(normalizedDestination);
+        await source.CopyToAsync(destination, cancellationToken);
+    }
+
+    private string? ResolveWithinWorkspace(string normalizedReference)
+    {
+        var workspaceBoundary = Path.EndsInDirectorySeparator(WorkspaceRoot)
+            ? WorkspaceRoot
+            : WorkspaceRoot + Path.DirectorySeparatorChar;
+        var fullPath = Path.GetFullPath(Path.Combine(WorkspaceRoot, normalizedReference));
+        return fullPath.StartsWith(workspaceBoundary, StringComparison.OrdinalIgnoreCase) ? fullPath : null;
+    }
+
+    private string ResolveWithinWorkspaceOrThrow(string workspaceRelativePath)
+    {
+        string normalizedReference;
+        try
+        {
+            normalizedReference = WorkspaceFileReference.Normalize(workspaceRelativePath);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new InvalidOperationException("The managed reference escapes the workspace boundary.", exception);
+        }
+
+        var fullPath = ResolveWithinWorkspace(normalizedReference)
+            ?? throw new InvalidOperationException("The managed reference escapes the workspace boundary.");
+        return fullPath;
     }
 }

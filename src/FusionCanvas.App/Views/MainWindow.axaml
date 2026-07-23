@@ -1,9 +1,10 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:doc="clr-namespace:FusionCanvas.App.DocumentWindow"
-        xmlns:listings="clr-namespace:FusionCanvas.App.Listings"
+        xmlns:items="clr-namespace:FusionCanvas.App.Items"
         xmlns:nav="clr-namespace:FusionCanvas.App.Navigation"
         xmlns:stores="clr-namespace:FusionCanvas.App.Stores"
+        xmlns:stageTools="clr-namespace:FusionCanvas.App.StageTools"
         xmlns:workspace="clr-namespace:FusionCanvas.App.Workspace"
         xmlns:views="clr-namespace:FusionCanvas.App.Views"
         xmlns:workflow="clr-namespace:FusionCanvas.Application.Workspace;assembly=FusionCanvas.Application"
@@ -123,9 +124,9 @@
                     IsEnabled="{Binding CanCreateGroup}"
                     Classes="storeSecondary" />
             <Button Grid.Column="1"
-                    Content="+ New listing"
-                    ToolTip.Tip="Capture a listing under the selected topic or default niche"
-                    Command="{Binding WorkspaceTree.BeginCreateListingCommand}"
+                    Content="+ New Item"
+                    ToolTip.Tip="Capture an Item under the selected topic or default niche"
+                    Command="{Binding WorkspaceTree.BeginCreateItemCommand}"
                     IsEnabled="{Binding CanCreateGroup}"
                     Classes="storeSecondary" />
           </Grid>
@@ -145,7 +146,7 @@
                       SelectedIndex="{Binding WorkspaceTree.StageFilterIndex}"
                       MinWidth="92"
                       MinHeight="34"
-                      ToolTip.Tip="Filter listings by workflow stage"
+                      ToolTip.Tip="Filter Items by workflow stage"
                       Classes="statusSelector">
               <ComboBoxItem Content="All stages" />
               <ComboBoxItem Content="Idea" />
@@ -158,7 +159,7 @@
                       SelectedIndex="{Binding WorkspaceTree.StatusFilterIndex}"
                       MinWidth="92"
                       MinHeight="34"
-                      ToolTip.Tip="Filter listings by lifecycle status"
+                      ToolTip.Tip="Filter Items by lifecycle status"
                       Classes="statusSelector">
               <ComboBoxItem Content="All statuses" />
               <ComboBoxItem Content="Draft" />
@@ -207,7 +208,7 @@
                       <Separator Margin="0,2" />
                       <CheckBox Content="Include archived"
                                 IsChecked="{Binding WorkspaceTree.IncludeArchived}"
-                                ToolTip.Tip="Reveal archived topics and listings with inactive treatment" />
+                                ToolTip.Tip="Reveal archived topics and Items with inactive treatment" />
                       <Separator Margin="0,2" />
                       <Button Content="Clear all"
                               HorizontalAlignment="Right"
@@ -256,13 +257,13 @@
                   <Border.ContextMenu>
                     <ContextMenu IsVisible="{Binding HasAssetActions}">
                       <MenuItem Header="New group (subgroup)" IsVisible="{Binding IsGroup}" Click="OnContextNewGroup" />
-                      <MenuItem Header="New listing" Click="OnContextNewListing" />
+                      <MenuItem Header="New Item" Click="OnContextNewItem" />
                       <Separator />
               <MenuItem Header="Rename" IsVisible="{Binding HasContextActions}" Click="OnContextRename" />
               <MenuItem Header="Copy" IsVisible="{Binding HasContextActions}" Click="OnContextCopy" />
               <MenuItem Header="Cut" IsVisible="{Binding HasContextActions}" Click="OnContextCut" />
               <MenuItem Header="Paste" IsEnabled="{Binding CanPaste}" Click="OnContextPaste" />
-              <MenuItem Header="Duplicate" IsVisible="{Binding IsListing}" Click="OnContextDuplicate" />
+              <MenuItem Header="Duplicate" IsVisible="{Binding IsItem}" Click="OnContextDuplicate" />
               <MenuItem Header="Assets…" Click="OnContextAssets" />
                       <Separator />
                       <MenuItem Header="Delete..." IsVisible="{Binding IsGroup}" Click="OnContextDelete" />
@@ -295,7 +296,7 @@
                                       Background="{Binding Converter={x:Static nav:TagBrushConverter.Background}, FallbackValue='#F0F2F5'}"
                                       BorderBrush="{Binding Converter={x:Static nav:TagBrushConverter.Border}, FallbackValue='#D9DEE7'}"
                                       BorderThickness="1"
-                                      ToolTip.Tip="Listing has this tag applied" />
+                                      ToolTip.Tip="Item has this tag applied" />
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -453,20 +454,28 @@
                            Foreground="#687385" />
               </StackPanel>
               <TextBlock Grid.Column="1"
-                         IsVisible="{Binding ListingInspector.HasState}"
-                         Text="{Binding ListingInspector.StageLabel}"
+                         IsVisible="{Binding ItemInspector.HasState}"
+                         Text="{Binding ItemInspector.StageLabel}"
                          FontSize="11"
                          FontWeight="SemiBold"
                          Foreground="#59A17D"
                          VerticalAlignment="Center" />
               <ComboBox Grid.Column="2"
-                         IsVisible="{Binding HasActiveListing}"
-                         ItemsSource="{Binding AvailableListingStatuses}"
-                         SelectedItem="{Binding SelectedListingStatus}"
+                         IsVisible="{Binding HasActiveItem}"
+                         ItemsSource="{Binding AvailableItemStatusOptions}"
+                         SelectedItem="{Binding SelectedItemStatusOption}"
+                         PlaceholderText="{Binding SelectedItemStatusLabel}"
                          MinWidth="120"
                          VerticalAlignment="Center"
+                         AutomationProperties.Name="Item lifecycle status"
                          ToolTip.Tip="Lifecycle status"
-                         Classes="statusSelector" />
+                         Classes="statusSelector">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="views:ItemStatusOptionViewModel">
+                    <TextBlock Text="{Binding Label}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
             </Grid>
             <Border MinHeight="360"
                     Padding="22"
@@ -542,7 +551,7 @@
               </Grid>
             </Border>
 
-            <Border IsVisible="{Binding ListingInspector.HasState}"
+            <Border IsVisible="{Binding ItemInspector.HasState}"
                     MinHeight="360"
                     Padding="22"
                     Background="#F7F8FA"
@@ -550,12 +559,12 @@
                     BorderThickness="1">
               <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Spacing="14">
-                  <TextBlock IsVisible="{Binding ListingInspector.IsReadOnly}"
-                             Text="{Binding ListingInspector.InactiveNotice}"
+                  <TextBlock IsVisible="{Binding ItemInspector.IsReadOnly}"
+                             Text="{Binding ItemInspector.InactiveNotice}"
                              TextWrapping="Wrap"
                              FontSize="12"
                              Foreground="#9A4B43" />
-                  <TextBlock Text="{Binding ListingInspector.DisplayPath}"
+                  <TextBlock Text="{Binding ItemInspector.DisplayPath}"
                              FontSize="12"
                              Foreground="#687385" />
 
@@ -573,28 +582,11 @@
                         <TextBlock Text="Working title"
                                    FontSize="11"
                                    Foreground="#687385" />
-                        <TextBox Text="{Binding ListingInspector.Title}"
-                                 IsReadOnly="{Binding !ListingInspector.CanEdit}"
+                        <TextBox Text="{Binding ItemInspector.Title}"
+                                 IsReadOnly="{Binding !ItemInspector.CanEditShared}"
                                  MinHeight="32"
-                                 PlaceholderText="Working title"
-                                 LostFocus="OnDetailsFieldLostFocus" />
-                        <TextBlock Text="Description"
-                                   FontSize="11"
-                                   Foreground="#687385" />
-                        <TextBox Text="{Binding ListingInspector.Description}"
-                                 IsReadOnly="{Binding !ListingInspector.CanEdit}"
-                                 AcceptsReturn="True"
-                                 MinHeight="56"
-                                 PlaceholderText="Short description of this product"
-                                 LostFocus="OnDetailsFieldLostFocus" />
-                        <TextBlock Text="Phrase"
-                                   FontSize="11"
-                                   Foreground="#687385" />
-                        <TextBox Text="{Binding ListingInspector.Phrase}"
-                                 IsReadOnly="{Binding !ListingInspector.CanEdit}"
-                                 MinHeight="32"
-                                 PlaceholderText="Hook or on-product phrase"
-                                 LostFocus="OnDetailsFieldLostFocus" />
+                                 PlaceholderText="Optional working title"
+                                 AutomationProperties.Name="Item working title" />
                       </StackPanel>
                     </StackPanel>
                   </Border>
@@ -604,26 +596,24 @@
                           BorderBrush="#D9DEE7"
                           BorderThickness="1"
                           CornerRadius="6"
-                          Classes.emphasized="{Binding ListingInspector.EmphasizesIdea}">
+                          IsVisible="{Binding ShowsIdeaStageTool}"
+                          Classes.emphasized="{Binding ItemInspector.EmphasizesIdea}">
                     <StackPanel Spacing="10">
                       <TextBlock Text="Idea"
                                  FontSize="14"
                                  FontWeight="SemiBold"
                                  Foreground="#243447" />
-                      <TextBox Text="{Binding ListingInspector.Idea}"
-                               IsReadOnly="{Binding !ListingInspector.CanEdit}"
+                      <TextBox Text="{Binding ItemInspector.Idea}"
+                               IsReadOnly="{Binding !ItemInspector.CanEditStage}"
                                AcceptsReturn="True"
                                MinHeight="64"
-                               PlaceholderText="What is this product concept?"
-                               LostFocus="OnDetailsFieldLostFocus" />
-                      <TextBlock Text="Audience"
-                                 FontSize="11"
-                                 Foreground="#687385" />
-                      <TextBox Text="{Binding ListingInspector.Audience}"
-                               IsReadOnly="{Binding !ListingInspector.CanEdit}"
-                               MinHeight="32"
-                               PlaceholderText="Who is this product for?"
-                               LostFocus="OnDetailsFieldLostFocus" />
+                               PlaceholderText="What is the original product idea?"
+                               AutomationProperties.Name="Original idea" />
+                      <TextBlock IsVisible="{Binding !ItemInspector.CanEditStage}"
+                                 Text="{Binding ItemInspector.StageReadOnlyReason}"
+                                 TextWrapping="Wrap"
+                                 FontSize="12"
+                                 Foreground="#9A4B43" />
                     </StackPanel>
                   </Border>
 
@@ -632,21 +622,44 @@
                           BorderBrush="#D9DEE7"
                           BorderThickness="1"
                           CornerRadius="6"
-                          Classes.emphasized="{Binding ListingInspector.EmphasizesConcept}">
+                          IsVisible="{Binding ShowsConceptStageTool}"
+                          Classes.emphasized="{Binding ItemInspector.EmphasizesConcept}">
                     <StackPanel Spacing="10">
                       <TextBlock Text="Concept"
                                  FontSize="14"
                                  FontWeight="SemiBold"
                                  Foreground="#243447" />
+                      <TextBlock Text="Concept idea"
+                                 FontSize="11"
+                                 Foreground="#687385" />
+                      <TextBox Text="{Binding ItemInspector.ConceptIdea}"
+                               IsReadOnly="{Binding !ItemInspector.CanEditStage}"
+                               AcceptsReturn="True"
+                               MinHeight="64"
+                               PlaceholderText="Refine the original idea"
+                               AutomationProperties.Name="Concept idea" />
+                      <TextBlock Text="Phrase"
+                                 FontSize="11"
+                                 Foreground="#687385" />
+                      <TextBox Text="{Binding ItemInspector.Phrase}"
+                               IsReadOnly="{Binding !ItemInspector.CanEditStage}"
+                               MinHeight="32"
+                               PlaceholderText="Single-line on-product phrase"
+                               AutomationProperties.Name="Concept phrase" />
                       <TextBlock Text="Graphic direction"
                                  FontSize="11"
                                  Foreground="#687385" />
-                      <TextBox Text="{Binding ListingInspector.GraphicDirection}"
-                               IsReadOnly="{Binding !ListingInspector.CanEdit}"
+                      <TextBox Text="{Binding ItemInspector.GraphicDirection}"
+                               IsReadOnly="{Binding !ItemInspector.CanEditStage}"
                                AcceptsReturn="True"
                                MinHeight="64"
                                PlaceholderText="Visual direction supporting this concept"
-                               LostFocus="OnDetailsFieldLostFocus" />
+                               AutomationProperties.Name="Graphics description" />
+                      <TextBlock IsVisible="{Binding !ItemInspector.CanEditStage}"
+                                 Text="{Binding ItemInspector.StageReadOnlyReason}"
+                                 TextWrapping="Wrap"
+                                 FontSize="12"
+                                 Foreground="#9A4B43" />
                     </StackPanel>
                   </Border>
 
@@ -660,12 +673,12 @@
                                  FontSize="14"
                                  FontWeight="SemiBold"
                                  Foreground="#243447" />
-                      <TextBox Text="{Binding ListingInspector.Notes}"
-                               IsReadOnly="{Binding !ListingInspector.CanEdit}"
+                      <TextBox Text="{Binding ItemInspector.Notes}"
+                               IsReadOnly="{Binding !ItemInspector.CanEditShared}"
                                AcceptsReturn="True"
                                MinHeight="80"
                                PlaceholderText="Plain-text notes"
-                               LostFocus="OnDetailsFieldLostFocus" />
+                               AutomationProperties.Name="Item notes" />
                     </StackPanel>
                   </Border>
 
@@ -679,7 +692,7 @@
                                  FontSize="14"
                                  FontWeight="SemiBold"
                                  Foreground="#243447" />
-                      <ItemsControl ItemsSource="{Binding ListingInspector.TagDraft}">
+                      <ItemsControl ItemsSource="{Binding ItemInspector.TagDraft}">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="x:String">
                             <Border Padding="8,3"
@@ -703,45 +716,168 @@
                                         BorderThickness="0"
                                         Foreground="#204466"
                                         ToolTip.Tip="Remove tag"
-                                        Command="{Binding $parent[ItemsControl].DataContext.ListingInspector.RemoveTagCommand}"
+                                        Command="{Binding $parent[ItemsControl].DataContext.ItemInspector.RemoveTagCommand}"
                                         CommandParameter="{Binding}" />
                               </Grid>
                             </Border>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>
-                      <TextBlock IsVisible="{Binding !ListingInspector.HasTags}"
+                      <TextBlock IsVisible="{Binding !ItemInspector.HasTags}"
                                  Text="No tags yet."
                                  FontSize="12"
                                  Foreground="#7C8797" />
                       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                        <TextBox Text="{Binding ListingInspector.TagInput}"
-                                 IsEnabled="{Binding ListingInspector.CanEdit}"
+                        <TextBox Text="{Binding ItemInspector.TagInput}"
+                                 IsEnabled="{Binding ItemInspector.CanEditShared}"
                                  MinHeight="32"
                                  PlaceholderText="Add a tag" />
                         <Button Grid.Column="1"
                                 Content="Add"
-                                IsEnabled="{Binding ListingInspector.CanEdit}"
-                                Command="{Binding ListingInspector.AddTagCommand}"
+                                IsEnabled="{Binding ItemInspector.CanEditShared}"
+                                Command="{Binding ItemInspector.AddTagCommand}"
                                 Classes="storeSecondary" />
                       </Grid>
                     </StackPanel>
                   </Border>
 
-                  <Border Padding="14"
+                  <Border IsVisible="{Binding ShowsDesignStageTool}"
+                          Padding="14"
                           Background="#FFFFFF"
                           BorderBrush="#D9DEE7"
                           BorderThickness="1"
                           CornerRadius="6"
-                          Classes.emphasized="{Binding ListingInspector.EmphasizesDesign}">
+                          Classes.emphasized="{Binding ItemInspector.EmphasizesDesign}">
+                    <StackPanel Spacing="10">
+                      <TextBlock Text="Design"
+                                 FontSize="14"
+                                 FontWeight="SemiBold"
+                                 Foreground="#243447" />
+                      <TextBlock Text="Managed PNG Design files"
+                                 FontSize="12"
+                                 Foreground="#687385" />
+                      <ListBox ItemsSource="{Binding DesignTool.Files}"
+                               SelectedItem="{Binding DesignTool.SelectedFile}"
+                               MinHeight="72"
+                               AutomationProperties.Name="Design files">
+                        <ListBox.ItemTemplate>
+                          <DataTemplate x:DataType="stageTools:DesignFileViewModel">
+                            <Grid ColumnDefinitions="*,Auto">
+                              <TextBlock Text="{Binding Name}" />
+                              <TextBlock Grid.Column="1"
+                                         IsVisible="{Binding IsMissing}"
+                                         Text="Missing"
+                                         Foreground="#9A4B43" />
+                            </Grid>
+                          </DataTemplate>
+                        </ListBox.ItemTemplate>
+                      </ListBox>
+                      <TextBlock Text="{Binding DesignTool.EmptyState}"
+                                 TextWrapping="Wrap"
+                                 FontSize="12"
+                                 Foreground="#7C8797" />
+                      <TextBlock IsVisible="{Binding DesignTool.IsReadOnly}"
+                                 Text="{Binding DesignTool.ReadOnlyReason}"
+                                 TextWrapping="Wrap"
+                                 FontSize="12"
+                                 Foreground="#9A4B43" />
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Import PNG…"
+                                IsEnabled="{Binding !DesignTool.IsReadOnly}"
+                                Click="OnImportDesignFiles"
+                                ToolTip.Tip="Import one or more PNG Design files"
+                                AutomationProperties.Name="Import PNG Design files"
+                                Classes="storeSecondary" />
+                        <Button Content="Preview"
+                                Click="OnPreviewDesignFile"
+                                ToolTip.Tip="Preview the selected managed PNG"
+                                Classes="storeSecondary" />
+                        <Button Content="Export copy…"
+                                Click="OnExportDesignFile"
+                                ToolTip.Tip="Export an independent copy"
+                                Classes="storeSecondary" />
+                        <Button Content="Remove…"
+                                IsEnabled="{Binding !DesignTool.IsReadOnly}"
+                                Click="OnRequestRemoveDesignFile"
+                                ToolTip.Tip="Remove the selected Design file"
+                                Classes="storeSecondary" />
+                      </StackPanel>
+                      <Border IsVisible="{Binding IsDesignRemoveConfirmationVisible}"
+                              Padding="10"
+                              Background="#FEECEB"
+                              CornerRadius="6">
+                        <StackPanel Spacing="8">
+                          <TextBlock Text="Remove this Design file and its managed copy permanently?"
+                                     TextWrapping="Wrap" />
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="Remove"
+                                    Command="{Binding ConfirmDesignRemoveCommand}"
+                                    Classes="storeAction" />
+                            <Button Content="Cancel"
+                                    Command="{Binding CancelDesignRemoveCommand}"
+                                    Classes="storeSecondary" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
+                      <TextBlock IsVisible="{Binding DesignTool.ErrorMessage}"
+                                 Text="{Binding DesignTool.ErrorMessage}"
+                                 TextWrapping="Wrap"
+                                 Foreground="#9A4B43" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border IsVisible="{Binding ShowsListingStageTool}"
+                          Padding="14"
+                          Background="#FFFFFF"
+                          BorderBrush="#D9DEE7"
+                          BorderThickness="1"
+                          CornerRadius="6">
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="Listing"
+                                 FontSize="14"
+                                 FontWeight="SemiBold"
+                                 Foreground="#243447" />
+                      <TextBlock Text="{Binding ListingTool.StatusSummary}"
+                                 TextWrapping="Wrap"
+                                 FontSize="12"
+                                 Foreground="#687385" />
+                      <TextBlock Text="Marketplace fields, mockups, and external publishing are outside this basic local workflow."
+                                 TextWrapping="Wrap"
+                                 FontSize="12"
+                                 Foreground="#687385" />
+                    </StackPanel>
+                  </Border>
+
+                  <StackPanel Orientation="Horizontal"
+                              Spacing="8"
+                              HorizontalAlignment="Left">
+                    <Button x:Name="SaveItemButton"
+                            Content="Save"
+                            IsEnabled="{Binding ItemInspector.HasUnsavedChanges}"
+                            Command="{Binding ItemInspector.SaveCommand}"
+                            ToolTip.Tip="Save working title, current-stage text, and Notes"
+                            AutomationProperties.Name="Save Item changes"
+                            Classes="storeAction" />
+                    <Button Content="Discard"
+                            IsEnabled="{Binding ItemInspector.HasUnsavedChanges}"
+                            Command="{Binding ItemInspector.DiscardCommand}"
+                            ToolTip.Tip="Discard unsaved Item text changes"
+                            Classes="storeSecondary" />
+                  </StackPanel>
+
+                  <Border Padding="14"
+                          Background="#FFFFFF"
+                          BorderBrush="#D9DEE7"
+                          BorderThickness="1"
+                          CornerRadius="6">
                     <StackPanel Spacing="10">
                       <TextBlock Text="Related assets"
                                  FontSize="14"
                                  FontWeight="SemiBold"
                                  Foreground="#243447" />
-                      <ItemsControl ItemsSource="{Binding ListingInspector.Assets}">
+                      <ItemsControl ItemsSource="{Binding ItemInspector.Assets}">
                         <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="workflow:ListingInspectorAssetEntry">
+                          <DataTemplate x:DataType="workflow:ItemInspectorAssetEntry">
                             <StackPanel Margin="0,0,0,4" Spacing="2">
                               <TextBlock Text="{Binding Name}" FontSize="13" Foreground="#243447" />
                               <TextBlock Text="{Binding Kind}" FontSize="11" Foreground="#687385" />
@@ -753,7 +889,7 @@
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>
-                      <TextBlock IsVisible="{Binding !ListingInspector.HasAssets}"
+                      <TextBlock IsVisible="{Binding !ItemInspector.HasAssets}"
                                  Text="No assets attached yet."
                                  FontSize="12"
                                  Foreground="#7C8797" />
@@ -774,28 +910,28 @@
                                   Spacing="8"
                                   HorizontalAlignment="Left">
                         <Button Content="Archive"
-                                IsVisible="{Binding ListingInspector.CanArchive}"
-                                Command="{Binding ListingInspector.RequestArchiveCommand}"
-                                ToolTip.Tip="Archive this listing without deleting it"
+                                IsVisible="{Binding ItemInspector.CanArchive}"
+                                Command="{Binding RequestArchiveItemCommand}"
+                                ToolTip.Tip="Archive this Item without deleting it"
                                 Classes="storeSecondary" />
                         <Button Content="Restore"
-                                IsVisible="{Binding ListingInspector.CanRestore}"
-                                Command="{Binding ListingInspector.RestoreCommand}"
-                                ToolTip.Tip="Restore this listing to its preserved topic"
+                                IsVisible="{Binding ItemInspector.CanRestore}"
+                                Command="{Binding RestoreItemCommand}"
+                                ToolTip.Tip="Restore this Item to its preserved topic"
                                 Classes="storeSecondary" />
                         <Button Content="Delete…"
-                                IsVisible="{Binding ListingInspector.HasState}"
-                                IsEnabled="{Binding ListingInspector.CanDelete}"
-                                Command="{Binding ListingInspector.RequestDeleteCommand}"
-                                ToolTip.Tip="Permanently delete this listing"
+                                IsVisible="{Binding ItemInspector.HasState}"
+                                IsEnabled="{Binding ItemInspector.CanDelete}"
+                                Command="{Binding RequestDeleteItemCommand}"
+                                ToolTip.Tip="Permanently delete this Item"
                                 Classes="storeSecondary" />
                       </StackPanel>
-                      <Border IsVisible="{Binding ListingInspector.ArchiveConfirmationVisible}"
+                      <Border IsVisible="{Binding ItemInspector.ArchiveConfirmationVisible}"
                               Padding="10"
                               Background="#FFF4E5"
                               CornerRadius="6">
                         <StackPanel Spacing="8">
-                          <TextBlock Text="Archive this listing? It leaves active navigation but stays recoverable."
+                          <TextBlock Text="Archive this Item? It leaves active navigation but stays recoverable."
                                      TextWrapping="Wrap"
                                      FontSize="12"
                                      Foreground="#243447" />
@@ -803,20 +939,20 @@
                                       Spacing="8"
                                       HorizontalAlignment="Left">
                             <Button Content="Archive"
-                                    Command="{Binding ListingInspector.ConfirmArchiveCommand}"
+                                    Command="{Binding ItemInspector.ConfirmArchiveCommand}"
                                     Classes="storeAction" />
                             <Button Content="Cancel"
-                                    Command="{Binding ListingInspector.CancelArchiveCommand}"
+                                    Command="{Binding ItemInspector.CancelArchiveCommand}"
                                     Classes="storeSecondary" />
                           </StackPanel>
                         </StackPanel>
                       </Border>
-                      <Border IsVisible="{Binding ListingInspector.DeleteConfirmationVisible}"
+                      <Border IsVisible="{Binding ItemInspector.DeleteConfirmationVisible}"
                               Padding="10"
                               Background="#FEECEB"
                               CornerRadius="6">
                         <StackPanel Spacing="8">
-                          <TextBlock Text="Permanently delete this listing? Connected creative records will block deletion."
+                          <TextBlock Text="Permanently delete this Item? Connected creative records will block deletion."
                                      TextWrapping="Wrap"
                                      FontSize="12"
                                      Foreground="#243447" />
@@ -824,10 +960,10 @@
                                       Spacing="8"
                                       HorizontalAlignment="Left">
                             <Button Content="Delete permanently"
-                                    Command="{Binding ListingInspector.ConfirmDeleteCommand}"
+                                    Command="{Binding ItemInspector.ConfirmDeleteCommand}"
                                     Classes="storeAction" />
                             <Button Content="Cancel"
-                                    Command="{Binding ListingInspector.CancelDeleteCommand}"
+                                    Command="{Binding ItemInspector.CancelDeleteCommand}"
                                     Classes="storeSecondary" />
                           </StackPanel>
                         </StackPanel>
@@ -835,13 +971,62 @@
                     </StackPanel>
                   </Border>
 
-                  <TextBlock IsVisible="{Binding ListingInspector.HasError}"
-                             Text="{Binding ListingInspector.ErrorMessage}"
+                  <TextBlock IsVisible="{Binding ItemInspector.HasError}"
+                             Text="{Binding ItemInspector.ErrorMessage}"
                              TextWrapping="Wrap"
                              FontSize="12"
                              Foreground="#9A4B43" />
                 </StackPanel>
               </ScrollViewer>
+            </Border>
+
+            <Border IsVisible="{Binding IsUnsavedChangesPromptVisible}"
+                    Padding="12"
+                    Background="#FFF4E5"
+                    BorderBrush="#E5B86A"
+                    BorderThickness="1"
+                    CornerRadius="6">
+              <StackPanel Spacing="8">
+                <TextBlock Text="Save Item changes?"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="{Binding UnsavedChangesPromptMessage}"
+                           TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Save"
+                          Command="{Binding SaveAndContinueCommand}"
+                          Classes="storeAction" />
+                  <Button Content="Discard"
+                          Command="{Binding DiscardAndContinueCommand}"
+                          Classes="storeSecondary" />
+                  <Button x:Name="CancelUnsavedTransitionButton"
+                          Content="Cancel"
+                          Command="{Binding CancelPendingTransitionCommand}"
+                          Classes="storeSecondary" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <Border IsVisible="{Binding IsStatusConfirmationVisible}"
+                    Padding="12"
+                    Background="#FFF4E5"
+                    BorderBrush="#E5B86A"
+                    BorderThickness="1"
+                    CornerRadius="6">
+              <StackPanel Spacing="8">
+                <TextBlock Text="Confirm lifecycle change"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="{Binding StatusConfirmationMessage}"
+                           TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Confirm"
+                          Command="{Binding ConfirmStatusChangeCommand}"
+                          Classes="storeAction" />
+                  <Button x:Name="CancelStatusChangeButton"
+                          Content="Cancel"
+                          Command="{Binding CancelStatusChangeCommand}"
+                          Classes="storeSecondary" />
+                </StackPanel>
+              </StackPanel>
             </Border>
 
             <Border IsVisible="{Binding GroupDetails.HasState}"
@@ -990,7 +1175,7 @@
             </Border>
 
             <Grid ColumnDefinitions="*,Auto,Auto"
-                  IsVisible="{Binding HasActiveListing}"
+                  IsVisible="{Binding HasActiveItem}"
                   Margin="0,4,0,0">
               <TextBlock Grid.Column="0"
                          Text="{Binding StageMoveError}"

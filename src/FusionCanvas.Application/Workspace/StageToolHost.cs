@@ -297,7 +297,7 @@ public static class BuiltInStageTools
         new(
             "built-in-listing-tool",
             "Listing",
-            "Default Listing-stage item tool.",
+            "Default Item-stage item tool.",
             "listing-stage-tool",
             [WorkflowStage.Listing],
             RequiresSelectedItem: true,

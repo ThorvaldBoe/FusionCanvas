@@ -52,11 +52,11 @@ public class WorkspaceFileStorageModelTests
             isArchived: false,
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow,
-            """{"listingId":"draft"}""");
+            """{"itemId":"draft"}""");
 
         Assert.Equal("assets/2026/06/design.png", asset.WorkspaceRelativePath);
         Assert.Equal(@"C:\imports\design.png", asset.OriginalSourcePath);
-        Assert.Equal("""{"listingId":"draft"}""", asset.MetadataJson);
+        Assert.Equal("""{"itemId":"draft"}""", asset.MetadataJson);
         Assert.DoesNotContain(asset.GetType().GetProperties(), property => property.Name.Contains("Bytes", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(asset.GetType().GetProperties(), property => property.Name.Contains("Content", StringComparison.OrdinalIgnoreCase));
     }
@@ -70,7 +70,7 @@ public class WorkspaceFileStorageModelTests
             WorkspaceEntityKind.Store,
             WorkspaceEntityKind.Niche,
             WorkspaceEntityKind.Group,
-            WorkspaceEntityKind.Listing,
+            WorkspaceEntityKind.Item,
             WorkspaceEntityKind.Asset,
             WorkspaceEntityKind.Prompt,
             WorkspaceEntityKind.Design,
@@ -82,8 +82,8 @@ public class WorkspaceFileStorageModelTests
             .ToArray();
 
         Assert.All(links, link => Assert.Equal(assetId, link.AssetId));
-        Assert.Throws<ArgumentException>(() => new AssetLink(Guid.Empty, WorkspaceEntityKind.Listing, Guid.NewGuid()));
-        Assert.Throws<ArgumentException>(() => new AssetLink(assetId, WorkspaceEntityKind.Listing, Guid.Empty));
+        Assert.Throws<ArgumentException>(() => new AssetLink(Guid.Empty, WorkspaceEntityKind.Item, Guid.NewGuid()));
+        Assert.Throws<ArgumentException>(() => new AssetLink(assetId, WorkspaceEntityKind.Item, Guid.Empty));
     }
 
     [Fact]

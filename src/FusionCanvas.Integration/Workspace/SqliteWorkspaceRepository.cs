@@ -6,7 +6,7 @@ namespace FusionCanvas.Integration.Workspace;
 
 public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceRepository
 {
-    private const int CurrentSchemaVersion = 4;
+    private const int CurrentSchemaVersion = 5;
 
     private readonly string _databasePath = databasePath;
 
@@ -20,7 +20,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
 
-        foreach (var table in new[] { "asset_links", "listing_tags", "prompts", "assets", "listings", "groups", "niches", "tags", "stores", "workspaces" })
+        foreach (var table in new[] { "asset_links", "item_tags", "prompts", "assets", "items", "groups", "niches", "tags", "stores", "workspaces" })
         {
             await ExecuteAsync(connection, transaction, $"DELETE FROM {table};", cancellationToken);
         }
@@ -50,9 +50,9 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             await InsertGroupAsync(connection, transaction, group, cancellationToken);
         }
 
-        foreach (var listing in snapshot.Listings)
+        foreach (var listing in snapshot.Items)
         {
-            await InsertListingAsync(connection, transaction, listing, cancellationToken);
+            await InsertItemAsync(connection, transaction, listing, cancellationToken);
         }
 
         foreach (var asset in snapshot.Assets)
@@ -65,9 +65,9 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             await InsertPromptAsync(connection, transaction, prompt, cancellationToken);
         }
 
-        foreach (var listingTag in snapshot.ListingTags)
+        foreach (var listingTag in snapshot.ItemTags)
         {
-            await InsertListingTagAsync(connection, transaction, listingTag, cancellationToken);
+            await InsertItemTagAsync(connection, transaction, listingTag, cancellationToken);
         }
 
         foreach (var assetLink in snapshot.AssetLinks)
@@ -93,11 +93,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             await LoadStoresAsync(connection, cancellationToken),
             await LoadNichesAsync(connection, cancellationToken),
             await LoadGroupsAsync(connection, cancellationToken),
-            await LoadListingsAsync(connection, cancellationToken),
+            await LoadItemsAsync(connection, cancellationToken),
             await LoadAssetsAsync(connection, cancellationToken),
             await LoadPromptsAsync(connection, cancellationToken),
             await LoadTagsAsync(connection, cancellationToken),
-            await LoadListingTagsAsync(connection, cancellationToken),
+            await LoadItemTagsAsync(connection, cancellationToken),
             await LoadAssetLinksAsync(connection, cancellationToken));
     }
 
@@ -178,7 +178,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
                 metadata_json TEXT NOT NULL
             );
 
-            CREATE TABLE IF NOT EXISTS listings (
+            CREATE TABLE IF NOT EXISTS items (
                 id TEXT PRIMARY KEY,
                 store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
                 niche_id TEXT NULL REFERENCES niches(id) ON DELETE SET NULL,
@@ -211,7 +211,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             CREATE TABLE IF NOT EXISTS prompts (
                 id TEXT PRIMARY KEY,
                 store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-                listing_id TEXT NULL REFERENCES listings(id) ON DELETE SET NULL,
+                item_id TEXT NULL REFERENCES items(id) ON DELETE SET NULL,
                 name TEXT NOT NULL,
                 description TEXT NULL,
                 text TEXT NOT NULL,
@@ -221,10 +221,10 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
                 metadata_json TEXT NOT NULL
             );
 
-            CREATE TABLE IF NOT EXISTS listing_tags (
-                listing_id TEXT NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+            CREATE TABLE IF NOT EXISTS item_tags (
+                item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
                 tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
-                PRIMARY KEY (listing_id, tag_id)
+                PRIMARY KEY (item_id, tag_id)
             );
 
             CREATE TABLE IF NOT EXISTS asset_links (
@@ -249,6 +249,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         if (schemaVersion < 4)
         {
             await MigrateToVersion4Async(connection, cancellationToken);
+        }
+
+        if (schemaVersion < 5)
+        {
+            await MigrateToVersion5Async(connection, cancellationToken);
         }
 
         await SetPragmaUserVersionAsync(connection, CurrentSchemaVersion, cancellationToken);
@@ -321,14 +326,19 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             await ExecuteAsync(connection, null, "ALTER TABLE tags ADD COLUMN color TEXT NULL;", cancellationToken);
         }
 
+        if (!await TableExistsAsync(connection, "listings", cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
         if (!await ColumnExistsAsync(connection, "listings", "workflow_stage", cancellationToken).ConfigureAwait(false))
         {
             await ExecuteAsync(connection, null, "ALTER TABLE listings ADD COLUMN workflow_stage INTEGER NOT NULL DEFAULT 0;", cancellationToken);
         }
 
-        // Old ListingStatus ints: Active=0, Draft=1, Ready=2, Published=3, Archived=4.
-        // New ListingStatus ints: Draft=0, Published=1, Paused=2, Rejected=3.
-        // WorkflowStage ints: Idea=0, Concept=1, Design=2, Listing=3.
+        // Old ItemStatus ints: Active=0, Draft=1, Ready=2, Published=3, Archived=4.
+        // New ItemStatus ints: Draft=0, Published=1, Paused=2, Rejected=3.
+        // WorkflowStage ints: Idea=0, Concept=1, Design=2, Item=3.
         // Translation never invents published state; stage is backfilled from the pre-v4 derivation;
         // and archived-valued rows are folded onto the archive flag.
         await ExecuteAsync(connection, null, """
@@ -355,6 +365,125 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
                 END;
             """, cancellationToken);
     }
+
+    private static async Task MigrateToVersion5Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        if (!await TableExistsAsync(connection, "listings", cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await ExecuteAsync(connection, transaction, """
+                CREATE TABLE IF NOT EXISTS items (
+                    id TEXT PRIMARY KEY,
+                    store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                    niche_id TEXT NULL REFERENCES niches(id) ON DELETE SET NULL,
+                    group_id TEXT NULL REFERENCES groups(id) ON DELETE SET NULL,
+                    name TEXT NOT NULL,
+                    description TEXT NULL,
+                    status INTEGER NOT NULL,
+                    workflow_stage INTEGER NOT NULL DEFAULT 0,
+                    is_archived INTEGER NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS item_tags (
+                    item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                    tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+                    PRIMARY KEY (item_id, tag_id)
+                );
+                CREATE TABLE prompts_v5 (
+                    id TEXT PRIMARY KEY,
+                    store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                    item_id TEXT NULL REFERENCES items(id) ON DELETE SET NULL,
+                    name TEXT NOT NULL,
+                    description TEXT NULL,
+                    text TEXT NOT NULL,
+                    is_archived INTEGER NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL
+                );
+                """, cancellationToken);
+
+            await ExecuteAsync(connection, transaction, """
+                INSERT INTO items (id, store_id, niche_id, group_id, name, description, status, workflow_stage, is_archived, created_at, updated_at, metadata_json)
+                SELECT id, store_id, niche_id, group_id, name, description, status, workflow_stage, is_archived, created_at, updated_at, metadata_json FROM listings;
+                """, cancellationToken);
+
+            await ExecuteAsync(connection, transaction, """
+                INSERT INTO item_tags (item_id, tag_id)
+                SELECT listing_id, tag_id FROM listing_tags;
+                """, cancellationToken);
+
+            await ExecuteAsync(connection, transaction, """
+                INSERT INTO prompts_v5 (id, store_id, item_id, name, description, text, is_archived, created_at, updated_at, metadata_json)
+                SELECT id, store_id, listing_id, name, description, text, is_archived, created_at, updated_at, metadata_json FROM prompts;
+                """, cancellationToken);
+
+            await VerifyRowCountEqualAsync(connection, transaction, "listings", "items", cancellationToken);
+            await VerifyRowCountEqualAsync(connection, transaction, "listing_tags", "item_tags", cancellationToken);
+            await VerifyRowCountEqualAsync(connection, transaction, "prompts", "prompts_v5", cancellationToken);
+            await VerifyForeignKeyIntegrityAsync(connection, transaction, cancellationToken);
+
+            await ExecuteAsync(connection, transaction, "DROP TABLE listing_tags;", cancellationToken);
+            await ExecuteAsync(connection, transaction, "DROP TABLE prompts;", cancellationToken);
+            await ExecuteAsync(connection, transaction, "DROP TABLE listings;", cancellationToken);
+            await ExecuteAsync(connection, transaction, "ALTER TABLE prompts_v5 RENAME TO prompts;", cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw new InvalidOperationException(
+                "The workspace database could not be upgraded from schema version 4 to 5. Restore a backup or use an older FusionCanvas version.");
+        }
+    }
+
+    private static async Task<bool> TableExistsAsync(SqliteConnection connection, string tableName, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT name FROM sqlite_master WHERE type = 'table' AND name = $name;";
+        command.Parameters.AddWithValue("$name", tableName);
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        return result is not null;
+    }
+
+    private static async Task VerifyRowCountEqualAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, string sourceTable, string destinationTable, CancellationToken cancellationToken)
+    {
+        var sourceCount = await ReadScalarIntAsync(connection, transaction, $"SELECT COUNT(*) FROM {sourceTable};", cancellationToken);
+        var destinationCount = await ReadScalarIntAsync(connection, transaction, $"SELECT COUNT(*) FROM {destinationTable};", cancellationToken);
+        if (sourceCount != destinationCount)
+        {
+            throw new InvalidOperationException($"Migration row-count verification failed: {sourceTable} has {sourceCount} rows but {destinationTable} has {destinationCount} rows.");
+        }
+    }
+
+    private static async Task VerifyForeignKeyIntegrityAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction?)transaction;
+        command.CommandText = "PRAGMA foreign_key_check;";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (await reader.ReadAsync(cancellationToken))
+        {
+            throw new InvalidOperationException("Migration foreign-key verification failed; the database has referential integrity violations.");
+        }
+    }
+
+    private static async Task<int> ReadScalarIntAsync(SqliteConnection connection, System.Data.Common.DbTransaction? transaction, string sql, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction?)transaction;
+        command.CommandText = sql;
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken));
+    }
+
 
     private static async Task<bool> ColumnExistsAsync(
         SqliteConnection connection,
@@ -465,9 +594,9 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         return ordered;
     }
 
-    private static Task InsertListingAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Listing listing, CancellationToken cancellationToken) =>
+    private static Task InsertItemAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Item listing, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
-            INSERT INTO listings (id, store_id, niche_id, group_id, name, description, status, workflow_stage, is_archived, created_at, updated_at, metadata_json)
+            INSERT INTO items (id, store_id, niche_id, group_id, name, description, status, workflow_stage, is_archived, created_at, updated_at, metadata_json)
             VALUES ($id, $store_id, $niche_id, $group_id, $name, $description, $status, $workflow_stage, $is_archived, $created_at, $updated_at, $metadata_json);
             """, cancellationToken, [.. CommonParameters(listing), ("$store_id", listing.StoreId.ToString()), ("$niche_id", listing.NicheId?.ToString()), ("$group_id", listing.GroupId?.ToString()), ("$status", (int)listing.Status), ("$workflow_stage", (int)listing.Stage)]);
 
@@ -479,12 +608,12 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
 
     private static Task InsertPromptAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Prompt prompt, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
-            INSERT INTO prompts (id, store_id, listing_id, name, description, text, is_archived, created_at, updated_at, metadata_json)
-            VALUES ($id, $store_id, $listing_id, $name, $description, $text, $is_archived, $created_at, $updated_at, $metadata_json);
-            """, cancellationToken, [.. CommonParameters(prompt), ("$store_id", prompt.StoreId.ToString()), ("$listing_id", prompt.ListingId?.ToString()), ("$text", prompt.Text)]);
+            INSERT INTO prompts (id, store_id, item_id, name, description, text, is_archived, created_at, updated_at, metadata_json)
+            VALUES ($id, $store_id, $item_id, $name, $description, $text, $is_archived, $created_at, $updated_at, $metadata_json);
+            """, cancellationToken, [.. CommonParameters(prompt), ("$store_id", prompt.StoreId.ToString()), ("$item_id", prompt.ItemId?.ToString()), ("$text", prompt.Text)]);
 
-    private static Task InsertListingTagAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, ListingTag listingTag, CancellationToken cancellationToken) =>
-        ExecuteAsync(connection, transaction, "INSERT INTO listing_tags (listing_id, tag_id) VALUES ($listing_id, $tag_id);", cancellationToken, ("$listing_id", listingTag.ListingId.ToString()), ("$tag_id", listingTag.TagId.ToString()));
+    private static Task InsertItemTagAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, ItemTag listingTag, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, "INSERT INTO item_tags (item_id, tag_id) VALUES ($item_id, $tag_id);", cancellationToken, ("$item_id", listingTag.ItemId.ToString()), ("$tag_id", listingTag.TagId.ToString()));
 
     private static Task InsertAssetLinkAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, AssetLink assetLink, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, "INSERT INTO asset_links (asset_id, entity_kind, entity_id) VALUES ($asset_id, $entity_kind, $entity_id);", cancellationToken, ("$asset_id", assetLink.AssetId.ToString()), ("$entity_kind", (int)assetLink.EntityKind), ("$entity_id", assetLink.EntityId.ToString()));
@@ -555,12 +684,12 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         return groups;
     }
 
-    private static async Task<IReadOnlyList<Listing>> LoadListingsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    private static async Task<IReadOnlyList<Item>> LoadItemsAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
-        var listings = new List<Listing>();
-        await foreach (var reader in ReadAsync(connection, "SELECT * FROM listings ORDER BY name;", cancellationToken))
+        var listings = new List<Item>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM items ORDER BY name;", cancellationToken))
         {
-            listings.Add(new Listing(ReadGuid(reader, "id"), ReadGuid(reader, "store_id"), ReadNullableGuid(reader, "niche_id"), ReadNullableGuid(reader, "group_id"), ReadString(reader, "name"), ReadNullableString(reader, "description"), (ListingStatus)ReadInt(reader, "status"), (WorkflowStage)ReadInt(reader, "workflow_stage"), ReadBool(reader, "is_archived"), ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json")));
+            listings.Add(new Item(ReadGuid(reader, "id"), ReadGuid(reader, "store_id"), ReadNullableGuid(reader, "niche_id"), ReadNullableGuid(reader, "group_id"), ReadString(reader, "name"), ReadNullableString(reader, "description"), (ItemStatus)ReadInt(reader, "status"), (WorkflowStage)ReadInt(reader, "workflow_stage"), ReadBool(reader, "is_archived"), ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json")));
         }
 
         return listings;
@@ -582,18 +711,18 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         var prompts = new List<Prompt>();
         await foreach (var reader in ReadAsync(connection, "SELECT * FROM prompts ORDER BY name;", cancellationToken))
         {
-            prompts.Add(new Prompt(ReadGuid(reader, "id"), ReadGuid(reader, "store_id"), ReadNullableGuid(reader, "listing_id"), ReadString(reader, "name"), ReadNullableString(reader, "description"), ReadString(reader, "text"), ReadBool(reader, "is_archived"), ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json")));
+            prompts.Add(new Prompt(ReadGuid(reader, "id"), ReadGuid(reader, "store_id"), ReadNullableGuid(reader, "item_id"), ReadString(reader, "name"), ReadNullableString(reader, "description"), ReadString(reader, "text"), ReadBool(reader, "is_archived"), ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json")));
         }
 
         return prompts;
     }
 
-    private static async Task<IReadOnlyList<ListingTag>> LoadListingTagsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    private static async Task<IReadOnlyList<ItemTag>> LoadItemTagsAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
-        var listingTags = new List<ListingTag>();
-        await foreach (var reader in ReadAsync(connection, "SELECT * FROM listing_tags;", cancellationToken))
+        var listingTags = new List<ItemTag>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM item_tags;", cancellationToken))
         {
-            listingTags.Add(new ListingTag(ReadGuid(reader, "listing_id"), ReadGuid(reader, "tag_id")));
+            listingTags.Add(new ItemTag(ReadGuid(reader, "item_id"), ReadGuid(reader, "tag_id")));
         }
 
         return listingTags;

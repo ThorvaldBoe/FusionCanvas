@@ -30,17 +30,17 @@ public class NavigationTreeViewModelTests
         var storeId = Guid.NewGuid();
         var nicheId = Guid.NewGuid();
         var groupId = Guid.NewGuid();
-        var listingId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
         var state = new NavigationTreePresentationState();
 
-        state.RevealPath([storeId, nicheId, groupId, listingId]);
+        state.RevealPath([storeId, nicheId, groupId, itemId]);
 
         Assert.True(state.IsExpanded(storeId));
         Assert.True(state.IsExpanded(nicheId));
         Assert.True(state.IsExpanded(groupId));
-        Assert.False(state.IsExpanded(listingId));
-        Assert.Equal(listingId, state.RevealedNodeId);
-        Assert.Equal(listingId, state.SelectedNodeId);
+        Assert.False(state.IsExpanded(itemId));
+        Assert.Equal(itemId, state.RevealedNodeId);
+        Assert.Equal(itemId, state.SelectedNodeId);
     }
 
     [Fact]
@@ -65,10 +65,10 @@ public class NavigationTreeViewModelTests
         var sample = NavigationSample.Create();
         var viewModel = new NavigationTreeViewModel(sample.Snapshot, new WorkspaceNavigationService());
 
-        viewModel.Select(new NavigationTarget(NavigationTargetKind.Listing, WorkspaceEntityKind.Listing, sample.Listing.Id));
+        viewModel.Select(new NavigationTarget(NavigationTargetKind.Item, WorkspaceEntityKind.Item, sample.Item.Id));
 
-        Assert.Equal(sample.Listing.Id, viewModel.ActiveTarget?.EntityId);
-        Assert.Equal(sample.Listing.Id, viewModel.PresentationState.SelectedNodeId);
+        Assert.Equal(sample.Item.Id, viewModel.ActiveTarget?.EntityId);
+        Assert.Equal(sample.Item.Id, viewModel.PresentationState.SelectedNodeId);
     }
 
     [Fact]
@@ -77,12 +77,12 @@ public class NavigationTreeViewModelTests
         var sample = NavigationSample.Create();
         var viewModel = new NavigationTreeViewModel(sample.Snapshot, new WorkspaceNavigationService());
 
-        viewModel.Reveal(new NavigationTarget(NavigationTargetKind.Listing, WorkspaceEntityKind.Listing, sample.Listing.Id));
+        viewModel.Reveal(new NavigationTarget(NavigationTargetKind.Item, WorkspaceEntityKind.Item, sample.Item.Id));
 
         Assert.True(viewModel.PresentationState.IsExpanded(sample.Store.Id));
         Assert.True(viewModel.PresentationState.IsExpanded(sample.Niche.Id));
         Assert.True(viewModel.PresentationState.IsExpanded(sample.Group.Id));
-        Assert.Equal(sample.Listing.Id, viewModel.PresentationState.RevealedNodeId);
+        Assert.Equal(sample.Item.Id, viewModel.PresentationState.RevealedNodeId);
     }
 
     [Fact]
@@ -93,12 +93,12 @@ public class NavigationTreeViewModelTests
         var snapshot = sample.Snapshot with { Niches = [.. sample.Snapshot.Niches, otherNiche] };
         var viewModel = new NavigationTreeViewModel(snapshot, new WorkspaceNavigationService());
 
-        viewModel.MoveListing(sample.Listing.Id, new NavigationTopicReference(WorkspaceEntityKind.Niche, otherNiche.Id));
-        viewModel.Reveal(new NavigationTarget(NavigationTargetKind.Listing, WorkspaceEntityKind.Listing, sample.Listing.Id));
+        viewModel.MoveItem(sample.Item.Id, new NavigationTopicReference(WorkspaceEntityKind.Niche, otherNiche.Id));
+        viewModel.Reveal(new NavigationTarget(NavigationTargetKind.Item, WorkspaceEntityKind.Item, sample.Item.Id));
 
         Assert.True(viewModel.PresentationState.IsExpanded(sample.Store.Id));
         Assert.True(viewModel.PresentationState.IsExpanded(otherNiche.Id));
-        Assert.Equal(sample.Listing.Id, viewModel.PresentationState.RevealedNodeId);
+        Assert.Equal(sample.Item.Id, viewModel.PresentationState.RevealedNodeId);
         var appTypeNames = typeof(NavigationTreeViewModel).Assembly.GetTypes().Select(type => type.Name).ToArray();
         Assert.DoesNotContain("SavedView", appTypeNames);
         Assert.DoesNotContain("BatchOperation", appTypeNames);
@@ -110,7 +110,7 @@ public class NavigationTreeViewModelTests
     private static Niche NewNiche(Guid storeId, string name) =>
         new(Guid.NewGuid(), storeId, name, null, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "{}");
 
-    private sealed record NavigationSample(WorkspaceSnapshot Snapshot, Store Store, Niche Niche, TopicGroup Group, Listing Listing)
+    private sealed record NavigationSample(WorkspaceSnapshot Snapshot, Store Store, Niche Niche, TopicGroup Group, Item Item)
     {
         public static NavigationSample Create()
         {
@@ -118,7 +118,7 @@ public class NavigationTreeViewModelTests
             var store = new Store(Guid.NewGuid(), "North Star Studio", null, false, now, now, "{}");
             var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, "{}");
             var group = new TopicGroup(Guid.NewGuid(), store.Id, niche.Id, null, "Seasonal", null, false, now, now, "{}");
-            var listing = new Listing(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Pumpkin espresso", null, ListingStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+            var listing = new Item(Guid.NewGuid(), store.Id, niche.Id, group.Id, "Pumpkin espresso", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
 
             return new NavigationSample(
                 new WorkspaceSnapshot([store], [niche], [group], [listing], [], [], [], [], []),

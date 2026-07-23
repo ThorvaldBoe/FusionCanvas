@@ -210,6 +210,16 @@ public sealed class DocumentWindowViewModel : INotifyPropertyChanged
         return tab;
     }
 
+    public DocumentTabViewModel OpenAdditional(DocumentContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var tab = new DocumentTabViewModel(Guid.NewGuid(), context);
+        Tabs.Add(tab);
+        SelectTab(tab);
+        OnPropertyChanged(nameof(HasOpenTabs));
+        return tab;
+    }
+
     public DocumentTabViewModel OpenOrReplaceActive(DocumentContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -241,6 +251,23 @@ public sealed class DocumentWindowViewModel : INotifyPropertyChanged
 
         ActiveTab.ReplaceContext(context);
         OnActiveTabChanged();
+    }
+
+    public void RefreshContexts(Guid entityId, WorkspaceEntityKind entityKind, DocumentContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var activeChanged = false;
+        foreach (var tab in Tabs.Where(tab =>
+                     tab.Context.Id == entityId && tab.Context.EntityKind == entityKind))
+        {
+            tab.ReplaceContext(context);
+            activeChanged |= ReferenceEquals(tab, ActiveTab);
+        }
+
+        if (activeChanged)
+        {
+            OnActiveTabChanged();
+        }
     }
 
     public void SelectTab(DocumentTabViewModel tab)
