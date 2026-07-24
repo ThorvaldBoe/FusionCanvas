@@ -58,7 +58,7 @@ Same as the prior two changes: clean break. The Integration adapters are constru
 
 ## Migration Plan
 
-This is a code-internal refactor with no persistence or runtime migration. Deployment is a single pull request landing after the Domain and Application changes; there is no runtime state to migrate and no rollback beyond reverting the commit.
+This is a code-internal refactor with no persistence or runtime migration. Deployment is a single pull request landing after the Domain and Application changes; there is no runtime state to migrate and no rollback beyond reverting the commit. All projects use SDK-style implicit globbing, so moving files requires no `.csproj` edits.
 
 ### Implementation Plan (sequenced by folder, each step ends with green build + tests)
 
