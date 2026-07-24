@@ -4,7 +4,7 @@ using System.Windows.Input;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.Application.Settings;
-using FusionCanvas.Application.Workspace;
+using FusionCanvas.Application.Workspaces;
 
 namespace FusionCanvas.App.Settings;
 

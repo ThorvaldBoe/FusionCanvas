@@ -1,6 +1,6 @@
-﻿using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Navigation;
+using FusionCanvas.Application.Navigation;
 
 namespace FusionCanvas.App.Navigation;
 

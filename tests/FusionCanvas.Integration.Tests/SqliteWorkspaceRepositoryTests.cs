@@ -1,4 +1,3 @@
-﻿using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Prompts;
@@ -10,6 +9,7 @@ using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Integration.Workspace;
 using Microsoft.Data.Sqlite;
+using FusionCanvas.Application.Groups;
 
 namespace FusionCanvas.Integration.Tests;
 

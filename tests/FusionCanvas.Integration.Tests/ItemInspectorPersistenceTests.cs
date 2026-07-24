@@ -1,12 +1,12 @@
-﻿using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
-using FusionCanvas.Domain.Tags;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Integration.Workspace;
 using Microsoft.Data.Sqlite;
+using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.Items;
 
 namespace FusionCanvas.Integration.Tests;
 

@@ -7,7 +7,9 @@
         xmlns:stageTools="clr-namespace:FusionCanvas.App.StageTools"
         xmlns:workspace="clr-namespace:FusionCanvas.App.Workspace"
         xmlns:views="clr-namespace:FusionCanvas.App.Views"
-        xmlns:workflow="clr-namespace:FusionCanvas.Application.Workspace;assembly=FusionCanvas.Application"
+        xmlns:appWorkflowNav="clr-namespace:FusionCanvas.Application.WorkflowNavigation;assembly=FusionCanvas.Application"
+        xmlns:appItems="clr-namespace:FusionCanvas.Application.Items;assembly=FusionCanvas.Application"
+        xmlns:appGroups="clr-namespace:FusionCanvas.Application.Groups;assembly=FusionCanvas.Application"
         x:Class="FusionCanvas.App.Views.MainWindow"
         x:DataType="views:MainWindowViewModel"
         KeyDown="OnWindowKeyDown"
@@ -422,7 +424,7 @@
               </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="workflow:WorkflowStageNavigatorEntry">
+              <DataTemplate x:DataType="appWorkflowNav:WorkflowStageNavigatorEntry">
                 <Button Content="{Binding Label}"
                         IsEnabled="{Binding CanNavigate}"
                         Command="{Binding $parent[ItemsControl].DataContext.SelectWorkflowStageCommand}"
@@ -876,7 +878,7 @@
                                  Foreground="{DynamicResource StrongTextBrush}" />
                       <ItemsControl ItemsSource="{Binding ItemInspector.Assets}">
                         <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="workflow:ItemInspectorAssetEntry">
+                          <DataTemplate x:DataType="appItems:ItemInspectorAssetEntry">
                             <StackPanel Margin="0,0,0,4" Spacing="2">
                               <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{DynamicResource StrongTextBrush}" />
                               <TextBlock Text="{Binding Kind}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -1071,7 +1073,7 @@
                                 SelectedItem="{Binding GroupDetails.SelectedDestination}"
                                 IsEnabled="{Binding GroupDetails.CanEdit}">
                         <ComboBox.ItemTemplate>
-                          <DataTemplate x:DataType="workflow:GroupDestination">
+                          <DataTemplate x:DataType="appGroups:GroupDestination">
                             <TextBlock Text="{Binding DisplayPath}" TextTrimming="CharacterEllipsis" />
                           </DataTemplate>
                         </ComboBox.ItemTemplate>

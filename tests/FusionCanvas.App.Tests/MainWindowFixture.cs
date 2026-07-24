@@ -1,16 +1,8 @@
-﻿using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
-using Avalonia.Headless.XUnit;
-using Avalonia.Input;
-using Avalonia.Input.TextInput;
-using Avalonia.LogicalTree;
+﻿using Avalonia.Controls;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Views;
 using FusionCanvas.Domain.Workspace;
-using FusionCanvas.Domain.Items;
-using FusionCanvas.Domain.Niches;
 
 namespace FusionCanvas.App.Tests;
 

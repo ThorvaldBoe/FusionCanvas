@@ -1,6 +1,10 @@
-using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Integration.Workspace;
+using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.Groups;
+using FusionCanvas.Application.Items;
+using FusionCanvas.Application.Assets;
+using FusionCanvas.Application.Tags;
 
 namespace FusionCanvas.App.Workspace;
 
