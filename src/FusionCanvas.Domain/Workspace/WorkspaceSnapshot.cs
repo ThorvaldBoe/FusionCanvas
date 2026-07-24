@@ -1,3 +1,11 @@
+﻿using FusionCanvas.Domain.Stores;
+using FusionCanvas.Domain.Niches;
+using FusionCanvas.Domain.Groups;
+using FusionCanvas.Domain.Items;
+using FusionCanvas.Domain.Tags;
+using FusionCanvas.Domain.Assets;
+using FusionCanvas.Domain.Prompts;
+
 namespace FusionCanvas.Domain.Workspace;
 
 public sealed record WorkspaceSnapshot(
