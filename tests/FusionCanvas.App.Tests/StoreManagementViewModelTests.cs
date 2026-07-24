@@ -494,14 +494,14 @@ public class StoreManagementViewModelTests
         var firstItem = new Item(Guid.NewGuid(), first.Id, firstNiche.Id, null, "Espresso", null, ItemStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var secondItem = new Item(Guid.NewGuid(), second.Id, secondNiche.Id, null, "Whiskers", null, ItemStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var snapshot = new WorkspaceSnapshot([first, second], [firstNiche, secondNiche], [], [firstItem, secondItem], [], [], [], [], []);
-        var storeService = new StoreManagementService(new InMemoryWorkspaceRepository(snapshot));
+        var repository = new InMemoryWorkspaceRepository(snapshot);
 
         var viewModel = new MainWindowViewModel(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
             new DocumentWindowViewModel(),
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            storeService,
+            repository,
             snapshot);
 
         Assert.Contains(viewModel.NavigationContexts, context => context.Context.Id == firstItem.Id);

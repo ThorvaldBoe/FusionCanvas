@@ -106,7 +106,7 @@ The baseline test suite uses mirrored test projects under `tests/`:
 * `FusionCanvas.Integration.Tests` protects local persistence and workspace file boundaries with isolated temporary resources.
 * `FusionCanvas.App.Tests` protects UI-owned state and navigation decisions and is the intended home for focused Avalonia headless view tests.
 
-New behavior should include focused automated tests in the relevant layer. Use framework-free tests for UI decision logic and Avalonia headless tests for meaningful view construction, binding, control-state, input, focus, selection, or visual-tree behavior. Static markup, full live-desktop automation, visual regression infrastructure, performance benchmarking, marketplace integration access, and AI provider access remain outside the routine baseline. The headless harness has not been added yet; current app tests cover view models and coordination rather than instantiated views.
+New behavior should include focused automated tests in the relevant layer. Use framework-free tests for UI decision logic and Avalonia headless tests for meaningful view construction, binding, control-state, input, focus, selection, or visual-tree behavior. The `FusionCanvas.App.Tests` project includes an Avalonia headless harness (`HeadlessTestApp`) and representative view tests covering `MainWindow` construction, compiled bindings, control state, and visual-tree behavior. Static markup, full live-desktop automation, visual regression infrastructure, performance benchmarking, marketplace integration access, and AI provider access remain outside the routine baseline.
 
 ## Project Status
 

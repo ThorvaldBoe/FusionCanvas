@@ -375,7 +375,7 @@ Priority should be given to testing:
 
 Use Avalonia headless tests when view construction, bindings, control state, routed input, focus, selection, or visual-tree behavior carries meaningful risk. Avoid superficial tests of static markup or framework implementation details. These tests belong in `dotnet test .\FusionCanvas.sln` and must run consistently under Codex, OpenCode, CI, and normal contributor environments.
 
-FusionCanvas does not yet have an Avalonia headless package, harness, or view tests; the current `FusionCanvas.App.Tests` project covers view models, commands, navigation state, and UI coordination only. Establishing the harness and representative view coverage is follow-up work.
+The `FusionCanvas.App.Tests` project includes an Avalonia headless harness (`HeadlessTestApp`) and representative view tests (`MainWindowLayoutTests`) covering `MainWindow` construction, compiled bindings, control state, and visual-tree behavior. View-model, command, and navigation tests remain framework-free. Additional headless view coverage should be added as meaningful framework behavior is introduced.
 
 Live desktop testing is optional and ad hoc. It can supplement deterministic evidence for native-window behavior, operating-system input, assistive-technology exposure, platform integration, visual judgment, or difficult interaction defects. Any mutating live check uses a disposable workspace or database and never becomes a standing module-completion or QA requirement.
 

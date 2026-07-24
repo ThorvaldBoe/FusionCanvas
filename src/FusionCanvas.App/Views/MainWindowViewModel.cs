@@ -11,6 +11,7 @@ using FusionCanvas.App.Workflow;
 using FusionCanvas.Application.Settings;
 using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Integration.Workspace;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
@@ -23,12 +24,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ItemStatuses.Ordered.ToDictionary(
             status => status,
             status => new ItemStatusOptionViewModel(status, status.ToString()));
-    private static readonly Guid StoreNodeId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-    private static readonly Guid NicheNodeId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
-    private static readonly Guid TopicNodeId = Guid.Parse("99999999-9999-9999-9999-999999999999");
-    private static readonly Guid IdeaNodeId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
-    private static readonly Guid DesignNodeId = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
-    private static readonly Guid ListingNodeId = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
 
     private readonly IToolContextResolver _toolContextResolver;
     private readonly IStageToolHostService _stageToolHostService;
@@ -43,22 +38,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private bool _isDesignRemoveConfirmationVisible;
     private WorkspaceSnapshot _workspaceSnapshot;
     private IReadOnlyList<NavigationDocumentContext> _navigationContexts = [];
-
-    public MainWindowViewModel()
-        : this(CreateSampleWorkspace())
-    {
-    }
-
-    private MainWindowViewModel(WorkspaceSnapshot sampleWorkspace)
-        : this(
-            new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
-            new DocumentWindowViewModel(),
-            new ToolContextResolver(),
-            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            new InMemoryWorkspaceRepository(sampleWorkspace),
-            sampleWorkspace)
-    {
-    }
 
     public static MainWindowViewModel CreateForDefaultWorkspace(SettingsViewModel? settings = null) =>
         new(
@@ -91,113 +70,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.TagManagement,
             settings)
     {
-    }
-
-    public MainWindowViewModel(
-        WorkflowStageNavigatorViewModel workflowNavigator,
-        DocumentWindowViewModel documentWindow)
-        : this(
-            workflowNavigator,
-            documentWindow,
-            new ToolContextResolver(),
-            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            new InMemoryWorkspaceRepository(CreateSampleWorkspace()),
-            CreateSampleWorkspace())
-    {
-    }
-
-    public MainWindowViewModel(
-        WorkflowStageNavigatorViewModel workflowNavigator,
-        DocumentWindowViewModel documentWindow,
-        IToolContextResolver toolContextResolver,
-        IStageToolHostService stageToolHostService,
-        IStoreManagementService storeManagementService,
-        WorkspaceSnapshot workspaceSnapshot)
-        : this(
-            workflowNavigator,
-            documentWindow,
-            toolContextResolver,
-            stageToolHostService,
-            storeManagementService,
-            null,
-            workspaceSnapshot)
-    {
-    }
-
-    public MainWindowViewModel(
-        WorkflowStageNavigatorViewModel workflowNavigator,
-        DocumentWindowViewModel documentWindow,
-        IToolContextResolver toolContextResolver,
-        IStageToolHostService stageToolHostService,
-        IStoreManagementService storeManagementService,
-        INicheManagementService? nicheManagementService,
-        WorkspaceSnapshot workspaceSnapshot)
-    {
-        var treeRepository = new InMemoryWorkspaceRepository(workspaceSnapshot);
-        WorkflowNavigator = workflowNavigator;
-        DocumentWindow = documentWindow;
-        WorkspaceManagement = new WorkspaceManagementViewModel(new WorkspaceManagementService(new InMemoryWorkspaceRepository(workspaceSnapshot)));
-        Settings = CreateSettings(null);
-        StoreManagement = new StoreManagementViewModel(storeManagementService, nicheManagementService);
-        _workspaceRepository = treeRepository;
-        _groupManagementService = new GroupManagementService(treeRepository);
-        _itemManagementService = new ItemManagementService(treeRepository);
-        _tagManagementService = new TagManagementService(treeRepository);
-        var fileStore = new InMemoryWorkspaceFileStore();
-        _assetManagementService = new AssetManagementService(treeRepository, fileStore);
-        _itemInspectorService = new ItemInspectorService(treeRepository);
-        GroupDetails = new GroupDetailsViewModel(_groupManagementService);
-        AssetsManagement = new AssetsViewModel(_assetManagementService);
-        ItemInspector = new ItemInspectorViewModel(_itemInspectorService, _itemManagementService, _tagManagementService);
-        DesignTool = new DesignStageToolViewModel(new DesignFileService(treeRepository, fileStore));
-        ListingTool = new ListingStageToolViewModel();
-        _toolContextResolver = toolContextResolver;
-        _stageToolHostService = stageToolHostService;
-        _workspaceSnapshot = workspaceSnapshot;
-        NavigationState = new NavigationTreePresentationState();
-        WorkspaceTree = new WorkspaceTreeViewModel(treeRepository, _groupManagementService, workspaceSnapshot, items: _itemManagementService);
-        OpenNavigationContextCommand = new RelayCommand(parameter =>
-        {
-            if (parameter is NavigationDocumentContext navigationContext)
-            {
-                OpenFromNavigation(navigationContext);
-            }
-        });
-        SelectWorkflowStageCommand = new RelayCommand(parameter =>
-        {
-            if (parameter is WorkflowStage stage)
-            {
-                SelectWorkflowStage(stage);
-            }
-        });
-        RequestSelectTabCommand = new RelayCommand(parameter =>
-        {
-            if (parameter is DocumentTabViewModel tab)
-            {
-                HandleSelectTabRequest(tab);
-            }
-        });
-        RequestCloseTabCommand = new RelayCommand(parameter =>
-        {
-            if (parameter is DocumentTabViewModel tab)
-            {
-                HandleCloseTabRequest(tab);
-            }
-        });
-        InitializeItemCommands();
-        InitializeGroupIntegration();
-        StoreManagement.ActiveStoreChanged += (_, store) => RebuildNavigationContexts(store);
-        StoreManagement.WorkspaceStructureChanged += (_, _) => RefreshWorkspaceSnapshot();
-        WorkspaceManagement.ActiveWorkspaceChanged += (_, workspace) => SwitchWorkspace(workspace);
-        SubscribeToWorkspacePromptState();
-        InitializeWorkspaces();
-        InitializeStores();
-        AssetsManagement.WorkspaceStructureChanged += (_, _) => RefreshWorkspaceSnapshot();
-        WorkspaceTree.ManageAssetsRequested += (_, selection) => Run(OpenManageAssetsAsync(selection));
-        DocumentWindow.ActiveContextChanged += (_, context) => CoordinateActiveContext(context);
-        DocumentWindow.ToolScopeChangeRequested += (_, scope) => ResolveActiveToolContext(scope);
-        DocumentWindow.StageToolSelectionRequested += (_, toolId) => SelectStageTool(toolId);
-        ItemInspector.Saved += (_, _) => HandleInspectorSaved();
     }
 
     public MainWindowViewModel(
@@ -1374,28 +1246,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 entityKind));
     }
 
-    private static WorkspaceSnapshot CreateSampleWorkspace()
-    {
-        var now = DateTimeOffset.UtcNow;
-        var store = new Store(StoreNodeId, "North Star Studio", null, false, now, now, """{"brand":"North Star"}""");
-        var niche = new Niche(NicheNodeId, store.Id, "Coffee", null, false, now, now, """{"tone":"warm"}""");
-        var topic = new TopicGroup(TopicNodeId, store.Id, niche.Id, null, "Dogs and coffee", null, false, now, now, """{"humor":"gentle"}""");
-        var idea = new Item(IdeaNodeId, store.Id, niche.Id, topic.Id, "Morning coffee idea", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, """{"phrase":"But first, walkies"}""");
-        var design = new Item(DesignNodeId, store.Id, niche.Id, topic.Id, "Retro mug design", null, ItemStatus.Draft, WorkflowStage.Design, false, now, now, "{}");
-        var item = new Item(ListingNodeId, store.Id, niche.Id, topic.Id, "Espresso listing draft", null, ItemStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
-
-        return new WorkspaceSnapshot(
-            [store],
-            [niche],
-            [topic],
-            [idea, design, item],
-            [],
-            [],
-            [],
-            [],
-            []);
-    }
-
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
@@ -1409,48 +1259,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         field = value;
         OnPropertyChanged(propertyName);
         return true;
-    }
-
-    private sealed class InMemoryWorkspaceRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
-    {
-        private WorkspaceSnapshot _snapshot = snapshot;
-
-        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
-        {
-            _snapshot = snapshot;
-            return Task.CompletedTask;
-        }
-
-        public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(_snapshot);
-    }
-
-    private sealed class InMemoryWorkspaceFileStore : IWorkspaceFileStore
-    {
-        private readonly HashSet<string> _existing = [];
-
-        public string WorkspaceRoot => string.Empty;
-
-        public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, AssetKind kind, CancellationToken cancellationToken = default)
-        {
-            var relativePath = $"assets/{Path.GetFileName(sourcePath)}";
-            _existing.Add(relativePath);
-            return Task.FromResult(new ManagedWorkspaceFile(
-                Path.GetFileName(sourcePath),
-                kind,
-                relativePath,
-                Path.Combine("workspace", relativePath),
-                sourcePath));
-        }
-
-        public bool Exists(string workspaceRelativePath) => _existing.Contains(workspaceRelativePath.Replace('\\', '/'));
-
-        public bool TryDelete(string workspaceRelativePath) => _existing.Remove(workspaceRelativePath.Replace('\\', '/'));
-
-        public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default) =>
-            Task.FromResult<Stream>(new MemoryStream());
-
-        public Task ExportCopyAsync(string workspaceRelativePath, string destinationPath, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }
 

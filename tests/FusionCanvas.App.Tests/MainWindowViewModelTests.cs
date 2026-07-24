@@ -1,3 +1,4 @@
+using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Views;
 using FusionCanvas.App.Workflow;
 using FusionCanvas.Application.Workspace;
@@ -10,7 +11,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void OpenFromNavigation_OpensTabAndCoordinatesNavigationAndWorkflow()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         var navigationContext = ReadyItemContext(viewModel);
 
         viewModel.OpenFromNavigation(navigationContext);
@@ -25,7 +26,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void OpenFromNavigation_DoesNotDiscardExistingTabs()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         var first = DraftItemContext(viewModel);
         var second = ActiveItemContext(viewModel);
 
@@ -39,7 +40,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void SelectingOpenTab_RecoordinatesNavigationAndWorkflow()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         var draft = DraftItemContext(viewModel);
         var active = ActiveItemContext(viewModel);
         var first = viewModel.DocumentWindow.Open(draft.Context);
@@ -56,7 +57,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void SelectWorkflowStage_UpdatesDocumentAndNavigator()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         viewModel.OpenFromNavigation(DraftItemContext(viewModel));
 
         viewModel.SelectWorkflowStage(WorkflowStage.Listing);
@@ -69,7 +70,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void ClosingLastTab_KeepsWorkingContextAndWorkflowNavigator()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         var tab = viewModel.DocumentWindow.Open(DraftItemContext(viewModel).Context);
 
         viewModel.DocumentWindow.CloseTab(tab);
@@ -81,7 +82,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void NormalTreeSelectionReusesCurrentTab_WhileControlOpenAddsAndKeepsExistingTab()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         var nicheNode = Assert.Single(viewModel.WorkspaceTree.Roots);
         var groupNode = nicheNode.Children.First(node => node.EntityKind == WorkspaceEntityKind.Group);
         var listingNode = groupNode.Children.First(node => node.EntityKind == WorkspaceEntityKind.Item);
@@ -103,7 +104,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void OpenFromNavigation_ResolvesVisibleToolContextScope()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
 
         viewModel.OpenFromNavigation(GroupContext(viewModel));
 
@@ -116,7 +117,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void ChangeToolScopeCommand_ReResolvesVisibleToolScope()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         viewModel.OpenFromNavigation(GroupContext(viewModel));
 
         viewModel.DocumentWindow.ChangeToolScopeCommand.Execute(ToolContextScopeKind.CurrentSubtree);
@@ -127,7 +128,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void SelectWorkflowStage_RefreshesStageToolHost()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         viewModel.OpenFromNavigation(DraftItemContext(viewModel));
 
         viewModel.SelectWorkflowStage(WorkflowStage.Design);
@@ -140,7 +141,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void TopicContextInItemBoundStage_ShowsItemRequiredState()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         viewModel.OpenFromNavigation(GroupContext(viewModel));
 
         viewModel.SelectWorkflowStage(WorkflowStage.Concept);
@@ -208,7 +209,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void GroupActions_FollowCanonicalSelectionCoordinatedFromTabsAndTree()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         var niche = viewModel.NavigationContexts.Single(context => context.Context.EntityKind == WorkspaceEntityKind.Niche);
         var group = GroupContext(viewModel);
         var nicheNode = Assert.Single(viewModel.WorkspaceTree.Roots);
@@ -233,7 +234,7 @@ public class MainWindowViewModelTests
     [Fact]
     public async Task PermanentGroupDeletionClosesTabsForDeletedEntities()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         var groupNode = viewModel.WorkspaceTree.Roots
             .SelectMany(root => root.Children)
             .Single(node => node.EntityId == GroupContext(viewModel).Context.Id);
@@ -316,7 +317,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void DetailsPaneVisibility_FollowsActiveContextKind()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         var niche = viewModel.NavigationContexts.Single(context => context.Context.EntityKind == WorkspaceEntityKind.Niche);
         var group = GroupContext(viewModel);
         var listing = ReadyItemContext(viewModel);
@@ -346,7 +347,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void ItemInspector_LoadsForActiveItemTabAndClearsForNonItemContext()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         var listing = ReadyItemContext(viewModel);
         var group = GroupContext(viewModel);
 
@@ -363,7 +364,7 @@ public class MainWindowViewModelTests
     [Fact]
     public async Task DirtyInspector_CommitsBeforeTabSwitchWithoutPrompt()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         var first = viewModel.DocumentWindow.Open(ReadyItemContext(viewModel).Context);
         var secondTab = viewModel.DocumentWindow.Open(ActiveItemContext(viewModel).Context);
         viewModel.RequestSelectTabCommand.Execute(first);
@@ -420,7 +421,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void StageMoveControls_ReflectActiveItemBoundaries()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
 
         viewModel.OpenFromNavigation(DraftItemContext(viewModel));
         Assert.False(viewModel.CanMoveStageBack);
@@ -434,7 +435,7 @@ public class MainWindowViewModelTests
     [Fact]
     public async Task MoveStageForward_AdvancesStageAndUpdatesView()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         viewModel.OpenFromNavigation(ReadyItemContext(viewModel));
 
         viewModel.MoveStageForwardCommand.Execute(null);
@@ -454,7 +455,7 @@ public class MainWindowViewModelTests
     [Fact]
     public async Task MoveStageBack_RegressesStage()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         viewModel.OpenFromNavigation(ReadyItemContext(viewModel));
 
         viewModel.MoveStageBackCommand.Execute(null);
@@ -467,7 +468,7 @@ public class MainWindowViewModelTests
     [Fact]
     public async Task SetItemStatus_ChangesStatusWithoutMovingStage()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         viewModel.OpenFromNavigation(ReadyItemContext(viewModel));
 
         viewModel.SetItemStatusCommand.Execute(ItemStatus.Rejected);
@@ -483,7 +484,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void StatusSelector_OffersOnlyCurrentAndAllowedDirectTargets()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         viewModel.OpenFromNavigation(ReadyItemContext(viewModel));
 
         Assert.Equal([ItemStatus.Draft, ItemStatus.Rejected], viewModel.AvailableItemStatuses);
@@ -496,7 +497,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void StatusConfirmation_CancelKeepsAuthoritativeStatusAndSelection()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         var context = ReadyItemContext(viewModel);
         viewModel.OpenFromNavigation(context);
 
@@ -513,7 +514,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void StageToolVisibility_FollowsActiveReviewStage()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         viewModel.OpenFromNavigation(ReadyItemContext(viewModel));
 
         Assert.True(viewModel.ShowsDesignStageTool);
@@ -529,7 +530,7 @@ public class MainWindowViewModelTests
     [Fact]
     public async Task StageMoveControls_DisabledForRejectedItem()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = MainWindowViewModelFactory.CreateSample();
         viewModel.OpenFromNavigation(ReadyItemContext(viewModel));
         viewModel.SetItemStatusCommand.Execute(ItemStatus.Rejected);
         viewModel.ConfirmStatusChangeCommand.Execute(null);
