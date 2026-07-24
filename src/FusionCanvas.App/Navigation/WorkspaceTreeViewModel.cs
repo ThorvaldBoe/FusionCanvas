@@ -1,18 +1,18 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using FusionCanvas.App.DocumentWindow;
-using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Navigation;
 using FusionCanvas.Domain.Workflow;
-using FusionCanvas.Domain.Prompts;
-using FusionCanvas.Domain.Tags;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Groups;
-using FusionCanvas.Domain.Niches;
-using FusionCanvas.Domain.Stores;
+using FusionCanvas.Application.WorkspaceTree;
+using FusionCanvas.Application.Groups;
+using FusionCanvas.Application.Items;
+using FusionCanvas.Application.Tags;
+using FusionCanvas.Application.Workspaces;
 
 namespace FusionCanvas.App.Navigation;
 

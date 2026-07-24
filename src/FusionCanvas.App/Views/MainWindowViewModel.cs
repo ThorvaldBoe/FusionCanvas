@@ -1,4 +1,4 @@
-﻿using FusionCanvas.App.Assets;
+using FusionCanvas.App.Assets;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Groups;
 using FusionCanvas.App.Items;
@@ -9,17 +9,27 @@ using FusionCanvas.App.StageTools;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.App.Workflow;
 using FusionCanvas.Application.Settings;
-using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Groups;
-using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Integration.Workspace;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using FusionCanvas.Application.Items;
+using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.Stores;
+using FusionCanvas.Application.WorkspaceTree;
+using FusionCanvas.Application.Groups;
+using FusionCanvas.Application.ToolContexts;
+using FusionCanvas.Application.StageTools;
+using FusionCanvas.Application.Assets;
+using FusionCanvas.Application.Tags;
+using FusionCanvas.Application.WorkflowNavigation;
+using FusionCanvas.Application.Niches;
+using FusionCanvas.Application.DesignFiles;
 
 namespace FusionCanvas.App.Views;
 

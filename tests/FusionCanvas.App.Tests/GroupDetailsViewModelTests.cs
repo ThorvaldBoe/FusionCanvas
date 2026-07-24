@@ -1,9 +1,10 @@
-﻿using FusionCanvas.App.Groups;
-using FusionCanvas.Application.Workspace;
+using FusionCanvas.App.Groups;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
+using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.Groups;
 
 namespace FusionCanvas.App.Tests;
 

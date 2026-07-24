@@ -1,12 +1,15 @@
-﻿using FusionCanvas.App.Tests.TestSupport;
+using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Views;
 using FusionCanvas.App.Workflow;
-using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
+using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.ToolContexts;
+using FusionCanvas.Application.WorkflowNavigation;
+using FusionCanvas.Application.StageTools;
 
 namespace FusionCanvas.App.Tests;
 

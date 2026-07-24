@@ -1,8 +1,7 @@
-﻿using FusionCanvas.App.StageTools;
-using FusionCanvas.Application.Workspace;
-using FusionCanvas.Domain.Workspace;
+using FusionCanvas.App.StageTools;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Items;
+using FusionCanvas.Application.Items;
 
 namespace FusionCanvas.App.Tests;
 

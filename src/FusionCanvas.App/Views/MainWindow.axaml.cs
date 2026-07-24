@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -12,10 +12,8 @@ using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Settings;
 using FusionCanvas.App.Stores;
 using FusionCanvas.App.Workspace;
-using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
-using FusionCanvas.Domain.Items;
-using FusionCanvas.Domain.Niches;
+using FusionCanvas.Application.Groups;
 
 namespace FusionCanvas.App.Views;
 

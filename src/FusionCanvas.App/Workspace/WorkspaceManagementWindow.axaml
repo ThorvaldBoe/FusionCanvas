@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:workspace="clr-namespace:FusionCanvas.App.Workspace"
-        xmlns:workflow="clr-namespace:FusionCanvas.Application.Workspace;assembly=FusionCanvas.Application"
+        xmlns:appWorkspaces="clr-namespace:FusionCanvas.Application.Workspaces;assembly=FusionCanvas.Application"
         x:Class="FusionCanvas.App.Workspace.WorkspaceManagementWindow"
         x:DataType="workspace:WorkspaceManagementViewModel"
         Title="Workspace Management"
@@ -37,7 +37,7 @@
                        Foreground="{DynamicResource SecondaryTextBrush}" />
             <ItemsControl ItemsSource="{Binding ActiveWorkspaces}">
               <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="workflow:WorkspaceSummary">
+                <DataTemplate x:DataType="appWorkspaces:WorkspaceSummary">
                   <Button Content="{Binding Name}"
                           Command="{Binding $parent[ItemsControl].DataContext.SelectWorkspaceCommand}"
                           CommandParameter="{Binding}"
@@ -56,7 +56,7 @@
             <ItemsControl IsVisible="{Binding HasArchivedWorkspaces}"
                           ItemsSource="{Binding ArchivedWorkspaces}">
               <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="workflow:WorkspaceSummary">
+                <DataTemplate x:DataType="appWorkspaces:WorkspaceSummary">
                   <Button Content="{Binding Name}"
                           Command="{Binding $parent[ItemsControl].DataContext.RestoreWorkspaceCommand}"
                           CommandParameter="{Binding}"

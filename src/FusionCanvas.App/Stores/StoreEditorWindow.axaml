@@ -1,7 +1,9 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:stores="clr-namespace:FusionCanvas.App.Stores"
-        xmlns:workflow="clr-namespace:FusionCanvas.Application.Workspace;assembly=FusionCanvas.Application"
+        xmlns:appStores="clr-namespace:FusionCanvas.Application.Stores;assembly=FusionCanvas.Application"
+        xmlns:appNiches="clr-namespace:FusionCanvas.Application.Niches;assembly=FusionCanvas.Application"
+        xmlns:appTags="clr-namespace:FusionCanvas.Application.Tags;assembly=FusionCanvas.Application"
         x:Class="FusionCanvas.App.Stores.StoreEditorWindow"
         x:DataType="stores:StoreManagementViewModel"
         Title="Store Editor"
@@ -37,7 +39,7 @@
                      Foreground="{DynamicResource SecondaryTextBrush}" />
           <ItemsControl ItemsSource="{Binding EditorActiveStores}">
             <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="workflow:StoreSummary">
+              <DataTemplate x:DataType="appStores:StoreSummary">
                 <Button Content="{Binding Name}"
                         Command="{Binding $parent[ItemsControl].DataContext.EditStoreCommand}"
                         CommandParameter="{Binding}"
@@ -56,7 +58,7 @@
           <ItemsControl IsVisible="{Binding HasArchivedStores}"
                         ItemsSource="{Binding ArchivedStores}">
             <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="workflow:StoreSummary">
+              <DataTemplate x:DataType="appStores:StoreSummary">
                 <Button Content="{Binding Name}"
                         Command="{Binding $parent[ItemsControl].DataContext.EditStoreCommand}"
                         CommandParameter="{Binding}"
@@ -171,7 +173,7 @@
                          Foreground="{DynamicResource SecondaryTextBrush}" />
               <ItemsControl ItemsSource="{Binding EditorActiveNiches}">
                 <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="workflow:NicheSummary">
+                  <DataTemplate x:DataType="appNiches:NicheSummary">
                     <Button Content="{Binding Name}"
                             Command="{Binding $parent[ItemsControl].DataContext.EditNicheCommand}"
                             CommandParameter="{Binding}"
@@ -190,7 +192,7 @@
               <ItemsControl IsVisible="{Binding HasArchivedNiches}"
                             ItemsSource="{Binding ArchivedNiches}">
                 <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="workflow:NicheSummary">
+                  <DataTemplate x:DataType="appNiches:NicheSummary">
                     <Button Content="{Binding Name}"
                             Command="{Binding $parent[ItemsControl].DataContext.EditNicheCommand}"
                             CommandParameter="{Binding}"
@@ -282,7 +284,7 @@
                          Foreground="{DynamicResource SecondaryTextBrush}" />
               <ItemsControl ItemsSource="{Binding EditorActiveTags}">
                 <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="workflow:TagSummary">
+                  <DataTemplate x:DataType="appTags:TagSummary">
                     <Button Content="{Binding Name}"
                             Command="{Binding $parent[ItemsControl].DataContext.EditTagCommand}"
                             CommandParameter="{Binding}"
@@ -301,7 +303,7 @@
               <ItemsControl IsVisible="{Binding HasArchivedTags}"
                             ItemsSource="{Binding ArchivedTags}">
                 <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="workflow:TagSummary">
+                  <DataTemplate x:DataType="appTags:TagSummary">
                     <Button Content="{Binding Name}"
                             Command="{Binding $parent[ItemsControl].DataContext.EditTagCommand}"
                             CommandParameter="{Binding}"

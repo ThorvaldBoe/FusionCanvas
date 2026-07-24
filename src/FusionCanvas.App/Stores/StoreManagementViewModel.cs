@@ -1,13 +1,11 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using FusionCanvas.App.DocumentWindow;
-using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
-using FusionCanvas.Domain.Tags;
-using FusionCanvas.Domain.Items;
-using FusionCanvas.Domain.Niches;
-using FusionCanvas.Domain.Stores;
+using FusionCanvas.Application.Stores;
+using FusionCanvas.Application.Niches;
+using FusionCanvas.Application.Tags;
 
 namespace FusionCanvas.App.Stores;
 
