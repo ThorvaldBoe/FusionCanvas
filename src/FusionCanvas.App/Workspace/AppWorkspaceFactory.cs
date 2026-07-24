@@ -1,5 +1,6 @@
-using FusionCanvas.Domain.Workspace;
-using FusionCanvas.Integration.Workspace;
+﻿using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Integration.Persistence;
+using FusionCanvas.Integration.Files;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Groups;
 using FusionCanvas.Application.Items;
