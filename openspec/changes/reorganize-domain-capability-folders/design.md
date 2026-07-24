@@ -96,7 +96,7 @@ The four remaining multi-type Domain files split as follows, each new file conta
 
 ## Migration Plan
 
-This is a code-internal refactor with no persistence or runtime migration. Deployment is a single pull request; there is no runtime state to migrate and no rollback beyond reverting the commit.
+This is a code-internal refactor with no persistence or runtime migration. Deployment is a single pull request; there is no runtime state to migrate and no rollback beyond reverting the commit. All projects use SDK-style implicit globbing, so moving files requires no `.csproj` edits.
 
 ### Implementation Plan (sequenced by capability, each step ends with green build + tests)
 

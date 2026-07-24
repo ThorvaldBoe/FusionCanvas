@@ -58,8 +58,8 @@
 
 ## 11. Test mirror
 
-- [ ] 11.1 Move `tests/FusionCanvas.Domain.Tests/ItemWorkflowPolicyTests.cs`, `ItemLifecycleStatusTests.cs`, `ItemHierarchyTests.cs` into a `Tests/Items/` subfolder (or the matching capability folder) and update `using` directives
-- [ ] 11.2 Move `NavigationTreeTests.cs` into `Tests/Navigation/`; move `WorkflowStageTests.cs` into `Tests/Workflow/`; move `WorkspaceFileStorageModelTests.cs` into `Tests/Assets/`; move `DomainPersistenceBoundaryTests.cs` into `Tests/Workspace/`; update `using` directives
+- [ ] 11.1 Move `tests/FusionCanvas.Domain.Tests/ItemWorkflowPolicyTests.cs`, `ItemLifecycleStatusTests.cs`, `ItemHierarchyTests.cs` into `Items/` and update `using` directives
+- [ ] 11.2 Move `NavigationTreeTests.cs` into `Navigation/`; move `WorkflowStageTests.cs` into `Workflow/`; move `WorkspaceFileStorageModelTests.cs` into `Assets/`; move `DomainPersistenceBoundaryTests.cs` into `Workspace/`; update `using` directives
 - [ ] 11.3 Run `dotnet build .\FusionCanvas.sln` and `dotnet test .\FusionCanvas.sln`; confirm all 482 tests remain green
 
 ## 12. Final verification
