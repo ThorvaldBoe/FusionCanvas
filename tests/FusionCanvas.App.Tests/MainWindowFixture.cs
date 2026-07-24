@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Input.TextInput;
 using Avalonia.LogicalTree;
 using Avalonia.VisualTree;
+using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Views;
 using FusionCanvas.Domain.Workspace;
 
@@ -18,7 +19,7 @@ internal sealed class MainWindowFixture : IDisposable
 
     public MainWindowFixture(double width = 1180, double height = 760)
     {
-        ViewModel = new MainWindowViewModel();
+        ViewModel = MainWindowViewModelFactory.CreateSample();
         Window = new MainWindow { DataContext = ViewModel };
         Window.Show();
         Window.Width = width;

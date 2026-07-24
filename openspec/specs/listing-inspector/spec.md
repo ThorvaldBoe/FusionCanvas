@@ -7,15 +7,15 @@ Defines how FusionCanvas presents a focused, durable Listing Inspector in the do
 ## Requirements
 
 ### Requirement: Listing inspector presents the listing as a product concept
-FusionCanvas SHALL display a Listing Inspector in the document window detail area for the active listing document context, showing the working title, lifecycle status, current workflow stage, topic path, idea, phrase, graphic direction, notes, linked tags, and related assets so the user can understand what the listing is and what needs to happen next.
+FusionCanvas SHALL display a Listing Inspector in the document window detail area for the active listing document context, showing the working title, lifecycle status, current workflow stage, topic path, description, idea, phrase, graphic direction, notes, linked tags, and related assets so the user can understand what the listing is and what needs to happen next.
 
 #### Scenario: User opens a listing
 - **WHEN** a listing becomes the active document context
-- **THEN** the detail area displays the inspector with the listing's working title, status, workflow stage, topic path, idea, phrase, graphic direction, notes, tags, and related assets
+- **THEN** the detail area displays the inspector with the listing's working title, status, workflow stage, topic path, description, idea, phrase, graphic direction, notes, tags, and related assets
 - **AND** the content reflects the persisted listing record
 
 #### Scenario: Listing has no creative details yet
-- **WHEN** the active listing has no idea, phrase, graphic direction, notes, tags, or assets
+- **WHEN** the active listing has no description, idea, phrase, graphic direction, notes, tags, or assets
 - **THEN** the inspector shows quiet empty placeholders for those sections
 - **AND** does not fabricate content or block viewing
 
@@ -88,20 +88,20 @@ The inspector SHALL keep every creative section accessible at every workflow sta
 - **AND** no section becomes unavailable because of the stage change
 
 ### Requirement: Listing inspector manages listing tags
-FusionCanvas SHALL allow the user to view the listing's linked tags, link an existing reusable store tag, create a new reusable store tag when the entered name has no case-insensitive match in the store, and remove tag links, SHALL normalize tag names to nonblank single-line values, and SHALL NOT delete reusable tag records when a link is removed.
+FusionCanvas SHALL allow the user to view the listing's linked tags, link an existing reusable store tag, create a new reusable store tag when the entered name has no case-insensitive match in the store, and remove tag links, SHALL normalize tag names to nonblank single-line values, SHALL persist each tag addition or removal immediately and atomically when the user applies it, and SHALL NOT delete reusable tag records when a link is removed.
 
 #### Scenario: User links an existing tag
 - **WHEN** the user adds a tag whose name matches an existing store tag
-- **THEN** FusionCanvas links that reusable tag to the listing on save
+- **THEN** FusionCanvas links that reusable tag to the listing when the addition is committed
 - **AND** does not create a duplicate tag record
 
 #### Scenario: User creates a new tag inline
 - **WHEN** the user adds a tag name with no case-insensitive match in the listing's store
-- **THEN** FusionCanvas creates one normalized reusable store tag and links it to the listing on save
+- **THEN** FusionCanvas creates one normalized reusable store tag and links it to the listing when the addition is committed
 
 #### Scenario: User removes a tag link
-- **WHEN** the user removes a tag from the listing and saves
-- **THEN** FusionCanvas removes only the listing-tag link
+- **WHEN** the user removes a tag from the listing
+- **THEN** FusionCanvas removes only the listing-tag link when the removal is committed
 - **AND** preserves the reusable tag record and its other links
 
 #### Scenario: User submits an invalid tag name
@@ -138,6 +138,31 @@ FusionCanvas SHALL commit pending working title, current-stage text, and Notes e
 - **WHEN** the user changes Item, tab, active view stage, or lifecycle state and no text edits are pending
 - **THEN** the transition proceeds immediately without a write
 
+### Requirement: Listing inspector hosts listing lifecycle actions
+FusionCanvas SHALL provide archive, restore, and confirmed permanent-delete actions for the active listing in the inspector, SHALL keep archived listings reachable and restorable through the tree's archived view and the read-only inspector, and SHALL keep inline creation, rename, move, and duplication in the tree.
+
+#### Scenario: User archives the active listing
+- **WHEN** the user confirms archive for the active listing
+- **THEN** FusionCanvas marks the listing archived through the existing listing-management behavior
+- **AND** the inspector presents the read-only inactive state with a restore action
+- **AND** the tree and document context refresh to the persisted state
+
+#### Scenario: User restores an archived listing
+- **WHEN** the user restores an archived listing from the inspector
+- **THEN** FusionCanvas restores the listing to its preserved topic through the existing listing-management behavior
+- **AND** reports an actionable error when the preserved topic path is not active
+
+#### Scenario: User permanently deletes the active listing
+- **WHEN** the user confirms permanent deletion for the active listing
+- **THEN** FusionCanvas deletes the listing through the existing listing-management deletion guard
+- **AND** surfaces the connected-records reason when deletion is blocked
+- **AND** selects a sensible nearby active listing when one exists, otherwise the active parent topic
+
+#### Scenario: Lifecycle operation is in progress or fails
+- **WHEN** archive, restore, or deletion is running or fails validation or persistence
+- **THEN** FusionCanvas prevents duplicate submission
+- **AND** keeps the inspector available to report success or an actionable error
+
 ### Requirement: Listing inspector keeps inactive listings read-only
 FusionCanvas SHALL present an archived or otherwise effectively inactive listing in a read-only inspector with a clear inactive notice and guidance to restore, and SHALL disable editing controls rather than hiding the listing's context.
 
@@ -171,3 +196,41 @@ FusionCanvas SHALL use compact action sizing, predictable keyboard flow through 
 - **WHEN** tag-management or lifecycle actions are shown
 - **THEN** their buttons are sized to their command groups rather than evenly stretched across the surface
 - **AND** field editing and lifecycle confirmations are reachable without pointer-only interaction
+
+### Requirement: Listing inspector captures optional idea-stage audience
+FusionCanvas SHALL allow the user to record an optional audience for a listing as the documented `idea.audience` metadata key, SHALL present it in the inspector's Idea section with the same automatic-save behavior as the other creative fields, and SHALL preserve the listing's stable identity, topic, archive state, status, tags, prompts, assets, and unknown metadata.
+
+#### Scenario: User records an audience
+- **WHEN** the user enters an audience for the active listing and the field loses focus
+- **THEN** FusionCanvas persists the value as the `idea.audience` metadata key and updates the timestamp atomically
+- **AND** preserves the listing's identity and related context
+
+#### Scenario: User omits the audience
+- **WHEN** the user captures or edits a listing without supplying an audience
+- **THEN** FusionCanvas creates or updates the listing without fabricating the `idea.audience` key
+- **AND** the omission does not block creation or editing
+
+#### Scenario: Audience survives unrelated edits
+- **WHEN** a listing carries an `idea.audience` value and the user edits other inspector fields
+- **THEN** the audience value is preserved unchanged
+
+### Requirement: Idea-stage triage uses the existing document controls
+FusionCanvas SHALL present idea-stage triage for the active idea-stage listing through the existing document-surface controls — explicit stage advance and regress, the lifecycle status selector, and the inspector lifecycle actions — and SHALL NOT introduce a competing triage surface, a second status control, or a reject marker duplicating the `Rejected` lifecycle status.
+
+#### Scenario: User promotes an idea
+- **WHEN** the user activates the advance control for an active idea-stage listing
+- **THEN** FusionCanvas persists `Concept` as the listing's stage through the accepted stage-movement behavior
+- **AND** repeated activation reaches `Design` and `Listing` when the creator has enough direction
+
+#### Scenario: User rejects an idea without deletion
+- **WHEN** the user sets an idea-stage listing's lifecycle status to `Rejected`
+- **THEN** the idea remains visible in the navigation tree with its inactive treatment
+- **AND** remains openable, reviewable, and reactivatable by returning the status to `Draft`
+
+#### Scenario: User archives an idea
+- **WHEN** the user confirms archive for an idea-stage listing from the inspector
+- **THEN** FusionCanvas preserves the idea with its topic and idea-stage metadata through the reversible archive behavior
+
+#### Scenario: User reviews unprocessed ideas
+- **WHEN** the user activates the `Idea` workflow-stage filter together with the `Draft` lifecycle-status filter
+- **THEN** the navigation tree lists exactly the unprocessed ideas with their parent topic context preserved
