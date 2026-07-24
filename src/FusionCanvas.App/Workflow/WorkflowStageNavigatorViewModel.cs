@@ -1,5 +1,6 @@
-using FusionCanvas.Application.Workspace;
+﻿using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Workflow;
 using System.ComponentModel;
 using System.Windows.Input;
 
