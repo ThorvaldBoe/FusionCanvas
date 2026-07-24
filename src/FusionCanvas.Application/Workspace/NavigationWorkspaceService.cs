@@ -1,4 +1,8 @@
-using FusionCanvas.Domain.Workspace;
+﻿using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Navigation;
+using FusionCanvas.Domain.Items;
+using FusionCanvas.Domain.Niches;
+using FusionCanvas.Domain.Stores;
 
 namespace FusionCanvas.Application.Workspace;
 

@@ -1,5 +1,10 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Prompts;
+using FusionCanvas.Domain.Assets;
+using FusionCanvas.Domain.Tags;
+using FusionCanvas.Domain.Niches;
+using FusionCanvas.Domain.Stores;
 
 namespace FusionCanvas.Application.Workspace;
 
