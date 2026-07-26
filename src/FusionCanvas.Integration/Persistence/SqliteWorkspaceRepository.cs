@@ -1,4 +1,4 @@
-using FusionCanvas.Domain.Workspace;
+﻿using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Prompts;
 using FusionCanvas.Domain.Assets;
@@ -10,7 +10,7 @@ using FusionCanvas.Domain.Stores;
 using Microsoft.Data.Sqlite;
 using FusionCanvas.Application.Workspaces;
 
-namespace FusionCanvas.Integration.Workspace;
+namespace FusionCanvas.Integration.Persistence;
 
 public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceRepository
 {

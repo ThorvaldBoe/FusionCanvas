@@ -1,4 +1,4 @@
-using FusionCanvas.App.Assets;
+﻿using FusionCanvas.App.Assets;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Groups;
 using FusionCanvas.App.Items;
@@ -14,7 +14,7 @@ using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Stores;
-using FusionCanvas.Integration.Workspace;
+using FusionCanvas.Integration.Files;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;

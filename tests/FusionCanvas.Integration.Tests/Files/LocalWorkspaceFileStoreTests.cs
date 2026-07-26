@@ -1,5 +1,5 @@
 ﻿using FusionCanvas.Domain.Assets;
-using FusionCanvas.Integration.Workspace;
+using FusionCanvas.Integration.Files;
 
 namespace FusionCanvas.Integration.Tests;
 

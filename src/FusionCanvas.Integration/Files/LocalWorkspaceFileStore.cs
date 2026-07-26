@@ -1,7 +1,7 @@
-using FusionCanvas.Domain.Assets;
+﻿using FusionCanvas.Domain.Assets;
 using FusionCanvas.Application.Workspaces;
 
-namespace FusionCanvas.Integration.Workspace;
+namespace FusionCanvas.Integration.Files;
 
 public sealed class LocalWorkspaceFileStore : IWorkspaceFileStore
 {
