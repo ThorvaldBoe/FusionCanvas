@@ -164,3 +164,16 @@ FusionCanvas SHALL keep the text search box persistently visible above the navig
 - **WHEN** the user closes the flyout with Escape or by moving focus away
 - **THEN** the applied filters remain in effect
 - **AND** focus returns to a predictable control in the navigation pane
+
+### Requirement: Item filters synchronize with workflow mutations
+Stage, status, archive, Tag, and text filters SHALL evaluate Item state and SHALL refresh after authoritative Item mutations without leaving stale visible rows or document state.
+
+#### Scenario: Status change leaves the active filter
+- **WHEN** an Item changes status and no longer matches the active status filter
+- **THEN** its row leaves the filtered tree
+- **AND** document and canonical selection resolve consistently without overwriting the new status
+
+#### Scenario: Empty Item is searched
+- **WHEN** an Item has no working title
+- **THEN** its derived fallback supports stable presentation
+- **AND** the fallback is not treated as persisted creative text

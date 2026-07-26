@@ -3,6 +3,7 @@
 ## Purpose
 TBD - created by archiving change fc-0005-navigation-tree. Update Purpose after archive.
 ## Requirements
+
 ### Requirement: Navigation tree represents workspace hierarchy
 FusionCanvas SHALL represent workspace navigation as a hierarchy of stores, topics, and items.
 
@@ -130,3 +131,15 @@ FusionCanvas SHALL provide a tag filter control above the workspace tree that fi
 - **THEN** tag chips can be toggled with keyboard input
 - **AND** the filter can be cleared without pointer-only interaction
 
+### Requirement: Navigation presents universal records as Items
+The navigation tree SHALL use Item terminology for stage-agnostic records and SHALL use the stable identity-derived fallback for an empty working title.
+
+#### Scenario: Empty-title Item appears in the tree
+- **WHEN** an Item has no working title
+- **THEN** its row shows `Untitled item · <short ID>`
+- **AND** retains normal selection, filtering, inactive treatment, and context actions
+
+#### Scenario: Published or Rejected Item appears
+- **WHEN** an Item becomes Published or Rejected
+- **THEN** its row updates to the authoritative lifecycle treatment
+- **AND** canonical selection remains coherent if active filters remove it

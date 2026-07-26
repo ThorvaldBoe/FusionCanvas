@@ -20,3 +20,10 @@ The cross-layer `Listing` to `Item` rename, v4-to-v5 SQLite migration, stage-awa
 - Lowercase `listing` locals that remain inside historical migration fixtures are test-fixture vocabulary, not public universal contracts.
 - No missing product, UX, data, architecture, or acceptance decision was discovered during the XAML rewrite. The corrections above reconcile implementation to already-approved artifacts; no delta-spec correction was required.
 - Later marketplace publishing, marketplace-specific Listing records, mockup generation, and exhaustive desktop transition combinations remain deliberately outside this module.
+
+## Learning Review
+
+- Result: no additional reusable lessons beyond the approved requirements and documentation corrections already captured by the change.
+- Evidence reviewed: final proposal, design, all 15 delta specs and 82 scenarios, task ledger, verification record, feedback-driven corrections, current implementation and tests, and the fresh 482-test/strict-validation archive gates.
+- Promotions completed: the explicit-save exception and Item terminology guidance were already promoted to the change's canonical documentation and delta specs.
+- Deferred promotions: none. Optional live-desktop observations remain supplemental and do not define a new process rule.

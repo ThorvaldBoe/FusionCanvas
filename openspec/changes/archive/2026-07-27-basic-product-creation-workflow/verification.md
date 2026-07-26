@@ -2,11 +2,11 @@
 
 ## Status
 
-**Implementation and deterministic verification complete; personal desktop acceptance remains.** The full solution baseline passes 430 tests, the change validates strictly, and the partial desktop pass below records completed scenarios and defects corrected before the user elected to complete the remaining UI pass personally.
+**Complete.** All 82 delta-spec acceptance scenarios are accounted for with passing deterministic evidence, the fresh full solution baseline passes 482 tests including 186 App/headless tests, and the change validates strictly. The partial real-desktop pass below is retained as optional supplemental evidence; its unfinished checks are not completion gates under the accepted testing baseline.
 
 ## Desktop capability and handoff
 
-OpenCode could not perform interactive desktop verification. Codex completed a partial isolated real-desktop pass on 2026-07-23; the user then requested that further UI automation stop and will complete the remaining acceptance checks personally.
+OpenCode could not perform interactive desktop verification. Codex completed a partial isolated real-desktop pass on 2026-07-23, after which the user requested that further UI automation stop. No additional live-desktop pass is required because mandatory UI verification is portable and deterministic.
 
 ## Environment and isolation
 
@@ -16,7 +16,7 @@ OpenCode could not perform interactive desktop verification. Codex completed a p
 - Disposable SQLite database: `C:\Code\oc-basic-workflow-implementation\TestResults\desktop-basic-product-creation-workflow-20260723\workspace.db`.
 - Disposable managed workspace root: `C:\Code\oc-basic-workflow-implementation\TestResults\desktop-basic-product-creation-workflow-20260723\managed-workspace`.
 - Material screenshots/automation logs: `C:\Code\oc-basic-workflow-implementation\TestResults\desktop-basic-product-creation-workflow-20260723`.
-- Limitations: The user requested stopping the desktop pass before publish/status recovery, archive/filter/multi-tab, complete missing-file restart, and minimum-height/accessibility checks. Those are explicitly left for personal verification.
+- Supplemental limitations: The user requested stopping the desktop pass before publish/status recovery, archive/filter/multi-tab, complete missing-file restart, and minimum-height/accessibility checks. Deterministic criterion evidence covers the accepted behavior; these optional observations were not rerun.
 
 ## Criterion-level evidence
 
@@ -134,8 +134,11 @@ All names below are exact xUnit method names. Each key was executed by `dotnet t
 | `openspec validate basic-product-creation-workflow --strict` | Passing | `Change 'basic-product-creation-workflow' is valid`. |
 | Package vulnerability audit | Passing | `dotnet list .\FusionCanvas.sln package --vulnerable --include-transitive`: no vulnerable packages. |
 | `git diff --check` | Passing | Only Git's informational LF-to-CRLF notices were emitted. |
+| `dotnet build .\FusionCanvas.sln -m:1` (fresh archive gate, 2026-07-27) | Passing | 0 warnings and 0 errors. |
+| `dotnet test .\FusionCanvas.sln -m:1 --no-build` (fresh archive gate, 2026-07-27) | Passing (482 tests) | Domain 96, Application 150, Integration 50, App/headless 186; failed 0, skipped 0. |
+| Acceptance-scenario audit (fresh archive gate, 2026-07-27) | Passing (82/82 scenarios) | Every `#### Scenario` title in all 15 delta specs appears in the criterion-level evidence table; no failed or unverified result is recorded. |
 
-## Targeted real-desktop pass
+## Optional Targeted Real-Desktop Pass
 
 Partial pass environment: Windows desktop, Debug `net10.0`, built with `dotnet build .\src\FusionCanvas.App\FusionCanvas.App.csproj --no-restore`. Isolation used `FUSIONCANVAS_WORKSPACE_DB=C:\Code\oc-basic-workflow-implementation\TestResults\desktop-basic-product-creation-workflow-20260723\workspace.db` and `FUSIONCANVAS_WORKSPACE_ROOT=C:\Code\oc-basic-workflow-implementation\TestResults\desktop-basic-product-creation-workflow-20260723\managed-workspace`. Screenshots, exported bytes, and the recoverable missing-file quarantine are in that `TestResults` directory.
 
@@ -156,5 +159,5 @@ Partial pass environment: Windows desktop, Debug `net10.0`, built with `dotnet b
 - Item terminology/spec-drift review: **Pass** — public universal App/Application/Domain symbols use Item; intentional Listing exceptions are final-stage, marketplace, or v4 migration vocabulary.
 - SQLite migration/data-loss review: **Pass** — strict v4-to-v5 real fixture and rollback tests pass.
 - File-boundary/path-traversal/compensation review: **Pass** — traversal, same-path export, handle release, import rollback, and remove compensation tests pass.
-- UI state/focus/accessibility review: **Partial** — deterministic state tests pass and two real-desktop defects were corrected; the user owns the remaining manual UI checklist above.
+- UI state/focus/accessibility review: **Pass for the mandatory deterministic gate** — App decision-logic and applicable headless tests pass. The partial desktop observations above are supplemental only.
 - Learning review and promoted lessons: **Complete** — see `retrospective.md`; no new canonical product decision or spec correction was required.

@@ -7,7 +7,7 @@ Defines how FusionCanvas tracks each listing's position in the creative workflow
 ## Requirements
 
 ### Requirement: Listing carries one workflow stage and one lifecycle status
-A listing SHALL persist exactly one workflow stage (`Idea`, `Concept`, `Design`, or `Listing`) and exactly one lifecycle status as two independent, user-owned facts, and the workflow stage SHALL NOT be derived from the lifecycle status.
+An Item SHALL persist exactly one workflow stage (`Idea`, `Concept`, `Design`, or `Listing`) and exactly one lifecycle status as independent user-owned facts, and SHALL NOT derive one from the other except to enforce explicit transition preconditions.
 
 #### Scenario: Listing persists stage and status independently
 - **WHEN** a listing is saved and reloaded
@@ -15,8 +15,13 @@ A listing SHALL persist exactly one workflow stage (`Idea`, `Concept`, `Design`,
 - **AND** neither value is computed from the other
 
 #### Scenario: Status change does not move the stage
-- **WHEN** the user changes a listing's lifecycle status
+- **WHEN** the user changes an Item's lifecycle status
 - **THEN** its workflow stage remains unchanged
+
+#### Scenario: Item persists stage and status independently
+- **WHEN** an Item is saved and reloaded
+- **THEN** its workflow stage and lifecycle status are reconstructed with their persisted values
+- **AND** neither value is computed from the other
 
 ### Requirement: Lifecycle status vocabulary is operational and fixed
 The listing lifecycle status SHALL be one of `Draft`, `Published`, `Paused`, or `Rejected`, and SHALL NOT include stage-like values, readiness values, or an archive value (archive state remains the separate archive mechanism).
@@ -32,7 +37,7 @@ The listing lifecycle status SHALL be one of `Draft`, `Published`, `Paused`, or 
 - **AND** it does not duplicate which workflow stage the listing is in
 
 ### Requirement: User changes lifecycle status quickly
-FusionCanvas SHALL allow the user to change a listing's lifecycle status from the listing's document surface through one compact selector, without requiring edits to unrelated fields, and SHALL apply the change atomically.
+FusionCanvas SHALL expose one Item-level status selector and SHALL allow exactly these transitions: Draft to Published at Listing or Rejected; Published to Paused or Rejected; Paused to Published at Listing, Draft, or Rejected; and Rejected to Draft.
 
 #### Scenario: User changes status from the document surface
 - **WHEN** the user selects a different lifecycle status while a listing document is active
@@ -40,9 +45,20 @@ FusionCanvas SHALL allow the user to change a listing's lifecycle status from th
 - **AND** the document surface, navigation context, and any active filters reflect the new status
 
 #### Scenario: Status change fails to persist
-- **WHEN** the status change cannot be saved
-- **THEN** the selector reverts to the persisted status
-- **AND** an inline error is shown without partially applying the change
+- **WHEN** an approved status change cannot be saved
+- **THEN** the selector reverts to persisted status
+- **AND** an actionable inline error appears without partial application
+
+#### Scenario: Item exposes allowed transitions
+- **WHEN** the status selector opens
+- **THEN** it displays the persisted current status and offers only direct transition targets valid for the Item's current status and stage
+- **AND** Published is unavailable unless Listing is current
+- **AND** Paused is never entered from a status other than Published
+
+#### Scenario: Confirmation is required
+- **WHEN** a transition enters Published or Rejected or leaves Published
+- **THEN** FusionCanvas asks for one confirmation
+- **AND** cancellation leaves stage, status, content, and selection unchanged
 
 ### Requirement: User moves the workflow stage with explicit controls
 FusionCanvas SHALL provide explicit advance and regress controls in the listing document surface that move a listing to the adjacent workflow stage, and clicking a stage in the workflow stage navigator SHALL remain view-only navigation that does not change the listing's stage.
@@ -70,7 +86,7 @@ FusionCanvas SHALL provide explicit advance and regress controls in the listing 
 - **AND** the listing's persisted stage remains `Design`
 
 ### Requirement: Stage movement pauses for inactive listings while status stays recoverable
-FusionCanvas SHALL disable the stage advance and regress controls while a listing is inactive (rejected or archived), and SHALL keep lifecycle status change available for a rejected listing so it can be reactivated.
+FusionCanvas SHALL disable stage movement while an Item is Published, Rejected, archived, or effectively archived and SHALL keep the allowed status-recovery and lifecycle actions available.
 
 #### Scenario: Rejected listing cannot move stages
 - **WHEN** the active listing's status is `Rejected`
@@ -81,6 +97,15 @@ FusionCanvas SHALL disable the stage advance and regress controls while a listin
 - **WHEN** the user changes a rejected listing's status to `Draft`
 - **THEN** the listing is treated as active work again
 - **AND** its persisted workflow stage resumes driving stage availability
+
+#### Scenario: Published Item cannot move stages
+- **WHEN** the active Item is Published
+- **THEN** advance and regress controls are unavailable
+- **AND** the surface explains that the Item must be confirmed Paused before protected content can change
+
+#### Scenario: Rejected Item is reactivated
+- **WHEN** the user confirms the allowed Rejected-to-Draft transition
+- **THEN** the Item becomes active Draft work at its preserved workflow stage
 
 ### Requirement: Workflow stage drives navigation availability and initial view
 FusionCanvas SHALL determine stage navigability from the listing's persisted workflow stage: the current stage and all earlier stages are navigable, later stages are disabled, and opening a listing document SHALL present the listing's current workflow stage view.
@@ -160,3 +185,21 @@ FusionCanvas SHALL migrate pre-v4 workspace databases to the lifecycle model by 
 #### Scenario: Migrated listings behave like native ones
 - **WHEN** migration completes
 - **THEN** migrated listings support stage movement, status change, navigator availability, and filtering identically to newly created listings
+
+### Requirement: Published and Rejected Items protect product content
+FusionCanvas SHALL keep stage text, Design files, related-asset relationships, and stage movement read-only for Published and Rejected Items while allowing approved shared metadata and lifecycle operations.
+
+#### Scenario: Published Item is reviewed
+- **WHEN** a Published Item is active
+- **THEN** stage content, Design-file mutations, related-asset mutations, and stage movement are unavailable
+- **AND** working title, Notes, Tags, topic placement, archive, and allowed status transitions remain available
+
+#### Scenario: User modifies Published content intentionally
+- **WHEN** the user requests a protected change on a Published Item
+- **THEN** FusionCanvas offers one confirmation to change it to Paused
+- **AND** after confirmation the user must regress to an upstream stage before editing that stage
+
+#### Scenario: Rejected Item is reviewed
+- **WHEN** a Rejected Item is active
+- **THEN** product content and stage movement remain read-only
+- **AND** working title, Notes, Tags, topic placement, archive, and Rejected-to-Draft recovery remain available
