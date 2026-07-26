@@ -1,10 +1,15 @@
-using FusionCanvas.App.DocumentWindow;
+﻿using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Stores;
 using FusionCanvas.App.Views;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.App.Workflow;
 using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Workflow;
+using FusionCanvas.Domain.Tags;
+using FusionCanvas.Domain.Items;
+using FusionCanvas.Domain.Niches;
+using FusionCanvas.Domain.Stores;
 
 namespace FusionCanvas.App.Tests;
 

@@ -1,5 +1,10 @@
-using System.IO;
+﻿using System.IO;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Assets;
+using FusionCanvas.Domain.Items;
+using FusionCanvas.Domain.Groups;
+using FusionCanvas.Domain.Niches;
+using FusionCanvas.Domain.Stores;
 
 namespace FusionCanvas.Application.Workspace;
 

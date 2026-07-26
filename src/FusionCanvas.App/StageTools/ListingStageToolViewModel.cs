@@ -1,7 +1,9 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Workflow;
+using FusionCanvas.Domain.Items;
 
 namespace FusionCanvas.App.StageTools;
 

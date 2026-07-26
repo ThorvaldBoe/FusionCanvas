@@ -1,5 +1,9 @@
-using FusionCanvas.Application.Workspace;
+﻿using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Workflow;
+using FusionCanvas.Domain.Items;
+using FusionCanvas.Domain.Niches;
+using FusionCanvas.Domain.Stores;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Input;

@@ -1,4 +1,4 @@
-using FusionCanvas.App.Assets;
+﻿using FusionCanvas.App.Assets;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Groups;
 using FusionCanvas.App.Items;
@@ -11,6 +11,11 @@ using FusionCanvas.App.Workflow;
 using FusionCanvas.Application.Settings;
 using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Workflow;
+using FusionCanvas.Domain.Items;
+using FusionCanvas.Domain.Groups;
+using FusionCanvas.Domain.Niches;
+using FusionCanvas.Domain.Stores;
 using FusionCanvas.Integration.Workspace;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;

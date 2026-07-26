@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
@@ -10,6 +10,7 @@ using FusionCanvas.App.Views;
 using FusionCanvas.Application.Settings;
 using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Stores;
 
 namespace FusionCanvas.App.Tests;
 

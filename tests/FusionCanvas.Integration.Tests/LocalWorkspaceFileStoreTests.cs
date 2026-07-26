@@ -1,4 +1,6 @@
-using FusionCanvas.Domain.Workspace;
+﻿using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Assets;
+using FusionCanvas.Domain.Stores;
 using FusionCanvas.Integration.Workspace;
 
 namespace FusionCanvas.Integration.Tests;

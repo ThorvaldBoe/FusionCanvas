@@ -1,5 +1,13 @@
-using FusionCanvas.Application.Workspace;
+﻿using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Workflow;
+using FusionCanvas.Domain.Prompts;
+using FusionCanvas.Domain.Assets;
+using FusionCanvas.Domain.Tags;
+using FusionCanvas.Domain.Items;
+using FusionCanvas.Domain.Groups;
+using FusionCanvas.Domain.Niches;
+using FusionCanvas.Domain.Stores;
 using FusionCanvas.Integration.Workspace;
 using Microsoft.Data.Sqlite;
 

@@ -1,5 +1,6 @@
-using FusionCanvas.Application.Workspace;
+﻿using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Workflow;
 
 namespace FusionCanvas.Application.Tests;
 
