@@ -1,8 +1,9 @@
-﻿using FusionCanvas.App.DocumentWindow;
-using FusionCanvas.Application.Workspace;
+using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
-using FusionCanvas.Domain.Items;
+using FusionCanvas.Application.StageTools;
+using FusionCanvas.Application.WorkflowNavigation;
+using FusionCanvas.Application.ToolContexts;
 
 namespace FusionCanvas.App.Tests;
 

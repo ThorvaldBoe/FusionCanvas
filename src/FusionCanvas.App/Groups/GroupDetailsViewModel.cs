@@ -2,8 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using FusionCanvas.App.DocumentWindow;
-using FusionCanvas.Application.Workspace;
-using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Application.Groups;
 
 namespace FusionCanvas.App.Groups;
 

@@ -1,7 +1,6 @@
-﻿using FusionCanvas.App.Workflow;
-using FusionCanvas.Application.Workspace;
-using FusionCanvas.Domain.Workspace;
+using FusionCanvas.App.Workflow;
 using FusionCanvas.Domain.Workflow;
+using FusionCanvas.Application.WorkflowNavigation;
 
 namespace FusionCanvas.App.Tests;
 

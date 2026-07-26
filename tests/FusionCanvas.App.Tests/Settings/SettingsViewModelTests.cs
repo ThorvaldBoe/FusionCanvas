@@ -1,9 +1,8 @@
-﻿using FusionCanvas.App.Settings;
+using FusionCanvas.App.Settings;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.Application.Settings;
-using FusionCanvas.Application.Workspace;
 using FusionCanvas.Domain.Workspace;
-using FusionCanvas.Domain.Stores;
+using FusionCanvas.Application.Workspaces;
 
 namespace FusionCanvas.App.Tests;
 

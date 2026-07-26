@@ -1,6 +1,5 @@
-﻿using FusionCanvas.Application.Workspace;
-using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Assets;
+using FusionCanvas.Application.Workspaces;
 
 namespace FusionCanvas.Integration.Workspace;
 

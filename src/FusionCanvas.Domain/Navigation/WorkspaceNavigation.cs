@@ -1,7 +1,6 @@
 using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Niches;
-using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.Domain.Navigation;

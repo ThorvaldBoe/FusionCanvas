@@ -1,0 +1,111 @@
+using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Navigation;
+
+namespace FusionCanvas.Application.Navigation;
+
+public sealed class WorkspaceNavigationService : IWorkspaceNavigationService
+{
+    public NavigationTreeSnapshot LoadTree(WorkspaceSnapshot snapshot) =>
+        WorkspaceNavigation.BuildTree(snapshot);
+
+    public NavigationTarget Select(WorkspaceSnapshot snapshot, NavigationTarget target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+
+        var tree = LoadTree(snapshot);
+        var node = tree.Flatten().FirstOrDefault(candidate =>
+            candidate.EntityKind == target.EntityKind && candidate.EntityId == target.EntityId);
+
+        if (node is null)
+        {
+            throw new InvalidOperationException("The selected navigation target does not exist in the workspace tree.");
+        }
+
+        return target;
+    }
+
+    public NavigationCreationScope ResolveCreationScope(WorkspaceSnapshot snapshot, NavigationTarget activeTarget)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(activeTarget);
+
+        return activeTarget.Kind switch
+        {
+            NavigationTargetKind.Store => ResolveStoreScope(snapshot, activeTarget.EntityId),
+            NavigationTargetKind.Topic => ResolveTopicScope(snapshot, activeTarget.EntityKind, activeTarget.EntityId),
+            NavigationTargetKind.Item => ResolveItemScope(snapshot, activeTarget.EntityId),
+            _ => throw new InvalidOperationException("Unsupported navigation target.")
+        };
+    }
+
+    public WorkspaceSnapshot MoveTopic(
+        WorkspaceSnapshot snapshot,
+        Guid groupId,
+        NavigationTopicReference destinationTopic) =>
+        WorkspaceNavigation.MoveTopic(snapshot, groupId, destinationTopic);
+
+    public WorkspaceSnapshot MoveItem(
+        WorkspaceSnapshot snapshot,
+        Guid itemId,
+        NavigationTopicReference destinationTopic) =>
+        WorkspaceNavigation.MoveItem(snapshot, itemId, destinationTopic);
+
+    public IReadOnlyList<Guid> RevealPath(WorkspaceSnapshot snapshot, NavigationTarget target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+
+        var tree = LoadTree(snapshot);
+        var node = tree.Flatten().FirstOrDefault(candidate =>
+            candidate.EntityKind == target.EntityKind && candidate.EntityId == target.EntityId)
+            ?? throw new InvalidOperationException("The reveal target does not exist in the workspace tree.");
+
+        return tree.GetPath(node.Id);
+    }
+
+    private static NavigationCreationScope ResolveStoreScope(WorkspaceSnapshot snapshot, Guid storeId)
+    {
+        if (snapshot.Stores.All(store => store.Id != storeId))
+        {
+            throw new InvalidOperationException("Store was not found.");
+        }
+
+        return new NavigationCreationScope(storeId, null, null);
+    }
+
+    private static NavigationCreationScope ResolveTopicScope(
+        WorkspaceSnapshot snapshot,
+        WorkspaceEntityKind topicKind,
+        Guid topicId)
+    {
+        if (topicKind == WorkspaceEntityKind.Niche)
+        {
+            var niche = snapshot.Niches.SingleOrDefault(candidate => candidate.Id == topicId)
+                ?? throw new InvalidOperationException("Niche was not found.");
+
+            return new NavigationCreationScope(niche.StoreId, niche.Id, WorkspaceEntityKind.Niche);
+        }
+
+        var group = snapshot.Groups.SingleOrDefault(candidate => candidate.Id == topicId)
+            ?? throw new InvalidOperationException("Group was not found.");
+
+        return new NavigationCreationScope(group.StoreId, group.Id, WorkspaceEntityKind.Group);
+    }
+
+    private static NavigationCreationScope ResolveItemScope(WorkspaceSnapshot snapshot, Guid itemId)
+    {
+        var listing = snapshot.Items.SingleOrDefault(candidate => candidate.Id == itemId)
+            ?? throw new InvalidOperationException("Listing was not found.");
+
+        if (listing.GroupId is Guid groupId)
+        {
+            return new NavigationCreationScope(listing.StoreId, groupId, WorkspaceEntityKind.Group);
+        }
+
+        if (listing.NicheId is Guid nicheId)
+        {
+            return new NavigationCreationScope(listing.StoreId, nicheId, WorkspaceEntityKind.Niche);
+        }
+
+        throw new InvalidOperationException("Listing does not have a valid creation scope.");
+    }
+}

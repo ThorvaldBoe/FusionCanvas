@@ -1,7 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:assets="using:FusionCanvas.App.Assets"
-        xmlns:workflow="clr-namespace:FusionCanvas.Application.Workspace;assembly=FusionCanvas.Application"
         x:Class="FusionCanvas.App.Assets.AssetsWindow"
         x:DataType="assets:AssetsViewModel"
         Title="Assets"

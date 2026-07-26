@@ -2,7 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using FusionCanvas.App.DocumentWindow;
-using FusionCanvas.Application.Workspace;
+using FusionCanvas.Application.Workspaces;
 
 namespace FusionCanvas.App.Workspace;
 

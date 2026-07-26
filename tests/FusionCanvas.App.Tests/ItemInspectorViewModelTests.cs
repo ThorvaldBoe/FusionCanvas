@@ -1,5 +1,4 @@
-﻿using FusionCanvas.App.Items;
-using FusionCanvas.Application.Workspace;
+using FusionCanvas.App.Items;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Tags;
@@ -7,6 +6,9 @@ using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
+using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.Items;
+using FusionCanvas.Application.Tags;
 
 namespace FusionCanvas.App.Tests;
 
