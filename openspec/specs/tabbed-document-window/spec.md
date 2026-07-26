@@ -3,6 +3,7 @@
 ## Purpose
 TBD - created by archiving change fc-0009-tabbed-document-window. Update Purpose after archive.
 ## Requirements
+
 ### Requirement: Workspace includes a tabbed document window
 The main workspace SHALL include a document window that can display multiple open document contexts as tabs.
 
@@ -117,3 +118,14 @@ When the active document context is a listing item, the document window detail a
 - **WHEN** the active listing's title, placement, archive state, status, or stage changes through another accepted surface while its tab is open
 - **THEN** the detail area reflects the updated persisted listing context
 
+### Requirement: Item tabs use universal terminology and stable fallback titles
+The tabbed document window SHALL treat Item as the universal item context and SHALL display the same derived fallback used by the tree when working title is empty.
+
+#### Scenario: Empty-title Item opens in a tab
+- **WHEN** the Item opens or replaces the reusable working tab
+- **THEN** the tab title is `Untitled item · <short ID>`
+- **AND** the fallback is not persisted as Item content
+
+#### Scenario: Item title is saved
+- **WHEN** the working title changes successfully
+- **THEN** every open tab for that Item refreshes to the authoritative title

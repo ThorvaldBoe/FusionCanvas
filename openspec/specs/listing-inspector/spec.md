@@ -62,7 +62,7 @@ FusionCanvas SHALL allow the user to edit the Item's optional working title, cur
 - **AND** the pending text commit is not discarded or blocked
 
 ### Requirement: Listing inspector aligns status and workflow stage with document context
-FusionCanvas SHALL display the listing's current lifecycle status and current workflow stage in the inspector, SHALL keep them synchronized with the workflow stage navigator and the document-context status control, and SHALL NOT introduce a second lifecycle-status selector in the same document context.
+The Item document surface SHALL display one Item-level lifecycle-status selector in shared Overview/header, SHALL source its options from the approved transition policy, and SHALL keep current stage, active view stage, tree treatment, tabs, and filters synchronized.
 
 #### Scenario: Status changes elsewhere in the document context
 - **WHEN** the listing's lifecycle status changes through the document-context status control while the inspector is visible
@@ -74,8 +74,17 @@ FusionCanvas SHALL display the listing's current lifecycle status and current wo
 - **THEN** the inspector displays the new current stage
 - **AND** updates stage-relevant emphasis to match
 
+#### Scenario: Status options are displayed
+- **WHEN** an Item document is active
+- **THEN** exactly one status selector is shown
+- **AND** it displays the persisted current status and only valid direct transition targets for the current stage and status
+
+#### Scenario: Stage or status changes
+- **WHEN** the active Item's stage or status changes successfully
+- **THEN** the surface, navigator, tree, tabs, and active filters refresh to the authoritative state
+
 ### Requirement: Listing inspector presents stage-relevant creative fields
-The inspector SHALL keep every creative section accessible at every workflow stage and SHALL emphasize the section relevant to the listing's current stage so the user understands what matters now while retaining access to completed-stage context.
+The Item document surface SHALL show exactly one primary built-in Stage Tool for the active view stage, SHALL make current-stage content editable when lifecycle policy allows, and SHALL present earlier-stage content read-only while retaining shared Item metadata outside the tool.
 
 #### Scenario: Listing is at the Concept stage
 - **WHEN** the active listing's current stage is `Concept`
@@ -86,6 +95,17 @@ The inspector SHALL keep every creative section accessible at every workflow sta
 - **WHEN** the active listing's current stage changes from `Idea` to `Design`
 - **THEN** the inspector moves emphasis to the assets section
 - **AND** no section becomes unavailable because of the stage change
+
+#### Scenario: Item is at Concept
+- **WHEN** Concept is both current and active
+- **THEN** the Concept Stage Tool shows editable Concept idea, Phrase, and Graphics description
+- **AND** Idea, Design, and Listing primary tools are not shown simultaneously
+- **AND** shared Overview, Notes, Tags, Related assets, and lifecycle areas remain available
+
+#### Scenario: User reviews an earlier stage
+- **WHEN** Design is current and the user activates Idea
+- **THEN** the Idea Stage Tool is visible read-only
+- **AND** the user must regress before editing Idea content
 
 ### Requirement: Listing inspector manages listing tags
 FusionCanvas SHALL allow the user to view the listing's linked tags, link an existing reusable store tag, create a new reusable store tag when the entered name has no case-insensitive match in the store, and remove tag links, SHALL normalize tag names to nonblank single-line values, SHALL persist each tag addition or removal immediately and atomically when the user applies it, and SHALL NOT delete reusable tag records when a link is removed.
@@ -234,3 +254,26 @@ FusionCanvas SHALL present idea-stage triage for the active idea-stage listing t
 #### Scenario: User reviews unprocessed ideas
 - **WHEN** the user activates the `Idea` workflow-stage filter together with the `Draft` lifecycle-status filter
 - **THEN** the navigation tree lists exactly the unprocessed ideas with their parent topic context preserved
+
+### Requirement: Listing inspector edits core creative fields with explicit save
+The Item document surface SHALL persist optional working title, current-stage text, and Notes only through explicit Save, SHALL preserve Item identity and placement, hidden legacy fields, unknown metadata, and inherited provenance, and SHALL keep Tags independently immediate.
+
+#### Scenario: User saves valid Item edits
+- **WHEN** the user changes optional working title, current-stage text, or Notes and invokes Save
+- **THEN** FusionCanvas persists the normalized values and updated timestamp
+- **AND** preserves identity, topic placement, archive state, status, stage, assets, prompts, hidden Audience and generic Description, unknown metadata, and provenance
+
+#### Scenario: Save targets a non-current stage
+- **WHEN** a stale or incorrect request attempts to save stage content that is not owned by the Item's current stage
+- **THEN** FusionCanvas rejects the mutation
+- **AND** leaves persisted Item content unchanged
+
+#### Scenario: User switches context with unsaved text
+- **WHEN** the Item surface has meaningful unsaved working title, current-stage text, or Notes and the user changes Item, tab, active view stage, or lifecycle state
+- **THEN** FusionCanvas asks whether to Save, Discard, or Cancel
+- **AND** retains the current draft and focus when cancellation is chosen
+
+#### Scenario: Tag changes while text is unsaved
+- **WHEN** the user applies or removes a Tag while text edits are pending
+- **THEN** the Tag mutation persists independently
+- **AND** the explicit text Save remains pending

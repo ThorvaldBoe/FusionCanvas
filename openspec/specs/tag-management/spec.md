@@ -271,3 +271,15 @@ FusionCanvas SHALL use compact action sizing, clear tooltips for icon-only comma
 - **WHEN** the listing tag editor is focused
 - **THEN** arrow keys navigate autocomplete, Enter applies or creates the selected entry, Backspace removes the last applied chip, and Escape clears the input without losing existing chips
 - **AND** focus remains in the editor after an apply or remove so rapid multi-tag entry is possible
+
+### Requirement: Tags link to Items and persist independently from Item text drafts
+FusionCanvas SHALL use Item terminology for universal Tag links and SHALL keep apply, create, and remove Tag operations independently immediate from guarded Item text edits.
+
+#### Scenario: Tag is applied while Item text is dirty
+- **WHEN** working title, current-stage text, or Notes has an unsaved draft and the user applies a Tag
+- **THEN** the Tag link persists atomically to the Item
+- **AND** the text draft and its Save/Discard/Cancel state remain unchanged
+
+#### Scenario: Item terminology migration preserves Tags
+- **WHEN** existing Listing Tag links are migrated
+- **THEN** every link references the same stable Item and Tag IDs

@@ -7,7 +7,7 @@ Defines how FusionCanvas creates, organizes, edits, duplicates, archives, restor
 ## Requirements
 
 ### Requirement: Listing management creates product concepts in active topics
-FusionCanvas SHALL allow a user to create a listing beneath an active niche or group using one nonblank single-line working title or idea, and SHALL NOT require assets, mockups, marketplace metadata, or other later-stage records.
+FusionCanvas SHALL provide Item management that creates a stage-agnostic Item beneath an active niche or group without requiring a title, assets, mockups, marketplace metadata, or stage content.
 
 #### Scenario: User captures a listing from a selected topic
 - **WHEN** the user commits one valid line of idea text while an active niche or group is canonically selected
@@ -21,9 +21,9 @@ FusionCanvas SHALL allow a user to create a listing beneath an active niche or g
 - **THEN** FusionCanvas uses the selected listing's containing group, or its niche when ungrouped, as the new listing destination
 
 #### Scenario: Store context uses the default niche
-- **WHEN** an active store has no applicable topic or listing selection and has a valid active default niche
-- **THEN** FusionCanvas creates the listing beneath that default niche
-- **AND** does not create a store-level listing
+- **WHEN** an active store has no applicable topic or Item selection and has a valid active default niche
+- **THEN** FusionCanvas creates the Item beneath that default niche
+- **AND** does not create a store-level Item
 
 #### Scenario: Store has one active niche
 - **WHEN** the active store has exactly one active niche and no valid default has yet been persisted
@@ -32,9 +32,8 @@ FusionCanvas SHALL allow a user to create a listing beneath an active niche or g
 
 #### Scenario: Store has no resolvable topic
 - **WHEN** the active store has no active niche, or has multiple active niches with no applicable selection and no valid default niche
-- **THEN** FusionCanvas blocks listing creation
-- **AND** guides the user to create or select a niche or configure the store default
-- **AND** does not guess from alphabetical order
+- **THEN** FusionCanvas blocks Item creation with an actionable setup path
+- **AND** creates no Item
 
 #### Scenario: User supplies optional details during creation
 - **WHEN** the user creates a listing with a valid idea line and optional description or notes
@@ -46,6 +45,27 @@ FusionCanvas SHALL allow a user to create a listing beneath an active niche or g
 - **THEN** FusionCanvas rejects the creation
 - **AND** preserves the draft for correction
 - **AND** leaves the persisted workspace unchanged
+
+#### Scenario: User creates an empty Item from a selected topic
+- **WHEN** the user invokes New Item while an active niche or group is canonically selected
+- **THEN** FusionCanvas creates a new Item with stable identity beneath that topic
+- **AND** the Item belongs to the topic's store
+- **AND** starts at Idea with Draft status
+- **AND** may have an empty working title and no attached assets
+
+#### Scenario: Selected Item supplies its containing topic
+- **WHEN** an active Item is selected and the user starts another Item
+- **THEN** FusionCanvas uses the selected Item's containing group, or its niche when ungrouped, as the destination
+
+#### Scenario: User supplies optional creation details
+- **WHEN** the user creates an Item with an optional working title, description-compatible legacy input, Notes, Tags, or inherited context
+- **THEN** FusionCanvas persists the supplied optional values
+- **AND** omitted values do not block creation
+
+#### Scenario: Generated identity is invalid
+- **WHEN** Item creation cannot obtain a non-empty unique ID
+- **THEN** FusionCanvas rejects creation
+- **AND** leaves persisted workspace state unchanged
 
 ### Requirement: Listing destinations honor active group ancestry
 FusionCanvas SHALL validate listing niche and group destinations against the active workspace and store, and SHALL treat a group as available only when its store, effective niche, and complete group ancestry are active.
@@ -271,3 +291,11 @@ FusionCanvas SHALL use compact action sizing, clear tooltips for icon-only comma
 #### Scenario: Icon-only listing command is shown
 - **WHEN** an icon-only listing command appears in the workspace tree
 - **THEN** the command exposes a tooltip that describes its action
+
+### Requirement: Item management preserves fallback labels without persisting them
+Item management SHALL expose one stable fallback display label for an empty working title and SHALL keep that label derived from identity.
+
+#### Scenario: Empty Item appears across surfaces
+- **WHEN** an empty-title Item is selected or opened
+- **THEN** its tree row, tab, and Overview use the same `Untitled item · <short ID>` label
+- **AND** saving unrelated data does not write the fallback into the Item name
