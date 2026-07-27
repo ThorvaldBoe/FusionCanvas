@@ -840,6 +840,14 @@ MockupColorVariant
 - may reference a color-specific TemplateAsset
 ```
 
+## Workspace package and database compatibility
+
+FusionCanvas workspace packages and local workspace databases share one backward-compatibility obligation. Every schema version shipped to users must remain migratable by future application versions, whether it is encountered as the user's local database or as the embedded database in a `.fcworkspace` package.
+
+Package manifests carry separate container-format, embedded-schema, and exporting-application versions so an importer can refuse newer unsupported content before changing live state. Older supported schemas use the same ordered SQLite migration chain as local databases.
+
+Any deliberate break in the database schema or workspace-package container must be stated explicitly in the change that introduces it and must ship with a migration path for previously shipped local databases and packages. Silently abandoning an earlier shipped version is not compatible with FusionCanvas's local-first ownership commitment.
+
 ## Open Questions
 
 - Should Idea and Phrase become independent entities later, or remain Item metadata?

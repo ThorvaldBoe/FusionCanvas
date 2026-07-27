@@ -1244,7 +1244,13 @@
           <StackPanel Orientation="Horizontal"
                       HorizontalAlignment="Right"
                       Spacing="8">
+            <Button x:Name="NoWorkspaceImportButton"
+                    Content="Import workspace…"
+                    IsEnabled="{Binding WorkspaceManagement.CanImportWorkspace}"
+                    Command="{Binding WorkspaceManagement.ImportWorkspaceCommand}"
+                    Classes="storeAction fixedDialog" />
             <Button Content="Create workspace"
+                    IsEnabled="{Binding !WorkspaceManagement.IsTransferRunning}"
                     Command="{Binding WorkspaceManagement.CreateWorkspaceCommand}"
                     Classes="storeAction fixedDialog" />
           </StackPanel>

@@ -37,6 +37,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         var viewModel = MainWindowViewModel.CreateForDefaultWorkspace(settings);
+        viewModel.WorkspaceManagement.PackagePicker = new AvaloniaWorkspacePackagePicker(StorageProvider);
         viewModel.StoreManagement.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(StoreManagementViewModel.IsStoreEditorOpen))

@@ -37,6 +37,12 @@ public sealed class LocalWorkspaceFileStore : IWorkspaceFileStore
 
     public string WorkspaceRoot { get; }
 
+    internal static bool IsSupportedCreativeAssetPath(string path)
+    {
+        var extension = Path.GetExtension(path);
+        return extension.Length == 0 || SupportedExtensions.Contains(extension);
+    }
+
     public async Task<ManagedWorkspaceFile> ImportAsync(
         string sourcePath,
         AssetKind kind,
@@ -136,6 +142,38 @@ public sealed class LocalWorkspaceFileStore : IWorkspaceFileStore
         }
 
         return Task.FromResult<Stream>(File.OpenRead(fullPath));
+    }
+
+    public async Task<WorkspaceFileRestoreOutcome> RestoreAsync(
+        string workspaceRelativePath,
+        Stream content,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        var fullPath = ResolveWithinWorkspaceOrThrow(workspaceRelativePath);
+        if (File.Exists(fullPath))
+        {
+            return WorkspaceFileRestoreOutcome.SkippedExisting;
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        try
+        {
+            await using var destination = new FileStream(
+                fullPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                81920,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+            await content.CopyToAsync(destination, cancellationToken);
+            return WorkspaceFileRestoreOutcome.Created;
+        }
+        catch
+        {
+            TryDelete(workspaceRelativePath);
+            throw;
+        }
     }
 
     public async Task ExportCopyAsync(string workspaceRelativePath, string destinationPath, CancellationToken cancellationToken = default)
