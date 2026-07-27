@@ -8,6 +8,7 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Assets;
 using FusionCanvas.App.Groups;
+using FusionCanvas.App.Ideation;
 using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Settings;
 using FusionCanvas.App.Stores;
@@ -23,18 +24,25 @@ public partial class MainWindow : Window
     private WorkspaceManagementWindow? _workspaceManagementWindow;
     private SettingsWindow? _settingsWindow;
     private AssetsWindow? _assetsWindow;
+    private IdeationWindow? _ideationWindow;
     private Window? _designPreviewWindow;
     private PointerPressedEventArgs? _dragPointerArgs;
     private WorkspaceTreeNodeViewModel? _dragNode;
     private Avalonia.Point _dragStart;
     private WorkspaceTreeNodeViewModel? _dropTarget;
 
-    public MainWindow() : this(settings: null) { }
-
-    public MainWindow(SettingsViewModel? settings)
+    public MainWindow()
     {
         InitializeComponent();
-        var viewModel = MainWindowViewModel.CreateForDefaultWorkspace(settings);
+    }
+
+    public MainWindow(AppServices services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        InitializeComponent();
+        var viewModel = MainWindowViewModel.CreateForDefaultWorkspace(
+            services.Settings,
+            services.AiTextGeneration);
         viewModel.WorkspaceManagement.PackagePicker = new AvaloniaWorkspacePackagePicker(StorageProvider);
         viewModel.StoreManagement.PropertyChanged += (_, args) =>
         {
@@ -65,6 +73,13 @@ public partial class MainWindow : Window
                 Dispatcher.UIThread.Post(() => CancelStatusChangeButton.Focus(), DispatcherPriority.Input);
             }
         };
+        viewModel.Ideation.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(IdeationViewModel.IsOpen))
+            {
+                SyncIdeationWindow(viewModel.Ideation);
+            }
+        };
         viewModel.Settings.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(SettingsViewModel.IsOpen))
@@ -77,6 +92,7 @@ public partial class MainWindow : Window
         SyncWorkspaceManagementWindow(viewModel.WorkspaceManagement);
         SyncStoreEditorWindow(viewModel.StoreManagement);
         SyncAssetsWindow(viewModel.AssetsManagement);
+        SyncIdeationWindow(viewModel.Ideation);
     }
 
     private void SyncSettingsWindow(SettingsViewModel settings)
@@ -187,6 +203,33 @@ public partial class MainWindow : Window
         if (!assets.IsOpen && _assetsWindow is not null)
         {
             _assetsWindow.Close();
+        }
+    }
+
+    private void SyncIdeationWindow(IdeationViewModel ideation)
+    {
+        if (ideation.IsOpen && _ideationWindow is null)
+        {
+            _ideationWindow = new IdeationWindow { DataContext = ideation };
+            _ideationWindow.Closed += (_, _) =>
+            {
+                _ideationWindow = null;
+                if (CanFocusOwner(this))
+                {
+                    Activate();
+                    if (!IdeationButton.Focus())
+                    {
+                        WorkspaceTreeControl.Focus();
+                    }
+                }
+            };
+            _ = _ideationWindow.ShowDialog(this);
+            return;
+        }
+
+        if (!ideation.IsOpen && _ideationWindow is not null)
+        {
+            _ideationWindow.Close();
         }
     }
 

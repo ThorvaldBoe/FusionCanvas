@@ -7,7 +7,7 @@ namespace FusionCanvas.App;
 
 public partial class App : Avalonia.Application
 {
-    private SettingsViewModel? _settings;
+    private AppServices? _services;
 
     public override void Initialize()
     {
@@ -18,9 +18,13 @@ public partial class App : Avalonia.Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            _settings = AppSettingsFactory.LoadInitialState();
-            var mainWindow = new MainWindow(_settings);
-            mainWindow.Closing += (_, _) => _settings?.FlushAsync().GetAwaiter().GetResult();
+            _services = AppServicesFactory.Create();
+            var mainWindow = new MainWindow(_services);
+            mainWindow.Closing += (_, _) =>
+            {
+                _services?.FlushAsync().GetAwaiter().GetResult();
+                _services?.Dispose();
+            };
             desktop.MainWindow = mainWindow;
         }
 

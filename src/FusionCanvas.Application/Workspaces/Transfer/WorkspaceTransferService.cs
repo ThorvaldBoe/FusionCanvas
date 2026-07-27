@@ -230,7 +230,10 @@ public sealed class WorkspaceTransferService(
             [.. live.Prompts, .. imported.Prompts],
             [.. live.Tags, .. imported.Tags],
             [.. live.ItemTags, .. imported.ItemTags],
-            [.. live.AssetLinks, .. imported.AssetLinks]);
+            [.. live.AssetLinks, .. imported.AssetLinks])
+        {
+            IdeationRejections = [.. live.IdeationRejections, .. imported.IdeationRejections]
+        };
 
     internal static IReadOnlyDictionary<string, int> CountEntities(WorkspaceSnapshot snapshot) =>
         new Dictionary<string, int>(StringComparer.Ordinal)
@@ -244,7 +247,8 @@ public sealed class WorkspaceTransferService(
             ["prompts"] = snapshot.Prompts.Count,
             ["tags"] = snapshot.Tags.Count,
             ["itemTags"] = snapshot.ItemTags.Count,
-            ["assetLinks"] = snapshot.AssetLinks.Count
+            ["assetLinks"] = snapshot.AssetLinks.Count,
+            ["ideationRejections"] = snapshot.IdeationRejections.Count
         };
 
     private static IReadOnlyList<string> BuildWarnings(

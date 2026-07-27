@@ -13,7 +13,7 @@ public static class AppSettingsFactory
     public static SettingsViewModel LoadInitialState()
     {
         var store = CreateStore();
-        var load = store.LoadAsync().GetAwaiter().GetResult();
+        var load = StartupTaskRunner.Run(() => store.LoadAsync());
         var themeController = new AvaloniaApplicationThemeController();
         return new SettingsViewModel(store, themeController, load.Value, load.Warning);
     }

@@ -7,6 +7,7 @@ using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
+using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Groups;
 using FusionCanvas.Application.WorkspaceTree;
@@ -69,7 +70,20 @@ public class GroupManagementServiceTests
     {
         var sample = Sample.CreateWithGroups();
         var otherNiche = new Niche(Guid.NewGuid(), sample.Store.Id, "Dogs", null, false, sample.Now, sample.Now, "{}");
-        var snapshot = sample.Snapshot with { Niches = [.. sample.Snapshot.Niches, otherNiche] };
+        var rejection = new IdeationRejection(
+            Guid.NewGuid(),
+            sample.Store.Id,
+            sample.Niche.Id,
+            sample.ChildGroup!.Id,
+            "Rejected candidate",
+            null,
+            IdeationMode.Basic,
+            sample.Now);
+        var snapshot = sample.Snapshot with
+        {
+            Niches = [.. sample.Snapshot.Niches, otherNiche],
+            IdeationRejections = [rejection]
+        };
         var repository = new TestRepository(snapshot);
         var service = new GroupManagementService(repository);
 
@@ -85,6 +99,7 @@ public class GroupManagementServiceTests
         Assert.Equal(root.Id, child.ParentGroupId);
         Assert.Equal(child.Id, listing.GroupId);
         Assert.Equal(otherNiche.Id, listing.NicheId);
+        Assert.Equal(otherNiche.Id, Assert.Single(repository.Snapshot.IdeationRejections).NicheId);
         Assert.Equal(sample.RootGroup.Id, result.State.ActiveGroupId);
     }
 
@@ -279,6 +294,15 @@ public class GroupManagementServiceTests
         var prompt = new Prompt(Guid.NewGuid(), sample.Store.Id, listing.Id, "Prompt", null, "Text", false, sample.Now, sample.Now, "{}");
         var tag = new Tag(Guid.NewGuid(), sample.Store.Id, "Tag", null, false, sample.Now, sample.Now, "{}");
         var asset = new Asset(Guid.NewGuid(), sample.Store.Id, "Asset", null, AssetKind.SourceDesign, "assets/source.png", null, false, false, sample.Now, sample.Now, "{}");
+        var rejection = new IdeationRejection(
+            Guid.NewGuid(),
+            sample.Store.Id,
+            sample.Niche.Id,
+            child.Id,
+            "Rejected candidate",
+            null,
+            IdeationMode.Basic,
+            sample.Now);
         var snapshot = sample.Snapshot with
         {
             Groups = [sample.RootGroup, child, sibling, grandchild],
@@ -287,6 +311,7 @@ public class GroupManagementServiceTests
             Tags = [tag],
             ItemTags = [new ItemTag(listing.Id, tag.Id)],
             Assets = [asset],
+            IdeationRejections = [rejection],
             AssetLinks =
             [
                 new AssetLink(asset.Id, WorkspaceEntityKind.Item, listing.Id),
@@ -308,6 +333,7 @@ public class GroupManagementServiceTests
         Assert.Empty(repository.Snapshot.Prompts);
         Assert.Empty(repository.Snapshot.ItemTags);
         Assert.Single(repository.Snapshot.Assets);
+        Assert.Null(Assert.Single(repository.Snapshot.IdeationRejections).GroupId);
         Assert.Equal(sample.RootGroup.Id, Assert.Single(repository.Snapshot.AssetLinks).EntityId);
         Assert.Equal(sample.RootGroup.Id, result.State.ActiveGroupId);
     }

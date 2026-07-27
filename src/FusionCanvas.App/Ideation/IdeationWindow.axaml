@@ -1,0 +1,180 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ideation="using:FusionCanvas.App.Ideation"
+        x:Class="FusionCanvas.App.Ideation.IdeationWindow"
+        x:DataType="ideation:IdeationViewModel"
+        Title="Ideation"
+        Width="720"
+        Height="680"
+        MinWidth="560"
+        MinHeight="500"
+        WindowStartupLocation="CenterOwner">
+  <Grid RowDefinitions="Auto,Auto,*,Auto"
+        Margin="22"
+        RowSpacing="14">
+    <StackPanel Grid.Row="0" Spacing="4">
+      <TextBlock Text="Ideation"
+                 FontSize="24"
+                 FontWeight="SemiBold"
+                 Foreground="{DynamicResource PrimaryTextBrush}" />
+      <TextBlock Text="{Binding ScopeLabel}"
+                 TextWrapping="Wrap"
+                 Foreground="{DynamicResource SecondaryTextBrush}"
+                 AutomationProperties.Name="Ideation scope" />
+    </StackPanel>
+
+    <Grid Grid.Row="1"
+          RowDefinitions="Auto,Auto,Auto,Auto"
+          ColumnDefinitions="*,160"
+          ColumnSpacing="12"
+          RowSpacing="6">
+      <TextBlock Grid.Row="0"
+                 Grid.Column="0"
+                 Text="Idea input (optional)"
+                 Foreground="{DynamicResource SecondaryTextBrush}" />
+      <TextBlock Grid.Row="0"
+                 Grid.Column="1"
+                 Text="Mode"
+                 Foreground="{DynamicResource SecondaryTextBrush}" />
+      <TextBox x:Name="GuidanceTextBox"
+               Grid.Row="1"
+               Grid.Column="0"
+               Text="{Binding Guidance}"
+               AcceptsReturn="True"
+               TextWrapping="Wrap"
+               MinHeight="72"
+               IsEnabled="{Binding IsNotBusy}"
+               PlaceholderText="For example: Grumpy"
+               AutomationProperties.Name="Optional idea guidance" />
+      <ComboBox Grid.Row="1"
+                Grid.Column="1"
+                ItemsSource="{Binding Modes}"
+                SelectedItem="{Binding SelectedMode}"
+                IsEnabled="{Binding IsNotBusy}"
+                AutomationProperties.Name="Ideation mode" />
+      <StackPanel Grid.Row="2"
+                  Grid.ColumnSpan="2"
+                  Orientation="Horizontal"
+                  Spacing="8"
+                  Margin="0,8,0,0">
+        <TextBlock Text="Number of ideas"
+                   VerticalAlignment="Center"
+                   Foreground="{DynamicResource SecondaryTextBrush}" />
+        <TextBox Text="{Binding CountText}"
+                 Width="64"
+                 IsEnabled="{Binding IsNotBusy}"
+                 AutomationProperties.Name="Number of ideas" />
+        <Button Content="Generate ideas"
+                Command="{Binding GenerateCommand}"
+                IsEnabled="{Binding CanGenerate}"
+                AutomationProperties.Name="Generate ideas" />
+        <ideation:SpinningWheel Width="22"
+                                Height="22"
+                                IsActive="{Binding IsBusy}"
+                                IsVisible="{Binding IsBusy}"
+                                Foreground="{DynamicResource AccentBrush}"
+                                AutomationProperties.Name="Generating ideas" />
+        <TextBlock Text="{Binding ProgressText}"
+                   IsVisible="{Binding IsBusy}"
+                   VerticalAlignment="Center"
+                   AutomationProperties.LiveSetting="Polite" />
+      </StackPanel>
+      <StackPanel Grid.Row="3"
+                  Grid.ColumnSpan="2"
+                  Spacing="3">
+        <StackPanel Orientation="Horizontal"
+                    Spacing="8"
+                    IsVisible="{Binding IsSnowclonesMode}">
+          <Button x:Name="ManageSnowclonesButton"
+                  Content="Manage Snowclones…"
+                  IsEnabled="{Binding CanManageSnowclones}"
+                  Click="OnManageSnowclones"
+                  AutomationProperties.Name="Manage Snowclones" />
+          <TextBlock Text="{Binding SnowcloneLibraryMessage}"
+                     VerticalAlignment="Center"
+                     TextWrapping="Wrap"
+                     Foreground="{DynamicResource DangerTextBrush}" />
+        </StackPanel>
+        <TextBlock Text="{Binding CountError}"
+                   IsVisible="{Binding CountError, Converter={x:Static ObjectConverters.IsNotNull}}"
+                   Foreground="{DynamicResource DangerTextBrush}" />
+        <TextBlock Text="{Binding AccessMessage}"
+                   IsVisible="{Binding AccessMessage, Converter={x:Static ObjectConverters.IsNotNull}}"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource DangerTextBrush}" />
+        <TextBlock Text="{Binding Error}"
+                   IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource DangerTextBrush}"
+                   AutomationProperties.LiveSetting="Assertive" />
+      </StackPanel>
+    </Grid>
+
+    <Border Grid.Row="2"
+            Padding="12"
+            Background="{DynamicResource PanelSurfaceBrush}"
+            BorderBrush="{DynamicResource ControlBorderBrush}"
+            BorderThickness="1">
+      <Grid RowDefinitions="Auto,*" RowSpacing="8">
+        <TextBlock Text="Ideas candidate list"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource StrongTextBrush}" />
+        <ListBox x:Name="CandidateList"
+                 Grid.Row="1"
+                 ItemsSource="{Binding Candidates}"
+                 AutomationProperties.Name="Ideas candidate list">
+          <ListBox.Styles>
+            <Style Selector="ListBoxItem">
+              <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            </Style>
+          </ListBox.Styles>
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="ideation:IdeaCandidateViewModel">
+              <Border Padding="10"
+                      Margin="0,0,0,6"
+                      Background="{DynamicResource ElevatedSurfaceBrush}"
+                      BorderBrush="{DynamicResource ControlBorderBrush}"
+                      BorderThickness="1">
+                <Grid ColumnDefinitions="*,Auto,Auto"
+                      RowDefinitions="Auto,Auto"
+                      ColumnSpacing="8">
+                  <TextBlock Text="{Binding Text}"
+                             TextWrapping="Wrap"
+                             VerticalAlignment="Center" />
+                  <Button Grid.Column="1"
+                          Content="Create"
+                          IsEnabled="{Binding CanDecide}"
+                          Click="OnCreateCandidate"
+                          AutomationProperties.Name="Create idea candidate" />
+                  <Button Grid.Column="2"
+                          Content="Reject"
+                          IsEnabled="{Binding CanDecide}"
+                          Click="OnRejectCandidate"
+                          AutomationProperties.Name="Reject idea candidate" />
+                  <TextBlock Grid.Row="1"
+                             Grid.ColumnSpan="3"
+                             Text="{Binding Error}"
+                             IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}"
+                             TextWrapping="Wrap"
+                             Foreground="{DynamicResource DangerTextBrush}" />
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="3" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+      <Button Grid.Column="1"
+              Content="Clear all"
+              IsEnabled="{Binding CanDiscard}"
+              Click="OnClearAll"
+              AutomationProperties.Name="Clear all idea candidates" />
+      <Button Grid.Column="2"
+              Content="Close"
+              Click="OnClose"
+              AutomationProperties.Name="Close Ideation" />
+    </Grid>
+  </Grid>
+</Window>

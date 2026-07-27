@@ -332,6 +332,7 @@ public sealed class NicheManagementService : INicheManagementService
             || snapshot.Prompts.Any(prompt => prompt.ItemId is Guid itemId && itemIds.Contains(itemId))
             || snapshot.AssetLinks.Any(link => IsNicheScopedAssetTarget(snapshot, link, nicheId))
             || snapshot.Assets.Any(asset => assetIds.Contains(asset.Id))
+            || snapshot.IdeationRejections.Any(rejection => rejection.NicheId == nicheId)
             || snapshot.ItemTags.Any(link => itemIds.Contains(link.ItemId));
     }
 

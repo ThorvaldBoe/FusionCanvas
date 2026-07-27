@@ -1,0 +1,60 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:settings="clr-namespace:FusionCanvas.App.Settings"
+             x:Class="FusionCanvas.App.Settings.AiProfileEditorView"
+             x:DataType="settings:AiProfileEditorViewModel">
+  <StackPanel Spacing="10">
+    <TextBlock Text="Model" FontWeight="SemiBold" />
+    <ComboBox ItemsSource="{Binding ModelIds}"
+              SelectedItem="{Binding ModelId, Mode=TwoWay}"
+              MinWidth="320"
+              HorizontalAlignment="Stretch" />
+    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+      <StackPanel Grid.Column="0" Spacing="4" IsVisible="{Binding SupportsMaxCompletionTokens}">
+        <TextBlock Text="Maximum output tokens" FontSize="12" />
+        <NumericUpDown Value="{Binding MaxCompletionTokens, Mode=TwoWay}"
+                       Minimum="1"
+                       FormatString="0" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Spacing="4" IsVisible="{Binding SupportsTemperature}">
+        <TextBlock Text="Temperature" FontSize="12" />
+        <NumericUpDown Value="{Binding Temperature, Mode=TwoWay}"
+                       Minimum="0"
+                       Maximum="2"
+                       Increment="0.1"
+                       FormatString="0.0#" />
+      </StackPanel>
+    </Grid>
+    <StackPanel IsVisible="{Binding SupportsReasoning}" Spacing="6">
+      <TextBlock Text="Reasoning" FontWeight="SemiBold" />
+      <ComboBox ItemsSource="{Binding ReasoningModes}"
+                SelectedItem="{Binding ReasoningMode, Mode=TwoWay}" />
+      <ComboBox IsVisible="{Binding IsReasoningEffort}"
+                ItemsSource="{Binding ReasoningEfforts}"
+                SelectedItem="{Binding ReasoningEffort, Mode=TwoWay}" />
+      <NumericUpDown IsVisible="{Binding IsReasoningTokenBudget}"
+                     PlaceholderText="Reasoning token budget"
+                     Value="{Binding ReasoningTokenBudget, Mode=TwoWay}"
+                     Minimum="1"
+                     FormatString="0" />
+    </StackPanel>
+    <Expander Header="Additional parameters" IsVisible="{Binding HasAdditionalParameters}">
+      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8" Margin="0,8,0,0">
+        <TextBox Grid.Row="0" Grid.Column="0" IsVisible="{Binding SupportsTopP}" PlaceholderText="Top P (0–1)" Text="{Binding TopP, Mode=TwoWay}" />
+        <TextBox Grid.Row="0" Grid.Column="1" IsVisible="{Binding SupportsTopK}" PlaceholderText="Top K" Text="{Binding TopK, Mode=TwoWay}" />
+        <TextBox Grid.Row="1" Grid.Column="0" IsVisible="{Binding SupportsMinP}" PlaceholderText="Min P (0–1)" Text="{Binding MinP, Mode=TwoWay}" />
+        <TextBox Grid.Row="1" Grid.Column="1" IsVisible="{Binding SupportsTopA}" PlaceholderText="Top A (0–1)" Text="{Binding TopA, Mode=TwoWay}" />
+        <TextBox Grid.Row="2" Grid.Column="0" IsVisible="{Binding SupportsFrequencyPenalty}" PlaceholderText="Frequency penalty" Text="{Binding FrequencyPenalty, Mode=TwoWay}" />
+        <TextBox Grid.Row="2" Grid.Column="1" IsVisible="{Binding SupportsPresencePenalty}" PlaceholderText="Presence penalty" Text="{Binding PresencePenalty, Mode=TwoWay}" />
+        <TextBox Grid.Row="3" Grid.Column="0" IsVisible="{Binding SupportsRepetitionPenalty}" PlaceholderText="Repetition penalty" Text="{Binding RepetitionPenalty, Mode=TwoWay}" />
+        <TextBox Grid.Row="3" Grid.Column="1" IsVisible="{Binding SupportsSeed}" PlaceholderText="Seed" Text="{Binding Seed, Mode=TwoWay}" />
+        <TextBox Grid.Row="4" Grid.ColumnSpan="2"
+                 AcceptsReturn="True"
+                 IsVisible="{Binding SupportsStop}"
+                 MinHeight="56"
+                 PlaceholderText="Stop sequences, one per line (maximum 4)"
+                 Text="{Binding StopSequences, Mode=TwoWay}" />
+      </Grid>
+    </Expander>
+  </StackPanel>
+</UserControl>

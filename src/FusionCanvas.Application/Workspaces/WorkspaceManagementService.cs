@@ -210,6 +210,9 @@ public sealed class WorkspaceManagementService : IWorkspaceManagementService
             Assets = snapshot.Assets.Where(asset => !storeIds.Contains(asset.StoreId)).ToArray(),
             Prompts = snapshot.Prompts.Where(prompt => !storeIds.Contains(prompt.StoreId)).ToArray(),
             Tags = snapshot.Tags.Where(tag => !storeIds.Contains(tag.StoreId)).ToArray(),
+            IdeationRejections = snapshot.IdeationRejections
+                .Where(rejection => !storeIds.Contains(rejection.StoreId))
+                .ToArray(),
             ItemTags = snapshot.ItemTags
                 .Where(listingTag => !itemIds.Contains(listingTag.ItemId) && !tagIds.Contains(listingTag.TagId))
                 .ToArray(),

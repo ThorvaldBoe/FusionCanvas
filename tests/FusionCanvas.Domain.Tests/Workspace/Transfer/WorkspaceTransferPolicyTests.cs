@@ -1,5 +1,6 @@
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Groups;
+using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Prompts;
@@ -39,6 +40,7 @@ public class WorkspaceTransferPolicyTests
         Assert.Equal(selected.Snapshot.Tags, result.Snapshot.Tags);
         Assert.Equal(selected.Snapshot.ItemTags, result.Snapshot.ItemTags);
         Assert.Equal([validLink], result.Snapshot.AssetLinks);
+        Assert.Equal(selected.Snapshot.IdeationRejections, result.Snapshot.IdeationRejections);
         Assert.Equal([crossWorkspaceLink], result.DroppedAssetLinks);
         Assert.All(result.Snapshot.Workspaces.Cast<WorkspaceEntity>()
             .Concat(result.Snapshot.Stores)
@@ -58,8 +60,24 @@ public class WorkspaceTransferPolicyTests
         var collisions = WorkspaceImportPreflight.FindIdentityCollisions(graph.Snapshot, graph.Snapshot);
 
         Assert.Equal(
-            ["Asset", "AssetLink", "Group", "Item", "ItemTag", "Niche", "Prompt", "Store", "Tag", "Workspace"],
+            ["Asset", "AssetLink", "Group", "IdeationRejection", "Item", "ItemTag", "Niche", "Prompt", "Store", "Tag", "Workspace"],
             collisions.Select(collision => collision.EntityType).Order(StringComparer.Ordinal).ToArray());
+    }
+
+    [Fact]
+    public void ForWorkspace_ExcludesRejectionWhoseGroupIsOutsideIncludedWorkspace()
+    {
+        var selected = CreateGraph("Selected");
+        var other = CreateGraph("Other");
+        var inconsistent = selected.Rejection with { Id = Guid.NewGuid(), GroupId = other.Group.Id };
+        var source = Merge(selected.Snapshot, other.Snapshot) with
+        {
+            IdeationRejections = [selected.Rejection, inconsistent, other.Rejection]
+        };
+
+        var result = WorkspaceSnapshotFilter.ForWorkspace(source, selected.Workspace.Id);
+
+        Assert.Equal(selected.Rejection, Assert.Single(result.Snapshot.IdeationRejections));
     }
 
     [Fact]
@@ -83,9 +101,21 @@ public class WorkspaceTransferPolicyTests
         var tag = new Tag(Guid.NewGuid(), store.Id, $"{name} tag", null, archived, Now, Now, "{}", "#123456");
         var itemTag = new ItemTag(item.Id, tag.Id);
         var assetLink = new AssetLink(asset.Id, WorkspaceEntityKind.Item, item.Id);
+        var rejection = new IdeationRejection(
+            Guid.NewGuid(),
+            store.Id,
+            niche.Id,
+            group.Id,
+            $"{name} rejected idea",
+            "Already explored",
+            IdeationMode.Snowclones,
+            Now);
         var snapshot = new WorkspaceSnapshot(
-            [workspace], [store], [niche], [group], [item], [asset], [prompt], [tag], [itemTag], [assetLink]);
-        return new Graph(snapshot, workspace, item, asset);
+            [workspace], [store], [niche], [group], [item], [asset], [prompt], [tag], [itemTag], [assetLink])
+        {
+            IdeationRejections = [rejection]
+        };
+        return new Graph(snapshot, workspace, group, item, asset, rejection);
     }
 
     private static WorkspaceSnapshot Merge(WorkspaceSnapshot left, WorkspaceSnapshot right) =>
@@ -99,11 +129,16 @@ public class WorkspaceTransferPolicyTests
             [.. left.Prompts, .. right.Prompts],
             [.. left.Tags, .. right.Tags],
             [.. left.ItemTags, .. right.ItemTags],
-            [.. left.AssetLinks, .. right.AssetLinks]);
+            [.. left.AssetLinks, .. right.AssetLinks])
+        {
+            IdeationRejections = [.. left.IdeationRejections, .. right.IdeationRejections]
+        };
 
     private sealed record Graph(
         WorkspaceSnapshot Snapshot,
         FusionCanvas.Domain.Workspace.Workspace Workspace,
+        TopicGroup Group,
         Item Item,
-        Asset Asset);
+        Asset Asset,
+        IdeationRejection Rejection);
 }

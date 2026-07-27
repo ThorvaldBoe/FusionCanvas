@@ -21,6 +21,8 @@ public static class WorkspaceSnapshotFilter
         var storeIds = stores.Select(store => store.Id).ToHashSet();
         var niches = source.Niches.Where(niche => storeIds.Contains(niche.StoreId)).ToArray();
         var groups = source.Groups.Where(group => storeIds.Contains(group.StoreId)).ToArray();
+        var nicheIds = niches.Select(niche => niche.Id).ToHashSet();
+        var groupIds = groups.Select(group => group.Id).ToHashSet();
         var items = source.Items.Where(item => storeIds.Contains(item.StoreId)).ToArray();
         var assets = source.Assets.Where(asset => storeIds.Contains(asset.StoreId)).ToArray();
         var prompts = source.Prompts.Where(prompt => storeIds.Contains(prompt.StoreId)).ToArray();
@@ -46,6 +48,12 @@ public static class WorkspaceSnapshotFilter
         var droppedLinks = source.AssetLinks
             .Where(link => assetIds.Contains(link.AssetId) && !IsTargetIncluded(link, includedTargetIds))
             .ToArray();
+        var ideationRejections = source.IdeationRejections
+            .Where(rejection =>
+                storeIds.Contains(rejection.StoreId) &&
+                nicheIds.Contains(rejection.NicheId) &&
+                (rejection.GroupId is null || groupIds.Contains(rejection.GroupId.Value)))
+            .ToArray();
 
         return new WorkspaceSnapshotFilterResult(
             new WorkspaceSnapshot(
@@ -58,7 +66,10 @@ public static class WorkspaceSnapshotFilter
                 prompts,
                 tags,
                 itemTags,
-                includedLinks),
+                includedLinks)
+            {
+                IdeationRejections = ideationRejections
+            },
             droppedLinks);
     }
 

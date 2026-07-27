@@ -91,6 +91,12 @@ Every feature that adds or changes behavior should include appropriate automated
 
 The project is intended to remain useful as a local desktop tool even without cloud services.
 
+## Ideation AI Configuration
+
+The Idea-stage `Ideation…` tool uses the OpenRouter configuration in **Settings → AI**. Save an API key in the native credential store, refresh the compatible model catalog, and select a ready model for Ideation (or let Ideation use the General profile).
+
+The API key is never stored in the workspace database or workspace packages. Ideation candidates remain transient until they are created or rejected; Snowclones mode uses the application-wide Snowclone Library.
+
 ## Testing Baseline
 
 Run the automated baseline from the repository root:

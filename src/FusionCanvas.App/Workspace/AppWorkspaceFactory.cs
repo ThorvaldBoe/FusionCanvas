@@ -6,6 +6,10 @@ using FusionCanvas.Application.Groups;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Assets;
 using FusionCanvas.Application.Tags;
+using FusionCanvas.Application.Ideation;
+using FusionCanvas.Application.Snowclones;
+using FusionCanvas.Integration.Snowclones;
+using FusionCanvas.Application.AI;
 
 namespace FusionCanvas.App.Workspace;
 
@@ -17,33 +21,59 @@ public sealed record AppWorkspaceRuntime(
     IItemManagementService ItemManagement,
     IAssetManagementService AssetManagement,
     ITagManagementService TagManagement,
-    IItemInspectorService ItemInspector);
+    IItemInspectorService ItemInspector,
+    IIdeationService Ideation,
+    IIdeationAccessStatus IdeationAccess,
+    ISnowcloneLibraryService SnowcloneLibrary,
+    SnowcloneLibraryResult SnowcloneLibraryInitialization);
 
 public static class AppWorkspaceFactory
 {
     public const string WorkspaceDatabaseEnvironmentVariable = "FUSIONCANVAS_WORKSPACE_DB";
     public const string WorkspaceRootEnvironmentVariable = "FUSIONCANVAS_WORKSPACE_ROOT";
 
-    public static AppWorkspaceRuntime CreateDefault()
-        => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()));
+    public static AppWorkspaceRuntime CreateDefault(IAiTextGenerationService ai)
+        => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()), ai);
 
-    public static AppWorkspaceRuntime Create(string databasePath)
-        => Create(databasePath, DefaultWorkspaceRoot(databasePath));
+    public static AppWorkspaceRuntime Create(string databasePath, IAiTextGenerationService ai)
+        => Create(databasePath, DefaultWorkspaceRoot(databasePath), ai);
 
-    public static AppWorkspaceRuntime Create(string databasePath, string workspaceRootPath)
+    public static AppWorkspaceRuntime Create(
+        string databasePath,
+        string workspaceRootPath,
+        IAiTextGenerationService ai)
     {
+        ArgumentNullException.ThrowIfNull(ai);
         var repository = new SqliteWorkspaceRepository(databasePath);
+        var snowcloneRepository = new SqliteSnowcloneRepository(databasePath);
         var fileStore = new LocalWorkspaceFileStore(workspaceRootPath);
-        var snapshot = repository.LoadAsync().GetAwaiter().GetResult();
+        var snapshot = StartupTaskRunner.Run(() => repository.LoadAsync());
+        var itemManagement = new ItemManagementService(repository);
+        var ideationAccess = new ConfiguredIdeationAccessStatus(ai);
+        var snowcloneLibrary = new SnowcloneLibraryService(
+            snowcloneRepository,
+            new SnowcloneCsvCodec(),
+            new EmbeddedBundledSnowcloneSource());
+        var snowcloneLibraryInitialization = StartupTaskRunner.Run(
+            () => snowcloneLibrary.InitializeAsync());
         return new AppWorkspaceRuntime(
             repository,
             fileStore,
             snapshot,
             new GroupManagementService(repository),
-            new ItemManagementService(repository),
+            itemManagement,
             new AssetManagementService(repository, fileStore),
             new TagManagementService(repository),
-            new ItemInspectorService(repository));
+            new ItemInspectorService(repository),
+            new IdeationService(
+                repository,
+                itemManagement,
+                new AiIdeaGenerator(ai),
+                new PersistedSnowcloneCatalog(snowcloneLibrary),
+                ideationAccess),
+            ideationAccess,
+            snowcloneLibrary,
+            snowcloneLibraryInitialization);
     }
 
     private static string DefaultDatabasePath()

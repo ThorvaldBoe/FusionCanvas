@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Workspace;
+using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Settings;
 using FusionCanvas.Application.Workspaces;
 
@@ -17,6 +18,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     private SettingsSection _selectedSection = SettingsSection.General;
     private bool _isOpen;
     private bool _isDarkMode;
+    private ApplicationSettings _currentSettings;
+    private bool _confirmDiscardCredentialDraft;
     private string? _errorMessage;
     private string _workspaceName = "No workspace";
     private int _saveGeneration;
@@ -26,17 +29,33 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         IApplicationSettingsStore store,
         IApplicationThemeController themeController,
         ApplicationSettings initialSettings,
-        string? loadWarning)
+        string? loadWarning,
+        AiSettingsViewModel? ai = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _themeController = themeController ?? throw new ArgumentNullException(nameof(themeController));
         _syncContext = SynchronizationContext.Current;
+        _currentSettings = initialSettings;
         _isDarkMode = initialSettings.DarkMode;
         _errorMessage = loadWarning;
         _themeController.ApplyDarkMode(_isDarkMode);
 
         OpenCommand = new RelayCommand(_ => Open());
-        CloseCommand = new RelayCommand(_ => Close());
+        Ai = ai ?? CreateOfflineAi(initialSettings.Ai);
+        Ai.SettingsChanged += (_, _) =>
+        {
+            _currentSettings = _currentSettings with { Ai = Ai.Current };
+            QueueSave(_currentSettings);
+        };
+
+        CloseCommand = new RelayCommand(_ => RequestClose());
+        ConfirmDiscardCommand = new RelayCommand(_ =>
+        {
+            Ai.DiscardCredentialDraft();
+            ConfirmDiscardCredentialDraft = false;
+            IsOpen = false;
+        });
+        CancelDiscardCommand = new RelayCommand(_ => ConfirmDiscardCredentialDraft = false);
         ManageWorkspacesCommand = new RelayCommand(_ => ManageWorkspaces(), () => _workspaceManagement is not null);
     }
 
@@ -50,7 +69,12 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
             if (SetField(ref _selectedSection, value))
             {
                 OnPropertyChanged(nameof(IsGeneralSection));
+                OnPropertyChanged(nameof(IsAiSection));
                 OnPropertyChanged(nameof(IsWorkspaceSection));
+                if (value == SettingsSection.AI)
+                {
+                    _ = Ai.EnsureLoadedAsync();
+                }
             }
         }
     }
@@ -59,11 +83,22 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
 
     public bool IsWorkspaceSection => _selectedSection == SettingsSection.Workspace;
 
+    public bool IsAiSection => _selectedSection == SettingsSection.AI;
+
     public IReadOnlyList<SettingsSection> Sections { get; } = new[]
     {
         SettingsSection.General,
+        SettingsSection.AI,
         SettingsSection.Workspace
     };
+
+    public AiSettingsViewModel Ai { get; }
+
+    public bool ConfirmDiscardCredentialDraft
+    {
+        get => _confirmDiscardCredentialDraft;
+        private set => SetField(ref _confirmDiscardCredentialDraft, value);
+    }
 
     public bool IsOpen
     {
@@ -79,7 +114,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
             if (SetField(ref _isDarkMode, value))
             {
                 _themeController.ApplyDarkMode(value);
-                QueueSave(value);
+                _currentSettings = _currentSettings with { DarkMode = value };
+                QueueSave(_currentSettings);
             }
         }
     }
@@ -103,6 +139,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     public ICommand CloseCommand { get; }
 
     public ICommand ManageWorkspacesCommand { get; }
+    public ICommand ConfirmDiscardCommand { get; }
+    public ICommand CancelDiscardCommand { get; }
 
     public void AttachWorkspaceManagement(WorkspaceManagementViewModel workspaceManagement)
     {
@@ -144,7 +182,18 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         IsOpen = true;
     }
 
-    private void Close() => IsOpen = false;
+    public bool RequestClose()
+    {
+        if (Ai.HasUnsavedCredentialDraft)
+        {
+            ConfirmDiscardCredentialDraft = true;
+            return false;
+        }
+
+        ConfirmDiscardCredentialDraft = false;
+        IsOpen = false;
+        return true;
+    }
 
     private void ManageWorkspaces()
     {
@@ -154,15 +203,15 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    private void QueueSave(bool darkMode)
+    private void QueueSave(ApplicationSettings settings)
     {
         var generation = Interlocked.Increment(ref _saveGeneration);
         _saveChain = _saveChain
-            .ContinueWith(_ => PersistAsync(generation, darkMode), TaskScheduler.Default)
+            .ContinueWith(_ => PersistAsync(generation, settings), TaskScheduler.Default)
             .Unwrap();
     }
 
-    private async Task PersistAsync(int generation, bool darkMode)
+    private async Task PersistAsync(int generation, ApplicationSettings settings)
     {
         if (generation != Volatile.Read(ref _saveGeneration))
         {
@@ -171,7 +220,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
 
         try
         {
-            var result = await _store.SaveAsync(new ApplicationSettings(darkMode)).ConfigureAwait(false);
+            var result = await _store.SaveAsync(settings).ConfigureAwait(false);
             if (generation == Volatile.Read(ref _saveGeneration))
             {
                 SetMessage(result.Saved ? null : result.Warning);
@@ -185,7 +234,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         {
             if (generation == Volatile.Read(ref _saveGeneration))
             {
-                SetMessage("The appearance preference could not be saved and may not survive restart.");
+                SetMessage("The application settings could not be saved and may not survive restart.");
             }
         }
     }
@@ -222,5 +271,49 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         }
 
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    private static AiSettingsViewModel CreateOfflineAi(AiConfigurationSettings settings)
+    {
+        var credentials = new OfflineCredentialStore();
+        return new AiSettingsViewModel(
+            settings,
+            credentials,
+            new OfflineCredentialValidator(),
+            new OfflineCatalogProvider(),
+            new OfflineCatalogCache());
+    }
+
+    private sealed class OfflineCredentialStore : IAiCredentialStore
+    {
+        public Task<AiCredentialReadResult> ReadAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(AiCredentialReadResult.NotFound);
+        public Task<AiCredentialOperationResult> SaveAsync(string apiKey, CancellationToken cancellationToken = default) =>
+            Task.FromResult(AiCredentialOperationResult.Failed("Native credential storage is unavailable in this session."));
+        public Task<AiCredentialOperationResult> RemoveAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(AiCredentialOperationResult.Failed("Native credential storage is unavailable in this session."));
+    }
+
+    private sealed class OfflineCredentialValidator : IAiCredentialValidator
+    {
+        public Task<AiCredentialValidationResult> ValidateAsync(string apiKey, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AiCredentialValidationResult(AiCredentialValidationKind.NetworkFailure));
+    }
+
+    private sealed class OfflineCatalogProvider : IAiModelCatalogProvider
+    {
+        public Task<AiModelCatalog> GetModelsAsync(
+            string apiKey,
+            bool requireZeroDataRetention,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AiModelCatalog(requireZeroDataRetention, DateTimeOffset.UtcNow, []));
+    }
+
+    private sealed class OfflineCatalogCache : IAiModelCatalogCache
+    {
+        public Task<AiModelCatalog?> LoadAsync(bool requireZeroDataRetention, CancellationToken cancellationToken = default) =>
+            Task.FromResult<AiModelCatalog?>(null);
+        public Task SaveAsync(AiModelCatalog catalog, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 }

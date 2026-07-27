@@ -1,5 +1,8 @@
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Workspaces.Transfer;
+using FusionCanvas.Domain.Ideation;
+using FusionCanvas.Domain.Niches;
+using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.Application.Tests;
@@ -24,6 +27,24 @@ public class WorkspaceTransferServiceTests
         Assert.True(result.Succeeded);
         Assert.Equal(selected.Id, Assert.Single(writer.Request!.Snapshot.Workspaces).Id);
         Assert.Equal(1, result.Summary!.EntityCounts["workspaces"]);
+    }
+
+    [Fact]
+    public async Task ExportWorkspaceAsync_IncludesOnlySelectedWorkspaceRejectionsAndCountsThem()
+    {
+        var selected = NewGraph("Selected");
+        var other = NewGraph("Other");
+        var repository = new FakeRepository(Merge(selected.Snapshot, other.Snapshot));
+        var writer = new FakeWriter();
+        var service = NewService(repository, writer: writer);
+
+        var result = await service.ExportWorkspaceAsync(
+            new WorkspaceExportRequest(selected.Workspace.Id, "selected.fcworkspace"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(selected.Rejection, Assert.Single(writer.Request!.Snapshot.IdeationRejections));
+        Assert.Equal(1, result.Summary!.EntityCounts["ideationRejections"]);
     }
 
     [Fact]
@@ -70,6 +91,62 @@ public class WorkspaceTransferServiceTests
         var imported = repository.Snapshot.Workspaces.Single(workspace => workspace.Id == packagedWorkspace.Id);
         Assert.False(imported.IsArchived);
         Assert.Equal("Brand (2)", imported.Name);
+    }
+
+    [Fact]
+    public async Task ImportWorkspaceAsync_PreservesLiveRejectionsAndAddsPackagedRejections()
+    {
+        var live = NewGraph("Live");
+        var package = NewGraph("Package");
+        var repository = new FakeRepository(live.Snapshot);
+        var service = NewService(repository, reader: new FakeReader(NewSession(package.Snapshot)));
+
+        var result = await service.ImportWorkspaceAsync(
+            new WorkspaceImportRequest("package.fcworkspace"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(
+            [live.Rejection, package.Rejection],
+            repository.Snapshot.IdeationRejections);
+    }
+
+    [Fact]
+    public async Task ImportWorkspaceAsync_OlderPackageWithoutRejectionsPreservesLiveHistory()
+    {
+        var live = NewGraph("Live");
+        var packagedWorkspace = NewWorkspace("Older package");
+        var package = new WorkspaceSnapshot([packagedWorkspace], [], [], [], [], [], [], [], [], []);
+        var repository = new FakeRepository(live.Snapshot);
+        var service = NewService(repository, reader: new FakeReader(NewSession(package)));
+
+        var result = await service.ImportWorkspaceAsync(
+            new WorkspaceImportRequest("older.fcworkspace"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(live.Rejection, Assert.Single(repository.Snapshot.IdeationRejections));
+    }
+
+    [Fact]
+    public async Task ImportWorkspaceAsync_RefusesRejectionIdentityCollisionBeforeSaving()
+    {
+        var live = NewGraph("Live");
+        var package = NewGraph("Package");
+        var collidingPackage = package.Snapshot with
+        {
+            IdeationRejections = [package.Rejection with { Id = live.Rejection.Id }]
+        };
+        var repository = new FakeRepository(live.Snapshot);
+        var service = NewService(repository, reader: new FakeReader(NewSession(collidingPackage)));
+
+        var result = await service.ImportWorkspaceAsync(
+            new WorkspaceImportRequest("collision.fcworkspace"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(0, repository.SaveCount);
+        Assert.Equal(live.Rejection, Assert.Single(repository.Snapshot.IdeationRejections));
     }
 
     [Fact]
@@ -181,7 +258,7 @@ public class WorkspaceTransferServiceTests
         return new FakeSession(
             new WorkspacePackageManifest(
                 1,
-                5,
+                7,
                 "test",
                 workspace.Id,
                 workspace.Name,
@@ -197,6 +274,48 @@ public class WorkspaceTransferServiceTests
 
     private static FusionCanvas.Domain.Workspace.Workspace NewWorkspace(string name) =>
         new(Guid.NewGuid(), name, null, false, Now, Now, "{}");
+
+    private static Graph NewGraph(string name)
+    {
+        var workspace = NewWorkspace(name);
+        var store = new Store(Guid.NewGuid(), workspace.Id, $"{name} store", null, false, Now, Now, "{}");
+        var niche = new Niche(Guid.NewGuid(), store.Id, $"{name} niche", null, false, Now, Now, "{}");
+        var rejection = new IdeationRejection(
+            Guid.NewGuid(),
+            store.Id,
+            niche.Id,
+            null,
+            $"{name} rejection",
+            "Not a fit",
+            IdeationMode.Basic,
+            Now);
+        var snapshot = new WorkspaceSnapshot([workspace], [store], [niche], [], [], [], [], [], [], [])
+        {
+            IdeationRejections = [rejection]
+        };
+        return new Graph(snapshot, workspace, rejection);
+    }
+
+    private static WorkspaceSnapshot Merge(WorkspaceSnapshot left, WorkspaceSnapshot right) =>
+        new(
+            [.. left.Workspaces, .. right.Workspaces],
+            [.. left.Stores, .. right.Stores],
+            [.. left.Niches, .. right.Niches],
+            [.. left.Groups, .. right.Groups],
+            [.. left.Items, .. right.Items],
+            [.. left.Assets, .. right.Assets],
+            [.. left.Prompts, .. right.Prompts],
+            [.. left.Tags, .. right.Tags],
+            [.. left.ItemTags, .. right.ItemTags],
+            [.. left.AssetLinks, .. right.AssetLinks])
+        {
+            IdeationRejections = [.. left.IdeationRejections, .. right.IdeationRejections]
+        };
+
+    private sealed record Graph(
+        WorkspaceSnapshot Snapshot,
+        FusionCanvas.Domain.Workspace.Workspace Workspace,
+        IdeationRejection Rejection);
 
     private sealed class FakeRepository(WorkspaceSnapshot? snapshot = null) : IWorkspaceRepository
     {
@@ -260,7 +379,7 @@ public class WorkspaceTransferServiceTests
     {
         public int CurrentFormatVersion => 1;
 
-        public int CurrentSchemaVersion => 5;
+        public int CurrentSchemaVersion => 7;
 
         public string AppVersion => "test";
 

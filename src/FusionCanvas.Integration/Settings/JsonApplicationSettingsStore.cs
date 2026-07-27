@@ -1,11 +1,12 @@
 using System.Text.Json;
+using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Settings;
 
 namespace FusionCanvas.Integration.Settings;
 
 public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
 {
-    private const int SupportedVersion = 1;
+    private const int SupportedVersion = 2;
 
     private static readonly JsonSerializerOptions WriteOptions = new()
     {
@@ -39,7 +40,7 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
             return ApplicationSettingsLoadResult.Defaulted();
         }
 
-        SettingsDocument document;
+        JsonDocument json;
         try
         {
             await using var stream = new FileStream(
@@ -48,7 +49,7 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
                 FileAccess.Read,
                 FileShare.Read);
 
-            document = await JsonSerializer.DeserializeAsync<SettingsDocument>(stream, ReadOptions, cancellationToken)
+            json = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken)
                 ?? throw new JsonException("The application settings document deserialized to null.");
         }
         catch (OperationCanceledException)
@@ -57,23 +58,58 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
         }
         catch (JsonException)
         {
-            return ApplicationSettingsLoadResult.Defaulted("The saved appearance preference is invalid and could not be read.");
+            return ApplicationSettingsLoadResult.Defaulted("The saved application settings are invalid and could not be read.");
         }
         catch (IOException)
         {
-            return ApplicationSettingsLoadResult.Defaulted("The saved appearance preference could not be read.");
+            return ApplicationSettingsLoadResult.Defaulted("The saved application settings could not be read.");
         }
         catch (UnauthorizedAccessException)
         {
-            return ApplicationSettingsLoadResult.Defaulted("The saved appearance preference could not be read.");
+            return ApplicationSettingsLoadResult.Defaulted("The saved application settings could not be read.");
         }
 
-        if (document.Version != SupportedVersion)
+        using (json)
         {
-            return ApplicationSettingsLoadResult.Defaulted("The saved appearance preference uses an unsupported version.");
-        }
+            var root = json.RootElement;
+            if (!TryGetInt32(root, "version", out var version) || version is < 1 or > SupportedVersion)
+            {
+                return ApplicationSettingsLoadResult.Defaulted("The saved application settings use an unsupported version.");
+            }
 
-        return ApplicationSettingsLoadResult.Success(new ApplicationSettings(document.DarkMode));
+            if (!TryGetBoolean(root, "darkMode", out var darkMode))
+            {
+                return ApplicationSettingsLoadResult.Defaulted(
+                    "The saved application settings contain an invalid appearance preference.");
+            }
+            if (version == 1)
+            {
+                return ApplicationSettingsLoadResult.Success(new ApplicationSettings(darkMode));
+            }
+
+            if (!TryGetProperty(root, "ai", out var aiElement))
+            {
+                return ApplicationSettingsLoadResult.Success(new ApplicationSettings(darkMode));
+            }
+
+            try
+            {
+                var ai = aiElement.Deserialize<AiConfigurationSettings>(ReadOptions);
+                return ai is null
+                    ? new ApplicationSettingsLoadResult(
+                        new ApplicationSettings(darkMode),
+                        UsedDefault: false,
+                        "The saved AI settings were invalid and were reset.")
+                    : ApplicationSettingsLoadResult.Success(new ApplicationSettings(darkMode, Normalize(ai)));
+            }
+            catch (JsonException)
+            {
+                return new ApplicationSettingsLoadResult(
+                    new ApplicationSettings(darkMode),
+                    UsedDefault: false,
+                    "The saved AI settings were invalid and were reset.");
+            }
+        }
     }
 
     public async Task<ApplicationSettingsSaveResult> SaveAsync(ApplicationSettings settings, CancellationToken cancellationToken = default)
@@ -94,7 +130,12 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
             {
                 await JsonSerializer.SerializeAsync(
                     stream,
-                    new SettingsDocument { Version = SupportedVersion, DarkMode = settings.DarkMode },
+                    new SettingsDocument
+                    {
+                        Version = SupportedVersion,
+                        DarkMode = settings.DarkMode,
+                        Ai = settings.Ai
+                    },
                     WriteOptions,
                     cancellationToken);
             }
@@ -110,13 +151,77 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
         catch (IOException)
         {
             TryDelete(tempPath);
-            return ApplicationSettingsSaveResult.Failed("The appearance preference could not be saved and may not survive restart.");
+            return ApplicationSettingsSaveResult.Failed("The application settings could not be saved and may not survive restart.");
         }
         catch (UnauthorizedAccessException)
         {
             TryDelete(tempPath);
-            return ApplicationSettingsSaveResult.Failed("The appearance preference could not be saved and may not survive restart.");
+            return ApplicationSettingsSaveResult.Failed("The application settings could not be saved and may not survive restart.");
         }
+    }
+
+    private static AiConfigurationSettings Normalize(AiConfigurationSettings settings) =>
+        settings with
+        {
+            General = Normalize(settings.General),
+            Ideation = settings.Ideation is null
+                ? AiPurposeProfileSettings.InheritGeneral
+                : Normalize(settings.Ideation),
+            Concept = settings.Concept is null
+                ? AiPurposeProfileSettings.InheritGeneral
+                : Normalize(settings.Concept)
+        };
+
+    private static AiPurposeProfileSettings Normalize(AiPurposeProfileSettings settings) =>
+        settings with
+        {
+            CustomProfile = Normalize(settings.CustomProfile)
+        };
+
+    private static AiProfileSettings Normalize(AiProfileSettings? settings) =>
+        settings is null
+            ? AiProfileSettings.Empty
+            : settings with
+            {
+                StopSequences = settings.StopSequences ?? [],
+                Reasoning = settings.Reasoning is null ||
+                    !Enum.IsDefined(settings.Reasoning.Mode)
+                    ? AiReasoningSettings.ProviderDefault
+                    : settings.Reasoning
+            };
+
+    private static bool TryGetProperty(JsonElement element, string name, out JsonElement value)
+    {
+        foreach (var property in element.EnumerateObject())
+        {
+            if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                return true;
+            }
+        }
+
+        value = default;
+        return false;
+    }
+
+    private static bool TryGetInt32(JsonElement element, string name, out int value)
+    {
+        value = default;
+        return TryGetProperty(element, name, out var property) && property.TryGetInt32(out value);
+    }
+
+    private static bool TryGetBoolean(JsonElement element, string name, out bool value)
+    {
+        value = default;
+        if (!TryGetProperty(element, name, out var property) ||
+            property.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+        {
+            return false;
+        }
+
+        value = property.GetBoolean();
+        return true;
     }
 
     private static void TryDelete(string path)
@@ -129,5 +234,6 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
     {
         public int Version { get; set; }
         public bool DarkMode { get; set; }
+        public AiConfigurationSettings Ai { get; set; } = AiConfigurationSettings.Default;
     }
 }

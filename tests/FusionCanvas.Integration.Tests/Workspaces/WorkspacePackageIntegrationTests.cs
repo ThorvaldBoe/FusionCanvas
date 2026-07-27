@@ -1,7 +1,11 @@
 using System.IO.Compression;
 using System.Text.Json;
 using FusionCanvas.Application.Workspaces.Transfer;
+using FusionCanvas.Application.Snowclones;
 using FusionCanvas.Domain.Assets;
+using FusionCanvas.Domain.Ideation;
+using FusionCanvas.Domain.Niches;
+using FusionCanvas.Domain.Snowclones;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Integration.Files;
@@ -54,6 +58,65 @@ public class WorkspacePackageIntegrationTests
         Assert.Equal(snapshot.ItemTags, restored.ItemTags);
         Assert.Equal(snapshot.AssetLinks, restored.AssetLinks);
         Assert.Equal([1, 2, 3, 4], await ReadBytesAsync(destinationFiles, "assets/design.png"));
+    }
+
+    [Fact]
+    public async Task ExportThenImport_RoundTripsRejectionsPreservesDestinationHistoryAndExcludesGlobalSnowclones()
+    {
+        using var temp = new TemporaryDirectory();
+        var sourceSnapshot = AddRejection(CreateSnapshot("Source", "assets/source.png"), "Source rejection");
+        var sourceRepository = new SqliteWorkspaceRepository(temp.GetPath("source.db"));
+        await sourceRepository.SaveAsync(sourceSnapshot, TestContext.Current.CancellationToken);
+        var sourceSnowclones = new SqliteSnowcloneRepository(temp.GetPath("source.db"));
+        var sourceSnowclone = NewSnowclone("Source {X}");
+        await sourceSnowclones.SaveAsync(
+            new SnowcloneLibrarySnapshot([sourceSnowclone], true),
+            TestContext.Current.CancellationToken);
+        var packagePath = temp.GetPath("rejections.fcworkspace");
+
+        var exported = await NewService(
+            sourceRepository,
+            new LocalWorkspaceFileStore(temp.GetPath("source-files"))).ExportWorkspaceAsync(
+                new WorkspaceExportRequest(sourceSnapshot.Workspaces[0].Id, packagePath),
+                cancellationToken: TestContext.Current.CancellationToken);
+
+        var embeddedPath = temp.GetPath("embedded.db");
+        using (var archive = ZipFile.OpenRead(packagePath))
+        await using (var input = archive.GetEntry("workspace.db")!.Open())
+        await using (var output = File.Create(embeddedPath))
+        {
+            await input.CopyToAsync(output, TestContext.Current.CancellationToken);
+        }
+
+        var embeddedSnowclones = await new SqliteSnowcloneRepository(embeddedPath)
+            .LoadAsync(TestContext.Current.CancellationToken);
+        var destinationSnapshot = AddRejection(
+            CreateSnapshot("Destination", "assets/destination.png"),
+            "Destination rejection");
+        var destinationRepository = new SqliteWorkspaceRepository(temp.GetPath("destination.db"));
+        await destinationRepository.SaveAsync(destinationSnapshot, TestContext.Current.CancellationToken);
+        var destinationSnowcloneRepository = new SqliteSnowcloneRepository(temp.GetPath("destination.db"));
+        var destinationSnowclone = NewSnowclone("Destination {X}");
+        await destinationSnowcloneRepository.SaveAsync(
+            new SnowcloneLibrarySnapshot([destinationSnowclone], true),
+            TestContext.Current.CancellationToken);
+
+        var imported = await NewService(
+            destinationRepository,
+            new LocalWorkspaceFileStore(temp.GetPath("destination-files"))).ImportWorkspaceAsync(
+                new WorkspaceImportRequest(packagePath),
+                cancellationToken: TestContext.Current.CancellationToken);
+        var restored = await destinationRepository.LoadAsync(TestContext.Current.CancellationToken);
+        var restoredSnowclones = await destinationSnowcloneRepository.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(exported.Succeeded);
+        Assert.Equal(1, exported.Summary!.EntityCounts["ideationRejections"]);
+        Assert.Empty(embeddedSnowclones.Snowclones);
+        Assert.True(imported.Succeeded);
+        Assert.Equal(2, restored.IdeationRejections.Count);
+        Assert.Contains(destinationSnapshot.IdeationRejections[0], restored.IdeationRejections);
+        Assert.Contains(sourceSnapshot.IdeationRejections[0], restored.IdeationRejections);
+        Assert.Equal(destinationSnowclone, Assert.Single(restoredSnowclones.Snowclones));
     }
 
     [Fact]
@@ -310,6 +373,29 @@ public class WorkspacePackageIntegrationTests
             "{\"asset\":true}");
         return new WorkspaceSnapshot([workspace], [store], [], [], [], [asset], [], [], [], []);
     }
+
+    private static WorkspaceSnapshot AddRejection(WorkspaceSnapshot snapshot, string text)
+    {
+        var store = Assert.Single(snapshot.Stores);
+        var niche = new Niche(Guid.NewGuid(), store.Id, $"{text} niche", null, false, Now, Now, "{}");
+        var rejection = new IdeationRejection(
+            Guid.NewGuid(),
+            store.Id,
+            niche.Id,
+            null,
+            text,
+            "Not suitable",
+            IdeationMode.Basic,
+            Now);
+        return snapshot with
+        {
+            Niches = [niche],
+            IdeationRejections = [rejection]
+        };
+    }
+
+    private static Snowclone NewSnowclone(string phrase) =>
+        new(Guid.NewGuid(), phrase, "Replace the placeholder.", Now, Now);
 
     private static async Task<byte[]> ReadBytesAsync(LocalWorkspaceFileStore store, string path)
     {

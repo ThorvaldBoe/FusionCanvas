@@ -1,0 +1,28 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ideation="using:FusionCanvas.App.Ideation"
+        x:Class="FusionCanvas.App.Ideation.IdeationDiscardConfirmationWindow"
+        x:DataType="ideation:IdeationViewModel"
+        Title="Discard candidates?"
+        Width="420"
+        Height="180"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner">
+  <Grid Margin="20" RowDefinitions="*,Auto" RowSpacing="16">
+    <TextBlock Text="{Binding DiscardConfirmationMessage}"
+               TextWrapping="Wrap"
+               VerticalAlignment="Center" />
+    <StackPanel Grid.Row="1"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8">
+      <Button x:Name="CancelButton"
+              Content="Cancel"
+              Click="OnCancel"
+              AutomationProperties.Name="Cancel discard" />
+      <Button Content="Discard"
+              Click="OnConfirm"
+              AutomationProperties.Name="Confirm discard" />
+    </StackPanel>
+  </Grid>
+</Window>

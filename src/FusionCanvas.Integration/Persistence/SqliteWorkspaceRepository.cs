@@ -7,6 +7,7 @@ using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
+using FusionCanvas.Domain.Ideation;
 using Microsoft.Data.Sqlite;
 using FusionCanvas.Application.Workspaces;
 
@@ -14,7 +15,7 @@ namespace FusionCanvas.Integration.Persistence;
 
 public sealed class SqliteWorkspaceRepository(string databasePath, bool useConnectionPooling = true) : IWorkspaceRepository
 {
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = SqliteDatabaseSchema.CurrentVersion;
 
     private readonly string _databasePath = databasePath;
 
@@ -23,12 +24,12 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_databasePath))!);
 
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        await EnsureSchemaAsync(connection, cancellationToken);
+        await SqliteDatabaseSchema.EnsureAsync(connection, cancellationToken);
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
 
-        foreach (var table in new[] { "asset_links", "item_tags", "prompts", "assets", "items", "groups", "niches", "tags", "stores", "workspaces" })
+        foreach (var table in new[] { "asset_links", "item_tags", "prompts", "assets", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
         {
             await ExecuteAsync(connection, transaction, $"DELETE FROM {table};", cancellationToken);
         }
@@ -56,6 +57,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         foreach (var group in OrderGroupsForInsert(snapshot.Groups))
         {
             await InsertGroupAsync(connection, transaction, group, cancellationToken);
+        }
+
+        foreach (var rejection in snapshot.IdeationRejections)
+        {
+            await InsertIdeationRejectionAsync(connection, transaction, rejection, cancellationToken);
         }
 
         foreach (var listing in snapshot.Items)
@@ -94,7 +100,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         }
 
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        await EnsureSchemaAsync(connection, cancellationToken);
+        await SqliteDatabaseSchema.EnsureAsync(connection, cancellationToken);
 
         return new WorkspaceSnapshot(
             await LoadWorkspacesAsync(connection, cancellationToken),
@@ -106,7 +112,10 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await LoadPromptsAsync(connection, cancellationToken),
             await LoadTagsAsync(connection, cancellationToken),
             await LoadItemTagsAsync(connection, cancellationToken),
-            await LoadAssetLinksAsync(connection, cancellationToken));
+            await LoadAssetLinksAsync(connection, cancellationToken))
+        {
+            IdeationRejections = await LoadIdeationRejectionsAsync(connection, cancellationToken)
+        };
     }
 
     private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
@@ -122,13 +131,18 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         return connection;
     }
 
-    private static async Task EnsureSchemaAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    internal static async Task EnsureSchemaCoreAsync(
+        SqliteConnection connection,
+        int currentSchemaVersion,
+        CancellationToken cancellationToken)
     {
         var schemaVersion = await ReadPragmaUserVersionAsync(connection, cancellationToken);
-        if (schemaVersion > CurrentSchemaVersion)
+        var isFreshDatabase = schemaVersion == 0
+            && !await HasUserTablesAsync(connection, cancellationToken);
+        if (schemaVersion > currentSchemaVersion)
         {
             throw new InvalidOperationException(
-                $"Workspace database schema version {schemaVersion} requires a newer FusionCanvas version. Current supported schema version is {CurrentSchemaVersion}.");
+                $"Workspace database schema version {schemaVersion} requires a newer FusionCanvas version. Current supported schema version is {currentSchemaVersion}.");
         }
 
         const string sql = """
@@ -246,30 +260,92 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 entity_id TEXT NOT NULL,
                 PRIMARY KEY (asset_id, entity_kind, entity_id)
             );
+
+            CREATE TABLE IF NOT EXISTS snowclones (
+                id TEXT PRIMARY KEY,
+                phrase TEXT NOT NULL,
+                normalized_phrase TEXT NOT NULL UNIQUE,
+                guidance TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS snowclone_library_state (
+                singleton_id INTEGER PRIMARY KEY CHECK(singleton_id = 1),
+                starter_initialized INTEGER NOT NULL
+            );
             """;
 
         await ExecuteAsync(connection, null, sql, cancellationToken);
-        if (schemaVersion < 2)
+        if (!isFreshDatabase && schemaVersion < 2)
         {
             await MigrateToVersion2Async(connection, cancellationToken);
         }
 
-        if (schemaVersion < 3)
+        if (!isFreshDatabase && schemaVersion < 3)
         {
             await MigrateToVersion3Async(connection, cancellationToken);
         }
 
-        if (schemaVersion < 4)
+        if (!isFreshDatabase && schemaVersion < 4)
         {
             await MigrateToVersion4Async(connection, cancellationToken);
         }
 
-        if (schemaVersion < 5)
+        if (!isFreshDatabase && schemaVersion < 5)
         {
             await MigrateToVersion5Async(connection, cancellationToken);
         }
 
-        await SetPragmaUserVersionAsync(connection, CurrentSchemaVersion, cancellationToken);
+        if (schemaVersion < 7)
+        {
+            await MigrateToVersion7Async(connection, cancellationToken);
+        }
+
+        await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
+    }
+
+    private static async Task<bool> HasUserTablesAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT EXISTS (
+                SELECT 1
+                FROM sqlite_master
+                WHERE type = 'table'
+                  AND name NOT LIKE 'sqlite_%'
+            );
+            """;
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken)) == 1;
+    }
+
+    private static async Task MigrateToVersion7Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await ExecuteAsync(connection, transaction, """
+                CREATE TABLE IF NOT EXISTS ideation_rejections (
+                    id TEXT PRIMARY KEY,
+                    store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                    niche_id TEXT NOT NULL REFERENCES niches(id) ON DELETE CASCADE,
+                    group_id TEXT NULL REFERENCES groups(id) ON DELETE SET NULL,
+                    text TEXT NOT NULL,
+                    reason TEXT NULL,
+                    mode INTEGER NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+                """, cancellationToken);
+            await VerifyForeignKeyIntegrityAsync(connection, transaction, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     private static async Task MigrateToVersion2Async(SqliteConnection connection, CancellationToken cancellationToken)
@@ -458,6 +534,30 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         }
     }
 
+    private static async Task MigrateToVersion6Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await ExecuteAsync(connection, transaction, """
+            CREATE TABLE IF NOT EXISTS snowclones (
+                id TEXT PRIMARY KEY,
+                phrase TEXT NOT NULL,
+                normalized_phrase TEXT NOT NULL UNIQUE,
+                guidance TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS snowclone_library_state (
+                singleton_id INTEGER PRIMARY KEY CHECK(singleton_id = 1),
+                starter_initialized INTEGER NOT NULL
+            );
+
+            INSERT OR IGNORE INTO snowclone_library_state (singleton_id, starter_initialized)
+            VALUES (1, 0);
+            """, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     private static async Task<bool> TableExistsAsync(SqliteConnection connection, string tableName, CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
@@ -577,6 +677,24 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             INSERT INTO groups (id, store_id, niche_id, parent_group_id, sort_order, name, description, is_archived, created_at, updated_at, metadata_json)
             VALUES ($id, $store_id, $niche_id, $parent_group_id, $sort_order, $name, $description, $is_archived, $created_at, $updated_at, $metadata_json);
             """, cancellationToken, [.. CommonParameters(group), ("$store_id", group.StoreId.ToString()), ("$niche_id", group.NicheId?.ToString()), ("$parent_group_id", group.ParentGroupId?.ToString()), ("$sort_order", group.SortOrder)]);
+
+    private static Task InsertIdeationRejectionAsync(
+        SqliteConnection connection,
+        System.Data.Common.DbTransaction transaction,
+        IdeationRejection rejection,
+        CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO ideation_rejections (id, store_id, niche_id, group_id, text, reason, mode, created_at)
+            VALUES ($id, $store_id, $niche_id, $group_id, $text, $reason, $mode, $created_at);
+            """, cancellationToken,
+            ("$id", rejection.Id.ToString()),
+            ("$store_id", rejection.StoreId.ToString()),
+            ("$niche_id", rejection.NicheId.ToString()),
+            ("$group_id", rejection.GroupId?.ToString()),
+            ("$text", rejection.Text),
+            ("$reason", rejection.Reason),
+            ("$mode", (int)rejection.Mode),
+            ("$created_at", rejection.CreatedAt.ToString("O")));
 
     private static IReadOnlyList<TopicGroup> OrderGroupsForInsert(IReadOnlyList<TopicGroup> groups)
     {
@@ -708,6 +826,27 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         return listings;
     }
 
+    private static async Task<IReadOnlyList<IdeationRejection>> LoadIdeationRejectionsAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        var rejections = new List<IdeationRejection>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM ideation_rejections ORDER BY created_at, id;", cancellationToken))
+        {
+            rejections.Add(new IdeationRejection(
+                ReadGuid(reader, "id"),
+                ReadGuid(reader, "store_id"),
+                ReadGuid(reader, "niche_id"),
+                ReadNullableGuid(reader, "group_id"),
+                ReadString(reader, "text"),
+                ReadNullableString(reader, "reason"),
+                (IdeationMode)ReadInt(reader, "mode"),
+                ReadDate(reader, "created_at")));
+        }
+
+        return rejections;
+    }
+
     private static async Task<IReadOnlyList<Asset>> LoadAssetsAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
         var assets = new List<Asset>();
@@ -802,6 +941,20 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 !snapshot.Niches.Any(niche => niche.Id == defaultNicheId && niche.StoreId == store.Id && !niche.IsArchived))
             {
                 throw new InvalidOperationException("A store default niche must reference an active niche in that store.");
+            }
+        }
+
+        foreach (var rejection in snapshot.IdeationRejections)
+        {
+            if (!snapshot.Stores.Any(store => store.Id == rejection.StoreId) ||
+                !snapshot.Niches.Any(niche => niche.Id == rejection.NicheId && niche.StoreId == rejection.StoreId) ||
+                rejection.GroupId is Guid groupId &&
+                !snapshot.Groups.Any(group =>
+                    group.Id == groupId &&
+                    group.StoreId == rejection.StoreId &&
+                    GroupHierarchy.GetEffectiveNiche(snapshot, group).Id == rejection.NicheId))
+            {
+                throw new InvalidOperationException("Every ideation rejection must belong to an existing store, niche, and optional group.");
             }
         }
     }

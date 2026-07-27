@@ -16,6 +16,7 @@ using FusionCanvas.Application.WorkflowNavigation;
 using FusionCanvas.Application.ToolContexts;
 using FusionCanvas.Application.StageTools;
 using FusionCanvas.Application.Tags;
+using FusionCanvas.Application.AI;
 
 namespace FusionCanvas.App.Tests;
 
@@ -480,13 +481,13 @@ public class StoreManagementViewModelTests
     public async Task AppWorkspaceFactory_UsesSqliteRepositoryForPersistentStores()
     {
         using var tempDirectory = new TemporaryDirectory();
-        var runtime = AppWorkspaceFactory.Create(tempDirectory.GetPath("workspace.db"));
+        var runtime = AppWorkspaceFactory.Create(tempDirectory.GetPath("workspace.db"), new UnavailableAi());
         var service = new StoreManagementService(runtime.Repository, () => Now, () => Guid.NewGuid());
 
         var created = await service.CreateStoreAsync(new StoreManagementCreateRequest(
             "North Star Studio",
             new StoreContext("POD brand", "Soft humor")), TestContext.Current.CancellationToken);
-        var reloaded = AppWorkspaceFactory.Create(tempDirectory.GetPath("workspace.db"));
+        var reloaded = AppWorkspaceFactory.Create(tempDirectory.GetPath("workspace.db"), new UnavailableAi());
 
         var store = Assert.Single(reloaded.Snapshot.Stores);
         Assert.True(created.Succeeded);
@@ -704,6 +705,23 @@ public class StoreManagementViewModelTests
 
         public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(_snapshot);
+    }
+
+    private sealed class UnavailableAi : IAiTextGenerationService
+    {
+        public Task<AiAvailabilityResult> GetAvailabilityAsync(
+            AiRequestPurpose purpose,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AiAvailabilityResult(
+                AiAvailabilityKind.MissingCredential,
+                "No test credential."));
+
+        public Task<AiTextResult> GenerateAsync(
+            AiTextRequest request,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(AiTextResult.Failure(
+                AiTextFailureKind.NotConfigured,
+                "No test credential."));
     }
 
     private sealed class TemporaryDirectory : IDisposable
