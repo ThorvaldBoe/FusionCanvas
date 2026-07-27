@@ -6,13 +6,18 @@ This acquisition imports the snowclone catalog supplied directly by the user on
 2026-07-27. The submitted text contained 380 non-empty candidate lines after
 the catalog header was removed.
 
-The import produced:
+The import and subsequent duplicate-aware supplementation produced:
 
-- 363 unique slot-bearing pattern records;
+- 365 unique slot-bearing pattern records;
 - 16 skipped structural duplicates, including duplicates within the submission
   and patterns already present in the v2 snowclone seed data; and
 - 1 skipped incomplete fragment (`one giant leap?`) with no recognizable
   replaceable slot.
+
+The two supplemental records preserve source-specific provenance for
+`yes, Virginia, there is X` and
+`how very different from our own dear X`, which were absent from the original
+363-record import.
 
 The records are stored in:
 
