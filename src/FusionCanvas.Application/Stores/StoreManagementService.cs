@@ -333,6 +333,7 @@ public sealed class StoreManagementService : IStoreManagementService
             || snapshot.Assets.Any(asset => asset.StoreId == storeId)
             || snapshot.Prompts.Any(prompt => prompt.StoreId == storeId)
             || snapshot.Tags.Any(tag => tag.StoreId == storeId)
+            || snapshot.IdeationRejections.Any(rejection => rejection.StoreId == storeId)
             || snapshot.ItemTags.Any(link => itemIds.Contains(link.ItemId) || tagIds.Contains(link.TagId))
             || snapshot.AssetLinks.Any(link => assetIds.Contains(link.AssetId) || IsStoreScopedAssetTarget(snapshot, link, storeId));
     }

@@ -455,7 +455,7 @@
           <ScrollViewer IsVisible="{Binding DocumentWindow.HasActiveDocument}"
                         VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="12">
-            <Grid ColumnDefinitions="*,Auto,Auto"
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto"
                   ColumnSpacing="8">
               <StackPanel Grid.Column="0" Spacing="3">
                 <TextBlock Text="{Binding DocumentWindow.ActiveDetailTitle}"
@@ -465,7 +465,21 @@
                 <TextBlock Text="{Binding DocumentWindow.ActiveNavigationPath}"
                            FontSize="12"
                            Foreground="{DynamicResource SecondaryTextBrush}" />
+                <TextBlock Text="{Binding IdeationUnavailableMessage}"
+                           IsVisible="{Binding IdeationUnavailableMessage, Converter={x:Static ObjectConverters.IsNotNull}}"
+                           TextWrapping="Wrap"
+                           FontSize="11"
+                           Foreground="{DynamicResource DangerTextBrush}" />
               </StackPanel>
+              <Button x:Name="IdeationButton"
+                      Grid.Column="3"
+                      IsVisible="{Binding IsIdeationActionVisible}"
+                      IsEnabled="{Binding CanOpenIdeation}"
+                      Command="{Binding OpenIdeationCommand}"
+                      Content="Ideation…"
+                      AutomationProperties.Name="Open Ideation"
+                      ToolTip.Tip="{Binding IdeationUnavailableMessage}"
+                      VerticalAlignment="Center" />
               <TextBlock Grid.Column="1"
                          IsVisible="{Binding ItemInspector.HasState}"
                          Text="{Binding ItemInspector.StageLabel}"

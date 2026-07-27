@@ -1,0 +1,42 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ideation="using:FusionCanvas.App.Ideation"
+        x:Class="FusionCanvas.App.Ideation.RejectIdeaWindow"
+        x:DataType="ideation:IdeationViewModel"
+        Title="Reject idea"
+        Width="440"
+        Height="250"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner">
+  <Grid Margin="20" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="10">
+    <TextBlock Text="Reject idea candidate?"
+               FontSize="18"
+               FontWeight="SemiBold" />
+    <TextBlock Grid.Row="1"
+               Text="{Binding RejectionCandidate.Text}"
+               TextWrapping="Wrap"
+               Foreground="{DynamicResource SecondaryTextBrush}" />
+    <StackPanel Grid.Row="2" Spacing="5">
+      <TextBlock Text="Reason (optional)"
+                 Foreground="{DynamicResource SecondaryTextBrush}" />
+      <TextBox x:Name="ReasonTextBox"
+               Text="{Binding RejectionReason}"
+               AcceptsReturn="True"
+               TextWrapping="Wrap"
+               MinHeight="64"
+               AutomationProperties.Name="Optional rejection reason" />
+    </StackPanel>
+    <StackPanel Grid.Row="3"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8">
+      <Button x:Name="CancelButton"
+              Content="Cancel"
+              Click="OnCancel"
+              AutomationProperties.Name="Cancel rejection" />
+      <Button Content="OK"
+              Click="OnConfirm"
+              AutomationProperties.Name="Confirm rejection" />
+    </StackPanel>
+  </Grid>
+</Window>

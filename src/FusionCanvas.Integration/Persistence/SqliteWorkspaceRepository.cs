@@ -7,6 +7,7 @@ using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
+using FusionCanvas.Domain.Ideation;
 using Microsoft.Data.Sqlite;
 using FusionCanvas.Application.Workspaces;
 
@@ -14,7 +15,7 @@ namespace FusionCanvas.Integration.Persistence;
 
 public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceRepository
 {
-    private const int CurrentSchemaVersion = 5;
+    private const int CurrentSchemaVersion = 6;
 
     private readonly string _databasePath = databasePath;
 
@@ -28,7 +29,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
 
-        foreach (var table in new[] { "asset_links", "item_tags", "prompts", "assets", "items", "groups", "niches", "tags", "stores", "workspaces" })
+        foreach (var table in new[] { "asset_links", "item_tags", "prompts", "assets", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
         {
             await ExecuteAsync(connection, transaction, $"DELETE FROM {table};", cancellationToken);
         }
@@ -56,6 +57,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         foreach (var group in OrderGroupsForInsert(snapshot.Groups))
         {
             await InsertGroupAsync(connection, transaction, group, cancellationToken);
+        }
+
+        foreach (var rejection in snapshot.IdeationRejections)
+        {
+            await InsertIdeationRejectionAsync(connection, transaction, rejection, cancellationToken);
         }
 
         foreach (var listing in snapshot.Items)
@@ -106,7 +112,10 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             await LoadPromptsAsync(connection, cancellationToken),
             await LoadTagsAsync(connection, cancellationToken),
             await LoadItemTagsAsync(connection, cancellationToken),
-            await LoadAssetLinksAsync(connection, cancellationToken));
+            await LoadAssetLinksAsync(connection, cancellationToken))
+        {
+            IdeationRejections = await LoadIdeationRejectionsAsync(connection, cancellationToken)
+        };
     }
 
     private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
@@ -264,7 +273,39 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             await MigrateToVersion5Async(connection, cancellationToken);
         }
 
+        if (schemaVersion < 6)
+        {
+            await MigrateToVersion6Async(connection, cancellationToken);
+        }
+
         await SetPragmaUserVersionAsync(connection, CurrentSchemaVersion, cancellationToken);
+    }
+
+    private static async Task MigrateToVersion6Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await ExecuteAsync(connection, transaction, """
+                CREATE TABLE IF NOT EXISTS ideation_rejections (
+                    id TEXT PRIMARY KEY,
+                    store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                    niche_id TEXT NOT NULL REFERENCES niches(id) ON DELETE CASCADE,
+                    group_id TEXT NULL REFERENCES groups(id) ON DELETE SET NULL,
+                    text TEXT NOT NULL,
+                    reason TEXT NULL,
+                    mode INTEGER NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+                """, cancellationToken);
+            await VerifyForeignKeyIntegrityAsync(connection, transaction, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     private static async Task MigrateToVersion2Async(SqliteConnection connection, CancellationToken cancellationToken)
@@ -573,6 +614,24 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             VALUES ($id, $store_id, $niche_id, $parent_group_id, $sort_order, $name, $description, $is_archived, $created_at, $updated_at, $metadata_json);
             """, cancellationToken, [.. CommonParameters(group), ("$store_id", group.StoreId.ToString()), ("$niche_id", group.NicheId?.ToString()), ("$parent_group_id", group.ParentGroupId?.ToString()), ("$sort_order", group.SortOrder)]);
 
+    private static Task InsertIdeationRejectionAsync(
+        SqliteConnection connection,
+        System.Data.Common.DbTransaction transaction,
+        IdeationRejection rejection,
+        CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO ideation_rejections (id, store_id, niche_id, group_id, text, reason, mode, created_at)
+            VALUES ($id, $store_id, $niche_id, $group_id, $text, $reason, $mode, $created_at);
+            """, cancellationToken,
+            ("$id", rejection.Id.ToString()),
+            ("$store_id", rejection.StoreId.ToString()),
+            ("$niche_id", rejection.NicheId.ToString()),
+            ("$group_id", rejection.GroupId?.ToString()),
+            ("$text", rejection.Text),
+            ("$reason", rejection.Reason),
+            ("$mode", (int)rejection.Mode),
+            ("$created_at", rejection.CreatedAt.ToString("O")));
+
     private static IReadOnlyList<TopicGroup> OrderGroupsForInsert(IReadOnlyList<TopicGroup> groups)
     {
         var remaining = groups.ToDictionary(group => group.Id);
@@ -703,6 +762,27 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         return listings;
     }
 
+    private static async Task<IReadOnlyList<IdeationRejection>> LoadIdeationRejectionsAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        var rejections = new List<IdeationRejection>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM ideation_rejections ORDER BY created_at, id;", cancellationToken))
+        {
+            rejections.Add(new IdeationRejection(
+                ReadGuid(reader, "id"),
+                ReadGuid(reader, "store_id"),
+                ReadGuid(reader, "niche_id"),
+                ReadNullableGuid(reader, "group_id"),
+                ReadString(reader, "text"),
+                ReadNullableString(reader, "reason"),
+                (IdeationMode)ReadInt(reader, "mode"),
+                ReadDate(reader, "created_at")));
+        }
+
+        return rejections;
+    }
+
     private static async Task<IReadOnlyList<Asset>> LoadAssetsAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
         var assets = new List<Asset>();
@@ -797,6 +877,20 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
                 !snapshot.Niches.Any(niche => niche.Id == defaultNicheId && niche.StoreId == store.Id && !niche.IsArchived))
             {
                 throw new InvalidOperationException("A store default niche must reference an active niche in that store.");
+            }
+        }
+
+        foreach (var rejection in snapshot.IdeationRejections)
+        {
+            if (!snapshot.Stores.Any(store => store.Id == rejection.StoreId) ||
+                !snapshot.Niches.Any(niche => niche.Id == rejection.NicheId && niche.StoreId == rejection.StoreId) ||
+                rejection.GroupId is Guid groupId &&
+                !snapshot.Groups.Any(group =>
+                    group.Id == groupId &&
+                    group.StoreId == rejection.StoreId &&
+                    GroupHierarchy.GetEffectiveNiche(snapshot, group).Id == rejection.NicheId))
+            {
+                throw new InvalidOperationException("Every ideation rejection must belong to an existing store, niche, and optional group.");
             }
         }
     }

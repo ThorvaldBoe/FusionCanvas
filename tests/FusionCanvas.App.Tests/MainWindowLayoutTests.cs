@@ -147,7 +147,7 @@ public class MainWindowLayoutTests
         fixture.PumpLayout();
 
         var headerGrid = fixture.FindControl<Grid>(g =>
-            g.ColumnDefinitions.Count == 3 && g.ColumnSpacing == 8
+            g.ColumnDefinitions.Count == 4 && g.ColumnSpacing == 8
             && g.IsVisible && g.Children.OfType<ComboBox>().Any());
         var statusSelector = headerGrid.Children.OfType<ComboBox>().First();
         var stageLabel = headerGrid.Children.OfType<TextBlock>()

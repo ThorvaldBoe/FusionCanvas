@@ -6,6 +6,8 @@ using FusionCanvas.Application.Groups;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Assets;
 using FusionCanvas.Application.Tags;
+using FusionCanvas.Application.Ideation;
+using FusionCanvas.Integration.Ideation;
 
 namespace FusionCanvas.App.Workspace;
 
@@ -17,7 +19,9 @@ public sealed record AppWorkspaceRuntime(
     IItemManagementService ItemManagement,
     IAssetManagementService AssetManagement,
     ITagManagementService TagManagement,
-    IItemInspectorService ItemInspector);
+    IItemInspectorService ItemInspector,
+    IIdeationService Ideation,
+    IIdeationAccessStatus IdeationAccess);
 
 public static class AppWorkspaceFactory
 {
@@ -35,15 +39,24 @@ public static class AppWorkspaceFactory
         var repository = new SqliteWorkspaceRepository(databasePath);
         var fileStore = new LocalWorkspaceFileStore(workspaceRootPath);
         var snapshot = repository.LoadAsync().GetAwaiter().GetResult();
+        var itemManagement = new ItemManagementService(repository);
+        var ideationAccess = new EnvironmentIdeationAccessStatus();
         return new AppWorkspaceRuntime(
             repository,
             fileStore,
             snapshot,
             new GroupManagementService(repository),
-            new ItemManagementService(repository),
+            itemManagement,
             new AssetManagementService(repository, fileStore),
             new TagManagementService(repository),
-            new ItemInspectorService(repository));
+            new ItemInspectorService(repository),
+            new IdeationService(
+                repository,
+                itemManagement,
+                new FakeIdeaGenerator(),
+                new InMemorySnowcloneCatalog(),
+                ideationAccess),
+            ideationAccess);
     }
 
     private static string DefaultDatabasePath()

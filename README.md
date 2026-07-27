@@ -91,6 +91,16 @@ Every feature that adds or changes behavior should include appropriate automated
 
 The project is intended to remain useful as a local desktop tool even without cloud services.
 
+## Local Ideation Placeholder
+
+The Idea-stage `Ideation…` tool is currently backed by a local fake generator. To make the action available during development, set a non-empty placeholder environment variable before starting FusionCanvas:
+
+```powershell
+$env:FUSIONCANVAS_AI_API_KEY = "placeholder"
+```
+
+The value is only an availability switch. It is not persisted, logged, added to generation context, or sent anywhere. The current Basic and Snowclones generators make no network requests and keep all workspace content local. A future real provider integration will replace this placeholder behind the existing application boundary.
+
 ## Testing Baseline
 
 Run the automated baseline from the repository root:

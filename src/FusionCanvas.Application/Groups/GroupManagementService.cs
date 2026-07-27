@@ -211,7 +211,11 @@ public sealed class GroupManagementService : IGroupManagementService
             Items = snapshot.Items.Select(listing =>
                 listing.GroupId is Guid groupId && subtreeIds.Contains(groupId)
                     ? listing with { NicheId = destinationNicheId }
-                    : listing).ToArray()
+                    : listing).ToArray(),
+            IdeationRejections = snapshot.IdeationRejections.Select(rejection =>
+                rejection.GroupId is Guid groupId && subtreeIds.Contains(groupId)
+                    ? rejection with { StoreId = destinationStoreId, NicheId = destinationNicheId }
+                    : rejection).ToArray()
         };
         var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
         if (saveError is not null)
@@ -373,7 +377,11 @@ public sealed class GroupManagementService : IGroupManagementService
             Items = snapshot.Items.Where(listing => !deletedItemIds.Contains(listing.Id)).ToArray(),
             Prompts = snapshot.Prompts.Where(prompt => !deletedPromptIds.Contains(prompt.Id)).ToArray(),
             ItemTags = snapshot.ItemTags.Where(link => !deletedItemIds.Contains(link.ItemId)).ToArray(),
-            AssetLinks = snapshot.AssetLinks.Where(link => !deletedEntityIds.Contains(link.EntityId)).ToArray()
+            AssetLinks = snapshot.AssetLinks.Where(link => !deletedEntityIds.Contains(link.EntityId)).ToArray(),
+            IdeationRejections = snapshot.IdeationRejections.Select(rejection =>
+                rejection.GroupId is Guid groupId && deletedGroupIds.Contains(groupId)
+                    ? rejection with { GroupId = null }
+                    : rejection).ToArray()
         };
         var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
         if (saveError is not null)

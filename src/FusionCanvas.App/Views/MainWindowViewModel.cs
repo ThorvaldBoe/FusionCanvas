@@ -1,6 +1,7 @@
 ﻿using FusionCanvas.App.Assets;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Groups;
+using FusionCanvas.App.Ideation;
 using FusionCanvas.App.Items;
 using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Settings;
@@ -30,6 +31,8 @@ using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.WorkflowNavigation;
 using FusionCanvas.Application.Niches;
 using FusionCanvas.Application.DesignFiles;
+using FusionCanvas.Application.Ideation;
+using FusionCanvas.Integration.Ideation;
 
 namespace FusionCanvas.App.Views;
 
@@ -48,6 +51,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly IAssetManagementService _assetManagementService;
     private readonly IItemInspectorService _itemInspectorService;
     private readonly ITagManagementService _tagManagementService;
+    private readonly IIdeationService _ideationService;
+    private readonly IIdeationAccessStatus _ideationAccessStatus;
     private ItemStatus? _pendingStatus;
     private bool _isStatusConfirmationVisible;
     private bool _isDesignRemoveConfirmationVisible;
@@ -83,7 +88,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.FileStore,
             runtime.ItemInspector,
             runtime.TagManagement,
-            settings)
+            settings,
+            runtime.Ideation,
+            runtime.IdeationAccess)
     {
     }
 
@@ -100,7 +107,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IWorkspaceFileStore? workspaceFileStore = null,
         IItemInspectorService? itemInspectorService = null,
         ITagManagementService? tagManagementService = null,
-        SettingsViewModel? settings = null)
+        SettingsViewModel? settings = null,
+        IIdeationService? ideationService = null,
+        IIdeationAccessStatus? ideationAccessStatus = null)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
@@ -116,11 +125,19 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         var fileStore = workspaceFileStore ?? new InMemoryWorkspaceFileStore();
         _assetManagementService = assetManagementService ?? new AssetManagementService(workspaceRepository, fileStore);
         _itemInspectorService = itemInspectorService ?? new ItemInspectorService(workspaceRepository);
+        _ideationAccessStatus = ideationAccessStatus ?? new EnvironmentIdeationAccessStatus();
+        _ideationService = ideationService ?? new IdeationService(
+            workspaceRepository,
+            _itemManagementService,
+            new FakeIdeaGenerator(),
+            new InMemorySnowcloneCatalog(),
+            _ideationAccessStatus);
         GroupDetails = new GroupDetailsViewModel(_groupManagementService);
         AssetsManagement = new AssetsViewModel(_assetManagementService);
         ItemInspector = new ItemInspectorViewModel(_itemInspectorService, _itemManagementService, _tagManagementService);
         DesignTool = new DesignStageToolViewModel(new DesignFileService(workspaceRepository, fileStore));
         ListingTool = new ListingStageToolViewModel();
+        Ideation = new IdeationViewModel(_ideationService, _ideationAccessStatus);
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
         _workspaceRepository = workspaceRepository;
@@ -155,6 +172,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 HandleCloseTabRequest(tab);
             }
         });
+        OpenIdeationCommand = new RelayCommand(_ => OpenIdeation());
         InitializeItemCommands();
         InitializeGroupIntegration();
         StoreManagement.ActiveStoreChanged += (_, store) => RebuildNavigationContexts(store);
@@ -169,6 +187,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         DocumentWindow.ToolScopeChangeRequested += (_, scope) => ResolveActiveToolContext(scope);
         DocumentWindow.StageToolSelectionRequested += (_, toolId) => SelectStageTool(toolId);
         ItemInspector.Saved += (_, _) => HandleInspectorSaved();
+        Ideation.WorkspaceChanged += (_, _) => RefreshWorkspaceSnapshotAndInspector();
+        Ideation.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(IdeationViewModel.IsOpen))
+            {
+                RaiseIdeationProperties();
+            }
+        };
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -193,6 +219,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public ListingStageToolViewModel ListingTool { get; }
 
+    public IdeationViewModel Ideation { get; }
+
     public WorkspaceTreeViewModel WorkspaceTree { get; }
 
     public NavigationTreePresentationState NavigationState { get; }
@@ -210,6 +238,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public ICommand OpenNavigationContextCommand { get; }
 
     public ICommand SelectWorkflowStageCommand { get; }
+
+    public ICommand OpenIdeationCommand { get; }
 
     public ICommand MoveStageForwardCommand { get; private set; } = null!;
 
@@ -309,6 +339,33 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public bool ShowsConceptStageTool => DocumentWindow.ActiveContext?.WorkflowStage == WorkflowStage.Concept;
     public bool ShowsDesignStageTool => DocumentWindow.ActiveContext?.WorkflowStage == WorkflowStage.Design;
     public bool ShowsListingStageTool => DocumentWindow.ActiveContext?.WorkflowStage == WorkflowStage.Listing;
+
+    public bool IsIdeationActionVisible =>
+        DocumentWindow.ActiveContext is
+        {
+            WorkflowStage: WorkflowStage.Idea,
+            EntityKind: WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group or WorkspaceEntityKind.Item
+        };
+
+    public bool CanOpenIdeation =>
+        IsIdeationActionVisible
+        && !Ideation.IsOpen
+        && _ideationAccessStatus.GetAvailability().IsAvailable
+        && ResolveIdeationScope().IsAvailable;
+
+    public string? IdeationUnavailableMessage
+    {
+        get
+        {
+            if (!IsIdeationActionVisible)
+            {
+                return null;
+            }
+
+            var access = _ideationAccessStatus.GetAvailability();
+            return access.IsAvailable ? ResolveIdeationScope().Error : access.UnavailableReason;
+        }
+    }
 
     public ICommand ConfirmStatusChangeCommand { get; private set; } = null!;
     public ICommand CancelStatusChangeCommand { get; private set; } = null!;
@@ -636,6 +693,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             RaiseLifecycleProperties();
             OnPropertyChanged(nameof(ShowStageToolHost));
             RefreshStageToolState();
+            RaiseIdeationProperties();
             return;
         }
 
@@ -658,6 +716,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         RaiseLifecycleProperties();
         OnPropertyChanged(nameof(ShowStageToolHost));
         RefreshStageToolState();
+        RaiseIdeationProperties();
     }
 
     private void CoordinateGroupDetails(DocumentContext context)
@@ -966,6 +1025,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ShowsConceptStageTool));
         OnPropertyChanged(nameof(ShowsDesignStageTool));
         OnPropertyChanged(nameof(ShowsListingStageTool));
+        RaiseIdeationProperties();
 
         if (ActiveItem is not { } item)
         {
@@ -1123,6 +1183,36 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         _stageToolHostService.SelectTool(new StageToolSelectionKey(state.WorkflowStage, state.ContextKind), toolId);
         ResolveActiveToolContext();
+    }
+
+    private void OpenIdeation()
+    {
+        if (!CanOpenIdeation)
+        {
+            return;
+        }
+
+        var resolution = ResolveIdeationScope();
+        if (resolution.Scope is { } scope)
+        {
+            Ideation.Open(scope);
+            RaiseIdeationProperties();
+        }
+    }
+
+    private IdeationScopeResult ResolveIdeationScope()
+    {
+        var context = DocumentWindow.ActiveContext;
+        return context is null
+            ? IdeationScopeResult.Unavailable("Select an active niche, group, or Item.")
+            : _ideationService.ResolveScope(_workspaceSnapshot, context.EntityKind, context.Id);
+    }
+
+    private void RaiseIdeationProperties()
+    {
+        OnPropertyChanged(nameof(IsIdeationActionVisible));
+        OnPropertyChanged(nameof(CanOpenIdeation));
+        OnPropertyChanged(nameof(IdeationUnavailableMessage));
     }
 
     private static IReadOnlyList<NavigationDocumentContext> CreateNavigationContexts(
