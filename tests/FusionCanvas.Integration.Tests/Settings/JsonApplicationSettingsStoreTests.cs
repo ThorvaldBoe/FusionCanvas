@@ -1,3 +1,4 @@
+using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Settings;
 using FusionCanvas.Integration.Settings;
 
@@ -100,7 +101,7 @@ public class JsonApplicationSettingsStoreTests
     {
         using var tempDirectory = new TemporaryDirectory();
         var path = tempDirectory.GetPath("settings.json");
-        await File.WriteAllTextAsync(path, "{\"version\":2,\"darkMode\":true}", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(path, "{\"version\":3,\"darkMode\":true}", TestContext.Current.CancellationToken);
         var store = new JsonApplicationSettingsStore(path);
 
         var result = await store.LoadAsync(TestContext.Current.CancellationToken);
@@ -191,6 +192,54 @@ public class JsonApplicationSettingsStoreTests
 
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => store.SaveAsync(new ApplicationSettings(DarkMode: true), new CancellationToken(canceled: true)));
+    }
+
+    [Fact]
+    public async Task Version2_RoundTripsCompleteAiSettingsWithoutASecret()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var path = tempDirectory.GetPath("settings.json");
+        var store = new JsonApplicationSettingsStore(path);
+        var profile = AiProfileSettings.Empty with
+        {
+            ModelId = "provider/model",
+            MaxCompletionTokens = 123,
+            Temperature = 0.4,
+            TopP = 0.8,
+            TopK = 20,
+            MinP = 0.1,
+            TopA = 0.2,
+            FrequencyPenalty = -0.3,
+            PresencePenalty = 0.5,
+            RepetitionPenalty = 1.1,
+            Seed = 42,
+            StopSequences = ["END"],
+            Reasoning = new AiReasoningSettings(AiReasoningMode.Effort, "high")
+        };
+        var ai = new AiConfigurationSettings(
+            false,
+            true,
+            profile,
+            new AiPurposeProfileSettings(false, true, profile with { ModelId = "idea/model" }),
+            new AiPurposeProfileSettings(true, true, profile with { ModelId = "retained/model" }));
+
+        Assert.True((await store.SaveAsync(
+            new ApplicationSettings(true, ai),
+            TestContext.Current.CancellationToken)).Saved);
+        var loaded = await store.LoadAsync(TestContext.Current.CancellationToken);
+        var json = await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken);
+
+        Assert.False(loaded.Value.Ai.RequireZeroDataRetention);
+        Assert.True(loaded.Value.Ai.AdvancedMode);
+        Assert.Equal("provider/model", loaded.Value.Ai.General.ModelId);
+        Assert.Equal(123, loaded.Value.Ai.General.MaxCompletionTokens);
+        Assert.Equal("high", loaded.Value.Ai.General.Reasoning.Effort);
+        Assert.Equal(["END"], loaded.Value.Ai.General.StopSequences);
+        Assert.Equal("idea/model", loaded.Value.Ai.Ideation.CustomProfile.ModelId);
+        Assert.Equal("retained/model", loaded.Value.Ai.Concept.CustomProfile.ModelId);
+        Assert.Contains("\"version\": 2", json);
+        Assert.DoesNotContain("apiKey", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("secret", json, StringComparison.OrdinalIgnoreCase);
     }
 
     private sealed class TemporaryDirectory : IDisposable
