@@ -5,11 +5,16 @@ public sealed record SnowcloneTemplateValidation(
     string Phrase,
     string Guidance,
     string DuplicateKey,
+    IReadOnlyList<string> PlaceholderTokens,
     string? Error)
 {
-    public static SnowcloneTemplateValidation Success(string phrase, string guidance, string duplicateKey) =>
-        new(true, phrase, guidance, duplicateKey, null);
+    public static SnowcloneTemplateValidation Success(
+        string phrase,
+        string guidance,
+        string duplicateKey,
+        IReadOnlyList<string> placeholderTokens) =>
+        new(true, phrase, guidance, duplicateKey, placeholderTokens, null);
 
     public static SnowcloneTemplateValidation Failure(string phrase, string guidance, string error) =>
-        new(false, phrase, guidance, string.Empty, error);
+        new(false, phrase, guidance, string.Empty, [], error);
 }

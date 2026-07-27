@@ -91,15 +91,11 @@ Every feature that adds or changes behavior should include appropriate automated
 
 The project is intended to remain useful as a local desktop tool even without cloud services.
 
-## Local Ideation Placeholder
+## Ideation AI Configuration
 
-The Idea-stage `Ideation…` tool is currently backed by a local fake generator. To make the action available during development, set a non-empty placeholder environment variable before starting FusionCanvas:
+The Idea-stage `Ideation…` tool uses the OpenRouter configuration in **Settings → AI**. Save an API key in the native credential store, refresh the compatible model catalog, and select a ready model for Ideation (or let Ideation use the General profile).
 
-```powershell
-$env:FUSIONCANVAS_AI_API_KEY = "placeholder"
-```
-
-The value is only an availability switch. It is not persisted, logged, added to generation context, or sent anywhere. The current Basic and Snowclones generators make no network requests and keep all workspace content local. A future real provider integration will replace this placeholder behind the existing application boundary.
+The API key is never stored in the workspace database or workspace packages. Ideation candidates remain transient until they are created or rejected; Snowclones mode uses the application-wide Snowclone Library.
 
 ## Testing Baseline
 

@@ -1,6 +1,7 @@
 using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Application.AI;
 
 namespace FusionCanvas.Application.Ideation;
 
@@ -13,17 +14,60 @@ public sealed record IdeationAccessAvailability(bool IsAvailable, string? Unavai
 
 public interface IIdeationAccessStatus
 {
+    event EventHandler? AvailabilityChanged
+    {
+        add { }
+        remove { }
+    }
+
     IdeationAccessAvailability GetAvailability();
+
+    Task RefreshAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
 
 public interface ISnowcloneCatalog
 {
-    IReadOnlyList<string> GetTemplates(int count);
+    Task<SnowcloneCatalogResult> GetSelectionsAsync(
+        int count,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed record IdeationSnowcloneSelection(
+    Guid Id,
+    string Phrase,
+    string Guidance,
+    IReadOnlyList<string> PlaceholderTokens);
+
+public sealed record SnowcloneCatalogResult(
+    bool Succeeded,
+    IReadOnlyList<IdeationSnowcloneSelection> Selections,
+    string? Error)
+{
+    public static SnowcloneCatalogResult Success(IReadOnlyList<IdeationSnowcloneSelection> selections) =>
+        new(true, selections, null);
+
+    public static SnowcloneCatalogResult Failure(string error) =>
+        new(false, [], error);
 }
 
 public interface IIdeaGenerator
 {
-    Task<string> GenerateAsync(IdeationGenerationContext context, int requestIndex, CancellationToken cancellationToken = default);
+    Task<IdeaGenerationResult> GenerateAsync(
+        IdeationGenerationContext context,
+        int requestIndex,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed record IdeaGenerationResult(
+    bool Succeeded,
+    string? Text,
+    AiTextFailureKind? FailureKind,
+    string? Error)
+{
+    public static IdeaGenerationResult Success(string text) => new(true, text, null, null);
+
+    public static IdeaGenerationResult Failure(AiTextFailureKind kind, string error) =>
+        new(false, null, kind, error);
 }
 
 public interface IIdeationService
@@ -62,6 +106,8 @@ public sealed record IdeationGenerationContext(
     string? Guidance,
     IdeationMode Mode,
     string? SnowcloneTemplate,
+    string? SnowcloneGuidance,
+    IReadOnlyList<string> SnowclonePlaceholderTokens,
     IReadOnlyList<string> ActiveIdeas,
     IReadOnlyList<IdeationRejectedContext> RejectedIdeas);
 

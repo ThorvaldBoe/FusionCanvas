@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.AI;
 using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Workspace;
@@ -77,8 +78,19 @@ public sealed class IdeationService : IIdeationService
         }
 
         var context = AssembleContext(snapshot, scopeResult.Scope!, request.Guidance, request.Mode);
-        var templates = request.Mode == IdeationMode.Snowclones ? _snowclones.GetTemplates(request.Count) : [];
+        var catalog = request.Mode == IdeationMode.Snowclones
+            ? await _snowclones.GetSelectionsAsync(request.Count, cancellationToken).ConfigureAwait(false)
+            : SnowcloneCatalogResult.Success([]);
+        if (!catalog.Succeeded)
+        {
+            return IdeationGenerationResult.Failure(
+                catalog.Error ?? "The Snowclone Library is unavailable.",
+                request.Count);
+        }
+
+        var selections = catalog.Selections;
         var outputs = new ConcurrentDictionary<int, string>();
+        var failures = new ConcurrentBag<IdeaGenerationResult>();
         var failed = 0;
         var completed = 0;
 
@@ -91,12 +103,36 @@ public sealed class IdeationService : IIdeationService
                 {
                     try
                     {
+                        var selection = request.Mode == IdeationMode.Snowclones
+                            ? selections[index]
+                            : null;
                         var operationContext = context with
                         {
-                            SnowcloneTemplate = request.Mode == IdeationMode.Snowclones ? templates[index] : null
+                            SnowcloneTemplate = selection?.Phrase,
+                            SnowcloneGuidance = selection?.Guidance,
+                            SnowclonePlaceholderTokens = selection?.PlaceholderTokens ?? []
                         };
-                        var text = await _generator.GenerateAsync(operationContext, index, token).ConfigureAwait(false);
-                        outputs[index] = text;
+                        var generated = await _generator.GenerateAsync(operationContext, index, token).ConfigureAwait(false);
+                        if (!generated.Succeeded || string.IsNullOrWhiteSpace(generated.Text))
+                        {
+                            failures.Add(generated);
+                            Interlocked.Increment(ref failed);
+                            return;
+                        }
+
+                        var text = generated.Text;
+                        if (operationContext.SnowclonePlaceholderTokens.Any(
+                                placeholder => text.Contains(placeholder, StringComparison.Ordinal)))
+                        {
+                            failures.Add(IdeaGenerationResult.Failure(
+                                AiTextFailureKind.InvalidProviderResponse,
+                                "A generated Snowclone still contained an unresolved placeholder."));
+                            Interlocked.Increment(ref failed);
+                        }
+                        else
+                        {
+                            outputs[index] = text;
+                        }
                     }
                     catch (OperationCanceledException) when (token.IsCancellationRequested)
                     {
@@ -104,6 +140,9 @@ public sealed class IdeationService : IIdeationService
                     }
                     catch
                     {
+                        failures.Add(IdeaGenerationResult.Failure(
+                            AiTextFailureKind.ProviderFailure,
+                            "The AI provider could not generate an idea."));
                         Interlocked.Increment(ref failed);
                     }
                     finally
@@ -132,11 +171,15 @@ public sealed class IdeationService : IIdeationService
             }
         }
 
+        var failureDetail = failures
+            .Select(result => result.Error)
+            .FirstOrDefault(message => !string.IsNullOrWhiteSpace(message));
         var error = failed switch
         {
             0 => null,
-            var count when count == request.Count => "No ideas could be generated. Try again.",
-            _ => $"{failed} of {request.Count} ideas could not be generated."
+            var count when count == request.Count =>
+                $"No ideas could be generated. {failureDetail ?? "Try again."}",
+            _ => $"{failed} of {request.Count} ideas could not be generated. {failureDetail}".Trim()
         };
         return new IdeationGenerationResult(
             failed < request.Count,
@@ -271,6 +314,8 @@ public sealed class IdeationService : IIdeationService
             string.IsNullOrWhiteSpace(guidance) ? null : guidance.Trim(),
             mode,
             null,
+            null,
+            [],
             activeIdeas,
             rejectedItems.Concat(recorded).ToArray());
     }

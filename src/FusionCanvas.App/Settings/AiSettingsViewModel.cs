@@ -61,6 +61,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler? SettingsChanged;
+    public event EventHandler? AvailabilityChanged;
     public event EventHandler? CredentialFocusRequested;
 
     public AiConfigurationSettings Current => _settings;
@@ -318,6 +319,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
             CredentialStatus = "Saved — not verified";
             Message = null;
             DiscardCredentialDraft();
+            AvailabilityChanged?.Invoke(this, EventArgs.Empty);
         }
         finally
         {
@@ -370,6 +372,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
             CredentialStatus = "No API key saved";
             Message = null;
             CredentialFocusRequested?.Invoke(this, EventArgs.Empty);
+            AvailabilityChanged?.Invoke(this, EventArgs.Empty);
         }
         finally
         {
@@ -422,6 +425,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         _allModels = models;
         ApplyModelFilter();
         NotifyReadiness();
+        AvailabilityChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private IReadOnlyList<AiModelDescriptor> _allModels = [];
@@ -475,6 +479,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         OnPropertyChanged(nameof(RequireZeroDataRetention));
         OnPropertyChanged(nameof(AdvancedMode));
         SettingsChanged?.Invoke(this, EventArgs.Empty);
+        AvailabilityChanged?.Invoke(this, EventArgs.Empty);
         NotifyReadiness();
     }
 

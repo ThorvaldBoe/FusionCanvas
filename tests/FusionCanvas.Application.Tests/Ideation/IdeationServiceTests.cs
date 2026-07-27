@@ -112,6 +112,28 @@ public sealed class IdeationServiceTests
     }
 
     [Fact]
+    public async Task Generate_SnowclonePropagatesPhraseGuidanceAndRejectsUnresolvedTokens()
+    {
+        var sample = Sample.Create();
+        var generator = new DelegateGenerator((context, _, _) =>
+        {
+            Assert.Contains("Fill", context.SnowcloneGuidance, StringComparison.Ordinal);
+            Assert.Contains("{X}", context.SnowclonePlaceholderTokens);
+            return Task.FromResult("Still has {X}");
+        });
+        var service = NewService(new InMemoryRepository(sample.Snapshot), generator);
+        var scope = service.ResolveScope(sample.Snapshot, WorkspaceEntityKind.Group, sample.Group.Id).Scope!;
+
+        var result = await service.GenerateAsync(
+            new IdeationGenerationRequest(scope, IdeationMode.Snowclones, null, 1),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Empty(result.Candidates);
+        Assert.Contains("unresolved placeholder", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Create_WritesFullIdeaAndUsesFirstSentenceInExactGroup()
     {
         var sample = Sample.Create();
@@ -328,30 +350,39 @@ public sealed class IdeationServiceTests
 
     private sealed class FixedCatalog : ISnowcloneCatalog
     {
-        public IReadOnlyList<string> GetTemplates(int count) =>
-            Enumerable.Range(0, count).Select(index => $"Template {index} X").ToArray();
+        public Task<SnowcloneCatalogResult> GetSelectionsAsync(
+            int count,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(SnowcloneCatalogResult.Success(
+                Enumerable.Range(0, count)
+                    .Select(index => new IdeationSnowcloneSelection(
+                        Guid.NewGuid(),
+                        $"Template {index} {{X}}",
+                        "Fill {X}.",
+                        ["{X}"]))
+                    .ToArray()));
     }
 
     private sealed class CapturingGenerator : IIdeaGenerator
     {
         public List<IdeationGenerationContext> Contexts { get; } = [];
 
-        public Task<string> GenerateAsync(IdeationGenerationContext context, int requestIndex, CancellationToken cancellationToken = default)
+        public Task<IdeaGenerationResult> GenerateAsync(IdeationGenerationContext context, int requestIndex, CancellationToken cancellationToken = default)
         {
             lock (Contexts)
             {
                 Contexts.Add(context);
             }
 
-            return Task.FromResult($"Candidate {requestIndex}");
+            return Task.FromResult(IdeaGenerationResult.Success($"Candidate {requestIndex}"));
         }
     }
 
     private sealed class DelegateGenerator(
         Func<IdeationGenerationContext, int, CancellationToken, Task<string>> generate) : IIdeaGenerator
     {
-        public Task<string> GenerateAsync(IdeationGenerationContext context, int requestIndex, CancellationToken cancellationToken = default) =>
-            generate(context, requestIndex, cancellationToken);
+        public async Task<IdeaGenerationResult> GenerateAsync(IdeationGenerationContext context, int requestIndex, CancellationToken cancellationToken = default) =>
+            IdeaGenerationResult.Success(await generate(context, requestIndex, cancellationToken));
     }
 
     private sealed class ConcurrencyGenerator : IIdeaGenerator
@@ -361,14 +392,14 @@ public sealed class IdeationServiceTests
 
         public int Peak => _peak;
 
-        public async Task<string> GenerateAsync(IdeationGenerationContext context, int requestIndex, CancellationToken cancellationToken = default)
+        public async Task<IdeaGenerationResult> GenerateAsync(IdeationGenerationContext context, int requestIndex, CancellationToken cancellationToken = default)
         {
             var active = Interlocked.Increment(ref _active);
             UpdatePeak(active);
             try
             {
                 await Task.Delay(5, cancellationToken);
-                return $"Candidate {requestIndex}";
+                return IdeaGenerationResult.Success($"Candidate {requestIndex}");
             }
             finally
             {

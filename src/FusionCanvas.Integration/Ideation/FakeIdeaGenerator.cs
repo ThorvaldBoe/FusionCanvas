@@ -12,7 +12,7 @@ public sealed class FakeIdeaGenerator : IIdeaGenerator
         _delay = delay ?? Task.Delay;
     }
 
-    public async Task<string> GenerateAsync(
+    public async Task<IdeaGenerationResult> GenerateAsync(
         IdeationGenerationContext context,
         int requestIndex,
         CancellationToken cancellationToken = default)
@@ -21,12 +21,13 @@ public sealed class FakeIdeaGenerator : IIdeaGenerator
         await _delay(TimeSpan.FromMilliseconds(90 + (requestIndex % 4 * 25)), cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
 
-        return context.Mode switch
+        var idea = context.Mode switch
         {
             IdeationMode.Basic => Basic(context, requestIndex),
             IdeationMode.Snowclones => Snowclone(context, requestIndex),
             _ => throw new ArgumentOutOfRangeException(nameof(context), "Unsupported Ideation mode.")
         };
+        return IdeaGenerationResult.Success(idea);
     }
 
     private static string Basic(IdeationGenerationContext context, int index)

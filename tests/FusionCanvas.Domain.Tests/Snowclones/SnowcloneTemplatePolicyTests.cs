@@ -59,6 +59,17 @@ public sealed class SnowcloneTemplatePolicyTests
         Assert.Equal("Preserve detail.", result.Guidance);
     }
 
+    [Fact]
+    public void Validate_ExposesDistinctCompleteNamedAndRepeatedTokens()
+    {
+        var result = SnowcloneTemplatePolicy.Validate(
+            "My {Audience} knows {Product}, and {Audience} agrees",
+            "Fill every placeholder.");
+
+        Assert.True(result.IsValid);
+        Assert.Equal(["{Audience}", "{Product}"], result.PlaceholderTokens);
+    }
+
     [Theory]
     [InlineData(" Easily distracted by {X} ", "easily distracted by {x}")]
     [InlineData("The\t{Hero}\r\nreturns", "the {hero} returns")]

@@ -7,12 +7,18 @@ namespace FusionCanvas.App;
 public static class AppServicesFactory
 {
     public static AppServices Create()
+        => Create(AppSettingsFactory.CreateStore());
+
+    public static AppServices Create(
+        FusionCanvas.Application.Settings.IApplicationSettingsStore settingsStore)
     {
-        var settingsStore = AppSettingsFactory.CreateStore();
-        var load = settingsStore.LoadAsync().GetAwaiter().GetResult();
-        var settingsDirectory = Path.GetDirectoryName(
-            ((FusionCanvas.Integration.Settings.JsonApplicationSettingsStore)settingsStore).SettingsPath)
-            ?? AppContext.BaseDirectory;
+        ArgumentNullException.ThrowIfNull(settingsStore);
+        var load = StartupTaskRunner.Run(() => settingsStore.LoadAsync());
+        var settingsPath =
+            (settingsStore as FusionCanvas.Integration.Settings.JsonApplicationSettingsStore)?.SettingsPath;
+        var settingsDirectory = settingsPath is null
+            ? AppContext.BaseDirectory
+            : Path.GetDirectoryName(settingsPath) ?? AppContext.BaseDirectory;
 
         var credentials = new NativeAiCredentialStore();
         var catalogCache = new JsonAiModelCatalogCache(Path.Combine(settingsDirectory, "ai-cache"));

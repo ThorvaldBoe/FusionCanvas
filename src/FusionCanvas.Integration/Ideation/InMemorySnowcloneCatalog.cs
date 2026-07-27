@@ -27,22 +27,30 @@ public sealed class InMemorySnowcloneCatalog : ISnowcloneCatalog
         _random = random ?? Random.Shared;
     }
 
-    public IReadOnlyList<string> GetTemplates(int count)
+    public Task<SnowcloneCatalogResult> GetSelectionsAsync(
+        int count,
+        CancellationToken cancellationToken = default)
     {
         if (count < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(count));
         }
 
-        var selected = new List<string>(count);
+        var selected = new List<IdeationSnowcloneSelection>(count);
         while (selected.Count < count)
         {
             var cycle = Templates.ToArray();
             Shuffle(cycle);
-            selected.AddRange(cycle.Take(count - selected.Count));
+            selected.AddRange(cycle
+                .Take(count - selected.Count)
+                .Select(template => new IdeationSnowcloneSelection(
+                    Guid.NewGuid(),
+                    template,
+                    "Replace X, Y, and Z using the creative context.",
+                    [])));
         }
 
-        return selected;
+        return Task.FromResult(SnowcloneCatalogResult.Success(selected));
     }
 
     private void Shuffle(string[] values)

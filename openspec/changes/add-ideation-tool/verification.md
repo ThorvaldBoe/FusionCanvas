@@ -103,3 +103,9 @@ The repository has pre-existing xUnit analyzer/nullability warnings. No warning 
 ## Limitations
 
 No optional live-desktop observation was performed. Native modality, operating-system close interception, spinner animation smoothness, and visual density are supported by implementation and deterministic tests but were not manually observed on this run.
+> Post-merge integration note (2026-07-27): the environment gate, fake generator,
+> and in-memory Snowclone catalog evidence below records this module's original
+> isolated implementation. Production composition now uses the saved OpenRouter
+> configuration and persisted Snowclone Library through
+> `integrate-ideation-openrouter-snowclones`. SQLite's shared schema authority is
+> v7, and the reconciliation change owns current cross-feature verification.

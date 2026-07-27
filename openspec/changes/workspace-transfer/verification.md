@@ -52,3 +52,7 @@ The `local-sqlite-persistence` delta was reviewed against the implementation: pa
 
 - Native platform file-picker overwrite confirmation is delegated to Avalonia and the operating system; deterministic tests verify suggested extension/command wiring and atomic replacement behavior behind the picker.
 - No live desktop check is required. Headless Avalonia tests cover the material binding, visibility, enablement, and routing risks.
+> Post-merge integration note (2026-07-27): workspace packages now scope, count,
+> collision-check, import, and preserve Ideation rejection history. Global
+> Snowclones and native OpenRouter credentials remain outside packages. Current
+> evidence is recorded by `integrate-ideation-openrouter-snowclones`.

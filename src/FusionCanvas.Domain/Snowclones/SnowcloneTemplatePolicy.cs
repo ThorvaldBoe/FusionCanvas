@@ -21,6 +21,7 @@ public static class SnowcloneTemplatePolicy
 
         var placeholderStart = -1;
         var placeholderCount = 0;
+        var placeholderTokens = new List<string>();
 
         for (var index = 0; index < normalizedPhrase.Length; index++)
         {
@@ -53,6 +54,7 @@ public static class SnowcloneTemplatePolicy
             }
 
             placeholderCount++;
+            placeholderTokens.Add(normalizedPhrase[placeholderStart..(index + 1)]);
             placeholderStart = -1;
         }
 
@@ -74,7 +76,8 @@ public static class SnowcloneTemplatePolicy
         return SnowcloneTemplateValidation.Success(
             normalizedPhrase,
             normalizedGuidance,
-            CreateDuplicateKey(normalizedPhrase));
+            CreateDuplicateKey(normalizedPhrase),
+            placeholderTokens.Distinct(StringComparer.Ordinal).ToArray());
     }
 
     public static string CreateDuplicateKey(string phrase)

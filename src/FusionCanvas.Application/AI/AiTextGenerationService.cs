@@ -68,4 +68,41 @@ public sealed class AiTextGenerationService : IAiTextGenerationService
                 settings.RequireZeroDataRetention),
             cancellationToken).ConfigureAwait(false);
     }
+
+    public async Task<AiAvailabilityResult> GetAvailabilityAsync(
+        AiRequestPurpose purpose,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!Enum.IsDefined(purpose))
+        {
+            return new(AiAvailabilityKind.InvalidConfiguration, "The requested AI purpose is invalid.");
+        }
+
+        var settings = _configuration.Current;
+        var catalog = await _catalogCache.LoadAsync(settings.RequireZeroDataRetention, cancellationToken)
+            .ConfigureAwait(false);
+        var resolution = AiConfigurationResolver.Resolve(settings, purpose, catalog?.Models ?? []);
+        if (!resolution.IsReady)
+        {
+            var kind = resolution.Availability is
+                AiConfigurationAvailability.MissingModel or
+                AiConfigurationAvailability.ModelUnavailable
+                ? AiAvailabilityKind.MissingModel
+                : AiAvailabilityKind.InvalidConfiguration;
+            return new(kind, string.Join(" ", resolution.Errors));
+        }
+
+        var credential = await _credentials.ReadAsync(cancellationToken).ConfigureAwait(false);
+        return credential.State switch
+        {
+            AiCredentialStateKind.Available when !string.IsNullOrWhiteSpace(credential.Secret) =>
+                AiAvailabilityResult.Ready,
+            AiCredentialStateKind.NotFound =>
+                new(AiAvailabilityKind.MissingCredential, "Add an OpenRouter API key in AI settings."),
+            _ => new(
+                AiAvailabilityKind.CredentialUnavailable,
+                credential.Message ?? "The saved OpenRouter credential is unavailable.")
+        };
+    }
 }

@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using System.ComponentModel;
+using FusionCanvas.App.Snowclones;
 
 namespace FusionCanvas.App.Ideation;
 
@@ -10,6 +11,7 @@ public partial class IdeationWindow : Window
     private bool _allowClose;
     private bool _confirmationOpen;
     private RejectIdeaWindow? _rejectWindow;
+    private SnowcloneLibraryWindow? _snowcloneLibraryWindow;
 
     public IdeationWindow()
     {
@@ -48,11 +50,38 @@ public partial class IdeationWindow : Window
     private async void OnClearAll(object? sender, RoutedEventArgs e) =>
         await RequestDiscardAsync(close: false);
 
+    private async void OnManageSnowclones(object? sender, RoutedEventArgs e)
+    {
+        if (_snowcloneLibraryWindow is not null || ViewModel is not { } viewModel)
+        {
+            return;
+        }
+
+        viewModel.OpenSnowcloneLibrary();
+        if (viewModel.SnowcloneLibrary is not { } library)
+        {
+            return;
+        }
+
+        _snowcloneLibraryWindow = new SnowcloneLibraryWindow { DataContext = library };
+        await _snowcloneLibraryWindow.ShowDialog(this);
+        _snowcloneLibraryWindow = null;
+        await viewModel.CompleteSnowcloneLibraryAsync();
+        Dispatcher.UIThread.Post(() => ManageSnowclonesButton.Focus(), DispatcherPriority.Input);
+    }
+
     private async void OnClose(object? sender, RoutedEventArgs e) =>
         await RequestDiscardAsync(close: true);
 
     private void OnClosing(object? sender, WindowClosingEventArgs e)
     {
+        if (_snowcloneLibraryWindow is not null)
+        {
+            e.Cancel = true;
+            _snowcloneLibraryWindow.Close();
+            return;
+        }
+
         if (_allowClose || ViewModel is not { IsOpen: true })
         {
             return;

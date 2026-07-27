@@ -69,3 +69,7 @@ The `workspace-transfer` change has planning artifacts but no implementation und
 - Security and dependencies: no package dependency was added; CSV is treated only as inert text and never executed; picker-selected streams avoid application-owned path construction; validation and parameterized SQLite commands handle untrusted content; no secrets or credentials are present.
 - Drift and hygiene: no unrelated refactor entered the change. Existing analyzer warnings elsewhere in the test suite remain pre-existing; the changed snowclone production and test files introduce no compiler or analyzer warnings. `git diff --check` passed apart from Git's informational line-ending notices.
 - Optional live desktop/file-picker observation was not needed; deterministic headless UI and adapter tests are the acceptance gate.
+> Post-merge integration note (2026-07-27): Ideation now owns the Snowclone
+> Library dialog as a nested modal and consumes its persisted phrase, guidance,
+> and brace-delimited tokens. The shared SQLite authority is v7; this module's v6
+> evidence remains the historical migration step it originally introduced.

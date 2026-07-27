@@ -31,12 +31,18 @@ public partial class MainWindow : Window
     private Avalonia.Point _dragStart;
     private WorkspaceTreeNodeViewModel? _dropTarget;
 
-    public MainWindow() : this(settings: null) { }
-
-    public MainWindow(SettingsViewModel? settings)
+    public MainWindow()
     {
         InitializeComponent();
-        var viewModel = MainWindowViewModel.CreateForDefaultWorkspace(settings);
+    }
+
+    public MainWindow(AppServices services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        InitializeComponent();
+        var viewModel = MainWindowViewModel.CreateForDefaultWorkspace(
+            services.Settings,
+            services.AiTextGeneration);
         viewModel.WorkspaceManagement.PackagePicker = new AvaloniaWorkspacePackagePicker(StorageProvider);
         viewModel.StoreManagement.PropertyChanged += (_, args) =>
         {

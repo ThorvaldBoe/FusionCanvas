@@ -33,8 +33,8 @@ using FusionCanvas.Application.WorkflowNavigation;
 using FusionCanvas.Application.Niches;
 using FusionCanvas.Application.DesignFiles;
 using FusionCanvas.Application.Ideation;
-using FusionCanvas.Integration.Ideation;
 using FusionCanvas.Application.Workspaces.Transfer;
+using FusionCanvas.Application.AI;
 
 namespace FusionCanvas.App.Views;
 
@@ -61,13 +61,15 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private WorkspaceSnapshot _workspaceSnapshot;
     private IReadOnlyList<NavigationDocumentContext> _navigationContexts = [];
 
-    public static MainWindowViewModel CreateForDefaultWorkspace(SettingsViewModel? settings = null) =>
+    public static MainWindowViewModel CreateForDefaultWorkspace(
+        SettingsViewModel settings,
+        IAiTextGenerationService ai) =>
         new(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
             new DocumentWindowViewModel(),
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            AppWorkspaceFactory.CreateDefault(),
+            AppWorkspaceFactory.CreateDefault(ai),
             settings);
 
     private MainWindowViewModel(
@@ -92,7 +94,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.TagManagement,
             settings,
             runtime.Ideation,
-            runtime.IdeationAccess)
+            runtime.IdeationAccess,
+            runtime.SnowcloneLibrary)
     {
     }
 
@@ -111,7 +114,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ITagManagementService? tagManagementService = null,
         SettingsViewModel? settings = null,
         IIdeationService? ideationService = null,
-        IIdeationAccessStatus? ideationAccessStatus = null)
+        IIdeationAccessStatus? ideationAccessStatus = null,
+        FusionCanvas.Application.Snowclones.ISnowcloneLibraryService? snowcloneLibrary = null)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
@@ -133,19 +137,24 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _tagManagementService = tagManagementService ?? new TagManagementService(workspaceRepository);
         _assetManagementService = assetManagementService ?? new AssetManagementService(workspaceRepository, fileStore);
         _itemInspectorService = itemInspectorService ?? new ItemInspectorService(workspaceRepository);
-        _ideationAccessStatus = ideationAccessStatus ?? new EnvironmentIdeationAccessStatus();
+        _ideationAccessStatus = ideationAccessStatus ?? DisabledIdeationAccessStatus.Instance;
         _ideationService = ideationService ?? new IdeationService(
             workspaceRepository,
             _itemManagementService,
-            new FakeIdeaGenerator(),
-            new InMemorySnowcloneCatalog(),
+            DisabledIdeaGenerator.Instance,
+            EmptySnowcloneCatalog.Instance,
             _ideationAccessStatus);
         GroupDetails = new GroupDetailsViewModel(_groupManagementService);
         AssetsManagement = new AssetsViewModel(_assetManagementService);
         ItemInspector = new ItemInspectorViewModel(_itemInspectorService, _itemManagementService, _tagManagementService);
         DesignTool = new DesignStageToolViewModel(new DesignFileService(workspaceRepository, fileStore));
         ListingTool = new ListingStageToolViewModel();
-        Ideation = new IdeationViewModel(_ideationService, _ideationAccessStatus);
+        Ideation = new IdeationViewModel(_ideationService, _ideationAccessStatus, snowcloneLibrary);
+        _ideationAccessStatus.AvailabilityChanged += (_, _) =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(RaiseIdeationProperties);
+        Settings.Ai.SettingsChanged += (_, _) => _ = _ideationAccessStatus.RefreshAsync();
+        Settings.Ai.AvailabilityChanged += (_, _) => _ = _ideationAccessStatus.RefreshAsync();
+        _ = _ideationAccessStatus.RefreshAsync();
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
         _workspaceRepository = workspaceRepository;
@@ -611,17 +620,19 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     private void InitializeWorkspaces()
     {
-        WorkspaceManagement.LoadAsync().GetAwaiter().GetResult();
-        StoreManagement.SetActiveWorkspaceAsync(WorkspaceManagement.SelectedWorkspace?.Id).GetAwaiter().GetResult();
+        StartupTaskRunner.Run(() => WorkspaceManagement.LoadAsync());
+        StartupTaskRunner.Run(() =>
+            StoreManagement.SetActiveWorkspaceAsync(WorkspaceManagement.SelectedWorkspace?.Id));
         GroupManagementServiceSetWorkspace(WorkspaceManagement.SelectedWorkspace?.Id);
     }
 
     private void InitializeStores()
     {
-        StoreManagement.LoadAsync().GetAwaiter().GetResult();
+        StartupTaskRunner.Run(() => StoreManagement.LoadAsync());
         if (StoreManagement.SelectedStore is null && StoreManagement.ActiveStores.Count > 0)
         {
-            StoreManagement.SelectStoreAsync(StoreManagement.ActiveStores[0]).GetAwaiter().GetResult();
+            StartupTaskRunner.Run(() =>
+                StoreManagement.SelectStoreAsync(StoreManagement.ActiveStores[0]));
             return;
         }
 
@@ -1221,6 +1232,37 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(IsIdeationActionVisible));
         OnPropertyChanged(nameof(CanOpenIdeation));
         OnPropertyChanged(nameof(IdeationUnavailableMessage));
+    }
+
+    private sealed class DisabledIdeationAccessStatus : IIdeationAccessStatus
+    {
+        public static DisabledIdeationAccessStatus Instance { get; } = new();
+
+        public IdeationAccessAvailability GetAvailability() =>
+            IdeationAccessAvailability.Unavailable("AI services were not supplied.");
+    }
+
+    private sealed class DisabledIdeaGenerator : IIdeaGenerator
+    {
+        public static DisabledIdeaGenerator Instance { get; } = new();
+
+        public Task<IdeaGenerationResult> GenerateAsync(
+            IdeationGenerationContext context,
+            int requestIndex,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(IdeaGenerationResult.Failure(
+                AiTextFailureKind.NotConfigured,
+                "AI services were not supplied."));
+    }
+
+    private sealed class EmptySnowcloneCatalog : ISnowcloneCatalog
+    {
+        public static EmptySnowcloneCatalog Instance { get; } = new();
+
+        public Task<SnowcloneCatalogResult> GetSelectionsAsync(
+            int count,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(SnowcloneCatalogResult.Failure("Snowclone services were not supplied."));
     }
 
     private static IReadOnlyList<NavigationDocumentContext> CreateNavigationContexts(

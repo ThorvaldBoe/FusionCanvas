@@ -7,9 +7,9 @@ using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Assets;
 using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.Ideation;
-using FusionCanvas.Integration.Ideation;
 using FusionCanvas.Application.Snowclones;
 using FusionCanvas.Integration.Snowclones;
+using FusionCanvas.Application.AI;
 
 namespace FusionCanvas.App.Workspace;
 
@@ -32,28 +32,30 @@ public static class AppWorkspaceFactory
     public const string WorkspaceDatabaseEnvironmentVariable = "FUSIONCANVAS_WORKSPACE_DB";
     public const string WorkspaceRootEnvironmentVariable = "FUSIONCANVAS_WORKSPACE_ROOT";
 
-    public static AppWorkspaceRuntime CreateDefault()
-        => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()));
+    public static AppWorkspaceRuntime CreateDefault(IAiTextGenerationService ai)
+        => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()), ai);
 
-    public static AppWorkspaceRuntime Create(string databasePath)
-        => Create(databasePath, DefaultWorkspaceRoot(databasePath));
+    public static AppWorkspaceRuntime Create(string databasePath, IAiTextGenerationService ai)
+        => Create(databasePath, DefaultWorkspaceRoot(databasePath), ai);
 
-    public static AppWorkspaceRuntime Create(string databasePath, string workspaceRootPath)
+    public static AppWorkspaceRuntime Create(
+        string databasePath,
+        string workspaceRootPath,
+        IAiTextGenerationService ai)
     {
+        ArgumentNullException.ThrowIfNull(ai);
         var repository = new SqliteWorkspaceRepository(databasePath);
         var snowcloneRepository = new SqliteSnowcloneRepository(databasePath);
         var fileStore = new LocalWorkspaceFileStore(workspaceRootPath);
-        var snapshot = repository.LoadAsync().GetAwaiter().GetResult();
+        var snapshot = StartupTaskRunner.Run(() => repository.LoadAsync());
         var itemManagement = new ItemManagementService(repository);
-        var ideationAccess = new EnvironmentIdeationAccessStatus();
+        var ideationAccess = new ConfiguredIdeationAccessStatus(ai);
         var snowcloneLibrary = new SnowcloneLibraryService(
             snowcloneRepository,
             new SnowcloneCsvCodec(),
             new EmbeddedBundledSnowcloneSource());
-        var snowcloneLibraryInitialization = snowcloneLibrary
-            .InitializeAsync()
-            .GetAwaiter()
-            .GetResult();
+        var snowcloneLibraryInitialization = StartupTaskRunner.Run(
+            () => snowcloneLibrary.InitializeAsync());
         return new AppWorkspaceRuntime(
             repository,
             fileStore,
@@ -66,8 +68,8 @@ public static class AppWorkspaceFactory
             new IdeationService(
                 repository,
                 itemManagement,
-                new FakeIdeaGenerator(),
-                new InMemorySnowcloneCatalog(),
+                new AiIdeaGenerator(ai),
+                new PersistedSnowcloneCatalog(snowcloneLibrary),
                 ideationAccess),
             ideationAccess,
             snowcloneLibrary,

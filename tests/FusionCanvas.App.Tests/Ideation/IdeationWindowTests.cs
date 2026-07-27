@@ -8,6 +8,7 @@ using FusionCanvas.Application.Items;
 using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Application.Snowclones;
 
 namespace FusionCanvas.App.Tests;
 
@@ -68,6 +69,45 @@ public sealed class IdeationWindowTests
         }
     }
 
+    [AvaloniaFact]
+    public async Task SnowcloneManagementIsProgressivelyDisclosedAndBlocksGenerationWhileOpen()
+    {
+        var library = new StubLibrary();
+        var viewModel = new IdeationViewModel(new NoOpService(), new AvailableAccess(), library);
+        viewModel.Open(Scope);
+        var window = new IdeationWindow { DataContext = viewModel };
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+            var manage = window.GetVisualDescendants().OfType<Button>()
+                .Single(button => AutomationProperties.GetName(button) == "Manage Snowclones");
+            Assert.False(manage.IsEffectivelyVisible);
+
+            viewModel.SelectedMode = IdeationMode.Snowclones;
+            await viewModel.CompleteSnowcloneLibraryAsync();
+            window.UpdateLayout();
+            Assert.True(manage.IsEffectivelyVisible);
+            Assert.True(viewModel.HasSnowclones);
+            Assert.True(viewModel.CanGenerate);
+
+            viewModel.OpenSnowcloneLibrary();
+            Assert.True(viewModel.IsSnowcloneLibraryOpen);
+            Assert.False(viewModel.CanGenerate);
+            viewModel.OpenSnowcloneLibrary();
+            Assert.True(viewModel.IsSnowcloneLibraryOpen);
+
+            await viewModel.CompleteSnowcloneLibraryAsync();
+            Assert.False(viewModel.IsSnowcloneLibraryOpen);
+            Assert.True(viewModel.CanGenerate);
+        }
+        finally
+        {
+            viewModel.RequestClose();
+            window.Close();
+        }
+    }
+
     private static readonly IdeationScope Scope = new(
         Guid.NewGuid(),
         Guid.NewGuid(),
@@ -95,5 +135,34 @@ public sealed class IdeationWindowTests
 
         public Task<IdeationDecisionResult> RejectAsync(IdeationScope scope, string candidateText, string? reason, IdeationMode mode, CancellationToken cancellationToken = default) =>
             Task.FromResult(new IdeationDecisionResult(true, null, Empty));
+    }
+
+    private sealed class StubLibrary : ISnowcloneLibraryService
+    {
+        private static readonly SnowcloneSummary Summary = new(
+            Guid.NewGuid(),
+            "Talk to me about {X}",
+            "Fill {X}.",
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow);
+        private static readonly SnowcloneLibraryResult Result = SnowcloneLibraryResult.Success(
+            new([Summary], [Summary], true, string.Empty));
+
+        public Task<SnowcloneLibraryResult> LoadAsync(string? searchText = null, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Result);
+        public Task<SnowcloneLibraryResult> InitializeAsync(string? searchText = null, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Result);
+        public Task<SnowcloneLibraryResult> CreateAsync(SnowcloneCreateRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+        public Task<SnowcloneLibraryResult> UpdateAsync(SnowcloneUpdateRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+        public Task<SnowcloneLibraryResult> DeleteAsync(Guid id, string? searchText = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+        public Task<SnowcloneLibraryResult> ImportAsync(Stream stream, string? searchText = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+        public Task<SnowcloneLibraryResult> ImportBundledAsync(string? searchText = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+        public Task<SnowcloneLibraryResult> ExportAsync(Stream stream, string? searchText = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }

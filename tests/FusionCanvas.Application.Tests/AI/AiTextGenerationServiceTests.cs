@@ -53,6 +53,68 @@ public class AiTextGenerationServiceTests
         Assert.Equal(0.9, fixture.Provider.Request.Profile.TopP);
     }
 
+    [Fact]
+    public async Task Availability_RequiresConfiguredModelThenNativeCredentialWithoutDispatch()
+    {
+        var missingModel = new Fixture(AiConfigurationSettings.Default);
+        var modelResult = await missingModel.Service.GetAvailabilityAsync(
+            AiRequestPurpose.Ideation,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(AiAvailabilityKind.MissingModel, modelResult.Kind);
+        Assert.Equal(0, missingModel.Credentials.Reads);
+
+        var profile = AiProfileSettings.Empty with { ModelId = "model" };
+        var fixture = new Fixture(AiConfigurationSettings.Default with { General = profile });
+        fixture.Cache.Catalog = new AiModelCatalog(
+            true,
+            DateTimeOffset.UtcNow,
+            [new AiModelDescriptor("model", "Model", null, null, ["text"], ["text"],
+                [], 1000, 100, null, null, true, null)]);
+
+        var missingKey = await fixture.Service.GetAvailabilityAsync(
+            AiRequestPurpose.Ideation,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(AiAvailabilityKind.MissingCredential, missingKey.Kind);
+
+        fixture.Credentials.Result = AiCredentialReadResult.Available("never-return-this");
+        var ready = await fixture.Service.GetAvailabilityAsync(
+            AiRequestPurpose.Ideation,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(AiAvailabilityKind.Ready, ready.Kind);
+        Assert.DoesNotContain("never-return-this", ready.Message, StringComparison.Ordinal);
+        Assert.Equal(0, fixture.Provider.Calls);
+    }
+
+    [Fact]
+    public async Task Availability_CategorizesCredentialAndProfileFailures()
+    {
+        var profile = AiProfileSettings.Empty with { ModelId = "model" };
+        var fixture = new Fixture(AiConfigurationSettings.Default with { General = profile });
+        fixture.Cache.Catalog = new AiModelCatalog(
+            true,
+            DateTimeOffset.UtcNow,
+            [new AiModelDescriptor("model", "Model", null, null, ["text"], ["text"],
+                [], 1000, 100, null, null, true, null)]);
+        fixture.Credentials.Result = AiCredentialReadResult.Failure(
+            AiCredentialStateKind.Locked,
+            "Credential store locked.");
+
+        var unavailable = await fixture.Service.GetAvailabilityAsync(
+            AiRequestPurpose.Ideation,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(AiAvailabilityKind.CredentialUnavailable, unavailable.Kind);
+
+        fixture.Configuration.Current = fixture.Configuration.Current with
+        {
+            General = profile with { Temperature = 0.7 }
+        };
+        var invalid = await fixture.Service.GetAvailabilityAsync(
+            AiRequestPurpose.Ideation,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(AiAvailabilityKind.InvalidConfiguration, invalid.Kind);
+        Assert.Equal(1, fixture.Credentials.Reads);
+    }
+
     private static AiTextRequest Request() =>
         new(AiRequestPurpose.General, [new AiTextMessage(AiMessageRole.User, "hello")]);
 

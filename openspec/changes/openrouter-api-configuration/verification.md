@@ -114,3 +114,7 @@
 | OR-AS-015 | User changes a valid non-secret AI preference | Settings persistence test | Version-2 complete snapshot round-trip passes. |
 | OR-AS-016 | User changes preferences repeatedly | Existing Settings save-queue regression plus mixed snapshot inspection | Latest-generation queue is shared by Dark mode and AI; explicit mixed rapid-edit fixture pending. |
 | OR-AS-017 | Non-secret preference cannot be saved | Existing Settings failure regression | Existing inline warning behavior remains in the shared complete-snapshot save path. |
+> Post-merge integration note (2026-07-27): Ideation is now a production caller
+> of the provider-neutral text-generation service. Availability is resolved from
+> the effective profile, cached catalog, privacy policy, and native credential
+> state by `integrate-ideation-openrouter-snowclones`.

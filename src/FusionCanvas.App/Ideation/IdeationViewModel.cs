@@ -5,6 +5,9 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using FusionCanvas.Application.Snowclones;
+using FusionCanvas.App.Snowclones;
+using Avalonia.Threading;
 
 namespace FusionCanvas.App.Ideation;
 
@@ -16,6 +19,7 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
 
     private readonly IIdeationService _service;
     private readonly IIdeationAccessStatus _accessStatus;
+    private readonly ISnowcloneLibraryService? _snowcloneLibrary;
     private IdeationScope? _scope;
     private string _guidance = string.Empty;
     private string _countText = DefaultCount.ToString();
@@ -29,11 +33,18 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
     private string? _error;
     private CancellationTokenSource? _generationCancellation;
     private long _generationToken;
+    private bool _hasSnowclones;
+    private bool _isSnowcloneLibraryOpen;
 
-    public IdeationViewModel(IIdeationService service, IIdeationAccessStatus accessStatus)
+    public IdeationViewModel(
+        IIdeationService service,
+        IIdeationAccessStatus accessStatus,
+        ISnowcloneLibraryService? snowcloneLibrary = null)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _accessStatus = accessStatus ?? throw new ArgumentNullException(nameof(accessStatus));
+        _snowcloneLibrary = snowcloneLibrary;
+        _accessStatus.AvailabilityChanged += (_, _) => Dispatcher.UIThread.Post(RaiseCommandState);
         GenerateCommand = new RelayCommand(_ => _ = GenerateAsync(), () => CanGenerate);
         CreateCandidateCommand = new RelayCommand(candidate =>
         {
@@ -59,6 +70,9 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
         RequestCloseCommand = new RelayCommand(_ => RequestDiscard(DiscardAction.Close));
         ConfirmDiscardCommand = new RelayCommand(_ => ConfirmDiscard());
         CancelDiscardCommand = new RelayCommand(_ => CancelDiscard());
+        ManageSnowclonesCommand = new RelayCommand(
+            _ => OpenSnowcloneLibrary(),
+            () => IsSnowclonesMode && !IsBusy && !IsSnowcloneLibraryOpen && _snowcloneLibrary is not null);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -86,6 +100,7 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
     public ICommand ConfirmDiscardCommand { get; }
 
     public ICommand CancelDiscardCommand { get; }
+    public ICommand ManageSnowclonesCommand { get; }
 
     public string ScopeLabel => _scope?.DisplayPath ?? string.Empty;
 
@@ -119,8 +134,31 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
     public IdeationMode SelectedMode
     {
         get => _selectedMode;
-        set => SetField(ref _selectedMode, value);
+        set
+        {
+            if (SetField(ref _selectedMode, value))
+            {
+                OnPropertyChanged(nameof(IsSnowclonesMode));
+                OnPropertyChanged(nameof(SnowcloneLibraryMessage));
+                RaiseCommandState();
+                if (IsSnowclonesMode)
+                {
+                    _ = RefreshSnowcloneLibraryAsync();
+                }
+            }
+        }
     }
+
+    public bool IsSnowclonesMode => SelectedMode == IdeationMode.Snowclones;
+    public bool CanManageSnowclones =>
+        IsSnowclonesMode && !IsBusy && !IsSnowcloneLibraryOpen && _snowcloneLibrary is not null;
+    public bool HasSnowclones => _hasSnowclones;
+    public bool IsSnowcloneLibraryOpen => _isSnowcloneLibraryOpen;
+    public SnowcloneLibraryViewModel? SnowcloneLibrary { get; private set; }
+    public string? SnowcloneLibraryMessage =>
+        IsSnowclonesMode && !HasSnowclones
+            ? "Add or import at least one Snowclone before generating."
+            : null;
 
     public bool IsBusy
     {
@@ -177,7 +215,9 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
 
     public bool CanGenerate => IsOpen
         && !IsBusy
+        && !IsSnowcloneLibraryOpen
         && TryGetCount(out _)
+        && (!IsSnowclonesMode || HasSnowclones)
         && _accessStatus.GetAvailability().IsAvailable;
 
     public string? AccessMessage => _accessStatus.GetAvailability().UnavailableReason;
@@ -224,6 +264,7 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanDiscard));
         OnPropertyChanged(nameof(IsRejectionVisible));
         RaiseCommandState();
+        _ = _accessStatus.RefreshAsync();
     }
 
     public async Task GenerateAsync()
@@ -425,6 +466,47 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
     {
         OnPropertyChanged(nameof(CanGenerate));
         OnPropertyChanged(nameof(AccessMessage));
+        OnPropertyChanged(nameof(CanManageSnowclones));
+    }
+
+    public void OpenSnowcloneLibrary()
+    {
+        if (_snowcloneLibrary is null || IsSnowcloneLibraryOpen || IsBusy || !IsSnowclonesMode)
+        {
+            return;
+        }
+
+        SnowcloneLibrary = new SnowcloneLibraryViewModel(_snowcloneLibrary);
+        _isSnowcloneLibraryOpen = true;
+        OnPropertyChanged(nameof(SnowcloneLibrary));
+        OnPropertyChanged(nameof(IsSnowcloneLibraryOpen));
+        RaiseCommandState();
+    }
+
+    public async Task CompleteSnowcloneLibraryAsync()
+    {
+        _isSnowcloneLibraryOpen = false;
+        SnowcloneLibrary = null;
+        OnPropertyChanged(nameof(SnowcloneLibrary));
+        OnPropertyChanged(nameof(IsSnowcloneLibraryOpen));
+        await RefreshSnowcloneLibraryAsync();
+    }
+
+    private async Task RefreshSnowcloneLibraryAsync()
+    {
+        if (_snowcloneLibrary is null)
+        {
+            return;
+        }
+
+        var result = await _snowcloneLibrary.LoadAsync();
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            _hasSnowclones = result.Succeeded && result.State.AllSnowclones.Count > 0;
+            OnPropertyChanged(nameof(HasSnowclones));
+            OnPropertyChanged(nameof(SnowcloneLibraryMessage));
+            RaiseCommandState();
+        });
     }
 
     private static string Normalize(string value) =>

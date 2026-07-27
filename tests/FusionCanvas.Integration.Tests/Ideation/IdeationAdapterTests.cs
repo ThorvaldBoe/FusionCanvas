@@ -23,21 +23,24 @@ public sealed class IdeationAdapterTests
     }
 
     [Fact]
-    public void SnowcloneCatalog_ExhaustsUniqueTemplatesBeforeRepeating()
+    public async Task SnowcloneCatalog_ExhaustsUniqueTemplatesBeforeRepeating()
     {
-        var templates = new InMemorySnowcloneCatalog(new Random(7)).GetTemplates(13);
+        var templates = (await new InMemorySnowcloneCatalog(new Random(7))
+            .GetSelectionsAsync(13, TestContext.Current.CancellationToken)).Selections;
 
-        Assert.Equal(12, templates.Take(12).Distinct().Count());
+        Assert.Equal(12, templates.Take(12).Select(template => template.Phrase).Distinct().Count());
         Assert.Equal(13, templates.Count);
     }
 
     [Fact]
-    public void SnowcloneCatalog_UsesDeterministicInjectedOrdering()
+    public async Task SnowcloneCatalog_UsesDeterministicInjectedOrdering()
     {
-        var first = new InMemorySnowcloneCatalog(new Random(42)).GetTemplates(20);
-        var second = new InMemorySnowcloneCatalog(new Random(42)).GetTemplates(20);
+        var first = (await new InMemorySnowcloneCatalog(new Random(42))
+            .GetSelectionsAsync(20, TestContext.Current.CancellationToken)).Selections;
+        var second = (await new InMemorySnowcloneCatalog(new Random(42))
+            .GetSelectionsAsync(20, TestContext.Current.CancellationToken)).Selections;
 
-        Assert.Equal(first, second);
+        Assert.Equal(first.Select(template => template.Phrase), second.Select(template => template.Phrase));
     }
 
     [Fact]
@@ -46,7 +49,7 @@ public sealed class IdeationAdapterTests
         var generator = new FakeIdeaGenerator((_, _) => Task.CompletedTask);
         var context = Context(IdeationMode.Basic, guidance: "Grumpy");
 
-        var text = await generator.GenerateAsync(context, 0, TestContext.Current.CancellationToken);
+        var text = (await generator.GenerateAsync(context, 0, TestContext.Current.CancellationToken)).Text!;
 
         Assert.Contains("grumpy", text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("pugs", text, StringComparison.OrdinalIgnoreCase);
@@ -61,7 +64,7 @@ public sealed class IdeationAdapterTests
             SnowcloneTemplate = "Talk to me about X"
         };
 
-        var text = await generator.GenerateAsync(context, 0, TestContext.Current.CancellationToken);
+        var text = (await generator.GenerateAsync(context, 0, TestContext.Current.CancellationToken)).Text!;
 
         Assert.Equal("Talk to me about grumpy pugs.", text);
     }
@@ -75,7 +78,7 @@ public sealed class IdeationAdapterTests
             SnowcloneTemplate = "X makes Y better at Z"
         };
 
-        var text = await generator.GenerateAsync(context, 0, TestContext.Current.CancellationToken);
+        var text = (await generator.GenerateAsync(context, 0, TestContext.Current.CancellationToken)).Text!;
 
         Assert.DoesNotContain("X", text);
         Assert.DoesNotContain("Y", text);
@@ -102,6 +105,8 @@ public sealed class IdeationAdapterTests
             guidance,
             mode,
             null,
+            null,
+            [],
             [],
             []);
 }

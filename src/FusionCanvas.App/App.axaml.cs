@@ -19,7 +19,7 @@ public partial class App : Avalonia.Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             _services = AppServicesFactory.Create();
-            var mainWindow = new MainWindow(_services.Settings);
+            var mainWindow = new MainWindow(_services);
             mainWindow.Closing += (_, _) =>
             {
                 _services?.FlushAsync().GetAwaiter().GetResult();
