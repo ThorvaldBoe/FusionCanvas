@@ -1,10 +1,44 @@
 ﻿using FusionCanvas.Domain.Assets;
 using FusionCanvas.Integration.Files;
+using FusionCanvas.Application.Workspaces;
 
 namespace FusionCanvas.Integration.Tests;
 
 public class LocalWorkspaceFileStoreTests
 {
+    [Fact]
+    public async Task RestoreAsync_CreatesFileAndSkipsExistingWithoutOverwriting()
+    {
+        using var root = new TemporaryDirectory();
+        var workspaceRoot = root.GetPath("workspace");
+        var store = new LocalWorkspaceFileStore(workspaceRoot);
+
+        var created = await store.RestoreAsync(
+            "assets/restored.png",
+            new MemoryStream([1, 2, 3]),
+            TestContext.Current.CancellationToken);
+        var skipped = await store.RestoreAsync(
+            "assets/restored.png",
+            new MemoryStream([9]),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(WorkspaceFileRestoreOutcome.Created, created);
+        Assert.Equal(WorkspaceFileRestoreOutcome.SkippedExisting, skipped);
+        Assert.Equal([1, 2, 3], await File.ReadAllBytesAsync(Path.Combine(workspaceRoot, "assets", "restored.png"), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task RestoreAsync_RejectsTraversalOutsideWorkspaceRoot()
+    {
+        using var root = new TemporaryDirectory();
+        var store = new LocalWorkspaceFileStore(root.GetPath("workspace"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.RestoreAsync(
+            "../escape.png",
+            new MemoryStream([1]),
+            TestContext.Current.CancellationToken));
+    }
+
     [Fact]
     public async Task ImportAsync_CopiesSourceFileIntoManagedWorkspace()
     {

@@ -42,7 +42,7 @@ Each workspace package SHALL contain a manifest carrying a container format vers
 - **AND** the manifest's format version and schema version determine whether the import proceeds, migrates, or is refused
 
 ### Requirement: Import restores a workspace with preserved identity
-FusionCanvas SHALL import a valid workspace package as a restored workspace whose records keep their original stable identities, relationships, archive states, timestamps, flexible metadata, and workspace-relative file references, and whose packaged files are restored into managed workspace storage at their original workspace-relative paths.
+FusionCanvas SHALL import a valid workspace package as a restored active workspace whose records keep their original stable identities, relationships, timestamps, flexible metadata, and workspace-relative file references, whose descendant records keep their archive states, and whose packaged files are restored into managed workspace storage at their original workspace-relative paths. If the packaged top-level workspace was archived, import SHALL activate that top-level workspace so it can become the current workspace scope.
 
 #### Scenario: Package is imported into an installation without that workspace
 - **WHEN** the user imports a valid package into an installation that does not contain the package's entities
@@ -54,6 +54,11 @@ FusionCanvas SHALL import a valid workspace package as a restored workspace whos
 - **WHEN** no workspace exists and the user imports a valid package
 - **THEN** the restored workspace becomes the first workspace of the installation
 - **AND** the no-workspace state is dismissed
+
+#### Scenario: Archived workspace package is imported
+- **WHEN** the user imports a valid package whose top-level workspace was archived at export time
+- **THEN** FusionCanvas imports the top-level workspace as active and selects it as the current workspace scope
+- **AND** archived descendant stores, niches, groups, items, assets, prompts, and tags retain their archive states
 
 ### Requirement: Import is one-shot and refuses duplicate identities
 FusionCanvas SHALL refuse to import a package whose entity identities already exist in the installation, and SHALL NOT merge, update, or synchronize an existing workspace from a package.

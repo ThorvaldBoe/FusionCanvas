@@ -54,6 +54,8 @@ Asset rows pass through untouched; files copy to their original relative paths. 
 
 A restored workspace whose normalized name collides with an **active** workspace gets an automatic unique suffix (e.g. `My Brand (2)`), reported in the summary. Conflict with an archived-only name imports under the original name, matching existing workspace-management uniqueness rules.
 
+The imported top-level workspace is always restored to active state so it can become the current workspace scope. Archive state remains preserved for every descendant store, niche, group, item, asset, prompt, tag, and relationship. The archived state recorded in a package therefore documents the exported source state but does not keep the imported top-level workspace unavailable.
+
 ### D5 — Missing files never block a transfer
 
 Export of an asset whose file is gone: record included, noted in manifest and summary; the asset shows as missing after import. Import of a file violating the extension allowlist: file skipped, asset imports as missing, summary warns. Missing-state presentation already exists and needs no changes.
@@ -113,7 +115,7 @@ Both operations accept `IProgress<WorkspaceTransferProgress>` (phase, completed 
 
 - `IWorkspaceTransferService` with `ExportWorkspaceAsync(WorkspaceExportRequest, IProgress<WorkspaceTransferProgress>, CancellationToken)` and `ImportWorkspaceAsync(WorkspaceImportRequest, …)` returning result records (`WorkspaceTransferResult` with `WorkspaceTransferSummary`: counts, warnings, final name; failure carries a recoverable message).
 - Ports: `IWorkspacePackageWriter` (filtered snapshot + file source + manifest → destination path) and `IWorkspacePackageReader` (package path → manifest, snapshot, validated file entries to restore). Manifest DTO `WorkspacePackageManifest` and `WorkspaceTransferProgress` live here as contracts.
-- Service orchestration (import): load live snapshot → pre-flight identity collision → resolve name → restore files via file store (skip-if-exists, progress, cancel) → merge lists → `SaveAsync` once → cleanup-on-failure. Export: filter → writer (which owns temp DB + zip + move) → summary.
+- Service orchestration (import): load live snapshot → pre-flight identity collision → resolve name → restore files via file store (skip-if-exists, progress, cancel) → merge lists with the imported top-level workspace activated and descendant archive states unchanged → `SaveAsync` once → cleanup-on-failure. Export: filter → writer (which owns temp DB + zip + move) → summary.
 - Extend `IWorkspaceFileStore` additively with a restore operation, e.g. `Task<WorkspaceFileRestoreOutcome> RestoreAsync(string workspaceRelativePath, Stream content, CancellationToken)` that validates the path, writes only when absent, and reports `Created`/`SkippedExisting`. Update `InMemoryWorkspaceFileStore` and contract tests accordingly.
 - Tests: `tests/FusionCanvas.Application.Tests` — service tests with fake package ports and the in-memory file store; file-store contract tests for the restore operation.
 
