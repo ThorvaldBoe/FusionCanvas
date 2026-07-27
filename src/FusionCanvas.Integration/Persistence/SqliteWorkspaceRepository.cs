@@ -14,8 +14,6 @@ namespace FusionCanvas.Integration.Persistence;
 
 public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceRepository
 {
-    private const int CurrentSchemaVersion = 5;
-
     private readonly string _databasePath = databasePath;
 
     public async Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
@@ -23,7 +21,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_databasePath))!);
 
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        await EnsureSchemaAsync(connection, cancellationToken);
+        await SqliteDatabaseSchema.EnsureAsync(connection, cancellationToken);
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
@@ -94,7 +92,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         }
 
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        await EnsureSchemaAsync(connection, cancellationToken);
+        await SqliteDatabaseSchema.EnsureAsync(connection, cancellationToken);
 
         return new WorkspaceSnapshot(
             await LoadWorkspacesAsync(connection, cancellationToken),
@@ -117,13 +115,18 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
         return connection;
     }
 
-    private static async Task EnsureSchemaAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    internal static async Task EnsureSchemaCoreAsync(
+        SqliteConnection connection,
+        int currentSchemaVersion,
+        CancellationToken cancellationToken)
     {
         var schemaVersion = await ReadPragmaUserVersionAsync(connection, cancellationToken);
-        if (schemaVersion > CurrentSchemaVersion)
+        var isFreshDatabase = schemaVersion == 0
+            && !await HasUserTablesAsync(connection, cancellationToken);
+        if (schemaVersion > currentSchemaVersion)
         {
             throw new InvalidOperationException(
-                $"Workspace database schema version {schemaVersion} requires a newer FusionCanvas version. Current supported schema version is {CurrentSchemaVersion}.");
+                $"Workspace database schema version {schemaVersion} requires a newer FusionCanvas version. Current supported schema version is {currentSchemaVersion}.");
         }
 
         const string sql = """
@@ -241,30 +244,65 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
                 entity_id TEXT NOT NULL,
                 PRIMARY KEY (asset_id, entity_kind, entity_id)
             );
+
+            CREATE TABLE IF NOT EXISTS snowclones (
+                id TEXT PRIMARY KEY,
+                phrase TEXT NOT NULL,
+                normalized_phrase TEXT NOT NULL UNIQUE,
+                guidance TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS snowclone_library_state (
+                singleton_id INTEGER PRIMARY KEY CHECK(singleton_id = 1),
+                starter_initialized INTEGER NOT NULL
+            );
             """;
 
         await ExecuteAsync(connection, null, sql, cancellationToken);
-        if (schemaVersion < 2)
+        if (!isFreshDatabase && schemaVersion < 2)
         {
             await MigrateToVersion2Async(connection, cancellationToken);
         }
 
-        if (schemaVersion < 3)
+        if (!isFreshDatabase && schemaVersion < 3)
         {
             await MigrateToVersion3Async(connection, cancellationToken);
         }
 
-        if (schemaVersion < 4)
+        if (!isFreshDatabase && schemaVersion < 4)
         {
             await MigrateToVersion4Async(connection, cancellationToken);
         }
 
-        if (schemaVersion < 5)
+        if (!isFreshDatabase && schemaVersion < 5)
         {
             await MigrateToVersion5Async(connection, cancellationToken);
         }
 
-        await SetPragmaUserVersionAsync(connection, CurrentSchemaVersion, cancellationToken);
+        if (schemaVersion < 6)
+        {
+            await MigrateToVersion6Async(connection, cancellationToken);
+        }
+
+        await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
+    }
+
+    private static async Task<bool> HasUserTablesAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT EXISTS (
+                SELECT 1
+                FROM sqlite_master
+                WHERE type = 'table'
+                  AND name NOT LIKE 'sqlite_%'
+            );
+            """;
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken)) == 1;
     }
 
     private static async Task MigrateToVersion2Async(SqliteConnection connection, CancellationToken cancellationToken)
@@ -451,6 +489,30 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
             throw new InvalidOperationException(
                 "The workspace database could not be upgraded from schema version 4 to 5. Restore a backup or use an older FusionCanvas version.");
         }
+    }
+
+    private static async Task MigrateToVersion6Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await ExecuteAsync(connection, transaction, """
+            CREATE TABLE IF NOT EXISTS snowclones (
+                id TEXT PRIMARY KEY,
+                phrase TEXT NOT NULL,
+                normalized_phrase TEXT NOT NULL UNIQUE,
+                guidance TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS snowclone_library_state (
+                singleton_id INTEGER PRIMARY KEY CHECK(singleton_id = 1),
+                starter_initialized INTEGER NOT NULL
+            );
+
+            INSERT OR IGNORE INTO snowclone_library_state (singleton_id, starter_initialized)
+            VALUES (1, 0);
+            """, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     private static async Task<bool> TableExistsAsync(SqliteConnection connection, string tableName, CancellationToken cancellationToken)
