@@ -17,5 +17,11 @@ public interface IWorkspaceFileStore
 
     Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default);
 
+    Task<WorkspaceFileRestoreOutcome> RestoreAsync(
+        string workspaceRelativePath,
+        Stream content,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This workspace file store does not support restoring packaged files.");
+
     Task ExportCopyAsync(string workspaceRelativePath, string destinationPath, CancellationToken cancellationToken = default);
 }

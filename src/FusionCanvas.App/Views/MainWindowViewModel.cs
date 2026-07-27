@@ -15,6 +15,7 @@ using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Integration.Files;
+using FusionCanvas.Integration.Packages;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
@@ -30,6 +31,7 @@ using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.WorkflowNavigation;
 using FusionCanvas.Application.Niches;
 using FusionCanvas.Application.DesignFiles;
+using FusionCanvas.Application.Workspaces.Transfer;
 
 namespace FusionCanvas.App.Views;
 
@@ -104,7 +106,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
-        WorkspaceManagement = new WorkspaceManagementViewModel(new WorkspaceManagementService(workspaceRepository));
+        var fileStore = workspaceFileStore ?? new InMemoryWorkspaceFileStore();
+        WorkspaceManagement = new WorkspaceManagementViewModel(
+            new WorkspaceManagementService(workspaceRepository),
+            new WorkspaceTransferService(
+                workspaceRepository,
+                fileStore,
+                new ZipWorkspacePackageWriter(),
+                new ZipWorkspacePackageReader()));
         Settings = CreateSettings(settings);
         StoreManagement = new StoreManagementViewModel(
             new StoreManagementService(workspaceRepository),
@@ -113,7 +122,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _groupManagementService = groupManagementService ?? new GroupManagementService(workspaceRepository);
         _itemManagementService = itemManagementService ?? new ItemManagementService(workspaceRepository);
         _tagManagementService = tagManagementService ?? new TagManagementService(workspaceRepository);
-        var fileStore = workspaceFileStore ?? new InMemoryWorkspaceFileStore();
         _assetManagementService = assetManagementService ?? new AssetManagementService(workspaceRepository, fileStore);
         _itemInspectorService = itemInspectorService ?? new ItemInspectorService(workspaceRepository);
         GroupDetails = new GroupDetailsViewModel(_groupManagementService);

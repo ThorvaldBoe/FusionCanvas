@@ -25,8 +25,14 @@
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource PrimaryTextBrush}" />
           <Button Content="New workspace"
+                  IsEnabled="{Binding !IsTransferRunning}"
                   Command="{Binding StartCreateWorkspaceCommand}"
                   Classes="primary" />
+          <Button x:Name="ImportWorkspaceButton"
+                  Content="Import workspace…"
+                  IsEnabled="{Binding CanImportWorkspace}"
+                  Command="{Binding ImportWorkspaceCommand}"
+                  Classes="secondary" />
         </StackPanel>
 
         <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -58,7 +64,7 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="appWorkspaces:WorkspaceSummary">
                   <Button Content="{Binding Name}"
-                          Command="{Binding $parent[ItemsControl].DataContext.RestoreWorkspaceCommand}"
+                          Command="{Binding $parent[ItemsControl].DataContext.ReviewArchivedWorkspaceCommand}"
                           CommandParameter="{Binding}"
                           Classes="listItem"
                           HorizontalContentAlignment="Left" />
@@ -86,6 +92,37 @@
                      IsVisible="{Binding HasError}"
                      FontSize="12"
                      Foreground="{DynamicResource DangerTextBrush}" />
+
+          <Border IsVisible="{Binding IsTransferRunning}"
+                  Background="{DynamicResource PanelSurfaceBrush}"
+                  BorderBrush="{DynamicResource SubtleBorderBrush}"
+                  BorderThickness="1"
+                  Padding="10">
+            <StackPanel Spacing="8">
+              <TextBlock Text="{Binding TransferPhase}"
+                         FontSize="12"
+                         Foreground="{DynamicResource SecondaryTextBrush}" />
+              <ProgressBar Minimum="0"
+                           Maximum="1"
+                           Value="{Binding TransferProgress}"
+                           Height="6" />
+              <Button x:Name="CancelTransferButton"
+                      Content="Cancel"
+                      Command="{Binding CancelTransferCommand}"
+                      Classes="secondary fixedAction" />
+            </StackPanel>
+          </Border>
+
+          <Border IsVisible="{Binding HasTransferSummary}"
+                  Background="{DynamicResource PanelSurfaceBrush}"
+                  BorderBrush="{DynamicResource SubtleBorderBrush}"
+                  BorderThickness="1"
+                  Padding="10">
+            <TextBlock Text="{Binding TransferSummary}"
+                       TextWrapping="Wrap"
+                       FontSize="12"
+                       Foreground="{DynamicResource SecondaryTextBrush}" />
+          </Border>
 
           <TextBox Text="{Binding WorkspaceName}"
                    PlaceholderText="Workspace name"
@@ -115,6 +152,18 @@
                     IsVisible="{Binding !IsCreatingNewWorkspace}"
                     IsEnabled="{Binding CanArchiveSelectedWorkspace}"
                     Command="{Binding ArchiveSelectedWorkspaceCommand}"
+                    Classes="secondary fixedAction" />
+            <Button Content="Restore"
+                    IsVisible="{Binding CanRestoreSelectedWorkspace}"
+                    IsEnabled="{Binding CanRestoreSelectedWorkspace}"
+                    Command="{Binding RestoreWorkspaceCommand}"
+                    CommandParameter="{Binding SelectedWorkspace}"
+                    Classes="secondary fixedAction" />
+            <Button x:Name="ExportWorkspaceButton"
+                    Content="Export"
+                    IsVisible="{Binding !IsCreatingNewWorkspace}"
+                    IsEnabled="{Binding CanExportSelectedWorkspace}"
+                    Command="{Binding ExportSelectedWorkspaceCommand}"
                     Classes="secondary fixedAction" />
             <Button Content="Delete"
                     IsVisible="{Binding !IsCreatingNewWorkspace}"

@@ -5,14 +5,14 @@ namespace FusionCanvas.Integration.Files;
 
 public sealed class InMemoryWorkspaceFileStore : IWorkspaceFileStore
 {
-    private readonly HashSet<string> _existing = [];
+    private readonly Dictionary<string, byte[]> _files = new(StringComparer.Ordinal);
 
     public string WorkspaceRoot => string.Empty;
 
     public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, AssetKind kind, CancellationToken cancellationToken = default)
     {
         var relativePath = $"assets/{Path.GetFileName(sourcePath)}";
-        _existing.Add(relativePath);
+        _files[relativePath] = [];
         return Task.FromResult(new ManagedWorkspaceFile(
             Path.GetFileName(sourcePath),
             kind,
@@ -21,12 +21,40 @@ public sealed class InMemoryWorkspaceFileStore : IWorkspaceFileStore
             sourcePath));
     }
 
-    public bool Exists(string workspaceRelativePath) => _existing.Contains(workspaceRelativePath.Replace('\\', '/'));
+    public bool Exists(string workspaceRelativePath) => _files.ContainsKey(Normalize(workspaceRelativePath));
 
-    public bool TryDelete(string workspaceRelativePath) => _existing.Remove(workspaceRelativePath.Replace('\\', '/'));
+    public bool TryDelete(string workspaceRelativePath) => _files.Remove(Normalize(workspaceRelativePath));
 
-    public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default) =>
-        Task.FromResult<Stream>(new MemoryStream());
+    public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default)
+    {
+        var normalized = Normalize(workspaceRelativePath);
+        if (!_files.TryGetValue(normalized, out var content))
+        {
+            throw new FileNotFoundException("The managed workspace file was not found.", normalized);
+        }
+
+        return Task.FromResult<Stream>(new MemoryStream(content, writable: false));
+    }
+
+    public async Task<WorkspaceFileRestoreOutcome> RestoreAsync(
+        string workspaceRelativePath,
+        Stream content,
+        CancellationToken cancellationToken = default)
+    {
+        var normalized = Normalize(workspaceRelativePath);
+        if (_files.ContainsKey(normalized))
+        {
+            return WorkspaceFileRestoreOutcome.SkippedExisting;
+        }
+
+        await using var buffer = new MemoryStream();
+        await content.CopyToAsync(buffer, cancellationToken);
+        _files[normalized] = buffer.ToArray();
+        return WorkspaceFileRestoreOutcome.Created;
+    }
 
     public Task ExportCopyAsync(string workspaceRelativePath, string destinationPath, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    private static string Normalize(string workspaceRelativePath) =>
+        WorkspaceFileReference.Normalize(workspaceRelativePath);
 }

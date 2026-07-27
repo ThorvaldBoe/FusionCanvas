@@ -12,9 +12,9 @@ using FusionCanvas.Application.Workspaces;
 
 namespace FusionCanvas.Integration.Persistence;
 
-public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceRepository
+public sealed class SqliteWorkspaceRepository(string databasePath, bool useConnectionPooling = true) : IWorkspaceRepository
 {
-    private const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 5;
 
     private readonly string _databasePath = databasePath;
 
@@ -111,7 +111,12 @@ public sealed class SqliteWorkspaceRepository(string databasePath) : IWorkspaceR
 
     private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
     {
-        var connection = new SqliteConnection($"Data Source={_databasePath}");
+        var connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = _databasePath,
+            Pooling = useConnectionPooling
+        }.ToString();
+        var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
         await ExecuteAsync(connection, null, "PRAGMA foreign_keys = ON;", cancellationToken);
         return connection;
