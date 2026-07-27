@@ -13,7 +13,7 @@ public sealed class IdeationPersistenceTests : IDisposable
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "fusioncanvas-ideation-" + Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public async Task Rejection_RoundTripsAndNewSchemaIsVersionSix()
+    public async Task Rejection_RoundTripsAndNewSchemaIsVersionSeven()
     {
         var path = Path.Combine(_directory, "workspace.db");
         var repository = new SqliteWorkspaceRepository(path);
@@ -36,11 +36,11 @@ public sealed class IdeationPersistenceTests : IDisposable
         await connection.OpenAsync(TestContext.Current.CancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version;";
-        Assert.Equal(6L, (long)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!);
+        Assert.Equal(7L, (long)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!);
     }
 
     [Fact]
-    public async Task VersionFiveDatabase_MigratesWithoutChangingExistingData()
+    public async Task VersionSixDatabase_MigratesWithoutChangingExistingData()
     {
         var path = Path.Combine(_directory, "migrate.db");
         var repository = new SqliteWorkspaceRepository(path);
@@ -55,7 +55,7 @@ public sealed class IdeationPersistenceTests : IDisposable
         {
             await connection.OpenAsync(TestContext.Current.CancellationToken);
             await using var command = connection.CreateCommand();
-            command.CommandText = "DROP TABLE ideation_rejections; PRAGMA user_version = 5;";
+            command.CommandText = "DROP TABLE ideation_rejections; PRAGMA user_version = 6;";
             await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
         }
 
@@ -67,7 +67,7 @@ public sealed class IdeationPersistenceTests : IDisposable
     }
 
     [Fact]
-    public async Task VersionFiveMigrationFailure_RollsBackTableAndVersion()
+    public async Task VersionSixMigrationFailure_RollsBackTableAndVersion()
     {
         var path = Path.Combine(_directory, "rollback.db");
         var repository = new SqliteWorkspaceRepository(path);
@@ -89,7 +89,7 @@ public sealed class IdeationPersistenceTests : IDisposable
                     NULL, NULL, 'Orphan', NULL, 0, 0, 0,
                     '2026-07-27T12:00:00.0000000+00:00',
                     '2026-07-27T12:00:00.0000000+00:00', '{}');
-                PRAGMA user_version = 5;
+                PRAGMA user_version = 6;
                 PRAGMA foreign_keys = ON;
                 """;
             await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
@@ -102,7 +102,7 @@ public sealed class IdeationPersistenceTests : IDisposable
         await verify.OpenAsync(TestContext.Current.CancellationToken);
         await using var version = verify.CreateCommand();
         version.CommandText = "PRAGMA user_version;";
-        Assert.Equal(5L, (long)(await version.ExecuteScalarAsync(TestContext.Current.CancellationToken))!);
+        Assert.Equal(6L, (long)(await version.ExecuteScalarAsync(TestContext.Current.CancellationToken))!);
         await using var table = verify.CreateCommand();
         table.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'ideation_rejections';";
         Assert.Equal(0L, (long)(await table.ExecuteScalarAsync(TestContext.Current.CancellationToken))!);

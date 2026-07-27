@@ -8,6 +8,8 @@ using FusionCanvas.Application.Assets;
 using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.Ideation;
 using FusionCanvas.Integration.Ideation;
+using FusionCanvas.Application.Snowclones;
+using FusionCanvas.Integration.Snowclones;
 
 namespace FusionCanvas.App.Workspace;
 
@@ -21,7 +23,9 @@ public sealed record AppWorkspaceRuntime(
     ITagManagementService TagManagement,
     IItemInspectorService ItemInspector,
     IIdeationService Ideation,
-    IIdeationAccessStatus IdeationAccess);
+    IIdeationAccessStatus IdeationAccess,
+    ISnowcloneLibraryService SnowcloneLibrary,
+    SnowcloneLibraryResult SnowcloneLibraryInitialization);
 
 public static class AppWorkspaceFactory
 {
@@ -37,10 +41,19 @@ public static class AppWorkspaceFactory
     public static AppWorkspaceRuntime Create(string databasePath, string workspaceRootPath)
     {
         var repository = new SqliteWorkspaceRepository(databasePath);
+        var snowcloneRepository = new SqliteSnowcloneRepository(databasePath);
         var fileStore = new LocalWorkspaceFileStore(workspaceRootPath);
         var snapshot = repository.LoadAsync().GetAwaiter().GetResult();
         var itemManagement = new ItemManagementService(repository);
         var ideationAccess = new EnvironmentIdeationAccessStatus();
+        var snowcloneLibrary = new SnowcloneLibraryService(
+            snowcloneRepository,
+            new SnowcloneCsvCodec(),
+            new EmbeddedBundledSnowcloneSource());
+        var snowcloneLibraryInitialization = snowcloneLibrary
+            .InitializeAsync()
+            .GetAwaiter()
+            .GetResult();
         return new AppWorkspaceRuntime(
             repository,
             fileStore,
@@ -56,7 +69,9 @@ public static class AppWorkspaceFactory
                 new FakeIdeaGenerator(),
                 new InMemorySnowcloneCatalog(),
                 ideationAccess),
-            ideationAccess);
+            ideationAccess,
+            snowcloneLibrary,
+            snowcloneLibraryInitialization);
     }
 
     private static string DefaultDatabasePath()

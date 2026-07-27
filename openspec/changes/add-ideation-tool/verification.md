@@ -31,7 +31,7 @@ The repository has pre-existing xUnit analyzer/nullability warnings. No warning 
 | Ideation runs for a selected group | PASS — `Generate_GroupScopeUsesDirectActiveAndRejectedIdeasAndSanitizesMetadata` proves exact-group inclusion and parent/child/root exclusion. |
 | Ideation runs without a selected group | PASS — `Generate_NicheScopeIncludesRootAndDescendantIdeas` proves whole-niche inclusion. |
 | Active Item has no Idea text | PASS — the exact-group test includes an applicable Item with no `idea` metadata and proves it contributes no fabricated text. |
-| Recorded rejection has no reason | PASS — `Rejection_RoundTripsAndNewSchemaIsVersionSix` round-trips a null reason; context assembly preserves nullable reasons. |
+| Recorded rejection has no reason | PASS — `Rejection_RoundTripsAndNewSchemaIsVersionSeven` round-trips a null reason; context assembly preserves nullable reasons. |
 | Generation payload is assembled | PASS — exact-group and niche tests inspect store, niche, group, guidance, active Ideas, rejected Ideas, and reasoning. |
 | Operational fields exist | PASS — the sanitization test excludes API key and inheritance provenance; `IdeationService.IsOperationalKey` also excludes IDs, timestamps, archive/status fields, paths, credentials, secrets, and tokens. |
 
@@ -80,20 +80,20 @@ The repository has pre-existing xUnit analyzer/nullability warnings. No warning 
 
 | Scenario | Result and evidence |
 |---|---|
-| Rejection is saved and reloaded | PASS — `Rejection_RoundTripsAndNewSchemaIsVersionSix`. |
+| Rejection is saved and reloaded | PASS — `Rejection_RoundTripsAndNewSchemaIsVersionSeven`. |
 | Group-scoped rejection is stored | PASS — the same test round-trips a group ID and null reason. |
 | Niche-root rejection is stored | PASS — the same test round-trips null group and a reason. |
 | Rejection save fails | PASS — atomic-failure application test keeps the repository snapshot unchanged. |
-| Previous supported database is opened | PASS — `VersionFiveDatabase_MigratesWithoutChangingExistingData` plus the updated repository migration suite. |
+| Previous supported database is opened | PASS — `VersionSixDatabase_MigratesWithoutChangingExistingData` plus the updated repository migration suite. |
 | New database is created | PASS — schema-version suite expects v6; round-trip test queries `PRAGMA user_version`. |
 | Migrated rejection data is saved | PASS — v5 migration test loads the new collection, after which standard round-trip persistence covers writes. |
-| Migration fails | PASS — `VersionFiveMigrationFailure_RollsBackTableAndVersion` proves both the v6 table creation and version remain rolled back; newer-version refusal uses v7. |
+| Migration fails | PASS — `VersionSixMigrationFailure_RollsBackTableAndVersion` proves both the v7 table creation and version remain rolled back; newer-version refusal uses v8. |
 
 ## Architecture, security, and changed-scope QA
 
 - PASS — Domain contains only the stable mode and validated rejection model.
 - PASS — Application owns scope resolution, sanitization, orchestration, concurrency, and decision boundaries without UI, SQLite, or network dependencies.
-- PASS — Integration owns the environment-variable adapter, fake generator/catalog, and SQLite v6 mapping/migration.
+- PASS — Integration owns the environment-variable adapter, fake generator/catalog, and SQLite v7 mapping/migration.
 - PASS — App owns composition and presentation. Its only SQLite reference remains the existing composition root (`AppWorkspaceFactory`); Domain has none.
 - PASS — `FUSIONCANVAS_AI_API_KEY` is read only by `EnvironmentIdeationAccessStatus`. The adapter returns a boolean/safe message, never the value. Sanitization excludes credential-like metadata before generation.
 - PASS — fake generation uses no HTTP/network API and persists no undecided candidates.

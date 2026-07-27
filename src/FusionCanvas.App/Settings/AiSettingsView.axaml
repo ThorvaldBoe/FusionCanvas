@@ -1,0 +1,119 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:settings="clr-namespace:FusionCanvas.App.Settings"
+             x:Class="FusionCanvas.App.Settings.AiSettingsView"
+             x:DataType="settings:AiSettingsViewModel">
+  <StackPanel Spacing="18" IsEnabled="{Binding !IsBusy}">
+    <StackPanel Spacing="3">
+      <TextBlock Text="AI" FontSize="20" FontWeight="SemiBold"
+                 Foreground="{DynamicResource PrimaryTextBrush}" />
+      <TextBlock Text="Connect OpenRouter and choose application-wide text generation settings."
+                 TextWrapping="Wrap"
+                 Foreground="{DynamicResource SecondaryTextBrush}" />
+    </StackPanel>
+
+    <Border Padding="14" Background="{DynamicResource ElevatedSurfaceBrush}"
+            BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
+      <StackPanel Spacing="10">
+        <TextBlock Text="OpenRouter connection" FontWeight="SemiBold"
+                   Foreground="{DynamicResource StrongTextBrush}" />
+        <TextBlock Text="{Binding CredentialStatus}" />
+        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsEditingCredential}">
+          <Button x:Name="AddOrReplaceKeyButton" Content="Add or replace key" Command="{Binding AddOrReplaceCommand}" />
+          <Button Content="Validate" Command="{Binding ValidateCredentialCommand}" />
+          <Button Content="Remove" Command="{Binding RequestRemoveCommand}" IsVisible="{Binding HasCredential}" />
+        </StackPanel>
+        <StackPanel Spacing="8" IsVisible="{Binding IsEditingCredential}">
+          <TextBox x:Name="ApiKeyDraft"
+                   PasswordChar="●"
+                   PlaceholderText="OpenRouter API key"
+                   Text="{Binding CredentialDraft, Mode=TwoWay}" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Save" Command="{Binding SaveCredentialCommand}" Classes="primary" />
+            <Button Content="Cancel" Command="{Binding CancelCredentialCommand}" />
+          </StackPanel>
+        </StackPanel>
+        <Border IsVisible="{Binding ConfirmRemove}" Padding="10"
+                Background="{DynamicResource DangerBackgroundBrush}" CornerRadius="4">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Remove the saved OpenRouter key from the native credential store?"
+                       TextWrapping="Wrap" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="Remove key" Command="{Binding RemoveCredentialCommand}" />
+              <Button Content="Cancel" Command="{Binding CancelRemoveCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </Border>
+
+    <Border Padding="14" Background="{DynamicResource ElevatedSurfaceBrush}"
+            BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
+      <StackPanel Spacing="10">
+        <TextBlock Text="Privacy and models" FontWeight="SemiBold" />
+        <ToggleSwitch Content="Require Zero Data Retention"
+                      IsChecked="{Binding RequireZeroDataRetention, Mode=TwoWay}" />
+        <TextBlock Text="When enabled, requests are restricted to endpoints OpenRouter marks as Zero Data Retention compatible."
+                   TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <Border IsVisible="{Binding ConfirmZdrOptOut}" Padding="10"
+                Background="{DynamicResource WarningBackgroundBrush}" CornerRadius="4">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Allow providers that may retain submitted content?" TextWrapping="Wrap" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="Allow retention" Command="{Binding ConfirmZdrOptOutCommand}" />
+              <Button Content="Keep ZDR" Command="{Binding CancelZdrOptOutCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <TextBox Grid.Column="0" PlaceholderText="Search models" Text="{Binding ModelSearch, Mode=TwoWay}" />
+          <Button Grid.Column="1" Content="Refresh models" Command="{Binding RefreshModelsCommand}" />
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <Border Padding="14" Background="{DynamicResource ElevatedSurfaceBrush}"
+            BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
+      <StackPanel Spacing="12">
+        <TextBlock Text="General" FontWeight="SemiBold" FontSize="16" />
+        <TextBlock Text="{Binding GeneralReadiness}" FontSize="12"
+                   Foreground="{DynamicResource SecondaryTextBrush}" />
+        <settings:AiProfileEditorView DataContext="{Binding General}" />
+      </StackPanel>
+    </Border>
+
+    <ToggleSwitch Content="Advanced: configure application areas separately"
+                  IsChecked="{Binding AdvancedMode, Mode=TwoWay}" />
+
+    <StackPanel IsVisible="{Binding AdvancedMode}" Spacing="14">
+      <Border Padding="14" Background="{DynamicResource ElevatedSurfaceBrush}"
+              BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
+        <StackPanel Spacing="10">
+          <TextBlock Text="Ideation" FontWeight="SemiBold" FontSize="16" />
+          <TextBlock Text="{Binding IdeationReadiness}" FontSize="12"
+                     Foreground="{DynamicResource SecondaryTextBrush}" />
+          <ToggleSwitch Content="Use General settings" IsChecked="{Binding IdeationUseGeneral, Mode=TwoWay}" />
+          <Panel IsVisible="{Binding !IdeationUseGeneral}">
+            <settings:AiProfileEditorView DataContext="{Binding Ideation}" />
+          </Panel>
+        </StackPanel>
+      </Border>
+      <Border Padding="14" Background="{DynamicResource ElevatedSurfaceBrush}"
+              BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
+        <StackPanel Spacing="10">
+          <TextBlock Text="Concept" FontWeight="SemiBold" FontSize="16" />
+          <TextBlock Text="{Binding ConceptReadiness}" FontSize="12"
+                     Foreground="{DynamicResource SecondaryTextBrush}" />
+          <ToggleSwitch Content="Use General settings" IsChecked="{Binding ConceptUseGeneral, Mode=TwoWay}" />
+          <Panel IsVisible="{Binding !ConceptUseGeneral}">
+            <settings:AiProfileEditorView DataContext="{Binding Concept}" />
+          </Panel>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+
+    <TextBlock IsVisible="{Binding HasMessage}" Text="{Binding Message}" TextWrapping="Wrap"
+               Foreground="{DynamicResource DangerTextBrush}" />
+    <ProgressBar IsVisible="{Binding IsBusy}" IsIndeterminate="True" Height="3" />
+  </StackPanel>
+</UserControl>
