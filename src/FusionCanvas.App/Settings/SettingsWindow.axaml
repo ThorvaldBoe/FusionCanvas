@@ -4,10 +4,10 @@
         x:Class="FusionCanvas.App.Settings.SettingsWindow"
         x:DataType="settings:SettingsViewModel"
         Title="Settings"
-        Width="720"
-        Height="480"
-        MinWidth="640"
-        MinHeight="420"
+        Width="860"
+        Height="680"
+        MinWidth="720"
+        MinHeight="520"
         CanResize="True"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ApplicationBackgroundBrush}">
@@ -105,6 +105,32 @@
             </StackPanel>
           </Border>
         </StackPanel>
+
+        <Panel IsVisible="{Binding IsAiSection}">
+          <settings:AiSettingsView DataContext="{Binding Ai}" />
+        </Panel>
+
+        <Border IsVisible="{Binding ConfirmDiscardCredentialDraft}"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                MaxWidth="420"
+                Padding="16"
+                Background="{DynamicResource WarningBackgroundBrush}"
+                BorderBrush="{DynamicResource WarningBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+          <StackPanel Spacing="10">
+            <TextBlock Text="Discard the unsaved API key draft?"
+                       FontWeight="SemiBold"
+                       TextWrapping="Wrap" />
+            <TextBlock Text="The draft has not been written to the native credential store."
+                       TextWrapping="Wrap" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="Discard" Command="{Binding ConfirmDiscardCommand}" />
+              <Button Content="Keep editing" Command="{Binding CancelDiscardCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
       </Grid>
     </ScrollViewer>
   </Grid>
