@@ -46,6 +46,8 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
         _snowcloneLibrary = snowcloneLibrary;
         _accessStatus.AvailabilityChanged += (_, _) => Dispatcher.UIThread.Post(RaiseCommandState);
         GenerateCommand = new RelayCommand(_ => _ = GenerateAsync(), () => CanGenerate);
+        IncrementCountCommand = new RelayCommand(_ => IncrementCount(), () => CanIncrementCount);
+        DecrementCountCommand = new RelayCommand(_ => DecrementCount(), () => CanDecrementCount);
         CreateCandidateCommand = new RelayCommand(candidate =>
         {
             if (candidate is IdeaCandidateViewModel row)
@@ -84,6 +86,10 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
     public ObservableCollection<IdeaCandidateViewModel> Candidates { get; } = [];
 
     public ICommand GenerateCommand { get; }
+
+    public ICommand IncrementCountCommand { get; }
+
+    public ICommand DecrementCountCommand { get; }
 
     public ICommand CreateCandidateCommand { get; }
 
@@ -130,6 +136,12 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
     }
 
     public string? CountError => TryGetCount(out _) ? null : $"Enter a whole number from {MinimumCount} to {MaximumCount}.";
+
+    public bool CanIncrementCount =>
+        !IsBusy && !(TryGetCount(out int n) && n == MaximumCount);
+
+    public bool CanDecrementCount =>
+        !IsBusy && !(TryGetCount(out int n) && n == MinimumCount);
 
     public IdeationMode SelectedMode
     {
@@ -462,11 +474,29 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
     private bool TryGetCount(out int count) =>
         int.TryParse(CountText, out count) && count is >= MinimumCount and <= MaximumCount;
 
+    private void IncrementCount() => CountText = GetNextCountText(1);
+
+    private void DecrementCount() => CountText = GetNextCountText(-1);
+
+    private string GetNextCountText(int direction)
+    {
+        if (int.TryParse(CountText, out int n))
+        {
+            n = Math.Clamp(n, MinimumCount, MaximumCount);
+            n = Math.Clamp(n + direction, MinimumCount, MaximumCount);
+            return n.ToString();
+        }
+
+        return (direction > 0 ? DefaultCount : MinimumCount).ToString();
+    }
+
     private void RaiseCommandState()
     {
         OnPropertyChanged(nameof(CanGenerate));
         OnPropertyChanged(nameof(AccessMessage));
         OnPropertyChanged(nameof(CanManageSnowclones));
+        OnPropertyChanged(nameof(CanIncrementCount));
+        OnPropertyChanged(nameof(CanDecrementCount));
     }
 
     public void OpenSnowcloneLibrary()

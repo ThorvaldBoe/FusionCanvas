@@ -108,6 +108,67 @@ public sealed class IdeationWindowTests
         }
     }
 
+    [AvaloniaFact]
+    public async Task CountStepperButtonsRenderBesideCountFieldWithLimitAndBusyDisabledStates()
+    {
+        var pending = new TaskCompletionSource<IdeationGenerationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var service = new PendingService(_ => pending.Task);
+        var viewModel = new IdeationViewModel(service, new AvailableAccess());
+        viewModel.Open(Scope);
+        var window = new IdeationWindow { DataContext = viewModel };
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+
+            var descendants = window.GetVisualDescendants().ToList();
+            var countBox = descendants.OfType<TextBox>().Single(box => AutomationProperties.GetName(box) == "Number of ideas");
+            var increment = descendants.OfType<Button>().Single(button => AutomationProperties.GetName(button) == "Increment idea count");
+            var decrement = descendants.OfType<Button>().Single(button => AutomationProperties.GetName(button) == "Decrement idea count");
+            var generate = descendants.OfType<Button>().Single(button => AutomationProperties.GetName(button) == "Generate ideas");
+
+            Assert.Same(countBox, descendants.Single(d => ReferenceEquals(d, countBox)));
+            Assert.True(descendants.IndexOf(countBox) < descendants.IndexOf(increment));
+            Assert.True(descendants.IndexOf(increment) < descendants.IndexOf(decrement));
+            Assert.True(descendants.IndexOf(decrement) < descendants.IndexOf(generate));
+
+            Assert.True(increment.IsEnabled);
+            Assert.True(decrement.IsEnabled);
+
+            viewModel.CountText = "20";
+            window.UpdateLayout();
+            Assert.False(increment.IsEnabled);
+            Assert.True(decrement.IsEnabled);
+
+            viewModel.CountText = "1";
+            window.UpdateLayout();
+            Assert.True(increment.IsEnabled);
+            Assert.False(decrement.IsEnabled);
+
+            viewModel.CountText = "5";
+            window.UpdateLayout();
+            Assert.True(increment.IsEnabled);
+            Assert.True(decrement.IsEnabled);
+
+            var generation = viewModel.GenerateAsync();
+            window.UpdateLayout();
+            Assert.True(viewModel.IsBusy);
+            Assert.False(increment.IsEnabled);
+            Assert.False(decrement.IsEnabled);
+
+            pending.SetResult(new(true, false, [new(0, "Idea")], 5, 5, 0, null));
+            await generation;
+            window.UpdateLayout();
+            Assert.True(increment.IsEnabled);
+            Assert.True(decrement.IsEnabled);
+        }
+        finally
+        {
+            viewModel.RequestClose();
+            window.Close();
+        }
+    }
+
     private static readonly IdeationScope Scope = new(
         Guid.NewGuid(),
         Guid.NewGuid(),
@@ -135,6 +196,25 @@ public sealed class IdeationWindowTests
 
         public Task<IdeationDecisionResult> RejectAsync(IdeationScope scope, string candidateText, string? reason, IdeationMode mode, CancellationToken cancellationToken = default) =>
             Task.FromResult(new IdeationDecisionResult(true, null, Empty));
+    }
+
+    private sealed class PendingService : IIdeationService
+    {
+        private readonly Func<CancellationToken, Task<IdeationGenerationResult>> _generate;
+
+        public PendingService(Func<CancellationToken, Task<IdeationGenerationResult>> generate) => _generate = generate;
+
+        public IdeationScopeResult ResolveScope(WorkspaceSnapshot snapshot, WorkspaceEntityKind entityKind, Guid entityId) =>
+            IdeationScopeResult.Available(Scope);
+
+        public Task<IdeationGenerationResult> GenerateAsync(IdeationGenerationRequest request, IProgress<IdeationGenerationProgress>? progress = null, CancellationToken cancellationToken = default) =>
+            _generate(cancellationToken);
+
+        public Task<IdeationDecisionResult> CreateAsync(IdeationScope scope, string candidateText, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new IdeationDecisionResult(true, null, new([], [], [], [], [], [], [], [], [])));
+
+        public Task<IdeationDecisionResult> RejectAsync(IdeationScope scope, string candidateText, string? reason, IdeationMode mode, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new IdeationDecisionResult(true, null, new([], [], [], [], [], [], [], [], [])));
     }
 
     private sealed class StubLibrary : ISnowcloneLibraryService
