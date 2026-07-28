@@ -276,8 +276,9 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
         }
 
         var token = ++_generationToken;
-        _generationCancellation = new CancellationTokenSource();
-        var cancellationToken = _generationCancellation.Token;
+        var cancellation = new CancellationTokenSource();
+        _generationCancellation = cancellation;
+        var cancellationToken = cancellation.Token;
         IsBusy = true;
         var requestMode = SelectedMode;
         Error = null;
@@ -330,10 +331,10 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
         {
             if (token == _generationToken)
             {
-                _generationCancellation?.Dispose();
                 _generationCancellation = null;
                 IsBusy = false;
             }
+            cancellation.Dispose();
         }
     }
 
@@ -454,8 +455,6 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
     {
         _generationToken++;
         _generationCancellation?.Cancel();
-        _generationCancellation?.Dispose();
-        _generationCancellation = null;
         IsBusy = false;
     }
 
