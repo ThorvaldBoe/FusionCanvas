@@ -207,7 +207,21 @@ public sealed class AiProfileEditorViewModel : INotifyPropertyChanged
 
     private void NotifyAll()
     {
-        OnPropertyChanged(string.Empty);
+        OnPropertyChanged(nameof(ModelId));
+        OnPropertyChanged(nameof(MaxCompletionTokens));
+        OnPropertyChanged(nameof(Temperature));
+        OnPropertyChanged(nameof(TopP));
+        OnPropertyChanged(nameof(TopK));
+        OnPropertyChanged(nameof(MinP));
+        OnPropertyChanged(nameof(TopA));
+        OnPropertyChanged(nameof(FrequencyPenalty));
+        OnPropertyChanged(nameof(PresencePenalty));
+        OnPropertyChanged(nameof(RepetitionPenalty));
+        OnPropertyChanged(nameof(Seed));
+        OnPropertyChanged(nameof(StopSequences));
+        OnPropertyChanged(nameof(ReasoningMode));
+        OnPropertyChanged(nameof(ReasoningEffort));
+        OnPropertyChanged(nameof(ReasoningTokenBudget));
         OnPropertyChanged(nameof(SelectedModel));
         OnPropertyChanged(nameof(SupportsReasoning));
         NotifyCapabilities();
