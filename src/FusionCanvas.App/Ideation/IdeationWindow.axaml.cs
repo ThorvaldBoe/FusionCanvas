@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using System.ComponentModel;
+using FusionCanvas.App.RejectedPhrases;
 using FusionCanvas.App.Snowclones;
 
 namespace FusionCanvas.App.Ideation;
@@ -12,6 +13,7 @@ public partial class IdeationWindow : Window
     private bool _confirmationOpen;
     private RejectIdeaWindow? _rejectWindow;
     private SnowcloneLibraryWindow? _snowcloneLibraryWindow;
+    private RejectedPhrasesWindow? _rejectedPhrasesWindow;
 
     public IdeationWindow()
     {
@@ -70,6 +72,26 @@ public partial class IdeationWindow : Window
         Dispatcher.UIThread.Post(() => ManageSnowclonesButton.Focus(), DispatcherPriority.Input);
     }
 
+    private async void OnManageRejectedPhrases(object? sender, RoutedEventArgs e)
+    {
+        if (_rejectedPhrasesWindow is not null || ViewModel is not { } viewModel)
+        {
+            return;
+        }
+
+        viewModel.OpenRejectedPhrases();
+        if (viewModel.RejectedPhrases is not { } manager)
+        {
+            return;
+        }
+
+        _rejectedPhrasesWindow = new RejectedPhrasesWindow { DataContext = manager };
+        await _rejectedPhrasesWindow.ShowDialog(this);
+        _rejectedPhrasesWindow = null;
+        await viewModel.CompleteRejectedPhrasesAsync();
+        Dispatcher.UIThread.Post(() => ManageRejectedPhrasesButton.Focus(), DispatcherPriority.Input);
+    }
+
     private async void OnClose(object? sender, RoutedEventArgs e) =>
         await RequestDiscardAsync(close: true);
 
@@ -79,6 +101,13 @@ public partial class IdeationWindow : Window
         {
             e.Cancel = true;
             _snowcloneLibraryWindow.Close();
+            return;
+        }
+
+        if (_rejectedPhrasesWindow is not null)
+        {
+            e.Cancel = true;
+            _rejectedPhrasesWindow.Close();
             return;
         }
 

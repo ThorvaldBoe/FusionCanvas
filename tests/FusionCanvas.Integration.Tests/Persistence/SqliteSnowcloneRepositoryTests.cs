@@ -21,7 +21,7 @@ public sealed class SqliteSnowcloneRepositoryTests
 
         Assert.Empty(loaded.Snowclones);
         Assert.False(loaded.StarterLibraryInitialized);
-        Assert.Equal(7, await ReadUserVersionAsync(path));
+        Assert.Equal(8, await ReadUserVersionAsync(path));
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public sealed class SqliteSnowcloneRepositoryTests
         Assert.Empty(library.Snowclones);
         Assert.False(library.StarterLibraryInitialized);
         Assert.Equal(workspace.Workspaces, reloadedWorkspace.Workspaces);
-        Assert.Equal(7, await ReadUserVersionAsync(path));
+        Assert.Equal(8, await ReadUserVersionAsync(path));
     }
 
     [Fact]
@@ -163,8 +163,8 @@ public sealed class SqliteSnowcloneRepositoryTests
         Assert.Empty(firstLibrary.Snowclones);
         Assert.Empty(secondLibrary.Snowclones);
         Assert.Empty(secondWorkspace.Workspaces);
-        Assert.Equal(7, await ReadUserVersionAsync(firstPath));
-        Assert.Equal(7, await ReadUserVersionAsync(secondPath));
+        Assert.Equal(8, await ReadUserVersionAsync(firstPath));
+        Assert.Equal(8, await ReadUserVersionAsync(secondPath));
     }
 
     [Fact]
@@ -176,7 +176,7 @@ public sealed class SqliteSnowcloneRepositoryTests
         {
             await connection.OpenAsync(TestContext.Current.CancellationToken);
             await using var command = connection.CreateCommand();
-            command.CommandText = "PRAGMA user_version = 8;";
+            command.CommandText = "PRAGMA user_version = 9;";
             await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
         }
 

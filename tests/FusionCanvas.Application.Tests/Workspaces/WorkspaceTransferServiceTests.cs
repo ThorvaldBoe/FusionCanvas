@@ -379,7 +379,7 @@ public class WorkspaceTransferServiceTests
     {
         public int CurrentFormatVersion => 1;
 
-        public int CurrentSchemaVersion => 7;
+        public int CurrentSchemaVersion => 8;
 
         public string AppVersion => "test";
 
