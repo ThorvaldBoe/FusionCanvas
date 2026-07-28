@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using FusionCanvas.Application.AI;
@@ -25,23 +26,98 @@ public class OpenRouterClientTests
     }
 
     [Fact]
-    public async Task GetModelsAsync_FiltersNonTextModelsAndUsesZdrPolicy()
+    public async Task GetModelsAsync_DerivesZdrFlagsFromEndpointListAndSendsNoZdrQuery()
     {
-        var handler = new RecordingHandler(Json(HttpStatusCode.OK, """
-            {"data":[
-              {"id":"text/model","name":"Text","description":"ok","architecture":{"input_modalities":["text"],"output_modalities":["text"]},"supported_parameters":["temperature","future"],"context_length":1000,"top_provider":{"max_completion_tokens":200},"pricing":{"prompt":"0.1","completion":"0.2"}},
-              {"id":"image/model","name":"Image","architecture":{"input_modalities":["text"],"output_modalities":["image"]},"supported_parameters":[]}
-            ]}
-            """));
+        var handler = new RecordingHandler(
+            Json(HttpStatusCode.OK, """
+                {"data":[
+                  {"id":"zdr/model","name":"ZDR","description":"ok","architecture":{"input_modalities":["text"],"output_modalities":["text"]},"supported_parameters":["temperature","future"],"context_length":1000,"top_provider":{"max_completion_tokens":200},"pricing":{"prompt":"0.1","completion":"0.2"}},
+                  {"id":"plain/model","name":"Plain","architecture":{"input_modalities":["text"],"output_modalities":["text"]},"supported_parameters":[],"context_length":1000,"top_provider":{},"pricing":{}},
+                  {"id":"image/model","name":"Image","architecture":{"input_modalities":["text"],"output_modalities":["image"]},"supported_parameters":[]}
+                ]}
+                """),
+            Json(HttpStatusCode.OK, """{"data":[{"model_id":"zdr/model"}]}"""));
         var client = CreateClient(handler);
 
         var catalog = await client.GetModelsAsync("secret", true, TestContext.Current.CancellationToken);
 
+        Assert.Equal(2, catalog.Models.Count);
+        var zdr = Assert.Single(catalog.Models, m => m.Id == "zdr/model");
+        var plain = Assert.Single(catalog.Models, m => m.Id == "plain/model");
+        Assert.True(zdr.ZeroDataRetentionCompatible);
+        Assert.False(plain.ZeroDataRetentionCompatible);
+        Assert.Contains("future", zdr.SupportedParameters);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Equal("/api/v1/models/user", handler.Requests[0].Uri.AbsolutePath);
+        Assert.DoesNotContain("zdr", handler.Requests[0].Uri.Query);
+        Assert.Equal("Bearer", handler.Requests[0].Scheme);
+        Assert.Equal("secret", handler.Requests[0].Parameter);
+        Assert.Equal("/api/v1/endpoints/zdr", handler.Requests[1].Uri.AbsolutePath);
+        Assert.Null(handler.Requests[1].Scheme);
+    }
+
+    [Fact]
+    public async Task GetModelsAsync_DegradesZdrListFailureWhenNotRequired()
+    {
+        var handler = new RecordingHandler(
+            Json(HttpStatusCode.OK, """
+                {"data":[{"id":"plain/model","name":"Plain","architecture":{"input_modalities":["text"],"output_modalities":["text"]},"supported_parameters":[],"context_length":1,"top_provider":{},"pricing":{}}]}
+                """),
+            Json(HttpStatusCode.ServiceUnavailable, """{"error":{"message":"temp"}}"""));
+        var client = CreateClient(handler);
+
+        var catalog = await client.GetModelsAsync("secret", false, TestContext.Current.CancellationToken);
+
         var model = Assert.Single(catalog.Models);
-        Assert.Equal("text/model", model.Id);
-        Assert.True(model.ZeroDataRetentionCompatible);
-        Assert.Contains("zdr=true", handler.Requests[0].Uri.Query);
-        Assert.Contains("future", model.SupportedParameters);
+        Assert.False(model.ZeroDataRetentionCompatible);
+    }
+
+    [Fact]
+    public async Task GetModelsAsync_FailsClosedWhenZdrListUnavailableWhileRequired()
+    {
+        var handler = new RecordingHandler(
+            Json(HttpStatusCode.OK, """{"data":[]}"""),
+            Json(HttpStatusCode.ServiceUnavailable, """{"error":{"message":"temp"}}"""));
+        var client = CreateClient(handler);
+
+        var exception = await Assert.ThrowsAsync<AiModelCatalogFetchException>(
+            () => client.GetModelsAsync("secret", true, TestContext.Current.CancellationToken));
+
+        Assert.Equal(AiModelCatalogFailureKind.ZdrDataUnavailable, exception.Kind);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized, AiModelCatalogFailureKind.Authentication)]
+    [InlineData(HttpStatusCode.Forbidden, AiModelCatalogFailureKind.Authentication)]
+    [InlineData(HttpStatusCode.InternalServerError, AiModelCatalogFailureKind.NetworkOrService)]
+    public async Task GetModelsAsync_MapsCatalogStatusFailures(
+        HttpStatusCode status,
+        AiModelCatalogFailureKind expected)
+    {
+        var handler = new RecordingHandler(Json(status, """{"error":{"message":"x"}}"""));
+        var client = CreateClient(handler);
+
+        var exception = await Assert.ThrowsAsync<AiModelCatalogFetchException>(
+            () => client.GetModelsAsync("secret", false, TestContext.Current.CancellationToken));
+
+        Assert.Equal(expected, exception.Kind);
+        Assert.DoesNotContain("secret", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetModelsAsync_MapsRateLimitedWithRetryAfter()
+    {
+        var handler = new RecordingHandler(
+            JsonWithRetry((HttpStatusCode)429, TimeSpan.FromSeconds(2), """{"error":{"message":"slow"}}"""),
+            JsonWithRetry((HttpStatusCode)429, TimeSpan.FromSeconds(2), """{"error":{"message":"slow"}}"""));
+        var client = CreateClient(handler);
+
+        var exception = await Assert.ThrowsAsync<AiModelCatalogFetchException>(
+            () => client.GetModelsAsync("secret", false, TestContext.Current.CancellationToken));
+
+        Assert.Equal(AiModelCatalogFailureKind.RateLimited, exception.Kind);
+        Assert.Equal(TimeSpan.FromSeconds(2), exception.RetryAfter);
+        Assert.Equal(2, handler.Requests.Count);
     }
 
     [Fact]
@@ -130,6 +206,16 @@ public class OpenRouterClientTests
 
     private static HttpResponseMessage Json(HttpStatusCode status, string json) =>
         new(status) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+
+    private static HttpResponseMessage JsonWithRetry(HttpStatusCode status, TimeSpan retryAfter, string json)
+    {
+        var response = new HttpResponseMessage(status)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+        response.Headers.RetryAfter = new RetryConditionHeaderValue(retryAfter);
+        return response;
+    }
 
     private sealed class RecordingHandler(params HttpResponseMessage[] responses) : HttpMessageHandler
     {

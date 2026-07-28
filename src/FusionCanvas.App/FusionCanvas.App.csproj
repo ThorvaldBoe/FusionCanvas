@@ -18,4 +18,8 @@
     <ProjectReference Include="..\FusionCanvas.Application\FusionCanvas.Application.csproj" />
     <ProjectReference Include="..\FusionCanvas.Integration\FusionCanvas.Integration.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FusionCanvas.App.Tests" />
+  </ItemGroup>
 </Project>

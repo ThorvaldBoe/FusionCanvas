@@ -89,28 +89,156 @@ public sealed class OpenRouterClient :
         bool requireZeroDataRetention,
         CancellationToken cancellationToken = default)
     {
-        var path = requireZeroDataRetention
-            ? "api/v1/models/user?zdr=true"
-            : "api/v1/models/user";
-        using var response = await SendGetAsync(path, apiKey, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-        using var json = await ReadJsonAsync(response, cancellationToken).ConfigureAwait(false);
-        var data = RequiredArray(json.RootElement, "data");
-        var models = new List<AiModelDescriptor>();
-        foreach (var item in data.EnumerateArray())
+        try
         {
-            var model = ParseModel(item, requireZeroDataRetention);
-            if (model is not null)
+            using var response = await SendGetAsync("api/v1/models/user", apiKey, cancellationToken).ConfigureAwait(false);
+            EnsureCatalogSuccess(response);
+            using var json = await ReadJsonAsync(response, cancellationToken).ConfigureAwait(false);
+            var data = RequiredArray(json.RootElement, "data");
+            var zdrModelIds = await GetZdrModelIdsAsync(requireZeroDataRetention, cancellationToken).ConfigureAwait(false);
+            var models = new List<AiModelDescriptor>();
+            foreach (var item in data.EnumerateArray())
             {
-                models.Add(model);
+                var model = ParseModel(item, zdrModelIds);
+                if (model is not null)
+                {
+                    models.Add(model);
+                }
             }
+
+            return new AiModelCatalog(
+                requireZeroDataRetention,
+                DateTimeOffset.UtcNow,
+                models.OrderBy(model => model.Name, StringComparer.OrdinalIgnoreCase).ToArray());
+        }
+        catch (AiModelCatalogFetchException)
+        {
+            throw;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new AiModelCatalogFetchException(
+                AiModelCatalogFailureKind.NetworkOrService,
+                CatalogFailureMessage(AiModelCatalogFailureKind.NetworkOrService));
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (HttpRequestException)
+        {
+            throw new AiModelCatalogFetchException(
+                AiModelCatalogFailureKind.NetworkOrService,
+                CatalogFailureMessage(AiModelCatalogFailureKind.NetworkOrService));
+        }
+        catch (Exception exception) when (exception is IOException or JsonException or InvalidDataException)
+        {
+            throw new AiModelCatalogFetchException(
+                AiModelCatalogFailureKind.InvalidResponse,
+                CatalogFailureMessage(AiModelCatalogFailureKind.InvalidResponse));
+        }
+    }
+
+    private async Task<IReadOnlyCollection<string>> GetZdrModelIdsAsync(
+        bool requireZeroDataRetention,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await FetchZdrModelIdsAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception) when (!requireZeroDataRetention)
+        {
+            return [];
+        }
+        catch (Exception)
+        {
+            throw new AiModelCatalogFetchException(
+                AiModelCatalogFailureKind.ZdrDataUnavailable,
+                CatalogFailureMessage(AiModelCatalogFailureKind.ZdrDataUnavailable));
+        }
+    }
+
+    private async Task<IReadOnlyCollection<string>> FetchZdrModelIdsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await SendGetAsync("api/v1/endpoints/zdr", null, cancellationToken).ConfigureAwait(false);
+            EnsureCatalogSuccess(response);
+            using var json = await ReadJsonAsync(response, cancellationToken).ConfigureAwait(false);
+            var data = RequiredArray(json.RootElement, "data");
+            var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in data.EnumerateArray())
+            {
+                var modelId = ReadString(item, "model_id");
+                if (!string.IsNullOrWhiteSpace(modelId))
+                {
+                    ids.Add(modelId);
+                }
+            }
+
+            return ids;
+        }
+        catch (AiModelCatalogFetchException)
+        {
+            throw;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new AiModelCatalogFetchException(
+                AiModelCatalogFailureKind.NetworkOrService,
+                CatalogFailureMessage(AiModelCatalogFailureKind.NetworkOrService));
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (HttpRequestException)
+        {
+            throw new AiModelCatalogFetchException(
+                AiModelCatalogFailureKind.NetworkOrService,
+                CatalogFailureMessage(AiModelCatalogFailureKind.NetworkOrService));
+        }
+        catch (Exception exception) when (exception is IOException or JsonException or InvalidDataException)
+        {
+            throw new AiModelCatalogFetchException(
+                AiModelCatalogFailureKind.InvalidResponse,
+                CatalogFailureMessage(AiModelCatalogFailureKind.InvalidResponse));
+        }
+    }
+
+    private static void EnsureCatalogSuccess(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
         }
 
-        return new AiModelCatalog(
-            requireZeroDataRetention,
-            DateTimeOffset.UtcNow,
-            models.OrderBy(model => model.Name, StringComparer.OrdinalIgnoreCase).ToArray());
+        var kind = response.StatusCode switch
+        {
+            HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => AiModelCatalogFailureKind.Authentication,
+            (HttpStatusCode)429 => AiModelCatalogFailureKind.RateLimited,
+            _ => AiModelCatalogFailureKind.NetworkOrService
+        };
+        throw new AiModelCatalogFetchException(
+            kind,
+            CatalogFailureMessage(kind),
+            kind == AiModelCatalogFailureKind.RateLimited ? ReadRetryAfter(response) : null);
     }
+
+    private static string CatalogFailureMessage(AiModelCatalogFailureKind kind) => kind switch
+    {
+        AiModelCatalogFailureKind.Authentication => "OpenRouter rejected the saved API key.",
+        AiModelCatalogFailureKind.RateLimited => "OpenRouter rate-limited the model catalog refresh.",
+        AiModelCatalogFailureKind.NetworkOrService => "OpenRouter model catalog is temporarily unavailable.",
+        AiModelCatalogFailureKind.InvalidResponse => "OpenRouter returned an invalid catalog response.",
+        AiModelCatalogFailureKind.ZdrDataUnavailable => "OpenRouter Zero Data Retention endpoint data could not be loaded.",
+        _ => "OpenRouter model catalog could not be loaded."
+    };
 
     public async Task<AiTextResult> GenerateAsync(
         AiProviderTextRequest request,
@@ -167,7 +295,7 @@ public sealed class OpenRouterClient :
 
     private async Task<HttpResponseMessage> SendGetAsync(
         string path,
-        string apiKey,
+        string? apiKey,
         CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -176,7 +304,10 @@ public sealed class OpenRouterClient :
         for (var attempt = 0; ; attempt++)
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, path);
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            if (apiKey is not null)
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            }
             var response = await _httpClient.SendAsync(
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
@@ -258,7 +389,7 @@ public sealed class OpenRouterClient :
         if (value is not null) root[name] = value.Value;
     }
 
-    private static AiModelDescriptor? ParseModel(JsonElement item, bool zdr)
+    private static AiModelDescriptor? ParseModel(JsonElement item, IReadOnlyCollection<string> zdrModelIds)
     {
         var id = ReadString(item, "id");
         var name = ReadString(item, "name");
@@ -291,7 +422,7 @@ public sealed class OpenRouterClient :
             ReadInt32(topProvider, "max_completion_tokens"),
             ReadDecimal(pricing, "prompt"),
             ReadDecimal(pricing, "completion"),
-            zdr,
+            zdrModelIds.Contains(id),
             ParseReasoning(item, supported));
     }
 

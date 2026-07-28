@@ -51,7 +51,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         CancelCredentialCommand = new DocumentWindow.RelayCommand(_ => CancelCredentialEdit());
         SaveCredentialCommand = new AsyncRelayCommand(SaveCredentialAsync, () => CanSaveCredential);
         ValidateCredentialCommand = new AsyncRelayCommand(ValidateCredentialAsync, () => HasCredential && !IsBusy);
-        RefreshModelsCommand = new AsyncRelayCommand(RefreshModelsAsync, () => HasCredential && !IsBusy);
+        RefreshModelsCommand = new AsyncRelayCommand(() => EnsureCatalogAsync(true), () => HasCredential && !IsBusy);
         RequestRemoveCommand = new DocumentWindow.RelayCommand(_ => ConfirmRemove = true);
         CancelRemoveCommand = new DocumentWindow.RelayCommand(_ => ConfirmRemove = false);
         RemoveCredentialCommand = new AsyncRelayCommand(RemoveCredentialAsync, () => HasCredential && !IsBusy);
@@ -181,7 +181,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
             }
 
             UpdateSettings(_settings with { RequireZeroDataRetention = true });
-            _ = LoadCatalogFromCacheAsync();
+            OnPrivacyPolicyChanged();
         }
     }
 
@@ -275,7 +275,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
                 AiCredentialStateKind.Locked or AiCredentialStateKind.AccessDenied
                 ? credential.Message
                 : null;
-            await LoadCatalogFromCacheAsync().ConfigureAwait(true);
+            await EnsureCatalogAsync(false).ConfigureAwait(true);
         }
         finally
         {
@@ -327,7 +327,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         }
     }
 
-    private async Task ValidateCredentialAsync()
+    internal async Task ValidateCredentialAsync()
     {
         IsBusy = true;
         try
@@ -348,6 +348,10 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
                 _ => result.Message ?? "Validation unavailable"
             };
             Message = result.Kind == AiCredentialValidationKind.Valid ? null : result.Message;
+            if (result.Kind == AiCredentialValidationKind.Valid)
+            {
+                await EnsureCatalogAsync(true).ConfigureAwait(true);
+            }
         }
         finally
         {
@@ -380,37 +384,123 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         }
     }
 
-    private async Task RefreshModelsAsync()
+    internal async Task EnsureCatalogAsync(bool force)
     {
-        IsBusy = true;
+        if (_catalogLoading)
+        {
+            return;
+        }
+
+        if (!HasCredential)
+        {
+            SetModels([]);
+            Message = "Add an OpenRouter API key to load available models.";
+            return;
+        }
+
+        _catalogLoading = true;
+        var ownedBusy = !IsBusy;
+        if (ownedBusy)
+        {
+            IsBusy = true;
+        }
+
         try
         {
-            var credential = await _credentials.ReadAsync().ConfigureAwait(true);
-            if (credential.State != AiCredentialStateKind.Available || credential.Secret is null)
+            if (!force)
             {
-                Message = credential.Message ?? "The saved API key is unavailable.";
-                return;
+                var cached = await LoadCatalogFromCacheAsync().ConfigureAwait(true);
+                if (cached is not null)
+                {
+                    return;
+                }
             }
 
-            var catalog = await _catalogProvider.GetModelsAsync(
-                credential.Secret,
-                RequireZeroDataRetention).ConfigureAwait(true);
-            await _catalogCache.SaveAsync(catalog).ConfigureAwait(true);
-            SetModels(catalog.Models);
-            Message = catalog.Models.Count == 0 ? "No compatible text models were returned." : null;
+            await RefreshCatalogAsync().ConfigureAwait(true);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
         {
             Message = "OpenRouter models could not be refreshed. A cached catalog remains available when present.";
             await LoadCatalogFromCacheAsync().ConfigureAwait(true);
         }
         finally
         {
-            IsBusy = false;
+            _catalogLoading = false;
+            if (ownedBusy)
+            {
+                IsBusy = false;
+            }
         }
     }
 
-    private async Task LoadCatalogFromCacheAsync()
+    private async Task RefreshCatalogAsync()
+    {
+        var credential = await _credentials.ReadAsync().ConfigureAwait(true);
+        if (credential.State != AiCredentialStateKind.Available || credential.Secret is null)
+        {
+            Message = credential.Message ?? "The saved API key is unavailable.";
+            return;
+        }
+
+        try
+        {
+            var catalog = await _catalogProvider.GetModelsAsync(
+                credential.Secret,
+                RequireZeroDataRetention).ConfigureAwait(true);
+            SetModels(catalog.Models);
+            Message = null;
+            await SaveCatalogCacheAsync(catalog).ConfigureAwait(true);
+            if (catalog.Models.Count == 0)
+            {
+                Message = "No compatible text models were returned.";
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (AiModelCatalogFetchException exception)
+        {
+            Message = CatalogFailureMessage(exception);
+            await LoadCatalogFromCacheAsync().ConfigureAwait(true);
+        }
+    }
+
+    private async Task SaveCatalogCacheAsync(AiModelCatalog catalog)
+    {
+        try
+        {
+            await _catalogCache.SaveAsync(catalog).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            Message = "Models were loaded but could not be cached; the catalog may not survive restart.";
+        }
+    }
+
+    private static string CatalogFailureMessage(AiModelCatalogFetchException exception) => exception.Kind switch
+    {
+        AiModelCatalogFailureKind.Authentication =>
+            "OpenRouter rejected the saved API key. Re-validate or replace it in AI settings.",
+        AiModelCatalogFailureKind.RateLimited => exception.RetryAfter is { } retry
+            ? $"OpenRouter rate-limited the model catalog. Retry in {(int)retry.TotalSeconds} seconds."
+            : "OpenRouter rate-limited the model catalog. Try again shortly.",
+        AiModelCatalogFailureKind.InvalidResponse =>
+            "OpenRouter returned an invalid catalog response. Try again later.",
+        AiModelCatalogFailureKind.ZdrDataUnavailable =>
+            "OpenRouter Zero Data Retention endpoint data could not be loaded. Try again later.",
+        _ => "OpenRouter models could not be refreshed. A cached catalog remains available when present."
+    };
+
+    private async Task<AiModelCatalog?> LoadCatalogFromCacheAsync()
     {
         var catalog = await _catalogCache.LoadAsync(RequireZeroDataRetention).ConfigureAwait(true);
         SetModels(catalog?.Models ?? []);
@@ -418,6 +508,8 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         {
             Message = "The model catalog is stale. Refresh when OpenRouter is available.";
         }
+
+        return catalog;
     }
 
     private void SetModels(IReadOnlyList<AiModelDescriptor> models)
@@ -429,14 +521,19 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
     }
 
     private IReadOnlyList<AiModelDescriptor> _allModels = [];
+    private bool _catalogLoading;
 
     private void ApplyModelFilter()
     {
-        var models = string.IsNullOrWhiteSpace(ModelSearch)
-            ? _allModels
-            : _allModels.Where(model =>
+        var models = _settings.RequireZeroDataRetention
+            ? _allModels.Where(model => model.ZeroDataRetentionCompatible).ToArray()
+            : _allModels;
+        if (!string.IsNullOrWhiteSpace(ModelSearch))
+        {
+            models = models.Where(model =>
                 model.Id.Contains(ModelSearch, StringComparison.OrdinalIgnoreCase) ||
                 model.Name.Contains(ModelSearch, StringComparison.OrdinalIgnoreCase)).ToArray();
+        }
         General.Models = models;
         Ideation.Models = models;
         Concept.Models = models;
@@ -446,7 +543,16 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
     {
         ConfirmZdrOptOut = false;
         UpdateSettings(_settings with { RequireZeroDataRetention = false });
-        _ = LoadCatalogFromCacheAsync();
+        OnPrivacyPolicyChanged();
+    }
+
+    private void OnPrivacyPolicyChanged()
+    {
+        ApplyModelFilter();
+        if (HasCredential)
+        {
+            _ = EnsureCatalogAsync(false);
+        }
     }
 
     private void ApplyProfiles()
