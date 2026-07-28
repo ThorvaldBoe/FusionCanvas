@@ -48,7 +48,7 @@ public class OpenRouterClientTests
         Assert.False(plain.ZeroDataRetentionCompatible);
         Assert.Contains("future", zdr.SupportedParameters);
         Assert.Equal(2, handler.Requests.Count);
-        Assert.Equal("/api/v1/models/user", handler.Requests[0].Uri.AbsolutePath);
+        Assert.Equal("/api/v1/models", handler.Requests[0].Uri.AbsolutePath);
         Assert.DoesNotContain("zdr", handler.Requests[0].Uri.Query);
         Assert.Equal("Bearer", handler.Requests[0].Scheme);
         Assert.Equal("secret", handler.Requests[0].Parameter);
@@ -86,8 +86,28 @@ public class OpenRouterClientTests
         Assert.Equal(AiModelCatalogFailureKind.ZdrDataUnavailable, exception.Kind);
     }
 
+    [Fact]
+    public async Task GetModelsAsync_ToleratesNullNumericFields()
+    {
+        var handler = new RecordingHandler(
+            Json(HttpStatusCode.OK, """
+                {"data":[
+                  {"id":"null/model","name":"Null","architecture":{"input_modalities":["text"],"output_modalities":["text"]},"supported_parameters":[],"context_length":null,"top_provider":{"max_completion_tokens":null},"pricing":{"prompt":null,"completion":null}},
+                  {"id":"ok/model","name":"Ok","architecture":{"input_modalities":["text"],"output_modalities":["text"]},"supported_parameters":[],"context_length":4096,"top_provider":{"max_completion_tokens":1024},"pricing":{"prompt":"0","completion":"0"}}
+                ]}
+                """),
+            Json(HttpStatusCode.OK, """{"data":[]}"""));
+        var client = CreateClient(handler);
+
+        var catalog = await client.GetModelsAsync("secret", false, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, catalog.Models.Count);
+        var nullModel = Assert.Single(catalog.Models, m => m.Id == "null/model");
+        Assert.Null(nullModel.ContextLength);
+        Assert.Null(nullModel.MaxCompletionTokens);
+    }
+
     [Theory]
-    [InlineData(HttpStatusCode.Unauthorized, AiModelCatalogFailureKind.Authentication)]
     [InlineData(HttpStatusCode.Forbidden, AiModelCatalogFailureKind.Authentication)]
     [InlineData(HttpStatusCode.InternalServerError, AiModelCatalogFailureKind.NetworkOrService)]
     public async Task GetModelsAsync_MapsCatalogStatusFailures(

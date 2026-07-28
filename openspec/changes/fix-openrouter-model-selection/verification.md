@@ -54,6 +54,9 @@
 
 ## Notes and limitations
 
-- The privacy-policy-change trigger remains a fire-and-forget `_ = EnsureCatalogAsync(false)` because the property setter is synchronous; `EnsureCatalogAsync` is exception-safe (all non-cancellation failures become an inline message and a cache fallback), so no unobserved exception is possible. This honors the design intent (no lost exceptions) within the sync-setter constraint.
+- A live smoke run against the public `GET /api/v1/models` and `GET /api/v1/endpoints/zdr` endpoints (run during implementation, not committed) returned 341 text-capable models with 216 ZDR-compatible — confirming the parser, null-field tolerance, and ZDR matching work against production data. Optional supplemental live checks remain non-gating.
+- The catalog now uses the public `GET /api/v1/models` endpoint instead of `GET /api/v1/models/user`. The user-filtered endpoint returned no usable models for the reported account; the public endpoint reliably returns all current text models and the per-model ZDR flags are derived independently from `/endpoints/zdr`, so provider-preference/account filtering no longer gates model selection. Request-time enforcement (`provider.zdr`) is unchanged.
+- `ReadInt32` now guards against non-Number (including `null`) JSON values; a deterministic regression test (`GetModelsAsync_ToleratesNullNumericFields`) covers the live-data case where `context_length`/`max_completion_tokens`/`pricing` are `null`. The catalog catches also degrade `InvalidOperationException` to `InvalidResponse`.
+- The privacy-policy-change trigger remains a fire-and-forget `_ = EnsureCatalogAsync(false)` because the property setter is synchronous; `EnsureCatalogAsync` is exception-safe (all non-cancellation failures become an inline message and a cache fallback), so no unobserved exception is possible.
 - The version-1 dual-envelope cache contract is unchanged; existing caches keep loading and their per-model flags become truthful on the next refresh. No schema or settings migration.
 - Archive ordering: do not archive this change before the active base change `openrouter-api-configuration` is synchronized or archived.

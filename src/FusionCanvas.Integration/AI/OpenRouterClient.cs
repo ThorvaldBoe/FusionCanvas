@@ -91,7 +91,7 @@ public sealed class OpenRouterClient :
     {
         try
         {
-            using var response = await SendGetAsync("api/v1/models/user", apiKey, cancellationToken).ConfigureAwait(false);
+            using var response = await SendGetAsync("api/v1/models", apiKey, cancellationToken).ConfigureAwait(false);
             EnsureCatalogSuccess(response);
             using var json = await ReadJsonAsync(response, cancellationToken).ConfigureAwait(false);
             var data = RequiredArray(json.RootElement, "data");
@@ -131,7 +131,7 @@ public sealed class OpenRouterClient :
                 AiModelCatalogFailureKind.NetworkOrService,
                 CatalogFailureMessage(AiModelCatalogFailureKind.NetworkOrService));
         }
-        catch (Exception exception) when (exception is IOException or JsonException or InvalidDataException)
+        catch (Exception exception) when (exception is IOException or JsonException or InvalidDataException or InvalidOperationException)
         {
             throw new AiModelCatalogFetchException(
                 AiModelCatalogFailureKind.InvalidResponse,
@@ -203,7 +203,7 @@ public sealed class OpenRouterClient :
                 AiModelCatalogFailureKind.NetworkOrService,
                 CatalogFailureMessage(AiModelCatalogFailureKind.NetworkOrService));
         }
-        catch (Exception exception) when (exception is IOException or JsonException or InvalidDataException)
+        catch (Exception exception) when (exception is IOException or JsonException or InvalidDataException or InvalidOperationException)
         {
             throw new AiModelCatalogFetchException(
                 AiModelCatalogFailureKind.InvalidResponse,
@@ -606,6 +606,7 @@ public sealed class OpenRouterClient :
     private static int? ReadInt32(JsonElement parent, string name) =>
         parent.ValueKind == JsonValueKind.Object &&
         parent.TryGetProperty(name, out var element) &&
+        element.ValueKind == JsonValueKind.Number &&
         element.TryGetInt32(out var value)
             ? value
             : null;
