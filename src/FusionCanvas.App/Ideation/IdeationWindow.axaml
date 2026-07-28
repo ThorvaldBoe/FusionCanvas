@@ -7,8 +7,9 @@
         Width="720"
         Height="680"
         MinWidth="560"
-        MinHeight="500"
-        WindowStartupLocation="CenterOwner">
+         MinHeight="500"
+         WindowStartupLocation="CenterOwner"
+         Background="{DynamicResource ElevatedSurfaceBrush}">
   <Grid RowDefinitions="Auto,Auto,*,Auto"
         Margin="22"
         RowSpacing="14">
