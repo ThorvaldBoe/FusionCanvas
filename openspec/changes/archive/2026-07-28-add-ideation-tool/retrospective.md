@@ -1,0 +1,23 @@
+# add-ideation-tool Retrospective
+
+## Outcome
+
+A creator with placeholder AI access can open Ideation from the Idea stage, generate a bounded batch of Basic or Snowclone candidates from the active store, niche, and optional group context, create useful candidates as normal Idea-stage Items, reject unsuitable candidates with optional reasoning, and safely discard remaining transient candidates. Durable rejections persist in SQLite (schema v7) and inform later batches. The module shipped with a fake local generator and in-memory Snowclone catalog as deliberate seams, later replaced by OpenRouter and a persisted Snowclone Library through `integrate-ideation-openrouter-snowclones`.
+
+## Feedback-Driven Adjustments
+
+| Initial assumption | Observed problem or feedback | Approved correction | Classification | Applicability | Promotion |
+| --- | --- | --- | --- | --- | --- |
+| `NotifyAll` could raise `PropertyChanged(string.Empty)` to refresh all bindings | Re-entrant `PropertyChanged` on `ModelIds`/`Models` during `SelectedItem` TwoWay updates crashed the OpenRouter model ComboBox with `Cannot change source while update is in progress` (fixed in `fixed-0728`, PR #72) | Replace blanket empty-string notification with explicit per-property notifications on scalar settings only; never notify collection sources from scalar setters | Implementation defect | Reusable | `docs/coding-standard.md` (proposed) |
+| `CancelGeneration` could `Cancel()` and immediately `Dispose()` the `CancellationTokenSource` | Disposing a CTS while an HTTP read is registered on its token tore down the socket and threw `TaskCanceledException` when closing the dialog during generation (fixed in `fix-ideation-close-during-generation`, PR #77) | Capture the CTS in a local inside the async method and dispose it only in the `finally` after the awaited operation completes; cancellers should only call `Cancel()` | Implementation defect | Reusable | `docs/coding-standard.md` (proposed) |
+| Default Avalonia Window chrome background was acceptable for the Ideation dialog | In dark mode the dialog was very dark with low contrast against inner `PanelSurfaceBrush`/`ElevatedSurfaceBrush` panels (fixed in `fix-ideation-dialog-background`, PR #76) | Set `Background="{DynamicResource ElevatedSurfaceBrush}"` on focused working dialogs so they read as elevated above the main window | UI | Reusable | `docs/ui-guidelines.md` (proposed) |
+| Right-edge content could sit flush against the `ScrollViewer` scrollbar | The Ideation button touched the scrollbar (fixed in `fix-ideation-button-scrollbar-spacing`, PR #75) | Add right padding (`Padding="0,0,8,0"`) to `ScrollViewer`s that host right-aligned action buttons | UI | Reusable | `docs/ui-guidelines.md` (proposed) |
+| The reason `TextBox` in the Reject dialog could live in a `StackPanel` inside a `*` grid row | `MinHeight=64` + `AcceptsReturn` overflowed the constrained `*` row and collided with the Cancel/OK buttons (fixed in `fix-reject-dialog-spacing`, PR #74) | Use a nested `Grid (Auto,*)` for label-plus-input sections inside fixed-height dialogs so the input is bounded by the cell | UI | Reusable | `docs/ui-guidelines.md` (proposed) |
+
+## Learning Review
+
+- **Result:** Reusable lessons identified.
+- **Evidence reviewed:** proposal, design, delta specs, tasks, `verification.md`, Git history of post-implementation fixes raised in this session (`fixed-0728`, `fix-reject-dialog-spacing`, `fix-ideation-button-scrollbar-spacing`, `fix-ideation-dialog-background`, `fix-ideation-close-during-generation`), and the in-progress `add-ideation-count-stepper` change.
+- **Promotions completed:** None yet into authoritative docs — all five lessons above are proposed for promotion into `docs/coding-standard.md` (async/INotifyPropertyChanged rules) and `docs/ui-guidelines.md` (dialog background, scrollbar padding, bounded input layout) as part of archiving. They are recorded here so the promotions can be applied in a follow-up maintenance pass.
+- **Deferred promotions:** The five reusable rules above are deferred to a separate docs-update commit so this archive stays scoped to the change itself. Rationale: the lessons were observed across multiple later fixes and deserve their own concise docs pass rather than being rushed into the archive commit.
+- **Change-specific notes:** The placeholder generator and in-memory Snowclone catalog were successfully superseded by `integrate-ideation-openrouter-snowclones`; the `verification.md` post-merge note records that reconciliation. The `ideation` capability remains the source of truth for behavior; later changes (`add-ideation-count-stepper`, etc.) stack on it.
