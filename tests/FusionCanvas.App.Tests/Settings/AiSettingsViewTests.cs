@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Settings;
+using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Settings;
 
 namespace FusionCanvas.App.Tests;
@@ -39,6 +40,124 @@ public class AiSettingsViewTests
             settings.Ai.DiscardCredentialDraft();
             window.Close();
         }
+    }
+
+    [AvaloniaFact]
+    public async Task AiSection_RendersEmptyGuidanceWhenNoCredential()
+    {
+        var ai = new AiSettingsViewModel(
+            AiConfigurationSettings.Default,
+            new CredentialStore(AiCredentialReadResult.NotFound),
+            new Validator(),
+            new CatalogProvider(),
+            new CatalogCache());
+        var settings = new SettingsViewModel(
+            new InMemoryApplicationSettingsStore(),
+            new FakeTheme(),
+            ApplicationSettings.Default,
+            null,
+            ai);
+        settings.OpenCommand.Execute(null);
+        var window = new SettingsWindow { DataContext = settings };
+        try
+        {
+            window.Show();
+            settings.SelectedSection = SettingsSection.AI;
+            await ai.EnsureLoadedAsync();
+            window.UpdateLayout();
+
+            Assert.Contains("API key", ai.Message);
+            var message = window.GetVisualDescendants().OfType<TextBlock>()
+                .FirstOrDefault(t => t.Text == ai.Message);
+            Assert.NotNull(message);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task AiSection_ListsOnlyZdrCompatibleModelsAfterValidation()
+    {
+        var ai = new AiSettingsViewModel(
+            AiConfigurationSettings.Default,
+            new CredentialStore(AiCredentialReadResult.Available("secret")),
+            new Validator(),
+            new CatalogProvider
+            {
+                Models = [Descriptor("zdr/model", true), Descriptor("plain/model", false)]
+            },
+            new CatalogCache
+            {
+                Cached = new AiModelCatalog(true, DateTimeOffset.UtcNow, [Descriptor("seed/model", true)])
+            });
+        var settings = new SettingsViewModel(
+            new InMemoryApplicationSettingsStore(),
+            new FakeTheme(),
+            ApplicationSettings.Default,
+            null,
+            ai);
+        settings.OpenCommand.Execute(null);
+        var window = new SettingsWindow { DataContext = settings };
+        try
+        {
+            window.Show();
+            settings.SelectedSection = SettingsSection.AI;
+            await ai.EnsureLoadedAsync();
+            await ai.ValidateCredentialAsync();
+            window.UpdateLayout();
+
+            var modelBox = window.GetVisualDescendants().OfType<AiSettingsView>().Single()
+                .GetVisualDescendants().OfType<ComboBox>().First();
+            var items = modelBox.Items.OfType<string>().ToArray();
+            Assert.Single(items);
+            Assert.Equal("zdr/model", items[0]);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static AiModelDescriptor Descriptor(string id, bool zdr) =>
+        new(id, id, null, null, ["text"], ["text"], [], 1000, null, null, null, zdr, null);
+
+    private sealed class CredentialStore : IAiCredentialStore
+    {
+        private readonly AiCredentialReadResult _result;
+        public CredentialStore(AiCredentialReadResult result) => _result = result;
+        public Task<AiCredentialReadResult> ReadAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(_result);
+        public Task<AiCredentialOperationResult> SaveAsync(string apiKey, CancellationToken cancellationToken = default) =>
+            Task.FromResult(AiCredentialOperationResult.Success);
+        public Task<AiCredentialOperationResult> RemoveAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(AiCredentialOperationResult.Success);
+    }
+
+    private sealed class Validator : IAiCredentialValidator
+    {
+        public Task<AiCredentialValidationResult> ValidateAsync(string apiKey, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AiCredentialValidationResult(AiCredentialValidationKind.Valid));
+    }
+
+    private sealed class CatalogProvider : IAiModelCatalogProvider
+    {
+        public IReadOnlyList<AiModelDescriptor> Models { get; set; } = [];
+        public Task<AiModelCatalog> GetModelsAsync(
+            string apiKey,
+            bool requireZeroDataRetention,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AiModelCatalog(requireZeroDataRetention, DateTimeOffset.UtcNow, Models));
+    }
+
+    private sealed class CatalogCache : IAiModelCatalogCache
+    {
+        public AiModelCatalog? Cached { get; set; }
+        public Task<AiModelCatalog?> LoadAsync(bool requireZeroDataRetention, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Cached);
+        public Task SaveAsync(AiModelCatalog catalog, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 
     private sealed class FakeTheme : IApplicationThemeController
