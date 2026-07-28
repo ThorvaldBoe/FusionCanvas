@@ -65,6 +65,14 @@
                  Width="64"
                  IsEnabled="{Binding IsNotBusy}"
                  AutomationProperties.Name="Number of ideas" />
+        <Button Content="&#x25B2;"
+                Command="{Binding IncrementCountCommand}"
+                IsEnabled="{Binding CanIncrementCount}"
+                AutomationProperties.Name="Increment idea count" />
+        <Button Content="&#x25BC;"
+                Command="{Binding DecrementCountCommand}"
+                IsEnabled="{Binding CanDecrementCount}"
+                AutomationProperties.Name="Decrement idea count" />
         <Button Content="Generate ideas"
                 Command="{Binding GenerateCommand}"
                 IsEnabled="{Binding CanGenerate}"
