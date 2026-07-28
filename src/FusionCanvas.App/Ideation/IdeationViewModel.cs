@@ -5,7 +5,9 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using FusionCanvas.Application.RejectedPhrases;
 using FusionCanvas.Application.Snowclones;
+using FusionCanvas.App.RejectedPhrases;
 using FusionCanvas.App.Snowclones;
 using Avalonia.Threading;
 
@@ -20,6 +22,7 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
     private readonly IIdeationService _service;
     private readonly IIdeationAccessStatus _accessStatus;
     private readonly ISnowcloneLibraryService? _snowcloneLibrary;
+    private readonly IRejectedPhraseManagementService? _rejectedPhrases;
     private IdeationScope? _scope;
     private string _guidance = string.Empty;
     private string _countText = DefaultCount.ToString();
@@ -35,15 +38,18 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
     private long _generationToken;
     private bool _hasSnowclones;
     private bool _isSnowcloneLibraryOpen;
+    private bool _isRejectedPhrasesOpen;
 
     public IdeationViewModel(
         IIdeationService service,
         IIdeationAccessStatus accessStatus,
-        ISnowcloneLibraryService? snowcloneLibrary = null)
+        ISnowcloneLibraryService? snowcloneLibrary = null,
+        IRejectedPhraseManagementService? rejectedPhrases = null)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _accessStatus = accessStatus ?? throw new ArgumentNullException(nameof(accessStatus));
         _snowcloneLibrary = snowcloneLibrary;
+        _rejectedPhrases = rejectedPhrases;
         _accessStatus.AvailabilityChanged += (_, _) => Dispatcher.UIThread.Post(RaiseCommandState);
         GenerateCommand = new RelayCommand(_ => _ = GenerateAsync(), () => CanGenerate);
         IncrementCountCommand = new RelayCommand(_ => IncrementCount(), () => CanIncrementCount);
@@ -75,6 +81,9 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
         ManageSnowclonesCommand = new RelayCommand(
             _ => OpenSnowcloneLibrary(),
             () => IsSnowclonesMode && !IsBusy && !IsSnowcloneLibraryOpen && _snowcloneLibrary is not null);
+        ManageRejectedPhrasesCommand = new RelayCommand(
+            _ => OpenRejectedPhrases(),
+            () => !IsBusy && !IsRejectedPhrasesOpen && _rejectedPhrases is not null && _scope is not null);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -107,6 +116,15 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
 
     public ICommand CancelDiscardCommand { get; }
     public ICommand ManageSnowclonesCommand { get; }
+
+    public ICommand ManageRejectedPhrasesCommand { get; }
+
+    public RejectedPhrasesViewModel? RejectedPhrases { get; private set; }
+
+    public bool IsRejectedPhrasesOpen => _isRejectedPhrasesOpen;
+
+    public bool CanManageRejectedPhrases =>
+        !IsBusy && !IsRejectedPhrasesOpen && _rejectedPhrases is not null && _scope is not null;
 
     public string ScopeLabel => _scope?.DisplayPath ?? string.Empty;
 
@@ -228,6 +246,7 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
     public bool CanGenerate => IsOpen
         && !IsBusy
         && !IsSnowcloneLibraryOpen
+        && !IsRejectedPhrasesOpen
         && TryGetCount(out _)
         && (!IsSnowclonesMode || HasSnowclones)
         && _accessStatus.GetAvailability().IsAvailable;
@@ -494,6 +513,7 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanGenerate));
         OnPropertyChanged(nameof(AccessMessage));
         OnPropertyChanged(nameof(CanManageSnowclones));
+        OnPropertyChanged(nameof(CanManageRejectedPhrases));
         OnPropertyChanged(nameof(CanIncrementCount));
         OnPropertyChanged(nameof(CanDecrementCount));
     }
@@ -519,6 +539,54 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(SnowcloneLibrary));
         OnPropertyChanged(nameof(IsSnowcloneLibraryOpen));
         await RefreshSnowcloneLibraryAsync();
+    }
+
+    public void OpenRejectedPhrases()
+    {
+        if (_rejectedPhrases is null || IsRejectedPhrasesOpen || IsBusy || _scope is null)
+        {
+            return;
+        }
+
+        var scope = _scope;
+        var initialScope = scope.GroupId is { } groupId
+            ? RejectedPhraseScope.ForGroup(scope.StoreId, scope.NicheId, groupId)
+            : RejectedPhraseScope.ForNiche(scope.StoreId, scope.NicheId);
+        var scopeOptions = BuildRejectedPhraseScopeOptions(scope);
+        var viewModel = new RejectedPhrasesViewModel(_rejectedPhrases);
+        viewModel.StateMutated += (_, _) => WorkspaceChanged?.Invoke(this, EventArgs.Empty);
+        RejectedPhrases = viewModel;
+        _isRejectedPhrasesOpen = true;
+        OnPropertyChanged(nameof(RejectedPhrases));
+        OnPropertyChanged(nameof(IsRejectedPhrasesOpen));
+        RaiseCommandState();
+        _ = viewModel.OpenAsync(initialScope, scopeOptions, default);
+    }
+
+    public async Task CompleteRejectedPhrasesAsync()
+    {
+        _isRejectedPhrasesOpen = false;
+        RejectedPhrases = null;
+        OnPropertyChanged(nameof(RejectedPhrases));
+        OnPropertyChanged(nameof(IsRejectedPhrasesOpen));
+        RaiseCommandState();
+        await Task.CompletedTask;
+    }
+
+    private static IReadOnlyList<ScopeOption> BuildRejectedPhraseScopeOptions(IdeationScope scope)
+    {
+        var options = new List<ScopeOption>
+        {
+            new("Whole workspace", RejectedPhraseScope.WholeWorkspaceView),
+            new(scope.DisplayPath, RejectedPhraseScope.ForNiche(scope.StoreId, scope.NicheId))
+        };
+
+        if (scope.GroupId is { } groupId)
+        {
+            options.Add(new(scope.DisplayPath, RejectedPhraseScope.ForGroup(scope.StoreId, scope.NicheId, groupId)));
+        }
+
+        return options;
     }
 
     private async Task RefreshSnowcloneLibraryAsync()

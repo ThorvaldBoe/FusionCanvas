@@ -95,7 +95,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             settings,
             runtime.Ideation,
             runtime.IdeationAccess,
-            runtime.SnowcloneLibrary)
+            runtime.SnowcloneLibrary,
+            runtime.RejectedPhrases)
     {
     }
 
@@ -115,7 +116,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         SettingsViewModel? settings = null,
         IIdeationService? ideationService = null,
         IIdeationAccessStatus? ideationAccessStatus = null,
-        FusionCanvas.Application.Snowclones.ISnowcloneLibraryService? snowcloneLibrary = null)
+        FusionCanvas.Application.Snowclones.ISnowcloneLibraryService? snowcloneLibrary = null,
+        FusionCanvas.Application.RejectedPhrases.IRejectedPhraseManagementService? rejectedPhrases = null)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
@@ -149,7 +151,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ItemInspector = new ItemInspectorViewModel(_itemInspectorService, _itemManagementService, _tagManagementService);
         DesignTool = new DesignStageToolViewModel(new DesignFileService(workspaceRepository, fileStore));
         ListingTool = new ListingStageToolViewModel();
-        Ideation = new IdeationViewModel(_ideationService, _ideationAccessStatus, snowcloneLibrary);
+        Ideation = new IdeationViewModel(_ideationService, _ideationAccessStatus, snowcloneLibrary, rejectedPhrases);
         _ideationAccessStatus.AvailabilityChanged += (_, _) =>
             Avalonia.Threading.Dispatcher.UIThread.Post(RaiseIdeationProperties);
         Settings.Ai.SettingsChanged += (_, _) => _ = _ideationAccessStatus.RefreshAsync();

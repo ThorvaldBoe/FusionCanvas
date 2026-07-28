@@ -104,6 +104,11 @@
                      TextWrapping="Wrap"
                      Foreground="{DynamicResource DangerTextBrush}" />
         </StackPanel>
+        <Button x:Name="ManageRejectedPhrasesButton"
+                Content="Manage rejected phrases…"
+                IsEnabled="{Binding CanManageRejectedPhrases}"
+                Click="OnManageRejectedPhrases"
+                AutomationProperties.Name="Manage rejected phrases" />
         <TextBlock Text="{Binding CountError}"
                    IsVisible="{Binding CountError, Converter={x:Static ObjectConverters.IsNotNull}}"
                    Foreground="{DynamicResource DangerTextBrush}" />

@@ -13,7 +13,7 @@ public sealed class IdeationPersistenceTests : IDisposable
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "fusioncanvas-ideation-" + Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public async Task Rejection_RoundTripsAndNewSchemaIsVersionSeven()
+    public async Task Rejection_RoundTripsAndNewSchemaIsVersionEight()
     {
         var path = Path.Combine(_directory, "workspace.db");
         var repository = new SqliteWorkspaceRepository(path);
@@ -36,7 +36,7 @@ public sealed class IdeationPersistenceTests : IDisposable
         await connection.OpenAsync(TestContext.Current.CancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version;";
-        Assert.Equal(7L, (long)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!);
+        Assert.Equal(8L, (long)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!);
     }
 
     [Fact]

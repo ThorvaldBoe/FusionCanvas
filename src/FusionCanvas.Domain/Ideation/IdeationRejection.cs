@@ -10,7 +10,8 @@ public sealed record IdeationRejection
         string text,
         string? reason,
         IdeationMode mode,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        DateTimeOffset? updatedAt = null)
     {
         Id = RequireId(id, nameof(id));
         StoreId = RequireId(storeId, nameof(storeId));
@@ -26,6 +27,9 @@ public sealed record IdeationRejection
             ? mode
             : throw new ArgumentOutOfRangeException(nameof(mode), mode, "Ideation mode is not supported.");
         CreatedAt = createdAt;
+        UpdatedAt = updatedAt is { } updatedValue && updatedValue < createdAt
+            ? throw new ArgumentException("Updated timestamp must not predate creation.", nameof(updatedAt))
+            : updatedAt;
     }
 
     public Guid Id { get; init; }
@@ -43,6 +47,8 @@ public sealed record IdeationRejection
     public IdeationMode Mode { get; init; }
 
     public DateTimeOffset CreatedAt { get; init; }
+
+    public DateTimeOffset? UpdatedAt { get; init; }
 
     private static Guid RequireId(Guid value, string name) =>
         value == Guid.Empty

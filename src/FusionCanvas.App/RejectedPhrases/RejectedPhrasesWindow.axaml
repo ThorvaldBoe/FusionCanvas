@@ -1,0 +1,274 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:rejected="using:FusionCanvas.App.RejectedPhrases"
+        xmlns:appRejected="using:FusionCanvas.Application.RejectedPhrases"
+        x:Class="FusionCanvas.App.RejectedPhrases.RejectedPhrasesWindow"
+        x:DataType="rejected:RejectedPhrasesViewModel"
+        Title="Rejected Phrases"
+        Width="920"
+        Height="650"
+        MinWidth="700"
+        MinHeight="500"
+        Background="{DynamicResource ApplicationBackgroundBrush}">
+  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="20">
+    <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,14">
+      <TextBlock Text="Rejected Phrases"
+                 FontSize="22"
+                 FontWeight="SemiBold"
+                 Foreground="{DynamicResource StrongTextBrush}" />
+      <TextBlock Text="Review and curate rejected ideation phrases used as negative guidance for future generation."
+                 FontSize="12"
+                 Foreground="{DynamicResource SecondaryTextBrush}" />
+    </StackPanel>
+
+    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10" IsVisible="{Binding HasScopeOptions}">
+      <TextBlock Text="Scope:"
+                 VerticalAlignment="Center"
+                 FontSize="12"
+                 FontWeight="SemiBold"
+                 Foreground="{DynamicResource SecondaryTextBrush}" />
+      <ComboBox x:Name="ScopeSelector"
+                ItemsSource="{Binding ScopeOptions}"
+                SelectionChanged="OnScopeSelectionChanged"
+                MinWidth="260" />
+    </StackPanel>
+
+    <Grid Grid.Row="2" ColumnDefinitions="*" ColumnSpacing="8" Margin="0,0,0,14">
+      <TextBox x:Name="SearchBox"
+               Grid.Column="0"
+               Text="{Binding SearchText}"
+               PlaceholderText="Search phrase or reason"
+               Classes="field" />
+    </Grid>
+
+    <Grid Grid.Row="3" ColumnDefinitions="300,*" ColumnSpacing="16">
+      <Border Grid.Column="0"
+              Padding="12"
+              Background="{DynamicResource PanelSurfaceBrush}"
+              BorderBrush="{DynamicResource ControlBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="6">
+        <Grid RowDefinitions="Auto,*,Auto">
+          <TextBlock Grid.Row="0"
+                     Text="Rejected phrases"
+                     FontSize="13"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource StrongTextBrush}"
+                     Margin="0,0,0,10" />
+
+          <Grid Grid.Row="1">
+            <ScrollViewer>
+              <ItemsControl x:Name="RejectionList"
+                            ItemsSource="{Binding Rejections}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="appRejected:RejectedPhraseSummary">
+                    <Button Content="{Binding Text}"
+                            Command="{Binding $parent[ItemsControl].DataContext.SelectRejectionCommand}"
+                            CommandParameter="{Binding}"
+                            HorizontalContentAlignment="Left"
+                            Classes="listItem" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+
+            <StackPanel IsVisible="{Binding IsEmpty}"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        Spacing="4">
+              <TextBlock Text="No rejected phrases yet"
+                         FontWeight="SemiBold"
+                         Foreground="{DynamicResource StrongTextBrush}" />
+              <TextBlock Text="Create one to capture guidance."
+                         FontSize="11"
+                         Foreground="{DynamicResource SecondaryTextBrush}" />
+            </StackPanel>
+
+            <StackPanel IsVisible="{Binding HasNoResults}"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        Spacing="8">
+              <TextBlock Text="No matching rejected phrases"
+                         FontWeight="SemiBold"
+                         Foreground="{DynamicResource StrongTextBrush}" />
+              <Button Content="Clear search"
+                      Command="{Binding ClearSearchCommand}"
+                      Classes="secondary" />
+            </StackPanel>
+          </Grid>
+
+          <Button Grid.Row="2"
+                  Content="New rejected phrase"
+                  Command="{Binding NewCommand}"
+                  IsEnabled="{Binding CanMutate}"
+                  HorizontalAlignment="Left"
+                  Margin="0,10,0,0"
+                  Classes="primary" />
+        </Grid>
+      </Border>
+
+      <Border Grid.Column="1"
+              Padding="16"
+              Background="{DynamicResource ElevatedSurfaceBrush}"
+              BorderBrush="{DynamicResource ControlBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="6">
+        <ScrollViewer>
+          <StackPanel Spacing="12">
+            <TextBlock Text="Rejected phrase details"
+                       FontSize="16"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource StrongTextBrush}" />
+
+            <TextBlock IsVisible="{Binding !HasSelection}"
+                       Text="Select a rejected phrase or create a new one."
+                       Foreground="{DynamicResource SecondaryTextBrush}" />
+
+            <StackPanel IsVisible="{Binding HasSelection}" Spacing="6">
+              <TextBlock Text="Phrase"
+                         FontSize="12"
+                         FontWeight="SemiBold"
+                         Foreground="{DynamicResource SecondaryTextBrush}" />
+              <TextBox x:Name="PhraseBox"
+                       Text="{Binding Phrase}"
+                       PlaceholderText="The rejected idea text"
+                       Classes="field" />
+            </StackPanel>
+
+            <StackPanel IsVisible="{Binding HasSelection}" Spacing="6">
+              <TextBlock Text="Reason"
+                         FontSize="12"
+                         FontWeight="SemiBold"
+                         Foreground="{DynamicResource SecondaryTextBrush}" />
+              <TextBox x:Name="ReasonBox"
+                       Text="{Binding Reason}"
+                       AcceptsReturn="True"
+                       TextWrapping="Wrap"
+                       MinHeight="120"
+                       PlaceholderText="Why this phrase should be avoided (optional)."
+                       Classes="field" />
+            </StackPanel>
+
+            <StackPanel IsVisible="{Binding HasSelection}"
+                        Orientation="Horizontal"
+                        Spacing="8">
+              <Button Content="Save"
+                      Command="{Binding SaveCommand}"
+                      IsEnabled="{Binding CanSave}"
+                      Classes="primary fixedAction" />
+              <Button Content="Delete"
+                      Command="{Binding RequestDeleteCommand}"
+                      IsEnabled="{Binding CanDelete}"
+                      Classes="danger fixedAction" />
+            </StackPanel>
+
+            <TextBlock Text="Working\u2026"
+                       IsVisible="{Binding IsBusy}"
+                       Foreground="{DynamicResource SecondaryTextBrush}" />
+            <TextBlock Text="{Binding ErrorMessage}"
+                       IsVisible="{Binding HasError}"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource DangerTextBrush}" />
+
+            <Border IsVisible="{Binding UnsavedPromptVisible}"
+                    Padding="12"
+                    Background="{DynamicResource WarningBackgroundBrush}"
+                    BorderBrush="{DynamicResource WarningBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding UnsavedPromptMessage}"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource StrongTextBrush}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Save"
+                          Command="{Binding SaveAndContinueCommand}"
+                          Classes="primary fixedAction" />
+                  <Button Content="Discard"
+                          Command="{Binding DiscardAndContinueCommand}"
+                          Classes="danger fixedAction" />
+                  <Button Content="Cancel"
+                          Command="{Binding CancelPendingCommand}"
+                          Classes="secondary fixedAction" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <Border IsVisible="{Binding DeleteConfirmationVisible}"
+                    Padding="12"
+                    Background="{DynamicResource DangerBackgroundBrush}"
+                    BorderBrush="{DynamicResource DangerBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding DeletePromptMessage}"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource DangerTextBrush}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Delete permanently"
+                          Command="{Binding ConfirmDeleteCommand}"
+                          Classes="danger" />
+                  <Button Content="Cancel"
+                          Command="{Binding CancelDeleteCommand}"
+                          Classes="secondary fixedAction" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+
+    <Button Grid.Row="4"
+            Content="Close"
+            Command="{Binding CloseCommand}"
+            HorizontalAlignment="Right"
+            Margin="0,14,0,0"
+            Classes="secondary fixedAction" />
+  </Grid>
+
+  <Window.Styles>
+    <Style Selector="Button.primary">
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource CommandForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.secondary">
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SecondaryButtonForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="{DynamicResource DangerStrongBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource CommandForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DangerStrongBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.fixedAction">
+      <Setter Property="Width" Value="104" />
+    </Style>
+    <Style Selector="Button.listItem">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Margin" Value="0,0,0,6" />
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource StrongTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="TextBox.field">
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Padding" Value="8,6" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource StrongTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+  </Window.Styles>
+</Window>

@@ -302,6 +302,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await MigrateToVersion7Async(connection, cancellationToken);
         }
 
+        if (schemaVersion < 8)
+        {
+            await MigrateToVersion8Async(connection, cancellationToken);
+        }
+
         await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
     }
 
@@ -335,7 +340,8 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                     text TEXT NOT NULL,
                     reason TEXT NULL,
                     mode INTEGER NOT NULL,
-                    created_at TEXT NOT NULL
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NULL
                 );
                 """, cancellationToken);
             await VerifyForeignKeyIntegrityAsync(connection, transaction, cancellationToken);
@@ -345,6 +351,24 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         {
             await transaction.RollbackAsync(cancellationToken);
             throw;
+        }
+    }
+
+    private static async Task MigrateToVersion8Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        if (!await ColumnExistsAsync(connection, "ideation_rejections", "updated_at", cancellationToken).ConfigureAwait(false))
+        {
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                await ExecuteAsync(connection, transaction, "ALTER TABLE ideation_rejections ADD COLUMN updated_at TEXT NULL;", cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
         }
     }
 
@@ -684,8 +708,8 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         IdeationRejection rejection,
         CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
-            INSERT INTO ideation_rejections (id, store_id, niche_id, group_id, text, reason, mode, created_at)
-            VALUES ($id, $store_id, $niche_id, $group_id, $text, $reason, $mode, $created_at);
+            INSERT INTO ideation_rejections (id, store_id, niche_id, group_id, text, reason, mode, created_at, updated_at)
+            VALUES ($id, $store_id, $niche_id, $group_id, $text, $reason, $mode, $created_at, $updated_at);
             """, cancellationToken,
             ("$id", rejection.Id.ToString()),
             ("$store_id", rejection.StoreId.ToString()),
@@ -694,7 +718,8 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             ("$text", rejection.Text),
             ("$reason", rejection.Reason),
             ("$mode", (int)rejection.Mode),
-            ("$created_at", rejection.CreatedAt.ToString("O")));
+            ("$created_at", rejection.CreatedAt.ToString("O")),
+            ("$updated_at", rejection.UpdatedAt?.ToString("O")));
 
     private static IReadOnlyList<TopicGroup> OrderGroupsForInsert(IReadOnlyList<TopicGroup> groups)
     {
@@ -841,7 +866,8 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 ReadString(reader, "text"),
                 ReadNullableString(reader, "reason"),
                 (IdeationMode)ReadInt(reader, "mode"),
-                ReadDate(reader, "created_at")));
+                ReadDate(reader, "created_at"),
+                ReadNullableDate(reader, "updated_at")));
         }
 
         return rejections;
@@ -926,6 +952,12 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     private static bool ReadBool(SqliteDataReader reader, string name) => ReadInt(reader, name) == 1;
 
     private static DateTimeOffset ReadDate(SqliteDataReader reader, string name) => DateTimeOffset.Parse(ReadString(reader, name));
+
+    private static DateTimeOffset? ReadNullableDate(SqliteDataReader reader, string name)
+    {
+        var ordinal = reader.GetOrdinal(name);
+        return reader.IsDBNull(ordinal) ? null : DateTimeOffset.Parse(reader.GetString(ordinal));
+    }
 
     private static void ValidateSnapshot(WorkspaceSnapshot snapshot)
     {

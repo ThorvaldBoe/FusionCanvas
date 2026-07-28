@@ -8,6 +8,7 @@ using FusionCanvas.Application.Assets;
 using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.Ideation;
 using FusionCanvas.Application.Snowclones;
+using FusionCanvas.Application.RejectedPhrases;
 using FusionCanvas.Integration.Snowclones;
 using FusionCanvas.Application.AI;
 
@@ -25,6 +26,7 @@ public sealed record AppWorkspaceRuntime(
     IIdeationService Ideation,
     IIdeationAccessStatus IdeationAccess,
     ISnowcloneLibraryService SnowcloneLibrary,
+    IRejectedPhraseManagementService RejectedPhrases,
     SnowcloneLibraryResult SnowcloneLibraryInitialization);
 
 public static class AppWorkspaceFactory
@@ -56,6 +58,7 @@ public static class AppWorkspaceFactory
             new EmbeddedBundledSnowcloneSource());
         var snowcloneLibraryInitialization = StartupTaskRunner.Run(
             () => snowcloneLibrary.InitializeAsync());
+        var rejectedPhrases = new RejectedPhraseManagementService(repository);
         return new AppWorkspaceRuntime(
             repository,
             fileStore,
@@ -73,6 +76,7 @@ public static class AppWorkspaceFactory
                 ideationAccess),
             ideationAccess,
             snowcloneLibrary,
+            rejectedPhrases,
             snowcloneLibraryInitialization);
     }
 
