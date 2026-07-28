@@ -3,11 +3,11 @@
         xmlns:ideation="using:FusionCanvas.App.Ideation"
         x:Class="FusionCanvas.App.Ideation.RejectIdeaWindow"
         x:DataType="ideation:IdeationViewModel"
-        Title="Reject idea"
-        Width="440"
-        Height="250"
-        CanResize="False"
-        WindowStartupLocation="CenterOwner">
+         Title="Reject idea"
+         Width="440"
+         Height="300"
+         CanResize="False"
+         WindowStartupLocation="CenterOwner">
   <Grid Margin="20" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="10">
     <TextBlock Text="Reject idea candidate?"
                FontSize="18"
@@ -16,16 +16,18 @@
                Text="{Binding RejectionCandidate.Text}"
                TextWrapping="Wrap"
                Foreground="{DynamicResource SecondaryTextBrush}" />
-    <StackPanel Grid.Row="2" Spacing="5">
+    <Grid Grid.Row="2" RowDefinitions="Auto,*" RowSpacing="5">
       <TextBlock Text="Reason (optional)"
                  Foreground="{DynamicResource SecondaryTextBrush}" />
       <TextBox x:Name="ReasonTextBox"
+               Grid.Row="1"
                Text="{Binding RejectionReason}"
                AcceptsReturn="True"
                TextWrapping="Wrap"
                MinHeight="64"
+               MaxHeight="120"
                AutomationProperties.Name="Optional rejection reason" />
-    </StackPanel>
+    </Grid>
     <StackPanel Grid.Row="3"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"
