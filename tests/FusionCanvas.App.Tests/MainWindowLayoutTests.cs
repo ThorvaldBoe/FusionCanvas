@@ -136,6 +136,17 @@ public class MainWindowLayoutTests
     }
 
     [AvaloniaFact]
+    public void IdeationButton_ReservesSpaceBeforeTheDetailsScrollbar()
+    {
+        using var fixture = new MainWindowFixture();
+
+        var button = fixture.FindControl<Button>(control => control.Name == "IdeationButton");
+
+        Assert.True(button.Margin.Right >= 12,
+            $"Expected the Ideation button to reserve at least 12px before the scrollbar, got {button.Margin.Right}px.");
+    }
+
+    [AvaloniaFact]
     public void FilterControls_StayWithinPaneAtMinimumWidth()
     {
         using var fixture = new MainWindowFixture(width: 900, height: 600);

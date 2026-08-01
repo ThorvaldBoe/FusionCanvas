@@ -504,6 +504,7 @@
                       IsEnabled="{Binding CanOpenIdeation}"
                       Command="{Binding OpenIdeationCommand}"
                       Content="Ideation…"
+                      Margin="0,0,12,0"
                       AutomationProperties.Name="Open Ideation"
                       ToolTip.Tip="{Binding IdeationUnavailableMessage}"
                       VerticalAlignment="Center" />
