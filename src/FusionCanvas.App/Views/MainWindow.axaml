@@ -480,7 +480,7 @@
         <Grid>
           <ScrollViewer IsVisible="{Binding DocumentWindow.HasActiveDocument}"
                         VerticalScrollBarVisibility="Auto"
-                        Padding="0,0,8,0">
+                        Padding="0,0,16,0">
             <StackPanel Spacing="12">
             <Grid ColumnDefinitions="*,Auto,Auto,Auto"
                   ColumnSpacing="8">
