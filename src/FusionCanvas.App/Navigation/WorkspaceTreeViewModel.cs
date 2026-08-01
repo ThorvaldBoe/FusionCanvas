@@ -181,6 +181,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     private bool _includeArchived;
     private int _stageFilterIndex;
     private int _statusFilterIndex;
+    private bool _nextToggleExpands = true;
     private string? _errorMessage;
     private bool _isBusy;
 
@@ -222,6 +223,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             }
         });
         ClearFiltersCommand = new RelayCommand(_ => ClearAllFilters());
+        ToggleExpandCollapseAllCommand = new RelayCommand(_ => ToggleExpandCollapseAll());
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -243,6 +245,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     public ICommand DuplicateCommand { get; }
     public ICommand ManageAssetsCommand { get; }
     public ICommand ClearFiltersCommand { get; }
+    public ICommand ToggleExpandCollapseAllCommand { get; }
 
     public IReadOnlyList<TagSummary> AvailableTagFilters { get; private set; } = [];
     public IReadOnlyList<Guid> SelectedTagFilterIds => [.. _selectedTagIds];
@@ -383,6 +386,20 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     public bool HasVisibleResults => Roots.Count > 0;
     public bool HasEmptyFilterResults => HasActiveFilters && !HasVisibleResults;
     public bool IsFiltering => BuildQuery().IsActive;
+
+    public bool NextToggleExpands => _nextToggleExpands;
+
+    public bool CanToggleExpandCollapseAll => !IsFiltering && Flatten(Roots).Any(node => node.HasChildren);
+
+    public string ExpandCollapseAllTooltip
+    {
+        get
+        {
+            if (IsFiltering) return "Filtering already expands all groups";
+            if (!Flatten(Roots).Any(node => node.HasChildren)) return "No groups to expand or collapse";
+            return _nextToggleExpands ? "Expand all groups" : "Collapse all groups";
+        }
+    }
 
     public ObservableCollection<TagFilterEntryViewModel> AvailableTags => _availableTags;
 
@@ -1147,6 +1164,80 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
     }
 
+    private void ToggleExpandCollapseAll()
+    {
+        if (!CanToggleExpandCollapseAll) return;
+        if (_nextToggleExpands)
+        {
+            ExpandAllNodes();
+        }
+        else
+        {
+            CollapseAllNodes();
+        }
+
+        _nextToggleExpands = !_nextToggleExpands;
+        OnPropertyChanged(nameof(NextToggleExpands));
+        OnPropertyChanged(nameof(ExpandCollapseAllTooltip));
+    }
+
+    private void ExpandAllNodes()
+    {
+        foreach (var node in Flatten(Roots))
+        {
+            if (node.HasChildren && !node.IsDraft)
+            {
+                node.IsExpanded = true;
+                _expandedIds.Add(node.EntityId);
+            }
+        }
+    }
+
+    private void CollapseAllNodes()
+    {
+        var ancestorIds = _editingNode is not null
+            ? CollectEditingNodeAncestorIds(Roots, _editingNode)
+            : new HashSet<Guid>();
+        foreach (var node in Flatten(Roots))
+        {
+            if (node.HasChildren && !node.IsDraft && !ancestorIds.Contains(node.EntityId))
+            {
+                node.IsExpanded = false;
+                _expandedIds.Remove(node.EntityId);
+            }
+        }
+    }
+
+    private static HashSet<Guid> CollectEditingNodeAncestorIds(
+        IEnumerable<WorkspaceTreeNodeViewModel> roots, WorkspaceTreeNodeViewModel target)
+    {
+        var ancestors = new HashSet<Guid>();
+        FindAncestors(roots, target, ancestors);
+        return ancestors;
+    }
+
+    private static bool FindAncestors(
+        IEnumerable<WorkspaceTreeNodeViewModel> nodes,
+        WorkspaceTreeNodeViewModel target,
+        HashSet<Guid> ancestors)
+    {
+        foreach (var node in nodes)
+        {
+            if (ReferenceEquals(node, target))
+            {
+                return true;
+            }
+
+            if (FindAncestors(node.Children, target, ancestors))
+            {
+                ancestors.Add(node.EntityId);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private void RefreshProjection(bool captureExpanded = true)
     {
         if (captureExpanded && !IsFiltering)
@@ -1160,6 +1251,8 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             SelectedNode = null;
             OnPropertyChanged(nameof(HasVisibleResults));
             OnPropertyChanged(nameof(HasEmptyFilterResults));
+            OnPropertyChanged(nameof(CanToggleExpandCollapseAll));
+            OnPropertyChanged(nameof(ExpandCollapseAllTooltip));
             return;
         }
 
@@ -1173,6 +1266,8 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         ApplyClipboardState();
         OnPropertyChanged(nameof(HasVisibleResults));
         OnPropertyChanged(nameof(HasEmptyFilterResults));
+        OnPropertyChanged(nameof(CanToggleExpandCollapseAll));
+        OnPropertyChanged(nameof(ExpandCollapseAllTooltip));
     }
 
     private WorkspaceTreeNodeViewModel ToNode(WorkspaceTreeProjectionNode projected)
