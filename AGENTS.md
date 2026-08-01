@@ -55,7 +55,8 @@ Discover → Define module → Propose → Review → Apply → Verify → Learn
 ### Agent Assignment and Handoffs
 
 - Assign by capability, not by assuming all agents or models are interchangeable. Use a high-reasoning agent or human for discovery, specification, design review, ambiguous corrections, and final acceptance review.
-- Lower-cost agents may implement bounded tasks only from an approved, implementation-ready delivery package. Current suggested routing is Codex for high-value planning, review, and desktop work; Kimi K3 for complex specification/review in OpenCode; and GLM 5.2 for explicit implementation tasks. Model names are operational examples and may change.
+- Lower-cost agents may implement bounded tasks only from an approved, implementation-ready delivery package. Current suggested routing is Codex for high-value planning, review, and desktop work; Kimi K3 for coordination and final verification in OpenCode; GLM 5.2 for specification review; and DeepSeek v4 flash for bounded implementation. Model names are operational examples and may change.
+- An optional, project-scoped OpenCode agent loop lives in `.opencode/agents/`: the primary `fc-coordinator` orchestrates the `fc-spec-reviewer`, `fc-implementer`, and `fc-verifier` subagents. It is an alternative driver for the same OpenSpec lifecycle, artifacts, and gates described above — not a separate process — and is documented in `.opencode/README.md`.
 - A handoff names the change, required artifacts, exact task range, validation commands, prohibited scope expansion, and escalation conditions.
 - If implementation exposes a missing product, UX, data, architecture, or acceptance decision, stop the affected task and return the ambiguity for review. Do not guess.
 
