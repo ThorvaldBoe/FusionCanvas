@@ -122,6 +122,8 @@ FusionCanvas is in early active development. Current and candidate work is recor
 
 FusionCanvas uses a specification-first, rolling module development process.
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) to report bugs, request features, and understand how GitHub Issues complement OpenSpec.
+
 For meaningful changes, contributors and agents first define one cohesive delivery module, build shared understanding through discussion, and create an implementation-ready OpenSpec delivery package. Detailed planning is limited to the next module so later specifications do not become stale before use.
 
 One delivery module normally maps to one OpenSpec change. Its proposal is the module-level anchor, and the delta specs, design, tasks, and verification artifacts carry their respective details; a separate module-specification document is not created by default.

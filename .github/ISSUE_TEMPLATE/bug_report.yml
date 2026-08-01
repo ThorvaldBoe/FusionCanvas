@@ -1,0 +1,72 @@
+name: Bug report
+description: Report behavior that is broken or differs from the documented expectation.
+title: "[Bug]: "
+labels:
+  - "type: bug"
+  - "status: needs-triage"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve FusionCanvas.
+
+        **Do not include credentials, API keys, passwords, personal information, private workspace data, or other sensitive material in this public issue.** For a potential security vulnerability, do not open a public issue; use a private reporting channel instead.
+  - type: input
+    id: version
+    attributes:
+      label: FusionCanvas version or commit
+      description: Use the application version, release tag, or commit SHA when available.
+      placeholder: "e.g., 0.1.0 or abc1234"
+    validations:
+      required: true
+  - type: input
+    id: operating-system
+    attributes:
+      label: Operating system
+      placeholder: "e.g., Windows 11 24H2"
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      description: What did you expect FusionCanvas to do?
+    validations:
+      required: true
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual behavior
+      description: What happened instead? Include an error message only after removing sensitive information.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: Steps to reproduce
+      description: Give the smallest reliable sequence of steps that demonstrates the problem.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: How often does this happen?
+      options:
+        - Every time
+        - Often
+        - Sometimes
+        - Once
+        - I have not been able to reproduce it
+    validations:
+      required: true
+  - type: textarea
+    id: logs-and-screenshots
+    attributes:
+      label: Logs or screenshots (optional)
+      description: Attach only redacted material that can be shared publicly.
+    validations:
+      required: false
