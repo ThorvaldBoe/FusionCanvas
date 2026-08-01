@@ -39,6 +39,7 @@ Discover → Define module → Propose → Review → Apply → Verify → Learn
 - Spec deltas use `## ADDED / MODIFIED / REMOVED / RENAMED Requirements` sections. Accepted specs live in `openspec/specs/`; active work in `openspec/changes/`; history in `openspec/changes/archive/`.
 - Never edit `openspec/specs/` directly to change behavior. Change behavior through a change's delta specs, then sync and archive through the workflow.
 - Small maintenance work that does not alter accepted behavior (bug fixes, internal refactors, docs, dependency updates) may proceed without a proposal — see `openspec/specs/openspec-project-workflow/spec.md`.
+- GitHub Issues complement OpenSpec: use the relevant primary issue for report origin, triage, and delivery tracking, but use OpenSpec artifacts as the authority for significant behavior, acceptance criteria, design, verification, and archive. Follow `CONTRIBUTING.md` for labels, issue promotion, branch naming, and pull-request linking; do not invent behavior from an issue that has not been resolved through OpenSpec.
 
 ### Delivery Module Rules
 

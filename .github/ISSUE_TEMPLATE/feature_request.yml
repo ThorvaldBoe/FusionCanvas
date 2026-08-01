@@ -1,0 +1,55 @@
+name: Feature request
+description: Describe a problem or opportunity that FusionCanvas could address.
+title: "[Feature]: "
+labels:
+  - "type: feature"
+  - "status: needs-triage"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for sharing an idea.
+
+        Focus on the problem and desired outcome rather than prescribing an implementation. **Do not include credentials, personal information, private workspace data, or other sensitive material in this public issue.**
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What is difficult or impossible today, and who is affected?
+    validations:
+      required: true
+  - type: textarea
+    id: current-workaround
+    attributes:
+      label: Current workaround
+      description: How do you handle this today?
+    validations:
+      required: true
+  - type: textarea
+    id: desired-outcome
+    attributes:
+      label: Desired outcome
+      description: What would success look like?
+    validations:
+      required: true
+  - type: dropdown
+    id: affected-area
+    attributes:
+      label: Affected product area
+      options:
+        - Workspace and navigation
+        - Ideas and concepts
+        - Designs and mockups
+        - Listings and publishing preparation
+        - AI assistance
+        - Plugins and integrations
+        - Other or not sure
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Are there other approaches, tools, or workflows that address the problem?
+    validations:
+      required: true
