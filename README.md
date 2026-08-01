@@ -138,6 +138,16 @@ One module normally maps to one OpenSpec change. Requirements and conceptual/fun
 
 Higher-reasoning agents or humans handle discovery, specification, design review, and ambiguous corrections. Lower-cost agents can implement bounded tasks after the delivery package is approved and sufficiently explicit. Deterministic tests, including applicable Avalonia headless view tests, are the routine verification path on every agent. Live desktop testing is optional and may be used ad hoc for platform-specific or visual risks.
 
+### Agent-Assisted Workflows
+
+OpenSpec is the backbone of feature work regardless of which tool drives it. A delivery module can be executed in any of these equivalent ways:
+
+1. **Codex** with the shared OpenSpec skills in `.codex/skills/` (`openspec-explore`, `openspec-propose`, `openspec-apply-change`, `openspec-sync-specs`, `openspec-archive-change`).
+2. **OpenCode** with the same skills, registered through `opencode.json`.
+3. **OpenCode** with the project-scoped agent loop in `.opencode/agents/`: the `fc-coordinator` primary agent orchestrates the `fc-spec-reviewer`, `fc-implementer`, and `fc-verifier` subagents through bounded proposal, implementation, and verification loops.
+
+All three produce and consume the same OpenSpec artifacts and honor the same approval and archive gates, so work can move freely between Codex and OpenCode. See [.opencode/README.md](.opencode/README.md) for the agent loop details.
+
 The original LifeOS planning files remain under `docs/LifeOS` as optional, potentially stale historical reference. They are not required reading, a current roadmap, or acceptance authority.
 
 ## Repository Structure
