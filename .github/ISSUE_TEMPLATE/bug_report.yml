@@ -15,10 +15,8 @@ body:
     id: version
     attributes:
       label: FusionCanvas version or commit
-      description: Use the application version, release tag, or commit SHA when available.
+      description: Optional, but useful when available. Use the application version, release tag, or commit SHA.
       placeholder: "e.g., 0.1.0 or abc1234"
-    validations:
-      required: true
   - type: input
     id: operating-system
     attributes:
