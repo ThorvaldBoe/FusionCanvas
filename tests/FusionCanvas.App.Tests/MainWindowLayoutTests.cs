@@ -159,6 +159,101 @@ public class MainWindowLayoutTests
         var gap = statusSelector.Bounds.Left - stageLabel!.Bounds.Right;
         Assert.True(gap >= 4, $"Expected header gap >= 4px, got {gap}px.");
     }
+
+    [AvaloniaFact]
+    public void TreeActionsToolbar_IsBetweenFilterAreaAndWorkspaceTree()
+    {
+        using var fixture = new MainWindowFixture();
+
+        var toolbar = fixture.FindControl<Border>(b => b.Name == "TreeActionsToolbar");
+        var searchBox = fixture.FindControl<TextBox>(tb => tb.Name == "TreeSearchBox");
+        var tree = fixture.FindControl<TreeView>(tv => tv.Name == "WorkspaceTreeControl");
+
+        Assert.NotNull(toolbar);
+        Assert.True(toolbar.IsVisible);
+        Assert.NotNull(searchBox);
+        Assert.NotNull(tree);
+
+        // Find the common parent DockPanel
+        var dockPanel = toolbar.Parent as DockPanel;
+        Assert.NotNull(dockPanel);
+        var dockChildren = dockPanel.Children.ToList();
+
+        // Find filter area as the nearest DockPanel child ancestor of searchBox
+        var filterArea = searchBox.GetVisualAncestors()
+            .OfType<Control>()
+            .FirstOrDefault(a => dockChildren.IndexOf(a) >= 0);
+        Assert.NotNull(filterArea);
+
+        // Find the tree's wrapping container (a Grid that is a DockPanel child)
+        var treeContainer = tree.GetVisualAncestors()
+            .OfType<Control>()
+            .FirstOrDefault(a => dockChildren.IndexOf(a) >= 0);
+        Assert.NotNull(treeContainer);
+
+        var filterIndex = dockChildren.IndexOf(filterArea);
+        var toolbarIndex = dockChildren.IndexOf(toolbar);
+        var treeContainerIndex = dockChildren.IndexOf(treeContainer);
+
+        Assert.True(filterIndex >= 0, "Filter area not found in DockPanel");
+        Assert.True(toolbarIndex >= 0, "Toolbar not found in DockPanel");
+        Assert.True(treeContainerIndex >= 0, "Tree container not found in DockPanel");
+        Assert.True(toolbarIndex > filterIndex, "Toolbar should appear after filter area");
+        Assert.True(treeContainerIndex > toolbarIndex, "Tree container should appear after toolbar");
+    }
+
+    [AvaloniaFact]
+    public void ExpandCollapseAllButton_TracksViewModelState()
+    {
+        using var fixture = new MainWindowFixture();
+
+        var button = fixture.FindControl<Button>(b => b.Name == "ExpandCollapseAllButton");
+        var vm = fixture.ViewModel.WorkspaceTree;
+
+        Assert.NotNull(button);
+        Assert.True(button.IsEnabled);
+
+        // Tooltip and automation name match the view model's default tooltip
+        var tooltip = ToolTip.GetTip(button) as string;
+        var automationName = AutomationProperties.GetName(button);
+        Assert.Equal(vm.ExpandCollapseAllTooltip, tooltip);
+        Assert.Equal(vm.ExpandCollapseAllTooltip, automationName);
+        Assert.Equal("Expand all groups", tooltip);
+
+        // Find the two PathIcons inside the button's Grid content
+        var iconPanel = button.GetVisualDescendants().OfType<Grid>()
+            .FirstOrDefault(g => g.Children.OfType<PathIcon>().Count() == 2);
+        Assert.NotNull(iconPanel);
+        var icons = iconPanel.Children.OfType<PathIcon>().ToList();
+        Assert.Equal(2, icons.Count);
+        Assert.True(icons[0].IsVisible);  // expand icon visible when NextToggleExpands is true
+        Assert.False(icons[1].IsVisible); // collapse icon hidden
+
+        // Toggle via command
+        vm.ToggleExpandCollapseAllCommand.Execute(null);
+        fixture.PumpLayout();
+
+        tooltip = ToolTip.GetTip(button) as string;
+        automationName = AutomationProperties.GetName(button);
+        Assert.Equal("Collapse all groups", tooltip);
+        Assert.Equal("Collapse all groups", automationName);
+
+        // After toggle, icons swap visibility
+        Assert.False(icons[0].IsVisible);
+        Assert.True(icons[1].IsVisible);
+
+        // Enablement: set filter to disable
+        vm.QueryText = "non-existent";
+        fixture.PumpLayout();
+        Assert.False(button.IsEnabled);
+        tooltip = ToolTip.GetTip(button) as string;
+        Assert.Equal("Filtering already expands all groups", tooltip);
+        Assert.Equal("Filtering already expands all groups", AutomationProperties.GetName(button));
+
+        vm.QueryText = string.Empty;
+        fixture.PumpLayout();
+        Assert.True(button.IsEnabled);
+    }
 }
 
 public class MainWindowInputTests

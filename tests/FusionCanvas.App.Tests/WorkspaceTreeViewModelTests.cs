@@ -522,6 +522,243 @@ public class WorkspaceTreeViewModelTests
         Assert.Equal("IdeaDraft", filtered[0].Name);
     }
 
+    // --- Tree-actions toolbar: expand/collapse-all toggle behavior ---
+
+    [Fact]
+    public void DefaultState_ToggleIsExpandAllAndEnabled()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var repository = new TestRepository(sample.Snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+
+        Assert.True(viewModel.NextToggleExpands);
+        Assert.Equal("Expand all groups", viewModel.ExpandCollapseAllTooltip);
+        Assert.True(viewModel.CanToggleExpandCollapseAll);
+    }
+
+    [Fact]
+    public void FirstToggle_ExpandsEveryTopicNodeIncludingNestedLevels()
+    {
+        var (snapshot, store, _, _, _) = CreateNestedSample();
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(store.Id, snapshot);
+
+        // All topic nodes start collapsed
+        var allNodes = FlattenNodes(viewModel.Roots).ToArray();
+        foreach (var node in allNodes.Where(n => n.HasChildren))
+        {
+            Assert.False(node.IsExpanded);
+        }
+
+        viewModel.ToggleExpandCollapseAllCommand.Execute(null);
+
+        // After toggle, every topic node with children is expanded
+        foreach (var node in allNodes.Where(n => n.HasChildren))
+        {
+            Assert.True(node.IsExpanded, $"Expected {node.Name} to be expanded");
+        }
+    }
+
+    [Fact]
+    public void SecondToggle_CollapsesEveryTopicNode()
+    {
+        var (snapshot, store, _, _, _) = CreateNestedSample();
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(store.Id, snapshot);
+
+        viewModel.ToggleExpandCollapseAllCommand.Execute(null); // expand all
+        viewModel.ToggleExpandCollapseAllCommand.Execute(null); // collapse all
+
+        var allNodes = FlattenNodes(viewModel.Roots).ToArray();
+        foreach (var node in allNodes.Where(n => n.HasChildren))
+        {
+            Assert.False(node.IsExpanded, $"Expected {node.Name} to be collapsed");
+        }
+    }
+
+    [Fact]
+    public void RememberedState_ManualCollapseDoesNotRedirectToggle()
+    {
+        var (snapshot, store, _, group, _) = CreateNestedSample();
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(store.Id, snapshot);
+
+        // Expand all
+        viewModel.ToggleExpandCollapseAllCommand.Execute(null);
+        Assert.Equal("Collapse all groups", viewModel.ExpandCollapseAllTooltip);
+
+        // Manually collapse one node (the group which has a child subgroup)
+        var groupNode = FlattenNodes(viewModel.Roots).First(n => n.EntityId == group.Id);
+        Assert.True(groupNode.HasChildren);
+        groupNode.IsExpanded = false;
+
+        // Toggle again — still performs collapse (remembered state)
+        viewModel.ToggleExpandCollapseAllCommand.Execute(null);
+
+        var allNodes = FlattenNodes(viewModel.Roots).ToArray();
+        foreach (var node in allNodes.Where(n => n.HasChildren))
+        {
+            Assert.False(node.IsExpanded, $"Expected {node.Name} to be collapsed after remembered-state toggle");
+        }
+    }
+
+    [Fact]
+    public async Task ToggleExpansion_SurvivesTreeRefresh()
+    {
+        var (snapshot, store, _, _, _) = CreateNestedSample();
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(store.Id, snapshot);
+
+        viewModel.ToggleExpandCollapseAllCommand.Execute(null);
+
+        // Reload (rebuilds projection)
+        await viewModel.ReloadAsync();
+
+        var allNodes = FlattenNodes(viewModel.Roots).ToArray();
+        foreach (var node in allNodes.Where(n => n.HasChildren))
+        {
+            Assert.True(node.IsExpanded, $"Expected {node.Name} to remain expanded after refresh");
+        }
+    }
+
+    [Fact]
+    public void FilterActive_DisablesToggleAndShowsFilterTooltip()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var repository = new TestRepository(sample.Snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+
+        Assert.True(viewModel.CanToggleExpandCollapseAll);
+
+        viewModel.QueryText = "non-existent";
+
+        Assert.False(viewModel.CanToggleExpandCollapseAll);
+        Assert.Equal("Filtering already expands all groups", viewModel.ExpandCollapseAllTooltip);
+
+        viewModel.QueryText = string.Empty;
+
+        Assert.True(viewModel.CanToggleExpandCollapseAll);
+        Assert.Equal("Expand all groups", viewModel.ExpandCollapseAllTooltip);
+    }
+
+    [Fact]
+    public void NoExpandableNodes_DisablesToggleWithNoGroupsTooltip()
+    {
+        var sample = Sample.Create(withGroup: false);
+        var repository = new TestRepository(sample.Snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+
+        Assert.False(viewModel.CanToggleExpandCollapseAll);
+        Assert.Equal("No groups to expand or collapse", viewModel.ExpandCollapseAllTooltip);
+    }
+
+    [Fact]
+    public async Task CollapseAll_ProtectsDraftAncestorChain()
+    {
+        var (snapshot, store, _, group, subGroup, unrelatedNiche, unrelatedGroup) = CreateNestedSampleWithUnrelatedBranch();
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(store.Id, snapshot);
+
+        // Expand all so tree is fully expanded
+        viewModel.ToggleExpandCollapseAllCommand.Execute(null);
+
+        // Verify unrelated branch is expanded before collapse
+        var unrelatedNicheNode = viewModel.Roots.Single(n => n.EntityId == unrelatedNiche.Id);
+        var unrelatedGroupNode = FlattenNodes(viewModel.Roots).First(n => n.EntityId == unrelatedGroup.Id);
+        Assert.True(unrelatedNicheNode.IsExpanded, "Unrelated niche should be expanded before collapse");
+        Assert.True(unrelatedGroupNode.IsExpanded, "Unrelated group should be expanded before collapse");
+
+        // Begin create on the subgroup to set up a draft
+        var subGroupNode = FlattenNodes(viewModel.Roots).First(n => n.EntityId == subGroup.Id);
+        viewModel.SelectNodeCommand.Execute(subGroupNode);
+        await viewModel.BeginCreateAsync();
+
+        // Verify draft is in editing state
+        Assert.NotNull(viewModel.SelectedNode);
+        Assert.True(viewModel.SelectedNode!.IsEditing);
+
+        // Now collapse all — the draft's ancestors should stay expanded,
+        // but unrelated branches should collapse
+        viewModel.ToggleExpandCollapseAllCommand.Execute(null);
+
+        // The draft's parent chain (subgroup -> group -> niche) should be expanded
+        var nicheNode = viewModel.Roots.Single(n => n.EntityId == store.DefaultNicheId);
+        Assert.True(nicheNode.IsExpanded, "Niche (draft ancestor) should stay expanded");
+
+        var groupNode = nicheNode.Children.Single(n => n.EntityId == group.Id);
+        Assert.True(groupNode.IsExpanded, "Group (draft ancestor) should stay expanded");
+
+        var draftParentNode = groupNode.Children.Single(n => n.EntityId == subGroup.Id);
+        Assert.True(draftParentNode.IsExpanded, "Subgroup (draft parent) should stay expanded");
+
+        // Unrelated branch nodes must be collapsed
+        Assert.False(unrelatedNicheNode.IsExpanded, "Unrelated niche should be collapsed after collapse-all");
+        Assert.False(unrelatedGroupNode.IsExpanded, "Unrelated group should be collapsed after collapse-all");
+
+        // The draft node itself (which has no children) was never expanded, verify editing
+        Assert.True(viewModel.SelectedNode!.IsEditing, "Draft should remain in editing state");
+    }
+
+    private static (WorkspaceSnapshot Snapshot, Store Store, Niche Niche, TopicGroup Group, TopicGroup SubGroup) CreateNestedSample()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var storeId = Guid.NewGuid();
+        var nicheId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var subGroupId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+
+        var store = new Store(storeId, "Store", null, false, now, now, "{}", nicheId);
+        var niche = new Niche(nicheId, storeId, "Coffee", null, false, now, now, "{}");
+        var group = new TopicGroup(groupId, storeId, nicheId, null, "Campaign", null, false, now, now, "{}");
+        var subGroup = new TopicGroup(subGroupId, storeId, null, groupId, "Sub-campaign", null, false, now, now, "{}");
+        var item = new Item(itemId, storeId, nicheId, subGroupId, "Item", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+
+        var snapshot = new WorkspaceSnapshot([store], [niche], [group, subGroup], [item], [], [], [], [], []);
+        return (snapshot, store, niche, group, subGroup);
+    }
+
+    private static (WorkspaceSnapshot Snapshot, Store Store, Niche Niche, TopicGroup Group, TopicGroup SubGroup, Niche UnrelatedNiche, TopicGroup UnrelatedGroup) CreateNestedSampleWithUnrelatedBranch()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var storeId = Guid.NewGuid();
+        var nicheId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var subGroupId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var unrelatedNicheId = Guid.NewGuid();
+        var unrelatedGroupId = Guid.NewGuid();
+        var unrelatedItemId = Guid.NewGuid();
+
+        var store = new Store(storeId, "Store", null, false, now, now, "{}", nicheId);
+        var niche = new Niche(nicheId, storeId, "Coffee", null, false, now, now, "{}");
+        var group = new TopicGroup(groupId, storeId, nicheId, null, "Campaign", null, false, now, now, "{}");
+        var subGroup = new TopicGroup(subGroupId, storeId, null, groupId, "Sub-campaign", null, false, now, now, "{}");
+        var item = new Item(itemId, storeId, nicheId, subGroupId, "Item", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var unrelatedNiche = new Niche(unrelatedNicheId, storeId, "Tea", null, false, now, now, "{}");
+        var unrelatedGroup = new TopicGroup(unrelatedGroupId, storeId, unrelatedNicheId, null, "Tea Group", null, false, now, now, "{}");
+        var unrelatedItem = new Item(unrelatedItemId, storeId, unrelatedNicheId, unrelatedGroupId, "Tea Item", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+
+        var snapshot = new WorkspaceSnapshot(
+            [store],
+            [niche, unrelatedNiche],
+            [group, subGroup, unrelatedGroup],
+            [item, unrelatedItem],
+            [], [], [], [], []);
+        return (snapshot, store, niche, group, subGroup, unrelatedNiche, unrelatedGroup);
+    }
+
+    private static IEnumerable<WorkspaceTreeNodeViewModel> FlattenNodes(IEnumerable<WorkspaceTreeNodeViewModel> nodes) =>
+        nodes.SelectMany(node => new[] { node }.Concat(FlattenNodes(node.Children)));
+
     private sealed class TestRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
     {
         public WorkspaceSnapshot Snapshot { get; private set; } = snapshot;
