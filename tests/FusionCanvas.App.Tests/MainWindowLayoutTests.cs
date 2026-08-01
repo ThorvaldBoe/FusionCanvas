@@ -120,6 +120,22 @@ public class MainWindowLayoutTests
     }
 
     [AvaloniaFact]
+    public void DetailsColumn_ReservesAGutterBetweenContentAndVerticalScrollbar()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.PumpLayout();
+
+        var scroller = fixture.FindControl<ScrollViewer>(sv =>
+            sv.IsVisible
+            && sv.Content is StackPanel
+            && sv.VerticalScrollBarVisibility == ScrollBarVisibility.Auto);
+
+        Assert.True(scroller.Padding.Right >= 16,
+            $"Expected details content to reserve at least 16px beside the scrollbar, got {scroller.Padding.Right}px.");
+    }
+
+    [AvaloniaFact]
     public void FilterControls_StayWithinPaneAtMinimumWidth()
     {
         using var fixture = new MainWindowFixture(width: 900, height: 600);
