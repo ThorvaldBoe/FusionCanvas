@@ -5,6 +5,7 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
 using Avalonia.VisualTree;
+using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Views;
 using FusionCanvas.Domain.Workflow;
 
@@ -101,6 +102,26 @@ public class MainWindowConstructionTests
 
 public class MainWindowLayoutTests
 {
+    [AvaloniaFact]
+    public void TreeExpanders_ProvideAFullyClickableRowHeightTarget()
+    {
+        using var fixture = new MainWindowFixture();
+
+        var expanders = fixture.Window.GetVisualDescendants()
+            .OfType<ToggleButton>()
+            .Where(button => button.DataContext is WorkspaceTreeNodeViewModel { HasChildren: true })
+            .ToList();
+
+        Assert.NotEmpty(expanders);
+        Assert.All(expanders, expander =>
+        {
+            Assert.True(expander.Bounds.Width >= 24,
+                $"Expected tree expander width >= 24px, got {expander.Bounds.Width}px.");
+            Assert.True(expander.Bounds.Height >= 34,
+                $"Expected tree expander height >= 34px, got {expander.Bounds.Height}px.");
+        });
+    }
+
     [AvaloniaFact]
     public void DetailsColumn_ScrollsWhenContentExceedsMinimumHeight()
     {
