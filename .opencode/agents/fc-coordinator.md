@@ -12,8 +12,22 @@ permission:
     "git status*": allow
     "git diff*": allow
     "git log*": allow
+    "git show*": allow
+    "git blame*": allow
+    "git rev-parse*": allow
+    "git ls-files*": allow
+    "git branch --show-current*": allow
     "dotnet build*": allow
     "dotnet test*": allow
+    "dotnet restore*": allow
+    "dotnet clean*": allow
+    "dotnet list*": allow
+    "dotnet --*": allow
+    "Get-*": allow
+    "Test-Path*": allow
+    "Resolve-Path*": allow
+    "echo *": allow
+    "rg *": allow
   task:
     "*": deny
     fc-spec-reviewer: allow

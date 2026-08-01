@@ -9,14 +9,30 @@ permission:
   edit: allow
   bash:
     "*": ask
-    "openspec status*": allow
-    "openspec instructions*": allow
     "openspec list*": allow
+    "openspec status*": allow
+    "openspec show*": allow
+    "openspec instructions*": allow
     "openspec validate*": allow
-    "dotnet build*": allow
-    "dotnet test*": allow
     "git status*": allow
     "git diff*": allow
+    "git log*": allow
+    "git show*": allow
+    "git blame*": allow
+    "git rev-parse*": allow
+    "git ls-files*": allow
+    "git branch --show-current*": allow
+    "dotnet build*": allow
+    "dotnet test*": allow
+    "dotnet restore*": allow
+    "dotnet clean*": allow
+    "dotnet list*": allow
+    "dotnet --*": allow
+    "Get-*": allow
+    "Test-Path*": allow
+    "Resolve-Path*": allow
+    "echo *": allow
+    "rg *": allow
   task: deny
   skill:
     "*": deny
