@@ -7,6 +7,8 @@ permission:
   glob: allow
   grep: allow
   edit: allow
+  external_directory:
+    "*/FusionCanvas-*/**": allow
   bash:
     "*": ask
     "openspec list*": allow
@@ -22,6 +24,15 @@ permission:
     "git rev-parse*": allow
     "git ls-files*": allow
     "git branch --show-current*": allow
+    "git show-ref*": allow
+    "git for-each-ref*": allow
+    "git merge-base*": allow
+    "git describe*": allow
+    "git rev-list*": allow
+    "git config --get*": allow
+    "git remote -v*": allow
+    "git remote show*": allow
+    "git fetch*": allow
     "dotnet build*": allow
     "dotnet test*": allow
     "dotnet restore*": allow
@@ -31,6 +42,18 @@ permission:
     "Get-*": allow
     "Test-Path*": allow
     "Resolve-Path*": allow
+    "Select-Object*": allow
+    "Select-String*": allow
+    "Where-Object*": allow
+    "Sort-Object*": allow
+    "Measure-Object*": allow
+    "Group-Object*": allow
+    "Compare-Object*": allow
+    "Format-Table*": allow
+    "Format-List*": allow
+    "Out-String*": allow
+    "ConvertTo-Json*": allow
+    "ConvertFrom-Json*": allow
     "echo *": allow
     "rg *": allow
   task: deny
