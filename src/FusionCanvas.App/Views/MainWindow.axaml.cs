@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
@@ -34,12 +35,14 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        WorkspaceTreeControl.AddHandler(PointerPressedEvent, OnWorkspaceTreePointerPressed, RoutingStrategies.Tunnel);
     }
 
     public MainWindow(AppServices services)
     {
         ArgumentNullException.ThrowIfNull(services);
         InitializeComponent();
+        WorkspaceTreeControl.AddHandler(PointerPressedEvent, OnWorkspaceTreePointerPressed, RoutingStrategies.Tunnel);
         var viewModel = MainWindowViewModel.CreateForDefaultWorkspace(
             services.Settings,
             services.AiTextGeneration);
@@ -258,6 +261,38 @@ public partial class MainWindow : Window
             _dragNode = node;
             _dragStart = point.Position;
         }
+    }
+
+    private void OnWorkspaceTreePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not TreeView ||
+            !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed ||
+            e.Source is not Visual source ||
+            source is ToggleButton ||
+            source.GetVisualAncestors().OfType<ToggleButton>().Any())
+        {
+            return;
+        }
+
+        var expander = ((TreeView)sender).GetVisualDescendants()
+            .OfType<ToggleButton>()
+            .Select(button => new { Button = button, Node = button.DataContext as WorkspaceTreeNodeViewModel })
+            .FirstOrDefault(candidate => candidate.Node is { HasChildren: true } && IsWithinExpanderHitTarget(e, candidate.Button));
+        if (expander?.Node is { } node)
+        {
+            node.IsExpanded = !node.IsExpanded;
+            e.Handled = true;
+        }
+    }
+
+    private static bool IsWithinExpanderHitTarget(PointerPressedEventArgs e, ToggleButton expander)
+    {
+        const double ExpanderHitTargetSize = 32;
+        var position = e.GetPosition(expander);
+        var horizontalPadding = Math.Max(0, (ExpanderHitTargetSize - expander.Bounds.Width) / 2);
+        var verticalPadding = Math.Max(0, (ExpanderHitTargetSize - expander.Bounds.Height) / 2);
+        return position.X >= -horizontalPadding && position.X <= expander.Bounds.Width + horizontalPadding &&
+               position.Y >= -verticalPadding && position.Y <= expander.Bounds.Height + verticalPadding;
     }
 
     private async void OnTreeNodePointerMoved(object? sender, PointerEventArgs e)

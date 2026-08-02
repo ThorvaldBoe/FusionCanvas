@@ -1324,12 +1324,6 @@
       <Setter Property="Padding" Value="0" />
       <Setter Property="Margin" Value="0,1" />
     </Style>
-    <Style Selector="TreeViewItem /template/ ToggleButton">
-      <Setter Property="Width" Value="24" />
-      <Setter Property="Height" Value="34" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-      <Setter Property="VerticalContentAlignment" Value="Center" />
-    </Style>
     <Style Selector="Border.treeRow">
       <Setter Property="Padding" Value="5,2" />
       <Setter Property="CornerRadius" Value="4" />
