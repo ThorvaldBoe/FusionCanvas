@@ -7,6 +7,7 @@
         xmlns:stageTools="clr-namespace:FusionCanvas.App.StageTools"
         xmlns:workspace="clr-namespace:FusionCanvas.App.Workspace"
         xmlns:views="clr-namespace:FusionCanvas.App.Views"
+        xmlns:cref="clr-namespace:FusionCanvas.App.ConceptRefinement"
         xmlns:appWorkflowNav="clr-namespace:FusionCanvas.Application.WorkflowNavigation;assembly=FusionCanvas.Application"
         xmlns:appItems="clr-namespace:FusionCanvas.Application.Items;assembly=FusionCanvas.Application"
         xmlns:appGroups="clr-namespace:FusionCanvas.Application.Groups;assembly=FusionCanvas.Application"
@@ -709,18 +710,182 @@
                                  FontSize="11"
                                  Foreground="{DynamicResource SecondaryTextBrush}" />
                       <TextBox Text="{Binding ItemInspector.GraphicDirection}"
-                               IsReadOnly="{Binding !ItemInspector.CanEditStage}"
-                               AcceptsReturn="True"
-                               MinHeight="64"
-                               PlaceholderText="Visual direction supporting this concept"
-                               AutomationProperties.Name="Graphics description"
-                               LostFocus="OnDetailsFieldLostFocus" />
+                                IsReadOnly="{Binding !ItemInspector.CanEditStage}"
+                                AcceptsReturn="True"
+                                MinHeight="64"
+                                PlaceholderText="Visual direction supporting this concept"
+                                AutomationProperties.Name="Graphics description"
+                                LostFocus="OnDetailsFieldLostFocus" />
                       <TextBlock IsVisible="{Binding !ItemInspector.CanEditStage}"
                                  Text="{Binding ItemInspector.StageReadOnlyReason}"
                                  TextWrapping="Wrap"
                                  FontSize="12"
                                  Foreground="{DynamicResource DangerTextBrush}" />
-                    </StackPanel>
+
+                      <!-- Concept refinement section -->
+                      <Separator Margin="0,4"
+                                 IsVisible="{Binding ShowsConceptStageTool}" />
+                      <TextBlock Text="Refine with AI"
+                                 FontSize="13"
+                                 FontWeight="SemiBold"
+                                 Foreground="{DynamicResource StrongTextBrush}"
+                                 IsVisible="{Binding ShowsConceptStageTool}" />
+                      <TextBlock Text="{Binding ConceptRefinement.UnavailableReason}"
+                                 IsVisible="{Binding ConceptRefinement.UnavailableReason, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                 TextWrapping="Wrap"
+                                 FontSize="11"
+                                 Foreground="{DynamicResource DangerTextBrush}" />
+
+                      <!-- VR-001: Inline error -->
+                      <TextBlock Text="{Binding ConceptRefinement.ErrorMessage}"
+                                 IsVisible="{Binding ConceptRefinement.HasError}"
+                                 TextWrapping="Wrap"
+                                 FontSize="11"
+                                 Foreground="{DynamicResource DangerTextBrush}" />
+
+                      <!-- Initialize button -->
+                      <Button Content="Initialize from base idea&#x2026;"
+                              IsEnabled="{Binding ConceptRefinement.CanInitialize}"
+                              IsVisible="{Binding ShowsConceptStageTool}"
+                              AutomationProperties.Name="Initialize from base idea"
+                              Command="{Binding ConceptRefinement.InitializeCommand}"
+                              ToolTip.Tip="{Binding ConceptRefinement.InitializeDisabledReason}"
+                              ToolTip.ShowOnDisabled="True" />
+
+                      <!-- VR-009: Visible guidance when Initialize is disabled -->
+                      <TextBlock Text="{Binding ConceptRefinement.InitializeDisabledReason}"
+                                 IsVisible="{Binding ConceptRefinement.InitializeDisabledReason, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                 TextWrapping="Wrap"
+                                 FontSize="11"
+                                 Foreground="{DynamicResource DangerTextBrush}" />
+
+                      <!-- Per-corner action rows -->
+                      <StackPanel Spacing="6"
+                                  IsVisible="{Binding ShowsConceptStageTool}">
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto"
+                              ColumnSpacing="4">
+                          <TextBlock Grid.Column="0"
+                                     Text="Concept idea:"
+                                     FontSize="11"
+                                     Foreground="{DynamicResource SecondaryTextBrush}"
+                                     VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="1"
+                                     Text="{Binding ItemInspector.ConceptIdea, StringFormat='{}{0}'}"
+                                     FontSize="11"
+                                     Foreground="{DynamicResource PrimaryTextBrush}"
+                                     VerticalAlignment="Center"
+                                     TextTrimming="CharacterEllipsis"
+                                     MaxWidth="180" />
+                          <Button Grid.Column="2"
+                                  Content="Fine tune"
+                                  IsEnabled="{Binding ConceptRefinement.CanFineTuneConceptIdea}"
+                                  Command="{Binding ConceptRefinement.FineTuneConceptIdeaCommand}"
+                                  AutomationProperties.Name="Fine tune Concept idea"
+                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}"
+                                  ToolTip.ShowOnDisabled="True" />
+                          <Button Grid.Column="3"
+                                  Content="Change"
+                                  IsEnabled="{Binding ConceptRefinement.CanChangeConceptIdea}"
+                                  Command="{Binding ConceptRefinement.ChangeConceptIdeaCommand}"
+                                  AutomationProperties.Name="Change Concept idea"
+                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}"
+                                  ToolTip.ShowOnDisabled="True" />
+                        </Grid>
+
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto"
+                              ColumnSpacing="4">
+                          <TextBlock Grid.Column="0"
+                                     Text="Phrase:"
+                                     FontSize="11"
+                                     Foreground="{DynamicResource SecondaryTextBrush}"
+                                     VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="1"
+                                     Text="{Binding ItemInspector.Phrase, StringFormat='{}{0}'}"
+                                     FontSize="11"
+                                     Foreground="{DynamicResource PrimaryTextBrush}"
+                                     VerticalAlignment="Center"
+                                     TextTrimming="CharacterEllipsis"
+                                     MaxWidth="180" />
+                          <Button Grid.Column="2"
+                                  Content="Fine tune"
+                                  IsEnabled="{Binding ConceptRefinement.CanFineTunePhrase}"
+                                  Command="{Binding ConceptRefinement.FineTunePhraseCommand}"
+                                  AutomationProperties.Name="Fine tune Phrase"
+                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}"
+                                  ToolTip.ShowOnDisabled="True" />
+                          <Button Grid.Column="3"
+                                  Content="Change"
+                                  IsEnabled="{Binding ConceptRefinement.CanChangePhrase}"
+                                  Command="{Binding ConceptRefinement.ChangePhraseCommand}"
+                                  AutomationProperties.Name="Change Phrase"
+                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}"
+                                  ToolTip.ShowOnDisabled="True" />
+                        </Grid>
+
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto"
+                              ColumnSpacing="4">
+                          <TextBlock Grid.Column="0"
+                                     Text="Graphic:"
+                                     FontSize="11"
+                                     Foreground="{DynamicResource SecondaryTextBrush}"
+                                     VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="1"
+                                     Text="{Binding ItemInspector.GraphicDirection, StringFormat='{}{0}'}"
+                                     FontSize="11"
+                                     Foreground="{DynamicResource PrimaryTextBrush}"
+                                     VerticalAlignment="Center"
+                                     TextTrimming="CharacterEllipsis"
+                                     MaxWidth="180" />
+                          <Button Grid.Column="2"
+                                  Content="Fine tune"
+                                  IsEnabled="{Binding ConceptRefinement.CanFineTuneGraphicDirection}"
+                                  Command="{Binding ConceptRefinement.FineTuneGraphicDirectionCommand}"
+                                  AutomationProperties.Name="Fine tune Graphic direction"
+                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}"
+                                  ToolTip.ShowOnDisabled="True" />
+                          <Button Grid.Column="3"
+                                  Content="Change"
+                                  IsEnabled="{Binding ConceptRefinement.CanChangeGraphicDirection}"
+                                  Command="{Binding ConceptRefinement.ChangeGraphicDirectionCommand}"
+                                  AutomationProperties.Name="Change Graphic direction"
+                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}"
+                                  ToolTip.ShowOnDisabled="True" />
+                        </Grid>
+                      </StackPanel>
+
+                      <!-- Score -->
+                      <TextBlock IsVisible="{Binding ShowsConceptStageTool}"
+                                 FontSize="11"
+                                 Foreground="{DynamicResource SecondaryTextBrush}">
+                        <Run Text="Triangle completeness: " />
+                        <Run Text="{Binding ConceptRefinement.Score}" />
+                        <Run Text="%" />
+                      </TextBlock>
+
+                      <!-- VR-007c: Busy indicator -->
+                      <TextBlock Text="Refinement in progress&#x2026;"
+                                 IsVisible="{Binding ConceptRefinement.IsBusy}"
+                                 FontSize="11"
+                                 Foreground="{DynamicResource SecondaryTextBrush}" />
+
+                      <!-- VR-007a/007d: History list, hidden when empty, disabled in read-only -->
+                      <ListBox ItemsSource="{Binding ConceptRefinement.History}"
+                               IsVisible="{Binding ConceptRefinement.HasHistory}"
+                               IsEnabled="{Binding ItemInspector.CanEditStage}"
+                               MaxHeight="160"
+                               ScrollViewer.VerticalScrollBarVisibility="Auto"
+                               SelectionMode="Single"
+                               SelectedItem="{Binding ConceptRefinement.SelectedHistoryEntry, Mode=TwoWay}"
+                               SelectedIndex="{Binding ConceptRefinement.CurrentEntryIndex, Mode=OneWay}">
+                        <ListBox.ItemTemplate>
+                          <DataTemplate x:DataType="cref:ConceptRefinementHistoryEntry">
+                            <TextBlock Text="{Binding Label}"
+                                       FontSize="11"
+                                       TextTrimming="CharacterEllipsis" />
+                          </DataTemplate>
+                        </ListBox.ItemTemplate>
+                      </ListBox>
+                     </StackPanel>
                   </Border>
 
                   <Border Padding="14"
