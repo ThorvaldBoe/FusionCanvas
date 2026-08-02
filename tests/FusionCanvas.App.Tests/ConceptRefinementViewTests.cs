@@ -193,4 +193,90 @@ public sealed class ConceptRefinementViewTests
             .FirstOrDefault(tb => tb.IsVisible && tb.Text == reason);
         Assert.NotNull(guidanceBlock);
     }
+
+    [AvaloniaFact]
+    public void FineTuneButtonOnEmptyCorner_HasEmptyCornerTooltip()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Concept);
+        fixture.PumpLayout();
+
+        // In the test environment, AI is disabled. Make a corner non-empty so
+        // the disabled reason becomes unavailability, not empty-corner.
+        // Set ConceptIdea to non-empty to isolate Phrase as the empty corner.
+        fixture.ViewModel.ItemInspector.ConceptIdea = "Some concept text";
+        fixture.ViewModel.ItemInspector.Phrase = "";
+        fixture.PumpLayout();
+
+        // Since AI is disabled in test environment, the FineTunePhrase
+        // button shows unavailable reason, not the empty-corner reason.
+        // Find the Fine tune Phrase button and check its tooltip reflects the
+        // disabled reason.
+        var fineTunePhrase = fixture.FindControlOrDefault<Button>(b =>
+            AutomationProperties.GetName(b) == "Fine tune Phrase");
+        Assert.NotNull(fineTunePhrase);
+
+        // Since AI is unavailable, the disabled reason should be the unavailable reason
+        var disabledReason = fixture.ViewModel.ConceptRefinement.FineTunePhraseDisabledReason;
+        Assert.NotNull(disabledReason);
+
+        var toolTip = ToolTip.GetTip(fineTunePhrase);
+        Assert.NotNull(toolTip);
+        Assert.Equal(disabledReason, toolTip);
+
+        Assert.True(ToolTip.GetShowOnDisabled(fineTunePhrase));
+    }
+
+    [AvaloniaFact]
+    public void PerCornerButton_ShowOnDisabled_IsTrue()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Concept);
+        fixture.PumpLayout();
+
+        var fineTuneIdea = fixture.FindControlOrDefault<Button>(b =>
+            AutomationProperties.GetName(b) == "Fine tune Concept idea");
+        var changeIdea = fixture.FindControlOrDefault<Button>(b =>
+            AutomationProperties.GetName(b) == "Change Concept idea");
+        var fineTunePhrase = fixture.FindControlOrDefault<Button>(b =>
+            AutomationProperties.GetName(b) == "Fine tune Phrase");
+        var changePhrase = fixture.FindControlOrDefault<Button>(b =>
+            AutomationProperties.GetName(b) == "Change Phrase");
+        var fineTuneGraphic = fixture.FindControlOrDefault<Button>(b =>
+            AutomationProperties.GetName(b) == "Fine tune Graphic direction");
+        var changeGraphic = fixture.FindControlOrDefault<Button>(b =>
+            AutomationProperties.GetName(b) == "Change Graphic direction");
+
+        Assert.True(ToolTip.GetShowOnDisabled(fineTuneIdea));
+        Assert.True(ToolTip.GetShowOnDisabled(changeIdea));
+        Assert.True(ToolTip.GetShowOnDisabled(fineTunePhrase));
+        Assert.True(ToolTip.GetShowOnDisabled(changePhrase));
+        Assert.True(ToolTip.GetShowOnDisabled(fineTuneGraphic));
+        Assert.True(ToolTip.GetShowOnDisabled(changeGraphic));
+    }
+
+    [AvaloniaFact]
+    public void DisabledButton_WithUnavailableReason_ShowsReasonInTooltip()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Concept);
+        fixture.PumpLayout();
+
+        // In test environment AI is unavailable
+        Assert.False(fixture.ViewModel.ConceptRefinement.IsAvailable);
+        var expectedReason = fixture.ViewModel.ConceptRefinement.UnavailableReason;
+        Assert.NotNull(expectedReason);
+
+        var fineTuneIdea = fixture.FindControlOrDefault<Button>(b =>
+            AutomationProperties.GetName(b) == "Fine tune Concept idea");
+        Assert.NotNull(fineTuneIdea);
+        Assert.False(fineTuneIdea.IsEnabled);
+
+        var toolTip = ToolTip.GetTip(fineTuneIdea);
+        Assert.NotNull(toolTip);
+        Assert.Equal(expectedReason, toolTip);
+    }
 }

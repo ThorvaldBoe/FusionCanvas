@@ -781,14 +781,14 @@
                                   IsEnabled="{Binding ConceptRefinement.CanFineTuneConceptIdea}"
                                   Command="{Binding ConceptRefinement.FineTuneConceptIdeaCommand}"
                                   AutomationProperties.Name="Fine tune Concept idea"
-                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}"
+                                  ToolTip.Tip="{Binding ConceptRefinement.FineTuneConceptIdeaDisabledReason}"
                                   ToolTip.ShowOnDisabled="True" />
                           <Button Grid.Column="3"
                                   Content="Change"
                                   IsEnabled="{Binding ConceptRefinement.CanChangeConceptIdea}"
                                   Command="{Binding ConceptRefinement.ChangeConceptIdeaCommand}"
                                   AutomationProperties.Name="Change Concept idea"
-                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}"
+                                  ToolTip.Tip="{Binding ConceptRefinement.ChangeConceptIdeaDisabledReason}"
                                   ToolTip.ShowOnDisabled="True" />
                         </Grid>
 
@@ -811,14 +811,14 @@
                                   IsEnabled="{Binding ConceptRefinement.CanFineTunePhrase}"
                                   Command="{Binding ConceptRefinement.FineTunePhraseCommand}"
                                   AutomationProperties.Name="Fine tune Phrase"
-                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}"
+                                  ToolTip.Tip="{Binding ConceptRefinement.FineTunePhraseDisabledReason}"
                                   ToolTip.ShowOnDisabled="True" />
                           <Button Grid.Column="3"
                                   Content="Change"
                                   IsEnabled="{Binding ConceptRefinement.CanChangePhrase}"
                                   Command="{Binding ConceptRefinement.ChangePhraseCommand}"
                                   AutomationProperties.Name="Change Phrase"
-                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}"
+                                  ToolTip.Tip="{Binding ConceptRefinement.ChangePhraseDisabledReason}"
                                   ToolTip.ShowOnDisabled="True" />
                         </Grid>
 
@@ -841,14 +841,14 @@
                                   IsEnabled="{Binding ConceptRefinement.CanFineTuneGraphicDirection}"
                                   Command="{Binding ConceptRefinement.FineTuneGraphicDirectionCommand}"
                                   AutomationProperties.Name="Fine tune Graphic direction"
-                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}"
+                                  ToolTip.Tip="{Binding ConceptRefinement.FineTuneGraphicDirectionDisabledReason}"
                                   ToolTip.ShowOnDisabled="True" />
                           <Button Grid.Column="3"
                                   Content="Change"
                                   IsEnabled="{Binding ConceptRefinement.CanChangeGraphicDirection}"
                                   Command="{Binding ConceptRefinement.ChangeGraphicDirectionCommand}"
                                   AutomationProperties.Name="Change Graphic direction"
-                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}"
+                                  ToolTip.Tip="{Binding ConceptRefinement.ChangeGraphicDirectionDisabledReason}"
                                   ToolTip.ShowOnDisabled="True" />
                         </Grid>
                       </StackPanel>
