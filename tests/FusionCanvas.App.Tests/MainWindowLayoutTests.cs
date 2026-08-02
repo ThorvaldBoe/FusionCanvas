@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Navigation;
@@ -103,23 +104,30 @@ public class MainWindowConstructionTests
 public class MainWindowLayoutTests
 {
     [AvaloniaFact]
-    public void TreeExpanders_ProvideAFullyClickableRowHeightTarget()
+    public void TreeExpander_ClickingOutsideTheGlyph_ExpandsItsGroup()
     {
         using var fixture = new MainWindowFixture();
 
-        var expanders = fixture.Window.GetVisualDescendants()
+        var expander = fixture.Window.GetVisualDescendants()
             .OfType<ToggleButton>()
-            .Where(button => button.DataContext is WorkspaceTreeNodeViewModel { HasChildren: true })
-            .ToList();
-
-        Assert.NotEmpty(expanders);
-        Assert.All(expanders, expander =>
+            .First(button => button.DataContext is WorkspaceTreeNodeViewModel { HasChildren: true, IsExpanded: false });
+        var node = Assert.IsType<WorkspaceTreeNodeViewModel>(expander.DataContext);
+        var clickPoint = new Avalonia.Point(expander.Bounds.Right + 6, expander.Bounds.Center.Y);
+        foreach (var ancestor in expander.GetVisualAncestors())
         {
-            Assert.True(expander.Bounds.Width >= 24,
-                $"Expected tree expander width >= 24px, got {expander.Bounds.Width}px.");
-            Assert.True(expander.Bounds.Height >= 34,
-                $"Expected tree expander height >= 34px, got {expander.Bounds.Height}px.");
-        });
+            if (ReferenceEquals(ancestor, fixture.Window))
+            {
+                break;
+            }
+
+            clickPoint += ancestor.Bounds.Position;
+        }
+
+        HeadlessWindowExtensions.MouseDown(fixture.Window, clickPoint, MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseUp(fixture.Window, clickPoint, MouseButton.Left, RawInputModifiers.None);
+        fixture.PumpLayout();
+
+        Assert.True(node.IsExpanded);
     }
 
     [AvaloniaFact]
