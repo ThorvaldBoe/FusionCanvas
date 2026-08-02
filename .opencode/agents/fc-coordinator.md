@@ -6,6 +6,7 @@ permission:
   edit:
     "*": deny
     "openspec/**": allow
+    "**/openspec/**": allow
   bash:
     "*": ask
     "openspec *": allow
@@ -17,6 +18,7 @@ permission:
     "git rev-parse*": allow
     "git ls-files*": allow
     "git branch --show-current*": allow
+    "git worktree*": allow
     "dotnet build*": allow
     "dotnet test*": allow
     "dotnet restore*": allow
@@ -52,9 +54,19 @@ Understand -> Specify -> Review -> Implement -> Verify -> Archive
 
 The lifecycle is ordered, but Specify, Implement, and Verify may loop until their quality gates pass.
 
+## Workspace setup
+
+Every feature and bugfix runs in its own git worktree on its own branch by default, including exploration-only work. Set this up before specifying or implementing:
+
+1. Base the branch on an up-to-date `main` unless the change deliberately stacks on another active change.
+2. Name the branch `codex/<issue-number>-<slug>` when a primary GitHub issue exists (per `openspec/specs/github-issue-workflow/spec.md`); otherwise use a short descriptive slug on the same pattern.
+3. Create the worktree as a sibling of the main checkout: `git worktree add ..\FusionCanvas-<slug> -b <branch> main`.
+4. Run all subsequent lifecycle commands (`openspec`, `dotnet build`, `dotnet test`) in the worktree, and create the change's OpenSpec artifacts there.
+5. If the session started in the main checkout, create the worktree first and continue there; do not build the change in the main checkout.
+
 ## Starting a change
 
-1. Restate the requested outcome and identify the active OpenSpec change, if one exists (`openspec list --json`).
+1. Restate the requested outcome, confirm the workspace setup above is done, and identify the active OpenSpec change, if one exists (`openspec list --json`).
 2. Load `openspec-explore` when the problem boundary, dependencies, existing behavior, or architectural impact is uncertain.
 3. Exploration should establish enough context to propose one coherent delivery module. It must not attempt exhaustive design.
 4. Load `openspec-propose` to create the delivery package: `proposal.md` as module anchor, delta specs with observable acceptance scenarios, `design.md` with a dedicated implementation plan, and `tasks.md` that includes criterion-level verification, strict OpenSpec validation, and the solution test baseline.
