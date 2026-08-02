@@ -11,6 +11,8 @@ using FusionCanvas.Application.Snowclones;
 using FusionCanvas.Application.RejectedPhrases;
 using FusionCanvas.Integration.Snowclones;
 using FusionCanvas.Application.AI;
+using FusionCanvas.Application.ConceptRefinement;
+using FusionCanvas.Integration.AI;
 
 namespace FusionCanvas.App.Workspace;
 
@@ -27,7 +29,9 @@ public sealed record AppWorkspaceRuntime(
     IIdeationAccessStatus IdeationAccess,
     ISnowcloneLibraryService SnowcloneLibrary,
     IRejectedPhraseManagementService RejectedPhrases,
-    SnowcloneLibraryResult SnowcloneLibraryInitialization);
+    SnowcloneLibraryResult SnowcloneLibraryInitialization,
+    IConceptRefinementService ConceptRefinement,
+    IConceptRefinementAccessStatus ConceptRefinementAccess);
 
 public static class AppWorkspaceFactory
 {
@@ -59,6 +63,12 @@ public static class AppWorkspaceFactory
         var snowcloneLibraryInitialization = StartupTaskRunner.Run(
             () => snowcloneLibrary.InitializeAsync());
         var rejectedPhrases = new RejectedPhraseManagementService(repository);
+        var conceptRefinementAccess = new ConfiguredConceptRefinementAccessStatus(ai);
+        var guidanceSource = new EmbeddedDesignTriangleGuidanceSource();
+        var conceptRefinement = new ConceptRefinementService(
+            repository,
+            ai,
+            guidanceSource);
         return new AppWorkspaceRuntime(
             repository,
             fileStore,
@@ -77,7 +87,9 @@ public static class AppWorkspaceFactory
             ideationAccess,
             snowcloneLibrary,
             rejectedPhrases,
-            snowcloneLibraryInitialization);
+            snowcloneLibraryInitialization,
+            conceptRefinement,
+            conceptRefinementAccess);
     }
 
     private static string DefaultDatabasePath()

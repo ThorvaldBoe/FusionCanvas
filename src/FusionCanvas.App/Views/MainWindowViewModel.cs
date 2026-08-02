@@ -35,6 +35,8 @@ using FusionCanvas.Application.DesignFiles;
 using FusionCanvas.Application.Ideation;
 using FusionCanvas.Application.Workspaces.Transfer;
 using FusionCanvas.Application.AI;
+using FusionCanvas.Application.ConceptRefinement;
+using FusionCanvas.App.ConceptRefinement;
 
 namespace FusionCanvas.App.Views;
 
@@ -55,6 +57,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly ITagManagementService _tagManagementService;
     private readonly IIdeationService _ideationService;
     private readonly IIdeationAccessStatus _ideationAccessStatus;
+    private readonly IConceptRefinementService _conceptRefinementService;
+    private readonly IConceptRefinementAccessStatus _conceptRefinementAccessStatus;
     private ItemStatus? _pendingStatus;
     private bool _isStatusConfirmationVisible;
     private bool _isDesignRemoveConfirmationVisible;
@@ -96,7 +100,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.Ideation,
             runtime.IdeationAccess,
             runtime.SnowcloneLibrary,
-            runtime.RejectedPhrases)
+            runtime.RejectedPhrases,
+            runtime.ConceptRefinement,
+            runtime.ConceptRefinementAccess)
     {
     }
 
@@ -117,7 +123,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IIdeationService? ideationService = null,
         IIdeationAccessStatus? ideationAccessStatus = null,
         FusionCanvas.Application.Snowclones.ISnowcloneLibraryService? snowcloneLibrary = null,
-        FusionCanvas.Application.RejectedPhrases.IRejectedPhraseManagementService? rejectedPhrases = null)
+        FusionCanvas.Application.RejectedPhrases.IRejectedPhraseManagementService? rejectedPhrases = null,
+        IConceptRefinementService? conceptRefinementService = null,
+        IConceptRefinementAccessStatus? conceptRefinementAccessStatus = null)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
@@ -140,6 +148,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _assetManagementService = assetManagementService ?? new AssetManagementService(workspaceRepository, fileStore);
         _itemInspectorService = itemInspectorService ?? new ItemInspectorService(workspaceRepository);
         _ideationAccessStatus = ideationAccessStatus ?? DisabledIdeationAccessStatus.Instance;
+        _conceptRefinementService = conceptRefinementService ?? DisabledConceptRefinementService.Instance;
+        _conceptRefinementAccessStatus = conceptRefinementAccessStatus ?? DisabledConceptRefinementAccessStatus.Instance;
         _ideationService = ideationService ?? new IdeationService(
             workspaceRepository,
             _itemManagementService,
@@ -152,10 +162,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         DesignTool = new DesignStageToolViewModel(new DesignFileService(workspaceRepository, fileStore));
         ListingTool = new ListingStageToolViewModel();
         Ideation = new IdeationViewModel(_ideationService, _ideationAccessStatus, snowcloneLibrary, rejectedPhrases);
+        ConceptRefinement = new ConceptRefinementSessionViewModel(
+            _conceptRefinementService,
+            _conceptRefinementAccessStatus,
+            ItemInspector);
         _ideationAccessStatus.AvailabilityChanged += (_, _) =>
             Avalonia.Threading.Dispatcher.UIThread.Post(RaiseIdeationProperties);
         Settings.Ai.SettingsChanged += (_, _) => _ = _ideationAccessStatus.RefreshAsync();
         Settings.Ai.AvailabilityChanged += (_, _) => _ = _ideationAccessStatus.RefreshAsync();
+        Settings.Ai.SettingsChanged += (_, _) => _ = ConceptRefinement.RefreshAvailabilityAsync();
+        Settings.Ai.AvailabilityChanged += (_, _) => _ = ConceptRefinement.RefreshAvailabilityAsync();
         _ = _ideationAccessStatus.RefreshAsync();
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
@@ -239,6 +255,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public ListingStageToolViewModel ListingTool { get; }
 
     public IdeationViewModel Ideation { get; }
+
+    public ConceptRefinementSessionViewModel ConceptRefinement { get; }
 
     public WorkspaceTreeViewModel WorkspaceTree { get; }
 
@@ -1060,6 +1078,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         {
             Run(DesignTool.LoadAsync(item.Id, canEdit));
         }
+
+        // Refresh concept refinement availability when Concept surface loads (D8)
+        if (activeStage == WorkflowStage.Concept)
+        {
+            _ = ConceptRefinement.RefreshAvailabilityAsync();
+        }
     }
 
     private void CloseDeletedEntityTabs(IReadOnlySet<Guid> entityIds)
@@ -1242,6 +1266,38 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         public IdeationAccessAvailability GetAvailability() =>
             IdeationAccessAvailability.Unavailable("AI services were not supplied.");
+    }
+
+    private sealed class DisabledConceptRefinementService : IConceptRefinementService
+    {
+        public static DisabledConceptRefinementService Instance { get; } = new();
+
+        public Task<ConceptRefinementResult> InitializeAsync(
+            Guid itemId,
+            string originalIdea,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(ConceptRefinementResult.Failure(
+                AiTextFailureKind.NotConfigured,
+                "AI services were not supplied."));
+
+        public Task<ConceptRefinementResult> RefineAsync(
+            Guid itemId,
+            ConceptRefinementActionKind action,
+            ConceptRefinementCorner corner,
+            ConceptRefinementTriangle current,
+            string originalIdea,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(ConceptRefinementResult.Failure(
+                AiTextFailureKind.NotConfigured,
+                "AI services were not supplied."));
+    }
+
+    private sealed class DisabledConceptRefinementAccessStatus : IConceptRefinementAccessStatus
+    {
+        public static DisabledConceptRefinementAccessStatus Instance { get; } = new();
+
+        public ConceptRefinementAccessAvailability GetAvailability() =>
+            ConceptRefinementAccessAvailability.Unavailable("AI services were not supplied.");
     }
 
     private sealed class DisabledIdeaGenerator : IIdeaGenerator
