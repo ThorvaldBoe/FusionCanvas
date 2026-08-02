@@ -375,6 +375,32 @@ public sealed class ConceptRefinementSessionViewModelTests
     }
 
     [Fact]
+    public async Task BaseIdeaChange_RaisesInitializeState()
+    {
+        var inspector = CreateInspector();
+        var svc = new StubRefinementService();
+        var acc = new StubRefinementAccess(true);
+        var vm = new ConceptRefinementSessionViewModel(svc, acc, inspector);
+
+        await SetupLoadedInspectorAsync(inspector);
+        vm.ResetSession();
+
+        var notifications = 0;
+        vm.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(vm.CanInitialize))
+            {
+                notifications++;
+            }
+        };
+
+        inspector.Idea = "Base idea";
+
+        Assert.True(vm.CanInitialize);
+        Assert.True(notifications > 0);
+    }
+
+    [Fact]
     public async Task InitializeDisabledReason_FieldsNotEmpty()
     {
         var inspector = CreateInspector();
@@ -390,6 +416,148 @@ public sealed class ConceptRefinementSessionViewModelTests
 
         Assert.False(vm.CanInitialize);
         Assert.Contains("empty", vm.InitializeDisabledReason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task FineTuneDisabledReason_CornerEmpty_ReturnsReason()
+    {
+        var inspector = CreateInspector();
+        var svc = new StubRefinementService();
+        var acc = new StubRefinementAccess(true);
+        var vm = new ConceptRefinementSessionViewModel(svc, acc, inspector);
+
+        await SetupLoadedInspectorAsync(inspector);
+        vm.ResetSession();
+
+        // ConceptIdea is non-empty, Phrase and GraphicDirection are empty.
+        inspector.ConceptIdea = "Some concept";
+        inspector.Phrase = "";
+
+        // Fine-tune for empty corner should show reason
+        Assert.NotNull(vm.FineTunePhraseDisabledReason);
+        Assert.Contains("Add text to this field", vm.FineTunePhraseDisabledReason);
+        Assert.NotNull(vm.FineTuneGraphicDirectionDisabledReason);
+        Assert.Contains("Add text to this field", vm.FineTuneGraphicDirectionDisabledReason);
+
+        // Fine-tune for non-empty corner should be null (enabled)
+        Assert.True(vm.CanFineTuneConceptIdea);
+        Assert.Null(vm.FineTuneConceptIdeaDisabledReason);
+
+        // Change operations never check empty corner so they should be null (enabled)
+        Assert.True(vm.CanChangeConceptIdea);
+        Assert.Null(vm.ChangeConceptIdeaDisabledReason);
+        Assert.True(vm.CanChangePhrase);
+        Assert.Null(vm.ChangePhraseDisabledReason);
+    }
+
+    [Fact]
+    public async Task FineTuneDisabledReason_Unavailable_ReturnsUnavailableReason()
+    {
+        var inspector = CreateInspector();
+        var svc = new StubRefinementService();
+        var acc = new StubRefinementAccess(false); // AI unavailable
+        var vm = new ConceptRefinementSessionViewModel(svc, acc, inspector);
+
+        await SetupLoadedInspectorAsync(inspector);
+        vm.ResetSession();
+
+        inspector.ConceptIdea = "Some concept";
+
+        Assert.False(vm.IsAvailable);
+        Assert.NotNull(vm.UnavailableReason);
+
+        // All per-corner disabled reasons should reflect unavailability
+        Assert.Equal(vm.UnavailableReason, vm.FineTuneConceptIdeaDisabledReason);
+        Assert.Equal(vm.UnavailableReason, vm.FineTunePhraseDisabledReason);
+        Assert.Equal(vm.UnavailableReason, vm.FineTuneGraphicDirectionDisabledReason);
+        Assert.Equal(vm.UnavailableReason, vm.ChangeConceptIdeaDisabledReason);
+        Assert.Equal(vm.UnavailableReason, vm.ChangePhraseDisabledReason);
+        Assert.Equal(vm.UnavailableReason, vm.ChangeGraphicDirectionDisabledReason);
+    }
+
+    [Fact]
+    public async Task FineTuneDisabledReason_Busy_ReturnsBusyReason()
+    {
+        var inspector = CreateInspector();
+        var svc = new StubRefinementService();
+        var acc = new StubRefinementAccess(true);
+        var vm = new ConceptRefinementSessionViewModel(svc, acc, inspector);
+
+        await SetupLoadedInspectorAsync(inspector);
+        vm.ResetSession();
+
+        // Set base idea and ensure all corners are empty so CanInitialize is true
+        inspector.Idea = "Base idea";
+        inspector.ConceptIdea = "";
+        inspector.Phrase = "";
+        inspector.GraphicDirection = "";
+
+        var tcs = new TaskCompletionSource<ConceptRefinementResult>();
+        svc.InitializeFunc = ct => tcs.Task;
+
+        vm.InitializeCommand.Execute(null);
+        Assert.True(vm.IsBusy);
+
+        var expected = "A refinement operation is in progress.";
+        Assert.Equal(expected, vm.FineTuneConceptIdeaDisabledReason);
+        Assert.Equal(expected, vm.FineTunePhraseDisabledReason);
+        Assert.Equal(expected, vm.FineTuneGraphicDirectionDisabledReason);
+        Assert.Equal(expected, vm.ChangeConceptIdeaDisabledReason);
+        Assert.Equal(expected, vm.ChangePhraseDisabledReason);
+        Assert.Equal(expected, vm.ChangeGraphicDirectionDisabledReason);
+
+        tcs.TrySetResult(ConceptRefinementResult.Success("A", "B", "C"));
+        await Task.Delay(100);
+        Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
+    public async Task FineTuneDisabledReason_ReadOnlyStage_ReturnsStageReadOnlyReason()
+    {
+        var inspector = CreateInspector();
+        var svc = new StubRefinementService();
+        var acc = new StubRefinementAccess(true);
+        var vm = new ConceptRefinementSessionViewModel(svc, acc, inspector);
+
+        // Create a state that is not effectively active → read-only with restore message
+        var state = CreateValidState(conceptIdea: "Some idea", phrase: "Some phrase", graphicDirection: "Some graphic")
+            with { IsEffectivelyActive = false };
+        var svcField = typeof(ItemInspectorViewModel).GetField(
+            "_service",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (svcField?.GetValue(inspector) is StubItemInspectorService stub)
+        {
+            stub.StateToReturn = state;
+        }
+
+        await inspector.LoadAsync(state.Id);
+        vm.ResetSession();
+
+        var expectedReason = inspector.StageReadOnlyReason;
+        Assert.False(string.IsNullOrEmpty(expectedReason));
+        Assert.Equal(expectedReason, vm.FineTuneConceptIdeaDisabledReason);
+        Assert.Equal(expectedReason, vm.ChangeConceptIdeaDisabledReason);
+    }
+
+    [Fact]
+    public async Task FineTuneDisabledReason_EnabledWhenFullyAvailable()
+    {
+        var inspector = CreateInspector();
+        var svc = new StubRefinementService();
+        var acc = new StubRefinementAccess(true);
+        var vm = new ConceptRefinementSessionViewModel(svc, acc, inspector);
+
+        await SetupLoadedInspectorAsync(inspector);
+        vm.ResetSession();
+
+        inspector.ConceptIdea = "Some concept";
+        inspector.Phrase = "Some phrase";
+        inspector.GraphicDirection = "Some graphic";
+
+        Assert.True(vm.CanFineTuneConceptIdea);
+        Assert.Null(vm.FineTuneConceptIdeaDisabledReason);
+        Assert.True(vm.CanChangeConceptIdea);
+        Assert.Null(vm.ChangeConceptIdeaDisabledReason);
     }
 
     [Fact]

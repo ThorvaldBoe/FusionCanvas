@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using Avalonia.Threading;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Items;
 using FusionCanvas.Application.ConceptRefinement;
@@ -183,6 +184,40 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
     // --- Current entry index (VR-007b) ---
 
     public int? CurrentEntryIndex => _currentIndex >= 0 ? _currentIndex : null;
+
+    // --- Per-corner disabled reasons ---
+
+    private string? GetPerCornerDisabledReason(bool isFineTune, string? cornerValue)
+    {
+        if (!IsAvailable)
+        {
+            return UnavailableReason;
+        }
+
+        if (!_inspector.CanEditStage)
+        {
+            return _inspector.StageReadOnlyReason;
+        }
+
+        if (IsBusy)
+        {
+            return "A refinement operation is in progress.";
+        }
+
+        if (isFineTune && !HasNonWhitespace(cornerValue))
+        {
+            return "Add text to this field before fine-tuning it.";
+        }
+
+        return null;
+    }
+
+    public string? FineTuneConceptIdeaDisabledReason => GetPerCornerDisabledReason(true, _inspector.ConceptIdea);
+    public string? FineTunePhraseDisabledReason => GetPerCornerDisabledReason(true, _inspector.Phrase);
+    public string? FineTuneGraphicDirectionDisabledReason => GetPerCornerDisabledReason(true, _inspector.GraphicDirection);
+    public string? ChangeConceptIdeaDisabledReason => GetPerCornerDisabledReason(false, _inspector.ConceptIdea);
+    public string? ChangePhraseDisabledReason => GetPerCornerDisabledReason(false, _inspector.Phrase);
+    public string? ChangeGraphicDirectionDisabledReason => GetPerCornerDisabledReason(false, _inspector.GraphicDirection);
 
     // --- Can initialize ---
 
@@ -567,11 +602,17 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanInitialize));
         OnPropertyChanged(nameof(InitializeDisabledReason));
         OnPropertyChanged(nameof(CanFineTuneConceptIdea));
+        OnPropertyChanged(nameof(FineTuneConceptIdeaDisabledReason));
         OnPropertyChanged(nameof(CanFineTunePhrase));
+        OnPropertyChanged(nameof(FineTunePhraseDisabledReason));
         OnPropertyChanged(nameof(CanFineTuneGraphicDirection));
+        OnPropertyChanged(nameof(FineTuneGraphicDirectionDisabledReason));
         OnPropertyChanged(nameof(CanChangeConceptIdea));
+        OnPropertyChanged(nameof(ChangeConceptIdeaDisabledReason));
         OnPropertyChanged(nameof(CanChangePhrase));
+        OnPropertyChanged(nameof(ChangePhraseDisabledReason));
         OnPropertyChanged(nameof(CanChangeGraphicDirection));
+        OnPropertyChanged(nameof(ChangeGraphicDirectionDisabledReason));
         OnPropertyChanged(nameof(HasHistory));
         OnPropertyChanged(nameof(CurrentEntryIndex));
         OnPropertyChanged(nameof(HasError));
@@ -581,7 +622,8 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     private void OnInspectorPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
-        if (args.PropertyName is nameof(ItemInspectorViewModel.ConceptIdea)
+        if (args.PropertyName is nameof(ItemInspectorViewModel.Idea)
+            or nameof(ItemInspectorViewModel.ConceptIdea)
             or nameof(ItemInspectorViewModel.Phrase)
             or nameof(ItemInspectorViewModel.GraphicDirection))
         {
@@ -674,7 +716,10 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     private void OnAccessAvailabilityChanged(object? sender, EventArgs args)
     {
-        RaiseCommandStates();
+        // Availability is refreshed after an async AI/catalog call and may raise
+        // its event on a worker thread. Avalonia bindings must be notified on the
+        // UI thread or the controls can remain stuck in their initial disabled state.
+        Dispatcher.UIThread.Post(RaiseCommandStates);
     }
 
     // --- INotifyPropertyChanged ---
