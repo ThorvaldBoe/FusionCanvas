@@ -38,7 +38,7 @@ Implementation follows `design.md` D1–D8. Do not reopen the design decisions l
 
 ## 6. Verification and validation gates
 
-- [ ] 6.1 Create `verification.md` mapping every acceptance scenario in `specs/concept-refinement/spec.md` (all 12 requirements) to criterion-level evidence: specific test names for each scenario, plus the listing-inspector removal diff check.
-- [ ] 6.2 Run `openspec validate add-concept-refinement-tool --strict` and `openspec validate --all --strict`; resolve all findings.
-- [ ] 6.3 Run `dotnet build .\FusionCanvas.sln` warning-clean and `dotnet test .\FusionCanvas.sln` with all tests passing; record results in `verification.md`.
-- [ ] 6.4 Confirm non-goals held: no schema migration, no persisted history, no implicit AI calls on stage entry, no AI scoring, no guidance-document UI, no prompt/response persistence.
+- [x] 6.1 Create `verification.md` mapping every acceptance scenario in `specs/concept-refinement/spec.md` (all 12 requirements) to criterion-level evidence: specific test names for each scenario, plus the listing-inspector removal diff check.
+- [x] 6.2 Run `openspec validate add-concept-refinement-tool --strict` and `openspec validate --all --strict`; resolve all findings.
+- [x] 6.3 Run `dotnet build .\FusionCanvas.sln` warning-clean and `dotnet test .\FusionCanvas.sln` with all tests passing; record results in `verification.md`.
+- [x] 6.4 Confirm non-goals held: no schema migration, no persisted history, no implicit AI calls on stage entry, no AI scoring, no guidance-document UI, no prompt/response persistence.
