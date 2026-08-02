@@ -364,6 +364,7 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
             _currentIndex = targetIndex;
             await _inspector.CommitEditsAsync().ConfigureAwait(true);
             RecomputeScore();
+            OnPropertyChanged(nameof(CurrentEntryIndex));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

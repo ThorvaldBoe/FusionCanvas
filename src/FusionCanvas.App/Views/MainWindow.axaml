@@ -708,7 +708,7 @@
                       <TextBlock Text="Graphic direction"
                                  FontSize="11"
                                  Foreground="{DynamicResource SecondaryTextBrush}" />
-<TextBox Text="{Binding ItemInspector.GraphicDirection}"
+                      <TextBox Text="{Binding ItemInspector.GraphicDirection}"
                                 IsReadOnly="{Binding !ItemInspector.CanEditStage}"
                                 AcceptsReturn="True"
                                 MinHeight="64"
@@ -748,7 +748,15 @@
                               IsVisible="{Binding ShowsConceptStageTool}"
                               AutomationProperties.Name="Initialize from base idea"
                               Command="{Binding ConceptRefinement.InitializeCommand}"
-                              ToolTip.Tip="{Binding ConceptRefinement.InitializeDisabledReason}" />
+                              ToolTip.Tip="{Binding ConceptRefinement.InitializeDisabledReason}"
+                              ToolTip.ShowOnDisabled="True" />
+
+                      <!-- VR-009: Visible guidance when Initialize is disabled -->
+                      <TextBlock Text="{Binding ConceptRefinement.InitializeDisabledReason}"
+                                 IsVisible="{Binding ConceptRefinement.InitializeDisabledReason, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                 TextWrapping="Wrap"
+                                 FontSize="11"
+                                 Foreground="{DynamicResource DangerTextBrush}" />
 
                       <!-- Per-corner action rows -->
                       <StackPanel Spacing="6"
@@ -772,13 +780,15 @@
                                   IsEnabled="{Binding ConceptRefinement.CanFineTuneConceptIdea}"
                                   Command="{Binding ConceptRefinement.FineTuneConceptIdeaCommand}"
                                   AutomationProperties.Name="Fine tune Concept idea"
-                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}" />
+                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}"
+                                  ToolTip.ShowOnDisabled="True" />
                           <Button Grid.Column="3"
                                   Content="Change"
                                   IsEnabled="{Binding ConceptRefinement.CanChangeConceptIdea}"
                                   Command="{Binding ConceptRefinement.ChangeConceptIdeaCommand}"
                                   AutomationProperties.Name="Change Concept idea"
-                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}" />
+                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}"
+                                  ToolTip.ShowOnDisabled="True" />
                         </Grid>
 
                         <Grid ColumnDefinitions="Auto,*,Auto,Auto"
@@ -800,13 +810,15 @@
                                   IsEnabled="{Binding ConceptRefinement.CanFineTunePhrase}"
                                   Command="{Binding ConceptRefinement.FineTunePhraseCommand}"
                                   AutomationProperties.Name="Fine tune Phrase"
-                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}" />
+                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}"
+                                  ToolTip.ShowOnDisabled="True" />
                           <Button Grid.Column="3"
                                   Content="Change"
                                   IsEnabled="{Binding ConceptRefinement.CanChangePhrase}"
                                   Command="{Binding ConceptRefinement.ChangePhraseCommand}"
                                   AutomationProperties.Name="Change Phrase"
-                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}" />
+                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}"
+                                  ToolTip.ShowOnDisabled="True" />
                         </Grid>
 
                         <Grid ColumnDefinitions="Auto,*,Auto,Auto"
@@ -828,13 +840,15 @@
                                   IsEnabled="{Binding ConceptRefinement.CanFineTuneGraphicDirection}"
                                   Command="{Binding ConceptRefinement.FineTuneGraphicDirectionCommand}"
                                   AutomationProperties.Name="Fine tune Graphic direction"
-                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}" />
+                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}"
+                                  ToolTip.ShowOnDisabled="True" />
                           <Button Grid.Column="3"
                                   Content="Change"
                                   IsEnabled="{Binding ConceptRefinement.CanChangeGraphicDirection}"
                                   Command="{Binding ConceptRefinement.ChangeGraphicDirectionCommand}"
                                   AutomationProperties.Name="Change Graphic direction"
-                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}" />
+                                  ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}"
+                                  ToolTip.ShowOnDisabled="True" />
                         </Grid>
                       </StackPanel>
 
@@ -860,7 +874,8 @@
                                MaxHeight="160"
                                ScrollViewer.VerticalScrollBarVisibility="Auto"
                                SelectionMode="Single"
-                               SelectedItem="{Binding ConceptRefinement.SelectedHistoryEntry, Mode=TwoWay}">
+                               SelectedItem="{Binding ConceptRefinement.SelectedHistoryEntry, Mode=TwoWay}"
+                               SelectedIndex="{Binding ConceptRefinement.CurrentEntryIndex, Mode=OneWay}">
                         <ListBox.ItemTemplate>
                           <DataTemplate x:DataType="cref:ConceptRefinementHistoryEntry">
                             <TextBlock Text="{Binding Label}"

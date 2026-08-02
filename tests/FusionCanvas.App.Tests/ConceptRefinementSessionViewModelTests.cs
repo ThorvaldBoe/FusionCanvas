@@ -413,15 +413,19 @@ public sealed class ConceptRefinementSessionViewModelTests
     }
 
     [Fact]
-    public async Task NonConceptCommit_AppendsNothing()
+    public async Task NonConceptCommit_AppendsNothing_EvenWithPreExistingConceptValues()
     {
+        // VR-010: uses pre-existing concept values in the loaded state so the baseline
+        // tracks a non-empty triangle; a Notes-only commit must NOT create an entry.
         var inspector = CreateInspector();
         var (svc, acc) = (new StubRefinementService(), new StubRefinementAccess(true));
         var vm = new ConceptRefinementSessionViewModel(svc, acc, inspector);
 
-        await SetupLoadedInspectorAsync(inspector);
+        await SetupLoadedInspectorAsync(inspector, conceptIdea: "Loaded concept",
+            phrase: "Loaded phrase", graphicDirection: "Loaded graphic");
         vm.ResetSession();
 
+        // At this point the baseline tracks "Loaded concept" / "Loaded phrase" / "Loaded graphic"
         inspector.Notes = "Some notes";
         await inspector.CommitEditsAsync();
         await Task.Delay(50);
@@ -493,9 +497,10 @@ public sealed class ConceptRefinementSessionViewModelTests
             inspector);
     }
 
-    private static async Task SetupLoadedInspectorAsync(ItemInspectorViewModel inspector, bool failSaves = false)
+    private static async Task SetupLoadedInspectorAsync(ItemInspectorViewModel inspector,
+        bool failSaves = false, string? conceptIdea = null, string? phrase = null, string? graphicDirection = null)
     {
-        var state = CreateValidState();
+        var state = CreateValidState(conceptIdea: conceptIdea, phrase: phrase, graphicDirection: graphicDirection);
         var svcField = typeof(ItemInspectorViewModel).GetField(
             "_service",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -508,17 +513,18 @@ public sealed class ConceptRefinementSessionViewModelTests
         await inspector.LoadAsync(state.Id);
     }
 
-    private static ItemInspectorState CreateValidState(Guid? id = null) =>
+    private static ItemInspectorState CreateValidState(Guid? id = null,
+        string? conceptIdea = null, string? phrase = null, string? graphicDirection = null) =>
         new(
             id ?? Guid.NewGuid(),
             "Test Item",
             "Description",
             new ItemInspectorCreativeFields(
-                Idea: "test-idea",
+                Idea: conceptIdea is not null ? "idea" : "test-idea",
                 Audience: null,
-                ConceptIdea: "",
-                Phrase: "",
-                GraphicDirection: ""),
+                ConceptIdea: conceptIdea ?? "",
+                Phrase: phrase ?? "",
+                GraphicDirection: graphicDirection ?? ""),
             "Notes",
             ItemStatus.Draft,
             WorkflowStage.Concept,

@@ -150,7 +150,7 @@ public sealed class ConceptRefinementViewTests
     [AvaloniaFact]
     public void ErrorMessage_ShowsWhenSet()
     {
-        // VR-001: inline error renders when ErrorMessage is set
+        // VR-001/VR-012: inline error TextBlock visible in the visual tree when ErrorMessage is set
         using var fixture = new MainWindowFixture();
         fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
         fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Concept);
@@ -159,11 +159,38 @@ public sealed class ConceptRefinementViewTests
         Assert.False(fixture.ViewModel.ConceptRefinement.HasError);
         Assert.Null(fixture.ViewModel.ConceptRefinement.ErrorMessage);
 
-        // Set an error on the session VM
         fixture.ViewModel.ConceptRefinement.SetErrorForTest("Test error message");
         fixture.PumpLayout();
 
         Assert.True(fixture.ViewModel.ConceptRefinement.HasError);
         Assert.Equal("Test error message", fixture.ViewModel.ConceptRefinement.ErrorMessage);
+
+        // Find a visible TextBlock whose text matches the error message
+        var errorBlock = fixture.Window.GetVisualDescendants()
+            .OfType<TextBlock>()
+            .FirstOrDefault(tb => tb.IsVisible && tb.Text == "Test error message");
+        Assert.NotNull(errorBlock);
+    }
+
+    [AvaloniaFact]
+    public void InitializeGuidance_VisibleWhenNoBaseIdea()
+    {
+        // VR-009: guidance TextBlock visible when Initialize is disabled due to no base idea
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Concept);
+        fixture.PumpLayout();
+
+        // In test environment AI is disabled, so Initialize is already disabled.
+        // The guidance should show the AI-unavailable message as the reason.
+        Assert.False(fixture.ViewModel.ConceptRefinement.CanInitialize);
+        Assert.NotNull(fixture.ViewModel.ConceptRefinement.InitializeDisabledReason);
+
+        // Find a visible TextBlock matching the disable reason
+        var reason = fixture.ViewModel.ConceptRefinement.InitializeDisabledReason;
+        var guidanceBlock = fixture.Window.GetVisualDescendants()
+            .OfType<TextBlock>()
+            .FirstOrDefault(tb => tb.IsVisible && tb.Text == reason);
+        Assert.NotNull(guidanceBlock);
     }
 }
