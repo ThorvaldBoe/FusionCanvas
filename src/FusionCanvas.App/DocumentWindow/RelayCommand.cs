@@ -13,13 +13,11 @@ public sealed class RelayCommand : ICommand
         _canExecute = canExecute;
     }
 
-    public event EventHandler? CanExecuteChanged
-    {
-        add { }
-        remove { }
-    }
+    public event EventHandler? CanExecuteChanged;
 
     public bool CanExecute(object? parameter) => _canExecute?.Invoke() ?? true;
 
     public void Execute(object? parameter) => _execute(parameter);
+
+    public void NotifyCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
 }

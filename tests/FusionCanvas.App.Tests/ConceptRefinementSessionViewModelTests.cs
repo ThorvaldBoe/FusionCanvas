@@ -1,3 +1,5 @@
+using Avalonia.Headless.XUnit;
+using Avalonia.Threading;
 using FusionCanvas.App.ConceptRefinement;
 using FusionCanvas.App.Items;
 using FusionCanvas.Application.AI;
@@ -318,20 +320,30 @@ public sealed class ConceptRefinementSessionViewModelTests
         Assert.False(vm.CanFineTuneConceptIdea);
     }
 
-    [Fact]
-    public void AvailabilityChanged_RaisesCommandStates()
+    [AvaloniaFact]
+    public async Task AvailabilityChanged_EnablesInitializeCommand()
     {
         var inspector = CreateInspector();
         var acc = new StubRefinementAccess(false);
         var svc = new StubRefinementService();
         var vm = new ConceptRefinementSessionViewModel(svc, acc, inspector);
 
-        Assert.False(vm.IsAvailable);
+        await SetupLoadedInspectorAsync(inspector);
+        vm.ResetSession();
+        inspector.Idea = "Base idea";
+
+        var notifications = 0;
+        vm.InitializeCommand.CanExecuteChanged += (_, _) => notifications++;
+
+        Assert.False(vm.InitializeCommand.CanExecute(null));
 
         acc.SetAvailable(true);
         acc.RaiseChanged();
+        Dispatcher.UIThread.RunJobs();
 
         Assert.True(vm.IsAvailable);
+        Assert.True(vm.InitializeCommand.CanExecute(null));
+        Assert.True(notifications > 0);
     }
 
     [Fact]

@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Windows.Input;
 using Avalonia.Threading;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Items;
@@ -252,14 +251,14 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     // --- Commands ---
 
-    public ICommand InitializeCommand { get; }
-    public ICommand FineTuneConceptIdeaCommand { get; }
-    public ICommand FineTunePhraseCommand { get; }
-    public ICommand FineTuneGraphicDirectionCommand { get; }
-    public ICommand ChangeConceptIdeaCommand { get; }
-    public ICommand ChangePhraseCommand { get; }
-    public ICommand ChangeGraphicDirectionCommand { get; }
-    public ICommand SelectHistoryEntryCommand { get; }
+    public RelayCommand InitializeCommand { get; }
+    public RelayCommand FineTuneConceptIdeaCommand { get; }
+    public RelayCommand FineTunePhraseCommand { get; }
+    public RelayCommand FineTuneGraphicDirectionCommand { get; }
+    public RelayCommand ChangeConceptIdeaCommand { get; }
+    public RelayCommand ChangePhraseCommand { get; }
+    public RelayCommand ChangeGraphicDirectionCommand { get; }
+    public RelayCommand SelectHistoryEntryCommand { get; }
 
     // --- Session lifecycle ---
 
@@ -596,6 +595,15 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     private void RaiseCommandStates()
     {
+        InitializeCommand.NotifyCanExecuteChanged();
+        FineTuneConceptIdeaCommand.NotifyCanExecuteChanged();
+        FineTunePhraseCommand.NotifyCanExecuteChanged();
+        FineTuneGraphicDirectionCommand.NotifyCanExecuteChanged();
+        ChangeConceptIdeaCommand.NotifyCanExecuteChanged();
+        ChangePhraseCommand.NotifyCanExecuteChanged();
+        ChangeGraphicDirectionCommand.NotifyCanExecuteChanged();
+        SelectHistoryEntryCommand.NotifyCanExecuteChanged();
+
         OnPropertyChanged(nameof(AccessStatus));
         OnPropertyChanged(nameof(IsAvailable));
         OnPropertyChanged(nameof(UnavailableReason));
