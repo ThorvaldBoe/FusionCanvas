@@ -60,11 +60,15 @@ public sealed class ConceptRefinementService : IConceptRefinementService
 
             Creative context:
             Store: {context.StoreName}
+            Store description: {context.StoreDescription}
             Niche: {context.NicheName}
+            Niche description: {context.NicheDescription}
+            Topic: {context.GroupName ?? "(none)"}
             Tags: {string.Join(", ", context.Tags)}
 
             {FormatMetadata("Store metadata", context.StoreMetadata)}
             {FormatMetadata("Niche metadata", context.NicheMetadata)}
+            {FormatMetadata("Topic metadata", context.GroupMetadata)}
             """);
 
         var request = new AiTextRequest(
@@ -166,11 +170,15 @@ public sealed class ConceptRefinementService : IConceptRefinementService
 
             Creative context:
             Store: {context.StoreName}
+            Store description: {context.StoreDescription}
             Niche: {context.NicheName}
+            Niche description: {context.NicheDescription}
+            Topic: {context.GroupName ?? "(none)"}
             Tags: {string.Join(", ", context.Tags)}
 
             {FormatMetadata("Store metadata", context.StoreMetadata)}
             {FormatMetadata("Niche metadata", context.NicheMetadata)}
+            {FormatMetadata("Topic metadata", context.GroupMetadata)}
             """);
 
         var request = new AiTextRequest(
@@ -313,7 +321,9 @@ public sealed class ConceptRefinementService : IConceptRefinementService
 
         return new CreativeContext(
             store?.Name ?? "",
+            store?.Description ?? "",
             niche?.Name ?? "",
+            niche?.Description ?? "",
             group?.Name,
             SanitizeMetadata(store?.MetadataJson),
             SanitizeMetadata(niche?.MetadataJson),
@@ -349,6 +359,7 @@ public sealed class ConceptRefinementService : IConceptRefinementService
         var compact = new string(normalized.Where(char.IsLetterOrDigit).ToArray());
         return normalized.StartsWith(ItemMetadataCodec.InheritedFromPrefix.ToLowerInvariant(), StringComparison.Ordinal) ||
                compact is "id" or "createdat" or "updatedat" or "isarchived" or "status" ||
+               compact.Contains("inherited", StringComparison.Ordinal) ||
                compact.Contains("path", StringComparison.Ordinal) ||
                compact.Contains("apikey", StringComparison.Ordinal) ||
                compact.Contains("credential", StringComparison.Ordinal) ||
@@ -369,7 +380,9 @@ public sealed class ConceptRefinementService : IConceptRefinementService
 
     private sealed record CreativeContext(
         string StoreName,
+        string StoreDescription,
         string NicheName,
+        string NicheDescription,
         string? GroupName,
         IReadOnlyDictionary<string, string> StoreMetadata,
         IReadOnlyDictionary<string, string> NicheMetadata,

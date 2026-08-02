@@ -715,11 +715,11 @@
                                 PlaceholderText="Visual direction supporting this concept"
                                 AutomationProperties.Name="Graphics description"
                                 LostFocus="OnDetailsFieldLostFocus" />
-                       <TextBlock IsVisible="{Binding !ItemInspector.CanEditStage}"
-                                  Text="{Binding ItemInspector.StageReadOnlyReason}"
-                                  TextWrapping="Wrap"
-                                  FontSize="12"
-                                  Foreground="{DynamicResource DangerTextBrush}" />
+                      <TextBlock IsVisible="{Binding !ItemInspector.CanEditStage}"
+                                 Text="{Binding ItemInspector.StageReadOnlyReason}"
+                                 TextWrapping="Wrap"
+                                 FontSize="12"
+                                 Foreground="{DynamicResource DangerTextBrush}" />
 
                       <!-- Concept refinement section -->
                       <Separator Margin="0,4"
@@ -735,13 +735,20 @@
                                  FontSize="11"
                                  Foreground="{DynamicResource DangerTextBrush}" />
 
+                      <!-- VR-001: Inline error -->
+                      <TextBlock Text="{Binding ConceptRefinement.ErrorMessage}"
+                                 IsVisible="{Binding ConceptRefinement.HasError}"
+                                 TextWrapping="Wrap"
+                                 FontSize="11"
+                                 Foreground="{DynamicResource DangerTextBrush}" />
+
                       <!-- Initialize button -->
                       <Button Content="Initialize from base idea&#x2026;"
                               IsEnabled="{Binding ConceptRefinement.CanInitialize}"
                               IsVisible="{Binding ShowsConceptStageTool}"
                               AutomationProperties.Name="Initialize from base idea"
                               Command="{Binding ConceptRefinement.InitializeCommand}"
-                              ToolTip.Tip="{Binding ConceptRefinement.UnavailableReason}" />
+                              ToolTip.Tip="{Binding ConceptRefinement.InitializeDisabledReason}" />
 
                       <!-- Per-corner action rows -->
                       <StackPanel Spacing="6"
@@ -840,9 +847,16 @@
                         <Run Text="%" />
                       </TextBlock>
 
-                      <!-- History list -->
+                      <!-- VR-007c: Busy indicator -->
+                      <TextBlock Text="Refinement in progress&#x2026;"
+                                 IsVisible="{Binding ConceptRefinement.IsBusy}"
+                                 FontSize="11"
+                                 Foreground="{DynamicResource SecondaryTextBrush}" />
+
+                      <!-- VR-007a/007d: History list, hidden when empty, disabled in read-only -->
                       <ListBox ItemsSource="{Binding ConceptRefinement.History}"
-                               IsVisible="{Binding ShowsConceptStageTool}"
+                               IsVisible="{Binding ConceptRefinement.HasHistory}"
+                               IsEnabled="{Binding ItemInspector.CanEditStage}"
                                MaxHeight="160"
                                ScrollViewer.VerticalScrollBarVisibility="Auto"
                                SelectionMode="Single"

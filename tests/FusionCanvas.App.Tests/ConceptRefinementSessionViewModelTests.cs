@@ -357,33 +357,122 @@ public sealed class ConceptRefinementSessionViewModelTests
     }
 
     [Fact]
-    public void InitializeDisabled_WhenNoBaseIdea()
+    public async Task InitializeDisabledReason_NoBaseIdea()
     {
         var inspector = CreateInspector();
         var svc = new StubRefinementService();
         var acc = new StubRefinementAccess(true);
         var vm = new ConceptRefinementSessionViewModel(svc, acc, inspector);
+
+        await SetupLoadedInspectorAsync(inspector);
+        vm.ResetSession();
 
         inspector.Idea = "";
         inspector.ConceptIdea = "";
-        inspector.Phrase = "";
-        inspector.GraphicDirection = "";
 
         Assert.False(vm.CanInitialize);
+        Assert.Contains("base idea", vm.InitializeDisabledReason, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void InitializeDisabled_WhenFieldsNotEmpty()
+    public async Task InitializeDisabledReason_FieldsNotEmpty()
     {
         var inspector = CreateInspector();
         var svc = new StubRefinementService();
         var acc = new StubRefinementAccess(true);
         var vm = new ConceptRefinementSessionViewModel(svc, acc, inspector);
 
+        await SetupLoadedInspectorAsync(inspector);
+        vm.ResetSession();
+
         inspector.Idea = "Base idea";
-        inspector.ConceptIdea = "Non-empty concept";
+        inspector.ConceptIdea = "Non-empty";
 
         Assert.False(vm.CanInitialize);
+        Assert.Contains("empty", vm.InitializeDisabledReason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ManualCommit_AppendsCorrectlyLabeledEntry()
+    {
+        var inspector = CreateInspector();
+        var (svc, acc) = (new StubRefinementService(), new StubRefinementAccess(true));
+        var vm = new ConceptRefinementSessionViewModel(svc, acc, inspector);
+
+        await SetupLoadedInspectorAsync(inspector);
+        vm.ResetSession();
+
+        inspector.ConceptIdea = "Manually edited concept";
+
+        await inspector.CommitEditsAsync();
+        await Task.Delay(50);
+
+        Assert.Single(vm.History);
+        Assert.Equal("Edited Concept idea", vm.History[0].Label);
+        Assert.Equal("Manually edited concept", vm.History[0].ConceptIdea);
+    }
+
+    [Fact]
+    public async Task NonConceptCommit_AppendsNothing()
+    {
+        var inspector = CreateInspector();
+        var (svc, acc) = (new StubRefinementService(), new StubRefinementAccess(true));
+        var vm = new ConceptRefinementSessionViewModel(svc, acc, inspector);
+
+        await SetupLoadedInspectorAsync(inspector);
+        vm.ResetSession();
+
+        inspector.Notes = "Some notes";
+        await inspector.CommitEditsAsync();
+        await Task.Delay(50);
+
+        Assert.Empty(vm.History);
+    }
+
+    [Fact]
+    public async Task AiTriggeredCommit_AddsNoManualEntry()
+    {
+        var inspector = CreateInspector();
+        var (svc, acc) = (new StubRefinementService(), new StubRefinementAccess(true));
+        var vm = new ConceptRefinementSessionViewModel(svc, acc, inspector);
+
+        await SetupLoadedInspectorAsync(inspector);
+        vm.ResetSession();
+
+        inspector.Idea = "Base";
+        svc.InitializeResult = ConceptRefinementResult.Success("AI Idea", "AI Phrase", "AI Graphic");
+        Assert.True(vm.CanInitialize);
+        vm.InitializeCommand.Execute(null);
+        await Task.Delay(100);
+
+        Assert.Single(vm.History);
+        Assert.Equal("Initialized from base idea", vm.History[0].Label);
+    }
+
+    [Fact]
+    public async Task FailedCommitAfterApply_RetainsHistoryEntryAndDraft()
+    {
+        var inspector = CreateInspector();
+        var (svc, acc) = (new StubRefinementService(), new StubRefinementAccess(true));
+        var vm = new ConceptRefinementSessionViewModel(svc, acc, inspector);
+
+        await SetupLoadedInspectorAsync(inspector, failSaves: true);
+        vm.ResetSession();
+
+        inspector.Idea = "Base";
+        svc.InitializeResult = ConceptRefinementResult.Success("Failed commit idea", "Failed commit phrase", "Failed commit graphic");
+
+        Assert.True(vm.CanInitialize);
+        vm.InitializeCommand.Execute(null);
+        await Task.Delay(100);
+
+        Assert.Single(vm.History);
+        Assert.Equal("Initialized from base idea", vm.History[0].Label);
+        Assert.Equal("Failed commit idea", inspector.ConceptIdea);
+
+        // Inspector's error surfaced (per D6)
+        Assert.True(inspector.HasError);
+        Assert.NotNull(inspector.ErrorMessage);
     }
 
     // --- Test helpers ---
@@ -404,7 +493,7 @@ public sealed class ConceptRefinementSessionViewModelTests
             inspector);
     }
 
-    private static async Task SetupLoadedInspectorAsync(ItemInspectorViewModel inspector)
+    private static async Task SetupLoadedInspectorAsync(ItemInspectorViewModel inspector, bool failSaves = false)
     {
         var state = CreateValidState();
         var svcField = typeof(ItemInspectorViewModel).GetField(
@@ -413,6 +502,7 @@ public sealed class ConceptRefinementSessionViewModelTests
         if (svcField?.GetValue(inspector) is StubItemInspectorService stub)
         {
             stub.StateToReturn = state;
+            stub.FailSaves = failSaves;
         }
 
         await inspector.LoadAsync(state.Id);
@@ -488,18 +578,25 @@ public sealed class ConceptRefinementSessionViewModelTests
     private sealed class StubItemInspectorService : IItemInspectorService
     {
         public ItemInspectorState? StateToReturn { get; set; }
+        public bool FailSaves { get; set; }
 
         public Task<ItemInspectorState?> LoadAsync(Guid itemId, CancellationToken cancellationToken = default) =>
             Task.FromResult(StateToReturn);
 
         public Task<ItemInspectorSaveResult> SaveAsync(ItemInspectorSaveRequest request, CancellationToken cancellationToken = default) =>
-            Task.FromResult(StateToReturn is { } s
-                ? ItemInspectorSaveResult.Success(s)
-                : ItemInspectorSaveResult.Failure("No state"));
+            FailSaves
+                ? Task.FromResult(ItemInspectorSaveResult.Failure("Save failed"))
+                : Task.FromResult(StateToReturn is { } s
+                    ? ItemInspectorSaveResult.Success(s)
+                    : ItemInspectorSaveResult.Failure("No state"));
 
         public Task<ItemInspectorSaveResult> SaveStageAsync(ItemStageAwareSaveRequest request, CancellationToken cancellationToken = default)
         {
-            // Return an updated state that preserves the current draft values
+            if (FailSaves)
+            {
+                return Task.FromResult(ItemInspectorSaveResult.Failure("SaveStage failed"));
+            }
+
             var updated = StateToReturn is { } s
                 ? s with
                 {

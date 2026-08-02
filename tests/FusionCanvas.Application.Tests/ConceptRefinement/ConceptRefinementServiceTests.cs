@@ -18,6 +18,7 @@ public sealed class ConceptRefinementServiceTests
     private static readonly Guid StoreId = Guid.NewGuid();
     private static readonly Guid NicheId = Guid.NewGuid();
     private static readonly Guid TagId = Guid.NewGuid();
+    private static readonly Guid GroupId = Guid.NewGuid();
 
     [Fact]
     public async Task InitializeAsync_WhenAiSucceeds_ParsesLabeledResponseAndReturnsSuccess()
@@ -120,6 +121,13 @@ public sealed class ConceptRefinementServiceTests
         Assert.Contains("Test Store", userMessage.Text);
         Assert.Contains("Test Niche", userMessage.Text);
         Assert.Contains("test-tag", userMessage.Text);
+
+        // VR-004: Store/niche descriptions present
+        Assert.Contains("A test store", userMessage.Text);
+        Assert.Contains("A test niche", userMessage.Text);
+
+        // VR-004: Topic shows (none) for ungrouped item
+        Assert.Contains("Topic: (none)", userMessage.Text);
 
         // No operational or secret fields
         Assert.DoesNotContain(ItemId.ToString(), userMessage.Text, StringComparison.OrdinalIgnoreCase);
@@ -284,10 +292,74 @@ public sealed class ConceptRefinementServiceTests
         Assert.Contains("Original idea", userMessage.Text);
         Assert.Contains("Test Store", userMessage.Text);
 
+        // VR-004: descriptions present
+        Assert.Contains("A test store", userMessage.Text);
+        Assert.Contains("A test niche", userMessage.Text);
+        Assert.Contains("Topic: (none)", userMessage.Text);
+
         // No operational/secret fields
         Assert.DoesNotContain(ItemId.ToString(), userMessage.Text, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("apikey", userMessage.Text, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("path", userMessage.Text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_WithGroupedItem_IncludesTopicNameAndMetadata()
+    {
+        var (service, ai, _) = CreateService(CreateGroupedSnapshot());
+        ai.Result = AiTextResult.Success(
+            """
+            IDEA: Grouped concept idea
+            PHRASE: Grouped phrase
+            GRAPHIC: Grouped graphic
+            """,
+            "test-model");
+
+        await service.InitializeAsync(ItemId, "Base idea", TestContext.Current.CancellationToken);
+
+        Assert.NotNull(ai.LastRequest);
+        var userMessage = ai.LastRequest.Messages[1];
+        Assert.Equal(AiMessageRole.User, userMessage.Role);
+
+        // VR-004: Topic group name included
+        Assert.Contains("Test Group", userMessage.Text);
+
+        // VR-004: Group metadata included (sanitized - brand/style kept)
+        Assert.Contains("groupstyle", userMessage.Text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_AdversarialMetadata_ExcludesOperationalKeys()
+    {
+        // VR-005: store/niche/group metadata with id/path/apikey/token/createdat/inheritedFrom keys
+        var snapshot = CreateAdversarialSnapshot();
+        var (service, ai, _) = CreateService(snapshot);
+        ai.Result = AiTextResult.Success(
+            """
+            IDEA: Clean idea
+            PHRASE: Clean phrase
+            GRAPHIC: Clean graphic
+            """,
+            "test-model");
+
+        await service.InitializeAsync(ItemId, "Base idea", TestContext.Current.CancellationToken);
+
+        Assert.NotNull(ai.LastRequest);
+        var userMessage = ai.LastRequest.Messages[1];
+        Assert.Equal(AiMessageRole.User, userMessage.Role);
+
+        // Sanitized values that should remain
+        Assert.Contains("brand=Adversarial", userMessage.Text);
+        Assert.Contains("tone=dark", userMessage.Text);
+
+        // Operational keys that must be absent
+        Assert.DoesNotContain("apikey", userMessage.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("token", userMessage.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("secret", userMessage.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("credential", userMessage.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("path", userMessage.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("createdAt", userMessage.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("inherited", userMessage.Text, StringComparison.OrdinalIgnoreCase);
     }
 
     private static (ConceptRefinementService Service, CapturingAi Ai, InMemoryRepository Repo) CreateService(WorkspaceSnapshot snapshot)
@@ -297,6 +369,48 @@ public sealed class ConceptRefinementServiceTests
         var guidance = new StubGuidanceSource();
         var service = new ConceptRefinementService(repo, ai, guidance);
         return (service, ai, repo);
+    }
+
+    private static WorkspaceSnapshot CreateGroupedSnapshot()
+    {
+        var store = new Store(StoreId, "Test Store", "A test store", false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, """{"brand": "nature"}""");
+        var niche = new Niche(NicheId, StoreId, "Test Niche", "A test niche", false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "{}");
+        var group = new TopicGroup(GroupId, StoreId, NicheId, null, "Test Group", null, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, """{"groupstyle": "playful"}""");
+        var item = new Item(ItemId, StoreId, NicheId, GroupId, "Test Item", null, ItemStatus.Draft, WorkflowStage.Concept, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, """{"idea": "Base idea"}""");
+        var tag = new Tag(TagId, StoreId, "test-tag", null, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "{}");
+        var itemTag = new ItemTag(ItemId, TagId);
+
+        return new WorkspaceSnapshot(
+            [store],
+            [niche],
+            [group],
+            [item],
+            [],
+            [],
+            [tag],
+            [itemTag],
+            []);
+    }
+
+    private static WorkspaceSnapshot CreateAdversarialSnapshot()
+    {
+        var metadata = """{"brand":"Adversarial","apiKey":"sk-12345","path":"/secret/","dbPath":"C:\\db","token":"abc","credential":"pwd","secret":"hidden","createdAt":"2024-01-01","inheritedFrom":"parent-group","id":"x123","tone":"dark"}""";
+        var store = new Store(StoreId, "Adv Store", "Adv store desc", false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, metadata);
+        var niche = new Niche(NicheId, StoreId, "Adv Niche", "Adv niche desc", false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, metadata);
+        var item = new Item(ItemId, StoreId, NicheId, null, "Test Item", null, ItemStatus.Draft, WorkflowStage.Concept, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "{}");
+        var tag = new Tag(TagId, StoreId, "adv-tag", null, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "{}");
+        var itemTag = new ItemTag(ItemId, TagId);
+
+        return new WorkspaceSnapshot(
+            [store],
+            [niche],
+            [],
+            [item],
+            [],
+            [],
+            [tag],
+            [itemTag],
+            []);
     }
 
     private static WorkspaceSnapshot CreateSnapshot()

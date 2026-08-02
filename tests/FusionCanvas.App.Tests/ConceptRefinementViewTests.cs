@@ -107,10 +107,12 @@ public sealed class ConceptRefinementViewTests
         fixture.PumpLayout();
 
         Assert.Empty(fixture.ViewModel.ConceptRefinement.History);
+        Assert.False(fixture.ViewModel.ConceptRefinement.HasHistory);
 
         var listBox = fixture.FindControlOrDefault<ListBox>(lb =>
             lb.ItemsSource == fixture.ViewModel.ConceptRefinement.History);
         Assert.NotNull(listBox);
+        Assert.False(listBox.IsVisible);
     }
 
     [AvaloniaFact]
@@ -143,5 +145,25 @@ public sealed class ConceptRefinementViewTests
         fixture.ViewModel.ItemInspector.GraphicDirection = "Bold visual direction";
 
         Assert.Equal(100, fixture.ViewModel.ConceptRefinement.Score);
+    }
+
+    [AvaloniaFact]
+    public void ErrorMessage_ShowsWhenSet()
+    {
+        // VR-001: inline error renders when ErrorMessage is set
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Concept);
+        fixture.PumpLayout();
+
+        Assert.False(fixture.ViewModel.ConceptRefinement.HasError);
+        Assert.Null(fixture.ViewModel.ConceptRefinement.ErrorMessage);
+
+        // Set an error on the session VM
+        fixture.ViewModel.ConceptRefinement.SetErrorForTest("Test error message");
+        fixture.PumpLayout();
+
+        Assert.True(fixture.ViewModel.ConceptRefinement.HasError);
+        Assert.Equal("Test error message", fixture.ViewModel.ConceptRefinement.ErrorMessage);
     }
 }

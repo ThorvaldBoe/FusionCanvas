@@ -22,6 +22,7 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
     private int _operationSequence;
     private bool _isApplying;
     private bool _isRollingBack;
+    private ConceptRefinementTriangle _baseline = new("", "", "");
     private sealed record CapturedOperation(int Sequence, Guid ItemId);
 
     public ConceptRefinementSessionViewModel(
@@ -135,6 +136,54 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
+    // --- Initialize disabled reason (VR-002) ---
+
+    public string? InitializeDisabledReason
+    {
+        get
+        {
+            if (IsAvailable && CanRefine && _inspector.CanEditStage)
+            {
+                if (!HasNonWhitespace(_inspector.Idea))
+                {
+                    return "A base idea is required before initializing.";
+                }
+
+                if (HasAnyNonWhitespaceCorner())
+                {
+                    return "All concept fields must be empty to initialize from the base idea.";
+                }
+
+                return null;
+            }
+
+            if (!_inspector.CanEditStage)
+            {
+                return _inspector.StageReadOnlyReason;
+            }
+
+            if (!IsAvailable)
+            {
+                return UnavailableReason;
+            }
+
+            if (IsBusy)
+            {
+                return "A refinement operation is in progress.";
+            }
+
+            return null;
+        }
+    }
+
+    // --- History visibility (VR-007a) ---
+
+    public bool HasHistory => History.Count > 0;
+
+    // --- Current entry index (VR-007b) ---
+
+    public int? CurrentEntryIndex => _currentIndex >= 0 ? _currentIndex : null;
+
     // --- Can initialize ---
 
     public bool CanInitialize =>
@@ -190,12 +239,17 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
         _currentIndex = -1;
         ErrorMessage = null;
         _sessionItemId = _inspector.LoadedItemId;
+        _baseline = new ConceptRefinementTriangle(
+            _inspector.ConceptIdea,
+            _inspector.Phrase,
+            _inspector.GraphicDirection);
         if (_sessionItemId is not null)
         {
             _sessionCts = new CancellationTokenSource();
         }
 
         RecomputeScore();
+        NotifyHistoryChanged();
         RaiseCommandStates();
     }
 
@@ -392,6 +446,7 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
             History.Add(entry);
             _currentIndex = History.Count - 1;
+            NotifyHistoryChanged();
 
             // Commit through the inspector's automatic-save path
             _isApplying = true;
@@ -426,6 +481,12 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     // --- Helpers ---
 
+    private void NotifyHistoryChanged()
+    {
+        OnPropertyChanged(nameof(HasHistory));
+        OnPropertyChanged(nameof(CurrentEntryIndex));
+    }
+
     private ConceptRefinementTriangle CaptureTriangle() =>
         new(_inspector.ConceptIdea, _inspector.Phrase, _inspector.GraphicDirection);
 
@@ -453,6 +514,8 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
             {
                 History.RemoveAt(i);
             }
+
+            NotifyHistoryChanged();
         }
     }
 
@@ -501,12 +564,16 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(IsAvailable));
         OnPropertyChanged(nameof(UnavailableReason));
         OnPropertyChanged(nameof(CanInitialize));
+        OnPropertyChanged(nameof(InitializeDisabledReason));
         OnPropertyChanged(nameof(CanFineTuneConceptIdea));
         OnPropertyChanged(nameof(CanFineTunePhrase));
         OnPropertyChanged(nameof(CanFineTuneGraphicDirection));
         OnPropertyChanged(nameof(CanChangeConceptIdea));
         OnPropertyChanged(nameof(CanChangePhrase));
         OnPropertyChanged(nameof(CanChangeGraphicDirection));
+        OnPropertyChanged(nameof(HasHistory));
+        OnPropertyChanged(nameof(CurrentEntryIndex));
+        OnPropertyChanged(nameof(HasError));
     }
 
     // --- Inspector event handlers ---
@@ -543,35 +610,41 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     private void AppendManualCommitEntry()
     {
+        var insp = _inspector;
+        // Only consider concept-field changes; non-Concept commits (title, notes, tags) are ignored.
+        var currentConceptIdea = insp.ConceptIdea;
+        var currentPhrase = insp.Phrase;
+        var currentGraphic = insp.GraphicDirection;
+
+        // Determine what to compare against: last entry or baseline
+        string prevConceptIdea, prevPhrase, prevGraphic;
         if (History.Count > 0)
         {
             var last = History[^1];
-            if (last.ConceptIdea == _inspector.ConceptIdea
-                && last.Phrase == _inspector.Phrase
-                && last.GraphicDirection == _inspector.GraphicDirection)
-            {
-                // No material change; skip
-                return;
-            }
+            prevConceptIdea = last.ConceptIdea;
+            prevPhrase = last.Phrase;
+            prevGraphic = last.GraphicDirection;
+        }
+        else
+        {
+            prevConceptIdea = _baseline.ConceptIdea;
+            prevPhrase = _baseline.Phrase;
+            prevGraphic = _baseline.GraphicDirection;
         }
 
-        // Determine which fields changed
+        // Determine which concept fields changed
         var changedFields = new List<string>();
-        var prevConceptIdea = History.Count > 0 ? History[^1].ConceptIdea : string.Empty;
-        var prevPhrase = History.Count > 0 ? History[^1].Phrase : string.Empty;
-        var prevGraphic = History.Count > 0 ? History[^1].GraphicDirection : string.Empty;
-
-        if (_inspector.ConceptIdea != prevConceptIdea)
+        if (currentConceptIdea != prevConceptIdea)
         {
             changedFields.Add("Concept idea");
         }
 
-        if (_inspector.Phrase != prevPhrase)
+        if (currentPhrase != prevPhrase)
         {
             changedFields.Add("Phrase");
         }
 
-        if (_inspector.GraphicDirection != prevGraphic)
+        if (currentGraphic != prevGraphic)
         {
             changedFields.Add("Graphic direction");
         }
@@ -589,12 +662,13 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
         var entry = new ConceptRefinementHistoryEntry(
             label,
-            _inspector.ConceptIdea,
-            _inspector.Phrase,
-            _inspector.GraphicDirection,
+            currentConceptIdea,
+            currentPhrase,
+            currentGraphic,
             DateTimeOffset.UtcNow);
         History.Add(entry);
         _currentIndex = History.Count - 1;
+        NotifyHistoryChanged();
     }
 
     private void OnAccessAvailabilityChanged(object? sender, EventArgs args)
@@ -603,6 +677,9 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
     }
 
     // --- INotifyPropertyChanged ---
+
+    // Public setter for testing (VR-001)
+    internal void SetErrorForTest(string message) => ErrorMessage = message;
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
