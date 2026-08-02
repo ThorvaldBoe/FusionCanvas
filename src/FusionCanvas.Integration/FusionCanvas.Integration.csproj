@@ -13,6 +13,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Snowclones\Resources\starter-snowclones.csv"
                       LogicalName="FusionCanvas.Integration.Snowclones.Resources.starter-snowclones.csv" />
+    <EmbeddedResource Include="AI\DesignTriangleGuidance.md"
+                      LogicalName="FusionCanvas.Integration.AI.DesignTriangleGuidance.md" />
   </ItemGroup>
 
   <PropertyGroup>

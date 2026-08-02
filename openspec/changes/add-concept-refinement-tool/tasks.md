@@ -4,23 +4,23 @@ Implementation follows `design.md` D1–D8. Do not reopen the design decisions l
 
 ## 1. Domain completeness score
 
-- [ ] 1.1 Add `src/FusionCanvas.Domain/Concepts/DesignTriangleScore.cs` implementing the D1 formula: per corner 0 / 0.5 / 1 (whitespace-only; trimmed length < 8; ≥ 8), score = `Round(100 × sum / 3)`.
-- [ ] 1.2 Add `tests/FusionCanvas.Domain.Tests/Concepts/DesignTriangleScoreTests.cs`: all empty → 0; all substantive → 100; one short corner half credit; whitespace-only corner treated as empty; monotonic as corners gain content.
+- [x] 1.1 Add `src/FusionCanvas.Domain/Concepts/DesignTriangleScore.cs` implementing the D1 formula: per corner 0 / 0.5 / 1 (whitespace-only; trimmed length < 8; ≥ 8), score = `Round(100 × sum / 3)`.
+- [x] 1.2 Add `tests/FusionCanvas.Domain.Tests/Concepts/DesignTriangleScoreTests.cs`: all empty → 0; all substantive → 100; one short corner half credit; whitespace-only corner treated as empty; monotonic as corners gain content.
 
 ## 2. Guidance document and source
 
-- [ ] 2.1 Add `IDesignTriangleGuidanceSource` (`string Load()`) in `src/FusionCanvas.Application/ConceptRefinement/`.
-- [ ] 2.2 Add `src/FusionCanvas.Integration/AI/DesignTriangleGuidance.md` as `EmbeddedResource` with the D4 placeholder content (idea = emotion/familiar setting, mandatory; phrase = optional on-product text; graphics = optional visual elements; the three must reinforce each other).
-- [ ] 2.3 Add `EmbeddedDesignTriangleGuidanceSource` in `src/FusionCanvas.Integration/AI/` reading the embedded resource.
-- [ ] 2.4 Add `tests/FusionCanvas.Integration.Tests/AI/EmbeddedDesignTriangleGuidanceSourceTests.cs`: loads non-empty content mentioning idea, phrase, and graphic.
+- [x] 2.1 Add `IDesignTriangleGuidanceSource` (`string Load()`) in `src/FusionCanvas.Application/ConceptRefinement/`.
+- [x] 2.2 Add `src/FusionCanvas.Integration/AI/DesignTriangleGuidance.md` as `EmbeddedResource` with the D4 placeholder content (idea = emotion/familiar setting, mandatory; phrase = optional on-product text; graphics = optional visual elements; the three must reinforce each other).
+- [x] 2.3 Add `EmbeddedDesignTriangleGuidanceSource` in `src/FusionCanvas.Integration/AI/` reading the embedded resource.
+- [x] 2.4 Add `tests/FusionCanvas.Integration.Tests/AI/EmbeddedDesignTriangleGuidanceSourceTests.cs`: loads non-empty content mentioning idea, phrase, and graphic.
 
 ## 3. Application refinement service
 
-- [ ] 3.1 Add `ConceptRefinementCorner`, `ConceptRefinementActionKind`, `ConceptRefinementTriangle`, `ConceptRefinementResult`, and `IConceptRefinementService` in `src/FusionCanvas.Application/ConceptRefinement/` per D2.
-- [ ] 3.2 Implement `ConceptRefinementService` (repository creative-context resolution, D3 prompt assembly with guidance document + creative context and no operational/secret fields, `AiRequestPurpose.Concept` dispatch).
-- [ ] 3.3 Implement D3 response parsing: labeled `IDEA:`/`PHRASE:`/`GRAPHIC:` for Initialize (all three required); label/quote stripping and `ItemMetadataCodec.NormalizeSingleLine` for Phrase on corner operations; empty results fail recoverably.
-- [ ] 3.4 Add `IConceptRefinementAccessStatus` + `ConfiguredConceptRefinementAccessStatus` mirroring `ConfiguredIdeationAccessStatus` for `AiRequestPurpose.Concept`.
-- [ ] 3.5 Add `tests/FusionCanvas.Application.Tests/ConceptRefinement/` tests with a capturing fake `IAiTextGenerationService` and in-memory repository: initialize parse success; malformed initialize failure leaves no partial values; fine-tune/change extraction and normalization; empty-result failure; availability mapping; captured request contains guidance text, action instruction, current triangle, original idea, creative context, and no identifiers/timestamps/paths/credentials.
+- [x] 3.1 Add `ConceptRefinementCorner`, `ConceptRefinementActionKind`, `ConceptRefinementTriangle`, `ConceptRefinementResult`, and `IConceptRefinementService` in `src/FusionCanvas.Application/ConceptRefinement/` per D2.
+- [x] 3.2 Implement `ConceptRefinementService` (repository creative-context resolution, D3 prompt assembly with guidance document + creative context and no operational/secret fields, `AiRequestPurpose.Concept` dispatch).
+- [x] 3.3 Implement D3 response parsing: labeled `IDEA:`/`PHRASE:`/`GRAPHIC:` for Initialize (all three required); label/quote stripping and `ItemMetadataCodec.NormalizeSingleLine` for Phrase on corner operations; empty results fail recoverably.
+- [x] 3.4 Add `IConceptRefinementAccessStatus` + `ConfiguredConceptRefinementAccessStatus` mirroring `ConfiguredIdeationAccessStatus` for `AiRequestPurpose.Concept`.
+- [x] 3.5 Add `tests/FusionCanvas.Application.Tests/ConceptRefinement/` tests with a capturing fake `IAiTextGenerationService` and in-memory repository: initialize parse success; malformed initialize failure leaves no partial values; fine-tune/change extraction and normalization; empty-result failure; availability mapping; captured request contains guidance text, action instruction, current triangle, original idea, creative context, and no identifiers/timestamps/paths/credentials.
 
 ## 4. Session view model and composition
 
