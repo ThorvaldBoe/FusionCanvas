@@ -1,0 +1,23 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="FusionCanvas.App.SplashWindow"
+        Title="FusionCanvas"
+        Icon="avares://FusionCanvas.App/Assets/FusionCanvas.ico"
+        Width="760"
+        Height="380"
+        MinWidth="560"
+        MinHeight="280"
+        MaxWidth="1140"
+        MaxHeight="570"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowDecorations="None"
+        Background="#071B3A">
+  <Border Background="#071B3A" Padding="16">
+    <Image Source="avares://FusionCanvas.App/Assets/FusionCanvasBanner.jpg"
+           Stretch="Uniform"
+           HorizontalAlignment="Stretch"
+           VerticalAlignment="Stretch" />
+  </Border>
+</Window>

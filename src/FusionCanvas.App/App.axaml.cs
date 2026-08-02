@@ -1,5 +1,6 @@
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using FusionCanvas.App.Settings;
 using FusionCanvas.App.Views;
 
@@ -18,6 +19,21 @@ public partial class App : Avalonia.Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            var splash = new SplashWindow();
+            desktop.MainWindow = splash;
+            splash.Show();
+            Dispatcher.UIThread.Post(() => InitializeMainWindow(desktop, splash));
+        }
+
+        base.OnFrameworkInitializationCompleted();
+    }
+
+    private void InitializeMainWindow(
+        IClassicDesktopStyleApplicationLifetime desktop,
+        SplashWindow splash)
+    {
+        RunWithSplashCleanup(splash, () =>
+        {
             _services = AppServicesFactory.Create();
             var mainWindow = new MainWindow(_services);
             mainWindow.Closing += (_, _) =>
@@ -26,8 +42,22 @@ public partial class App : Avalonia.Application
                 _services?.Dispose();
             };
             desktop.MainWindow = mainWindow;
-        }
+            mainWindow.Show();
+        });
+    }
 
-        base.OnFrameworkInitializationCompleted();
+    internal static void RunWithSplashCleanup(SplashWindow splash, Action startup)
+    {
+        ArgumentNullException.ThrowIfNull(splash);
+        ArgumentNullException.ThrowIfNull(startup);
+
+        try
+        {
+            startup();
+        }
+        finally
+        {
+            splash.Close();
+        }
     }
 }
