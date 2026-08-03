@@ -4,8 +4,10 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Styling;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Settings;
+using FusionCanvas.App.Versioning;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.Application.Settings;
+using FusionCanvas.Application.Versioning;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Application.Workspaces;
 
@@ -207,6 +209,43 @@ public class SettingsWindowTests
             await settings.FlushAsync();
         }
         finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public void AboutSection_ShowsProductVersionAndCopyDiagnosticsButton()
+    {
+        var info = new ApplicationVersionInfo("0.1.42", "0.1.42+g3f91c2a", "3f91c2a");
+        var settings = new SettingsViewModel(
+            new InMemoryApplicationSettingsStore(),
+            new AvaloniaApplicationThemeController(),
+            ApplicationSettings.Default,
+            loadWarning: null,
+            versionProvider: new ConstantVersionProvider(info),
+            clipboard: new NullClipboardService());
+        settings.OpenCommand.Execute(null);
+        settings.SelectedSection = SettingsSection.About;
+
+        var window = new SettingsWindow { DataContext = settings };
+        try
+        {
+            window.Show();
+            PumpLayout(window);
+
+            Assert.True(settings.IsAboutSection);
+            var version = FindControl<TextBlock>(window, t => t.IsVisible && t.Text == "Version 0.1.42");
+            Assert.NotNull(version);
+            var copyButton = FindControl<Button>(window, b => (b.Content as string) == "Copy diagnostics" && b.IsVisible);
+            Assert.NotNull(copyButton);
+            Assert.Same(settings.CopyDiagnosticsCommand, copyButton!.Command);
+            var product = FindControl<TextBlock>(window, t => t.IsVisible && t.Text == "FusionCanvas");
+            Assert.NotNull(product);
+        }
+        finally { window.Close(); }
+    }
+
+    private sealed class ConstantVersionProvider(ApplicationVersionInfo info) : IApplicationVersionProvider
+    {
+        public ApplicationVersionInfo GetVersion() => info;
     }
 
     private static SettingsViewModel NewSettingsViewModel(WorkspaceManagementViewModel? management = null)

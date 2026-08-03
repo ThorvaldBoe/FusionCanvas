@@ -46,3 +46,46 @@ Issue `#57` requests a way to manage multiple mockup configurations. After triag
 ### Broad request split into modules
 
 Issue `#71` asks for marketplace publishing. Discovery shows independent Etsy export and Shopify export outcomes. Issue `#71` remains the tracking issue, while linked child issues become the primary work records for their separate OpenSpec changes and pull requests.
+
+## Versioning and releases
+
+FusionCanvas uses [Nerdbank.GitVersioning](https://github.com/dotnet/Nerdbank.GitVersioning) to generate the application version from the repository.
+
+- The manually maintained `Major.Minor` version lives in [`version.json`](version.json) at the repository root. The `Build` component is generated automatically from Git version height and is never stored.
+- A single central build dependency in [`Directory.Build.props`](Directory.Build.props) applies Nerdbank.GitVersioning to every Clean Architecture project. Layer `.csproj` files must not set a competing `Version`, `VersionPrefix`, `PackageVersion`, or `AssemblyVersion` property.
+- The same Git commit produces the same version whether it is built locally or in GitHub Actions. The canonical build number is derived from the repository, **not** from `github.run_number`.
+- The user-facing version is exposed in Settings → About, and the About section provides a copyable diagnostic block (version, short commit id, platform) for bug reports.
+
+### GitHub Actions checkout
+
+GitHub Actions builds must preserve full Git history so Nerdbank.GitVersioning can compute the build number:
+
+```yaml
+- name: Checkout
+  uses: actions/checkout@v4
+  with:
+    fetch-depth: 0
+```
+
+A shallow checkout builds successfully but produces a less useful version.
+
+### Release tag convention
+
+Releases use the Git tag form:
+
+```text
+vMajor.Minor.Build
+```
+
+Example: `v0.4.127`.
+
+The Git tag, application version, release title, and artifact filename use the same `Major.Minor.Build` value:
+
+```text
+Application version: 0.4.127
+Git tag:              v0.4.127
+Release title:       FusionCanvas 0.4.127
+Artifact:            FusionCanvas-0.4.127-win-x64.zip
+```
+
+Creating the complete GitHub release workflow is outside the scope of the versioning module; this convention documents the intended alignment.
