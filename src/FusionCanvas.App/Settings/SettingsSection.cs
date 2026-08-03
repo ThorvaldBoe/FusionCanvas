@@ -4,5 +4,6 @@ public enum SettingsSection
 {
     General,
     AI,
-    Workspace
+    Workspace,
+    About
 }

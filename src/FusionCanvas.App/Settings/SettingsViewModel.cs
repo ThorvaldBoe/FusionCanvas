@@ -2,9 +2,11 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using FusionCanvas.App.DocumentWindow;
+using FusionCanvas.App.Versioning;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Settings;
+using FusionCanvas.Application.Versioning;
 using FusionCanvas.Application.Workspaces;
 
 namespace FusionCanvas.App.Settings;
@@ -13,6 +15,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
 {
     private readonly IApplicationSettingsStore _store;
     private readonly IApplicationThemeController _themeController;
+    private readonly IApplicationVersionProvider _versionProvider;
+    private readonly IClipboardService _clipboard;
     private readonly SynchronizationContext? _syncContext;
     private WorkspaceManagementViewModel? _workspaceManagement;
     private SettingsSection _selectedSection = SettingsSection.General;
@@ -30,15 +34,21 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         IApplicationThemeController themeController,
         ApplicationSettings initialSettings,
         string? loadWarning,
-        AiSettingsViewModel? ai = null)
+        AiSettingsViewModel? ai = null,
+        IApplicationVersionProvider? versionProvider = null,
+        IClipboardService? clipboard = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _themeController = themeController ?? throw new ArgumentNullException(nameof(themeController));
+        _versionProvider = versionProvider ?? UnknownApplicationVersionProvider.Instance;
+        _clipboard = clipboard ?? NullClipboardService.Instance;
         _syncContext = SynchronizationContext.Current;
         _currentSettings = initialSettings;
         _isDarkMode = initialSettings.DarkMode;
         _errorMessage = loadWarning;
         _themeController.ApplyDarkMode(_isDarkMode);
+        Version = _versionProvider.GetVersion();
+        DiagnosticsText = ApplicationVersionDiagnostics.Format(Version, ApplicationVersionDiagnostics.BuildPlatformString());
 
         OpenCommand = new RelayCommand(_ => Open());
         Ai = ai ?? CreateOfflineAi(initialSettings.Ai);
@@ -57,6 +67,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         });
         CancelDiscardCommand = new RelayCommand(_ => ConfirmDiscardCredentialDraft = false);
         ManageWorkspacesCommand = new RelayCommand(_ => ManageWorkspaces(), () => _workspaceManagement is not null);
+        CopyDiagnosticsCommand = new RelayCommand(_ => CopyDiagnostics());
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -71,6 +82,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(IsGeneralSection));
                 OnPropertyChanged(nameof(IsAiSection));
                 OnPropertyChanged(nameof(IsWorkspaceSection));
+                OnPropertyChanged(nameof(IsAboutSection));
                 if (value == SettingsSection.AI)
                 {
                     _ = Ai.EnsureLoadedAsync();
@@ -85,12 +97,19 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
 
     public bool IsAiSection => _selectedSection == SettingsSection.AI;
 
+    public bool IsAboutSection => _selectedSection == SettingsSection.About;
+
     public IReadOnlyList<SettingsSection> Sections { get; } = new[]
     {
         SettingsSection.General,
         SettingsSection.AI,
-        SettingsSection.Workspace
+        SettingsSection.Workspace,
+        SettingsSection.About
     };
+
+    public ApplicationVersionInfo Version { get; }
+
+    public string DiagnosticsText { get; }
 
     public AiSettingsViewModel Ai { get; }
 
@@ -141,6 +160,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     public ICommand ManageWorkspacesCommand { get; }
     public ICommand ConfirmDiscardCommand { get; }
     public ICommand CancelDiscardCommand { get; }
+    public ICommand CopyDiagnosticsCommand { get; }
 
     public void AttachWorkspaceManagement(WorkspaceManagementViewModel workspaceManagement)
     {
@@ -201,6 +221,12 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         {
             management.OpenWorkspaceManagementCommand.Execute(null);
         }
+    }
+
+    private void CopyDiagnostics()
+    {
+        var text = DiagnosticsText;
+        _ = _clipboard.SetTextAsync(text);
     }
 
     private void QueueSave(ApplicationSettings settings)

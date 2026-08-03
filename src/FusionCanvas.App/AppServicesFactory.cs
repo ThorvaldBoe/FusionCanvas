@@ -1,4 +1,5 @@
 using FusionCanvas.App.Settings;
+using FusionCanvas.App.Versioning;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Integration.AI;
 
@@ -39,7 +40,9 @@ public static class AppServicesFactory
             new AvaloniaApplicationThemeController(),
             load.Value,
             load.Warning,
-            aiSettings);
+            aiSettings,
+            new AssemblyApplicationVersionProvider(),
+            AvaloniaClipboardService.Instance);
         var textService = new AiTextGenerationService(aiSettings, credentials, catalogCache, openRouter);
         return new AppServices(httpClient, settingsStore, settings, textService);
     }
