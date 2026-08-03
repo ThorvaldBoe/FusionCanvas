@@ -22,6 +22,9 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
     private int _operationSequence;
     private bool _isApplying;
     private bool _isRollingBack;
+    private string _conceptIdeaInput = string.Empty;
+    private string _phraseInput = string.Empty;
+    private string _graphicDirectionInput = string.Empty;
     private ConceptRefinementTriangle _baseline = new("", "", "");
     private sealed record CapturedOperation(int Sequence, Guid ItemId);
 
@@ -136,6 +139,44 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
+    // --- Local refinement inputs ---
+
+    public string ConceptIdeaInput
+    {
+        get => _conceptIdeaInput;
+        set
+        {
+            if (SetField(ref _conceptIdeaInput, value ?? string.Empty))
+            {
+                RaiseCommandStates();
+            }
+        }
+    }
+
+    public string PhraseInput
+    {
+        get => _phraseInput;
+        set
+        {
+            if (SetField(ref _phraseInput, value ?? string.Empty))
+            {
+                RaiseCommandStates();
+            }
+        }
+    }
+
+    public string GraphicDirectionInput
+    {
+        get => _graphicDirectionInput;
+        set
+        {
+            if (SetField(ref _graphicDirectionInput, value ?? string.Empty))
+            {
+                RaiseCommandStates();
+            }
+        }
+    }
+
     // --- Initialize disabled reason (VR-002) ---
 
     public string? InitializeDisabledReason
@@ -211,12 +252,12 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
         return null;
     }
 
-    public string? FineTuneConceptIdeaDisabledReason => GetPerCornerDisabledReason(true, _inspector.ConceptIdea);
-    public string? FineTunePhraseDisabledReason => GetPerCornerDisabledReason(true, _inspector.Phrase);
-    public string? FineTuneGraphicDirectionDisabledReason => GetPerCornerDisabledReason(true, _inspector.GraphicDirection);
-    public string? ChangeConceptIdeaDisabledReason => GetPerCornerDisabledReason(false, _inspector.ConceptIdea);
-    public string? ChangePhraseDisabledReason => GetPerCornerDisabledReason(false, _inspector.Phrase);
-    public string? ChangeGraphicDirectionDisabledReason => GetPerCornerDisabledReason(false, _inspector.GraphicDirection);
+    public string? FineTuneConceptIdeaDisabledReason => GetPerCornerDisabledReason(true, ConceptIdeaInput);
+    public string? FineTunePhraseDisabledReason => GetPerCornerDisabledReason(true, PhraseInput);
+    public string? FineTuneGraphicDirectionDisabledReason => GetPerCornerDisabledReason(true, GraphicDirectionInput);
+    public string? ChangeConceptIdeaDisabledReason => GetPerCornerDisabledReason(false, ConceptIdeaInput);
+    public string? ChangePhraseDisabledReason => GetPerCornerDisabledReason(false, PhraseInput);
+    public string? ChangeGraphicDirectionDisabledReason => GetPerCornerDisabledReason(false, GraphicDirectionInput);
 
     // --- Can initialize ---
 
@@ -230,13 +271,13 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
     // --- Can FineTune (per corner) ---
 
     public bool CanFineTuneConceptIdea =>
-        CanRefine && HasNonWhitespace(_inspector.ConceptIdea);
+        CanRefine && HasNonWhitespace(ConceptIdeaInput);
 
     public bool CanFineTunePhrase =>
-        CanRefine && HasNonWhitespace(_inspector.Phrase);
+        CanRefine && HasNonWhitespace(PhraseInput);
 
     public bool CanFineTuneGraphicDirection =>
-        CanRefine && HasNonWhitespace(_inspector.GraphicDirection);
+        CanRefine && HasNonWhitespace(GraphicDirectionInput);
 
     // --- Can Change (per corner) ---
 
@@ -277,6 +318,7 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
             _inspector.ConceptIdea,
             _inspector.Phrase,
             _inspector.GraphicDirection);
+        SyncInputsFromInspector();
         if (_sessionItemId is not null)
         {
             _sessionCts = new CancellationTokenSource();
@@ -523,7 +565,7 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
     }
 
     private ConceptRefinementTriangle CaptureTriangle() =>
-        new(_inspector.ConceptIdea, _inspector.Phrase, _inspector.GraphicDirection);
+        new(ConceptIdeaInput, PhraseInput, GraphicDirectionInput);
 
     private void ApplySingleCornerValue(ConceptRefinementCorner corner, ConceptRefinementResult result)
     {
@@ -589,9 +631,16 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
         !string.IsNullOrWhiteSpace(value);
 
     private bool HasAnyNonWhitespaceCorner() =>
-        HasNonWhitespace(_inspector.ConceptIdea)
-        || HasNonWhitespace(_inspector.Phrase)
-        || HasNonWhitespace(_inspector.GraphicDirection);
+        HasNonWhitespace(ConceptIdeaInput)
+        || HasNonWhitespace(PhraseInput)
+        || HasNonWhitespace(GraphicDirectionInput);
+
+    private void SyncInputsFromInspector()
+    {
+        SetField(ref _conceptIdeaInput, _inspector.ConceptIdea, nameof(ConceptIdeaInput));
+        SetField(ref _phraseInput, _inspector.Phrase, nameof(PhraseInput));
+        SetField(ref _graphicDirectionInput, _inspector.GraphicDirection, nameof(GraphicDirectionInput));
+    }
 
     private void RaiseCommandStates()
     {
@@ -630,12 +679,26 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     private void OnInspectorPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
-        if (args.PropertyName is nameof(ItemInspectorViewModel.Idea)
-            or nameof(ItemInspectorViewModel.ConceptIdea)
-            or nameof(ItemInspectorViewModel.Phrase)
-            or nameof(ItemInspectorViewModel.GraphicDirection))
+        if (args.PropertyName is nameof(ItemInspectorViewModel.ConceptIdea))
         {
+            SetField(ref _conceptIdeaInput, _inspector.ConceptIdea, nameof(ConceptIdeaInput));
             RecomputeScore();
+            RaiseCommandStates();
+        }
+        else if (args.PropertyName is nameof(ItemInspectorViewModel.Phrase))
+        {
+            SetField(ref _phraseInput, _inspector.Phrase, nameof(PhraseInput));
+            RecomputeScore();
+            RaiseCommandStates();
+        }
+        else if (args.PropertyName is nameof(ItemInspectorViewModel.GraphicDirection))
+        {
+            SetField(ref _graphicDirectionInput, _inspector.GraphicDirection, nameof(GraphicDirectionInput));
+            RecomputeScore();
+            RaiseCommandStates();
+        }
+        else if (args.PropertyName is nameof(ItemInspectorViewModel.Idea))
+        {
             RaiseCommandStates();
         }
         else if (args.PropertyName is nameof(ItemInspectorViewModel.LoadedItemId))
