@@ -12,24 +12,23 @@ permission:
   bash:
     "*": ask
     "openspec *": allow
-    "git status*": allow
-    "git diff*": allow
-    "git log*": allow
-    "git show*": allow
-    "git blame*": allow
-    "git rev-parse*": allow
-    "git ls-files*": allow
-    "git branch --show-current*": allow
-    "git show-ref*": allow
-    "git for-each-ref*": allow
-    "git merge-base*": allow
-    "git describe*": allow
-    "git rev-list*": allow
-    "git config --get*": allow
-    "git remote -v*": allow
-    "git remote show*": allow
-    "git fetch*": allow
-    "git worktree*": allow
+    "git *": allow
+    "gh *": allow
+    "git push *--force*": ask
+    "git push *-f*": ask
+    "git push *--delete*": ask
+    "git push * -d *": ask
+    "git reset --hard*": ask
+    "git clean *": ask
+    "git branch -D*": ask
+    "git branch -d*": ask
+    "git branch --delete*": ask
+    "git tag -d*": ask
+    "git tag --delete*": ask
+    "git stash drop*": ask
+    "git stash clear*": ask
+    "gh repo delete*": ask
+    "gh pr delete*": ask
     "dotnet build*": allow
     "dotnet test*": allow
     "dotnet restore*": allow
