@@ -168,11 +168,60 @@ public class MainWindowLayoutTests
     public void IdeationButton_ReservesSpaceBeforeTheDetailsScrollbar()
     {
         using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.PumpLayout();
 
-        var button = fixture.FindControl<Button>(control => control.Name == "IdeationButton");
-
+        var button = fixture.FindControlOrDefault<Button>(control => control.Name == "IdeationButton");
+        Assert.NotNull(button);
         Assert.True(button.Margin.Right >= 12,
             $"Expected the Ideation button to reserve at least 12px before the scrollbar, got {button.Margin.Right}px.");
+    }
+
+    [AvaloniaFact]
+    public void TagPills_InItemInspector_FitContentAndDoNotStretchFullWidth()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.PumpLayout();
+
+        // Add a tag to the ItemInspector's TagDraft
+        fixture.ViewModel.ItemInspector.TagDraft.Add("TestTag");
+        fixture.PumpLayout();
+
+        // Find the ItemsControl bound to TagDraft
+        var itemsControl = fixture.FindControl<ItemsControl>(ic =>
+            ic.ItemsSource == fixture.ViewModel.ItemInspector.TagDraft);
+        Assert.NotNull(itemsControl);
+
+        // Find the container panel (WrapPanel) for the items
+        var wrapPanel = itemsControl.GetVisualDescendants().OfType<WrapPanel>().FirstOrDefault();
+        Assert.NotNull(wrapPanel);
+
+        // Find the tag pill Border inside the ItemsControl
+        var tagBorder = itemsControl.GetVisualDescendants().OfType<Border>()
+            .FirstOrDefault(b => b.Child is StackPanel sp
+                && sp.Children.OfType<TextBlock>().Any(tb => tb.Text == "TestTag"));
+        Assert.NotNull(tagBorder);
+
+        // Assert HorizontalAlignment is Left (not Stretch)
+        Assert.Equal(Avalonia.Layout.HorizontalAlignment.Left, tagBorder.HorizontalAlignment);
+
+        // Assert the tag pill width is less than 200px (short tag)
+        Assert.True(tagBorder.Bounds.Width < 200,
+            $"Expected tag pill width < 200px for short text, got {tagBorder.Bounds.Width}px.");
+
+        // Assert the containing WrapPanel is narrower than the inspector panel
+        // The inspector column is typically > 300px wide
+        var inspectorPanel = itemsControl.Parent as StackPanel
+            ?? itemsControl.GetVisualAncestors().OfType<StackPanel>().FirstOrDefault();
+        var container = inspectorPanel?.Parent as Border;
+        if (container != null)
+        {
+            Assert.True(container.Bounds.Width > 300,
+                $"Expected inspector container width > 300px, got {container.Bounds.Width}px.");
+            Assert.True(tagBorder.Bounds.Width <= wrapPanel.Bounds.Width,
+                $"Expected tag pill width ({tagBorder.Bounds.Width}px) to fit within wrap panel ({wrapPanel.Bounds.Width}px).");
+        }
     }
 
     [AvaloniaFact]
