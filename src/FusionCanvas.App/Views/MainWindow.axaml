@@ -934,6 +934,11 @@
                                  FontWeight="SemiBold"
                                  Foreground="{DynamicResource StrongTextBrush}" />
                       <ItemsControl ItemsSource="{Binding ItemInspector.TagDraft}">
+                        <ItemsControl.ItemContainerTheme>
+                          <ControlTheme TargetType="ContentPresenter">
+                            <Setter Property="HorizontalContentAlignment" Value="Left" />
+                          </ControlTheme>
+                        </ItemsControl.ItemContainerTheme>
                         <ItemsControl.ItemsPanel>
                           <ItemsPanelTemplate>
                             <WrapPanel Orientation="Horizontal" />
