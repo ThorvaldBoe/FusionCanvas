@@ -919,6 +919,11 @@
                                  FontWeight="SemiBold"
                                  Foreground="{DynamicResource StrongTextBrush}" />
                       <ItemsControl ItemsSource="{Binding ItemInspector.TagDraft}">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="x:String">
                             <Border Padding="8,3"
@@ -926,14 +931,14 @@
                                     Background="{DynamicResource AccentSoftBackgroundBrush}"
                                     BorderBrush="{DynamicResource AccentSoftBorderBrush}"
                                     BorderThickness="1"
-                                    Margin="0,0,6,6">
-                              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    Margin="0,0,6,6"
+                                    HorizontalAlignment="Left">
+                              <StackPanel Orientation="Horizontal" Spacing="6">
                                 <TextBlock Text="{Binding}"
                                            FontSize="12"
                                            Foreground="{DynamicResource AccentSoftForegroundBrush}"
                                            VerticalAlignment="Center" />
-                                <Button Grid.Column="1"
-                                        Content="×"
+                                <Button Content="×"
                                         Padding="0"
                                         Width="18"
                                         Height="18"
@@ -944,7 +949,7 @@
                                         ToolTip.Tip="Remove tag"
                                         Command="{Binding $parent[ItemsControl].DataContext.ItemInspector.RemoveTagCommand}"
                                         CommandParameter="{Binding}" />
-                              </Grid>
+                              </StackPanel>
                             </Border>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
