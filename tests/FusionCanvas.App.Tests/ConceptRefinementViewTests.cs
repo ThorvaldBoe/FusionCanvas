@@ -1,6 +1,7 @@
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Views;
 using FusionCanvas.Domain.Workflow;
@@ -63,6 +64,73 @@ public sealed class ConceptRefinementViewTests
             AutomationProperties.GetName(b) == "Fine tune Graphic direction"));
         Assert.NotNull(fixture.FindControlOrDefault<Button>(b =>
             AutomationProperties.GetName(b) == "Change Graphic direction"));
+    }
+
+    [AvaloniaFact]
+    public void WorkingTriangleEditors_ShowCompleteValuesAndBindTwoWay()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Concept);
+
+        const string idea = "A complete concept idea long enough to wrap across several lines without being ellipsized.";
+        const string phrase = "A complete phrase that remains one logical line while wrapping visually";
+        const string graphic = "A complete graphic direction with composition, palette, typography, texture, and placement details.";
+        fixture.ViewModel.ConceptRefinement.ConceptIdeaInput = idea;
+        fixture.ViewModel.ConceptRefinement.PhraseInput = phrase;
+        fixture.ViewModel.ConceptRefinement.GraphicDirectionInput = graphic;
+        fixture.PumpLayout();
+
+        var ideaEditor = fixture.FindControlOrDefault<TextBox>(tb =>
+            AutomationProperties.GetName(tb) == "Refinement Concept idea input");
+        var phraseEditor = fixture.FindControlOrDefault<TextBox>(tb =>
+            AutomationProperties.GetName(tb) == "Refinement Phrase input");
+        var graphicEditor = fixture.FindControlOrDefault<TextBox>(tb =>
+            AutomationProperties.GetName(tb) == "Refinement Graphic direction input");
+
+        Assert.NotNull(ideaEditor);
+        Assert.NotNull(phraseEditor);
+        Assert.NotNull(graphicEditor);
+        Assert.Equal(idea, ideaEditor.Text);
+        Assert.Equal(phrase, phraseEditor.Text);
+        Assert.Equal(graphic, graphicEditor.Text);
+        Assert.Equal(TextWrapping.Wrap, ideaEditor.TextWrapping);
+        Assert.Equal(TextWrapping.Wrap, phraseEditor.TextWrapping);
+        Assert.Equal(TextWrapping.Wrap, graphicEditor.TextWrapping);
+        Assert.True(ideaEditor.AcceptsReturn);
+        Assert.False(phraseEditor.AcceptsReturn);
+        Assert.True(graphicEditor.AcceptsReturn);
+        Assert.True(ideaEditor.MinHeight >= 72);
+        Assert.True(phraseEditor.MinHeight >= 44);
+        Assert.True(graphicEditor.MinHeight >= 72);
+        Assert.Equal(ideaEditor.Bounds.X, phraseEditor.Bounds.X);
+        Assert.Equal(ideaEditor.Bounds.X, graphicEditor.Bounds.X);
+
+        ideaEditor.Text = "Edited through the visible control";
+        fixture.PumpLayout();
+
+        Assert.Equal("Edited through the visible control", fixture.ViewModel.ConceptRefinement.ConceptIdeaInput);
+        Assert.NotEqual("Edited through the visible control", fixture.ViewModel.ItemInspector.ConceptIdea);
+    }
+
+    [AvaloniaFact]
+    public void WorkingTriangleEditors_AreReadOnlyDuringConceptReview()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Concept);
+        fixture.PumpLayout();
+
+        // The fixture's first item is in Idea, so Concept is a read-only review stage.
+        Assert.False(fixture.ViewModel.ItemInspector.CanEditStage);
+        var editors = new[]
+        {
+            fixture.FindControlOrDefault<TextBox>(tb => AutomationProperties.GetName(tb) == "Refinement Concept idea input"),
+            fixture.FindControlOrDefault<TextBox>(tb => AutomationProperties.GetName(tb) == "Refinement Phrase input"),
+            fixture.FindControlOrDefault<TextBox>(tb => AutomationProperties.GetName(tb) == "Refinement Graphic direction input")
+        };
+
+        Assert.All(editors, editor => Assert.True(Assert.IsType<TextBox>(editor).IsReadOnly));
     }
 
     [AvaloniaFact]

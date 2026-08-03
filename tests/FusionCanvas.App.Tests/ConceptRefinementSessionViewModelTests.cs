@@ -152,6 +152,167 @@ public sealed class ConceptRefinementSessionViewModelTests
     }
 
     [Fact]
+    public async Task WorkingInputs_InitializeAndSynchronizeOnlyMatchingInspectorDraft()
+    {
+        var inspector = CreateInspector();
+        var vm = CreateSessionViewModel(inspector);
+
+        await SetupLoadedInspectorAsync(
+            inspector,
+            conceptIdea: "Initial idea",
+            phrase: "Initial phrase",
+            graphicDirection: "Initial graphic");
+        vm.ResetSession();
+
+        Assert.Equal("Initial idea", vm.ConceptIdeaInput);
+        Assert.Equal("Initial phrase", vm.PhraseInput);
+        Assert.Equal("Initial graphic", vm.GraphicDirectionInput);
+
+        vm.PhraseInput = "Locally edited phrase";
+        inspector.ConceptIdea = "Inspector idea update";
+
+        Assert.Equal("Inspector idea update", vm.ConceptIdeaInput);
+        Assert.Equal("Locally edited phrase", vm.PhraseInput);
+        Assert.Equal("Initial graphic", vm.GraphicDirectionInput);
+    }
+
+    [Fact]
+    public async Task FineTune_UsesCurrentWorkingTriangleAndSynchronizesSuccessfulTarget()
+    {
+        var inspector = CreateInspector();
+        var service = new StubRefinementService
+        {
+            RefineResult = ConceptRefinementResult.Success("AI result", null, null)
+        };
+        var vm = new ConceptRefinementSessionViewModel(service, new StubRefinementAccess(true), inspector);
+
+        await SetupLoadedInspectorAsync(inspector, conceptIdea: "Stored idea", phrase: "Stored phrase", graphicDirection: "Stored graphic");
+        vm.ResetSession();
+        vm.ConceptIdeaInput = "Visible edited idea";
+        vm.PhraseInput = "Visible edited phrase";
+        vm.GraphicDirectionInput = "Visible edited graphic";
+
+        vm.FineTuneConceptIdeaCommand.Execute(null);
+        await Task.Delay(100);
+
+        Assert.Equal(ConceptRefinementActionKind.FineTune, service.LastAction);
+        Assert.Equal(ConceptRefinementCorner.ConceptIdea, service.LastCorner);
+        Assert.Equal(new ConceptRefinementTriangle(
+            "Visible edited idea", "Visible edited phrase", "Visible edited graphic"), service.LastCurrent);
+        Assert.Equal("AI result", vm.ConceptIdeaInput);
+        Assert.Equal("Visible edited phrase", vm.PhraseInput);
+        Assert.Equal("Visible edited graphic", vm.GraphicDirectionInput);
+    }
+
+    [Fact]
+    public async Task Change_AllowsEmptyTargetAndUsesCurrentWorkingTriangle()
+    {
+        var inspector = CreateInspector();
+        var service = new StubRefinementService
+        {
+            RefineResult = ConceptRefinementResult.Failure(AiTextFailureKind.ProviderFailure, "No result")
+        };
+        var vm = new ConceptRefinementSessionViewModel(service, new StubRefinementAccess(true), inspector);
+
+        await SetupLoadedInspectorAsync(inspector, conceptIdea: "Stored idea", phrase: "Stored phrase", graphicDirection: "Stored graphic");
+        vm.ResetSession();
+        vm.ConceptIdeaInput = "Visible idea";
+        vm.PhraseInput = "";
+        vm.GraphicDirectionInput = "Visible graphic";
+
+        Assert.True(vm.CanChangePhrase);
+        vm.ChangePhraseCommand.Execute(null);
+        await Task.Delay(100);
+
+        Assert.Equal(ConceptRefinementActionKind.Change, service.LastAction);
+        Assert.Equal(ConceptRefinementCorner.Phrase, service.LastCorner);
+        Assert.Equal(new ConceptRefinementTriangle("Visible idea", "", "Visible graphic"), service.LastCurrent);
+    }
+
+    [Fact]
+    public async Task EditingWorkingInputs_DoesNotChangeInspectorScoreOrHistory()
+    {
+        var inspector = CreateInspector();
+        var vm = CreateSessionViewModel(inspector);
+
+        await SetupLoadedInspectorAsync(inspector, conceptIdea: "Stored idea", phrase: "Stored phrase", graphicDirection: "Stored graphic");
+        vm.ResetSession();
+        var score = vm.Score;
+
+        vm.ConceptIdeaInput = "Local idea";
+        vm.PhraseInput = "Local phrase";
+        vm.GraphicDirectionInput = "Local graphic";
+
+        Assert.Equal("Stored idea", inspector.ConceptIdea);
+        Assert.Equal("Stored phrase", inspector.Phrase);
+        Assert.Equal("Stored graphic", inspector.GraphicDirection);
+        Assert.Equal(score, vm.Score);
+        Assert.Empty(vm.History);
+    }
+
+    [Fact]
+    public async Task RefinementFailure_PreservesWorkingInputsAndInspectorState()
+    {
+        var inspector = CreateInspector();
+        var service = new StubRefinementService
+        {
+            RefineResult = ConceptRefinementResult.Failure(AiTextFailureKind.ProviderFailure, "Provider failed")
+        };
+        var vm = new ConceptRefinementSessionViewModel(service, new StubRefinementAccess(true), inspector);
+
+        await SetupLoadedInspectorAsync(inspector, conceptIdea: "Stored idea", phrase: "Stored phrase", graphicDirection: "Stored graphic");
+        vm.ResetSession();
+        vm.ConceptIdeaInput = "Local idea";
+        vm.PhraseInput = "Local phrase";
+        vm.GraphicDirectionInput = "Local graphic";
+        var score = vm.Score;
+
+        vm.ChangeGraphicDirectionCommand.Execute(null);
+        await Task.Delay(100);
+
+        Assert.Equal("Local idea", vm.ConceptIdeaInput);
+        Assert.Equal("Local phrase", vm.PhraseInput);
+        Assert.Equal("Local graphic", vm.GraphicDirectionInput);
+        Assert.Equal("Stored idea", inspector.ConceptIdea);
+        Assert.Equal("Stored phrase", inspector.Phrase);
+        Assert.Equal("Stored graphic", inspector.GraphicDirection);
+        Assert.Equal(score, vm.Score);
+        Assert.Empty(vm.History);
+        Assert.Equal("Provider failed", vm.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task RefinementCancellation_PreservesWorkingInputsAndInspectorState()
+    {
+        var inspector = CreateInspector();
+        var service = new StubRefinementService
+        {
+            RefineFunc = _ => Task.FromCanceled<ConceptRefinementResult>(new CancellationToken(canceled: true))
+        };
+        var vm = new ConceptRefinementSessionViewModel(service, new StubRefinementAccess(true), inspector);
+
+        await SetupLoadedInspectorAsync(inspector, conceptIdea: "Stored idea", phrase: "Stored phrase", graphicDirection: "Stored graphic");
+        vm.ResetSession();
+        vm.ConceptIdeaInput = "Local idea";
+        vm.PhraseInput = "Local phrase";
+        vm.GraphicDirectionInput = "Local graphic";
+        var score = vm.Score;
+
+        vm.ChangeConceptIdeaCommand.Execute(null);
+        await Task.Delay(100);
+
+        Assert.Equal("Local idea", vm.ConceptIdeaInput);
+        Assert.Equal("Local phrase", vm.PhraseInput);
+        Assert.Equal("Local graphic", vm.GraphicDirectionInput);
+        Assert.Equal("Stored idea", inspector.ConceptIdea);
+        Assert.Equal("Stored phrase", inspector.Phrase);
+        Assert.Equal("Stored graphic", inspector.GraphicDirection);
+        Assert.Equal(score, vm.Score);
+        Assert.Empty(vm.History);
+        Assert.Null(vm.ErrorMessage);
+    }
+
+    [Fact]
     public async Task FineTuneDisabledForEmptyCorner()
     {
         var inspector = CreateInspector();
@@ -726,6 +887,9 @@ public sealed class ConceptRefinementSessionViewModelTests
             ConceptRefinementResult.Failure(AiTextFailureKind.NotConfigured, "Not set");
         public Func<CancellationToken, Task<ConceptRefinementResult>>? InitializeFunc { get; set; }
         public Func<CancellationToken, Task<ConceptRefinementResult>>? RefineFunc { get; set; }
+        public ConceptRefinementActionKind? LastAction { get; private set; }
+        public ConceptRefinementCorner? LastCorner { get; private set; }
+        public ConceptRefinementTriangle? LastCurrent { get; private set; }
 
         public Task<ConceptRefinementResult> InitializeAsync(
             Guid itemId, string originalIdea, CancellationToken cancellationToken = default) =>
@@ -734,8 +898,13 @@ public sealed class ConceptRefinementSessionViewModelTests
         public Task<ConceptRefinementResult> RefineAsync(
             Guid itemId, ConceptRefinementActionKind action, ConceptRefinementCorner corner,
             ConceptRefinementTriangle current, string originalIdea,
-            CancellationToken cancellationToken = default) =>
-            RefineFunc?.Invoke(cancellationToken) ?? Task.FromResult(RefineResult);
+            CancellationToken cancellationToken = default)
+        {
+            LastAction = action;
+            LastCorner = corner;
+            LastCurrent = current;
+            return RefineFunc?.Invoke(cancellationToken) ?? Task.FromResult(RefineResult);
+        }
     }
 
     private sealed class StubRefinementAccess : IConceptRefinementAccessStatus
