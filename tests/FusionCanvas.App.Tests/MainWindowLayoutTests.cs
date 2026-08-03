@@ -192,6 +192,7 @@ public class MainWindowLayoutTests
         var itemsControl = fixture.FindControl<ItemsControl>(ic =>
             ic.ItemsSource == fixture.ViewModel.ItemInspector.TagDraft);
         Assert.NotNull(itemsControl);
+        Assert.NotNull(itemsControl.ItemContainerTheme);
 
         // Find the container panel (WrapPanel) for the items
         var wrapPanel = itemsControl.GetVisualDescendants().OfType<WrapPanel>().FirstOrDefault();
