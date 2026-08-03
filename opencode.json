@@ -5,32 +5,10 @@
   },
   "permission": {
     "edit": "allow",
-    "bash": {
-      "*": "ask",
-      "git status*": "allow",
-      "git diff*": "allow",
-      "git log*": "allow",
-      "git show*": "allow",
-      "git blame*": "allow",
-      "git rev-parse*": "allow",
-      "git ls-files*": "allow",
-      "git branch --show-current*": "allow",
-      "dotnet build*": "allow",
-      "dotnet test*": "allow",
-      "dotnet restore*": "allow",
-      "dotnet clean*": "allow",
-      "dotnet list*": "allow",
-      "dotnet --*": "allow",
-      "openspec list*": "allow",
-      "openspec status*": "allow",
-      "openspec show*": "allow",
-      "openspec instructions*": "allow",
-      "openspec validate*": "allow",
-      "Get-*": "allow",
-      "Test-Path*": "allow",
-      "Resolve-Path*": "allow",
-      "echo *": "allow",
-      "rg *": "allow"
-    }
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "bash": "allow"
   }
 }
