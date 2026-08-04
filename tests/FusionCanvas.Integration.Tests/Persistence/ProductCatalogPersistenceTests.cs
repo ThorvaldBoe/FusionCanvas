@@ -102,6 +102,31 @@ public class ProductCatalogPersistenceTests
     }
 
     [Fact]
+    public async Task SaveAsync_RejectsTargetToAreaFromAnotherStore()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var repository = new SqliteWorkspaceRepository(tempDirectory.GetPath("catalog.db"));
+        var snapshot = CreateCatalogSnapshot();
+        var otherStore = new Store(Guid.NewGuid(), "Other", null, false, Now, Now, "{}");
+        var otherProduct = new StoreProduct(Guid.NewGuid(), otherStore.Id, "Other product", null, null, Now, Now, "{}");
+        var otherOffering = new FulfillmentOffering(Guid.NewGuid(), otherProduct.Id, "Provider", null, FulfillmentKind.FixedProvider, "Provider", null, Now, Now, "{}");
+        var otherArea = new DesignArea(Guid.NewGuid(), otherOffering.Id, "Front", null, "front", "DTG", 3000, 4000, [], Now, Now, "{}");
+        snapshot = snapshot with
+        {
+            Stores = [.. snapshot.Stores, otherStore],
+            StoreProducts = [.. snapshot.StoreProducts, otherProduct],
+            FulfillmentOfferings = [.. snapshot.FulfillmentOfferings, otherOffering],
+            DesignAreas = [.. snapshot.DesignAreas, otherArea],
+            ItemDesignAreaTargets = [new ItemDesignAreaTarget(snapshot.Items[0].Id, otherArea.Id)]
+        };
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => repository.SaveAsync(snapshot, TestContext.Current.CancellationToken));
+
+        Assert.Contains("own store", exception.Message);
+    }
+
+    [Fact]
     public async Task SaveAsync_RejectsOrphanOfferingWithoutProduct()
     {
         using var tempDirectory = new TemporaryDirectory();

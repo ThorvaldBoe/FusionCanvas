@@ -1344,7 +1344,8 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         var areaIds = snapshot.DesignAreas.Select(area => area.Id).ToHashSet();
         foreach (var target in snapshot.ItemDesignAreaTargets)
         {
-            if (!snapshot.Items.Any(item => item.Id == target.ItemId))
+            var item = snapshot.Items.SingleOrDefault(item => item.Id == target.ItemId);
+            if (item is null)
             {
                 throw new InvalidOperationException("Every item design-area target must reference an existing item before saving.");
             }
@@ -1352,6 +1353,14 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             if (!areaIds.Contains(target.DesignAreaId))
             {
                 throw new InvalidOperationException("Every item design-area target must reference an existing design area before saving.");
+            }
+
+            var area = snapshot.DesignAreas.Single(area => area.Id == target.DesignAreaId);
+            var offering = snapshot.FulfillmentOfferings.Single(offering => offering.Id == area.FulfillmentOfferingId);
+            var product = snapshot.StoreProducts.Single(product => product.Id == offering.StoreProductId);
+            if (item.StoreId != product.StoreId)
+            {
+                throw new InvalidOperationException("Every item design-area target must reference a design area from the item's own store before saving.");
             }
         }
     }
