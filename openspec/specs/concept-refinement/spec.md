@@ -158,26 +158,27 @@ FusionCanvas SHALL allow at most one in-flight refinement AI operation per Item 
 - **AND** a recoverable inline error is reported near the refinement actions
 
 ### Requirement: Refinement requests use guidance and creative context without operational or secret data
-FusionCanvas SHALL assemble refinement AI requests from the bundled design-triangle guidance document, the action semantics, the current triangle values, the Item's original Idea, and applicable user-authored creative context (store, niche, topic, inherited tags and metadata), and MUST exclude credentials, identifiers, timestamps, file paths, and other operational fields from the request payload.
+FusionCanvas SHALL assemble refinement AI requests from the bundled canonical Design Triangle framework, the action semantics, the current triangle values, the Item's original Idea, and applicable user-authored creative context (store, niche, topic, inherited tags and metadata), and MUST exclude credentials, identifiers, timestamps, file paths, and other operational fields from the request payload. The request SHALL instruct the model to respect the framework's social-meaning model, coherent three-corner relationship, and semantic graphic role while preserving the existing Initialize and per-corner response contracts.
 
-#### Scenario: Request includes guidance and creative context
+#### Scenario: Request includes framework and creative context
 - **WHEN** a Fine tune, Change, or Initialize request is assembled
-- **THEN** it contains the design-triangle guidance content, the action instruction, current triangle values, original Idea text, and applicable creative context
+- **THEN** it contains the canonical Design Triangle framework, the action instruction, current triangle values, original Idea text, and applicable creative context
+- **AND** it directs the model to preserve or improve wearer signal, viewer inference or effect, intentional Phrase/Graphic relationship, and Graphic semantic role as applicable to the action
 
 #### Scenario: Operational and secret data is excluded
 - **WHEN** source entities contain credentials, database identifiers, timestamps, file paths, or internal provenance
 - **THEN** those values are absent from the request payload, logs, and errors
 
 ### Requirement: The design-triangle guidance document ships with the app
-FusionCanvas SHALL bundle a design-triangle guidance markdown document with the application and SHALL load it at runtime through an application-facing contract for use as refinement prompt context. The bundled content SHALL be a basic placeholder description of the design triangle that the maintainer can replace with the formal document later. No user interface SHALL display the document in this module.
+FusionCanvas SHALL bundle one canonical PoD Design Framework Markdown document with the application and SHALL load it at runtime through an application-facing contract for use as Ideation and Concept refinement prompt context. The document SHALL combine the framework README and canonical Foundations of PoD Design, Design Triangle and Design Pyramid, Sketch Layout Language, and Generating SLL documents in that order. No user interface SHALL display or open the document in this module.
 
-#### Scenario: Guidance content is available at runtime
-- **WHEN** a refinement prompt is assembled
-- **THEN** the bundled design-triangle guidance text is included as prompt context
+#### Scenario: Canonical framework content is available at runtime
+- **WHEN** an Ideation or Concept refinement prompt is assembled
+- **THEN** the bundled content includes the social-meaning, Design Triangle, Design Pyramid, SLL, and SLL-generation framework sections as prompt context
 
-#### Scenario: No guidance UI
-- **WHEN** the user navigates the Concept stage surface
-- **THEN** no control displays or opens the guidance document
+#### Scenario: No framework UI
+- **WHEN** the user navigates the Idea or Concept stage surfaces
+- **THEN** no control displays or opens the framework document
 
 ### Requirement: The refinement section remains accessible and theme coherent
 FusionCanvas SHALL make the refinement actions keyboard reachable in a logical order after the Concept fields, SHALL give icon-only or compact actions meaningful accessible names, SHALL present history entries as a selectable list, and SHALL resolve busy, disabled, error, and selection states from shared application theme resources.
