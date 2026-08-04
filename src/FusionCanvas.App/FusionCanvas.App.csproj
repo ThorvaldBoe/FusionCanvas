@@ -28,5 +28,6 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="FusionCanvas.App.Tests" />
+    <InternalsVisibleTo Include="FusionCanvas.UITests" />
   </ItemGroup>
 </Project>

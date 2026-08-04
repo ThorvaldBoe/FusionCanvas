@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Automation;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.VisualTree;
@@ -58,6 +59,26 @@ public class StoreEditorHeadlessTests
         var newProductButton = FindButton(window, "New product");
         Assert.NotNull(newProductButton);
         Assert.True(newProductButton!.IsEnabled);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void StoreCreationControls_ExposeStableAutomationIdentifiers()
+    {
+        var window = CreateEditorWindow();
+
+        var newStore = FindButton(window, "New store");
+        var storeName = window.GetVisualDescendants().OfType<TextBox>()
+            .Single(textBox => textBox.Name == "StoreNameTextBox");
+        var save = FindButton(window, "Save");
+        var activeStores = window.GetVisualDescendants().OfType<ItemsControl>()
+            .Single(control => AutomationProperties.GetAutomationId(control) == "StoreEditor.ActiveStores");
+
+        Assert.Equal("StoreEditor.NewStore", AutomationProperties.GetAutomationId(newStore));
+        Assert.Equal("StoreEditor.Name", AutomationProperties.GetAutomationId(storeName));
+        Assert.Equal("StoreEditor.SaveStore", AutomationProperties.GetAutomationId(save));
+        Assert.NotNull(activeStores);
 
         window.Close();
     }
