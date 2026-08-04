@@ -13,3 +13,10 @@ FusionCanvas ships one canonical, UTF-8-preserved PoD Design Framework asset for
 ## Deferred or Change-Specific Notes
 
 - The correction does not change product behavior, scope, or the future SLL boundary.
+
+## Learning Review
+
+- Result: no reusable lessons promoted.
+- Evidence reviewed: approved delivery package, UTF-8 asset review finding, corrected integration test, and verification evidence.
+- Promotions completed: none.
+- Deferred promotions: project-wide external-text encoding guidance is deferred because this was a change-specific composition defect and the resource regression test directly protects the affected boundary.
