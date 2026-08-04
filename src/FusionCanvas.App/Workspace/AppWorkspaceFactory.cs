@@ -12,6 +12,7 @@ using FusionCanvas.Application.RejectedPhrases;
 using FusionCanvas.Integration.Snowclones;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.ConceptRefinement;
+using FusionCanvas.Application.Products;
 using FusionCanvas.Integration.AI;
 
 namespace FusionCanvas.App.Workspace;
@@ -31,7 +32,8 @@ public sealed record AppWorkspaceRuntime(
     IRejectedPhraseManagementService RejectedPhrases,
     SnowcloneLibraryResult SnowcloneLibraryInitialization,
     IConceptRefinementService ConceptRefinement,
-    IConceptRefinementAccessStatus ConceptRefinementAccess);
+    IConceptRefinementAccessStatus ConceptRefinementAccess,
+    IProductSupplierSetupService ProductSupplierSetup);
 
 public static class AppWorkspaceFactory
 {
@@ -89,7 +91,8 @@ public static class AppWorkspaceFactory
             rejectedPhrases,
             snowcloneLibraryInitialization,
             conceptRefinement,
-            conceptRefinementAccess);
+            conceptRefinementAccess,
+            new ProductSupplierSetupService(repository));
     }
 
     private static string DefaultDatabasePath()

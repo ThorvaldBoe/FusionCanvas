@@ -6,6 +6,7 @@ using FusionCanvas.Domain.Tags;
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Prompts;
 using FusionCanvas.Domain.Ideation;
+using FusionCanvas.Domain.Products;
 
 namespace FusionCanvas.Domain.Workspace;
 
@@ -22,6 +23,16 @@ public sealed record WorkspaceSnapshot(
     IReadOnlyList<AssetLink> AssetLinks)
 {
     public IReadOnlyList<IdeationRejection> IdeationRejections { get; init; } = [];
+
+    public IReadOnlyList<StoreProduct> StoreProducts { get; init; } = [];
+
+    public IReadOnlyList<FulfillmentOffering> FulfillmentOfferings { get; init; } = [];
+
+    public IReadOnlyList<ProductVariant> ProductVariants { get; init; } = [];
+
+    public IReadOnlyList<DesignArea> DesignAreas { get; init; } = [];
+
+    public IReadOnlyList<ItemDesignAreaTarget> ItemDesignAreaTargets { get; init; } = [];
 
     public WorkspaceSnapshot(
         IReadOnlyList<Store> Stores,

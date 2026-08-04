@@ -27,6 +27,7 @@ public partial class StoreEditorWindow : Window
         if (_subscribedViewModel is not null)
         {
             _subscribedViewModel.StoreNameFocusRequested -= OnStoreNameFocusRequested;
+            _subscribedViewModel.ProductNameFocusRequested -= OnProductNameFocusRequested;
             _subscribedViewModel = null;
         }
 
@@ -37,6 +38,7 @@ public partial class StoreEditorWindow : Window
 
         _subscribedViewModel = viewModel;
         viewModel.StoreNameFocusRequested += OnStoreNameFocusRequested;
+        viewModel.ProductNameFocusRequested += OnProductNameFocusRequested;
     }
 
     private void OnStoreNameFocusRequested(object? sender, EventArgs e)
@@ -45,6 +47,18 @@ public partial class StoreEditorWindow : Window
         {
             StoreNameTextBox.Focus();
             StoreNameTextBox.SelectAll();
+        });
+    }
+
+    private void OnProductNameFocusRequested(object? sender, EventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (ProductNameTextBox is not null)
+            {
+                ProductNameTextBox.Focus();
+                ProductNameTextBox.SelectAll();
+            }
         });
     }
 }

@@ -8,8 +8,10 @@ using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Ideation;
+using FusionCanvas.Domain.Products;
 using Microsoft.Data.Sqlite;
 using FusionCanvas.Application.Workspaces;
+using System.Text.Json;
 
 namespace FusionCanvas.Integration.Persistence;
 
@@ -29,7 +31,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
 
-        foreach (var table in new[] { "asset_links", "item_tags", "prompts", "assets", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
+        foreach (var table in new[] { "item_design_area_targets", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
         {
             await ExecuteAsync(connection, transaction, $"DELETE FROM {table};", cancellationToken);
         }
@@ -42,6 +44,26 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         foreach (var store in snapshot.Stores)
         {
             await InsertStoreAsync(connection, transaction, store, cancellationToken);
+        }
+
+        foreach (var product in snapshot.StoreProducts)
+        {
+            await InsertStoreProductAsync(connection, transaction, product, cancellationToken);
+        }
+
+        foreach (var offering in snapshot.FulfillmentOfferings)
+        {
+            await InsertFulfillmentOfferingAsync(connection, transaction, offering, cancellationToken);
+        }
+
+        foreach (var variant in snapshot.ProductVariants)
+        {
+            await InsertProductVariantAsync(connection, transaction, variant, cancellationToken);
+        }
+
+        foreach (var area in snapshot.DesignAreas)
+        {
+            await InsertDesignAreaAsync(connection, transaction, area, cancellationToken);
         }
 
         foreach (var tag in snapshot.Tags)
@@ -89,6 +111,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await InsertAssetLinkAsync(connection, transaction, assetLink, cancellationToken);
         }
 
+        foreach (var target in snapshot.ItemDesignAreaTargets)
+        {
+            await InsertItemDesignAreaTargetAsync(connection, transaction, target, cancellationToken);
+        }
+
         await transaction.CommitAsync(cancellationToken);
     }
 
@@ -114,7 +141,12 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await LoadItemTagsAsync(connection, cancellationToken),
             await LoadAssetLinksAsync(connection, cancellationToken))
         {
-            IdeationRejections = await LoadIdeationRejectionsAsync(connection, cancellationToken)
+            IdeationRejections = await LoadIdeationRejectionsAsync(connection, cancellationToken),
+            StoreProducts = await LoadStoreProductsAsync(connection, cancellationToken),
+            FulfillmentOfferings = await LoadFulfillmentOfferingsAsync(connection, cancellationToken),
+            ProductVariants = await LoadProductVariantsAsync(connection, cancellationToken),
+            DesignAreas = await LoadDesignAreasAsync(connection, cancellationToken),
+            ItemDesignAreaTargets = await LoadItemDesignAreaTargetsAsync(connection, cancellationToken)
         };
     }
 
@@ -261,6 +293,59 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 PRIMARY KEY (asset_id, entity_kind, entity_id)
             );
 
+            CREATE TABLE IF NOT EXISTS product_blueprints (
+                id TEXT PRIMARY KEY,
+                store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                description TEXT NULL,
+                external_product_id TEXT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS fulfillment_offerings (
+                id TEXT PRIMARY KEY,
+                store_product_id TEXT NOT NULL REFERENCES product_blueprints(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                description TEXT NULL,
+                kind INTEGER NOT NULL,
+                provider_name TEXT NULL,
+                external_offering_id TEXT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS product_variants (
+                id TEXT PRIMARY KEY,
+                fulfillment_offering_id TEXT NOT NULL REFERENCES fulfillment_offerings(id) ON DELETE CASCADE,
+                options_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS design_areas (
+                id TEXT PRIMARY KEY,
+                fulfillment_offering_id TEXT NOT NULL REFERENCES fulfillment_offerings(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                description TEXT NULL,
+                position TEXT NOT NULL,
+                decoration_method TEXT NOT NULL,
+                width INTEGER NOT NULL,
+                height INTEGER NOT NULL,
+                variant_ids_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS item_design_area_targets (
+                item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                design_area_id TEXT NOT NULL REFERENCES design_areas(id) ON DELETE CASCADE,
+                PRIMARY KEY (item_id, design_area_id)
+            );
+
             CREATE TABLE IF NOT EXISTS snowclones (
                 id TEXT PRIMARY KEY,
                 phrase TEXT NOT NULL,
@@ -305,6 +390,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         if (schemaVersion < 8)
         {
             await MigrateToVersion8Async(connection, cancellationToken);
+        }
+
+        if (schemaVersion < 9)
+        {
+            await MigrateToVersion9Async(connection, cancellationToken);
         }
 
         await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
@@ -369,6 +459,75 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 await transaction.RollbackAsync(cancellationToken);
                 throw;
             }
+        }
+    }
+
+    private static async Task MigrateToVersion9Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await ExecuteAsync(connection, transaction, """
+                CREATE TABLE IF NOT EXISTS product_blueprints (
+                    id TEXT PRIMARY KEY,
+                    store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                    name TEXT NOT NULL,
+                    description TEXT NULL,
+                    external_product_id TEXT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS fulfillment_offerings (
+                    id TEXT PRIMARY KEY,
+                    store_product_id TEXT NOT NULL REFERENCES product_blueprints(id) ON DELETE CASCADE,
+                    name TEXT NOT NULL,
+                    description TEXT NULL,
+                    kind INTEGER NOT NULL,
+                    provider_name TEXT NULL,
+                    external_offering_id TEXT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS product_variants (
+                    id TEXT PRIMARY KEY,
+                    fulfillment_offering_id TEXT NOT NULL REFERENCES fulfillment_offerings(id) ON DELETE CASCADE,
+                    options_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS design_areas (
+                    id TEXT PRIMARY KEY,
+                    fulfillment_offering_id TEXT NOT NULL REFERENCES fulfillment_offerings(id) ON DELETE CASCADE,
+                    name TEXT NOT NULL,
+                    description TEXT NULL,
+                    position TEXT NOT NULL,
+                    decoration_method TEXT NOT NULL,
+                    width INTEGER NOT NULL,
+                    height INTEGER NOT NULL,
+                    variant_ids_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS item_design_area_targets (
+                    item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                    design_area_id TEXT NOT NULL REFERENCES design_areas(id) ON DELETE CASCADE,
+                    PRIMARY KEY (item_id, design_area_id)
+                );
+                """, cancellationToken);
+            await VerifyForeignKeyIntegrityAsync(connection, transaction, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
         }
     }
 
@@ -774,6 +933,68 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     private static Task InsertAssetLinkAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, AssetLink assetLink, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, "INSERT INTO asset_links (asset_id, entity_kind, entity_id) VALUES ($asset_id, $entity_kind, $entity_id);", cancellationToken, ("$asset_id", assetLink.AssetId.ToString()), ("$entity_kind", (int)assetLink.EntityKind), ("$entity_id", assetLink.EntityId.ToString()));
 
+    private static Task InsertStoreProductAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, StoreProduct product, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO product_blueprints (id, store_id, name, description, external_product_id, created_at, updated_at, metadata_json)
+            VALUES ($id, $store_id, $name, $description, $external_product_id, $created_at, $updated_at, $metadata_json);
+            """, cancellationToken,
+            ("$id", product.Id.ToString()),
+            ("$store_id", product.StoreId.ToString()),
+            ("$name", product.Name),
+            ("$description", product.Description),
+            ("$external_product_id", product.ExternalProductId),
+            ("$created_at", product.CreatedAt.ToString("O")),
+            ("$updated_at", product.UpdatedAt.ToString("O")),
+            ("$metadata_json", product.MetadataJson));
+
+    private static Task InsertFulfillmentOfferingAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, FulfillmentOffering offering, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO fulfillment_offerings (id, store_product_id, name, description, kind, provider_name, external_offering_id, created_at, updated_at, metadata_json)
+            VALUES ($id, $store_product_id, $name, $description, $kind, $provider_name, $external_offering_id, $created_at, $updated_at, $metadata_json);
+            """, cancellationToken,
+            ("$id", offering.Id.ToString()),
+            ("$store_product_id", offering.StoreProductId.ToString()),
+            ("$name", offering.Name),
+            ("$description", offering.Description),
+            ("$kind", (int)offering.Kind),
+            ("$provider_name", offering.ProviderName),
+            ("$external_offering_id", offering.ExternalOfferingId),
+            ("$created_at", offering.CreatedAt.ToString("O")),
+            ("$updated_at", offering.UpdatedAt.ToString("O")),
+            ("$metadata_json", offering.MetadataJson));
+
+    private static Task InsertProductVariantAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, ProductVariant variant, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO product_variants (id, fulfillment_offering_id, options_json, created_at, updated_at)
+            VALUES ($id, $fulfillment_offering_id, $options_json, $created_at, $updated_at);
+            """, cancellationToken,
+            ("$id", variant.Id.ToString()),
+            ("$fulfillment_offering_id", variant.FulfillmentOfferingId.ToString()),
+            ("$options_json", JsonSerializer.Serialize(variant.Options)),
+            ("$created_at", variant.CreatedAt.ToString("O")),
+            ("$updated_at", variant.UpdatedAt.ToString("O")));
+
+    private static Task InsertDesignAreaAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, DesignArea area, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO design_areas (id, fulfillment_offering_id, name, description, position, decoration_method, width, height, variant_ids_json, created_at, updated_at, metadata_json)
+            VALUES ($id, $fulfillment_offering_id, $name, $description, $position, $decoration_method, $width, $height, $variant_ids_json, $created_at, $updated_at, $metadata_json);
+            """, cancellationToken,
+            ("$id", area.Id.ToString()),
+            ("$fulfillment_offering_id", area.FulfillmentOfferingId.ToString()),
+            ("$name", area.Name),
+            ("$description", area.Description),
+            ("$position", area.Position),
+            ("$decoration_method", area.DecorationMethod),
+            ("$width", area.Width),
+            ("$height", area.Height),
+            ("$variant_ids_json", JsonSerializer.Serialize(area.VariantIds)),
+            ("$created_at", area.CreatedAt.ToString("O")),
+            ("$updated_at", area.UpdatedAt.ToString("O")),
+            ("$metadata_json", area.MetadataJson));
+
+    private static Task InsertItemDesignAreaTargetAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, ItemDesignAreaTarget target, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, "INSERT INTO item_design_area_targets (item_id, design_area_id) VALUES ($item_id, $design_area_id);", cancellationToken, ("$item_id", target.ItemId.ToString()), ("$design_area_id", target.DesignAreaId.ToString()));
+
     private static (string Name, object? Value)[] CommonParameters(WorkspaceEntity entity) =>
     [
         ("$id", entity.Id.ToString()),
@@ -917,6 +1138,96 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         return assetLinks;
     }
 
+    private static async Task<IReadOnlyList<StoreProduct>> LoadStoreProductsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var products = new List<StoreProduct>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM product_blueprints ORDER BY name;", cancellationToken))
+        {
+            products.Add(new StoreProduct(
+                ReadGuid(reader, "id"),
+                ReadGuid(reader, "store_id"),
+                ReadString(reader, "name"),
+                ReadNullableString(reader, "description"),
+                ReadNullableString(reader, "external_product_id"),
+                ReadDate(reader, "created_at"),
+                ReadDate(reader, "updated_at"),
+                ReadString(reader, "metadata_json")));
+        }
+
+        return products;
+    }
+
+    private static async Task<IReadOnlyList<FulfillmentOffering>> LoadFulfillmentOfferingsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var offerings = new List<FulfillmentOffering>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM fulfillment_offerings ORDER BY name;", cancellationToken))
+        {
+            offerings.Add(new FulfillmentOffering(
+                ReadGuid(reader, "id"),
+                ReadGuid(reader, "store_product_id"),
+                ReadString(reader, "name"),
+                ReadNullableString(reader, "description"),
+                (FulfillmentKind)ReadInt(reader, "kind"),
+                ReadNullableString(reader, "provider_name"),
+                ReadNullableString(reader, "external_offering_id"),
+                ReadDate(reader, "created_at"),
+                ReadDate(reader, "updated_at"),
+                ReadString(reader, "metadata_json")));
+        }
+
+        return offerings;
+    }
+
+    private static async Task<IReadOnlyList<ProductVariant>> LoadProductVariantsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var variants = new List<ProductVariant>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM product_variants ORDER BY created_at, id;", cancellationToken))
+        {
+            variants.Add(new ProductVariant(
+                ReadGuid(reader, "id"),
+                ReadGuid(reader, "fulfillment_offering_id"),
+                JsonSerializer.Deserialize<List<VariantOption>>(ReadString(reader, "options_json")) ?? [],
+                ReadDate(reader, "created_at"),
+                ReadDate(reader, "updated_at")));
+        }
+
+        return variants;
+    }
+
+    private static async Task<IReadOnlyList<DesignArea>> LoadDesignAreasAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var areas = new List<DesignArea>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM design_areas ORDER BY name;", cancellationToken))
+        {
+            areas.Add(new DesignArea(
+                ReadGuid(reader, "id"),
+                ReadGuid(reader, "fulfillment_offering_id"),
+                ReadString(reader, "name"),
+                ReadNullableString(reader, "description"),
+                ReadString(reader, "position"),
+                ReadString(reader, "decoration_method"),
+                ReadInt(reader, "width"),
+                ReadInt(reader, "height"),
+                JsonSerializer.Deserialize<List<Guid>>(ReadString(reader, "variant_ids_json")) ?? [],
+                ReadDate(reader, "created_at"),
+                ReadDate(reader, "updated_at"),
+                ReadString(reader, "metadata_json")));
+        }
+
+        return areas;
+    }
+
+    private static async Task<IReadOnlyList<ItemDesignAreaTarget>> LoadItemDesignAreaTargetsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var targets = new List<ItemDesignAreaTarget>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM item_design_area_targets;", cancellationToken))
+        {
+            targets.Add(new ItemDesignAreaTarget(ReadGuid(reader, "item_id"), ReadGuid(reader, "design_area_id")));
+        }
+
+        return targets;
+    }
+
     private static async IAsyncEnumerable<SqliteDataReader> ReadAsync(
         SqliteConnection connection,
         string sql,
@@ -987,6 +1298,60 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                     GroupHierarchy.GetEffectiveNiche(snapshot, group).Id == rejection.NicheId))
             {
                 throw new InvalidOperationException("Every ideation rejection must belong to an existing store, niche, and optional group.");
+            }
+        }
+
+        var storeIds = snapshot.Stores.Select(store => store.Id).ToHashSet();
+        foreach (var product in snapshot.StoreProducts)
+        {
+            if (!storeIds.Contains(product.StoreId))
+            {
+                throw new InvalidOperationException("Every product blueprint must belong to an existing store before saving.");
+            }
+        }
+
+        var productIds = snapshot.StoreProducts.Select(product => product.Id).ToHashSet();
+        foreach (var offering in snapshot.FulfillmentOfferings)
+        {
+            if (!productIds.Contains(offering.StoreProductId))
+            {
+                throw new InvalidOperationException("Every fulfillment offering must belong to an existing product blueprint before saving.");
+            }
+        }
+
+        var offeringIds = snapshot.FulfillmentOfferings.Select(offering => offering.Id).ToHashSet();
+        foreach (var variant in snapshot.ProductVariants)
+        {
+            if (!offeringIds.Contains(variant.FulfillmentOfferingId))
+            {
+                throw new InvalidOperationException("Every product variant must belong to an existing fulfillment offering before saving.");
+            }
+        }
+
+        foreach (var area in snapshot.DesignAreas)
+        {
+            if (!offeringIds.Contains(area.FulfillmentOfferingId))
+            {
+                throw new InvalidOperationException("Every design area must belong to an existing fulfillment offering before saving.");
+            }
+
+            if (area.VariantIds.Any(variantId => snapshot.ProductVariants.All(variant => !(variant.Id == variantId && variant.FulfillmentOfferingId == area.FulfillmentOfferingId))))
+            {
+                throw new InvalidOperationException("A design area may only apply to variants from its own offering.");
+            }
+        }
+
+        var areaIds = snapshot.DesignAreas.Select(area => area.Id).ToHashSet();
+        foreach (var target in snapshot.ItemDesignAreaTargets)
+        {
+            if (!snapshot.Items.Any(item => item.Id == target.ItemId))
+            {
+                throw new InvalidOperationException("Every item design-area target must reference an existing item before saving.");
+            }
+
+            if (!areaIds.Contains(target.DesignAreaId))
+            {
+                throw new InvalidOperationException("Every item design-area target must reference an existing design area before saving.");
             }
         }
     }

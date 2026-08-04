@@ -1,4 +1,4 @@
-using FusionCanvas.Domain.Ideation;
+﻿using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
@@ -84,7 +84,7 @@ public sealed class SqliteWorkspaceRepositoryUpdatedAtTests : IDisposable
         await verify.OpenAsync(TestContext.Current.CancellationToken);
         await using var versionCommand = verify.CreateCommand();
         versionCommand.CommandText = "PRAGMA user_version;";
-        Assert.Equal(8L, (long)(await versionCommand.ExecuteScalarAsync(TestContext.Current.CancellationToken))!);
+        Assert.Equal(9L, (long)(await versionCommand.ExecuteScalarAsync(TestContext.Current.CancellationToken))!);
     }
 
     [Fact]
@@ -99,7 +99,7 @@ public sealed class SqliteWorkspaceRepositoryUpdatedAtTests : IDisposable
         await connection.OpenAsync(TestContext.Current.CancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version;";
-        Assert.Equal(8L, (long)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!);
+        Assert.Equal(9L, (long)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!);
         await using var column = connection.CreateCommand();
         column.CommandText = "PRAGMA table_info(ideation_rejections);";
         var columnNames = new List<string>();

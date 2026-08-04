@@ -4,7 +4,7 @@ namespace FusionCanvas.Integration.Persistence;
 
 internal static class SqliteDatabaseSchema
 {
-    internal const int CurrentVersion = 8;
+    internal const int CurrentVersion = 9;
 
     internal static Task EnsureAsync(
         SqliteConnection connection,

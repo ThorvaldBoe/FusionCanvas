@@ -6,6 +6,10 @@ Issue [#94](https://github.com/ThorvaldBoe/FusionCanvas/issues/94) needs a durab
 
 The catalog is deliberately local-first and manual in this module. The same structure must retain Printify's meaningful catalog relationships so future API import can map data into the application without forcing a redesign or leaking provider DTOs into the Domain.
 
+## Origin
+
+Primary issue: [#94](https://github.com/ThorvaldBoe/FusionCanvas/issues/94)
+
 ## What Changes
 
 - Add a store-management Product and fulfillment catalog where a creator manually maintains Printify product blueprints, fixed-provider offerings, and Printify Choice network offerings.

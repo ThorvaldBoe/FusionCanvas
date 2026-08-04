@@ -6,6 +6,7 @@ using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
+using FusionCanvas.Domain.Products;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.WorkflowNavigation;
 using FusionCanvas.Application.ToolContexts;
@@ -32,6 +33,11 @@ internal static class SampleWorkspace
         var design = new Item(DesignNodeId, store.Id, niche.Id, topic.Id, "Retro mug design", null, ItemStatus.Draft, WorkflowStage.Design, false, now, now, "{}");
         var item = new Item(ListingNodeId, store.Id, niche.Id, topic.Id, "Espresso listing draft", null, ItemStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
 
+        var product = new StoreProduct(Guid.NewGuid(), store.Id, "Gildan 64000", "Blank tee", null, now, now, "{}");
+        var offering = new FulfillmentOffering(Guid.NewGuid(), product.Id, "Printful", null, FulfillmentKind.FixedProvider, "Printful", null, now, now, "{}");
+        var variant = new ProductVariant(Guid.NewGuid(), offering.Id, [new VariantOption("Color", "Black")], now, now);
+        var area = new DesignArea(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 3000, 4500, [variant.Id], now, now, "{}");
+
         return new WorkspaceSnapshot(
             [store],
             [niche],
@@ -41,7 +47,14 @@ internal static class SampleWorkspace
             [],
             [],
             [],
-            []);
+            [])
+        {
+            StoreProducts = [product],
+            FulfillmentOfferings = [offering],
+            ProductVariants = [variant],
+            DesignAreas = [area],
+            ItemDesignAreaTargets = []
+        };
     }
 }
 

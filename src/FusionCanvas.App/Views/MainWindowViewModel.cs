@@ -36,6 +36,7 @@ using FusionCanvas.Application.Ideation;
 using FusionCanvas.Application.Workspaces.Transfer;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.ConceptRefinement;
+using FusionCanvas.Application.Products;
 using FusionCanvas.App.ConceptRefinement;
 
 namespace FusionCanvas.App.Views;
@@ -102,7 +103,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.SnowcloneLibrary,
             runtime.RejectedPhrases,
             runtime.ConceptRefinement,
-            runtime.ConceptRefinementAccess)
+            runtime.ConceptRefinementAccess,
+            runtime.ProductSupplierSetup)
     {
     }
 
@@ -125,7 +127,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         FusionCanvas.Application.Snowclones.ISnowcloneLibraryService? snowcloneLibrary = null,
         FusionCanvas.Application.RejectedPhrases.IRejectedPhraseManagementService? rejectedPhrases = null,
         IConceptRefinementService? conceptRefinementService = null,
-        IConceptRefinementAccessStatus? conceptRefinementAccessStatus = null)
+        IConceptRefinementAccessStatus? conceptRefinementAccessStatus = null,
+        IProductSupplierSetupService? productSupplierSetupService = null)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
@@ -138,10 +141,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 new ZipWorkspacePackageWriter(),
                 new ZipWorkspacePackageReader()));
         Settings = CreateSettings(settings);
+        var productService = productSupplierSetupService ?? new ProductSupplierSetupService(workspaceRepository);
         StoreManagement = new StoreManagementViewModel(
             new StoreManagementService(workspaceRepository),
             new NicheManagementService(workspaceRepository),
-            new TagManagementService(workspaceRepository));
+            new TagManagementService(workspaceRepository),
+            productService);
         _groupManagementService = groupManagementService ?? new GroupManagementService(workspaceRepository);
         _itemManagementService = itemManagementService ?? new ItemManagementService(workspaceRepository);
         _tagManagementService = tagManagementService ?? new TagManagementService(workspaceRepository);
@@ -159,7 +164,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         GroupDetails = new GroupDetailsViewModel(_groupManagementService);
         AssetsManagement = new AssetsViewModel(_assetManagementService);
         ItemInspector = new ItemInspectorViewModel(_itemInspectorService, _itemManagementService, _tagManagementService);
-        DesignTool = new DesignStageToolViewModel(new DesignFileService(workspaceRepository, fileStore));
+        DesignTool = new DesignStageToolViewModel(new DesignFileService(workspaceRepository, fileStore), productService);
         ListingTool = new ListingStageToolViewModel();
         Ideation = new IdeationViewModel(_ideationService, _ideationAccessStatus, snowcloneLibrary, rejectedPhrases);
         ConceptRefinement = new ConceptRefinementSessionViewModel(
