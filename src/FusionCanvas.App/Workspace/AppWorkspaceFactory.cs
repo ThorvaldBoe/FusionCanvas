@@ -83,7 +83,7 @@ public static class AppWorkspaceFactory
             new IdeationService(
                 repository,
                 itemManagement,
-                new AiIdeaGenerator(ai),
+                new AiIdeaGenerator(ai, guidanceSource),
                 new PersistedSnowcloneCatalog(snowcloneLibrary),
                 ideationAccess),
             ideationAccess,

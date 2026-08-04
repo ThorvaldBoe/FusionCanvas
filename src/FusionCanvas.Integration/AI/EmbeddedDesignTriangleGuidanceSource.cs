@@ -5,7 +5,7 @@ namespace FusionCanvas.Integration.AI;
 public sealed class EmbeddedDesignTriangleGuidanceSource : IDesignTriangleGuidanceSource
 {
     internal const string ResourceName =
-        "FusionCanvas.Integration.AI.DesignTriangleGuidance.md";
+        "FusionCanvas.Integration.AI.PoDDesignFramework.md";
 
     public string Load()
     {

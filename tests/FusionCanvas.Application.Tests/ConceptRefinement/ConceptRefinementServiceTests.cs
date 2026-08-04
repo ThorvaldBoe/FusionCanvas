@@ -112,6 +112,9 @@ public sealed class ConceptRefinementServiceTests
         Assert.Contains("idea", systemMessage.Text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("phrase", systemMessage.Text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("graphic", systemMessage.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("wearer signal", systemMessage.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("viewer inference", systemMessage.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("semantic role", systemMessage.Text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("IDEA:", systemMessage.Text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("PHRASE:", systemMessage.Text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("GRAPHIC:", systemMessage.Text, StringComparison.OrdinalIgnoreCase);
