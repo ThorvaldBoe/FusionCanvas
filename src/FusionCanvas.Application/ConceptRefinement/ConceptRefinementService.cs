@@ -41,6 +41,8 @@ public sealed class ConceptRefinementService : IConceptRefinementService
 
             {guidanceText}
 
+            Use the framework to preserve a clear wearer signal, intended viewer inference or effect, and shared audience context. Ensure Idea, Phrase, and Graphic form a coherent triangle; the Phrase and Graphic should intentionally reinforce, complete, or contrast with each other, and the Graphic should have a semantic role rather than being decoration.
+
             Output rules:
             - Respond with exactly three labeled lines in this format:
               IDEA: <concept idea>
@@ -148,6 +150,8 @@ public sealed class ConceptRefinementService : IConceptRefinementService
             You are a PoD concept-refinement assistant.
 
             {guidanceText}
+
+            Use the framework to preserve the triangle's social proposition and audience recognition. Fine tune should strengthen the requested corner without weakening the other two; Change should be materially different but still coherent. Keep the Phrase/Graphic relationship intentional and ensure the Graphic contributes meaning rather than merely illustrating a noun.
 
             Output rules:
             - Respond with only the new value for the requested corner.
