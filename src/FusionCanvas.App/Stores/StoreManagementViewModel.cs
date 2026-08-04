@@ -6,6 +6,8 @@ using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Application.Stores;
 using FusionCanvas.Application.Niches;
 using FusionCanvas.Application.Tags;
+using FusionCanvas.Application.Products;
+using FusionCanvas.Domain.Products;
 
 namespace FusionCanvas.App.Stores;
 
@@ -20,7 +22,8 @@ public enum StoreManagementEditorTab
 {
     BasicInfo,
     Niches,
-    Tags
+    Tags,
+    Products
 }
 
 public sealed class StoreManagementViewModel : INotifyPropertyChanged
@@ -37,8 +40,34 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         SelectNichesTab,
         SelectTag,
         StartNewTag,
-        SelectTagsTab
+        SelectTagsTab,
+        SelectProductsTab,
+        StartNewProduct,
+        SelectProduct,
+        SelectOffering,
+        StartNewOffering,
+        SelectArea,
+        SelectVariant
     }
+
+    private sealed record ProductDraft(
+        string Name,
+        string Description,
+        string ExternalProductId);
+
+    private sealed record OfferingDraft(
+        string Name,
+        string Description,
+        string ExternalOfferingId,
+        int KindIndex,
+        string ProviderName,
+        string AreaName,
+        string AreaPosition,
+        string AreaDecorationMethod,
+        string AreaWidth,
+        string AreaHeight,
+        string VariantColor,
+        string VariantSize);
 
     private sealed record EditorState(
         string Name,
@@ -62,6 +91,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private readonly IStoreManagementService _service;
     private readonly INicheManagementService? _nicheService;
     private readonly ITagManagementService? _tagService;
+    private readonly IProductSupplierSetupService? _productService;
     private bool _isSelectorExpanded;
     private bool _isStoreEditorOpen;
     private bool _firstStorePromptDismissed;
@@ -81,6 +111,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private NicheSummary? _pendingEditorNiche;
     private TagSummary? _pendingEditorTag;
     private TagSummary? _pendingDeleteTag;
+    private StoreProductSummary? _pendingEditorProduct;
+    private FulfillmentOfferingSummary? _pendingEditorOffering;
     private int _pendingDeleteTagItemCount;
     private PendingEditorAction _pendingEditorAction;
     private EditorState _originalEditorState = EmptyEditorState();
@@ -108,11 +140,40 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private string _tagDescription = string.Empty;
     private string? _errorMessage;
 
-    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null, ITagManagementService? tagService = null)
+    private bool _productDeleteWarningVisible;
+    private bool _offeringDeleteWarningVisible;
+    private bool _isCreatingNewProduct;
+    private bool _isCreatingNewOffering;
+    private Guid? _draftProductId;
+    private Guid? _draftOfferingId;
+    private StoreProductSummary? _pendingDeleteProduct;
+    private FulfillmentOfferingSummary? _pendingDeleteOffering;
+    private StoreProductSummary? _selectedProduct;
+    private FulfillmentOfferingSummary? _selectedOffering;
+    private ProductDraft _originalProductState = new(string.Empty, string.Empty, string.Empty);
+    private OfferingDraft _originalOfferingState = new(string.Empty, string.Empty, string.Empty, 0, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
+    private string _productName = string.Empty;
+    private string _productDescription = string.Empty;
+    private string _externalProductId = string.Empty;
+    private string _offeringName = string.Empty;
+    private string _offeringDescription = string.Empty;
+    private string _offeringExternalOfferingId = string.Empty;
+    private int _offeringKindIndex;
+    private string _offeringProviderName = string.Empty;
+    private string _areaName = string.Empty;
+    private string _areaPosition = string.Empty;
+    private string _areaDecorationMethod = string.Empty;
+    private string _areaWidth = string.Empty;
+    private string _areaHeight = string.Empty;
+    private string _variantColor = string.Empty;
+    private string _variantSize = string.Empty;
+
+    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null, ITagManagementService? tagService = null, IProductSupplierSetupService? productService = null)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _nicheService = nicheService;
         _tagService = tagService;
+        _productService = productService;
         ToggleStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = !IsSelectorExpanded);
         ExpandStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = true);
         CollapseStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = false);
@@ -223,6 +284,48 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         ConfirmDeleteTagCommand = new RelayCommand(_ => Run(ConfirmDeleteTagAsync()));
         CancelDeleteTagCommand = new RelayCommand(_ => ClearTagDeleteWarning());
         StartCreateTagCommand = new RelayCommand(_ => StartCreateTag());
+        OpenProductsTabCommand = new RelayCommand(_ => OpenProductsTab());
+        SelectProductsTabCommand = new RelayCommand(_ => SelectProductsTab());
+        StartCreateProductCommand = new RelayCommand(_ => StartCreateProduct());
+        SelectProductCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is StoreProductSummary product)
+            {
+                SelectProductForEditing(product);
+            }
+        });
+        SaveSelectedProductCommand = new RelayCommand(_ => Run(SaveSelectedProductAsync()));
+        RequestDeleteSelectedProductCommand = new RelayCommand(_ => RequestDeleteSelectedProduct());
+        ConfirmDeleteProductCommand = new RelayCommand(_ => Run(ConfirmDeleteProductAsync()));
+        CancelDeleteProductCommand = new RelayCommand(_ => ClearProductDeleteWarning());
+        StartCreateOfferingCommand = new RelayCommand(_ => StartCreateOffering());
+        SelectOfferingCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is FulfillmentOfferingSummary offering)
+            {
+                SelectOfferingForEditing(offering);
+            }
+        });
+        SaveSelectedOfferingCommand = new RelayCommand(_ => Run(SaveSelectedOfferingAsync()));
+        RequestDeleteSelectedOfferingCommand = new RelayCommand(_ => RequestDeleteSelectedOffering());
+        ConfirmDeleteOfferingCommand = new RelayCommand(_ => Run(ConfirmDeleteOfferingAsync()));
+        CancelDeleteOfferingCommand = new RelayCommand(_ => ClearOfferingDeleteWarning());
+        AddVariantCommand = new RelayCommand(_ => Run(AddVariantAsync()));
+        RemoveSelectedVariantCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is ProductVariantSummary variant)
+            {
+                Run(RemoveVariantAsync(variant));
+            }
+        });
+        AddDesignAreaCommand = new RelayCommand(_ => Run(AddDesignAreaAsync()));
+        RemoveSelectedDesignAreaCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is DesignAreaSummary area)
+            {
+                Run(RemoveDesignAreaAsync(area));
+            }
+        });
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -232,6 +335,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public event EventHandler? WorkspaceStructureChanged;
 
     public event EventHandler? StoreNameFocusRequested;
+
+    public event EventHandler? ProductNameFocusRequested;
 
     public IReadOnlyList<StoreSummary> ActiveStores { get; private set; } = [];
 
@@ -310,7 +415,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public bool HasUnsavedNicheChanges => CurrentNicheEditorState() != _originalNicheEditorState;
 
-    public bool HasAnyUnsavedChanges => HasUnsavedChanges || HasUnsavedNicheChanges || HasUnsavedTagChanges;
+    public bool HasAnyUnsavedChanges => HasUnsavedChanges || HasUnsavedNicheChanges || HasUnsavedTagChanges || HasAnyCatalogUnsavedChanges;
 
     public bool CanSaveSelectedStore => _isCreatingNewStore || (SelectedStore is not null && HasUnsavedChanges);
 
@@ -334,6 +439,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public bool IsTagsTabSelected => SelectedEditorTab == StoreManagementEditorTab.Tags;
 
+    public bool IsProductsTabSelected => SelectedEditorTab == StoreManagementEditorTab.Products;
+
     public StoreManagementEditorTab SelectedEditorTab
     {
         get => _selectedEditorTab;
@@ -344,6 +451,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(IsBasicInfoTabSelected));
                 OnPropertyChanged(nameof(IsNichesTabSelected));
                 OnPropertyChanged(nameof(IsTagsTabSelected));
+                OnPropertyChanged(nameof(IsProductsTabSelected));
             }
         }
     }
@@ -419,11 +527,13 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             : $"Delete tag '{_pendingDeleteTag.Name}' permanently? It will be removed from {_pendingDeleteTagItemCount} Item(s). This cannot be undone.";
 
     public string DiscardChangesMessage =>
-        HasUnsavedTagChanges && !HasUnsavedChanges && !HasUnsavedNicheChanges
+        HasUnsavedTagChanges && !HasUnsavedChanges && !HasUnsavedNicheChanges && !HasAnyCatalogUnsavedChanges
             ? "Discard changes? Unsaved tag edits will be lost."
-            : HasUnsavedNicheChanges && !HasUnsavedChanges
-                ? "Discard changes? Unsaved niche edits will be lost."
-                : "Discard changes? Unsaved store, niche, or tag edits will be lost.";
+            : HasAnyCatalogUnsavedChanges && !HasUnsavedChanges && !HasUnsavedNicheChanges && !HasUnsavedTagChanges
+                ? "Discard changes? Unsaved product, offering, variant, or area edits will be lost."
+                : HasUnsavedNicheChanges && !HasUnsavedChanges
+                    ? "Discard changes? Unsaved niche edits will be lost."
+                    : "Discard changes? Unsaved store, niche, tag, or catalog edits will be lost.";
 
     public string NewStoreName
     {
@@ -644,6 +754,278 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         }
     }
 
+    public IReadOnlyList<StoreProductSummary> Products { get; private set; } = [];
+
+    public IReadOnlyList<StoreProductSummary> EditorProducts =>
+        _isCreatingNewProduct && _draftProductId is not null
+            ? Products.Concat([DraftProduct()]).ToArray()
+            : Products;
+
+    public StoreProductSummary? SelectedProduct
+    {
+        get => _selectedProduct;
+        private set
+        {
+            if (SetField(ref _selectedProduct, value))
+            {
+                OnPropertyChanged(nameof(HasSelectedProduct));
+                OnPropertyChanged(nameof(CanDeleteSelectedProduct));
+                OnPropertyChanged(nameof(CanArchiveSelectedProduct));
+            }
+        }
+    }
+
+    public FulfillmentOfferingSummary? SelectedOffering
+    {
+        get => _selectedOffering;
+        private set
+        {
+            if (SetField(ref _selectedOffering, value))
+            {
+                OnPropertyChanged(nameof(OfferingVariants));
+                OnPropertyChanged(nameof(OfferingDesignAreas));
+                OnPropertyChanged(nameof(HasSelectedOffering));
+                OnPropertyChanged(nameof(CanDeleteSelectedOffering));
+            }
+        }
+    }
+
+    public IReadOnlyList<ProductVariantSummary> OfferingVariants =>
+        SelectedOffering?.Variants ?? [];
+
+    public IReadOnlyList<DesignAreaSummary> OfferingDesignAreas =>
+        SelectedOffering?.DesignAreas ?? [];
+
+    public bool HasSelectedProduct => _selectedProduct is not null;
+
+    public bool HasSelectedOffering => SelectedOffering is not null;
+
+    public bool HasSelectedVariant => SelectedOffering?.Variants.Any() == true;
+
+    public bool HasSelectedDesignArea => SelectedOffering?.DesignAreas.Any() == true;
+
+    public bool HasAnyCatalogUnsavedChanges => HasUnsavedProductChanges || HasUnsavedOfferingChanges;
+
+    public bool HasUnsavedProductChanges => _isCreatingNewProduct || (SelectedProduct is not null && _draftProductId is null && CurrentProductEditorState() != _originalProductState);
+
+    public bool HasUnsavedOfferingChanges => _isCreatingNewOffering || (SelectedOffering is not null && _draftOfferingId is null && CurrentOfferingEditorState() != _originalOfferingState);
+
+    public bool CanSaveSelectedProduct => _productService is not null && SelectedStore is not null && !SelectedStore.IsArchived && HasUnsavedProductChanges;
+
+    public bool CanSaveSelectedOffering => _productService is not null && SelectedProduct is not null && SelectedStore is { IsArchived: false } && HasUnsavedOfferingChanges;
+
+    public bool CanDeleteSelectedProduct => _productService is not null && SelectedProduct is not null && !_isCreatingNewProduct;
+
+    public bool CanArchiveSelectedProduct => false;
+
+    public bool CanDeleteSelectedOffering => _productService is not null && SelectedOffering is not null && !_isCreatingNewOffering;
+
+    public bool CanCreateCatalogItem => _productService is not null && SelectedStore is { IsArchived: false } && !_isCreatingNewStore;
+
+    public bool ProductDeleteWarningVisible
+    {
+        get => _productDeleteWarningVisible;
+        private set => SetField(ref _productDeleteWarningVisible, value);
+    }
+
+    public bool OfferingDeleteWarningVisible
+    {
+        get => _offeringDeleteWarningVisible;
+        private set => SetField(ref _offeringDeleteWarningVisible, value);
+    }
+
+    public string ProductDeleteWarningMessage => _pendingDeleteProduct is null
+        ? "Permanent deletion cannot be undone."
+        : $"Delete product '{_pendingDeleteProduct.Name}' permanently? This cannot be undone.";
+
+    public string OfferingDeleteWarningMessage => _pendingDeleteOffering is null
+        ? "Permanent deletion cannot be undone."
+        : $"Delete offering '{_pendingDeleteOffering.Name}' permanently? This cannot be undone.";
+
+    public string ProductName
+    {
+        get => _productName;
+        set
+        {
+            if (SetField(ref _productName, value))
+            {
+                RaiseProductEditorStateProperties();
+                OnPropertyChanged(nameof(EditorProducts));
+            }
+        }
+    }
+
+    public string ProductDescription
+    {
+        get => _productDescription;
+        set
+        {
+            if (SetField(ref _productDescription, value))
+            {
+                RaiseProductEditorStateProperties();
+            }
+        }
+    }
+
+    public string ExternalProductId
+    {
+        get => _externalProductId;
+        set
+        {
+            if (SetField(ref _externalProductId, value))
+            {
+                RaiseProductEditorStateProperties();
+            }
+        }
+    }
+
+    public string OfferingName
+    {
+        get => _offeringName;
+        set
+        {
+            if (SetField(ref _offeringName, value))
+            {
+                RaiseOfferingEditorStateProperties();
+            }
+        }
+    }
+
+    public string OfferingDescription
+    {
+        get => _offeringDescription;
+        set
+        {
+            if (SetField(ref _offeringDescription, value))
+            {
+                RaiseOfferingEditorStateProperties();
+            }
+        }
+    }
+
+    public string OfferingExternalOfferingId
+    {
+        get => _offeringExternalOfferingId;
+        set
+        {
+            if (SetField(ref _offeringExternalOfferingId, value))
+            {
+                RaiseOfferingEditorStateProperties();
+            }
+        }
+    }
+
+    public bool IsChoiceNetworkOffering => OfferingKindIndex == 1;
+
+    public int OfferingKindIndex
+    {
+        get => _offeringKindIndex;
+        set
+        {
+            if (SetField(ref _offeringKindIndex, value))
+            {
+                OnPropertyChanged(nameof(IsChoiceNetworkOffering));
+                RaiseOfferingEditorStateProperties();
+            }
+        }
+    }
+
+    public string OfferingProviderName
+    {
+        get => _offeringProviderName;
+        set
+        {
+            if (SetField(ref _offeringProviderName, value))
+            {
+                RaiseOfferingEditorStateProperties();
+            }
+        }
+    }
+
+    public string AreaName
+    {
+        get => _areaName;
+        set
+        {
+            if (SetField(ref _areaName, value))
+            {
+                RaiseOfferingEditorStateProperties();
+            }
+        }
+    }
+
+    public string AreaPosition
+    {
+        get => _areaPosition;
+        set
+        {
+            if (SetField(ref _areaPosition, value))
+            {
+                RaiseOfferingEditorStateProperties();
+            }
+        }
+    }
+
+    public string AreaDecorationMethod
+    {
+        get => _areaDecorationMethod;
+        set
+        {
+            if (SetField(ref _areaDecorationMethod, value))
+            {
+                RaiseOfferingEditorStateProperties();
+            }
+        }
+    }
+
+    public string AreaWidth
+    {
+        get => _areaWidth;
+        set
+        {
+            if (SetField(ref _areaWidth, value))
+            {
+                RaiseOfferingEditorStateProperties();
+            }
+        }
+    }
+
+    public string AreaHeight
+    {
+        get => _areaHeight;
+        set
+        {
+            if (SetField(ref _areaHeight, value))
+            {
+                RaiseOfferingEditorStateProperties();
+            }
+        }
+    }
+
+    public string VariantColor
+    {
+        get => _variantColor;
+        set
+        {
+            if (SetField(ref _variantColor, value))
+            {
+                RaiseOfferingEditorStateProperties();
+            }
+        }
+    }
+
+    public string VariantSize
+    {
+        get => _variantSize;
+        set
+        {
+            if (SetField(ref _variantSize, value))
+            {
+                RaiseOfferingEditorStateProperties();
+            }
+        }
+    }
+
     public string? ErrorMessage
     {
         get => _errorMessage;
@@ -737,6 +1119,42 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public ICommand CancelDeleteTagCommand { get; }
 
     public ICommand StartCreateTagCommand { get; }
+
+    public ICommand OpenProductsTabCommand { get; }
+
+    public ICommand SelectProductsTabCommand { get; }
+
+    public ICommand StartCreateProductCommand { get; }
+
+    public ICommand SelectProductCommand { get; }
+
+    public ICommand SaveSelectedProductCommand { get; }
+
+    public ICommand RequestDeleteSelectedProductCommand { get; }
+
+    public ICommand ConfirmDeleteProductCommand { get; }
+
+    public ICommand CancelDeleteProductCommand { get; }
+
+    public ICommand StartCreateOfferingCommand { get; }
+
+    public ICommand SelectOfferingCommand { get; }
+
+    public ICommand SaveSelectedOfferingCommand { get; }
+
+    public ICommand RequestDeleteSelectedOfferingCommand { get; }
+
+    public ICommand ConfirmDeleteOfferingCommand { get; }
+
+    public ICommand CancelDeleteOfferingCommand { get; }
+
+    public ICommand AddVariantCommand { get; }
+
+    public ICommand RemoveSelectedVariantCommand { get; }
+
+    public ICommand AddDesignAreaCommand { get; }
+
+    public ICommand RemoveSelectedDesignAreaCommand { get; }
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
@@ -1185,7 +1603,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     private void SelectBasicInfoTab()
     {
-        if (HasUnsavedNicheChanges)
+        if (HasUnsavedNicheChanges || HasAnyCatalogUnsavedChanges)
         {
             RequestDiscardBefore(PendingEditorAction.SelectBasicInfoTab);
             return;
@@ -1196,7 +1614,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     private void SelectNichesTab()
     {
-        if (HasUnsavedChanges)
+        if (HasUnsavedChanges || HasAnyCatalogUnsavedChanges)
         {
             RequestDiscardBefore(PendingEditorAction.SelectNichesTab);
             return;
@@ -1659,7 +2077,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     private void SelectTagsTab()
     {
-        if (HasUnsavedChanges || HasUnsavedNicheChanges)
+        if (HasUnsavedChanges || HasUnsavedNicheChanges || HasAnyCatalogUnsavedChanges)
         {
             RequestDiscardBefore(PendingEditorAction.SelectTagsTab);
             return;
@@ -1673,6 +2091,671 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
         Run(LoadTagsForSelectedStoreAsync());
     }
+
+    private void OpenProductsTab()
+    {
+        OpenStoreEditor();
+        SelectProductsTab();
+    }
+
+    private void SelectProductsTab()
+    {
+        if (HasUnsavedChanges || HasUnsavedNicheChanges || HasUnsavedTagChanges)
+        {
+            RequestDiscardBefore(PendingEditorAction.SelectProductsTab);
+            return;
+        }
+
+        SelectedEditorTab = StoreManagementEditorTab.Products;
+        if (SelectedStore is { IsArchived: false } && _selectedProduct is null && Products.Count > 0)
+        {
+            SelectProductForEditing(Products[0]);
+        }
+
+        Run(LoadProductsForSelectedStoreAsync());
+    }
+
+    private async Task LoadProductsForSelectedStoreAsync(CancellationToken cancellationToken = default)
+    {
+        if (_productService is null)
+        {
+            return;
+        }
+
+        var state = await _productService.LoadForStoreAsync(SelectedStore is { IsArchived: false } ? SelectedStore.Id : Guid.Empty, cancellationToken).ConfigureAwait(false);
+        ApplyProductState(state);
+    }
+
+    private void ApplyProductState(ProductSupplierSetupState state)
+    {
+        Products = state.Products;
+        SelectedProduct = _isCreatingNewProduct
+            ? DraftProduct()
+            : state.Products.FirstOrDefault(product => product.Id == SelectedProduct?.Id)
+                ?? state.Products.FirstOrDefault();
+        if (!_isCreatingNewProduct)
+        {
+            ApplySelectedProductFields(SelectedProduct);
+        }
+
+        OnPropertyChanged(nameof(Products));
+        OnPropertyChanged(nameof(EditorProducts));
+        OnPropertyChanged(nameof(SelectedProduct));
+        OnPropertyChanged(nameof(HasSelectedProduct));
+        OnPropertyChanged(nameof(CanDeleteSelectedProduct));
+        OnPropertyChanged(nameof(CanCreateCatalogItem));
+        if (SelectedProduct is not null)
+        {
+            ApplySelectedOfferingAfterProductChange();
+        }
+        else
+        {
+            ClearOfferingSelection();
+        }
+    }
+
+    public void SelectProductForEditing(StoreProductSummary product)
+    {
+        ArgumentNullException.ThrowIfNull(product);
+        if (_isCreatingNewProduct && product.Id == _draftProductId)
+        {
+            SelectedProduct = DraftProduct();
+            OnPropertyChanged(nameof(SelectedProduct));
+            return;
+        }
+
+        if (HasUnsavedProductChanges && SelectedProduct?.Id != product.Id)
+        {
+            RequestDiscardBefore(PendingEditorAction.SelectProduct, product: product);
+            return;
+        }
+
+        PerformSelectProductForEditing(product);
+    }
+
+    private void PerformSelectProductForEditing(StoreProductSummary product)
+    {
+        _isCreatingNewProduct = false;
+        _draftProductId = null;
+        SelectedProduct = product;
+        ApplySelectedProductFields(product);
+        ApplySelectedOfferingAfterProductChange();
+        ClearProductDeleteWarning();
+        ClearDiscardChangesPrompt();
+        OnPropertyChanged(nameof(SelectedProduct));
+        OnPropertyChanged(nameof(EditorProducts));
+        OnPropertyChanged(nameof(HasSelectedProduct));
+        OnPropertyChanged(nameof(CanDeleteSelectedProduct));
+        RaiseProductEditorStateProperties();
+    }
+
+    private void ApplySelectedOfferingAfterProductChange()
+    {
+        var offerings = SelectedProduct?.Offerings ?? [];
+        SelectedOffering = offerings.FirstOrDefault(offering => offering.Id == SelectedOffering?.Id) ?? offerings.FirstOrDefault();
+        if (SelectedOffering is not null)
+        {
+            ApplySelectedOfferingFields(SelectedOffering);
+        }
+        else
+        {
+            ClearOfferingEditingFields();
+        }
+    }
+
+    private void ApplySelectedOfferingFields(FulfillmentOfferingSummary offering)
+    {
+        _offeringName = offering.Name;
+        _offeringDescription = offering.Description ?? string.Empty;
+        _offeringExternalOfferingId = offering.ExternalOfferingId ?? string.Empty;
+        _offeringKindIndex = offering.Kind == FulfillmentKind.FixedProvider ? 0 : 1;
+        _offeringProviderName = offering.ProviderName ?? string.Empty;
+        CaptureOriginalOfferingState();
+    }
+
+    public void SelectOfferingForEditing(FulfillmentOfferingSummary offering)
+    {
+        ArgumentNullException.ThrowIfNull(offering);
+        if (_isCreatingNewOffering && offering.Id == _draftOfferingId)
+        {
+            SelectedOffering = DraftOffering();
+            OnPropertyChanged(nameof(SelectedOffering));
+            return;
+        }
+
+        if (HasUnsavedOfferingChanges && SelectedOffering?.Id != offering.Id)
+        {
+            RequestDiscardBefore(PendingEditorAction.SelectOffering, offering: offering);
+            return;
+        }
+
+        PerformSelectOfferingForEditing(offering);
+    }
+
+    private void PerformSelectOfferingForEditing(FulfillmentOfferingSummary offering)
+    {
+        _isCreatingNewOffering = false;
+        _draftOfferingId = null;
+        SelectedOffering = offering;
+        ApplySelectedOfferingFields(offering);
+        ClearOfferingDeleteWarning();
+        ClearDiscardChangesPrompt();
+        OnPropertyChanged(nameof(SelectedOffering));
+        OnPropertyChanged(nameof(HasSelectedOffering));
+        OnPropertyChanged(nameof(CanDeleteSelectedOffering));
+        OnPropertyChanged(nameof(OfferingVariants));
+        OnPropertyChanged(nameof(OfferingDesignAreas));
+        RaiseOfferingEditorStateProperties();
+    }
+
+    public void StartCreateProduct()
+    {
+        if (!CanCreateCatalogItem)
+        {
+            ErrorMessage = "Select an active saved store before creating a product.";
+            return;
+        }
+
+        if (HasUnsavedProductChanges)
+        {
+            RequestDiscardBefore(PendingEditorAction.StartNewProduct);
+            return;
+        }
+
+        BeginCreateProductDraft();
+    }
+
+    private void BeginCreateProductDraft()
+    {
+        _isCreatingNewProduct = true;
+        _draftProductId = Guid.NewGuid();
+        ClearProductEditorFields();
+        SelectedProduct = DraftProduct();
+        ClearProductDeleteWarning();
+        ClearDiscardChangesPrompt();
+        ErrorMessage = null;
+        OnPropertyChanged(nameof(SelectedProduct));
+        OnPropertyChanged(nameof(EditorProducts));
+        OnPropertyChanged(nameof(HasSelectedProduct));
+        OnPropertyChanged(nameof(CanDeleteSelectedProduct));
+        RaiseProductEditorStateProperties();
+        ProductNameFocusRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    public async Task SaveSelectedProductAsync(CancellationToken cancellationToken = default)
+    {
+        if (_productService is null)
+        {
+            ErrorMessage = "Product and fulfillment setup is not available.";
+            return;
+        }
+
+        if (SelectedStore is null)
+        {
+            ErrorMessage = "Select a store before saving a product.";
+            return;
+        }
+
+        if (_isCreatingNewProduct)
+        {
+            var result = await _productService.CreateProductAsync(
+                new CreateProductRequest(SelectedStore.Id, ProductName, EmptyToNull(ProductDescription), EmptyToNull(ExternalProductId)),
+                cancellationToken).ConfigureAwait(false);
+            if (result.Succeeded)
+            {
+                _isCreatingNewProduct = false;
+                _draftProductId = null;
+            }
+
+            ApplyProductResult(result);
+            return;
+        }
+
+        if (SelectedProduct is null)
+        {
+            ErrorMessage = "Select a product before saving.";
+            return;
+        }
+
+        var updateResult = await _productService.UpdateProductAsync(
+            new UpdateProductRequest(SelectedProduct.Id, ProductName, EmptyToNull(ProductDescription), EmptyToNull(ExternalProductId)),
+            cancellationToken).ConfigureAwait(false);
+        ApplyProductResult(updateResult);
+    }
+
+    private void ApplyProductResult(ProductSupplierSetupResult result)
+    {
+        ErrorMessage = result.Error;
+        ApplyProductState(result.State);
+        if (result.Product is not null && result.Succeeded)
+        {
+            PerformSelectProductForEditing(result.Product);
+            WorkspaceStructureChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public void RequestDeleteSelectedProduct()
+    {
+        if (_isCreatingNewProduct)
+        {
+            ErrorMessage = "Save the new product before deleting it.";
+            return;
+        }
+
+        if (SelectedProduct is null)
+        {
+            ErrorMessage = "Select a product before deleting.";
+            return;
+        }
+
+        _pendingDeleteProduct = SelectedProduct;
+        ProductDeleteWarningVisible = true;
+        OnPropertyChanged(nameof(ProductDeleteWarningMessage));
+    }
+
+    public async Task ConfirmDeleteProductAsync(CancellationToken cancellationToken = default)
+    {
+        if (_productService is null)
+        {
+            ErrorMessage = "Product and fulfillment setup is not available.";
+            return;
+        }
+
+        if (_pendingDeleteProduct is null)
+        {
+            ErrorMessage = "Select a product before deleting.";
+            return;
+        }
+
+        var result = await _productService.DeleteProductAsync(
+            new DeleteProductRequest(_pendingDeleteProduct.Id, Confirm: true),
+            cancellationToken).ConfigureAwait(false);
+        ErrorMessage = result.Error;
+        ApplyProductState(result.State);
+        if (_isCreatingNewProduct)
+        {
+            _isCreatingNewProduct = false;
+            _draftProductId = null;
+            OnPropertyChanged(nameof(EditorProducts));
+        }
+
+        ClearProductDeleteWarning();
+    }
+
+    private void ClearProductDeleteWarning()
+    {
+        _pendingDeleteProduct = null;
+        ProductDeleteWarningVisible = false;
+        OnPropertyChanged(nameof(ProductDeleteWarningMessage));
+    }
+
+    public void StartCreateOffering()
+    {
+        if (_productService is null || SelectedProduct is null || SelectedStore is null || SelectedStore.IsArchived)
+        {
+            ErrorMessage = "Select an active product before creating an offering.";
+            return;
+        }
+
+        if (HasUnsavedOfferingChanges)
+        {
+            RequestDiscardBefore(PendingEditorAction.StartNewOffering);
+            return;
+        }
+
+        BeginCreateOfferingDraft();
+    }
+
+    private void BeginCreateOfferingDraft()
+    {
+        _isCreatingNewOffering = true;
+        _draftOfferingId = Guid.NewGuid();
+        ClearOfferingEditingFields();
+        SelectedOffering = DraftOffering();
+        ClearOfferingDeleteWarning();
+        ClearDiscardChangesPrompt();
+        ErrorMessage = null;
+        OnPropertyChanged(nameof(SelectedOffering));
+        OnPropertyChanged(nameof(HasSelectedOffering));
+        OnPropertyChanged(nameof(CanDeleteSelectedOffering));
+        OnPropertyChanged(nameof(OfferingVariants));
+        OnPropertyChanged(nameof(OfferingDesignAreas));
+        RaiseOfferingEditorStateProperties();
+    }
+
+    public async Task SaveSelectedOfferingAsync(CancellationToken cancellationToken = default)
+    {
+        if (_productService is null)
+        {
+            ErrorMessage = "Product and fulfillment setup is not available.";
+            return;
+        }
+
+        if (SelectedProduct is null)
+        {
+            ErrorMessage = "Select a product before saving an offering.";
+            return;
+        }
+
+        var kind = OfferingKindIndex == 0 ? FulfillmentKind.FixedProvider : FulfillmentKind.PrintifyChoiceNetwork;
+        if (_isCreatingNewOffering)
+        {
+            var result = await _productService.CreateOfferingAsync(
+                new CreateOfferingRequest(
+                    SelectedProduct.Id,
+                    OfferingName,
+                    kind,
+                    kind == FulfillmentKind.FixedProvider ? EmptyToNull(OfferingProviderName) : null,
+                    EmptyToNull(OfferingDescription),
+                    EmptyToNull(OfferingExternalOfferingId)),
+                cancellationToken).ConfigureAwait(false);
+            if (result.Succeeded)
+            {
+                _isCreatingNewOffering = false;
+                _draftOfferingId = null;
+            }
+
+            ApplyOfferingResult(result);
+            return;
+        }
+
+        if (SelectedOffering is null)
+        {
+            ErrorMessage = "Select an offering before saving.";
+            return;
+        }
+
+        var updateResult = await _productService.UpdateOfferingAsync(
+            new UpdateOfferingRequest(
+                SelectedOffering.Id,
+                OfferingName,
+                kind,
+                kind == FulfillmentKind.FixedProvider ? EmptyToNull(OfferingProviderName) : null,
+                EmptyToNull(OfferingDescription),
+                EmptyToNull(OfferingExternalOfferingId)),
+            cancellationToken).ConfigureAwait(false);
+        ApplyOfferingResult(updateResult);
+    }
+
+    private void ApplyOfferingResult(ProductSupplierSetupResult result)
+    {
+        ErrorMessage = result.Error;
+        ApplyProductState(result.State);
+        if (result.Offering is not null && result.Succeeded)
+        {
+            PerformSelectOfferingForEditing(result.Offering);
+            WorkspaceStructureChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public void RequestDeleteSelectedOffering()
+    {
+        if (_isCreatingNewOffering)
+        {
+            ErrorMessage = "Save the new offering before deleting it.";
+            return;
+        }
+
+        if (SelectedOffering is null)
+        {
+            ErrorMessage = "Select an offering before deleting.";
+            return;
+        }
+
+        _pendingDeleteOffering = SelectedOffering;
+        OfferingDeleteWarningVisible = true;
+        OnPropertyChanged(nameof(OfferingDeleteWarningMessage));
+    }
+
+    public async Task ConfirmDeleteOfferingAsync(CancellationToken cancellationToken = default)
+    {
+        if (_productService is null)
+        {
+            ErrorMessage = "Product and fulfillment setup is not available.";
+            return;
+        }
+
+        if (_pendingDeleteOffering is null)
+        {
+            ErrorMessage = "Select an offering before deleting.";
+            return;
+        }
+
+        var result = await _productService.DeleteOfferingAsync(
+            new DeleteOfferingRequest(_pendingDeleteOffering.Id, Confirm: true),
+            cancellationToken).ConfigureAwait(false);
+        ErrorMessage = result.Error;
+        ApplyProductState(result.State);
+        if (_isCreatingNewOffering)
+        {
+            _isCreatingNewOffering = false;
+            _draftOfferingId = null;
+            OnPropertyChanged(nameof(OfferingVariants));
+            OnPropertyChanged(nameof(OfferingDesignAreas));
+        }
+
+        ClearOfferingDeleteWarning();
+    }
+
+    private void ClearOfferingDeleteWarning()
+    {
+        _pendingDeleteOffering = null;
+        OfferingDeleteWarningVisible = false;
+        OnPropertyChanged(nameof(OfferingDeleteWarningMessage));
+    }
+
+    public async Task AddVariantAsync(CancellationToken cancellationToken = default)
+    {
+        if (_productService is null || SelectedOffering is null)
+        {
+            ErrorMessage = "Select an offering before adding a variant.";
+            return;
+        }
+
+        var options = new List<VariantOptionDraft>();
+        if (!string.IsNullOrWhiteSpace(VariantColor))
+        {
+            options.Add(new VariantOptionDraft("Color", VariantColor.Trim()));
+        }
+
+        if (!string.IsNullOrWhiteSpace(VariantSize))
+        {
+            options.Add(new VariantOptionDraft("Size", VariantSize.Trim()));
+        }
+
+        if (options.Count == 0)
+        {
+            ErrorMessage = "Enter at least a color or size for the variant.";
+            return;
+        }
+
+        var result = await _productService.CreateVariantAsync(
+            new CreateVariantRequest(SelectedOffering.Id, options),
+            cancellationToken).ConfigureAwait(false);
+        ApplyProductResult(result);
+    }
+
+    public async Task RemoveVariantAsync(ProductVariantSummary variant, CancellationToken cancellationToken = default)
+    {
+        if (_productService is null)
+        {
+            return;
+        }
+
+        var result = await _productService.DeleteVariantAsync(
+            new DeleteVariantRequest(variant.Id, Confirm: true),
+            cancellationToken).ConfigureAwait(false);
+        ApplyProductResult(result);
+    }
+
+    public async Task AddDesignAreaAsync(CancellationToken cancellationToken = default)
+    {
+        if (_productService is null || SelectedOffering is null)
+        {
+            ErrorMessage = "Select an offering before adding a printable area.";
+            return;
+        }
+
+        if (!int.TryParse(AreaWidth, out var width) || width <= 0 || !int.TryParse(AreaHeight, out var height) || height <= 0)
+        {
+            ErrorMessage = "Design area width and height must be positive whole numbers.";
+            return;
+        }
+
+        var result = await _productService.CreateDesignAreaAsync(
+            new CreateDesignAreaRequest(
+                SelectedOffering.Id,
+                AreaName,
+                string.IsNullOrWhiteSpace(AreaPosition) ? "front" : AreaPosition.Trim(),
+                string.IsNullOrWhiteSpace(AreaDecorationMethod) ? "DTG" : AreaDecorationMethod.Trim(),
+                width,
+                height,
+                null),
+            cancellationToken).ConfigureAwait(false);
+        ApplyProductResult(result);
+    }
+
+    public async Task RemoveDesignAreaAsync(DesignAreaSummary area, CancellationToken cancellationToken = default)
+    {
+        if (_productService is null)
+        {
+            return;
+        }
+
+        var result = await _productService.DeleteDesignAreaAsync(
+            new DeleteDesignAreaRequest(area.Id, Confirm: true),
+            cancellationToken).ConfigureAwait(false);
+        ApplyProductResult(result);
+    }
+
+    private void ClearOfferingSelection()
+    {
+        _isCreatingNewOffering = false;
+        _draftOfferingId = null;
+        SelectedOffering = null;
+        ClearOfferingEditingFields();
+        OnPropertyChanged(nameof(SelectedOffering));
+        OnPropertyChanged(nameof(HasSelectedOffering));
+        OnPropertyChanged(nameof(OfferingVariants));
+        OnPropertyChanged(nameof(OfferingDesignAreas));
+    }
+
+    private StoreProductSummary? DraftProduct()
+    {
+        if (!_isCreatingNewProduct || _draftProductId is not { } id || SelectedStore is null)
+        {
+            return null;
+        }
+
+        var now = DateTimeOffset.Now;
+        var name = string.IsNullOrWhiteSpace(ProductName) ? "New product" : ProductName.Trim();
+        return new StoreProductSummary(id, SelectedStore.Id, name, EmptyToNull(ProductDescription), EmptyToNull(ExternalProductId), []);
+    }
+
+    private FulfillmentOfferingSummary? DraftOffering()
+    {
+        if (!_isCreatingNewOffering || _draftOfferingId is not { } id || SelectedProduct is null)
+        {
+            return null;
+        }
+
+        var kind = OfferingKindIndex == 0 ? FulfillmentKind.FixedProvider : FulfillmentKind.PrintifyChoiceNetwork;
+        var name = string.IsNullOrWhiteSpace(OfferingName) ? "New offering" : OfferingName.Trim();
+        return new FulfillmentOfferingSummary(
+            id, SelectedProduct.Id, name, EmptyToNull(OfferingDescription), kind,
+            kind == FulfillmentKind.FixedProvider ? EmptyToNull(OfferingProviderName) : null,
+            EmptyToNull(OfferingExternalOfferingId), [], []);
+    }
+
+    private ProductDraft CurrentProductEditorState() =>
+        new(ProductName, ProductDescription, ExternalProductId);
+
+    private OfferingDraft CurrentOfferingEditorState() =>
+        new(
+            OfferingName,
+            OfferingDescription,
+            OfferingExternalOfferingId,
+            OfferingKindIndex,
+            OfferingProviderName,
+            AreaName,
+            AreaPosition,
+            AreaDecorationMethod,
+            AreaWidth,
+            AreaHeight,
+            VariantColor,
+            VariantSize);
+
+    private void ApplySelectedProductFields(StoreProductSummary? product)
+    {
+        if (product is null)
+        {
+            ClearProductEditorFields();
+            CaptureOriginalProductState();
+            return;
+        }
+
+        ProductName = product.Name;
+        ProductDescription = product.Description ?? string.Empty;
+        ExternalProductId = product.ExternalProductId ?? string.Empty;
+        CaptureOriginalProductState();
+    }
+
+    private void ClearProductEditorFields()
+    {
+        ProductName = string.Empty;
+        ProductDescription = string.Empty;
+        ExternalProductId = string.Empty;
+    }
+
+    private void ClearOfferingEditingFields()
+    {
+        OfferingName = string.Empty;
+        OfferingDescription = string.Empty;
+        OfferingExternalOfferingId = string.Empty;
+        OfferingKindIndex = 0;
+        OfferingProviderName = string.Empty;
+        AreaName = string.Empty;
+        AreaPosition = string.Empty;
+        AreaDecorationMethod = string.Empty;
+        AreaWidth = string.Empty;
+        AreaHeight = string.Empty;
+        VariantColor = string.Empty;
+        VariantSize = string.Empty;
+        CaptureOriginalOfferingState();
+    }
+
+    private void CaptureOriginalProductState()
+    {
+        _originalProductState = CurrentProductEditorState();
+        RaiseProductEditorStateProperties();
+    }
+
+    private void CaptureOriginalOfferingState()
+    {
+        _originalOfferingState = CurrentOfferingEditorState();
+        RaiseOfferingEditorStateProperties();
+    }
+
+    private void RaiseProductEditorStateProperties()
+    {
+        OnPropertyChanged(nameof(HasUnsavedProductChanges));
+        OnPropertyChanged(nameof(HasAnyUnsavedChanges));
+        OnPropertyChanged(nameof(HasAnyCatalogUnsavedChanges));
+        OnPropertyChanged(nameof(CanSaveSelectedProduct));
+        OnPropertyChanged(nameof(CanDeleteSelectedProduct));
+        OnPropertyChanged(nameof(EditorProducts));
+    }
+
+    private void RaiseOfferingEditorStateProperties()
+    {
+        OnPropertyChanged(nameof(HasUnsavedOfferingChanges));
+        OnPropertyChanged(nameof(HasAnyUnsavedChanges));
+        OnPropertyChanged(nameof(HasAnyCatalogUnsavedChanges));
+        OnPropertyChanged(nameof(CanSaveSelectedOffering));
+        OnPropertyChanged(nameof(CanDeleteSelectedOffering));
+        OnPropertyChanged(nameof(IsChoiceNetworkOffering));
+    }
+
 
     private void ApplyNicheState(NicheManagementState state)
     {
@@ -1836,15 +2919,19 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         return new NicheSummary(id, SelectedStore.Id, name, CurrentNicheContext(), IsArchived: false, now, now);
     }
 
-    private void RequestDiscardBefore(PendingEditorAction action, StoreSummary? store = null, NicheSummary? niche = null, TagSummary? tag = null)
+    private void RequestDiscardBefore(PendingEditorAction action, StoreSummary? store = null, NicheSummary? niche = null, TagSummary? tag = null, StoreProductSummary? product = null, FulfillmentOfferingSummary? offering = null)
     {
         _pendingEditorAction = action;
         _pendingEditorStore = store;
         _pendingEditorNiche = niche;
         _pendingEditorTag = tag;
+        _pendingEditorProduct = product;
+        _pendingEditorOffering = offering;
         ClearDeleteWarning();
         ClearNicheDeleteWarning();
         ClearTagDeleteWarning();
+        ClearProductDeleteWarning();
+        ClearOfferingDeleteWarning();
         DiscardChangesPromptVisible = true;
         OnPropertyChanged(nameof(DiscardChangesMessage));
     }
@@ -1855,6 +2942,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         var store = _pendingEditorStore;
         var niche = _pendingEditorNiche;
         var tag = _pendingEditorTag;
+        var product = _pendingEditorProduct;
+        var offering = _pendingEditorOffering;
         DiscardCurrentEditorChanges();
         ClearDiscardChangesPrompt();
 
@@ -1892,6 +2981,22 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 SelectedEditorTab = StoreManagementEditorTab.Tags;
                 Run(LoadTagsForSelectedStoreAsync());
                 break;
+            case PendingEditorAction.SelectProductsTab:
+                SelectedEditorTab = StoreManagementEditorTab.Products;
+                Run(LoadProductsForSelectedStoreAsync());
+                break;
+            case PendingEditorAction.StartNewProduct:
+                BeginCreateProductDraft();
+                break;
+            case PendingEditorAction.SelectProduct when product is not null:
+                PerformSelectProductForEditing(product);
+                break;
+            case PendingEditorAction.SelectOffering when offering is not null:
+                PerformSelectOfferingForEditing(offering);
+                break;
+            case PendingEditorAction.StartNewOffering:
+                BeginCreateOfferingDraft();
+                break;
         }
     }
 
@@ -1928,17 +3033,53 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
         ApplySelectedTagFields(SelectedTag);
         CaptureOriginalTagEditorState();
+        if (_isCreatingNewProduct)
+        {
+            _isCreatingNewProduct = false;
+            _draftProductId = null;
+            SelectedProduct = Products.FirstOrDefault(product => product.Id == SelectedProduct?.Id) ?? Products.FirstOrDefault();
+        }
+
+        ApplySelectedProductFields(SelectedProduct);
+        ApplySelectedOfferingAfterProductChange();
+        CaptureOriginalProductState();
+        if (_isCreatingNewOffering)
+        {
+            _isCreatingNewOffering = false;
+            _draftOfferingId = null;
+        }
+
+        ApplySelectedOfferingFieldsForDiscard();
         OnPropertyChanged(nameof(SelectedStore));
         OnPropertyChanged(nameof(EditorActiveStores));
         OnPropertyChanged(nameof(SelectedNiche));
         OnPropertyChanged(nameof(EditorActiveNiches));
         OnPropertyChanged(nameof(SelectedTag));
         OnPropertyChanged(nameof(EditorActiveTags));
+        OnPropertyChanged(nameof(SelectedProduct));
+        OnPropertyChanged(nameof(EditorProducts));
+        OnPropertyChanged(nameof(SelectedOffering));
         OnPropertyChanged(nameof(HasSelectedStore));
         OnPropertyChanged(nameof(CanRestoreSelectedStore));
         RaiseEditorActionProperties();
         RaiseNicheEditorActionProperties();
         RaiseTagEditorActionProperties();
+        RaiseProductEditorStateProperties();
+        RaiseOfferingEditorStateProperties();
+    }
+
+    private void ApplySelectedOfferingFieldsForDiscard()
+    {
+        var offerings = SelectedProduct?.Offerings ?? [];
+        SelectedOffering = offerings.FirstOrDefault(offering => offering.Id == SelectedOffering?.Id) ?? offerings.FirstOrDefault();
+        if (SelectedOffering is not null)
+        {
+            ApplySelectedOfferingFields(SelectedOffering);
+        }
+        else
+        {
+            ClearOfferingEditingFields();
+        }
     }
 
     private void ClearDiscardChangesPrompt()
@@ -1947,6 +3088,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         _pendingEditorStore = null;
         _pendingEditorNiche = null;
         _pendingEditorTag = null;
+        _pendingEditorProduct = null;
+        _pendingEditorOffering = null;
         DiscardChangesPromptVisible = false;
     }
 

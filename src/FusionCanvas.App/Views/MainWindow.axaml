@@ -1032,6 +1032,55 @@
                                  TextWrapping="Wrap"
                                  FontSize="12"
                                  Foreground="{DynamicResource DangerTextBrush}" />
+                      <Border IsVisible="{Binding DesignTool.HasTargets}"
+                              Padding="10"
+                              Background="{DynamicResource PanelSurfaceBrush}"
+                              BorderBrush="{DynamicResource SubtleBorderBrush}"
+                              BorderThickness="1"
+                              CornerRadius="6">
+                        <StackPanel Spacing="8">
+                          <TextBlock Text="Design areas"
+                                     FontSize="13"
+                                     FontWeight="SemiBold"
+                                     Foreground="{DynamicResource StrongTextBrush}" />
+                          <TextBlock Text="{Binding DesignTool.SelectedTargetsSummary}"
+                                     FontSize="12"
+                                     TextWrapping="Wrap"
+                                     Foreground="{DynamicResource MutedTextBrush}" />
+                          <ItemsControl ItemsSource="{Binding DesignTool.Targets}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="stageTools:DesignAreaTargetViewModel">
+                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                          IsEnabled="{Binding !IsReadOnly}"
+                                          Content="{Binding Summary}"
+                                          Foreground="{DynamicResource PrimaryTextBrush}" />
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <TextBlock IsVisible="{Binding DesignTool.HasSelectedChoiceTarget}"
+                                     Text="{Binding DesignTool.ChoiceNetworkWarning}"
+                                     TextWrapping="Wrap"
+                                     FontSize="12"
+                                     Foreground="{DynamicResource WarningTextBrush}" />
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="Save design targets"
+                                    IsEnabled="{Binding !DesignTool.IsReadOnly}"
+                                    Command="{Binding DesignTool.SaveDesignTargetsCommand}"
+                                    AutomationProperties.Name="Save design targets"
+                                    Classes="storeAction" />
+                          </StackPanel>
+                          <TextBlock IsVisible="{Binding DesignTool.TargetErrorMessage}"
+                                     Text="{Binding DesignTool.TargetErrorMessage}"
+                                     TextWrapping="Wrap"
+                                     FontSize="12"
+                                     Foreground="{DynamicResource DangerTextBrush}" />
+                        </StackPanel>
+                      </Border>
+                      <TextBlock IsVisible="{Binding !DesignTool.HasTargets}"
+                                 Text="{Binding DesignTool.TargetEmptyState}"
+                                 TextWrapping="Wrap"
+                                 FontSize="12"
+                                 Foreground="{DynamicResource MutedTextBrush}" />
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Content="Import PNG…"
                                 IsEnabled="{Binding !DesignTool.IsReadOnly}"
