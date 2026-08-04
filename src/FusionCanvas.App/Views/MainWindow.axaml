@@ -85,10 +85,12 @@
             <Button Grid.Column="2"
                     Content="..."
                     ToolTip.Tip="Store actions"
+                    AutomationProperties.AutomationId="StoreManagement.Actions"
                     Classes="iconButton">
               <Button.Flyout>
                 <MenuFlyout>
                   <MenuItem Header="Manage stores"
+                            AutomationProperties.AutomationId="StoreManagement.OpenEditor"
                             Command="{Binding StoreManagement.OpenStoreEditorCommand}" />
                   <MenuItem Header="Store assets…"
                             Click="OnContextStoreAssets" />
