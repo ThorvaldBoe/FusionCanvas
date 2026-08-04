@@ -32,7 +32,7 @@ GitHub issue [#110: UI test suite support](https://github.com/ThorvaldBoe/Fusion
 - A new `FusionCanvas.UITests` test project, Appium client package, fixtures, journey helpers, and test data setup.
 - Targeted automation IDs in `FusionCanvas.App` XAML; these also improve accessibility discoverability.
 - Test-run documentation and potentially a dedicated Windows UI-test CI job once the required Windows automation server setup is defined.
-- The Appium/Windows Application Driver runtime is an external local/CI prerequisite; it must not be required by `dotnet test .\\FusionCanvas.sln`.
+- The Appium server, Windows driver, and its WinAppDriver binary are external local/CI prerequisites; they must not be required by `dotnet test .\\FusionCanvas.sln`.
 
 ## Boundaries and Verification
 

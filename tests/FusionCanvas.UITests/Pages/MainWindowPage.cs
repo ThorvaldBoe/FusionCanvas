@@ -6,7 +6,7 @@ internal sealed class MainWindowPage(WindowsDriver driver) : UiPage(driver)
 {
     public void OpenStoreManagement()
     {
-        FindByAutomationId(AutomationIds.StoreManagementActions).Click();
         FindByAutomationId(AutomationIds.StoreManagementOpenEditor).Click();
+        SwitchToWindowContainingAutomationId(AutomationIds.StoreEditorNewStore);
     }
 }

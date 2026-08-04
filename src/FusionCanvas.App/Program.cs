@@ -7,6 +7,8 @@ public static class Program
     private const string WorkspaceDatabaseArgument = "--fusioncanvas-workspace-db";
     private const string WorkspaceRootArgument = "--fusioncanvas-workspace-root";
     private const string SettingsPathArgument = "--fusioncanvas-settings-path";
+    private const string UiTestModeArgument = "--fusioncanvas-ui-test";
+    internal const string UiTestModeEnvironmentVariable = "FUSIONCANVAS_UI_TEST_MODE";
 
     [STAThread]
     public static void Main(string[] args)
@@ -31,6 +33,12 @@ public static class Program
         for (var index = 0; index < args.Length; index++)
         {
             var argument = args[index];
+            if (argument == UiTestModeArgument)
+            {
+                Environment.SetEnvironmentVariable(UiTestModeEnvironmentVariable, "1");
+                continue;
+            }
+
             if (!TryGetRuntimePathEnvironmentVariable(argument, out var environmentVariable))
             {
                 avaloniaArguments.Add(argument);

@@ -20,7 +20,7 @@
 
 ## 4. Verification and delivery evidence
 
-- [ ] 4.1 Run the documented Windows filtered smoke-suite command with the automation server available; record the result for the harness-launch, isolation, locator, keyboard, visible-result, persistence, selection, and diagnostic scenarios.
+- [x] 4.1 Run the documented Windows filtered smoke-suite command with the automation server available; record the result for the harness-launch, isolation, locator, keyboard, visible-result, persistence, selection, and diagnostic scenarios.
 - [x] 4.2 Confirm the missing-server path reports the documented actionable prerequisite without running a journey.
-- [ ] 4.3 Run `dotnet test .\\FusionCanvas.sln` without Windows automation prerequisites and record the result for the deterministic-baseline scenarios.
+- [x] 4.3 Run `dotnet test .\\FusionCanvas.sln` without Windows automation prerequisites and record the result for the deterministic-baseline scenarios.
 - [x] 4.4 Run `openspec validate ui-test-suite-support --strict` and correct every validation failure before marking the delivery package complete.

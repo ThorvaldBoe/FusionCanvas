@@ -13,10 +13,9 @@ public sealed class StoreCreationUiSmokeTests
         var storeName = $"UI Smoke {Guid.NewGuid():N}";
         using var session = UiApplicationSession.Start();
 
-        new MainWindowPage(session.Driver).OpenStoreManagement();
         new StoreEditorPage(session.Driver).CreateStore(storeName);
 
-        var repository = new SqliteWorkspaceRepository(session.TestRoot.DatabasePath);
+        var repository = new SqliteWorkspaceRepository(session.TestRoot.DatabasePath, useConnectionPooling: false);
         var snapshot = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Contains(snapshot.Stores, store => store.Name == storeName);

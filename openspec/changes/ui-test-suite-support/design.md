@@ -29,7 +29,7 @@ This is test infrastructure, not a new product surface. The UX preflight is not 
 
 Create `tests/FusionCanvas.UITests`, targeting `net10.0` and xUnit v3, with the Appium .NET client. The harness connects to a locally running Appium-compatible Windows server, launches the built `FusionCanvas.App` executable, and uses Windows accessibility automation.
 
-This is the free framework endorsed in Avalonia's UI-testing guidance and provides real window, focus, keyboard, mouse, and accessibility coverage. Avalonia Headless remains the preferred lane for in-process UI risks.
+This is the free framework endorsed in Avalonia's UI-testing guidance and provides real window, focus, keyboard, mouse, and accessibility coverage. Appium's Windows driver and its WinAppDriver binary are installed explicitly, and Appium is started on localhost as the external server prerequisite. Avalonia Headless remains the preferred lane for in-process UI risks.
 
 Alternatives considered:
 
@@ -59,7 +59,11 @@ Visible text remains a user assertion, but not an element locator. This keeps te
 
 Keep journey specifications as ordinary readable C# xUnit tests using small page objects/helpers: `AppSession`, `MainWindowPage`, and `StoreEditorPage`. Helpers own waiting for an element's meaningful ready state and emit diagnostics; tests own intent and assertions. The smoke collection is selected with a normal xUnit trait/category and `dotnet test --filter`.
 
-The first journey starts from an empty isolated workspace, opens Store Management, creates a generated unique store through keyboard input and the primary action, verifies the store is visibly selected/listed, and verifies the name through an isolated persistence read after UI interaction. It does not depend on user data, network services, AI credentials, or an existing workspace.
+The first journey starts from an isolated database seeded with the minimum required workspace, opens the real Store Editor as the UI-test mode's automation window, creates a generated unique store through keyboard input and the primary action, verifies the store is visibly listed, and verifies the name through an isolated persistence read after UI interaction. It does not depend on user data, network services, AI credentials, or an existing contributor workspace.
+
+### Provide a stable single-window target in UI-test mode
+
+The compiled application accepts the test-only `--fusioncanvas-ui-test` launch argument. It bypasses the startup splash and hosts the real Store Editor as the process's automation window after composing the normal application services against the isolated paths. This avoids both transient splash attachment and WinAppDriver's unreliable discovery of Avalonia flyout and secondary-window surfaces. Production startup and UI remain unchanged, and the argument is not exposed as an end-user command.
 
 ## Risks / Trade-offs
 

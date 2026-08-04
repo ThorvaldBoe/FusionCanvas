@@ -15,6 +15,30 @@ internal abstract class UiPage(WindowsDriver driver)
         () => Driver.FindElement(MobileBy.AccessibilityId(automationId)),
         $"control with automation ID '{automationId}'");
 
+    protected void SwitchToWindowContainingAutomationId(string automationId)
+    {
+        WaitUntil(() =>
+        {
+            foreach (var handle in Driver.WindowHandles)
+            {
+                Driver.SwitchTo().Window(handle);
+                try
+                {
+                    if (Driver.FindElement(MobileBy.AccessibilityId(automationId)) is not null)
+                    {
+                        return Driver;
+                    }
+                }
+                catch (WebDriverException)
+                {
+                    // The editor window may not have completed its UI Automation tree yet.
+                }
+            }
+
+            return null;
+        }, $"window containing control with automation ID '{automationId}'");
+    }
+
     protected void WaitFor(Func<bool> condition, string expectation)
     {
         var stopwatch = Stopwatch.StartNew();

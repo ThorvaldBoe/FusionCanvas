@@ -2,21 +2,21 @@
 
 ## Results
 
-| Acceptance scenario | Method | Result | Evidence / limitation |
+| Acceptance scenario | Method | Result | Evidence |
 | --- | --- | --- | --- |
-| Harness launches compiled app | Windows filtered smoke run | Pending | WinAppDriver is not installed or listening at `http://127.0.0.1:4723` in this environment. |
-| Missing prerequisite is actionable | Focused infrastructure test and smoke command | Passed | `UiTestConfigurationTests` passed 3/3. The smoke command failed before a journey with the documented WinAppDriver/README message. |
-| State is isolated and cleanup is safe | Focused infrastructure tests and code inspection | Passed (harness) | `DisposableUiTestRoot` creates unique paths below `%TEMP%`, validates ownership before cleanup, and passes only test-only launch arguments. Live cleanup remains covered by the pending smoke run. |
-| Stable accessible control identity | App code and focused headless-test build | Pending execution | IDs were added for the Main Window store-management action and Store Editor journey controls. The App test runner did not complete in this environment; see deterministic-baseline limitation. |
-| Store creation succeeds end-to-end | Windows smoke journey | Pending | Requires a running Windows automation server. |
-| Keyboard entry and primary enablement | Windows smoke journey | Pending | Requires a running Windows automation server. |
-| Suite is selectable and diagnosable | `dotnet test --filter "Suite=UiSmoke"` | Passed (selection/diagnostic path) | The filtered command discovered exactly one smoke test and reported the actionable prerequisite failure with a nonzero exit code. |
-| Headless baseline remains independent | Solution-level baseline | Pending | `FusionCanvas.UITests` is not in `FusionCanvas.sln`. Attempts to execute the existing solution/App runner in this environment stalled while spawning many child `dotnet` processes; the test commands were terminated and only those child processes were stopped. |
-| Desktop scenario scope remains proportionate | OpenSpec review | Passed | The change contains one Windows-first store-creation smoke journey and retains focused deterministic lanes. |
+| Harness launches compiled app | Windows filtered smoke run | Passed | Appium 3.6.0 with Windows driver 6.1.0 and WinAppDriver 1.2.1 launched the compiled app and established the session. |
+| Missing prerequisite is actionable | Focused infrastructure tests and controlled failure | Passed | Three configuration tests passed; an unavailable server fails before the journey with the README/setup message. |
+| State is isolated and cleanup is safe | Infrastructure tests, live smoke, and code inspection | Passed | The run used a unique `%TEMP%` root for database, workspace files, and settings and completed cleanup without retaining it. |
+| Stable accessible control identity | Live Appium smoke and headless baseline | Passed | Store Editor interaction controls were located by automation ID; the result button was asserted by accessibility name because Avalonia does not aggregate child text on `ItemsControl`. |
+| Store creation succeeds end-to-end | Windows smoke journey | Passed | The test clicked New Store, typed a unique name, saved, observed the visible store, and verified it through `SqliteWorkspaceRepository`. |
+| Keyboard entry and primary enablement | Windows smoke journey | Passed | WebDriver keyboard input plus focus movement caused the primary action to become enabled before it was clicked. |
+| Suite is selectable and diagnosable | Filtered `dotnet test` run | Passed | `Suite=UiSmoke` discovered and ran exactly one test with standard output and exit code. |
+| Headless baseline remains independent | Solution-level baseline | Passed | With the optional UI project outside `FusionCanvas.sln`, the baseline passed without Appium: Domain 177, Application 269, Integration 130, App 366 (942 total). |
+| Desktop scenario scope remains proportionate | OpenSpec review | Passed | The module contains one Windows-first store-creation smoke journey and retains focused deterministic lanes. |
 
 ## Commands
 
 - Passed: `dotnet test .\\tests\\FusionCanvas.UITests\\FusionCanvas.UITests.csproj -v minimal --filter 'FullyQualifiedName~UiTestConfigurationTests' --no-restore` (3 passed).
-- Expected prerequisite failure: `dotnet test .\\tests\\FusionCanvas.UITests\\FusionCanvas.UITests.csproj --filter 'Suite=UiSmoke' --no-restore -v minimal`.
+- Passed: `dotnet test .\\tests\\FusionCanvas.UITests\\FusionCanvas.UITests.csproj --no-build --no-restore --filter "Suite=UiSmoke" -v minimal` (1 passed, 0 failed; 12 seconds), against localhost Appium.
+- Passed: `dotnet test .\\FusionCanvas.sln --no-restore -v minimal` (942 passed, 0 failed).
 - Passed: `openspec validate ui-test-suite-support --strict`.
-- Interrupted due runner stall: `dotnet test .\\FusionCanvas.sln -v minimal` and focused `FusionCanvas.App.Tests` invocation. Neither produced a pass/fail result in this environment.

@@ -43,7 +43,7 @@ public sealed class UiTestConfigurationTests
         var exception = Assert.Throws<InvalidOperationException>(
             () => UiApplicationSession.EnsureAutomationServerAvailable(new Uri("http://127.0.0.1:1")));
 
-        Assert.Contains("WinAppDriver", exception.Message);
+        Assert.Contains("appium --port 4723", exception.Message);
         Assert.Contains("README.md", exception.Message);
     }
 

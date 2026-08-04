@@ -23,6 +23,7 @@ internal sealed class DisposableUiTestRoot : IDisposable
     public string RootPath => _rootPath;
 
     public string CreateApplicationArguments() => string.Join(' ',
+        "--fusioncanvas-ui-test",
         "--fusioncanvas-workspace-db", Quote(DatabasePath),
         "--fusioncanvas-workspace-root", Quote(WorkspaceRootPath),
         "--fusioncanvas-settings-path", Quote(SettingsPath));
@@ -49,14 +50,24 @@ internal sealed class DisposableUiTestRoot : IDisposable
             throw new InvalidOperationException($"Refusing to clean a path outside disposable UI test root '{_rootPath}'.");
         }
 
-        try
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (true)
         {
-            Directory.Delete(_rootPath, recursive: true);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            throw new InvalidOperationException(
-                $"UI test cleanup could not remove disposable root '{_rootPath}'. Retain this path for diagnostics.", exception);
+            try
+            {
+                Directory.Delete(_rootPath, recursive: true);
+                return;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                if (DateTime.UtcNow >= deadline)
+                {
+                    throw new InvalidOperationException(
+                        $"UI test cleanup could not remove disposable root '{_rootPath}'. Retain this path for diagnostics.", exception);
+                }
+
+                Thread.Sleep(200);
+            }
         }
     }
 
