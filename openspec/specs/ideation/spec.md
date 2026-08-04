@@ -108,23 +108,25 @@ The Ideation dialog SHALL display the resolved store, niche, and optional group 
 - **AND** existing candidates remain visible
 
 ### Requirement: Basic mode generates concise contextual candidates
-Basic mode SHALL use the fake generator to asynchronously request the desired number of varied, concise Idea candidates from the resolved creative context and optional guidance.
+Basic mode SHALL use the configured provider-independent AI text service to asynchronously request the desired number of varied, concise Idea candidates from the resolved creative context and optional guidance. Each request SHALL include the bundled canonical Design Triangle framework as system prompt context and SHALL instruct the model to produce one Idea-stage direction grounded in a wearer signal, intended viewer inference or effect, and audience-recognizable shared context, without producing a full refined Concept, finished design specification, or SLL artifact.
 
 #### Scenario: User requests grumpy pug ideas
 - **WHEN** the active niche is `Dogs`, the selected group is `Pugs`, the guidance is `Grumpy`, and the user generates in Basic mode
-- **THEN** the fake generator returns short candidate directions that incorporate the pug and grumpy context
-- **AND** it does not return a full refined Concept or finished design specification
+- **THEN** each request includes the canonical Design Triangle framework and asks for one short Idea direction that incorporates the pug and grumpy context
+- **AND** the requested direction has a meaningful wearer-facing social proposition rather than generic decorative or topic-only copy
+- **AND** it asks for neither a full refined Concept, a finished design specification, nor an SLL artifact
 
 #### Scenario: Guidance is empty
 - **WHEN** the user generates in Basic mode without guidance
-- **THEN** generation still uses the resolved store, niche, optional group, active Idea, and rejected-Idea context
+- **THEN** generation still uses the canonical framework and the resolved store, niche, optional group, active Idea, and rejected-Idea context
 
 ### Requirement: Snowclones mode fills an in-memory template
-Snowclones mode SHALL choose a template for each requested candidate from a small bundled in-memory catalog, SHALL fill its variable positions using the resolved creative context, and SHALL avoid repeating a template within one batch while unused catalog entries remain.
+Snowclones mode SHALL choose a template for each requested candidate from the application-wide persisted Snowclone Library, SHALL fill its variable positions using the resolved creative context, SHALL include the bundled canonical Design Triangle framework as system prompt context, and SHALL avoid repeating a template within one batch while unused catalog entries remain. It SHALL preserve the Snowclone contract by requesting only one completed phrase with no explanation unless essential, while asking for a result that expresses an audience-relevant identity, experience, attitude, or tension instead of generic humor.
 
 #### Scenario: Snowclone candidate is generated
-- **WHEN** the selected template is `Talk to me about X` and the active context concerns grumpy pugs
-- **THEN** the fake generator returns a relevant completed phrase such as `Talk to me about grumpy pugs`
+- **WHEN** the selected template is `Talk to me about {X}` and the active context concerns grumpy pugs
+- **THEN** the AI request includes the canonical Design Triangle framework and asks for one relevant completed phrase such as `Talk to me about grumpy pugs`
+- **AND** the result contains no unresolved placeholder and no explanation
 
 #### Scenario: Batch fits within the catalog
 - **WHEN** the requested count does not exceed the number of available Snowclone templates
