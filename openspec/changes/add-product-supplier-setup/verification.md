@@ -23,7 +23,7 @@ Final: `dotnet test .\FusionCanvas.sln` green (Domain 177, Application 269, Inte
 | --- | --- | --- |
 | User designs without configured targets | `ProductCatalogViewModelTests.DesignTool_LoadsTargetsAndRespectsReadOnly` (zero selected areas; design-file workflow unchanged) + `ProductSupplierSetupServiceTests.EmptyStore_ReportsNeedsFirstProduct` | Pass |
 | User selects multiple compatible areas | `ProductSupplierSetupServiceTests.MultipleCompatibleAreas_ArePersistedAtomicallyAndShownAfterReload` (complete selected set persisted atomically; shown after reload) + `ProductCatalogViewModelTests.DesignTool_SaveTargets_PersistsSelectionAtomically` + `DesignTargetSelectorHeadlessTests` (view binds checkbox + Save action) | Pass |
-| User attempts cross-Store target selection | `ProductSupplierSetupServiceTests.CrossStoreTargetSelection_IsRejectedAndPreservesPriorTargets` (rejected; prior targets preserved) | Pass |
+| User attempts cross-Store target selection | `ProductSupplierSetupServiceTests.CrossStoreTargetSelection_IsRejectedAndPreservesPriorTargets` (service rejection and prior targets preserved) + `ProductCatalogPersistenceTests.SaveAsync_RejectsTargetToAreaFromAnotherStore` (repository boundary rejects an invalid cross-Store snapshot) | Pass |
 | User reviews Design from a protected context | `ProductSupplierSetupServiceTests.ProtectedItem_RejectsTargetMutation` + `ProductCatalogViewModelTests.DesignTool_DoesNotCommitWhenReadOnly` + `DesignTool_LoadsTargetsAndRespectsReadOnly` (read-only guidance; no mutation committed) | Pass |
 
 ## `store-management`
@@ -48,7 +48,12 @@ Final: `dotnet test .\FusionCanvas.sln` green (Domain 177, Application 269, Inte
 | Gate | Command | Result |
 | --- | --- | --- |
 | Strict OpenSpec validation | `openspec validate add-product-supplier-setup --strict` | See 6.2 |
-| Full deterministic test baseline | `dotnet test .\FusionCanvas.sln` | Pass (934 tests) |
+| Full deterministic test baseline | `dotnet test .\FusionCanvas.sln --no-restore -v minimal` | Pass (940 tests) |
+
+## Post-implementation audit
+
+- Added a persistence-boundary Store-ownership check for Item design-area targets, preventing invalid cross-Store references even when the repository is called directly.
+- Added Store Editor controls to select applicable variants when adding a printable area; leaving every checkbox clear retains the documented all-variants behavior.
 
 ## Limitations
 

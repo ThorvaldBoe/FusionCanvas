@@ -589,6 +589,20 @@
                         Command="{Binding AddDesignAreaCommand}"
                         Classes="secondary" />
               </StackPanel>
+              <StackPanel IsVisible="{Binding HasSelectedVariant}"
+                          Spacing="4">
+                <TextBlock Text="Applicable variants (leave clear for all variants)"
+                           FontSize="12"
+                           Foreground="{DynamicResource SecondaryTextBrush}" />
+                <ItemsControl ItemsSource="{Binding ApplicableVariants}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="stores:ApplicableVariantViewModel">
+                      <CheckBox Content="{Binding Label}"
+                                IsChecked="{Binding IsSelected, Mode=TwoWay}" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
               <ItemsControl ItemsSource="{Binding OfferingDesignAreas}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="appProducts:DesignAreaSummary">

@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Collections.ObjectModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using FusionCanvas.App.DocumentWindow;
@@ -16,6 +17,32 @@ public sealed record StoreSelectorEntry(StoreSummary Store, bool IsSelected)
     public Guid Id => Store.Id;
 
     public string Name => Store.Name;
+}
+
+public sealed class ApplicableVariantViewModel(ProductVariantSummary variant) : INotifyPropertyChanged
+{
+    private bool _isSelected;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public Guid Id => variant.Id;
+
+    public string Label => string.Join(", ", variant.Options.Select(option => $"{option.Name}: {option.Value}"));
+
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected == value)
+            {
+                return;
+            }
+
+            _isSelected = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+        }
+    }
 }
 
 public enum StoreManagementEditorTab
@@ -758,7 +785,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public IReadOnlyList<StoreProductSummary> EditorProducts =>
         _isCreatingNewProduct && _draftProductId is not null
-            ? Products.Concat([DraftProduct()]).ToArray()
+            ? Products.Concat([DraftProduct()!]).ToArray()
             : Products;
 
     public StoreProductSummary? SelectedProduct
@@ -784,6 +811,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             {
                 OnPropertyChanged(nameof(OfferingVariants));
                 OnPropertyChanged(nameof(OfferingDesignAreas));
+                RefreshApplicableVariants();
                 OnPropertyChanged(nameof(HasSelectedOffering));
                 OnPropertyChanged(nameof(CanDeleteSelectedOffering));
             }
@@ -795,6 +823,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public IReadOnlyList<DesignAreaSummary> OfferingDesignAreas =>
         SelectedOffering?.DesignAreas ?? [];
+
+    public ObservableCollection<ApplicableVariantViewModel> ApplicableVariants { get; } = [];
 
     public bool HasSelectedProduct => _selectedProduct is not null;
 
@@ -2610,7 +2640,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 string.IsNullOrWhiteSpace(AreaDecorationMethod) ? "DTG" : AreaDecorationMethod.Trim(),
                 width,
                 height,
-                null),
+                ApplicableVariants.Where(variant => variant.IsSelected).Select(variant => variant.Id).ToArray()),
             cancellationToken).ConfigureAwait(false);
         ApplyProductResult(result);
     }
@@ -2638,6 +2668,21 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(HasSelectedOffering));
         OnPropertyChanged(nameof(OfferingVariants));
         OnPropertyChanged(nameof(OfferingDesignAreas));
+        RefreshApplicableVariants();
+    }
+
+    private void RefreshApplicableVariants()
+    {
+        ApplicableVariants.Clear();
+        if (SelectedOffering is null)
+        {
+            return;
+        }
+
+        foreach (var variant in SelectedOffering.Variants)
+        {
+            ApplicableVariants.Add(new ApplicableVariantViewModel(variant));
+        }
     }
 
     private StoreProductSummary? DraftProduct()
