@@ -836,7 +836,7 @@
                                  IsReadOnly="{Binding !ItemInspector.CanEditStage}"
                                  AcceptsReturn="False"
                                  TextWrapping="Wrap"
-                                 MinHeight="44"
+                                 MinHeight="72"
                                  VerticalContentAlignment="Center"
                                  AutomationProperties.Name="Refinement Phrase input" />
                         <Button Grid.Row="1"
