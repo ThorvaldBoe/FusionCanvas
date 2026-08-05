@@ -875,7 +875,8 @@ public sealed class ConceptRefinementSessionViewModelTests
             [],
             [],
             [],
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            Sll: null);
 
     // --- Stubs ---
 

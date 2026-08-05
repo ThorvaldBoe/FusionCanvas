@@ -295,7 +295,7 @@ public class ItemInspectorServiceTests
             ExpectedCurrentStage: WorkflowStage.Listing,
             sample.Item.Name,
             Notes: null,
-            new ItemStageSavePayload(WorkflowStage.Idea, "idea", null, null, null),
+            new ItemStageSavePayload(WorkflowStage.Idea, "idea", null, null, null, null),
             []);
 
         var result = await service.SaveStageAsync(staleRequest, TestContext.Current.CancellationToken);
@@ -327,7 +327,8 @@ public class ItemInspectorServiceTests
                 Idea: null,
                 ConceptIdea: "concept idea",
                 Phrase: "  trimmed phrase  ",
-                GraphicDirection: "direction"),
+                GraphicDirection: "direction",
+                Sll: null),
             []), TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
@@ -338,6 +339,64 @@ public class ItemInspectorServiceTests
         Assert.Contains("\"idea.audience\":\"Coffee fans\"", persisted.MetadataJson);
         Assert.Contains("\"unknownKey\":\"keep\"", persisted.MetadataJson);
         Assert.Contains("\"notes\":\"saved notes\"", persisted.MetadataJson);
+    }
+
+    [Fact]
+    public async Task SaveStageAsync_PersistsSllAndReloadsIt()
+    {
+        var sample = Sample.Create();
+        var item = sample.Item with { Stage = WorkflowStage.Concept };
+        var repository = new TestRepository(sample.Snapshot with { Items = [item] });
+        var service = new ItemInspectorService(repository);
+
+        var sll = """{"AsciiSketch":"+---+\n|X|\n+---+","Triangle":{"Phrase":"LIVE"},"Assumptions":[],"Communication":{},"Notes":{},"Validation":{}}""";
+        var result = await service.SaveStageAsync(new ItemStageAwareSaveRequest(
+            item.Id,
+            ExpectedCurrentStage: WorkflowStage.Concept,
+            Title: item.Name,
+            Notes: null,
+            new ItemStageSavePayload(
+                WorkflowStage.Concept,
+                Idea: null,
+                ConceptIdea: null,
+                Phrase: "LIVE",
+                GraphicDirection: null,
+                Sll: sll),
+            []), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(sll, result.State!.Sll);
+
+        var reloaded = await service.LoadAsync(item.Id, TestContext.Current.CancellationToken);
+        Assert.Equal(sll, reloaded!.Sll);
+    }
+
+    [Fact]
+    public async Task SaveStageAsync_SllOnlyChangePersists()
+    {
+        var sample = Sample.Create();
+        var item = sample.Item with { Stage = WorkflowStage.Concept };
+        var repository = new TestRepository(sample.Snapshot with { Items = [item] });
+        var service = new ItemInspectorService(repository);
+
+        var sll = "new sll text";
+        var result = await service.SaveStageAsync(new ItemStageAwareSaveRequest(
+            item.Id,
+            ExpectedCurrentStage: WorkflowStage.Concept,
+            Title: item.Name,
+            Notes: null,
+            new ItemStageSavePayload(
+                WorkflowStage.Concept,
+                Idea: null,
+                ConceptIdea: null,
+                Phrase: "LIVE",
+                GraphicDirection: null,
+                Sll: sll),
+            []), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        var persisted = repository.Snapshot.Items.Single(candidate => candidate.Id == item.Id);
+        Assert.Contains("\"sll\":\"new sll text\"", persisted.MetadataJson);
     }
 
     [Fact]
@@ -369,7 +428,8 @@ public class ItemInspectorServiceTests
                 Idea: "updated idea",
                 ConceptIdea: null,
                 Phrase: null,
-                GraphicDirection: null),
+                GraphicDirection: null,
+                Sll: null),
             []), TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);

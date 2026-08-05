@@ -32,6 +32,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
     private string _audience = string.Empty;
     private string _phrase = string.Empty;
     private string _graphicDirection = string.Empty;
+    private string _sll = string.Empty;
     private string _notes = string.Empty;
     private string _tagInput = string.Empty;
     private string? _errorMessage;
@@ -47,6 +48,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
     private string _originalConceptIdea = string.Empty;
     private string _originalPhrase = string.Empty;
     private string _originalGraphicDirection = string.Empty;
+    private string _originalSll = string.Empty;
     private string _originalNotes = string.Empty;
     private IReadOnlyList<string> _originalTagNames = [];
 
@@ -260,6 +262,18 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         }
     }
 
+    public string Sll
+    {
+        get => _sll;
+        set
+        {
+            if (SetField(ref _sll, value))
+            {
+                RaiseDirty();
+            }
+        }
+    }
+
     public string Notes
     {
         get => _notes;
@@ -332,7 +346,8 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
             WorkflowStage.Idea => Idea != _originalIdea,
             WorkflowStage.Concept => ConceptIdea != _originalConceptIdea
                 || Phrase != _originalPhrase
-                || GraphicDirection != _originalGraphicDirection,
+                || GraphicDirection != _originalGraphicDirection
+                || Sll != _originalSll,
             WorkflowStage.Design or WorkflowStage.Listing => false,
             _ => false
         };
@@ -394,6 +409,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         Audience = string.Empty;
         Phrase = string.Empty;
         GraphicDirection = string.Empty;
+        Sll = string.Empty;
         Notes = string.Empty;
         TagDraft.Clear();
         TagInput = string.Empty;
@@ -504,7 +520,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         var trimmed = Title.Trim();
         var hasLineBreaks = trimmed.Contains('\n') || trimmed.Contains('\r');
         return new CommitSnapshot(
-            Title, Notes, Idea, ConceptIdea, Phrase, GraphicDirection, [.. TagDraft], hasLineBreaks);
+            Title, Notes, Idea, ConceptIdea, Phrase, GraphicDirection, Sll, [.. TagDraft], hasLineBreaks);
     }
 
     private void ApplySavedStatePreservingEdits(ItemInspectorState state, CommitSnapshot snapshot)
@@ -520,6 +536,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         GraphicDirection = GraphicDirection == snapshot.GraphicDirection
             ? (state.Creative.GraphicDirection ?? string.Empty)
             : GraphicDirection;
+        Sll = Sll == snapshot.Sll ? (state.Sll ?? string.Empty) : Sll;
         Notes = Notes == snapshot.Notes ? (state.Notes ?? string.Empty) : Notes;
         if (TagDraft.SequenceEqual(snapshot.TagDraft))
         {
@@ -538,6 +555,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         _originalConceptIdea = state.Creative.ConceptIdea ?? string.Empty;
         _originalPhrase = state.Creative.Phrase ?? string.Empty;
         _originalGraphicDirection = state.Creative.GraphicDirection ?? string.Empty;
+        _originalSll = state.Sll ?? string.Empty;
         _originalNotes = state.Notes ?? string.Empty;
         _originalTagNames = [.. TagDraft];
         RaiseDirty();
@@ -551,6 +569,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         string ConceptIdea,
         string Phrase,
         string GraphicDirection,
+        string Sll,
         IReadOnlyList<string> TagDraft,
         bool TitleHasLineBreaks);
 
@@ -565,6 +584,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         ConceptIdea = state.Creative.ConceptIdea ?? string.Empty;
         Phrase = state.Creative.Phrase ?? string.Empty;
         GraphicDirection = state.Creative.GraphicDirection ?? string.Empty;
+        Sll = state.Sll ?? string.Empty;
         Notes = state.Notes ?? string.Empty;
         TagDraft.Clear();
         foreach (var tag in state.Tags)
@@ -587,6 +607,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         _originalConceptIdea = ConceptIdea;
         _originalPhrase = Phrase;
         _originalGraphicDirection = GraphicDirection;
+        _originalSll = Sll;
         _originalNotes = Notes;
         _originalTagNames = [.. TagDraft];
         RaiseDirty();
@@ -767,9 +788,9 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
     private ItemStageSavePayload CreateStagePayload(WorkflowStage stage) =>
         stage switch
         {
-            WorkflowStage.Idea => new(stage, Idea, null, null, null),
-            WorkflowStage.Concept => new(stage, null, ConceptIdea, Phrase, GraphicDirection),
-            WorkflowStage.Design or WorkflowStage.Listing => new(stage, null, null, null, null),
+            WorkflowStage.Idea => new(stage, Idea, null, null, null, null),
+            WorkflowStage.Concept => new(stage, null, ConceptIdea, Phrase, GraphicDirection, Sll),
+            WorkflowStage.Design or WorkflowStage.Listing => new(stage, null, null, null, null, null),
             _ => throw new ArgumentOutOfRangeException(nameof(stage), stage, "Unsupported workflow stage.")
         };
 

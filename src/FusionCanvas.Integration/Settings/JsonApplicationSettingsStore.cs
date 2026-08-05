@@ -169,7 +169,10 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
                 : Normalize(settings.Ideation),
             Concept = settings.Concept is null
                 ? AiPurposeProfileSettings.InheritGeneral
-                : Normalize(settings.Concept)
+                : Normalize(settings.Concept),
+            Sll = settings.Sll is null
+                ? AiPurposeProfileSettings.InheritGeneral
+                : Normalize(settings.Sll)
         };
 
     private static AiPurposeProfileSettings Normalize(AiPurposeProfileSettings settings) =>

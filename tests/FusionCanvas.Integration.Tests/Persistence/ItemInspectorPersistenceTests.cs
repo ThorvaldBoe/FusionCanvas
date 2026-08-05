@@ -98,6 +98,33 @@ public class ItemInspectorPersistenceTests
         Assert.Empty(reloaded.ItemTags);
     }
 
+    [Fact]
+    public async Task InspectorSave_StageAwareConceptSave_RoundTripsSll()
+    {
+        using var directory = new TestDirectory();
+        var repository = new SqliteWorkspaceRepository(Path.Combine(directory.Path, "workspace.db"));
+        var now = DateTimeOffset.UtcNow;
+        var nicheId = Guid.NewGuid();
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", nicheId);
+        var niche = new Niche(nicheId, store.Id, "Niche", null, false, now, now, "{}");
+        var listing = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Concept", null, ItemStatus.Draft, WorkflowStage.Concept, false, now, now, "{}");
+        await repository.SaveAsync(new WorkspaceSnapshot([store], [niche], [], [listing], [], [], [], [], []), TestContext.Current.CancellationToken);
+        var service = new ItemInspectorService(repository, clock: () => now.AddMinutes(1), newId: Guid.NewGuid);
+
+        var sll = """{"AsciiSketch":"+---+\n|X|\n+---+","Triangle":{"Phrase":"LIVE"},"Assumptions":[],"Communication":{},"Notes":{},"Validation":{}}""";
+        var saved = await service.SaveStageAsync(new ItemStageAwareSaveRequest(
+            listing.Id,
+            ExpectedCurrentStage: WorkflowStage.Concept,
+            Title: listing.Name,
+            Notes: null,
+            new ItemStageSavePayload(WorkflowStage.Concept, null, null, "LIVE", null, sll),
+            []), TestContext.Current.CancellationToken);
+        var reloaded = await service.LoadAsync(listing.Id, TestContext.Current.CancellationToken);
+
+        Assert.True(saved.Succeeded);
+        Assert.Equal(sll, reloaded!.Sll);
+    }
+
     private sealed class FailingRepository(IWorkspaceRepository inner) : IWorkspaceRepository
     {
         public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) => inner.LoadAsync(cancellationToken);

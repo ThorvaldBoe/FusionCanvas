@@ -900,6 +900,64 @@
                           </DataTemplate>
                         </ListBox.ItemTemplate>
                       </ListBox>
+
+                      <!-- SLL generation section -->
+                      <Separator Margin="0,4"
+                                 IsVisible="{Binding ShowsConceptStageTool}" />
+                      <TextBlock Text="Generate SLL sketch"
+                                 FontSize="13"
+                                 FontWeight="SemiBold"
+                                 Foreground="{DynamicResource StrongTextBrush}"
+                                 IsVisible="{Binding ShowsConceptStageTool}" />
+                      <TextBlock Text="{Binding SllGeneration.UnavailableReason}"
+                                 IsVisible="{Binding SllGeneration.UnavailableReason, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                 TextWrapping="Wrap"
+                                 FontSize="11"
+                                 Foreground="{DynamicResource DangerTextBrush}" />
+
+                      <TextBlock Text="{Binding SllGeneration.ErrorMessage}"
+                                 IsVisible="{Binding SllGeneration.HasError}"
+                                 TextWrapping="Wrap"
+                                 FontSize="11"
+                                 Foreground="{DynamicResource DangerTextBrush}" />
+
+                      <Button Content="Generate SLL&#x2026;"
+                              IsEnabled="{Binding SllGeneration.CanGenerate}"
+                              IsVisible="{Binding ShowsConceptStageTool}"
+                              AutomationProperties.Name="Generate SLL sketch"
+                              Command="{Binding SllGeneration.GenerateCommand}"
+                              ToolTip.Tip="{Binding SllGeneration.GenerateDisabledReason}"
+                              ToolTip.ShowOnDisabled="True" />
+
+                      <Button Content="Regenerate SLL&#x2026;"
+                              IsEnabled="{Binding SllGeneration.CanRegenerate}"
+                              IsVisible="{Binding ShowsConceptStageTool}"
+                              AutomationProperties.Name="Regenerate SLL sketch"
+                              Command="{Binding SllGeneration.RegenerateCommand}"
+                              ToolTip.Tip="{Binding SllGeneration.RegenerateDisabledReason}"
+                              ToolTip.ShowOnDisabled="True" />
+
+                      <TextBlock Text="SLL generation in progress&#x2026;"
+                                 IsVisible="{Binding SllGeneration.IsBusy}"
+                                 FontSize="11"
+                                 Foreground="{DynamicResource SecondaryTextBrush}" />
+
+                      <TextBlock Text="This sketch is stale — complete the triangle to regenerate."
+                                 IsVisible="{Binding SllGeneration.IsStale}"
+                                 TextWrapping="Wrap"
+                                 FontSize="11"
+                                 Foreground="{DynamicResource WarningTextBrush}" />
+
+                      <TextBox Text="{Binding SllGeneration.AsciiSketch}"
+                               IsReadOnly="True"
+                               IsVisible="{Binding SllGeneration.HasCurrentSll}"
+                               AcceptsReturn="True"
+                               TextWrapping="NoWrap"
+                               FontFamily="Consolas,Menlo,monospace"
+                               FontSize="11"
+                               MinHeight="120"
+                               AutomationProperties.Name="Generated SLL sketch"
+                               ScrollViewer.HorizontalScrollBarVisibility="Auto" />
                      </StackPanel>
                   </Border>
 

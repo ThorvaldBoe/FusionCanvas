@@ -12,6 +12,7 @@ using FusionCanvas.Application.RejectedPhrases;
 using FusionCanvas.Integration.Snowclones;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.ConceptRefinement;
+using FusionCanvas.Application.SllGeneration;
 using FusionCanvas.Application.Products;
 using FusionCanvas.Integration.AI;
 
@@ -33,6 +34,8 @@ public sealed record AppWorkspaceRuntime(
     SnowcloneLibraryResult SnowcloneLibraryInitialization,
     IConceptRefinementService ConceptRefinement,
     IConceptRefinementAccessStatus ConceptRefinementAccess,
+    ISllGenerationService SllGeneration,
+    ISllAccessStatus SllGenerationAccess,
     IProductSupplierSetupService ProductSupplierSetup);
 
 public static class AppWorkspaceFactory
@@ -71,6 +74,11 @@ public static class AppWorkspaceFactory
             repository,
             ai,
             guidanceSource);
+        var sllGenerationAccess = new ConfiguredSllAccessStatus(ai);
+        var sllGeneration = new SllGenerationService(
+            repository,
+            ai,
+            guidanceSource);
         return new AppWorkspaceRuntime(
             repository,
             fileStore,
@@ -92,6 +100,8 @@ public static class AppWorkspaceFactory
             snowcloneLibraryInitialization,
             conceptRefinement,
             conceptRefinementAccess,
+            sllGeneration,
+            sllGenerationAccess,
             new ProductSupplierSetupService(repository));
     }
 

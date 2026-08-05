@@ -221,7 +221,8 @@ public class JsonApplicationSettingsStoreTests
             true,
             profile,
             new AiPurposeProfileSettings(false, true, profile with { ModelId = "idea/model" }),
-            new AiPurposeProfileSettings(true, true, profile with { ModelId = "retained/model" }));
+            new AiPurposeProfileSettings(true, true, profile with { ModelId = "retained/model" }),
+            new AiPurposeProfileSettings(true, true, profile with { ModelId = "sll/model" }));
 
         Assert.True((await store.SaveAsync(
             new ApplicationSettings(true, ai),
@@ -237,9 +238,34 @@ public class JsonApplicationSettingsStoreTests
         Assert.Equal(["END"], loaded.Value.Ai.General.StopSequences);
         Assert.Equal("idea/model", loaded.Value.Ai.Ideation.CustomProfile.ModelId);
         Assert.Equal("retained/model", loaded.Value.Ai.Concept.CustomProfile.ModelId);
+        Assert.Equal("sll/model", loaded.Value.Ai.Sll.CustomProfile.ModelId);
         Assert.Contains("\"version\": 2", json);
         Assert.DoesNotContain("apiKey", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("secret", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task LoadAsync_PreSllSettingsJsonDefaultsSllToInheritGeneral()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var path = tempDirectory.GetPath("settings.json");
+        var json = """
+            {
+              "version": 2,
+              "darkMode": true,
+              "ai": {
+                "advancedMode": true
+              }
+            }
+            """;
+        await File.WriteAllTextAsync(path, json, TestContext.Current.CancellationToken);
+        var store = new JsonApplicationSettingsStore(path);
+
+        var result = await store.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(result.UsedDefault);
+        Assert.True(result.Value.Ai.AdvancedMode);
+        Assert.True(result.Value.Ai.Sll.UseGeneral);
     }
 
     private sealed class TemporaryDirectory : IDisposable

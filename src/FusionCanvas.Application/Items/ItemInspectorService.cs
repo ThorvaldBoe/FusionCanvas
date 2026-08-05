@@ -200,6 +200,7 @@ public sealed class ItemInspectorService : IItemInspectorService
                 ApplyInspectorField(metadata, ItemMetadataCodec.PhraseKey,
                     string.IsNullOrWhiteSpace(payload.Phrase) ? null : ItemMetadataCodec.NormalizeSingleLine(payload.Phrase));
                 ApplyInspectorField(metadata, ItemMetadataCodec.GraphicDirectionKey, payload.GraphicDirection);
+                ApplyInspectorField(metadata, ItemMetadataCodec.SllKey, payload.Sll);
                 break;
             case WorkflowStage.Design:
             case WorkflowStage.Listing:
@@ -294,6 +295,7 @@ public sealed class ItemInspectorService : IItemInspectorService
         var conceptIdea = metadata.GetValueOrDefault(ItemMetadataCodec.ConceptIdeaKey);
         var phrase = metadata.GetValueOrDefault(ItemMetadataCodec.PhraseKey);
         var graphicDirection = metadata.GetValueOrDefault(ItemMetadataCodec.GraphicDirectionKey);
+        var sll = metadata.GetValueOrDefault(ItemMetadataCodec.SllKey);
         var creative = new ItemInspectorCreativeFields(
             string.IsNullOrWhiteSpace(idea) ? null : idea,
             string.IsNullOrWhiteSpace(audience) ? null : audience,
@@ -339,7 +341,8 @@ public sealed class ItemInspectorService : IItemInspectorService
             tags,
             assetEntries,
             availableTagNames,
-            listing.UpdatedAt);
+            listing.UpdatedAt,
+            string.IsNullOrWhiteSpace(sll) ? null : sll);
     }
 
     private static string BuildDisplayPath(WorkspaceSnapshot snapshot, Item listing)

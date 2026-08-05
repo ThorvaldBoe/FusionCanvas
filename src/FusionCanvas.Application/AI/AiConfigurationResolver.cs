@@ -31,6 +31,7 @@ public static class AiConfigurationResolver
         {
             AiRequestPurpose.Ideation => settings.Ideation,
             AiRequestPurpose.Concept => settings.Concept,
+            AiRequestPurpose.Sll => settings.Sll,
             _ => throw new ArgumentOutOfRangeException(nameof(purpose))
         };
 

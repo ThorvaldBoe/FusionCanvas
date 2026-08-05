@@ -24,6 +24,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
     private string _modelSearch = string.Empty;
     private bool _ideationUseGeneral;
     private bool _conceptUseGeneral;
+    private bool _sllUseGeneral;
 
     public AiSettingsViewModel(
         AiConfigurationSettings settings,
@@ -39,13 +40,16 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         _catalogCache = catalogCache;
         _ideationUseGeneral = settings.Ideation.UseGeneral;
         _conceptUseGeneral = settings.Concept.UseGeneral;
+        _sllUseGeneral = settings.Sll.UseGeneral;
 
         General = new AiProfileEditorViewModel(settings.General);
         Ideation = new AiProfileEditorViewModel(settings.Ideation.CustomProfile);
         Concept = new AiProfileEditorViewModel(settings.Concept.CustomProfile);
+        Sll = new AiProfileEditorViewModel(settings.Sll.CustomProfile);
         General.SettingsChanged += (_, _) => ApplyProfiles();
         Ideation.SettingsChanged += (_, _) => ApplyProfiles();
         Concept.SettingsChanged += (_, _) => ApplyProfiles();
+        Sll.SettingsChanged += (_, _) => ApplyProfiles();
 
         AddOrReplaceCommand = new DocumentWindow.RelayCommand(_ => BeginCredentialEdit());
         CancelCredentialCommand = new DocumentWindow.RelayCommand(_ => CancelCredentialEdit());
@@ -68,6 +72,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
     public AiProfileEditorViewModel General { get; }
     public AiProfileEditorViewModel Ideation { get; }
     public AiProfileEditorViewModel Concept { get; }
+    public AiProfileEditorViewModel Sll { get; }
     public string GeneralReadiness => Readiness(AiRequestPurpose.General);
     public string IdeationReadiness => IdeationUseGeneral
         ? $"Using General — {Readiness(AiRequestPurpose.Ideation)}"
@@ -75,6 +80,9 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
     public string ConceptReadiness => ConceptUseGeneral
         ? $"Using General — {Readiness(AiRequestPurpose.Concept)}"
         : Readiness(AiRequestPurpose.Concept);
+    public string SllReadiness => SllUseGeneral
+        ? $"Using General — {Readiness(AiRequestPurpose.Sll)}"
+        : Readiness(AiRequestPurpose.Sll);
 
     public bool IsBusy
     {
@@ -223,6 +231,25 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
             if (!value && !_settings.Concept.HasCustomProfile)
             {
                 Concept.Replace(General.Snapshot);
+            }
+
+            ApplyProfiles();
+        }
+    }
+
+    public bool SllUseGeneral
+    {
+        get => _sllUseGeneral;
+        set
+        {
+            if (!SetField(ref _sllUseGeneral, value))
+            {
+                return;
+            }
+
+            if (!value && !_settings.Sll.HasCustomProfile)
+            {
+                Sll.Replace(General.Snapshot);
             }
 
             ApplyProfiles();
@@ -537,6 +564,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         General.Models = models;
         Ideation.Models = models;
         Concept.Models = models;
+        Sll.Models = models;
     }
 
     private void ApplyZdrOptOut()
@@ -565,11 +593,16 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
             ConceptUseGeneral,
             _settings.Concept.HasCustomProfile || !ConceptUseGeneral,
             Concept.Snapshot);
+        var sll = new AiPurposeProfileSettings(
+            SllUseGeneral,
+            _settings.Sll.HasCustomProfile || !SllUseGeneral,
+            Sll.Snapshot);
         UpdateSettings(_settings with
         {
             General = General.Snapshot,
             Ideation = ideation,
-            Concept = concept
+            Concept = concept,
+            Sll = sll
         });
     }
 
@@ -616,6 +649,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         OnPropertyChanged(nameof(GeneralReadiness));
         OnPropertyChanged(nameof(IdeationReadiness));
         OnPropertyChanged(nameof(ConceptReadiness));
+        OnPropertyChanged(nameof(SllReadiness));
     }
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? name = null)

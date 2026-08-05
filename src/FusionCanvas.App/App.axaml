@@ -56,6 +56,7 @@
         <SolidColorBrush x:Key="DangerBorderBrush" Color="#E3B4B0" />
         <SolidColorBrush x:Key="WarningBackgroundBrush" Color="#FFF4E5" />
         <SolidColorBrush x:Key="WarningBorderBrush" Color="#E5B86A" />
+        <SolidColorBrush x:Key="WarningTextBrush" Color="#8A6A1F" />
       </ResourceDictionary>
 
       <!-- Dark appearance; applied when the user enables Dark mode. -->
@@ -106,6 +107,7 @@
         <SolidColorBrush x:Key="DangerBorderBrush" Color="#7A5A5A" />
         <SolidColorBrush x:Key="WarningBackgroundBrush" Color="#3A3220" />
         <SolidColorBrush x:Key="WarningBorderBrush" Color="#8A6F35" />
+        <SolidColorBrush x:Key="WarningTextBrush" Color="#D9B873" />
       </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>
     </ResourceDictionary>

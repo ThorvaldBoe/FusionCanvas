@@ -40,6 +40,44 @@ public class AiSettingsViewModelTests
     }
 
     [Fact]
+    public void SllPurpose_DefaultsToUseGeneral()
+    {
+        var vm = Create();
+
+        Assert.True(vm.SllUseGeneral);
+        Assert.True(vm.Current.Sll.UseGeneral);
+    }
+
+    [Fact]
+    public void SllPurpose_CopiesGeneralOnceAndRoundTripsCustomProfile()
+    {
+        var vm = Create();
+        vm.General.ModelId = "general/model";
+        vm.AdvancedMode = true;
+
+        vm.SllUseGeneral = false;
+        Assert.Equal("general/model", vm.Sll.ModelId);
+        vm.Sll.ModelId = "sll/model";
+        vm.SllUseGeneral = true;
+        vm.General.ModelId = "new/general";
+        vm.SllUseGeneral = false;
+
+        Assert.Equal("sll/model", vm.Sll.ModelId);
+        Assert.True(vm.Current.Sll.HasCustomProfile);
+        Assert.Equal("sll/model", vm.Current.Sll.CustomProfile.ModelId);
+    }
+
+    [Fact]
+    public void SllReadiness_ShowsUsingGeneral_WhenSllUsesGeneral()
+    {
+        var vm = Create();
+        vm.AdvancedMode = true;
+
+        Assert.True(vm.SllUseGeneral);
+        Assert.Contains("Using General", vm.SllReadiness);
+    }
+
+    [Fact]
     public void ZdrOptOutRequiresConfirmationAndDoesNotReplaceModel()
     {
         var vm = Create();
