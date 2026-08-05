@@ -5,6 +5,7 @@ using System.Text;
 using System.Windows.Input;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.Application.Items;
+using IItemCsvCodec = FusionCanvas.Application.Items.Import.IItemCsvCodec;
 using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Integration.Items.Import;
 

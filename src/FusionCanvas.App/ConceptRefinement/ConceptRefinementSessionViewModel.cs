@@ -25,6 +25,9 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
     private string _conceptIdeaInput = string.Empty;
     private string _phraseInput = string.Empty;
     private string _graphicDirectionInput = string.Empty;
+    private string _conceptIdeaInstructions = string.Empty;
+    private string _phraseInstructions = string.Empty;
+    private string _graphicDirectionInstructions = string.Empty;
     private ConceptRefinementTriangle _baseline = new("", "", "");
     private sealed record CapturedOperation(int Sequence, Guid ItemId);
 
@@ -177,6 +180,26 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
         }
     }
 
+    // --- Per-corner refinement instructions (presentation-only; no enablement/score/history effect) ---
+
+    public string ConceptIdeaInstructions
+    {
+        get => _conceptIdeaInstructions;
+        set => SetField(ref _conceptIdeaInstructions, value ?? string.Empty);
+    }
+
+    public string PhraseInstructions
+    {
+        get => _phraseInstructions;
+        set => SetField(ref _phraseInstructions, value ?? string.Empty);
+    }
+
+    public string GraphicDirectionInstructions
+    {
+        get => _graphicDirectionInstructions;
+        set => SetField(ref _graphicDirectionInstructions, value ?? string.Empty);
+    }
+
     // --- Initialize disabled reason (VR-002) ---
 
     public string? InitializeDisabledReason
@@ -319,6 +342,9 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
             _inspector.Phrase,
             _inspector.GraphicDirection);
         SyncInputsFromInspector();
+        ConceptIdeaInstructions = string.Empty;
+        PhraseInstructions = string.Empty;
+        GraphicDirectionInstructions = string.Empty;
         if (_sessionItemId is not null)
         {
             _sessionCts = new CancellationTokenSource();
@@ -381,6 +407,7 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
                 corner,
                 current,
                 _inspector.Idea,
+                GetInstruction(corner),
                 ct).ConfigureAwait(true);
             return result;
         }, $"Fine-tuned {cornerName}", corner);
@@ -410,6 +437,7 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
                 corner,
                 current,
                 _inspector.Idea,
+                GetInstruction(corner),
                 ct).ConfigureAwait(true);
             return result;
         }, $"Changed {cornerName}", corner);
@@ -490,6 +518,7 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
             if (singleCorner is { } corner)
             {
                 ApplySingleCornerValue(corner, result);
+                ClearInstruction(corner);
             }
             else
             {
@@ -566,6 +595,30 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     private ConceptRefinementTriangle CaptureTriangle() =>
         new(ConceptIdeaInput, PhraseInput, GraphicDirectionInput);
+
+    private string? GetInstruction(ConceptRefinementCorner corner) => corner switch
+    {
+        ConceptRefinementCorner.ConceptIdea => ConceptIdeaInstructions,
+        ConceptRefinementCorner.Phrase => PhraseInstructions,
+        ConceptRefinementCorner.GraphicDirection => GraphicDirectionInstructions,
+        _ => null
+    };
+
+    private void ClearInstruction(ConceptRefinementCorner corner)
+    {
+        switch (corner)
+        {
+            case ConceptRefinementCorner.ConceptIdea:
+                ConceptIdeaInstructions = string.Empty;
+                break;
+            case ConceptRefinementCorner.Phrase:
+                PhraseInstructions = string.Empty;
+                break;
+            case ConceptRefinementCorner.GraphicDirection:
+                GraphicDirectionInstructions = string.Empty;
+                break;
+        }
+    }
 
     private void ApplySingleCornerValue(ConceptRefinementCorner corner, ConceptRefinementResult result)
     {

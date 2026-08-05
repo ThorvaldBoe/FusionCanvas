@@ -153,6 +153,7 @@ public sealed class ConceptRefinementServiceTests
             ConceptRefinementCorner.ConceptIdea,
             new ConceptRefinementTriangle("A cozy cabin", "Find peace", "Snowy trees"),
             "Mountain cabin",
+            null,
             TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
@@ -173,6 +174,7 @@ public sealed class ConceptRefinementServiceTests
             ConceptRefinementCorner.Phrase,
             new ConceptRefinementTriangle("A cozy cabin", "Find peace", "Snowy trees"),
             "Mountain cabin",
+            null,
             TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
@@ -193,6 +195,7 @@ public sealed class ConceptRefinementServiceTests
             ConceptRefinementCorner.GraphicDirection,
             new ConceptRefinementTriangle("A cozy cabin", "Find peace", ""),
             "Mountain cabin",
+            null,
             TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
@@ -211,6 +214,7 @@ public sealed class ConceptRefinementServiceTests
             ConceptRefinementCorner.ConceptIdea,
             new ConceptRefinementTriangle("Old idea", "Old phrase", "Old graphic"),
             "Original idea",
+            null,
             TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
@@ -229,6 +233,7 @@ public sealed class ConceptRefinementServiceTests
             ConceptRefinementCorner.ConceptIdea,
             new ConceptRefinementTriangle("Old idea", "Old phrase", "Old graphic"),
             "Original idea",
+            null,
             TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
@@ -247,6 +252,7 @@ public sealed class ConceptRefinementServiceTests
             ConceptRefinementCorner.ConceptIdea,
             new ConceptRefinementTriangle("Old idea", "Old phrase", "Old graphic"),
             "Original idea",
+            null,
             TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
@@ -265,6 +271,7 @@ public sealed class ConceptRefinementServiceTests
             ConceptRefinementCorner.GraphicDirection,
             new ConceptRefinementTriangle("Idea", "Phrase", ""),
             "Original idea",
+            null,
             TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
@@ -283,6 +290,7 @@ public sealed class ConceptRefinementServiceTests
             ConceptRefinementCorner.ConceptIdea,
             new ConceptRefinementTriangle("Old idea", "Old phrase", "Old graphic"),
             "Original idea",
+            null,
             TestContext.Current.CancellationToken);
 
         Assert.NotNull(ai.LastRequest);
@@ -304,6 +312,90 @@ public sealed class ConceptRefinementServiceTests
         Assert.DoesNotContain(ItemId.ToString(), userMessage.Text, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("apikey", userMessage.Text, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("path", userMessage.Text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RefineAsync_NonEmptyInstruction_IncludedInUserMessage()
+    {
+        var (service, ai, _) = CreateService(CreateSnapshot());
+        ai.Result = AiTextResult.Success("Live every moment", "test-model");
+
+        await service.RefineAsync(
+            ItemId,
+            ConceptRefinementActionKind.FineTune,
+            ConceptRefinementCorner.Phrase,
+            new ConceptRefinementTriangle("A cozy cabin", "Find peace", "Snowy trees"),
+            "Mountain cabin",
+            "make the phrase shorter",
+            TestContext.Current.CancellationToken);
+
+        Assert.NotNull(ai.LastRequest);
+        var userMessage = ai.LastRequest.Messages[1];
+        Assert.Contains("Creator instruction: make the phrase shorter", userMessage.Text);
+        // Action semantics are preserved alongside the instruction.
+        Assert.Contains("Improve the Phrase", userMessage.Text);
+    }
+
+    [Fact]
+    public async Task RefineAsync_InstructionOnChange_IncludedInUserMessage()
+    {
+        var (service, ai, _) = CreateService(CreateSnapshot());
+        ai.Result = AiTextResult.Success("Abstract watercolor splashes", "test-model");
+
+        await service.RefineAsync(
+            ItemId,
+            ConceptRefinementActionKind.Change,
+            ConceptRefinementCorner.GraphicDirection,
+            new ConceptRefinementTriangle("A cozy cabin", "Find peace", ""),
+            "Mountain cabin",
+            "use a bold minimalist style",
+            TestContext.Current.CancellationToken);
+
+        Assert.NotNull(ai.LastRequest);
+        var userMessage = ai.LastRequest.Messages[1];
+        Assert.Contains("Creator instruction: use a bold minimalist style", userMessage.Text);
+        Assert.Contains("Propose a materially different direction", userMessage.Text);
+    }
+
+    [Fact]
+    public async Task RefineAsync_EmptyInstruction_NotIncludedInUserMessage()
+    {
+        var (service, ai, _) = CreateService(CreateSnapshot());
+        ai.Result = AiTextResult.Success("A cozy cabin", "test-model");
+
+        await service.RefineAsync(
+            ItemId,
+            ConceptRefinementActionKind.FineTune,
+            ConceptRefinementCorner.ConceptIdea,
+            new ConceptRefinementTriangle("A cozy cabin", "Find peace", "Snowy trees"),
+            "Mountain cabin",
+            "   ",
+            TestContext.Current.CancellationToken);
+
+        Assert.NotNull(ai.LastRequest);
+        var userMessage = ai.LastRequest.Messages[1];
+        Assert.DoesNotContain("Creator instruction", userMessage.Text);
+    }
+
+    [Fact]
+    public async Task RefineAsync_Instruction_SystemMessageBoundsIt()
+    {
+        var (service, ai, _) = CreateService(CreateSnapshot());
+        ai.Result = AiTextResult.Success("A cozy cabin", "test-model");
+
+        await service.RefineAsync(
+            ItemId,
+            ConceptRefinementActionKind.FineTune,
+            ConceptRefinementCorner.ConceptIdea,
+            new ConceptRefinementTriangle("A cozy cabin", "Find peace", "Snowy trees"),
+            "Mountain cabin",
+            "make it warmer",
+            TestContext.Current.CancellationToken);
+
+        Assert.NotNull(ai.LastRequest);
+        var systemMessage = ai.LastRequest.Messages[0];
+        Assert.Contains("supplemental guidance", systemMessage.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("cannot override", systemMessage.Text, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

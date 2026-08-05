@@ -7,9 +7,11 @@ using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Settings;
 using FusionCanvas.App.Stores;
 using FusionCanvas.App.StageTools;
+using FusionCanvas.App.SllGeneration;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.App.Workflow;
 using FusionCanvas.Application.Settings;
+using FusionCanvas.Application.SllGeneration;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Items;
@@ -62,6 +64,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly IConceptRefinementService _conceptRefinementService;
     private readonly IConceptRefinementAccessStatus _conceptRefinementAccessStatus;
     private readonly IItemCsvImportService _itemCsvImportService;
+    private readonly ISllGenerationService _sllGenerationService;
+    private readonly ISllAccessStatus _sllAccessStatus;
     private ItemStatus? _pendingStatus;
     private bool _isStatusConfirmationVisible;
     private bool _isDesignRemoveConfirmationVisible;
@@ -106,6 +110,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.RejectedPhrases,
             runtime.ConceptRefinement,
             runtime.ConceptRefinementAccess,
+            runtime.SllGeneration,
+            runtime.SllGenerationAccess,
             runtime.ProductSupplierSetup,
             runtime.ItemCsvImport)
     {
@@ -131,6 +137,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         FusionCanvas.Application.RejectedPhrases.IRejectedPhraseManagementService? rejectedPhrases = null,
         IConceptRefinementService? conceptRefinementService = null,
         IConceptRefinementAccessStatus? conceptRefinementAccessStatus = null,
+        ISllGenerationService? sllGenerationService = null,
+        ISllAccessStatus? sllAccessStatus = null,
         IProductSupplierSetupService? productSupplierSetupService = null,
         IItemCsvImportService? itemCsvImportService = null)
     {
@@ -160,6 +168,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _ideationAccessStatus = ideationAccessStatus ?? DisabledIdeationAccessStatus.Instance;
         _conceptRefinementService = conceptRefinementService ?? DisabledConceptRefinementService.Instance;
         _conceptRefinementAccessStatus = conceptRefinementAccessStatus ?? DisabledConceptRefinementAccessStatus.Instance;
+        _sllGenerationService = sllGenerationService ?? DisabledSllGenerationService.Instance;
+        _sllAccessStatus = sllAccessStatus ?? DisabledSllAccessStatus.Instance;
         _ideationService = ideationService ?? new IdeationService(
             workspaceRepository,
             _itemManagementService,
@@ -176,12 +186,18 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             _conceptRefinementService,
             _conceptRefinementAccessStatus,
             ItemInspector);
+        SllGeneration = new SllGenerationSessionViewModel(
+            _sllGenerationService,
+            _sllAccessStatus,
+            ItemInspector);
         _ideationAccessStatus.AvailabilityChanged += (_, _) =>
             Avalonia.Threading.Dispatcher.UIThread.Post(RaiseIdeationProperties);
         Settings.Ai.SettingsChanged += (_, _) => _ = _ideationAccessStatus.RefreshAsync();
         Settings.Ai.AvailabilityChanged += (_, _) => _ = _ideationAccessStatus.RefreshAsync();
         Settings.Ai.SettingsChanged += (_, _) => _ = ConceptRefinement.RefreshAvailabilityAsync();
         Settings.Ai.AvailabilityChanged += (_, _) => _ = ConceptRefinement.RefreshAvailabilityAsync();
+        Settings.Ai.SettingsChanged += (_, _) => _ = SllGeneration.RefreshAvailabilityAsync();
+        Settings.Ai.AvailabilityChanged += (_, _) => _ = SllGeneration.RefreshAvailabilityAsync();
         _ = _ideationAccessStatus.RefreshAsync();
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
@@ -267,6 +283,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public IdeationViewModel Ideation { get; }
 
     public ConceptRefinementSessionViewModel ConceptRefinement { get; }
+
+    public SllGenerationSessionViewModel SllGeneration { get; }
 
     public WorkspaceTreeViewModel WorkspaceTree { get; }
 
@@ -1102,6 +1120,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         if (activeStage == WorkflowStage.Concept)
         {
             _ = ConceptRefinement.RefreshAvailabilityAsync();
+            _ = SllGeneration.RefreshAvailabilityAsync();
         }
     }
 
@@ -1305,6 +1324,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             ConceptRefinementCorner corner,
             ConceptRefinementTriangle current,
             string originalIdea,
+            string? instruction,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(ConceptRefinementResult.Failure(
                 AiTextFailureKind.NotConfigured,
@@ -1317,6 +1337,28 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         public ConceptRefinementAccessAvailability GetAvailability() =>
             ConceptRefinementAccessAvailability.Unavailable("AI services were not supplied.");
+    }
+
+    private sealed class DisabledSllGenerationService : ISllGenerationService
+    {
+        public static DisabledSllGenerationService Instance { get; } = new();
+
+        public Task<SllGenerationResult> GenerateAsync(
+            Guid itemId,
+            ConceptRefinementTriangle triangle,
+            string originalIdea,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(SllGenerationResult.Failure(
+                AiTextFailureKind.NotConfigured,
+                "AI services were not supplied."));
+    }
+
+    private sealed class DisabledSllAccessStatus : ISllAccessStatus
+    {
+        public static DisabledSllAccessStatus Instance { get; } = new();
+
+        public SllAccessAvailability GetAvailability() =>
+            SllAccessAvailability.Unavailable("AI services were not supplied.");
     }
 
     private sealed class DisabledIdeaGenerator : IIdeaGenerator

@@ -14,6 +14,7 @@ public class AiConfigurationTests
         Assert.Null(settings.General.ModelId);
         Assert.True(settings.Ideation.UseGeneral);
         Assert.True(settings.Concept.UseGeneral);
+        Assert.True(settings.Sll.UseGeneral);
     }
 
     [Fact]
@@ -31,6 +32,23 @@ public class AiConfigurationTests
 
         settings = settings with { AdvancedMode = true };
         Assert.Equal(custom, AiConfigurationResolver.ProfileFor(settings, AiRequestPurpose.Ideation));
+        Assert.Equal(general, AiConfigurationResolver.ProfileFor(settings, AiRequestPurpose.Concept));
+        Assert.Equal(general, AiConfigurationResolver.ProfileFor(settings, AiRequestPurpose.Sll));
+    }
+
+    [Fact]
+    public void ProfileFor_SllUsesItsOwnCustomProfileWhenConfigured()
+    {
+        var general = Profile("general/model");
+        var sll = Profile("sll/model");
+        var settings = AiConfigurationSettings.Default with
+        {
+            AdvancedMode = true,
+            General = general,
+            Sll = new AiPurposeProfileSettings(false, true, sll)
+        };
+
+        Assert.Equal(sll, AiConfigurationResolver.ProfileFor(settings, AiRequestPurpose.Sll));
         Assert.Equal(general, AiConfigurationResolver.ProfileFor(settings, AiRequestPurpose.Concept));
     }
 

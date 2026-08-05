@@ -4,6 +4,8 @@ using Avalonia.VisualTree;
 using FusionCanvas.App.Items.Import;
 using FusionCanvas.App.Navigation;
 using FusionCanvas.Application.Items;
+using IItemCsvCodec = FusionCanvas.Application.Items.Import.IItemCsvCodec;
+using ItemCsvRow = FusionCanvas.Application.Items.Import.ItemCsvRow;
 using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Domain.Workspace;
 

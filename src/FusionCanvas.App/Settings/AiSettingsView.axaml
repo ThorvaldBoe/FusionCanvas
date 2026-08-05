@@ -110,6 +110,18 @@
           </Panel>
         </StackPanel>
       </Border>
+      <Border Padding="14" Background="{DynamicResource ElevatedSurfaceBrush}"
+              BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
+        <StackPanel Spacing="10">
+          <TextBlock Text="SLL sketch" FontWeight="SemiBold" FontSize="16" />
+          <TextBlock Text="{Binding SllReadiness}" FontSize="12"
+                     Foreground="{DynamicResource SecondaryTextBrush}" />
+          <ToggleSwitch Content="Use General settings" IsChecked="{Binding SllUseGeneral, Mode=TwoWay}" />
+          <Panel IsVisible="{Binding !SllUseGeneral}">
+            <settings:AiProfileEditorView DataContext="{Binding Sll}" />
+          </Panel>
+        </StackPanel>
+      </Border>
     </StackPanel>
 
     <TextBlock IsVisible="{Binding HasMessage}" Text="{Binding Message}" TextWrapping="Wrap"

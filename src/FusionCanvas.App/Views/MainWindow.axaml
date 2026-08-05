@@ -307,6 +307,7 @@
               <MenuItem Header="Paste" IsEnabled="{Binding CanPaste}" Click="OnContextPaste" />
               <MenuItem Header="Duplicate" IsVisible="{Binding IsItem}" Click="OnContextDuplicate" />
               <MenuItem Header="Assets…" Click="OnContextAssets" />
+              <MenuItem Header="Export to CSV..." IsVisible="{Binding IsTopic}" Click="OnContextExport" />
                       <Separator />
                       <MenuItem Header="Delete..." IsVisible="{Binding IsGroup}" Click="OnContextDelete" />
                     </ContextMenu>
@@ -763,11 +764,11 @@
                                  Foreground="{DynamicResource DangerTextBrush}" />
 
                       <!-- Per-corner action rows -->
-                      <Grid RowDefinitions="Auto,Auto,Auto"
-                            ColumnDefinitions="Auto,*,Auto,Auto"
-                            RowSpacing="6"
-                            ColumnSpacing="4"
-                            IsVisible="{Binding ShowsConceptStageTool}">
+      <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+            ColumnDefinitions="Auto,*,Auto,Auto"
+            RowSpacing="6"
+            ColumnSpacing="4"
+            IsVisible="{Binding ShowsConceptStageTool}">
                         <TextBlock Grid.Row="0"
                                    Grid.Column="0"
                                    Text="Concept idea:"
@@ -801,14 +802,21 @@
                                 AutomationProperties.Name="Change Concept idea"
                                 ToolTip.Tip="{Binding ConceptRefinement.ChangeConceptIdeaDisabledReason}"
                                 ToolTip.ShowOnDisabled="True" />
+                        <TextBox Grid.Row="1"
+                                 Grid.Column="1"
+                                 Grid.ColumnSpan="3"
+                                 Text="{Binding ConceptRefinement.ConceptIdeaInstructions, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 IsReadOnly="{Binding !ItemInspector.CanEditStage}"
+                                 PlaceholderText="Instructions"
+                                 AutomationProperties.Name="Instructions for Concept idea" />
 
-                        <TextBlock Grid.Row="1"
+                        <TextBlock Grid.Row="2"
                                    Grid.Column="0"
                                    Text="Phrase:"
                                    FontSize="11"
                                    Foreground="{DynamicResource SecondaryTextBrush}"
                                    VerticalAlignment="Top" />
-                        <TextBox Grid.Row="1"
+                        <TextBox Grid.Row="2"
                                  Grid.Column="1"
                                  Text="{Binding ConceptRefinement.PhraseInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  IsReadOnly="{Binding !ItemInspector.CanEditStage}"
@@ -817,7 +825,7 @@
                                  MinHeight="44"
                                  VerticalContentAlignment="Center"
                                  AutomationProperties.Name="Refinement Phrase input" />
-                        <Button Grid.Row="1"
+                        <Button Grid.Row="2"
                                 Grid.Column="2"
                                 Content="Fine tune"
                                 VerticalAlignment="Top"
@@ -826,7 +834,7 @@
                                 AutomationProperties.Name="Fine tune Phrase"
                                 ToolTip.Tip="{Binding ConceptRefinement.FineTunePhraseDisabledReason}"
                                 ToolTip.ShowOnDisabled="True" />
-                        <Button Grid.Row="1"
+                        <Button Grid.Row="2"
                                 Grid.Column="3"
                                 Content="Change"
                                 VerticalAlignment="Top"
@@ -835,14 +843,21 @@
                                 AutomationProperties.Name="Change Phrase"
                                 ToolTip.Tip="{Binding ConceptRefinement.ChangePhraseDisabledReason}"
                                 ToolTip.ShowOnDisabled="True" />
+                        <TextBox Grid.Row="3"
+                                 Grid.Column="1"
+                                 Grid.ColumnSpan="3"
+                                 Text="{Binding ConceptRefinement.PhraseInstructions, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 IsReadOnly="{Binding !ItemInspector.CanEditStage}"
+                                 PlaceholderText="Instructions"
+                                 AutomationProperties.Name="Instructions for Phrase" />
 
-                        <TextBlock Grid.Row="2"
+                        <TextBlock Grid.Row="4"
                                    Grid.Column="0"
                                    Text="Graphic:"
                                    FontSize="11"
                                    Foreground="{DynamicResource SecondaryTextBrush}"
                                    VerticalAlignment="Top" />
-                        <TextBox Grid.Row="2"
+                        <TextBox Grid.Row="4"
                                  Grid.Column="1"
                                  Text="{Binding ConceptRefinement.GraphicDirectionInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  IsReadOnly="{Binding !ItemInspector.CanEditStage}"
@@ -851,7 +866,7 @@
                                  MinHeight="72"
                                  VerticalContentAlignment="Top"
                                  AutomationProperties.Name="Refinement Graphic direction input" />
-                        <Button Grid.Row="2"
+                        <Button Grid.Row="4"
                                 Grid.Column="2"
                                 Content="Fine tune"
                                 VerticalAlignment="Top"
@@ -860,7 +875,7 @@
                                 AutomationProperties.Name="Fine tune Graphic direction"
                                 ToolTip.Tip="{Binding ConceptRefinement.FineTuneGraphicDirectionDisabledReason}"
                                 ToolTip.ShowOnDisabled="True" />
-                        <Button Grid.Row="2"
+                        <Button Grid.Row="4"
                                 Grid.Column="3"
                                 Content="Change"
                                 VerticalAlignment="Top"
@@ -869,6 +884,13 @@
                                 AutomationProperties.Name="Change Graphic direction"
                                 ToolTip.Tip="{Binding ConceptRefinement.ChangeGraphicDirectionDisabledReason}"
                                 ToolTip.ShowOnDisabled="True" />
+                        <TextBox Grid.Row="5"
+                                 Grid.Column="1"
+                                 Grid.ColumnSpan="3"
+                                 Text="{Binding ConceptRefinement.GraphicDirectionInstructions, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 IsReadOnly="{Binding !ItemInspector.CanEditStage}"
+                                 PlaceholderText="Instructions"
+                                 AutomationProperties.Name="Instructions for Graphic direction" />
                       </Grid>
 
                       <!-- Score -->
@@ -903,6 +925,64 @@
                           </DataTemplate>
                         </ListBox.ItemTemplate>
                       </ListBox>
+
+                      <!-- SLL generation section -->
+                      <Separator Margin="0,4"
+                                 IsVisible="{Binding ShowsConceptStageTool}" />
+                      <TextBlock Text="Generate SLL sketch"
+                                 FontSize="13"
+                                 FontWeight="SemiBold"
+                                 Foreground="{DynamicResource StrongTextBrush}"
+                                 IsVisible="{Binding ShowsConceptStageTool}" />
+                      <TextBlock Text="{Binding SllGeneration.UnavailableReason}"
+                                 IsVisible="{Binding SllGeneration.UnavailableReason, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                 TextWrapping="Wrap"
+                                 FontSize="11"
+                                 Foreground="{DynamicResource DangerTextBrush}" />
+
+                      <TextBlock Text="{Binding SllGeneration.ErrorMessage}"
+                                 IsVisible="{Binding SllGeneration.HasError}"
+                                 TextWrapping="Wrap"
+                                 FontSize="11"
+                                 Foreground="{DynamicResource DangerTextBrush}" />
+
+                      <Button Content="Generate SLL&#x2026;"
+                              IsEnabled="{Binding SllGeneration.CanGenerate}"
+                              IsVisible="{Binding ShowsConceptStageTool}"
+                              AutomationProperties.Name="Generate SLL sketch"
+                              Command="{Binding SllGeneration.GenerateCommand}"
+                              ToolTip.Tip="{Binding SllGeneration.GenerateDisabledReason}"
+                              ToolTip.ShowOnDisabled="True" />
+
+                      <Button Content="Regenerate SLL&#x2026;"
+                              IsEnabled="{Binding SllGeneration.CanRegenerate}"
+                              IsVisible="{Binding ShowsConceptStageTool}"
+                              AutomationProperties.Name="Regenerate SLL sketch"
+                              Command="{Binding SllGeneration.RegenerateCommand}"
+                              ToolTip.Tip="{Binding SllGeneration.RegenerateDisabledReason}"
+                              ToolTip.ShowOnDisabled="True" />
+
+                      <TextBlock Text="SLL generation in progress&#x2026;"
+                                 IsVisible="{Binding SllGeneration.IsBusy}"
+                                 FontSize="11"
+                                 Foreground="{DynamicResource SecondaryTextBrush}" />
+
+                      <TextBlock Text="This sketch is stale — complete the triangle to regenerate."
+                                 IsVisible="{Binding SllGeneration.IsStale}"
+                                 TextWrapping="Wrap"
+                                 FontSize="11"
+                                 Foreground="{DynamicResource WarningTextBrush}" />
+
+                      <TextBox Text="{Binding SllGeneration.AsciiSketch}"
+                               IsReadOnly="True"
+                               IsVisible="{Binding SllGeneration.HasCurrentSll}"
+                               AcceptsReturn="True"
+                               TextWrapping="NoWrap"
+                               FontFamily="Consolas,Menlo,monospace"
+                               FontSize="11"
+                               MinHeight="120"
+                               AutomationProperties.Name="Generated SLL sketch"
+                               ScrollViewer.HorizontalScrollBarVisibility="Auto" />
                      </StackPanel>
                   </Border>
 

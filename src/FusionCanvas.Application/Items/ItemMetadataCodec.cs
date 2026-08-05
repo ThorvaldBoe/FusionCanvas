@@ -10,6 +10,7 @@ internal static class ItemMetadataCodec
     public const string IdeaAudienceKey = "idea.audience";
     public const string PhraseKey = "phrase";
     public const string GraphicDirectionKey = "graphicDirection";
+    public const string SllKey = "sll";
     public const string InheritedFromPrefix = "inheritedFrom:";
 
     public static string NormalizeName(string? value) => value?.Trim() ?? string.Empty;

@@ -332,6 +332,30 @@ public class ItemInspectorViewModelTests
     }
 
     [Fact]
+    public async Task SllOnlyChange_MarksDirtyAndCommitsThroughStagePayload()
+    {
+        var sample = Sample.Create();
+        var conceptItem = sample.Item with { Stage = WorkflowStage.Concept };
+        sample.Repository.Set(sample.Snapshot with { Items = [conceptItem] });
+        var viewModel = sample.CreateViewModel(clock: () => sample.Now.AddMinutes(1));
+        await viewModel.LoadAsync(conceptItem.Id);
+        viewModel.ApplyStage(WorkflowStage.Concept);
+
+        // An SLL-only change with no other dirty field must still register as unsaved
+        // (regression guard for the SR-001 dirty-check fix).
+        viewModel.Sll = """{"AsciiSketch":"+---+","Triangle":{"Phrase":"X"}}""";
+
+        Assert.True(viewModel.HasUnsavedChanges);
+
+        await viewModel.CommitEditsAsync();
+
+        Assert.False(viewModel.HasError);
+        var persisted = sample.Repository.Snapshot.Items.Single(listing => listing.Id == conceptItem.Id);
+        Assert.Contains("\"sll\":", persisted.MetadataJson);
+        Assert.Contains("AsciiSketch", persisted.MetadataJson);
+    }
+
+    [Fact]
     public async Task Archive_ConfirmedArchivesAndRaisesLifecycleChanged()
     {
         var sample = Sample.Create();

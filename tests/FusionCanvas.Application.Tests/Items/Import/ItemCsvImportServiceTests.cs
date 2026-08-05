@@ -9,6 +9,7 @@ using FusionCanvas.Domain.Tags;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Application.Items;
+using ItemCsvRow = FusionCanvas.Application.Items.Import.ItemCsvRow;
 using FusionCanvas.Application.Items.Import;
 
 namespace FusionCanvas.Application.Tests.Items.Import;
