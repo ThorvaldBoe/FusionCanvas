@@ -101,7 +101,7 @@ public sealed class ConceptRefinementViewTests
         Assert.False(phraseEditor.AcceptsReturn);
         Assert.True(graphicEditor.AcceptsReturn);
         Assert.True(ideaEditor.MinHeight >= 72);
-        Assert.True(phraseEditor.MinHeight >= 44);
+        Assert.True(phraseEditor.MinHeight >= 72);
         Assert.True(graphicEditor.MinHeight >= 72);
         Assert.Equal(ideaEditor.Bounds.X, phraseEditor.Bounds.X);
         Assert.Equal(ideaEditor.Bounds.X, graphicEditor.Bounds.X);

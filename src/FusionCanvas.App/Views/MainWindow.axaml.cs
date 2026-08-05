@@ -554,6 +554,14 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnTreeEditorLostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel viewModel && viewModel.WorkspaceTree.HasEditingNode)
+        {
+            await viewModel.WorkspaceTree.CommitEditAsync();
+        }
+    }
+
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
         if (DataContext is not MainWindowViewModel viewModel || TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is TextBox)
@@ -599,6 +607,7 @@ public partial class MainWindow : Window
         if (TrySelectContextGroup(sender, out var viewModel, out _))
         {
             await viewModel.WorkspaceTree.BeginCreateAsync();
+            FocusVisibleTreeEditor();
         }
     }
 
@@ -607,6 +616,7 @@ public partial class MainWindow : Window
         if (TrySelectContextNode(sender, out var viewModel, out _))
         {
             await viewModel.WorkspaceTree.BeginCreateItemAsync();
+            FocusVisibleTreeEditor();
         }
     }
 

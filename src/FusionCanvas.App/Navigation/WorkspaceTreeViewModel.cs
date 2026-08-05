@@ -303,6 +303,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
     public bool HasSelection => SelectedNode is not null;
     public bool CanManageSelection => SelectedNode?.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Item;
+    public bool HasEditingNode => _editingNode is not null;
     public IItemCsvFilePicker FilePicker { get; set; }
 
     public IItemCsvCodec CsvCodec { get => _csvCodec; set => _csvCodec = value; }
