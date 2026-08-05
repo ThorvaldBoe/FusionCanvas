@@ -53,6 +53,21 @@ public class AiConfigurationTests
     }
 
     [Fact]
+    public void ProfileFor_TitleAlwaysUsesGeneralProfile()
+    {
+        var general = Profile("general/model");
+        var customConcept = Profile("concept/model");
+        var settings = AiConfigurationSettings.Default with
+        {
+            General = general,
+            Concept = new AiPurposeProfileSettings(false, true, customConcept),
+            AdvancedMode = true
+        };
+
+        Assert.Equal(general, AiConfigurationResolver.ProfileFor(settings, AiRequestPurpose.Title));
+    }
+
+    [Fact]
     public void EnableCustom_CopiesGeneralOnceAndRetainsExistingCustomProfile()
     {
         var general = Profile("general/model");

@@ -5,5 +5,6 @@ public enum AiRequestPurpose
     General,
     Ideation,
     Concept,
-    Sll
+    Sll,
+    Title
 }

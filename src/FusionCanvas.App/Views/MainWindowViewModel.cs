@@ -40,6 +40,7 @@ using FusionCanvas.Application.AI;
 using FusionCanvas.Application.ConceptRefinement;
 using FusionCanvas.Application.Products;
 using FusionCanvas.Application.Items.Import;
+using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.App.ConceptRefinement;
 
 namespace FusionCanvas.App.Views;
@@ -112,6 +113,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.ConceptRefinementAccess,
             runtime.SllGeneration,
             runtime.SllGenerationAccess,
+            runtime.TitleOptimization,
             runtime.ProductSupplierSetup,
             runtime.ItemCsvImport)
     {
@@ -139,6 +141,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IConceptRefinementAccessStatus? conceptRefinementAccessStatus = null,
         ISllGenerationService? sllGenerationService = null,
         ISllAccessStatus? sllAccessStatus = null,
+        ITitleOptimizationService? titleOptimizationService = null,
         IProductSupplierSetupService? productSupplierSetupService = null,
         IItemCsvImportService? itemCsvImportService = null)
     {
@@ -178,7 +181,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             _ideationAccessStatus);
         GroupDetails = new GroupDetailsViewModel(_groupManagementService);
         AssetsManagement = new AssetsViewModel(_assetManagementService);
-        ItemInspector = new ItemInspectorViewModel(_itemInspectorService, _itemManagementService, _tagManagementService);
+        ItemInspector = new ItemInspectorViewModel(_itemInspectorService, _itemManagementService, _tagManagementService, titleOptimizationService);
         DesignTool = new DesignStageToolViewModel(new DesignFileService(workspaceRepository, fileStore), productService);
         ListingTool = new ListingStageToolViewModel();
         Ideation = new IdeationViewModel(_ideationService, _ideationAccessStatus, snowcloneLibrary, rejectedPhrases);
@@ -198,6 +201,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         Settings.Ai.AvailabilityChanged += (_, _) => _ = ConceptRefinement.RefreshAvailabilityAsync();
         Settings.Ai.SettingsChanged += (_, _) => _ = SllGeneration.RefreshAvailabilityAsync();
         Settings.Ai.AvailabilityChanged += (_, _) => _ = SllGeneration.RefreshAvailabilityAsync();
+        Settings.Ai.SettingsChanged += (_, _) => _ = ItemInspector.RefreshTitleOptimizationAvailabilityAsync();
+        Settings.Ai.AvailabilityChanged += (_, _) => _ = ItemInspector.RefreshTitleOptimizationAvailabilityAsync();
         _ = _ideationAccessStatus.RefreshAsync();
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;

@@ -7,6 +7,7 @@ using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Tags;
+using FusionCanvas.Application.TitleOptimization;
 
 namespace FusionCanvas.App.Items;
 
@@ -21,6 +22,11 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
     private readonly IItemInspectorService _service;
     private readonly IItemManagementService _itemManagement;
     private readonly ITagManagementService? _tagManagement;
+    private readonly ITitleOptimizationService? _optimization;
+    private CancellationTokenSource? _optimizationCts;
+    private bool _titleAiReady;
+    private string _optimizeDisabledReason = string.Empty;
+    private bool _isOptimizing;
     private ItemInspectorState? _state;
     private Guid? _loadedItemId;
     private WorkflowStage _currentStage = WorkflowStage.Idea;
@@ -55,11 +61,13 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
     public ItemInspectorViewModel(
         IItemInspectorService service,
         IItemManagementService itemManagement,
-        ITagManagementService? tagManagement = null)
+        ITagManagementService? tagManagement = null,
+        ITitleOptimizationService? optimization = null)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _itemManagement = itemManagement ?? throw new ArgumentNullException(nameof(itemManagement));
         _tagManagement = tagManagement;
+        _optimization = optimization;
         AddTagCommand = new RelayCommand(_ => Run(AddTagAsync()));
         RemoveTagCommand = new RelayCommand(parameter =>
         {
@@ -68,6 +76,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
                 Run(RemoveTagAsync(name));
             }
         });
+        OptimizeCommand = new RelayCommand(_ => Run(OptimizeTitleAsync()), () => CanOptimize);
         RequestArchiveCommand = new RelayCommand(_ => ArchiveConfirmationVisible = true, () => CanArchive);
         ConfirmArchiveCommand = new RelayCommand(_ => Run(ConfirmArchiveAsync()));
         CancelArchiveCommand = new RelayCommand(_ => ArchiveConfirmationVisible = false);
@@ -127,7 +136,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
 
     public bool CanEdit => CanEditShared;
 
-    public bool CanEditShared => _state is { IsEffectivelyActive: true } && !IsBusy;
+    public bool CanEditShared => _state is { IsEffectivelyActive: true } && !IsBusy && !_isOptimizing;
 
     public bool CanEditStage =>
         _state is { IsEffectivelyActive: true } state
@@ -186,6 +195,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
             if (SetField(ref _title, value))
             {
                 RaiseDirty();
+                OnOptimizeAvailabilityChanged();
             }
         }
     }
@@ -210,6 +220,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
             if (SetField(ref _idea, value))
             {
                 RaiseDirty();
+                OnOptimizeAvailabilityChanged();
             }
         }
     }
@@ -222,6 +233,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
             if (SetField(ref _conceptIdea, value))
             {
                 RaiseDirty();
+                OnOptimizeAvailabilityChanged();
             }
         }
     }
@@ -246,6 +258,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
             if (SetField(ref _phrase, value))
             {
                 RaiseDirty();
+                OnOptimizeAvailabilityChanged();
             }
         }
     }
@@ -258,6 +271,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
             if (SetField(ref _graphicDirection, value))
             {
                 RaiseDirty();
+                OnOptimizeAvailabilityChanged();
             }
         }
     }
@@ -305,6 +319,66 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
     }
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
+
+    public bool IsOptimizing
+    {
+        get => _isOptimizing;
+        private set
+        {
+            if (SetField(ref _isOptimizing, value))
+            {
+                OnOptimizeAvailabilityChanged();
+            }
+        }
+    }
+
+    public bool CanOptimize =>
+        _optimization is not null && !_isOptimizing && CanEditShared && _titleAiReady && HasCreativeContentForOptimize;
+
+    public string OptimizeGuidance
+    {
+        get
+        {
+            if (_optimization is null)
+            {
+                return string.Empty;
+            }
+
+            if (!_titleAiReady)
+            {
+                return string.IsNullOrWhiteSpace(_optimizeDisabledReason)
+                    ? "AI for titles is not available. Configure AI in settings."
+                    : _optimizeDisabledReason;
+            }
+
+            if (!HasCreativeContentForOptimize)
+            {
+                return "Add creative content (Idea, Concept idea, Phrase, or Graphic direction) before optimizing the title.";
+            }
+
+            if (!CanEditShared)
+            {
+                return "Restore the item before editing its title.";
+            }
+
+            return "Optimize this working title.";
+        }
+    }
+
+    private bool HasCreativeContentForOptimize
+    {
+        get
+        {
+            var metadata = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [TitleUniquenessPolicy.IdeaKey] = Idea,
+                [TitleUniquenessPolicy.ConceptIdeaKey] = ConceptIdea,
+                [TitleUniquenessPolicy.PhraseKey] = Phrase,
+                [TitleUniquenessPolicy.GraphicDirectionKey] = GraphicDirection
+            };
+            return TitleUniquenessPolicy.HasCreativeContent(metadata);
+        }
+    }
 
     public bool IsBusy
     {
@@ -372,9 +446,11 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
     public ICommand RequestDeleteCommand { get; }
     public ICommand ConfirmDeleteCommand { get; }
     public ICommand CancelDeleteCommand { get; }
+    public ICommand OptimizeCommand { get; }
 
     public async Task LoadAsync(Guid itemId, CancellationToken cancellationToken = default)
     {
+        CancelOptimization();
         var state = await _service.LoadAsync(itemId, cancellationToken).ConfigureAwait(true);
         if (state is null)
         {
@@ -384,6 +460,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
 
         ApplyState(state);
         LoadedItemId = itemId;
+        _ = RefreshTitleOptimizationAvailabilityAsync(cancellationToken);
     }
 
     public void ApplyStage(WorkflowStage stage)
@@ -399,6 +476,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
 
     public void Clear()
     {
+        CancelOptimization();
         State = null;
         LoadedItemId = null;
         _currentStage = WorkflowStage.Idea;
@@ -418,6 +496,92 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         DeleteConfirmationVisible = false;
         ResetBaselines();
         RaiseStageProperties();
+    }
+
+    public async Task RefreshTitleOptimizationAvailabilityAsync(CancellationToken cancellationToken = default)
+    {
+        if (_optimization is null)
+        {
+            _titleAiReady = false;
+            _optimizeDisabledReason = string.Empty;
+        }
+        else
+        {
+            var availability = await _optimization.GetAvailabilityAsync(cancellationToken).ConfigureAwait(true);
+            _titleAiReady = availability.IsReady;
+            _optimizeDisabledReason = availability.IsReady ? string.Empty : availability.Message;
+        }
+
+        OnOptimizeAvailabilityChanged();
+    }
+
+    private async Task OptimizeTitleAsync()
+    {
+        if (!CanOptimize || _optimization is null || _state is not { } state)
+        {
+            return;
+        }
+
+        CancelOptimization();
+        var cts = new CancellationTokenSource();
+        _optimizationCts = cts;
+        IsOptimizing = true;
+        ErrorMessage = null;
+
+        string? title;
+        try
+        {
+            var result = await _optimization
+                .OptimizeAsync(new TitleOptimizationRequest(state.Id), cts.Token)
+                .ConfigureAwait(true);
+            if (cts.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (!result.Succeeded)
+            {
+                ErrorMessage = result.Error;
+                return;
+            }
+
+            title = result.Title!;
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            ErrorMessage = exception.Message;
+            return;
+        }
+        finally
+        {
+            if (ReferenceEquals(_optimizationCts, cts))
+            {
+                _optimizationCts = null;
+            }
+
+            cts.Dispose();
+            IsOptimizing = false;
+        }
+
+        Title = title;
+        await CommitEditsAsync().ConfigureAwait(true);
+    }
+
+    private void CancelOptimization()
+    {
+        _optimizationCts?.Cancel();
+    }
+
+    private void OnOptimizeAvailabilityChanged()
+    {
+        OnPropertyChanged(nameof(CanOptimize));
+        OnPropertyChanged(nameof(OptimizeGuidance));
+        OnPropertyChanged(nameof(CanEditShared));
+        OnPropertyChanged(nameof(CanEdit));
     }
 
     public Task CommitEditsAsync(CancellationToken cancellationToken = default)
@@ -761,6 +925,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanArchive));
         OnPropertyChanged(nameof(CanRestore));
         OnPropertyChanged(nameof(CanDelete));
+        OnOptimizeAvailabilityChanged();
     }
 
     private void RaiseDirty()

@@ -15,6 +15,7 @@ using FusionCanvas.Application.ConceptRefinement;
 using FusionCanvas.Application.SllGeneration;
 using FusionCanvas.Application.Products;
 using FusionCanvas.Application.Items.Import;
+using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.Integration.AI;
 
 namespace FusionCanvas.App.Workspace;
@@ -37,6 +38,7 @@ public sealed record AppWorkspaceRuntime(
     IConceptRefinementAccessStatus ConceptRefinementAccess,
     ISllGenerationService SllGeneration,
     ISllAccessStatus SllGenerationAccess,
+    ITitleOptimizationService TitleOptimization,
     IProductSupplierSetupService ProductSupplierSetup,
     IItemCsvImportService ItemCsvImport);
 
@@ -81,6 +83,7 @@ public static class AppWorkspaceFactory
             repository,
             ai,
             guidanceSource);
+        var titleOptimization = new TitleOptimizationService(repository, ai);
         return new AppWorkspaceRuntime(
             repository,
             fileStore,
@@ -104,6 +107,7 @@ public static class AppWorkspaceFactory
             conceptRefinementAccess,
             sllGeneration,
             sllGenerationAccess,
+            titleOptimization,
             new ProductSupplierSetupService(repository),
             new ItemCsvImportService(repository));
     }

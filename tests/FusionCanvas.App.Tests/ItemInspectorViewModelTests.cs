@@ -9,6 +9,8 @@ using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Tags;
+using FusionCanvas.Application.AI;
+using FusionCanvas.Application.TitleOptimization;
 
 namespace FusionCanvas.App.Tests;
 
@@ -428,6 +430,200 @@ public class ItemInspectorViewModelTests
         Assert.Single(sample.Repository.Snapshot.Items);
     }
 
+    [Fact]
+    public async Task Optimize_DisabledWhenNoOptimizationServiceIsSupplied()
+    {
+        var sample = Sample.Create();
+        var viewModel = sample.CreateViewModel(); // no TitleOptimization service
+        await viewModel.LoadAsync(sample.Item.Id);
+
+        Assert.False(viewModel.CanOptimize);
+    }
+
+    [Fact]
+    public async Task Optimize_DisabledWithSettingsGuidanceWhenAiUnavailable()
+    {
+        var sample = Sample.Create();
+        var optimization = new FakeTitleOptimization
+        {
+            Availability = new AiAvailabilityResult(AiAvailabilityKind.MissingCredential, "Add an OpenRouter API key in AI settings.")
+        };
+        var viewModel = sample.CreateViewModel(optimization: optimization);
+        await viewModel.LoadAsync(sample.Item.Id);
+        await viewModel.RefreshTitleOptimizationAvailabilityAsync();
+
+        Assert.False(viewModel.CanOptimize);
+        Assert.Contains("AI settings", viewModel.OptimizeGuidance);
+    }
+
+    [Fact]
+    public async Task Optimize_DisabledWithContentGuidanceWhenNoCreativeContent()
+    {
+        var sample = Sample.Create();
+        var optimization = new FakeTitleOptimization();
+        var viewModel = sample.CreateViewModel(optimization: optimization);
+        sample.Repository.Set(sample.Snapshot with { Items = [sample.Item with { MetadataJson = "{}" }] });
+        await viewModel.LoadAsync(sample.Item.Id);
+        await viewModel.RefreshTitleOptimizationAvailabilityAsync();
+
+        Assert.False(viewModel.CanOptimize);
+        Assert.Contains("creative content", viewModel.OptimizeGuidance);
+    }
+
+    [Fact]
+    public async Task Optimize_DisabledWithRestoreGuidanceWhenReadOnlyArchived()
+    {
+        var sample = Sample.Create();
+        var optimization = new FakeTitleOptimization();
+        var viewModel = sample.CreateViewModel(optimization: optimization);
+        sample.Repository.Set(sample.Snapshot with { Items = [sample.Item with { IsArchived = true }] });
+        await viewModel.LoadAsync(sample.Item.Id);
+        await viewModel.RefreshTitleOptimizationAvailabilityAsync();
+
+        Assert.False(viewModel.CanOptimize);
+        Assert.Contains("Restore", viewModel.OptimizeGuidance);
+    }
+
+    [Fact]
+    public async Task Optimize_EnabledWhenAiReadyAndCreativeContentPresent()
+    {
+        var sample = Sample.Create();
+        var optimization = new FakeTitleOptimization();
+        var viewModel = sample.CreateViewModel(optimization: optimization);
+        await viewModel.LoadAsync(sample.Item.Id);
+        await viewModel.RefreshTitleOptimizationAvailabilityAsync();
+
+        Assert.True(viewModel.CanOptimize);
+    }
+
+    [Fact]
+    public async Task Optimize_SuccessOverwritesAndPersists()
+    {
+        var sample = Sample.Create();
+        var optimization = new FakeTitleOptimization
+        {
+            Result = TitleOptimizationResult.Success("Pug coach hostage")
+        };
+        var viewModel = sample.CreateViewModel(optimization: optimization, clock: () => sample.Now.AddMinutes(1));
+        await viewModel.LoadAsync(sample.Item.Id);
+        await viewModel.RefreshTitleOptimizationAvailabilityAsync();
+
+        viewModel.OptimizeCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.Title == "Pug coach hostage" && sample.Repository.SaveCount > 0);
+
+        Assert.False(viewModel.HasError);
+        Assert.Equal("Pug coach hostage", viewModel.Title);
+        var persisted = sample.Repository.Snapshot.Items.Single(item => item.Id == sample.Item.Id);
+        Assert.Equal("Pug coach hostage", persisted.Name);
+    }
+
+    [Fact]
+    public async Task Optimize_LocksFieldWhileRunning()
+    {
+        var sample = Sample.Create();
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var optimization = new FakeTitleOptimization
+        {
+            Handler = async (_, _) =>
+            {
+                await gate.Task;
+                return TitleOptimizationResult.Success("Pug coach hostage");
+            }
+        };
+        var viewModel = sample.CreateViewModel(optimization: optimization);
+        await viewModel.LoadAsync(sample.Item.Id);
+        await viewModel.RefreshTitleOptimizationAvailabilityAsync();
+        Assert.True(viewModel.CanEditShared);
+
+        viewModel.OptimizeCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.IsOptimizing);
+
+        Assert.True(viewModel.IsOptimizing);
+        Assert.False(viewModel.CanEditShared);
+        Assert.False(viewModel.CanOptimize);
+
+        gate.SetResult();
+        await WaitUntilAsync(() => !viewModel.IsOptimizing);
+    }
+
+    [Fact]
+    public async Task Optimize_FailureLeavesTitleUnchanged()
+    {
+        var sample = Sample.Create();
+        var optimization = new FakeTitleOptimization
+        {
+            Result = TitleOptimizationResult.Failure("Provider boom.")
+        };
+        var viewModel = sample.CreateViewModel(optimization: optimization);
+        await viewModel.LoadAsync(sample.Item.Id);
+        await viewModel.RefreshTitleOptimizationAvailabilityAsync();
+        var original = viewModel.Title;
+
+        viewModel.OptimizeCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.HasError);
+
+        Assert.Equal(original, viewModel.Title);
+        Assert.True(viewModel.HasError);
+    }
+
+    [Fact]
+    public async Task Optimize_ItemSwitchCancelsInFlightOperation()
+    {
+        var sample = Sample.Create();
+        var other = sample.Item with { Id = Guid.NewGuid(), Name = "Other item" };
+        sample.Repository.Set(sample.Snapshot with { Items = [sample.Item, other] });
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var optimization = new FakeTitleOptimization
+        {
+            Handler = async (_, token) =>
+            {
+                using var registration = token.Register(() => gate.TrySetCanceled());
+                await gate.Task;
+                return TitleOptimizationResult.Success("Late title");
+            }
+        };
+        var viewModel = sample.CreateViewModel(optimization: optimization);
+        await viewModel.LoadAsync(sample.Item.Id);
+        await viewModel.RefreshTitleOptimizationAvailabilityAsync();
+
+        viewModel.OptimizeCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.IsOptimizing);
+        await viewModel.LoadAsync(other.Id);
+
+        await WaitUntilAsync(() => viewModel.LoadedItemId == other.Id);
+        Assert.NotEqual("Late title", viewModel.Title);
+        Assert.False(viewModel.IsOptimizing);
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 2000)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        while (!condition())
+        {
+            if (stopwatch.ElapsedMilliseconds > timeoutMs)
+            {
+                throw new TimeoutException("Condition was not met within the timeout.");
+            }
+
+            await Task.Delay(10);
+        }
+    }
+
+    private sealed class FakeTitleOptimization : ITitleOptimizationService
+    {
+        public AiAvailabilityResult Availability { get; set; } = AiAvailabilityResult.Ready;
+        public TitleOptimizationResult Result { get; set; } = TitleOptimizationResult.Success("Optimized title");
+        public Func<TitleOptimizationRequest, CancellationToken, Task<TitleOptimizationResult>>? Handler { get; set; }
+
+        public Task<AiAvailabilityResult> GetAvailabilityAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(Availability);
+
+        public async Task<TitleOptimizationResult> OptimizeAsync(
+            TitleOptimizationRequest request,
+            CancellationToken cancellationToken = default) =>
+            Handler is null ? Result : await Handler(request, cancellationToken);
+    }
+
     private sealed class TestRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
     {
         public WorkspaceSnapshot Snapshot { get; private set; } = snapshot;
@@ -455,10 +651,13 @@ public class ItemInspectorViewModelTests
 
     private sealed record Sample(WorkspaceSnapshot Snapshot, DateTimeOffset Now, Store Store, Niche Niche, TopicGroup Root, TopicGroup Child, Item Item, Tag Tag, TestRepository Repository)
     {
-        public ItemInspectorViewModel CreateViewModel(Func<DateTimeOffset>? clock = null) =>
+        public ItemInspectorViewModel CreateViewModel(
+            Func<DateTimeOffset>? clock = null,
+            ITitleOptimizationService? optimization = null) =>
             new(
                 new ItemInspectorService(Repository, clock: clock, newId: Guid.NewGuid),
-                new ItemManagementService(Repository, clock: clock, newId: Guid.NewGuid));
+                new ItemManagementService(Repository, clock: clock, newId: Guid.NewGuid),
+                optimization: optimization);
 
         public static Sample Create(bool withRelationships = false)
         {
