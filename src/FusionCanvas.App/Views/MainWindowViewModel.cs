@@ -1291,6 +1291,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             ConceptRefinementCorner corner,
             ConceptRefinementTriangle current,
             string originalIdea,
+            string? instruction,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(ConceptRefinementResult.Failure(
                 AiTextFailureKind.NotConfigured,
