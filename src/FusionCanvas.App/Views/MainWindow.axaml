@@ -299,6 +299,7 @@
                     <ContextMenu IsVisible="{Binding HasAssetActions}">
                       <MenuItem Header="New group (subgroup)" IsVisible="{Binding IsGroup}" Click="OnContextNewGroup" />
                       <MenuItem Header="New Item" Click="OnContextNewItem" />
+                      <MenuItem Header="Import…" IsVisible="{Binding IsTopic}" Click="OnContextImport" />
                       <Separator />
               <MenuItem Header="Rename" IsVisible="{Binding HasContextActions}" Click="OnContextRename" />
               <MenuItem Header="Copy" IsVisible="{Binding HasContextActions}" Click="OnContextCopy" />

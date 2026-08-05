@@ -1,0 +1,168 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:items="using:FusionCanvas.App.Items.Import"
+        x:Class="FusionCanvas.App.Items.Import.ItemImportWindow"
+        x:DataType="items:ItemImportViewModel"
+        Title="Import Items"
+        Width="860"
+        Height="620"
+        MinWidth="680"
+        MinHeight="460"
+        Background="{DynamicResource ApplicationBackgroundBrush}">
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="20">
+    <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,14">
+      <TextBlock Text="Import Items"
+                 FontSize="22"
+                 FontWeight="SemiBold"
+                 Foreground="{DynamicResource StrongTextBrush}" />
+      <TextBlock Text="{Binding TargetLabel}"
+                 FontSize="12"
+                 Foreground="{DynamicResource SecondaryTextBrush}" />
+    </StackPanel>
+
+    <Grid Grid.Row="1"
+          ColumnDefinitions="Auto,Auto"
+          ColumnSpacing="8"
+          Margin="0,0,0,14">
+      <Button Grid.Column="0"
+              Content="Pick CSV file…"
+              Command="{Binding PickFileCommand}"
+              IsEnabled="{Binding !IsBusy}"
+              Classes="secondary" />
+      <Button Grid.Column="1"
+              Content="Export sample"
+              Command="{Binding ExportSampleCommand}"
+              IsEnabled="{Binding !IsBusy}"
+              Classes="secondary" />
+    </Grid>
+
+    <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="16">
+      <Border Grid.Column="0"
+              Padding="12"
+              Background="{DynamicResource PanelSurfaceBrush}"
+              BorderBrush="{DynamicResource ControlBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="6">
+        <Grid RowDefinitions="Auto,*">
+          <TextBlock Grid.Row="0"
+                     Text="Raw source"
+                     FontSize="13"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource StrongTextBrush}"
+                     Margin="0,0,0,10" />
+          <TextBox Grid.Row="1"
+                   x:Name="RawSourceBox"
+                   Text="{Binding RawSource}"
+                   AcceptsReturn="True"
+                   TextWrapping="Wrap"
+                   FontFamily="Consolas, Courier New, monospace"
+                   PlaceholderText="Paste or pick a file. Columns are separated by ; with optional Title;Base Idea;Concept Idea;Phrase;Graphic;Notes;Tags header."
+                   Classes="field" />
+        </Grid>
+      </Border>
+
+      <Border Grid.Column="1"
+              Padding="12"
+              Background="{DynamicResource ElevatedSurfaceBrush}"
+              BorderBrush="{DynamicResource ControlBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="6">
+        <Grid RowDefinitions="Auto,*,Auto,Auto">
+          <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+            <TextBlock Grid.Column="0"
+                       Text="Preview"
+                       FontSize="13"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource StrongTextBrush}" />
+            <Button Grid.Column="1"
+                    Content="Run preview"
+                    Command="{Binding RunPreviewCommand}"
+                    IsEnabled="{Binding !IsBusy}"
+                    Classes="secondary" />
+          </Grid>
+
+          <ScrollViewer Grid.Row="1">
+            <ItemsControl x:Name="PreviewList"
+                          ItemsSource="{Binding PreviewRows}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <TextBlock Text="{Binding}"
+                             TextWrapping="Wrap"
+                             Foreground="{DynamicResource StrongTextBrush}"
+                             Margin="0,0,0,6" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+
+          <TextBlock Grid.Row="2"
+                     Text="{Binding LoadError}"
+                     IsVisible="{Binding HasLoadError}"
+                     TextWrapping="Wrap"
+                     Foreground="{DynamicResource DangerTextBrush}"
+                     Margin="0,10,0,0" />
+
+          <ItemsControl Grid.Row="3"
+                        ItemsSource="{Binding ErrorMessages}"
+                        IsVisible="{Binding HasErrors}"
+                        Margin="0,10,0,0">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <TextBlock Text="{Binding}"
+                           Foreground="{DynamicResource DangerTextBrush}"
+                           Margin="0,0,0,4" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <StackPanel Grid.Row="3"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8"
+                Margin="0,14,0,0">
+      <TextBlock Text="{Binding ErrorMessage}"
+                 IsVisible="{Binding HasErrorMessage}"
+                 VerticalAlignment="Center"
+                 TextWrapping="Wrap"
+                 Foreground="{DynamicResource DangerTextBrush}" />
+      <Button Content="Import"
+              Command="{Binding ImportCommand}"
+              IsEnabled="{Binding CanImport}"
+              Classes="primary fixedAction" />
+      <Button Content="Close"
+              Command="{Binding CloseCommand}"
+              Classes="secondary fixedAction" />
+    </StackPanel>
+  </Grid>
+
+  <Window.Styles>
+    <Style Selector="Button.primary">
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource CommandForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.secondary">
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SecondaryButtonForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.fixedAction">
+      <Setter Property="Width" Value="104" />
+    </Style>
+    <Style Selector="TextBox.field">
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Padding" Value="8,6" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource StrongTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+  </Window.Styles>
+</Window>

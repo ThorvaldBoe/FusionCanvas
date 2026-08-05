@@ -13,6 +13,7 @@ using FusionCanvas.Integration.Snowclones;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.ConceptRefinement;
 using FusionCanvas.Application.Products;
+using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Integration.AI;
 
 namespace FusionCanvas.App.Workspace;
@@ -33,7 +34,8 @@ public sealed record AppWorkspaceRuntime(
     SnowcloneLibraryResult SnowcloneLibraryInitialization,
     IConceptRefinementService ConceptRefinement,
     IConceptRefinementAccessStatus ConceptRefinementAccess,
-    IProductSupplierSetupService ProductSupplierSetup);
+    IProductSupplierSetupService ProductSupplierSetup,
+    IItemCsvImportService ItemCsvImport);
 
 public static class AppWorkspaceFactory
 {
@@ -92,7 +94,8 @@ public static class AppWorkspaceFactory
             snowcloneLibraryInitialization,
             conceptRefinement,
             conceptRefinementAccess,
-            new ProductSupplierSetupService(repository));
+            new ProductSupplierSetupService(repository),
+            new ItemCsvImportService(repository));
     }
 
     private static string DefaultDatabasePath()

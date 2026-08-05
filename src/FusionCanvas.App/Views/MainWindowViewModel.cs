@@ -37,6 +37,7 @@ using FusionCanvas.Application.Workspaces.Transfer;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.ConceptRefinement;
 using FusionCanvas.Application.Products;
+using FusionCanvas.Application.Items.Import;
 using FusionCanvas.App.ConceptRefinement;
 
 namespace FusionCanvas.App.Views;
@@ -60,6 +61,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly IIdeationAccessStatus _ideationAccessStatus;
     private readonly IConceptRefinementService _conceptRefinementService;
     private readonly IConceptRefinementAccessStatus _conceptRefinementAccessStatus;
+    private readonly IItemCsvImportService _itemCsvImportService;
     private ItemStatus? _pendingStatus;
     private bool _isStatusConfirmationVisible;
     private bool _isDesignRemoveConfirmationVisible;
@@ -104,7 +106,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.RejectedPhrases,
             runtime.ConceptRefinement,
             runtime.ConceptRefinementAccess,
-            runtime.ProductSupplierSetup)
+            runtime.ProductSupplierSetup,
+            runtime.ItemCsvImport)
     {
     }
 
@@ -128,7 +131,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         FusionCanvas.Application.RejectedPhrases.IRejectedPhraseManagementService? rejectedPhrases = null,
         IConceptRefinementService? conceptRefinementService = null,
         IConceptRefinementAccessStatus? conceptRefinementAccessStatus = null,
-        IProductSupplierSetupService? productSupplierSetupService = null)
+        IProductSupplierSetupService? productSupplierSetupService = null,
+        IItemCsvImportService? itemCsvImportService = null)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
@@ -149,6 +153,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             productService);
         _groupManagementService = groupManagementService ?? new GroupManagementService(workspaceRepository);
         _itemManagementService = itemManagementService ?? new ItemManagementService(workspaceRepository);
+        _itemCsvImportService = itemCsvImportService ?? new ItemCsvImportService(workspaceRepository);
         _tagManagementService = tagManagementService ?? new TagManagementService(workspaceRepository);
         _assetManagementService = assetManagementService ?? new AssetManagementService(workspaceRepository, fileStore);
         _itemInspectorService = itemInspectorService ?? new ItemInspectorService(workspaceRepository);
@@ -264,6 +269,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public ConceptRefinementSessionViewModel ConceptRefinement { get; }
 
     public WorkspaceTreeViewModel WorkspaceTree { get; }
+
+    public IItemCsvImportService ItemCsvImport => _itemCsvImportService;
 
     public NavigationTreePresentationState NavigationState { get; }
 
@@ -711,6 +718,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private void RefreshWorkspaceSnapshotAndInspector()
     {
         RefreshWorkspaceSnapshot();
+        RefreshActiveItemInspector();
+    }
+
+    public async Task RefreshWorkspaceAfterImportAsync()
+    {
+        RefreshWorkspaceSnapshot();
+        await WorkspaceTree.ReloadAsync().ConfigureAwait(true);
         RefreshActiveItemInspector();
     }
 

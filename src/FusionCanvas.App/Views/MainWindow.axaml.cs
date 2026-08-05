@@ -10,12 +10,15 @@ using Avalonia.VisualTree;
 using FusionCanvas.App.Assets;
 using FusionCanvas.App.Groups;
 using FusionCanvas.App.Ideation;
+using FusionCanvas.App.Items.Import;
 using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Settings;
 using FusionCanvas.App.Stores;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Application.Groups;
+using FusionCanvas.Application.Items;
+using FusionCanvas.Application.Items.Import;
 
 namespace FusionCanvas.App.Views;
 
@@ -678,6 +681,27 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnContextImport(object? sender, RoutedEventArgs e)
+    {
+        if (!TrySelectContextTopic(sender, out var viewModel, out var node))
+        {
+            return;
+        }
+
+        var topic = new ItemTopicReference(
+            node.EntityKind == WorkspaceEntityKind.Group
+                ? WorkspaceEntityKind.Group
+                : WorkspaceEntityKind.Niche,
+            node.EntityId);
+        var import = new ItemImportViewModel(topic, node.Name, viewModel.ItemCsvImport);
+        var window = new ItemImportWindow { DataContext = import };
+        await window.ShowDialog(this);
+        if (import.HasImportCompleted)
+        {
+            await viewModel.RefreshWorkspaceAfterImportAsync();
+        }
+    }
+
     private bool TrySelectContextGroup(
         object? sender,
         out MainWindowViewModel viewModel,
@@ -702,6 +726,22 @@ public partial class MainWindow : Window
         viewModel = DataContext as MainWindowViewModel ?? null!;
         node = sender is MenuItem { DataContext: WorkspaceTreeNodeViewModel candidate } ? candidate : null!;
         if (viewModel is null || node is null || !node.HasContextActions)
+        {
+            return false;
+        }
+
+        viewModel.WorkspaceTree.SelectNodeCommand.Execute(node);
+        return true;
+    }
+
+    private bool TrySelectContextTopic(
+        object? sender,
+        out MainWindowViewModel viewModel,
+        out WorkspaceTreeNodeViewModel node)
+    {
+        viewModel = DataContext as MainWindowViewModel ?? null!;
+        node = sender is MenuItem { DataContext: WorkspaceTreeNodeViewModel candidate } ? candidate : null!;
+        if (viewModel is null || node is null || !node.IsTopic)
         {
             return false;
         }
