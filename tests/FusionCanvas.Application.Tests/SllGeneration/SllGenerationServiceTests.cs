@@ -137,7 +137,10 @@ public sealed class SllGenerationServiceTests
     [Fact]
     public async Task GenerateAsync_WhenSketchEmpty_ReturnsFailed()
     {
-        var emptySketch = SampleResponse().Replace("+----------------------------------+\n|    I'M NOT SAYING I'D SURVIVE    |\n|         A DRAGON ATTACK          |\n+----------------------------------+", "", StringComparison.Ordinal);
+        var emptySketch = SampleResponse()
+            .Replace("+----------------------------------+", "", StringComparison.Ordinal)
+            .Replace("|    I'M NOT SAYING I'D SURVIVE    |", "", StringComparison.Ordinal)
+            .Replace("|         A DRAGON ATTACK          |", "", StringComparison.Ordinal);
         var (service, ai, _) = CreateService(CreateSnapshot());
         ai.Result = AiTextResult.Success(emptySketch, "test-model");
 
