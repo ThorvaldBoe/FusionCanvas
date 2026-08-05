@@ -371,19 +371,27 @@ public sealed class ConceptRefinementViewTests
         Assert.Equal("Instructions", phraseInstructions.PlaceholderText);
         Assert.Equal("Instructions", graphicInstructions.PlaceholderText);
 
-        // Each instruction field sits below its corner's Change button pair.
+        // Each instruction field sits under its corner's button pair, beside the
+        // corner's value box, and is narrower than that value box.
         var ideaChange = fixture.FindControlOrDefault<Button>(b =>
             AutomationProperties.GetName(b) == "Change Concept idea");
         var phraseChange = fixture.FindControlOrDefault<Button>(b =>
             AutomationProperties.GetName(b) == "Change Phrase");
         var graphicChange = fixture.FindControlOrDefault<Button>(b =>
             AutomationProperties.GetName(b) == "Change Graphic direction");
+        var ideaEditor = fixture.FindControlOrDefault<TextBox>(tb =>
+            AutomationProperties.GetName(tb) == "Refinement Concept idea input");
         Assert.NotNull(ideaChange);
         Assert.NotNull(phraseChange);
         Assert.NotNull(graphicChange);
+        Assert.NotNull(ideaEditor);
+
         Assert.True(ideaInstructions.Bounds.Y > ideaChange.Bounds.Y);
         Assert.True(phraseInstructions.Bounds.Y > phraseChange.Bounds.Y);
         Assert.True(graphicInstructions.Bounds.Y > graphicChange.Bounds.Y);
+
+        Assert.True(ideaInstructions.Bounds.X > ideaEditor.Bounds.X);
+        Assert.True(ideaInstructions.Bounds.Width < ideaEditor.Bounds.Width);
 
         // Two-way binding: VM -> control.
         fixture.ViewModel.ConceptRefinement.ConceptIdeaInstructions = "make it warmer";
