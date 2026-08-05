@@ -139,11 +139,12 @@ FusionCanvas SHALL persist and load every store with a valid workspace identity.
 - **AND** permanent workspace deletion with owned stores occurs only through explicit application behavior that removes the workspace and its owned store-scoped records together
 
 ### Requirement: Phase 0 persistence avoids advanced storage scope
-The Phase 0 SQLite persistence capability SHALL avoid storage behavior that belongs to later workflow or platform changes.
+The Phase 0 SQLite persistence capability SHALL avoid storage behavior that belongs to later workflow or platform changes. Single-workspace import/export packages are no longer excluded: they are provided by the workspace-transfer capability, which reuses this persistence layer rather than extending it.
 
 #### Scenario: Contributor reviews Phase 0 persistence scope
 - **WHEN** a contributor reviews the FC-0003 implementation
-- **THEN** it does not implement cloud sync, multi-user collaboration, encryption, full backup/restore, import/export packages, marketplace synchronization, AI provider history, plugin data stores, or advanced search optimization
+- **THEN** it does not implement cloud sync, multi-user collaboration, encryption, full backup/restore, marketplace synchronization, AI provider history, plugin data stores, or advanced search optimization
+- **AND** single-workspace import/export packages are understood to belong to the workspace-transfer capability, not to the persistence layer itself
 
 ### Requirement: Tag color is persisted with a versioned migration
 FusionCanvas SHALL persist an optional color on every tag in a dedicated `tags.color` column, SHALL round-trip that color through workspace save and load, and SHALL introduce the column through a versioned SQLite migration from schema version 3 to 4 with safe backfill for existing tags.

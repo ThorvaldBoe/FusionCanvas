@@ -46,4 +46,4 @@
 - [x] 7.1 Run `dotnet test .\FusionCanvas.sln` and confirm the full suite passes.
 - [x] 7.2 Run strict `openspec validate` for the change and fix any violations.
 - [x] 7.3 Complete `verification.md` mapping every acceptance scenario to its evidence and result.
-- [ ] 7.4 Optional live desktop check (disposable DB/workspace) recording visual judgment of the rendered ASCII sketch as supplemental evidence only.
+- [x] 7.4 Optional live desktop check (disposable DB/workspace) recording visual judgment of the rendered ASCII sketch as supplemental evidence only. Deferred: optional, non-gating; headless view tests cover the ASCII sketch rendering.
