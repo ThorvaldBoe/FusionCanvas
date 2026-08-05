@@ -14,6 +14,7 @@ using FusionCanvas.Application.AI;
 using FusionCanvas.Application.ConceptRefinement;
 using FusionCanvas.Application.SllGeneration;
 using FusionCanvas.Application.Products;
+using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Integration.AI;
 
 namespace FusionCanvas.App.Workspace;
@@ -36,7 +37,8 @@ public sealed record AppWorkspaceRuntime(
     IConceptRefinementAccessStatus ConceptRefinementAccess,
     ISllGenerationService SllGeneration,
     ISllAccessStatus SllGenerationAccess,
-    IProductSupplierSetupService ProductSupplierSetup);
+    IProductSupplierSetupService ProductSupplierSetup,
+    IItemCsvImportService ItemCsvImport);
 
 public static class AppWorkspaceFactory
 {
@@ -102,7 +104,8 @@ public static class AppWorkspaceFactory
             conceptRefinementAccess,
             sllGeneration,
             sllGenerationAccess,
-            new ProductSupplierSetupService(repository));
+            new ProductSupplierSetupService(repository),
+            new ItemCsvImportService(repository));
     }
 
     private static string DefaultDatabasePath()
