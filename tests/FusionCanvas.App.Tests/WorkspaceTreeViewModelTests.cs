@@ -1,5 +1,6 @@
 using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Groups;
+using FusionCanvas.App.Items;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Tags;
@@ -11,6 +12,7 @@ using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Groups;
 using FusionCanvas.Application.WorkspaceTree;
 using FusionCanvas.Application.Items;
+using FusionCanvas.Integration.Items;
 
 namespace FusionCanvas.App.Tests;
 
@@ -758,6 +760,97 @@ public class WorkspaceTreeViewModelTests
 
     private static IEnumerable<WorkspaceTreeNodeViewModel> FlattenNodes(IEnumerable<WorkspaceTreeNodeViewModel> nodes) =>
         nodes.SelectMany(node => new[] { node }.Concat(FlattenNodes(node.Children)));
+
+    [Fact]
+    public async Task ExportCsv_WithNullPickerWritesNothing()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var repository = new TestRepository(sample.Snapshot);
+        var codec = new RecordingCsvCodec(new ItemCsvCodec());
+        var viewModel = new WorkspaceTreeViewModel(
+            repository,
+            new GroupManagementService(repository),
+            sample.Snapshot,
+            csvCodec: codec);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+        var group = Assert.Single(Assert.Single(viewModel.Roots).Children);
+
+        await viewModel.ExportCsvAsync(group);
+
+        Assert.Empty(codec.Writes);
+        Assert.Null(viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task ExportCsv_WritesRowsToChosenDestination()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var repository = new TestRepository(sample.Snapshot);
+        var codec = new RecordingCsvCodec(new ItemCsvCodec());
+        var viewModel = new WorkspaceTreeViewModel(
+            repository,
+            new GroupManagementService(repository),
+            sample.Snapshot,
+            csvCodec: codec,
+            filePicker: new StubItemCsvFilePicker(() => new MemoryStream()));
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+        var group = Assert.Single(Assert.Single(viewModel.Roots).Children);
+
+        await viewModel.ExportCsvAsync(group);
+
+        Assert.Single(codec.Writes);
+        Assert.Null(viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task ExportCsv_SurfacesErrorWhenDestinationFails()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var repository = new TestRepository(sample.Snapshot);
+        var viewModel = new WorkspaceTreeViewModel(
+            repository,
+            new GroupManagementService(repository),
+            sample.Snapshot,
+            filePicker: new StubItemCsvFilePicker(() => new ThrowingStream()));
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+        var group = Assert.Single(Assert.Single(viewModel.Roots).Children);
+
+        await viewModel.ExportCsvAsync(group);
+
+        Assert.NotNull(viewModel.ErrorMessage);
+        Assert.Contains("could not be exported", viewModel.ErrorMessage);
+    }
+
+    private sealed class RecordingCsvCodec(IItemCsvCodec inner) : IItemCsvCodec
+    {
+        public List<IReadOnlyList<ItemCsvRow>> Writes { get; } = [];
+
+        public Task WriteAsync(
+            Stream stream,
+            IReadOnlyList<ItemCsvRow> rows,
+            CancellationToken cancellationToken = default)
+        {
+            Writes.Add(rows);
+            return inner.WriteAsync(stream, rows, cancellationToken);
+        }
+    }
+
+    private sealed class StubItemCsvFilePicker(Func<Stream?> factory) : IItemCsvFilePicker
+    {
+        public Task<Stream?> OpenExportAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(factory());
+        }
+    }
+
+    private sealed class ThrowingStream : MemoryStream
+    {
+        public override void Flush() => throw new IOException("write failed");
+
+        public override Task FlushAsync(CancellationToken cancellationToken) =>
+            throw new IOException("write failed");
+    }
 
     private sealed class TestRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
     {
