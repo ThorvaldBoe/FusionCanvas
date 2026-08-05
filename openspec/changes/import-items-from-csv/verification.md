@@ -23,7 +23,8 @@ New tests added by this change:
 | --- | --- | --- |
 | User reads the documented column order | Columns are the seven-item `Title;Base Idea;Concept Idea;Phrase;Graphic;Notes;Tags` order in `ItemCsvCodec` (+ `WriteSample`); `ItemCsvCodecTests.WriteSample...` verifies the header exactly | Pass |
 | Columns are separated by a single semi-colon | `ItemCsvCodecTests.Parse_ParsesValidRowsAndSplitsTags` (7-field rows parsed) + wrong-column-count error in `Parse_WrongColumnCountReportsErrorOnLine` | Pass |
-| Literal semi-colon is escaped as a double semi-colon | `ItemCsvCodecTests.Parse_DecodesDoubleSemicolonsAsLiteralSemicolons` (`;;` → literal `;`) + sample demonstrates `;;` | Pass |
+| Fields are quoted using standard CSV quoting (matching export) | `ItemCsvCodecTests.Parse_QuotedFieldPreservesLiteralSemicolon`, `Parse_QuotedFieldAllowsEmbeddedQuotesAndLineBreaks`, and round-trip `Parse_ImportsRowsWrittenByExportCodec` | Pass |
+| Empty fields are preserved in any column position | `ItemCsvCodecTests.Parse_EmptyMiddleFieldIsPreserved` (empty Notes between Graphic and Tags) | Pass |
 | Optional header row is detected and ignored | `ItemCsvCodecTests.Parse_AcceptsHeaderAndSkipsIt`, `Parse_HeaderDetectionIsCaseInsensitive`, `Parse_HeaderOnlyProducesZeroRowsWithoutErrors` | Pass |
 | A data row equal to the headings is indistinguishable from a header | `ItemCsvCodecTests.Parse_DataRowEqualToHeadingsOnFirstLineIsTreatedAsHeader` + documented limitation | Pass |
 | Tags are comma-separated within their column | `ItemCsvCodecTests.Parse_ParsesValidRowsAndSplitsTags` (`funny,caffeine` → two tags) | Pass |

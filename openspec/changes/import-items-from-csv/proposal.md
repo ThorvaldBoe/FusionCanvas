@@ -11,7 +11,7 @@ Users who already have a list of existing designs have no way to get them into F
   - lets the user pick a CSV file (`*.csv`) via the system open-file picker;
   - shows a sample file they can export to learn the exact format;
   - shows an editable **raw source** text field and a read-only **preview** of the parsed import;
-  - runs a syntax check when generating the preview, and **disables Import** and shows an `Error on line N` message on malformed rows;
+  - runs a syntax check when generating the preview, and **disables Import** and shows a detailed `Line N: <reason>` error (naming the line, the offending column, and why) on malformed rows;
   - enables Import only when the source parses cleanly and every row has a title.
 - Define a **CSV format** for items with seven semi-colon-delimited columns in order: `Title`, `Base Idea`, `Concept Idea`, `Phrase`, `Graphic`, `Notes`, `Tags`.
 - Create imported items via the existing item-creation path at the chosen niche/group, mapping each column to the correct item field/metadata key.
@@ -19,7 +19,8 @@ Users who already have a list of existing designs have no way to get them into F
 
 ### Durable format rules (captured in the spec)
 - Columns are separated by a single semi-colon `;`.
-- A literal semi-colon inside a field is escaped as a double semi-colon `;;` (the exporter produces this; the importer unescapes it).
+- Fields are quoted using standard CSV quoting, matching the export format: a field containing a `;`, double quote, CR, or LF is double-quoted, and an embedded double quote is written doubled (`""`).
+- Empty fields are preserved in any column position (for example, an empty `Notes` between `Graphic` and `Tags`).
 - A leading header row is optional; the importer recognizes and ignores the header if it identifies the column headings.
 - `Title` is the only mandatory column. A row without a title is an error and the import must not create that row.
 - `Tags` is comma-separated within its column.
@@ -27,7 +28,7 @@ Users who already have a list of existing designs have no way to get them into F
 ## Capabilities
 
 ### New Capabilities
-- `item-csv-import`: Defines the item CSV format (columns, semi-colon delimiter, `;;` escaping, optional header, comma-separated tags), sample-file export, the **niche/group context-menu `Import…` entry**, the file picker and import dialog (raw source editor + read-only preview + syntax check with `Error on line N`), and creation of imported Design items at the selected niche/group with correct stage, inherited-context, and metadata mapping.
+- `item-csv-import`: Defines the item CSV format (columns, semi-colon delimiter, standard double-quote quoting matching the exporter, empty fields preserved, optional header, comma-separated tags), sample-file export, the **niche/group context-menu `Import…` entry**, the file picker and import dialog (raw source editor + read-only preview + syntax check with a detailed `Line N: <reason>` error), and creation of imported Design items at the selected niche/group with correct stage, inherited-context, and metadata mapping.
 
 ### Modified Capabilities
 <!-- None. The new `Import…` context-menu entry on niche and group rows is owned by the new `item-csv-import` capability, so no existing capability's requirements change. -->
