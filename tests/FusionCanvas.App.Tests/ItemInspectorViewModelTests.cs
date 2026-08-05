@@ -566,7 +566,7 @@ public class ItemInspectorViewModelTests
         await WaitUntilAsync(() => viewModel.IsOptimizing);
         await viewModel.LoadAsync(other.Id);
 
-        await WaitUntilAsync(() => viewModel.LoadedItemId == other.Id);
+        await WaitUntilAsync(() => viewModel.LoadedItemId == other.Id && !viewModel.IsOptimizing);
         Assert.NotEqual("Late title", viewModel.Title);
         Assert.False(viewModel.IsOptimizing);
     }
