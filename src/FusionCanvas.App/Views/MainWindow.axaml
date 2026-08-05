@@ -650,14 +650,16 @@
                                    PlaceholderText="Optional working title"
                                    AutomationProperties.Name="Item working title"
                                    LostFocus="OnDetailsFieldLostFocus" />
-                          <Button Grid.Column="1"
+                          <Border Grid.Column="1"
                                   Margin="8,0,0,0"
-                                  Padding="12,6"
-                                  Content="Optimize"
-                                  Command="{Binding ItemInspector.OptimizeCommand}"
-                                  IsEnabled="{Binding ItemInspector.CanOptimize}"
-                                  ToolTip.Tip="{Binding ItemInspector.OptimizeGuidance}"
-                                  AutomationProperties.Name="Optimize title" />
+                                  Background="Transparent"
+                                  ToolTip.Tip="{Binding ItemInspector.OptimizeGuidance}">
+                            <Button Padding="12,6"
+                                    Content="Optimize"
+                                    Command="{Binding ItemInspector.OptimizeCommand}"
+                                    IsEnabled="{Binding ItemInspector.CanOptimize}"
+                                    AutomationProperties.Name="Optimize title" />
+                          </Border>
                         </Grid>
                       </StackPanel>
                     </StackPanel>

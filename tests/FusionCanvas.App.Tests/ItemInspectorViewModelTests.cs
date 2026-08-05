@@ -497,6 +497,26 @@ public class ItemInspectorViewModelTests
     }
 
     [Fact]
+    public async Task OptimizeCommand_CanExecuteTracksReadyAiAfterRefresh()
+    {
+        var sample = Sample.Create();
+        var optimization = new FakeTitleOptimization
+        {
+            Availability = new AiAvailabilityResult(AiAvailabilityKind.MissingCredential, "Add an OpenRouter API key in AI settings.")
+        };
+        var viewModel = sample.CreateViewModel(optimization: optimization);
+        await viewModel.LoadAsync(sample.Item.Id);
+
+        Assert.False(viewModel.OptimizeCommand.CanExecute(null));
+
+        optimization.Availability = AiAvailabilityResult.Ready;
+        await viewModel.RefreshTitleOptimizationAvailabilityAsync();
+
+        Assert.True(viewModel.CanOptimize);
+        Assert.True(viewModel.OptimizeCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task Optimize_SuccessOverwritesAndPersists()
     {
         var sample = Sample.Create();

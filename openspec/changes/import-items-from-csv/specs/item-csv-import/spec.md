@@ -11,12 +11,18 @@ FusionCanvas SHALL support importing a list of Design items from a semi-colon-de
 #### Scenario: Columns are separated by a single semi-colon
 - **WHEN** a line contains multiple columns
 - **THEN** each column is separated by exactly one `;` character
-- **AND** there are no column separators inside escaped literal content
+- **AND** the separator is not recognized inside a quoted field, so separator characters inside a field do not shift the columns
 
-#### Scenario: Literal semi-colon is escaped as a double semi-colon
-- **WHEN** a field value contains a semi-colon
-- **THEN** the import format represents it as a double semi-colon `;;`
-- **AND** the importer decodes `;;` as a single literal `;` within that field's text
+#### Scenario: Fields are quoted using standard CSV quoting
+- **WHEN** a field value contains a `;`, a double quote `"`, a carriage return, or a line feed
+- **THEN** the field is written as a double-quoted field, matching the format the export feature produces
+- **AND** an embedded double quote inside a quoted field is written as two double quotes (`""`)
+- **AND** the importer decodes the quoted field back to its literal value
+
+#### Scenario: Empty fields are preserved in any column position
+- **WHEN** a row has an empty middle field (for example an empty Notes between Graphic and Tags)
+- **THEN** the importer treats consecutive separators as an empty field rather than as an escaped semi-colon
+- **AND** columns to the right of the empty field are not shifted
 
 #### Scenario: Optional header row is detected and ignored
 - **WHEN** the first line of the source is a header identifying the columns
@@ -141,9 +147,9 @@ FusionCanvas SHALL present an Import dialog when the user selects Import, offeri
 - **AND** the sample demonstrates the column order and escaping rules
 
 #### Scenario: Preview runs a syntax check and disables Import on error
-- **WHEN** the user generates the preview and the source has a malformed row (for example a line with an inconsistent number of single-semi-colon separators)
+- **WHEN** the user generates the preview and the source has a malformed row (for example a line with an inconsistent number of semi-colon separators or a missing title)
 - **THEN** the Import action is disabled
-- **AND** FusionCanvas shows an error message of the form `Error on line N` identifying the offending line
+- **AND** FusionCanvas shows an error message of the form `Line N: <reason>` that identifies the offending line, the affected column, and why it is incorrect (for example `Line 3: The Title field is required.` or `Line 2: Expected 7 columns in this order: Title, Base Idea, Concept Idea, Phrase, Graphic, Notes, Tags; found 5.`)
 
 #### Scenario: Preview shows a valid import and enables Import
 - **WHEN** the user generates the preview and every row parses correctly with a title

@@ -73,7 +73,7 @@ New tests added by this change:
 | User selects a CSV file | `ItemImportViewModelTests.PickFile_HydratesRawSourceAndRunsPreview` (file contents → `RawSource`, preview runs) + decoder-failure → `HasLoadError` | Pass |
 | User edits the raw source | `ItemImportWindow` `RawSourceBox` is editable (constructed in `Window_ConstructsWithRequiredControls`); `RunPreview` re-parses edited source | Pass |
 | User exports a sample file | `ItemImportViewModelTests.ExportSample_WritesCodecSampleToExportStream` + `ItemCsvCodecTests.WriteSample...` | Pass |
-| Preview runs a syntax check and disables Import on error | `ItemImportViewModelTests.RunPreview_WithErrorDisablesImport` (`Error on line N`) + `ItemImportWindowTests.ImportButtonIsEnabledOnlyWhenPreviewIsValid` (disabled) | Pass |
+| Preview runs a syntax check and disables Import on error | `ItemImportViewModelTests.RunPreview_WithErrorDisablesImport` (detailed `Line N: <reason>`) + `ItemImportWindowTests.ImportButtonIsEnabledOnlyWhenPreviewIsValid` (disabled); `ItemCsvCodecTests.Parse_WrongColumnCountReportsErrorOnLine` names the expected columns and count, `Parse_BlankTitleExcludesRowAndReportsError` names the Title field | Pass |
 | Preview shows a valid import and enables Import | `ItemImportViewModelTests.RunPreview_PopulatesPreviewAndEnablesImport` + `ItemImportWindowTests.ImportButtonIsEnabledOnlyWhenPreviewIsValid` (enabled) | Pass |
 | Empty source disables Import | `ItemImportViewModelTests.RunPreview_EmptySourceDisablesImport` | Pass |
 

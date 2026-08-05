@@ -1,4 +1,7 @@
+using System.Text;
+using FusionCanvas.Application.Items;
 using FusionCanvas.Integration.Items.Import;
+using ExportCodec = FusionCanvas.Integration.Items.ItemCsvCodec;
 
 namespace FusionCanvas.Integration.Tests.Items.Import;
 
@@ -73,14 +76,74 @@ public sealed class ItemCsvCodecTests
     }
 
     [Fact]
-    public void Parse_DecodesDoubleSemicolonsAsLiteralSemicolons()
+    public void Parse_QuotedFieldPreservesLiteralSemicolon()
     {
         var result = _codec.Parse(
-            "Title;Base ;; Idea;Concept;Phrase;Graphic;Notes;Tags\n");
+            "Title;\"Base; Idea\";Concept;Phrase;Graphic;Notes;Tags\n");
 
         Assert.Empty(result.Errors);
         var row = Assert.Single(result.Rows);
-        Assert.Equal("Base ; Idea", row.BaseIdea);
+        Assert.Equal("Base; Idea", row.BaseIdea);
+    }
+
+    [Fact]
+    public void Parse_QuotedFieldAllowsEmbeddedQuotesAndLineBreaks()
+    {
+        var result = _codec.Parse(
+            "Title;Base;Concept;Phrase;Graphic;\"line1\nline2; \"\"quoted\"\"\";Tags\n");
+
+        Assert.Empty(result.Errors);
+        var row = Assert.Single(result.Rows);
+        Assert.Equal("line1\nline2; \"quoted\"", row.Notes);
+    }
+
+    [Fact]
+    public void Parse_EmptyMiddleFieldIsPreserved()
+    {
+        var result = _codec.Parse(
+            "Dadabase;I keep my dad jokes in a dad-a-base;Concept;Phrase;A vintage terminal;;computers\n");
+
+        Assert.Empty(result.Errors);
+        var row = Assert.Single(result.Rows);
+        Assert.Equal("A vintage terminal", row.Graphic);
+        Assert.Null(row.Notes);
+        Assert.Equal(["computers"], row.Tags);
+    }
+
+    [Fact]
+    public async Task Parse_ImportsRowsWrittenByExportCodec()
+    {
+        var exporter = new ExportCodec();
+        var rows = new List<ItemCsvRow>
+        {
+            new("Dadabase", "I keep my dad jokes in a dad-a-base", "The nerdy pride",
+                "I keep my dad jokes in a dad-a-base", "A vintage terminal; with detail", null, "computers"),
+            new("Second", "idea;with;colons", "concept", "phrase", "graphic",
+                "notes; with semicolon and \"quotes\"", "a, b")
+        };
+
+        using var stream = new MemoryStream();
+        await exporter.WriteAsync(stream, rows, TestContext.Current.CancellationToken);
+        var csv = Encoding.UTF8.GetString(stream.ToArray());
+
+        var result = _codec.Parse(csv);
+        Assert.Empty(result.Errors);
+        Assert.Equal(2, result.Rows.Count);
+
+        var first = result.Rows[0];
+        Assert.Equal("Dadabase", first.Title);
+        Assert.Equal("I keep my dad jokes in a dad-a-base", first.BaseIdea);
+        Assert.Equal("The nerdy pride", first.ConceptIdea);
+        Assert.Equal("I keep my dad jokes in a dad-a-base", first.Phrase);
+        Assert.Equal("A vintage terminal; with detail", first.Graphic);
+        Assert.Null(first.Notes);
+        Assert.Equal(["computers"], first.Tags);
+
+        var second = result.Rows[1];
+        Assert.Equal("Second", second.Title);
+        Assert.Equal("idea;with;colons", second.BaseIdea);
+        Assert.Equal("notes; with semicolon and \"quotes\"", second.Notes);
+        Assert.Equal(["a", "b"], second.Tags);
     }
 
     [Fact]
@@ -93,7 +156,10 @@ public sealed class ItemCsvCodecTests
         Assert.True(result.HasErrors);
         Assert.Equal(2, result.Errors.Count);
         Assert.Equal([1, 2], result.Errors.Select(error => error.LineNumber).ToArray());
-        Assert.Equal(["Error on line 1", "Error on line 2"], result.ErrorText);
+        Assert.StartsWith("Line 1:", result.ErrorText[0]);
+        Assert.Contains("found 6", result.ErrorText[0]);
+        Assert.StartsWith("Line 2:", result.ErrorText[1]);
+        Assert.Contains("found 8", result.ErrorText[1]);
         Assert.Empty(result.Rows);
     }
 
@@ -132,7 +198,7 @@ public sealed class ItemCsvCodecTests
             "\n" +
             "Two;Base;Concept;Phrase;Graphic;Notes;Tag\n");
 
-        Assert.Equal(["Error on line 2"], result.ErrorText);
+        Assert.Equal(["Line 2: Expected 7 columns in this order: Title, Base Idea, Concept Idea, Phrase, Graphic, Notes, Tags; found 1."], result.ErrorText);
         Assert.Equal(2, result.Rows.Count);
     }
 

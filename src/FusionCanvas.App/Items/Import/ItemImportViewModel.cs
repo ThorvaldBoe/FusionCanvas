@@ -164,7 +164,7 @@ public sealed class ItemImportViewModel : INotifyPropertyChanged
         ErrorMessages.Clear();
         foreach (var error in _parseResult.Errors)
         {
-            ErrorMessages.Add($"Error on line {error.LineNumber}");
+            ErrorMessages.Add($"Line {error.LineNumber}: {error.Message}");
         }
 
         ErrorMessage = null;

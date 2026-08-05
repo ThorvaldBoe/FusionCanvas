@@ -7,5 +7,5 @@ public sealed record ItemCsvParseResult(
     public bool HasErrors => Errors.Count > 0;
 
     public IReadOnlyList<string> ErrorText =>
-        Errors.Select(error => $"Error on line {error.LineNumber}").ToArray();
+        Errors.Select(error => $"Line {error.LineNumber}: {error.Message}").ToArray();
 }

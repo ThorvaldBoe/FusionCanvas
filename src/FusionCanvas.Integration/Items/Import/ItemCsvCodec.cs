@@ -1,15 +1,16 @@
+using System.Text;
 using FusionCanvas.Application.Items.Import;
 
 namespace FusionCanvas.Integration.Items.Import;
 
 /// <summary>
-/// Parses and writes the item import CSV format: seven semi-colon-delimited
-/// columns (Title;Base Idea;Concept Idea;Phrase;Graphic;Notes;Tags).
-/// A double semi-colon (;;) is an escaped literal semi-colon; a lone semi-colon
-/// is a column separator. Because an empty field between two non-empty fields is
-/// written as ;; and therefore read as an escaped semi-colon, empty fields are
-/// only representable as the trailing field; users resolve ambiguous rows in the
-/// import dialog's raw-source editor.
+/// Parses the item import CSV format: seven semi-colon-delimited columns
+/// (Title;Base Idea;Concept Idea;Phrase;Graphic;Notes;Tags) using standard CSV
+/// field quoting, matching the format produced by the export feature.
+/// A field is quoted with double quotes when it contains a `;`, `"`, CR, or LF;
+/// an embedded double quote is written as two double quotes (`""`). Empty fields
+/// are represented by empty space between separators and can appear anywhere in a
+/// row, so an import of an exported file round-trips without column shifts.
 /// </summary>
 public sealed class ItemCsvCodec : IItemCsvCodec
 {
@@ -20,9 +21,11 @@ public sealed class ItemCsvCodec : IItemCsvCodec
         "Title", "Base Idea", "Concept Idea", "Phrase", "Graphic", "Notes", "Tags"
     ];
 
+    private static readonly string ColumnList = string.Join(", ", Headings);
+
     private const string SampleCsv =
         "Title;Base Idea;Concept Idea;Phrase;Graphic;Notes;Tags\r\n" +
-        "Retro coffee tee;Coffee pun;Retro vibe;Coffee time;Retro cup;Use ;; for a semi-colon;funny,caffeine\r\n" +
+        "Retro coffee tee;Coffee pun;Retro vibe;Coffee time;Retro cup;\"Use \"\"quotes\"\"; carefully\";funny,caffeine\r\n" +
         "Summer quote tee;Summer slogan;Beach vibe;Summer in the city;Sun graphic;Beach summer notes;summer,fresh\r\n";
 
     public ItemCsvParseResult Parse(string source)
@@ -32,23 +35,17 @@ public sealed class ItemCsvCodec : IItemCsvCodec
         var rows = new List<ItemCsvRow>();
         var errors = new List<ItemCsvParseError>();
 
-        var normalized = source.Replace("\r\n", "\n");
-        var rawLines = normalized.Split('\n');
+        var records = Tokenize(source);
 
-        for (var index = 0; index < rawLines.Length; index++)
+        for (var index = 0; index < records.Count; index++)
         {
-            if (index == rawLines.Length - 1 && string.IsNullOrEmpty(rawLines[index]))
-            {
-                continue;
-            }
+            var (lineNumber, fields) = records[index];
 
-            var lineNumber = index + 1;
-            var fields = SplitFields(rawLines[index]);
-            if (fields.Count != ExpectedColumnCount)
+            if (fields.Length != ExpectedColumnCount)
             {
                 errors.Add(new ItemCsvParseError(
                     lineNumber,
-                    $"Line must contain exactly {ExpectedColumnCount} columns separated by single semi-colons."));
+                    $"Expected {ExpectedColumnCount} columns in this order: {ColumnList}; found {fields.Length}."));
                 continue;
             }
 
@@ -60,7 +57,7 @@ public sealed class ItemCsvCodec : IItemCsvCodec
             var title = fields[0].Trim();
             if (string.IsNullOrWhiteSpace(title))
             {
-                errors.Add(new ItemCsvParseError(lineNumber, "Title is required."));
+                errors.Add(new ItemCsvParseError(lineNumber, "The Title field is required."));
                 continue;
             }
 
@@ -101,32 +98,93 @@ public sealed class ItemCsvCodec : IItemCsvCodec
             .ToArray();
     }
 
-    private static List<string> SplitFields(string line)
+    private static List<(int LineNumber, string[] Fields)> Tokenize(string source)
     {
+        var records = new List<(int, string[])>();
+        var recordStartLine = 1;
+        var line = 1;
         var fields = new List<string>();
-        var current = new System.Text.StringBuilder();
+        var current = new StringBuilder();
+        var inQuotes = false;
+        var index = 0;
 
-        for (var index = 0; index < line.Length; index++)
+        void CloseField()
         {
-            if (line[index] != ';')
+            fields.Add(current.ToString());
+            current.Clear();
+        }
+
+        void CloseRecord()
+        {
+            fields.Add(current.ToString());
+            current.Clear();
+            records.Add((recordStartLine, fields.ToArray()));
+            fields = new List<string>();
+        }
+
+        while (index < source.Length)
+        {
+            var ch = source[index];
+
+            if (inQuotes)
             {
-                current.Append(line[index]);
+                if (ch == '"')
+                {
+                    if (index + 1 < source.Length && source[index + 1] == '"')
+                    {
+                        current.Append('"');
+                        index += 2;
+                        continue;
+                    }
+
+                    inQuotes = false;
+                    index++;
+                    continue;
+                }
+
+                if (ch == '\n')
+                {
+                    line++;
+                }
+
+                current.Append(ch);
+                index++;
                 continue;
             }
 
-            if (index + 1 < line.Length && line[index + 1] == ';')
+            if (ch == '"' && current.Length == 0)
             {
-                current.Append(';');
+                inQuotes = true;
                 index++;
+                continue;
             }
-            else
+
+            if (ch == ';')
             {
-                fields.Add(current.ToString());
-                current.Clear();
+                CloseField();
+                index++;
+                continue;
             }
+
+            if (ch == '\r' || ch == '\n')
+            {
+                var isCrLf = ch == '\r' && index + 1 < source.Length && source[index + 1] == '\n';
+                CloseRecord();
+                line++;
+                recordStartLine = line;
+                index += isCrLf ? 2 : 1;
+                continue;
+            }
+
+            current.Append(ch);
+            index++;
         }
 
-        fields.Add(current.ToString());
-        return fields;
+        if (current.Length > 0 || fields.Count > 0)
+        {
+            CloseRecord();
+        }
+
+        return records;
     }
 }

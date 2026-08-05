@@ -69,7 +69,7 @@ public sealed class ItemCsvImportService : IItemCsvImportService
             var nameError = ItemMetadataCodec.ValidateName(name);
             if (nameError is not null)
             {
-                errors.Add($"Error on line {row.LineNumber}: {nameError}");
+                errors.Add($"Line {row.LineNumber}: {nameError}");
                 continue;
             }
 
@@ -77,7 +77,7 @@ public sealed class ItemCsvImportService : IItemCsvImportService
             var itemId = _idGenerator.NewId();
             if (itemId == Guid.Empty)
             {
-                errors.Add($"Error on line {row.LineNumber}: Item identity could not be generated.");
+                errors.Add($"Line {row.LineNumber}: Item identity could not be generated.");
                 continue;
             }
 

@@ -38,7 +38,7 @@ public sealed class ItemImportViewModelTests
 
         Assert.False(vm.CanImport);
         Assert.True(vm.HasErrors);
-        Assert.Equal(["Error on line 2"], vm.ErrorMessages);
+        Assert.Equal(["Line 2: bad"], vm.ErrorMessages);
     }
 
     [Fact]

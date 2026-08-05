@@ -582,6 +582,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(OptimizeGuidance));
         OnPropertyChanged(nameof(CanEditShared));
         OnPropertyChanged(nameof(CanEdit));
+        (OptimizeCommand as RelayCommand)?.NotifyCanExecuteChanged();
     }
 
     public Task CommitEditsAsync(CancellationToken cancellationToken = default)

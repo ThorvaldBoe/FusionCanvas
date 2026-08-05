@@ -7,9 +7,9 @@ This module is one coherent, user-visible outcome: import a list of designs as i
 ## Goals / Non-Goals
 
 **Goals:**
-- Define an authoritative item CSV text format (7 columns, `;` delimiter, `;;` escaping, optional header, comma-separated tags).
+- Define an authoritative item CSV text format (7 columns, `;` delimiter, standard double-quote field quoting matching the export format, optional header, comma-separated tags).
 - Provide an "Import…" context-menu action on niche and group rows that opens a targeted import dialog.
-- Dialog supports file pick, sample-file export, an editable raw-source field, a read-only parsed preview, and a syntax check that disables Import and shows `Error on line N` on malformed input.
+- Dialog supports file pick, sample-file export, an editable raw-source field, a read-only parsed preview, and a syntax check that disables Import and shows a detailed `Line N: <reason>` error naming the offending line and column on malformed input.
 - Create imported items at the chosen niche/group with correct field→metadata mapping and stage (Concept when a concept field is present, else Idea), creating-and-linking tags by name.
 - Deterministic tests: domain/application/CSV/headless-view coverage in the `dotnet test` baseline.
 
@@ -29,19 +29,19 @@ The service depends on `IToolContextResolver` (like `ItemManagementService`) so 
 - Alternative considered: skip inheritance entirely. Rejected because it contradicts `context-aware-tools` ("Topic-scoped tools create work in place … apply applicable inherited tags and metadata").
 
 ### 2. CSV codec lives in Integration behind an Application contract
-Follow the Snowclone precedent exactly: an `IItemCsvCodec` (Application) implemented by `ItemCsvCodec` (Integration). The Snowclone codec uses `TextFieldParser` with a comma delimiter; that does **not** fit the item format, which uses a custom `;` delimiter with `;;` escaping and an optional header. So implement a bespoke line-based parser in `ItemCsvCodec`:
-- Split the source on newlines into physical lines (handle both `\r\n`, `\n`, and trailing final newline).
-- For each line, tokenize fields by scanning characters: a `;` followed by `;` decodes to a literal `;`; a lone `;` is a field delimiter. End-of-line yields the final (possibly empty) field.
-- Expect exactly 7 fields per row; otherwise record a structural error for that physical line number.
+Follow the Snowclone precedent exactly: an `IItemCsvCodec` (Application) implemented by `ItemCsvCodec` (Integration). The Snowclone codec uses `TextFieldParser` with a comma delimiter; that does **not** fit the item format, which uses a `;` delimiter with an optional header. So implement a bespoke tokenizing parser in `ItemCsvCodec` that reads the whole source as a character stream:
+- A field is a run of characters. A field that begins with a double quote is quoted; it is ended by the matching closing quote, `""` inside a quoted field decodes to a literal `"`, and a quoted field may contain `;`, CR, or LF. A single `;` outside quotes is a field delimiter. This is the same standard quoting the export feature emits, so exported rows round-trip.
+- A `;` outside quotes splits fields; an unquoted `\n`, lone `\r`, or `\r\n` ends the record. Empty fields are represented by empty space between separators and may appear in any column (including in the middle), so an empty Notes between Graphic and Tags is preserved rather than misread as an escaped semi-colon.
+- Expect exactly 7 fields per row; otherwise record a structural error for that physical line number naming the expected columns and the count found.
 - Header detection: if the first data line's fields match the known headings (Title, Base Idea, Concept Idea, Phrase, Graphic, Notes, Tags) case-insensitively, skip it as a header. A real item row whose seven fields literally equal the headings is indistinguishable from a header — this is an accepted, documented limitation of exact header detection.
 - Build an `ItemCsvRow` (Title, BaseIdea, ConceptIdea, Phrase, Graphic, Notes, and parsed tags list). A blank Title is a row-level validation error: the row is **excluded from `Rows`** and reported only via `Errors`, so Import (gated on no errors) never fires while a title is missing. The import service therefore only ever receives valid rows.
 - Tag parsing splits the `Tags` field on commas; tag names must not contain commas (no comma escaping is defined for this format) — a comma is always a separator.
-- `Parse(sourceText)` returns `ItemCsvParseResult(Rows, Errors)` where `Errors` carries `(lineNumber, message)` used for `Error on line N`. Also provide `WriteSample()` returning a header + example rows demonstrating escaping and comma tags.
+- `Parse(sourceText)` returns `ItemCsvParseResult(Rows, Errors)` where `Errors` carries `(lineNumber, message)` rendered as a detailed `Line N: <reason>` that names the affected column and why it is incorrect. Also provide `WriteSample()` returning a header + example rows demonstrating quoting and comma tags.
 
 The codec works on `string` source (raw dialog field), so a stream-based read is only used once at file-pick time to hydrate the raw field (read as strict UTF-8; a decoder failure is reported as a load error rather than crashing the dialog).
 
 ### 3. Syntax check gates the Import action
-`RunPreview` calls `IItemCsvCodec.Parse(rawSource)`. `CanImport` is true only when `Rows` is non-empty **and** there are no errors (structural or missing-title). On any error (or an empty source) the dialog is non-editable-import state: Import disabled and an error text shown as `Error on line N` (first error), per the issue. This is deterministic and framework-free, so it is unit-tested in App view-model tests; the codec and service are tested in Integration/Application tests respectively.
+`RunPreview` calls `IItemCsvCodec.Parse(rawSource)`. `CanImport` is true only when `Rows` is non-empty **and** there are no errors (structural or missing-title). On any error (or an empty source) the dialog is non-editable-import state: Import disabled and an error text shown as `Line N: <reason>` naming the line and column (first error), so users know which field to fix. This is deterministic and framework-free, so it is unit-tested in App view-model tests; the codec and service are tested in Integration/Application tests respectively.
 
 ### 4. Stage decision on import
 Per the resolved decision: an imported item is created at `Concept` stage when any of Concept Idea, Phrase, or Graphic is populated; otherwise at `Idea`. `Base Idea` is always stored under the `idea` key regardless of stage. The item is created `Draft` at the chosen stage, consistent with existing item creation. (Metadata keys are cumulative; storing `idea` plus concept fields is consistent with how items move through stages.)
@@ -61,7 +61,7 @@ Add `IItemCsvFilePicker` with `OpenImportAsync` and `OpenExportAsync` (sample), 
 
 ## Risks / Trade-offs
 
-- **Custom parser correctness** (escaping `;;`, optional header, trailing empty field, CRLF) → Cover thoroughly with framework-free `ItemCsvCodec` unit tests (valid, header, `;;` literal, wrong column count → `Error on line N`, missing title, duplicate titles imported).
+- **Custom parser correctness** (standard quoting, optional header, empty fields in any column, CRLF) → Cover thoroughly with framework-free `ItemCsvCodec` unit tests (valid, header, quoted `;` preserved, empty middle field, wrong column count → detailed `Line N` error, missing title, duplicate titles imported, round-trip with the exporter).
 - **Niche selection plumbing is new** (existing context helpers skip Niche) → Small, isolated change in `MainWindow.axaml.cs`; verify with a headless tree test or focused handler test before relying on live UI.
 - **Atomicity of bulk import** → Single snapshot save; if it fails, nothing is created and the error is surfaced, so no partial batch. Per-row failures are collected and reported rather than stopping mid-import.
 - **Stage semantics** (Concept vs Idea) is a product decision resolved here and recorded in the spec; implementation must not reopen it.
@@ -78,12 +78,12 @@ Layered order, each step verifiable, ending with the full baseline.
 ### Application contracts (framework-free)
 1. Add `src/FusionCanvas.Application/Items/Import/ItemCsvRow.cs` — record with `Title`, `BaseIdea`, `ConceptIdea`, `Phrase`, `Graphic`, `Notes`, and `IReadOnlyList<string> Tags`, plus the physical `LineNumber`.
 2. Add `IItemCsvParseError`/`ItemCsvParseError.cs` — `(int LineNumber, string Message)`.
-3. Add `ItemCsvParseResult.cs` — `IReadOnlyList<ItemCsvRow> Rows`, `IReadOnlyList<ItemCsvParseError> Errors`, and helper `IReadOnlyList<string> ErrorText` producing `Error on line N` strings.
+3. Add `ItemCsvParseResult.cs` — `IReadOnlyList<ItemCsvRow> Rows`, `IReadOnlyList<ItemCsvParseError> Errors`, and helper `IReadOnlyList<string> ErrorText` producing detailed `Line N: <reason>` strings.
 4. Add `IItemCsvCodec.cs` (Application) — `ItemCsvParseResult Parse(string source)` and `string WriteSample()`.
 5. Add `IItemCsvImportService.cs` + request/result records: `ItemCsvImportRequest(Target, Rows)` where `Target` is an `ItemTopicReference` (Niche or Group, from `ItemManagementService`/`ItemTopicReference`), and `ItemCsvImportResult(bool Succeeded, int ImportedCount, IReadOnlyList<string> Errors)`; plus `IItemCsvImportService.ImportAsync(request, ct)`.
 
 ### Integration
-6. Add `src/FusionCanvas.Integration/Items/Import/ItemCsvCodec.cs` implementing `IItemCsvCodec` with the bespoke `;`/`;;` parser, header detection, 7-column validation, and `WriteSample`. (Place next to or near the Snowclone codec pattern.)
+6. Add `src/FusionCanvas.Integration/Items/Import/ItemCsvCodec.cs` implementing `IItemCsvCodec` with the bespoke `;`-delimited tokenizing parser using standard double-quote field quoting (matching the exporter), header detection, 7-column validation, and `WriteSample`. (Place next to or near the Snowclone codec pattern.)
 7. Implement `ItemCsvImportService` in Application (framework-free, uses `IWorkspaceRepository`, `IToolContextResolver`, `Func<DateTimeOffset> clock`, `IItemIdGenerator` idGenerator — mirroring `ItemManagementService`'s dependencies and constructor fallbacks):
    - Load snapshot; resolve target topic → storeId/nicheId/groupId (reuse the same resolution contract as `ItemManagementService.ResolveCreateTopicAsync`/`TryResolveActiveTopic` — reuse or minimally expose what's needed).
    - For each parsed row: normalize/validate title (`ItemMetadataCodec.NormalizeName` + `ValidateName`, blank rows never reach the service since the codec excludes them); apply per-column normalization — Title→`NormalizeName`+`ValidateName`; Phrase→`NormalizeSingleLine`; Base Idea/Concept Idea/Graphic/Notes→`NormalizeOptional`; Tags→per-tag trim + single-line validation mirroring `NormalizeTagNames`.
@@ -100,9 +100,9 @@ Layered order, each step verifiable, ending with the full baseline.
 11. Wire the tree: in `MainWindow.axaml` context menu add `<MenuItem Header="Import…" IsVisible="{Binding IsTopic}" Click="OnContextImport"/>`; in `MainWindow.axaml.cs` add `OnContextImport` that selects the Niche or Group node (extend selection helper to accept `IsTopic`) and awaits `ItemImportWindow.ShowDialog(this)`, then refreshes the workspace tree on success. Register the new services in the DI composition root (`src/FusionCanvas.App/Workspace/AppWorkspaceFactory.cs`).
 
 ### Tests (mirror production, xUnit v3)
-12. `tests/FusionCanvas.Integration.Tests/Items/Import/ItemCsvCodecTests.cs` — valid parse, header skipped, `;;` decoding, wrong column count → `Error on line N`, missing title, comma tags, CRLF handling, `WriteSample` shape.
+12. `tests/FusionCanvas.Integration.Tests/Items/Import/ItemCsvCodecTests.cs` — valid parse, header skipped, quoted `;`/`""`/newline decoding, empty middle field preserved, wrong column count → detailed `Line N` error, missing title, comma tags, CRLF handling, round-trip with the exporter, `WriteSample` shape.
 13. `tests/FusionCanvas.Application.Tests/Items/Import/ItemCsvImportServiceTests.cs` — using an in-memory `TestRepository`/`Sample` harness (as `ItemManagementServiceTests`) verify items created at the niche/group, Idea vs Concept stage selection, metadata keys written, tags created-and-linked, missing-title error skips no import (or reports), single-save behavior, duplicate titles both imported.
-14. `tests/FusionCanvas.App.Tests/Items/Import/ItemImportViewModelTests.cs` — framework-free VM tests: pick file hydrates `RawSource`, `RunPreview` populates preview + toggles `CanImport` on errors, `Error on line N` formatting, Import invokes service and sets completion, Cancel leaves no mutation.
+14. `tests/FusionCanvas.App.Tests/Items/Import/ItemImportViewModelTests.cs` — framework-free VM tests: pick file hydrates `RawSource`, `RunPreview` populates preview + toggles `CanImport` on errors, detailed `Line N` error formatting, Import invokes service and sets completion, Cancel leaves no mutation.
 15. Headless view test `tests/FusionCanvas.App.Tests/Items/Import/ItemImportWindowTests.cs` (with `HeadlessTestApp`/`MainWindowFixture` pattern) for the dialog: construction, raw-source/preview bindings, Import disabled/enabled states, and the context-menu Import entry visibility for niche/group rows where framework risk is material.
 
 ### Decisions not to reopen
