@@ -347,4 +347,75 @@ public sealed class ConceptRefinementViewTests
         Assert.NotNull(toolTip);
         Assert.Equal(expectedReason, toolTip);
     }
+
+    [AvaloniaFact]
+    public void InstructionFields_PresentBelowButtonPairs_WithPlaceholderAndTwoWay()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Concept);
+        fixture.PumpLayout();
+
+        var ideaInstructions = fixture.FindControlOrDefault<TextBox>(tb =>
+            AutomationProperties.GetName(tb) == "Instructions for Concept idea");
+        var phraseInstructions = fixture.FindControlOrDefault<TextBox>(tb =>
+            AutomationProperties.GetName(tb) == "Instructions for Phrase");
+        var graphicInstructions = fixture.FindControlOrDefault<TextBox>(tb =>
+            AutomationProperties.GetName(tb) == "Instructions for Graphic direction");
+
+        Assert.NotNull(ideaInstructions);
+        Assert.NotNull(phraseInstructions);
+        Assert.NotNull(graphicInstructions);
+
+        Assert.Equal("Instructions", ideaInstructions.PlaceholderText);
+        Assert.Equal("Instructions", phraseInstructions.PlaceholderText);
+        Assert.Equal("Instructions", graphicInstructions.PlaceholderText);
+
+        // Each instruction field sits below its corner's Change button pair.
+        var ideaChange = fixture.FindControlOrDefault<Button>(b =>
+            AutomationProperties.GetName(b) == "Change Concept idea");
+        var phraseChange = fixture.FindControlOrDefault<Button>(b =>
+            AutomationProperties.GetName(b) == "Change Phrase");
+        var graphicChange = fixture.FindControlOrDefault<Button>(b =>
+            AutomationProperties.GetName(b) == "Change Graphic direction");
+        Assert.NotNull(ideaChange);
+        Assert.NotNull(phraseChange);
+        Assert.NotNull(graphicChange);
+        Assert.True(ideaInstructions.Bounds.Y > ideaChange.Bounds.Y);
+        Assert.True(phraseInstructions.Bounds.Y > phraseChange.Bounds.Y);
+        Assert.True(graphicInstructions.Bounds.Y > graphicChange.Bounds.Y);
+
+        // Two-way binding: VM -> control.
+        fixture.ViewModel.ConceptRefinement.ConceptIdeaInstructions = "make it warmer";
+        fixture.PumpLayout();
+        Assert.Equal("make it warmer", ideaInstructions.Text);
+
+        // Two-way binding: control -> VM.
+        ideaInstructions.Text = "edited direction";
+        fixture.PumpLayout();
+        Assert.Equal("edited direction", fixture.ViewModel.ConceptRefinement.ConceptIdeaInstructions);
+        // Instruction text must not touch the inspector draft.
+        Assert.NotEqual("edited direction", fixture.ViewModel.ItemInspector.ConceptIdea);
+    }
+
+    [AvaloniaFact]
+    public void InstructionFields_AreReadOnlyDuringConceptReview()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Concept);
+        fixture.PumpLayout();
+
+        // The first item is in Idea, so Concept is a read-only review stage.
+        Assert.False(fixture.ViewModel.ItemInspector.CanEditStage);
+
+        var instructionFields = new[]
+        {
+            fixture.FindControlOrDefault<TextBox>(tb => AutomationProperties.GetName(tb) == "Instructions for Concept idea"),
+            fixture.FindControlOrDefault<TextBox>(tb => AutomationProperties.GetName(tb) == "Instructions for Phrase"),
+            fixture.FindControlOrDefault<TextBox>(tb => AutomationProperties.GetName(tb) == "Instructions for Graphic direction")
+        };
+
+        Assert.All(instructionFields, field => Assert.True(Assert.IsType<TextBox>(field).IsReadOnly));
+    }
 }
