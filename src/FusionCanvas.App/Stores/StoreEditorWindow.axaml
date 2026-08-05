@@ -29,6 +29,7 @@
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource PrimaryTextBrush}" />
           <Button Content="New store"
+                  AutomationProperties.AutomationId="StoreEditor.NewStore"
                   Command="{Binding StartCreateStoreCommand}"
                   Classes="primary" />
         </StackPanel>
@@ -38,7 +39,8 @@
                      FontSize="12"
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource SecondaryTextBrush}" />
-          <ItemsControl ItemsSource="{Binding EditorActiveStores}">
+          <ItemsControl ItemsSource="{Binding EditorActiveStores}"
+                        AutomationProperties.AutomationId="StoreEditor.ActiveStores">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="appStores:StoreSummary">
                 <Button Content="{Binding Name}"
@@ -115,6 +117,7 @@
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource StrongTextBrush}" />
             <TextBox x:Name="StoreNameTextBox"
+                     AutomationProperties.AutomationId="StoreEditor.Name"
                      Text="{Binding NewStoreName}"
                      PlaceholderText="Store name"
                      Classes="field" />
@@ -140,6 +143,7 @@
                         Spacing="8"
                         Margin="0,8,0,0">
               <Button Content="Save"
+                      AutomationProperties.AutomationId="StoreEditor.SaveStore"
                       Command="{Binding SaveSelectedStoreCommand}"
                       IsEnabled="{Binding CanSaveSelectedStore}"
                       Classes="primary fixedAction" />
