@@ -5,4 +5,4 @@
 
 ## 2. Verification
 
-- [ ] 2.1 Validate the OpenSpec change strictly and run the solution test baseline.
+- [x] 2.1 Validate the OpenSpec change strictly and run the solution test baseline.
