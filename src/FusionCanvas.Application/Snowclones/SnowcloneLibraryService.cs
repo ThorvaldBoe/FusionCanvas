@@ -29,37 +29,9 @@ public sealed class SnowcloneLibraryService : ISnowcloneLibraryService
         CancellationToken cancellationToken = default)
     {
         var snapshotResult = await TryLoadAsync(searchText, cancellationToken).ConfigureAwait(false);
-        if (!snapshotResult.Succeeded)
-        {
-            return snapshotResult.Result!;
-        }
-
-        var snapshot = snapshotResult.Snapshot!;
-        if (snapshot.StarterLibraryInitialized)
-        {
-            return SnowcloneLibraryResult.Success(BuildState(snapshot, searchText));
-        }
-
-        try
-        {
-            await using var stream = await _bundledSource.OpenReadAsync(cancellationToken).ConfigureAwait(false);
-            return await ImportCoreAsync(
-                snapshot,
-                stream,
-                searchText,
-                markStarterInitialized: true,
-                cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            return SnowcloneLibraryResult.Failure(
-                $"Unable to initialize the bundled snowclone library: {ex.Message}",
-                BuildState(snapshot, searchText));
-        }
+        return snapshotResult.Succeeded
+            ? SnowcloneLibraryResult.Success(BuildState(snapshotResult.Snapshot!, searchText))
+            : snapshotResult.Result!;
     }
 
     public async Task<SnowcloneLibraryResult> LoadAsync(

@@ -11,6 +11,7 @@ using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.WorkflowNavigation;
 using FusionCanvas.Application.ToolContexts;
 using FusionCanvas.Application.StageTools;
+using FusionCanvas.Application.TitleOptimization;
 
 namespace FusionCanvas.App.Tests.TestSupport;
 
@@ -74,12 +75,14 @@ internal sealed class InMemoryWorkspaceRepository(WorkspaceSnapshot snapshot) : 
 
 internal static class MainWindowViewModelFactory
 {
-    internal static MainWindowViewModel CreateSample() =>
+    internal static MainWindowViewModel CreateSample(
+        ITitleOptimizationService? titleOptimization = null) =>
         new(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
             new DocumentWindow.DocumentWindowViewModel(),
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             new InMemoryWorkspaceRepository(SampleWorkspace.Create()),
-            SampleWorkspace.Create());
+            SampleWorkspace.Create(),
+            titleOptimizationService: titleOptimization);
 }

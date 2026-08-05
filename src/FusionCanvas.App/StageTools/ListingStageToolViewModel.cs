@@ -40,7 +40,7 @@ public sealed class ListingStageToolViewModel : INotifyPropertyChanged
     }
 
     public ItemStageSavePayload ToStagePayload() =>
-        new(WorkflowStage.Listing, Idea: null, ConceptIdea: null, Phrase: null, GraphicDirection: null);
+        new(WorkflowStage.Listing, Idea: null, ConceptIdea: null, Phrase: null, GraphicDirection: null, Sll: null);
 
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

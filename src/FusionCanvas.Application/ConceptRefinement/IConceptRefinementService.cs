@@ -13,5 +13,6 @@ public interface IConceptRefinementService
         ConceptRefinementCorner corner,
         ConceptRefinementTriangle current,
         string originalIdea,
+        string? instruction,
         CancellationToken cancellationToken = default);
 }

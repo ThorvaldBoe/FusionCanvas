@@ -10,12 +10,16 @@ using Avalonia.VisualTree;
 using FusionCanvas.App.Assets;
 using FusionCanvas.App.Groups;
 using FusionCanvas.App.Ideation;
+using FusionCanvas.App.Items;
+using FusionCanvas.App.Items.Import;
 using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Settings;
 using FusionCanvas.App.Stores;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Application.Groups;
+using FusionCanvas.Application.Items;
+using FusionCanvas.Application.Items.Import;
 
 namespace FusionCanvas.App.Views;
 
@@ -47,6 +51,8 @@ public partial class MainWindow : Window
             services.Settings,
             services.AiTextGeneration);
         viewModel.WorkspaceManagement.PackagePicker = new AvaloniaWorkspacePackagePicker(StorageProvider);
+        viewModel.WorkspaceTree.FilePicker = new FusionCanvas.App.Items.AvaloniaItemCsvFilePicker(StorageProvider);
+        viewModel.WorkspaceTree.CsvCodec = new FusionCanvas.Integration.Items.ItemCsvCodec();
         viewModel.StoreManagement.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(StoreManagementViewModel.IsStoreEditorOpen))
@@ -548,6 +554,14 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnTreeEditorLostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel viewModel && viewModel.WorkspaceTree.HasEditingNode)
+        {
+            await viewModel.WorkspaceTree.CommitEditAsync();
+        }
+    }
+
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
         if (DataContext is not MainWindowViewModel viewModel || TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is TextBox)
@@ -593,6 +607,7 @@ public partial class MainWindow : Window
         if (TrySelectContextGroup(sender, out var viewModel, out _))
         {
             await viewModel.WorkspaceTree.BeginCreateAsync();
+            FocusVisibleTreeEditor();
         }
     }
 
@@ -601,6 +616,7 @@ public partial class MainWindow : Window
         if (TrySelectContextNode(sender, out var viewModel, out _))
         {
             await viewModel.WorkspaceTree.BeginCreateItemAsync();
+            FocusVisibleTreeEditor();
         }
     }
 
@@ -656,6 +672,15 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnContextExport(object? sender, RoutedEventArgs e)
+    {
+        if (TrySelectContextNode(sender, out var viewModel, out var node) &&
+            node.EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group)
+        {
+            await viewModel.WorkspaceTree.ExportCsvAsync(node);
+        }
+    }
+
     private async void OnContextStoreAssets(object? sender, RoutedEventArgs e)
     {
         if (DataContext is MainWindowViewModel viewModel)
@@ -675,6 +700,31 @@ public partial class MainWindow : Window
         if (await dialog.ShowDialog<bool>(this))
         {
             await viewModel.WorkspaceTree.DeleteGroupAsync(node.EntityId, ConfirmPermanentDeletion: true);
+        }
+    }
+
+    private async void OnContextImport(object? sender, RoutedEventArgs e)
+    {
+        if (!TrySelectContextTopic(sender, out var viewModel, out var node))
+        {
+            return;
+        }
+
+        var topic = new ItemTopicReference(
+            node.EntityKind == WorkspaceEntityKind.Group
+                ? WorkspaceEntityKind.Group
+                : WorkspaceEntityKind.Niche,
+            node.EntityId);
+        var import = new ItemImportViewModel(
+            topic,
+            node.Name,
+            viewModel.ItemCsvImport,
+            new FusionCanvas.Integration.Items.Import.ItemCsvCodec());
+        var window = new ItemImportWindow { DataContext = import };
+        await window.ShowDialog(this);
+        if (import.HasImportCompleted)
+        {
+            await viewModel.RefreshWorkspaceAfterImportAsync();
         }
     }
 
@@ -702,6 +752,22 @@ public partial class MainWindow : Window
         viewModel = DataContext as MainWindowViewModel ?? null!;
         node = sender is MenuItem { DataContext: WorkspaceTreeNodeViewModel candidate } ? candidate : null!;
         if (viewModel is null || node is null || !node.HasContextActions)
+        {
+            return false;
+        }
+
+        viewModel.WorkspaceTree.SelectNodeCommand.Execute(node);
+        return true;
+    }
+
+    private bool TrySelectContextTopic(
+        object? sender,
+        out MainWindowViewModel viewModel,
+        out WorkspaceTreeNodeViewModel node)
+    {
+        viewModel = DataContext as MainWindowViewModel ?? null!;
+        node = sender is MenuItem { DataContext: WorkspaceTreeNodeViewModel candidate } ? candidate : null!;
+        if (viewModel is null || node is null || !node.IsTopic)
         {
             return false;
         }

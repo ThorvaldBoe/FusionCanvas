@@ -17,7 +17,8 @@ public sealed record ItemInspectorState(
     IReadOnlyList<ItemInspectorTagEntry> Tags,
     IReadOnlyList<ItemInspectorAssetEntry> Assets,
     IReadOnlyList<string> AvailableTagNames,
-    DateTimeOffset UpdatedAt)
+    DateTimeOffset UpdatedAt,
+    string? Sll)
 {
     public bool IsReadOnly => !IsEffectivelyActive;
 }

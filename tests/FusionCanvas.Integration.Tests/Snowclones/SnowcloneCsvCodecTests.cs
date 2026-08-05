@@ -1,5 +1,6 @@
 using System.Text;
 using FusionCanvas.Application.Snowclones;
+using FusionCanvas.Domain.Snowclones;
 using FusionCanvas.Integration.Snowclones;
 
 namespace FusionCanvas.Integration.Tests.Snowclones;
@@ -125,9 +126,55 @@ public sealed class SnowcloneCsvCodecTests
         var result = await _codec.ReadAsync(stream, TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
-        var row = Assert.Single(result.Rows);
-        Assert.Equal("Easily distracted by {X}", row.Phrase);
-        Assert.Contains("Replace {X}", row.Guidance);
+        Assert.Equal(31, result.Rows.Count);
+
+        var expectedPhrases = new[]
+        {
+            "Keep Calm and {Action}",
+            "Keep Calm, I'm a {Profession}",
+            "I Paused My {Activity} to Be Here",
+            "I'm Not Arguing, I'm a {Profession}",
+            "I'm Not Arguing, I'm Just Explaining Why {Opinion}",
+            "I Can't, I Have {Activity}",
+            "Easily Distracted By {Interest}",
+            "World's Okayest {Role}",
+            "Fueled By {Thing} and {Emotion}",
+            "Powered By {Thing}",
+            "Professional {HumorousOccupation}",
+            "I Work Hard So My {LovedOneOrPet} Can Have a Better Life",
+            "Straight Outta {PlaceOrTopic}",
+            "Born To {DreamActivity}, Forced To {Obligation}",
+            "Trust Me, I'm a {Profession}",
+            "I'm Silently Correcting Your {MistakeType}",
+            "I'm Not Lazy, I'm {HumorousExcuse}",
+            "Eat. Sleep. {Activity}. Repeat.",
+            "Life Is Better With {Thing}",
+            "Home Is Where My {BelovedThing} Is",
+            "I Like Big {PluralObject} and I Cannot Lie",
+            "Warning: {HumorousWarning}",
+            "I'm The Reason {HumorousConsequence}",
+            "{Thing} Because {Reason}",
+            "Be Nice To Me, I Might Be Your {Profession}",
+            "Everything I Need Is {LocationOrPossession}",
+            "Everything I Need I Learned From {Source}",
+            "Real {Role} {Action}",
+            "Mess With {PersonOrThing}, {Consequence}",
+            "{Trait} Is Better Than {OppositeTrait}",
+            "{Thing} First. {FollowUpActivity}"
+        };
+
+        Assert.Equal(
+            expectedPhrases.OrderBy(static phrase => phrase, StringComparer.OrdinalIgnoreCase),
+            result.Rows.Select(row => row.Phrase).OrderBy(static phrase => phrase, StringComparer.OrdinalIgnoreCase));
+
+        foreach (var row in result.Rows)
+        {
+            var validation = SnowcloneTemplatePolicy.Validate(row.Phrase, row.Guidance);
+            Assert.True(validation.IsValid, $"Bundled starter row {row.RowNumber} is invalid: {validation.Error}");
+        }
+
+        var keepCalmProfession = Assert.Single(result.Rows, row => row.Phrase == "Keep Calm, I'm a {Profession}");
+        Assert.Contains("Replace {Profession}", keepCalmProfession.Guidance);
     }
 
     private async Task<SnowcloneCsvReadResult> ReadAsync(string csv)

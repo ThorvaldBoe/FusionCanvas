@@ -8,6 +8,8 @@ using Avalonia.Media;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Views;
+using FusionCanvas.Application.AI;
+using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.Domain.Workflow;
 
 namespace FusionCanvas.App.Tests;
@@ -359,6 +361,81 @@ public class MainWindowLayoutTests
         vm.QueryText = string.Empty;
         fixture.PumpLayout();
         Assert.True(button.IsEnabled);
+    }
+}
+
+public class MainWindowTitleOptimizationTests
+{
+    [AvaloniaFact]
+    public async Task OptimizeButton_PresentAndDisabledWhenUnavailable()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.PumpLayout();
+        await Task.Delay(150);
+
+        var titleBox = fixture.FindControlOrDefault<TextBox>(tb =>
+            AutomationProperties.GetName(tb) == "Item working title" && tb.IsVisible);
+        var optimizeButton = fixture.FindControlOrDefault<Button>(b =>
+            AutomationProperties.GetName(b) == "Optimize title" && b.IsVisible);
+
+        Assert.NotNull(titleBox);
+        Assert.NotNull(optimizeButton);
+        Assert.False(optimizeButton!.IsEnabled);
+    }
+
+    [AvaloniaFact]
+    public async Task OptimizeButton_DisabledWithTooltipWhenAiUnavailable()
+    {
+        var optimization = new UnavailableTitleOptimization();
+        using var fixture = new MainWindowFixture(titleOptimization: optimization);
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.PumpLayout();
+        await Task.Delay(150);
+
+        var optimizeButton = fixture.FindControlOrDefault<Button>(b =>
+            AutomationProperties.GetName(b) == "Optimize title" && b.IsVisible);
+
+        Assert.NotNull(optimizeButton);
+        Assert.False(optimizeButton!.IsEnabled);
+        var tip = ToolTip.GetTip((Avalonia.Controls.Control)optimizeButton.Parent!);
+        Assert.NotNull(tip);
+        Assert.Contains("AI settings", tip!.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [AvaloniaFact]
+    public async Task OptimizeTitle_FieldPrecedesButtonInDocumentOrder()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.PumpLayout();
+        await Task.Delay(150);
+        fixture.PumpLayout();
+
+        var descendants = fixture.Window.GetVisualDescendants().ToList();
+        var titleBox = fixture.FindControl<TextBox>(tb =>
+            AutomationProperties.GetName(tb) == "Item working title" && tb.IsVisible);
+        var optimizeButton = fixture.FindControl<Button>(b =>
+            AutomationProperties.GetName(b) == "Optimize title" && b.IsVisible);
+
+        var titleIndex = descendants.IndexOf(titleBox);
+        var buttonIndex = descendants.IndexOf(optimizeButton);
+
+        Assert.True(titleIndex >= 0);
+        Assert.True(buttonIndex > titleIndex);
+    }
+
+    private sealed class UnavailableTitleOptimization : ITitleOptimizationService
+    {
+        public Task<AiAvailabilityResult> GetAvailabilityAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AiAvailabilityResult(
+                AiAvailabilityKind.MissingCredential,
+                "Add an OpenRouter API key in AI settings."));
+
+        public Task<TitleOptimizationResult> OptimizeAsync(
+            TitleOptimizationRequest request,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(TitleOptimizationResult.Failure("AI is unavailable."));
     }
 }
 

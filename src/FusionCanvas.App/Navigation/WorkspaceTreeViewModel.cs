@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using FusionCanvas.App.DocumentWindow;
+using FusionCanvas.App.Items;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Navigation;
 using FusionCanvas.Domain.Workflow;
@@ -165,6 +166,8 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     private readonly IItemManagementService _items;
     private readonly WorkspaceTreeSelectionCoordinator _selection;
     private readonly WorkspaceTreeClipboard _clipboard;
+    private readonly IItemCsvExportService _csvExport;
+    private IItemCsvCodec _csvCodec;
     private readonly HashSet<Guid> _expandedIds = [];
     private HashSet<Guid>? _expandedIdsBeforeFilter;
     private readonly ObservableCollection<TagFilterEntryViewModel> _availableTags = [];
@@ -191,11 +194,17 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         WorkspaceSnapshot snapshot,
         WorkspaceTreeSelectionCoordinator? selection = null,
         WorkspaceTreeClipboard? clipboard = null,
-        IItemManagementService? items = null)
+        IItemManagementService? items = null,
+        IItemCsvExportService? csvExport = null,
+        IItemCsvCodec? csvCodec = null,
+        IItemCsvFilePicker? filePicker = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _groups = groups ?? throw new ArgumentNullException(nameof(groups));
         _items = items ?? new ItemManagementService(repository);
+        _csvExport = csvExport ?? new ItemCsvExportService();
+        _csvCodec = csvCodec ?? NullItemCsvCodec.Instance;
+        FilePicker = filePicker ?? new NullItemCsvFilePicker();
         _snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
         _selection = selection ?? new WorkspaceTreeSelectionCoordinator();
         _clipboard = clipboard ?? new WorkspaceTreeClipboard();
@@ -294,6 +303,10 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
     public bool HasSelection => SelectedNode is not null;
     public bool CanManageSelection => SelectedNode?.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Item;
+    public bool HasEditingNode => _editingNode is not null;
+    public IItemCsvFilePicker FilePicker { get; set; }
+
+    public IItemCsvCodec CsvCodec { get => _csvCodec; set => _csvCodec = value; }
     public bool IsBusy { get => _isBusy; private set => SetField(ref _isBusy, value); }
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
     public string? ErrorMessage { get => _errorMessage; private set { SetField(ref _errorMessage, value); OnPropertyChanged(nameof(HasError)); } }
@@ -885,6 +898,35 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         entityIds.UnionWith(itemIds);
         entityIds.UnionWith(promptIds);
         return new GroupDeleteImpact(group.Id, group.Name, groupIds.Count - 1, itemIds.Count, entityIds);
+    }
+
+    public async Task ExportCsvAsync(WorkspaceTreeNodeViewModel node)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        if (node.EntityKind is not (WorkspaceEntityKind.Group or WorkspaceEntityKind.Niche) || IsBusy)
+        {
+            return;
+        }
+
+        ErrorMessage = null;
+        var rows = _csvExport.Project(_snapshot, node.EntityKind, node.EntityId);
+        var stream = await FilePicker.OpenExportAsync().ConfigureAwait(false);
+        if (stream is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using (stream)
+            {
+                await CsvCodec.WriteAsync(stream, rows).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            ErrorMessage = "The items could not be exported to CSV.";
+        }
     }
 
     public async Task DeleteGroupAsync(Guid groupId, bool ConfirmPermanentDeletion)

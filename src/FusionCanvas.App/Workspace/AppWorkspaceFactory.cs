@@ -12,8 +12,12 @@ using FusionCanvas.Application.RejectedPhrases;
 using FusionCanvas.Integration.Snowclones;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.ConceptRefinement;
+using FusionCanvas.Application.SllGeneration;
 using FusionCanvas.Application.Products;
+using FusionCanvas.Application.Items.Import;
+using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.Integration.AI;
+using FusionCanvas.Integration.SllGeneration;
 
 namespace FusionCanvas.App.Workspace;
 
@@ -33,7 +37,12 @@ public sealed record AppWorkspaceRuntime(
     SnowcloneLibraryResult SnowcloneLibraryInitialization,
     IConceptRefinementService ConceptRefinement,
     IConceptRefinementAccessStatus ConceptRefinementAccess,
-    IProductSupplierSetupService ProductSupplierSetup);
+    ISllGenerationService SllGeneration,
+    ISllAccessStatus SllGenerationAccess,
+    ITitleOptimizationService TitleOptimization,
+    IProductSupplierSetupService ProductSupplierSetup,
+    IItemCsvImportService ItemCsvImport,
+    ISllDocumentCodec SllDocumentCodec);
 
 public static class AppWorkspaceFactory
 {
@@ -71,6 +80,12 @@ public static class AppWorkspaceFactory
             repository,
             ai,
             guidanceSource);
+        var sllGenerationAccess = new ConfiguredSllAccessStatus(ai);
+        var sllGeneration = new SllGenerationService(
+            repository,
+            ai,
+            guidanceSource);
+        var titleOptimization = new TitleOptimizationService(repository, ai);
         return new AppWorkspaceRuntime(
             repository,
             fileStore,
@@ -92,7 +107,12 @@ public static class AppWorkspaceFactory
             snowcloneLibraryInitialization,
             conceptRefinement,
             conceptRefinementAccess,
-            new ProductSupplierSetupService(repository));
+            sllGeneration,
+            sllGenerationAccess,
+            titleOptimization,
+            new ProductSupplierSetupService(repository),
+            new ItemCsvImportService(repository),
+            new SllDocumentCodec());
     }
 
     private static string DefaultDatabasePath()

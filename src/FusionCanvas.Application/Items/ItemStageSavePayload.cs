@@ -7,4 +7,5 @@ public sealed record ItemStageSavePayload(
     string? Idea,
     string? ConceptIdea,
     string? Phrase,
-    string? GraphicDirection);
+    string? GraphicDirection,
+    string? Sll);
