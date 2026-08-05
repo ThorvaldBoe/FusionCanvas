@@ -106,7 +106,7 @@ public sealed class SnowcloneLibraryServiceTests
     }
 
     [Fact]
-    public async Task InitializeAsync_ImportsOnceAndPersistsMarker()
+    public async Task InitializeAsync_LeavesLibraryEmptyAndImportsNothing()
     {
         var repository = new InMemoryRepository(SnowcloneLibrarySnapshot.Empty);
         var codec = new StubCsvCodec
@@ -121,48 +121,9 @@ public sealed class SnowcloneLibraryServiceTests
 
         Assert.True(first.Succeeded);
         Assert.True(second.Succeeded);
-        Assert.True(repository.Snapshot.StarterLibraryInitialized);
-        Assert.Single(repository.Snapshot.Snowclones);
-        Assert.Equal(1, codec.ReadCalls);
-        Assert.Equal(1, repository.SaveCalls);
-    }
-
-    [Fact]
-    public async Task InitializeAsync_AfterStarterDeletionDoesNotResurrectIt()
-    {
-        var starter = Snowclone("Easily distracted by {X}", "Replace X.");
-        var repository = new InMemoryRepository(new SnowcloneLibrarySnapshot([starter], true));
-        var codec = new StubCsvCodec
-        {
-            ReadResult = SnowcloneCsvReadResult.Success(
-                [new SnowcloneCsvRow(starter.Phrase, starter.Guidance, 2)])
-        };
-        var service = Service(repository, codec);
-
-        await service.DeleteAsync(starter.Id);
-        var result = await service.InitializeAsync();
-
-        Assert.True(result.Succeeded);
         Assert.Empty(repository.Snapshot.Snowclones);
-        Assert.True(repository.Snapshot.StarterLibraryInitialized);
-        Assert.Equal(0, codec.ReadCalls);
-    }
-
-    [Fact]
-    public async Task InitializeAsync_InvalidBundleDoesNotSaveOrSetMarker()
-    {
-        var repository = new InMemoryRepository(SnowcloneLibrarySnapshot.Empty);
-        var codec = new StubCsvCodec
-        {
-            ReadResult = SnowcloneCsvReadResult.Failure("CSV header must be Phrase,Guidance.")
-        };
-        var service = Service(repository, codec);
-
-        var result = await service.InitializeAsync();
-
-        Assert.False(result.Succeeded);
         Assert.False(repository.Snapshot.StarterLibraryInitialized);
-        Assert.Empty(repository.Snapshot.Snowclones);
+        Assert.Equal(0, codec.ReadCalls);
         Assert.Equal(0, repository.SaveCalls);
     }
 
@@ -188,6 +149,24 @@ public sealed class SnowcloneLibraryServiceTests
         Assert.Equal(1, result.SkippedCount);
         Assert.Equal("User guidance", repository.Snapshot.Snowclones.Single(item => item.Id == existing.Id).Guidance);
         Assert.Contains(repository.Snapshot.Snowclones, item => item.Phrase == "New {Y}");
+    }
+
+    [Fact]
+    public async Task ImportBundledAsync_InvalidBundleFailsWithoutImporting()
+    {
+        var repository = new InMemoryRepository(SnowcloneLibrarySnapshot.Empty);
+        var codec = new StubCsvCodec
+        {
+            ReadResult = SnowcloneCsvReadResult.Failure("Snowclone CSV header must be Phrase,Guidance.")
+        };
+        var service = Service(repository, codec);
+
+        var result = await service.ImportBundledAsync();
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("Phrase,Guidance", result.Error);
+        Assert.Empty(repository.Snapshot.Snowclones);
+        Assert.Equal(0, repository.SaveCalls);
     }
 
     [Fact]
