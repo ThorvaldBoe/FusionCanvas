@@ -354,6 +354,7 @@
                                IsVisible="{Binding IsEditing}"
                                AttachedToVisualTree="OnTreeEditorAttached"
                                KeyDown="OnTreeEditorKeyDown"
+                               LostFocus="OnTreeEditorLostFocus"
                                MinHeight="28"
                                Padding="5,2" />
                     </Grid>

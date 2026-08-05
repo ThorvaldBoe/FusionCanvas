@@ -31,12 +31,15 @@ public class WorkspaceTreeViewModelTests
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
         viewModel.SelectNodeCommand.Execute(Assert.Single(viewModel.Roots));
 
+        Assert.False(viewModel.HasEditingNode);
         await viewModel.BeginCreateAsync();
+        Assert.True(viewModel.HasEditingNode);
         var draft = viewModel.SelectedNode!;
         draft.DraftName = "Campaign";
         await viewModel.CommitEditAsync(addAnotherSibling: true);
 
         Assert.Contains(repository.Snapshot.Groups, group => group.Name == "Campaign");
+        Assert.True(viewModel.HasEditingNode);
         Assert.True(viewModel.SelectedNode!.IsDraft);
         Assert.True(viewModel.SelectedNode.IsEditing);
         Assert.Equal(0, openedTabs);
@@ -221,10 +224,12 @@ public class WorkspaceTreeViewModelTests
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
 
         await viewModel.BeginCreateItemAsync();
+        Assert.True(viewModel.HasEditingNode);
         Assert.True(viewModel.SelectedNode!.IsDraft);
         Assert.Equal(WorkspaceEntityKind.Item, viewModel.SelectedNode.EntityKind);
         viewModel.SelectedNode.DraftName = " Zebra idea ";
         await viewModel.CommitEditAsync();
+        Assert.False(viewModel.HasEditingNode);
         Assert.Equal("Zebra idea", viewModel.SelectedNode!.Name);
         Assert.Equal(0, openedTabs);
 

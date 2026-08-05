@@ -304,6 +304,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
     public bool HasSelection => SelectedNode is not null;
     public bool CanManageSelection => SelectedNode?.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Item;
+    public bool HasEditingNode => _editingNode is not null;
     public IItemCsvFilePicker FilePicker { get; set; }
     public bool IsBusy { get => _isBusy; private set => SetField(ref _isBusy, value); }
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
