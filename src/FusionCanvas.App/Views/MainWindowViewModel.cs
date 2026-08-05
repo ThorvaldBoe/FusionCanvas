@@ -37,6 +37,7 @@ using FusionCanvas.Application.Workspaces.Transfer;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.ConceptRefinement;
 using FusionCanvas.Application.Products;
+using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.App.ConceptRefinement;
 
 namespace FusionCanvas.App.Views;
@@ -104,6 +105,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.RejectedPhrases,
             runtime.ConceptRefinement,
             runtime.ConceptRefinementAccess,
+            runtime.TitleOptimization,
             runtime.ProductSupplierSetup)
     {
     }
@@ -128,6 +130,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         FusionCanvas.Application.RejectedPhrases.IRejectedPhraseManagementService? rejectedPhrases = null,
         IConceptRefinementService? conceptRefinementService = null,
         IConceptRefinementAccessStatus? conceptRefinementAccessStatus = null,
+        ITitleOptimizationService? titleOptimizationService = null,
         IProductSupplierSetupService? productSupplierSetupService = null)
     {
         WorkflowNavigator = workflowNavigator;
@@ -163,7 +166,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             _ideationAccessStatus);
         GroupDetails = new GroupDetailsViewModel(_groupManagementService);
         AssetsManagement = new AssetsViewModel(_assetManagementService);
-        ItemInspector = new ItemInspectorViewModel(_itemInspectorService, _itemManagementService, _tagManagementService);
+        ItemInspector = new ItemInspectorViewModel(_itemInspectorService, _itemManagementService, _tagManagementService, titleOptimizationService);
         DesignTool = new DesignStageToolViewModel(new DesignFileService(workspaceRepository, fileStore), productService);
         ListingTool = new ListingStageToolViewModel();
         Ideation = new IdeationViewModel(_ideationService, _ideationAccessStatus, snowcloneLibrary, rejectedPhrases);
@@ -177,6 +180,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         Settings.Ai.AvailabilityChanged += (_, _) => _ = _ideationAccessStatus.RefreshAsync();
         Settings.Ai.SettingsChanged += (_, _) => _ = ConceptRefinement.RefreshAvailabilityAsync();
         Settings.Ai.AvailabilityChanged += (_, _) => _ = ConceptRefinement.RefreshAvailabilityAsync();
+        Settings.Ai.SettingsChanged += (_, _) => _ = ItemInspector.RefreshTitleOptimizationAvailabilityAsync();
+        Settings.Ai.AvailabilityChanged += (_, _) => _ = ItemInspector.RefreshTitleOptimizationAvailabilityAsync();
         _ = _ideationAccessStatus.RefreshAsync();
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;

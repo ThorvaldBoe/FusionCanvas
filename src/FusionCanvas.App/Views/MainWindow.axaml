@@ -640,12 +640,23 @@
                         <TextBlock Text="Working title"
                                    FontSize="11"
                                    Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <TextBox Text="{Binding ItemInspector.Title}"
-                                 IsReadOnly="{Binding !ItemInspector.CanEditShared}"
-                                 MinHeight="32"
-                                 PlaceholderText="Optional working title"
-                                 AutomationProperties.Name="Item working title"
-                                 LostFocus="OnDetailsFieldLostFocus" />
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBox Grid.Column="0"
+                                   Text="{Binding ItemInspector.Title}"
+                                   IsReadOnly="{Binding !ItemInspector.CanEditShared}"
+                                   MinHeight="32"
+                                   PlaceholderText="Optional working title"
+                                   AutomationProperties.Name="Item working title"
+                                   LostFocus="OnDetailsFieldLostFocus" />
+                          <Button Grid.Column="1"
+                                  Margin="8,0,0,0"
+                                  Padding="12,6"
+                                  Content="Optimize"
+                                  Command="{Binding ItemInspector.OptimizeCommand}"
+                                  IsEnabled="{Binding ItemInspector.CanOptimize}"
+                                  ToolTip.Tip="{Binding ItemInspector.OptimizeGuidance}"
+                                  AutomationProperties.Name="Optimize title" />
+                        </Grid>
                       </StackPanel>
                     </StackPanel>
                   </Border>

@@ -13,6 +13,7 @@ using FusionCanvas.Integration.Snowclones;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.ConceptRefinement;
 using FusionCanvas.Application.Products;
+using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.Integration.AI;
 
 namespace FusionCanvas.App.Workspace;
@@ -33,6 +34,7 @@ public sealed record AppWorkspaceRuntime(
     SnowcloneLibraryResult SnowcloneLibraryInitialization,
     IConceptRefinementService ConceptRefinement,
     IConceptRefinementAccessStatus ConceptRefinementAccess,
+    ITitleOptimizationService TitleOptimization,
     IProductSupplierSetupService ProductSupplierSetup);
 
 public static class AppWorkspaceFactory
@@ -71,6 +73,7 @@ public static class AppWorkspaceFactory
             repository,
             ai,
             guidanceSource);
+        var titleOptimization = new TitleOptimizationService(repository, ai);
         return new AppWorkspaceRuntime(
             repository,
             fileStore,
@@ -92,6 +95,7 @@ public static class AppWorkspaceFactory
             snowcloneLibraryInitialization,
             conceptRefinement,
             conceptRefinementAccess,
+            titleOptimization,
             new ProductSupplierSetupService(repository));
     }
 
