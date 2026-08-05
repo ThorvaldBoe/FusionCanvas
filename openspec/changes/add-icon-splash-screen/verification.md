@@ -13,8 +13,4 @@
 
 - `dotnet test .\tests\FusionCanvas.App.Tests\FusionCanvas.App.Tests.csproj --no-restore --filter FullyQualifiedName~SplashWindowTests`: PASS (3 tests).
 - `openspec validate add-icon-splash-screen --type change --strict`: PASS.
-- `dotnet test .\FusionCanvas.sln --no-restore -v minimal`: 296 passed, 1 failed.
-
-## Baseline Limitation
-
-The full solution baseline has one failing pre-existing App layout test: `MainWindowLayoutTests.IdeationButton_ReservesSpaceBeforeTheDetailsScrollbar`. It cannot find the `IdeationButton` because the current sample view model makes that button not visible. The failure is unrelated to the icon/splash files and reproduces when the test is run in isolation. No unrelated fix was included.
+- 2026-08-06 deterministic rerun passed all projects without building: Domain 188, Application 325, Integration 129, and App/headless 366; 1,008 passed, 0 failed, 0 skipped. The projects were run serially because the aggregate command previously exceeded its sandbox time limit.

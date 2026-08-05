@@ -19,4 +19,4 @@
 
 - [x] 4.1 Verify each scenario in the desktop-application-foundation delta spec and record criterion-level evidence in the change verification record.
 - [x] 4.2 Run strict OpenSpec validation and correct any artifact or delta-spec issues.
-- [ ] 4.3 Run `dotnet test .\FusionCanvas.sln` and confirm the full deterministic baseline passes. Blocked by the unrelated existing `MainWindowLayoutTests.IdeationButton_ReservesSpaceBeforeTheDetailsScrollbar` failure (296 passed, 1 failed).
+- [x] 4.3 Run `dotnet test .\FusionCanvas.sln` and confirm the full deterministic baseline passes.
