@@ -10,6 +10,7 @@ using Avalonia.VisualTree;
 using FusionCanvas.App.Assets;
 using FusionCanvas.App.Groups;
 using FusionCanvas.App.Ideation;
+using FusionCanvas.App.Items;
 using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Settings;
 using FusionCanvas.App.Stores;
@@ -47,6 +48,7 @@ public partial class MainWindow : Window
             services.Settings,
             services.AiTextGeneration);
         viewModel.WorkspaceManagement.PackagePicker = new AvaloniaWorkspacePackagePicker(StorageProvider);
+        viewModel.WorkspaceTree.FilePicker = new AvaloniaItemCsvFilePicker(StorageProvider);
         viewModel.StoreManagement.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(StoreManagementViewModel.IsStoreEditorOpen))
@@ -653,6 +655,15 @@ public partial class MainWindow : Window
         {
             viewModel.WorkspaceTree.SelectNodeCommand.Execute(node);
             viewModel.WorkspaceTree.ManageAssetsCommand.Execute(null);
+        }
+    }
+
+    private async void OnContextExport(object? sender, RoutedEventArgs e)
+    {
+        if (TrySelectContextNode(sender, out var viewModel, out var node) &&
+            node.EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group)
+        {
+            await viewModel.WorkspaceTree.ExportCsvAsync(node);
         }
     }
 

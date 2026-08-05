@@ -306,6 +306,7 @@
               <MenuItem Header="Paste" IsEnabled="{Binding CanPaste}" Click="OnContextPaste" />
               <MenuItem Header="Duplicate" IsVisible="{Binding IsItem}" Click="OnContextDuplicate" />
               <MenuItem Header="Assets…" Click="OnContextAssets" />
+              <MenuItem Header="Export to CSV..." IsVisible="{Binding IsTopic}" Click="OnContextExport" />
                       <Separator />
                       <MenuItem Header="Delete..." IsVisible="{Binding IsGroup}" Click="OnContextDelete" />
                     </ContextMenu>
