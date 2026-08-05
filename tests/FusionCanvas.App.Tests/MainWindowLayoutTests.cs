@@ -398,7 +398,7 @@ public class MainWindowTitleOptimizationTests
 
         Assert.NotNull(optimizeButton);
         Assert.False(optimizeButton!.IsEnabled);
-        var tip = ToolTip.GetTip(optimizeButton);
+        var tip = ToolTip.GetTip((Avalonia.Controls.Control)optimizeButton.Parent!);
         Assert.NotNull(tip);
         Assert.Contains("AI settings", tip!.ToString(), StringComparison.OrdinalIgnoreCase);
     }
