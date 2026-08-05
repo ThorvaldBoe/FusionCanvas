@@ -13,6 +13,7 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
 {
     private readonly ISllGenerationService _service;
     private readonly ISllAccessStatus _accessStatus;
+    private readonly ISllDocumentCodec _codec;
     private readonly ItemInspectorViewModel _inspector;
     private bool _isBusy;
     private string? _errorMessage;
@@ -25,10 +26,12 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
     public SllGenerationSessionViewModel(
         ISllGenerationService service,
         ISllAccessStatus accessStatus,
+        ISllDocumentCodec codec,
         ItemInspectorViewModel inspector)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _accessStatus = accessStatus ?? throw new ArgumentNullException(nameof(accessStatus));
+        _codec = codec ?? throw new ArgumentNullException(nameof(codec));
         _inspector = inspector ?? throw new ArgumentNullException(nameof(inspector));
 
         GenerateCommand = new RelayCommand(_ => Run(ExecuteGenerateAsync()), () => CanGenerate);
@@ -218,7 +221,7 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
             }
 
             _current = result.Document;
-            _inspector.Sll = result.Document!.Serialize();
+            _inspector.Sll = _codec.Serialize(result.Document!);
 
             await _inspector.CommitEditsAsync(ct).ConfigureAwait(true);
             RaiseCurrentChanged();
@@ -242,7 +245,7 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
     private void LoadCurrentFromInspector()
     {
         var sllText = _inspector.Sll;
-        if (string.IsNullOrWhiteSpace(sllText) || !SllDocument.TryDeserialize(sllText, out var document))
+        if (string.IsNullOrWhiteSpace(sllText) || !_codec.TryDeserialize(sllText, out var document))
         {
             _current = null;
         }

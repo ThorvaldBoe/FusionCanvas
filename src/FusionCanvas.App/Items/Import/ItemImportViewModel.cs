@@ -7,7 +7,6 @@ using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.Application.Items;
 using IItemCsvCodec = FusionCanvas.Application.Items.Import.IItemCsvCodec;
 using FusionCanvas.Application.Items.Import;
-using FusionCanvas.Integration.Items.Import;
 
 namespace FusionCanvas.App.Items.Import;
 
@@ -32,13 +31,13 @@ public sealed class ItemImportViewModel : INotifyPropertyChanged
         ItemTopicReference target,
         string targetLabel,
         IItemCsvImportService importService,
-        IItemCsvCodec? codec = null,
+        IItemCsvCodec codec,
         IItemCsvFilePicker? filePicker = null)
     {
         _target = target ?? throw new ArgumentNullException(nameof(target));
         _targetLabel = targetLabel ?? string.Empty;
         _importService = importService ?? throw new ArgumentNullException(nameof(importService));
-        _codec = codec ?? new ItemCsvCodec();
+        _codec = codec ?? throw new ArgumentNullException(nameof(codec));
         _filePicker = filePicker ?? new NullItemCsvFilePicker();
 
         PickFileCommand = new RelayCommand(_ => Begin(PickFileAsync()));

@@ -189,6 +189,23 @@ public sealed class SllGenerationServiceTests
     }
 
     [Fact]
+    public async Task GenerateAsync_SystemMessageBindsUntrustedContent()
+    {
+        var (service, ai, _) = CreateService(CreateSnapshot());
+        ai.Result = AiTextResult.Success(SampleResponse(), "test-model");
+
+        await service.GenerateAsync(ItemId, Triangle(), "Negotiating with a dragon", TestContext.Current.CancellationToken);
+
+        Assert.NotNull(ai.LastRequest);
+        var systemMessage = ai.LastRequest.Messages[0];
+
+        Assert.Equal(AiMessageRole.System, systemMessage.Role);
+        Assert.Contains("untrusted", systemMessage.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("instructions", systemMessage.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("output rules", systemMessage.Text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task GenerateAsync_AdversarialMetadata_ExcludesOperationalKeys()
     {
         var snapshot = CreateAdversarialSnapshot();

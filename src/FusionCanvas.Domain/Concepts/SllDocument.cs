@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 namespace FusionCanvas.Domain.Concepts;
 
 /// <summary>
@@ -16,22 +14,6 @@ public sealed record SllDocument(
     SllNotes Notes,
     SllValidation Validation)
 {
-    public string Serialize() => JsonSerializer.Serialize(this);
-
-    public static bool TryDeserialize(string json, out SllDocument? document)
-    {
-        try
-        {
-            document = JsonSerializer.Deserialize<SllDocument>(json);
-            return document is not null;
-        }
-        catch (JsonException)
-        {
-            document = null;
-            return false;
-        }
-    }
-
     /// <summary>
     /// Validates the hard SLL invariants: the ASCII sketch is non-empty and the triangle's
     /// phrase preserves the supplied phrase unless an explicit revision is recorded.

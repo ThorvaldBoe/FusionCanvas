@@ -88,7 +88,7 @@ New tests added by this change:
 
 ## Limitations
 
-- **Empty fields between two non-empty fields are not representable** under the required `;;`-escape rule (`;;` always reads as a literal semi-colon). Empty fields are only representable as the trailing field. Users resolve ambiguous rows in the dialog's raw-source editor; this is documented in `ItemCsvCodec` and reflected in the sample (which avoids empty middle fields). Changing this would require a format change (e.g. quoting) and is out of scope here.
+- **Empty fields in any column position are supported** via standard CSV quoting, matching the export format; consecutive separators represent an empty field rather than an escaped semi-colon. (The earlier `;;`-escape convention is no longer used.)
 - **Tag names containing commas are not supported** (the comma is always a tag separator in the `Tags` column).
 - **Header detection is exact-match on the first line only**: a real item row whose seven fields literally equal the column headings is treated as a header.
 - Full export of existing items is a separate module and out of scope here (only sample-file export is included).

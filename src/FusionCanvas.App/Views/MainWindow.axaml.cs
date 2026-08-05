@@ -52,6 +52,7 @@ public partial class MainWindow : Window
             services.AiTextGeneration);
         viewModel.WorkspaceManagement.PackagePicker = new AvaloniaWorkspacePackagePicker(StorageProvider);
         viewModel.WorkspaceTree.FilePicker = new FusionCanvas.App.Items.AvaloniaItemCsvFilePicker(StorageProvider);
+        viewModel.WorkspaceTree.CsvCodec = new FusionCanvas.Integration.Items.ItemCsvCodec();
         viewModel.StoreManagement.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(StoreManagementViewModel.IsStoreEditorOpen))
@@ -704,7 +705,11 @@ public partial class MainWindow : Window
                 ? WorkspaceEntityKind.Group
                 : WorkspaceEntityKind.Niche,
             node.EntityId);
-        var import = new ItemImportViewModel(topic, node.Name, viewModel.ItemCsvImport);
+        var import = new ItemImportViewModel(
+            topic,
+            node.Name,
+            viewModel.ItemCsvImport,
+            new FusionCanvas.Integration.Items.Import.ItemCsvCodec());
         var window = new ItemImportWindow { DataContext = import };
         await window.ShowDialog(this);
         if (import.HasImportCompleted)

@@ -14,7 +14,6 @@ using FusionCanvas.Application.Groups;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.Workspaces;
-using FusionCanvas.Integration.Items;
 
 namespace FusionCanvas.App.Navigation;
 
@@ -168,7 +167,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     private readonly WorkspaceTreeSelectionCoordinator _selection;
     private readonly WorkspaceTreeClipboard _clipboard;
     private readonly IItemCsvExportService _csvExport;
-    private readonly IItemCsvCodec _csvCodec;
+    private IItemCsvCodec _csvCodec;
     private readonly HashSet<Guid> _expandedIds = [];
     private HashSet<Guid>? _expandedIdsBeforeFilter;
     private readonly ObservableCollection<TagFilterEntryViewModel> _availableTags = [];
@@ -204,7 +203,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         _groups = groups ?? throw new ArgumentNullException(nameof(groups));
         _items = items ?? new ItemManagementService(repository);
         _csvExport = csvExport ?? new ItemCsvExportService();
-        _csvCodec = csvCodec ?? new ItemCsvCodec();
+        _csvCodec = csvCodec ?? NullItemCsvCodec.Instance;
         FilePicker = filePicker ?? new NullItemCsvFilePicker();
         _snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
         _selection = selection ?? new WorkspaceTreeSelectionCoordinator();
@@ -305,6 +304,8 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     public bool HasSelection => SelectedNode is not null;
     public bool CanManageSelection => SelectedNode?.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Item;
     public IItemCsvFilePicker FilePicker { get; set; }
+
+    public IItemCsvCodec CsvCodec { get => _csvCodec; set => _csvCodec = value; }
     public bool IsBusy { get => _isBusy; private set => SetField(ref _isBusy, value); }
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
     public string? ErrorMessage { get => _errorMessage; private set { SetField(ref _errorMessage, value); OnPropertyChanged(nameof(HasError)); } }
@@ -918,7 +919,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         {
             await using (stream)
             {
-                await _csvCodec.WriteAsync(stream, rows).ConfigureAwait(false);
+                await CsvCodec.WriteAsync(stream, rows).ConfigureAwait(false);
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

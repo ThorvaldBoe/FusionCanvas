@@ -8,11 +8,14 @@ using FusionCanvas.Application.WorkspaceTree;
 using FusionCanvas.Domain.Concepts;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Items;
+using FusionCanvas.Integration.SllGeneration;
 
 namespace FusionCanvas.App.Tests;
 
 public sealed class SllGenerationSessionViewModelTests
 {
+    private static readonly SllDocumentCodec Codec = new();
+
     [Fact]
     public async Task Generate_DisabledWhenTriangleIncomplete()
     {
@@ -47,7 +50,7 @@ public sealed class SllGenerationSessionViewModelTests
         var inspector = CreateInspector();
         var acc = new StubSllAccess(false);
         var svc = new StubSllService();
-        var vm = new SllGenerationSessionViewModel(svc, acc, inspector);
+        var vm = new SllGenerationSessionViewModel(svc, acc, Codec, inspector);
 
         await SetupLoadedInspectorAsync(
             inspector,
@@ -88,7 +91,7 @@ public sealed class SllGenerationSessionViewModelTests
     {
         var inspector = CreateInspector();
         var svc = new StubSllService();
-        var vm = new SllGenerationSessionViewModel(svc, new StubSllAccess(true), inspector);
+        var vm = new SllGenerationSessionViewModel(svc, new StubSllAccess(true), Codec, inspector);
 
         await SetupLoadedInspectorAsync(
             inspector,
@@ -114,7 +117,7 @@ public sealed class SllGenerationSessionViewModelTests
     {
         var inspector = CreateInspector();
         var svc = new StubSllService();
-        var vm = new SllGenerationSessionViewModel(svc, new StubSllAccess(true), inspector);
+        var vm = new SllGenerationSessionViewModel(svc, new StubSllAccess(true), Codec, inspector);
 
         await SetupLoadedInspectorAsync(
             inspector,
@@ -140,7 +143,7 @@ public sealed class SllGenerationSessionViewModelTests
     {
         var inspector = CreateInspector();
         var svc = new StubSllService();
-        var vm = new SllGenerationSessionViewModel(svc, new StubSllAccess(true), inspector);
+        var vm = new SllGenerationSessionViewModel(svc, new StubSllAccess(true), Codec, inspector);
 
         await SetupLoadedInspectorAsync(
             inspector,
@@ -166,7 +169,7 @@ public sealed class SllGenerationSessionViewModelTests
     {
         var inspector = CreateInspector();
         var svc = new StubSllService();
-        var vm = new SllGenerationSessionViewModel(svc, new StubSllAccess(true), inspector);
+        var vm = new SllGenerationSessionViewModel(svc, new StubSllAccess(true), Codec, inspector);
 
         await SetupLoadedInspectorAsync(
             inspector,
@@ -285,6 +288,7 @@ public sealed class SllGenerationSessionViewModelTests
         return new SllGenerationSessionViewModel(
             new StubSllService(),
             new StubSllAccess(true),
+            Codec,
             inspector);
     }
 

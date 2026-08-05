@@ -811,6 +811,7 @@ public class WorkspaceTreeViewModelTests
             repository,
             new GroupManagementService(repository),
             sample.Snapshot,
+            csvCodec: new ItemCsvCodec(),
             filePicker: new StubItemCsvFilePicker(() => new ThrowingStream()));
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
         var group = Assert.Single(Assert.Single(viewModel.Roots).Children);

@@ -17,6 +17,7 @@ using FusionCanvas.Application.Products;
 using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.Integration.AI;
+using FusionCanvas.Integration.SllGeneration;
 
 namespace FusionCanvas.App.Workspace;
 
@@ -40,7 +41,8 @@ public sealed record AppWorkspaceRuntime(
     ISllAccessStatus SllGenerationAccess,
     ITitleOptimizationService TitleOptimization,
     IProductSupplierSetupService ProductSupplierSetup,
-    IItemCsvImportService ItemCsvImport);
+    IItemCsvImportService ItemCsvImport,
+    ISllDocumentCodec SllDocumentCodec);
 
 public static class AppWorkspaceFactory
 {
@@ -109,7 +111,8 @@ public static class AppWorkspaceFactory
             sllGenerationAccess,
             titleOptimization,
             new ProductSupplierSetupService(repository),
-            new ItemCsvImportService(repository));
+            new ItemCsvImportService(repository),
+            new SllDocumentCodec());
     }
 
     private static string DefaultDatabasePath()

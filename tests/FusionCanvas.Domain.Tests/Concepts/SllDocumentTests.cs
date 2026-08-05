@@ -21,33 +21,6 @@ public sealed class SllDocumentTests
             new SllValidation("text first, graphic second", "TEXT anchor", "wearer signal clear", "long phrase"));
 
     [Fact]
-    public void Serialize_RoundTrips_PreservesFields()
-    {
-        var original = Sample();
-
-        var json = original.Serialize();
-        var ok = SllDocument.TryDeserialize(json, out var parsed);
-
-        Assert.True(ok);
-        Assert.NotNull(parsed);
-        Assert.Equal(original.Assumptions, parsed!.Assumptions);
-        Assert.Equal(original.Communication.WearerSignal, parsed.Communication.WearerSignal);
-        Assert.Equal(original.Triangle.Phrase, parsed.Triangle.Phrase);
-        Assert.Equal(original.AsciiSketch, parsed.AsciiSketch);
-        Assert.Equal(original.Notes.Typography, parsed.Notes.Typography);
-        Assert.Equal(original.Validation.LargestRisk, parsed.Validation.LargestRisk);
-    }
-
-    [Fact]
-    public void TryDeserialize_InvalidJson_ReturnsFalse()
-    {
-        var ok = SllDocument.TryDeserialize("not json", out var parsed);
-
-        Assert.False(ok);
-        Assert.Null(parsed);
-    }
-
-    [Fact]
     public void Validate_CompleteDocument_ReturnsTrue()
     {
         Assert.True(Sample().Validate(SuppliedPhrase));

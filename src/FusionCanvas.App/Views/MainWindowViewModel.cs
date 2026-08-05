@@ -19,6 +19,7 @@ using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Integration.Files;
 using FusionCanvas.Integration.Packages;
+using FusionCanvas.Integration.SllGeneration;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
@@ -67,6 +68,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly IItemCsvImportService _itemCsvImportService;
     private readonly ISllGenerationService _sllGenerationService;
     private readonly ISllAccessStatus _sllAccessStatus;
+    private readonly ISllDocumentCodec _sllDocumentCodec;
     private ItemStatus? _pendingStatus;
     private bool _isStatusConfirmationVisible;
     private bool _isDesignRemoveConfirmationVisible;
@@ -115,7 +117,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.SllGenerationAccess,
             runtime.TitleOptimization,
             runtime.ProductSupplierSetup,
-            runtime.ItemCsvImport)
+            runtime.ItemCsvImport,
+            runtime.SllDocumentCodec)
     {
     }
 
@@ -143,7 +146,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ISllAccessStatus? sllAccessStatus = null,
         ITitleOptimizationService? titleOptimizationService = null,
         IProductSupplierSetupService? productSupplierSetupService = null,
-        IItemCsvImportService? itemCsvImportService = null)
+        IItemCsvImportService? itemCsvImportService = null,
+        ISllDocumentCodec? sllDocumentCodec = null)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
@@ -173,6 +177,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _conceptRefinementAccessStatus = conceptRefinementAccessStatus ?? DisabledConceptRefinementAccessStatus.Instance;
         _sllGenerationService = sllGenerationService ?? DisabledSllGenerationService.Instance;
         _sllAccessStatus = sllAccessStatus ?? DisabledSllAccessStatus.Instance;
+        _sllDocumentCodec = sllDocumentCodec ?? new SllDocumentCodec();
         _ideationService = ideationService ?? new IdeationService(
             workspaceRepository,
             _itemManagementService,
@@ -192,6 +197,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         SllGeneration = new SllGenerationSessionViewModel(
             _sllGenerationService,
             _sllAccessStatus,
+            _sllDocumentCodec,
             ItemInspector);
         _ideationAccessStatus.AvailabilityChanged += (_, _) =>
             Avalonia.Threading.Dispatcher.UIThread.Post(RaiseIdeationProperties);
