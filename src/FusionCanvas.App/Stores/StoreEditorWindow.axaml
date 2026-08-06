@@ -548,7 +548,7 @@
                             HorizontalContentAlignment="Left">
                       <StackPanel Orientation="Horizontal"
                                   Spacing="6">
-                        <TextBlock Text="{Binding Options}" />
+                        <TextBlock Text="{Binding DisplayName}" />
                         <Button Content="Remove"
                                 Command="{Binding $parent[ItemsControl].DataContext.RemoveSelectedVariantCommand}"
                                 CommandParameter="{Binding}"
@@ -793,7 +793,7 @@
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Button.tabButton">
-      <Setter Property="Width" Value="116" />
+      <Setter Property="MinWidth" Value="116" />
       <Setter Property="Padding" Value="10,8" />
       <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource SecondaryButtonForegroundBrush}" />
