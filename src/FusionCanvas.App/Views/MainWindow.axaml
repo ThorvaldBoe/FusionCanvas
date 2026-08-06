@@ -33,8 +33,9 @@
             BorderThickness="0,0,1,0"
             Padding="18">
       <DockPanel LastChildFill="True">
-        <Grid DockPanel.Dock="Top"
-              ColumnDefinitions="Auto,*,Auto,Auto"
+        <Grid x:Name="NavigationHeader"
+              DockPanel.Dock="Top"
+              ColumnDefinitions="Auto,*,Auto"
               ColumnSpacing="8"
               Margin="0,0,0,18">
           <TextBlock Grid.Column="0"
@@ -43,23 +44,26 @@
                      FontWeight="SemiBold"
                      Foreground="{DynamicResource PrimaryTextBrush}"
                      VerticalAlignment="Center" />
-          <Border Grid.Column="2"
+          <Border Grid.Column="1"
                   ToolTip.Tip="Manage workspaces in settings"
+                  MinWidth="0"
+                  HorizontalAlignment="Stretch"
                   VerticalAlignment="Center">
-            <StackPanel Orientation="Horizontal" Spacing="6">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
               <PathIcon Data="M3,5 H10 L12,7 H21 V19 H3 Z"
                         Width="16" Height="16"
                         Foreground="{DynamicResource SecondaryTextBrush}"
                         VerticalAlignment="Center" />
-              <TextBlock Text="{Binding Settings.WorkspaceName}"
+              <TextBlock Grid.Column="1"
+                         Text="{Binding Settings.WorkspaceName}"
                          MaxWidth="120"
                          TextTrimming="CharacterEllipsis"
                          FontSize="12"
                          Foreground="{DynamicResource SecondaryTextBrush}"
                          VerticalAlignment="Center" />
-            </StackPanel>
+            </Grid>
           </Border>
-          <Button Grid.Column="3"
+          <Button Grid.Column="2"
                   Content="⚙"
                   ToolTip.Tip="Settings"
                   Command="{Binding Settings.OpenCommand}"
