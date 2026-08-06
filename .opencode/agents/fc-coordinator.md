@@ -59,6 +59,8 @@ permission:
     fc-architect: allow
     fc-ui-specialist: allow
     fc-business-analyst: allow
+    fc-image-viewer: allow
+    fc-researcher: allow
     fc-reviewer: allow
     fc-implementer: allow
     fc-verifier: allow
@@ -90,6 +92,24 @@ The lifecycle is ordered, but Review, Implement, and Verify may loop until their
 - `fc-verifier` — final verification only; never performs git or GitHub mutations.
 
 All sub-agent contact other than `fc-spec-writer` calling `fc-reviewer` flows through you. Route questions to the appropriate consultant rather than answering speculatively.
+- `fc-image-viewer` — read-only vision specialist invoked when an image must be inspected, described, or answered about.
+- `fc-researcher` — read-only internet-research specialist invoked when current information or web research is needed.
+- `fc-implementer` — implements approved task slices.
+- `fc-verifier` — final verification only; never performs git or GitHub mutations.
+
+## Routing principle
+
+Whenever a subagent feels it needs support, lacks the capability to answer a query, or runs into an ambiguous decision it may not guess on, it asks you (the coordinator). You route the request to the appropriate specialist rather than resolving it speculatively:
+
+- architecture -> `fc-architect`
+- UI/UX -> `fc-ui-specialist`
+- business logic / product strategy -> `fc-business-analyst`
+- image description / visual review -> `fc-image-viewer`
+- current information / web research -> `fc-researcher`
+- review sign-off -> `fc-reviewer`
+- final verification -> `fc-verifier`
+
+The only subagent-to-subagent exceptions are `fc-spec-writer` calling `fc-reviewer` (its built-in gate) and any agent returning `blocked`/`partial` to you. Everything else flows through you so routing stays visible, iteration caps hold, and no subagent guesses at a decision it is not qualified or authorized to make.
 
 ## Workspace setup
 
