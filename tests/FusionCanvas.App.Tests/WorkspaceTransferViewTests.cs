@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.App.DocumentWindow;
@@ -34,6 +35,38 @@ public class WorkspaceTransferViewTests
             var export = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "ExportWorkspaceButton");
             Assert.True(import.IsEnabled);
             Assert.True(export.IsEnabled);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task WorkspaceDialog_ClickingAnotherWorkspaceChangesSelection()
+    {
+        var personal = NewWorkspace("Personal");
+        var client = NewWorkspace("Client");
+        var viewModel = CreateViewModel(
+            personal,
+            new ImmediateTransferService(),
+            snapshot: new WorkspaceSnapshot([personal, client], [], [], [], [], [], [], [], [], []));
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        var window = new WorkspaceManagementWindow { DataContext = viewModel };
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+
+            var clientButton = window.GetVisualDescendants()
+                .OfType<Button>()
+                .Single(button => Equals(button.Content, client.Name));
+
+            clientButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+            await WaitForAsync(
+                () => viewModel.SelectedWorkspace?.Id == client.Id,
+                TestContext.Current.CancellationToken);
         }
         finally
         {
@@ -94,10 +127,11 @@ public class WorkspaceTransferViewTests
     private static WorkspaceManagementViewModel CreateViewModel(
         FusionCanvas.Domain.Workspace.Workspace workspace,
         IWorkspaceTransferService transfer,
-        IWorkspacePackagePicker? picker = null)
+        IWorkspacePackagePicker? picker = null,
+        WorkspaceSnapshot? snapshot = null)
     {
         var repository = new InMemoryRepository(
-            new WorkspaceSnapshot([workspace], [], [], [], [], [], [], [], [], []));
+            snapshot ?? new WorkspaceSnapshot([workspace], [], [], [], [], [], [], [], [], []));
         return new WorkspaceManagementViewModel(
             new WorkspaceManagementService(repository, () => Now),
             transfer,
@@ -106,6 +140,24 @@ public class WorkspaceTransferViewTests
 
     private static FusionCanvas.Domain.Workspace.Workspace NewWorkspace() =>
         new(Guid.NewGuid(), "Personal", null, false, Now, Now, "{}");
+
+    private static FusionCanvas.Domain.Workspace.Workspace NewWorkspace(string name) =>
+        new(Guid.NewGuid(), name, null, false, Now, Now, "{}");
+
+    private static async Task WaitForAsync(Func<bool> condition, CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            if (condition())
+            {
+                return;
+            }
+
+            await Task.Delay(10, cancellationToken);
+        }
+
+        Assert.True(condition());
+    }
 
     private sealed class TransferMainWindowFixture : IDisposable
     {
