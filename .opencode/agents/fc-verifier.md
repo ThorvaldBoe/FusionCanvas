@@ -1,7 +1,7 @@
 ---
 description: Verifies that intent, OpenSpec artifacts, implementation, tests, and observable behavior agree for a FusionCanvas change; reports routed findings without editing files.
 mode: subagent
-model: openrouter/moonshotai/kimi-k3
+model: openrouter/z-ai/glm-5.2
 permission:
   read: allow
   glob: allow
@@ -63,7 +63,7 @@ permission:
   question: deny
 ---
 
-Perform final verification of the active FusionCanvas OpenSpec change. Do not modify files.
+Perform final verification of the active FusionCanvas OpenSpec change. Do not modify files and do not perform any git or GitHub mutation (no commit, push, PR, or issue changes).
 
 There is no separate verify skill in this repository. Verification follows the change's own `verification.md` and the scoped completion QA defined in `docs/qa-review.md` and the `qa-review-baseline` spec.
 
