@@ -120,6 +120,45 @@ public class AiSettingsViewTests
         }
     }
 
+    [AvaloniaFact]
+    public void AiSection_ProgressivelyDisclosesAdvancedPurposeProfiles()
+    {
+        var ai = new AiSettingsViewModel(
+            AiConfigurationSettings.Default,
+            new CredentialStore(AiCredentialReadResult.NotFound),
+            new Validator(),
+            new CatalogProvider(),
+            new CatalogCache());
+        var settings = new SettingsViewModel(
+            new InMemoryApplicationSettingsStore(),
+            new FakeTheme(),
+            ApplicationSettings.Default,
+            null,
+            ai);
+        settings.OpenCommand.Execute(null);
+        settings.SelectedSection = SettingsSection.AI;
+        var window = new SettingsWindow { DataContext = settings };
+        window.Show();
+        try
+        {
+            window.UpdateLayout();
+            var ideationText = window.GetVisualDescendants().OfType<TextBlock>()
+                .Single(text => text.Text == "Ideation");
+            Assert.Equal(0, ideationText.Bounds.Height);
+
+            ai.AdvancedMode = true;
+            window.UpdateLayout();
+
+            Assert.True(ideationText.Bounds.Height > 0);
+            Assert.True(window.GetVisualDescendants().OfType<TextBlock>()
+                .Single(text => text.Text == "Concept").Bounds.Height > 0);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
     private static AiModelDescriptor Descriptor(string id, bool zdr) =>
         new(id, id, null, null, ["text"], ["text"], [], 1000, null, null, null, zdr, null);
 

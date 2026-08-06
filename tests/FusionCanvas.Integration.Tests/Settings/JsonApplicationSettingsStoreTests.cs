@@ -268,6 +268,25 @@ public class JsonApplicationSettingsStoreTests
         Assert.True(result.Value.Ai.Sll.UseGeneral);
     }
 
+    [Fact]
+    public async Task LoadAsync_MalformedAiSectionPreservesReadableAppearancePreference()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var path = tempDirectory.GetPath("settings.json");
+        await File.WriteAllTextAsync(
+            path,
+            "{\"version\":2,\"darkMode\":true,\"ai\":\"not-an-object\"}",
+            TestContext.Current.CancellationToken);
+
+        var result = await new JsonApplicationSettingsStore(path)
+            .LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(result.UsedDefault);
+        Assert.True(result.Value.DarkMode);
+        Assert.Equal(AiConfigurationSettings.Default, result.Value.Ai);
+        Assert.Contains("AI settings", result.Warning);
+    }
+
     private sealed class TemporaryDirectory : IDisposable
     {
         private readonly DirectoryInfo _directory = Directory.CreateTempSubdirectory();

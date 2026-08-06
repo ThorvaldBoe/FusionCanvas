@@ -54,6 +54,49 @@ public class AiTextGenerationServiceTests
     }
 
     [Fact]
+    public async Task GenerateAsync_UsesCustomPurposeProfileWhenAdvancedModeIsEnabled()
+    {
+        var general = AiProfileSettings.Empty with { ModelId = "general/model" };
+        var ideation = AiProfileSettings.Empty with { ModelId = "ideation/model", Temperature = 0.8 };
+        var settings = AiConfigurationSettings.Default with
+        {
+            AdvancedMode = true,
+            General = general,
+            Ideation = new AiPurposeProfileSettings(false, true, ideation)
+        };
+        var fixture = new Fixture(settings);
+        fixture.Cache.Catalog = new AiModelCatalog(
+            true,
+            DateTimeOffset.UtcNow,
+            [
+                new AiModelDescriptor("general/model", "General", null, null, ["text"], ["text"], [], 1000, 100, null, null, true, null),
+                new AiModelDescriptor("ideation/model", "Ideation", null, null, ["text"], ["text"], [AiParameterRegistry.Temperature], 1000, 100, null, null, true, null)
+            ]);
+        fixture.Credentials.Result = AiCredentialReadResult.Available("secret");
+
+        var result = await fixture.Service.GenerateAsync(
+            new AiTextRequest(AiRequestPurpose.Ideation, [new AiTextMessage(AiMessageRole.User, "idea")]),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("ideation/model", fixture.Provider.Request!.ModelId);
+        Assert.Equal(0.8, fixture.Provider.Request.Profile.Temperature);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_CancellationIsPropagatedWithoutProviderDispatch()
+    {
+        var fixture = new Fixture(AiConfigurationSettings.Default);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.Service.GenerateAsync(
+            Request(),
+            new CancellationToken(canceled: true)));
+
+        Assert.Equal(0, fixture.Credentials.Reads);
+        Assert.Equal(0, fixture.Provider.Calls);
+    }
+
+    [Fact]
     public async Task Availability_RequiresConfiguredModelThenNativeCredentialWithoutDispatch()
     {
         var missingModel = new Fixture(AiConfigurationSettings.Default);
