@@ -12,6 +12,7 @@ public sealed class StoreManagementService : IStoreManagementService
     private const string TargetMarketKey = "targetMarket";
     private const string BrandDirectionKey = "brandDirection";
     private const string PlanningContextKey = "planningContext";
+    private const string UrlKey = "url";
 
     private readonly IWorkspaceRepository _repository;
     private readonly Func<DateTimeOffset> _clock;
@@ -361,7 +362,8 @@ public sealed class StoreManagementService : IStoreManagementService
             metadata.GetValueOrDefault(NotesKey),
             metadata.GetValueOrDefault(TargetMarketKey),
             metadata.GetValueOrDefault(BrandDirectionKey),
-            metadata.GetValueOrDefault(PlanningContextKey));
+            metadata.GetValueOrDefault(PlanningContextKey),
+            metadata.GetValueOrDefault(UrlKey));
     }
 
     private static string ToMetadataJson(StoreContext context, string existingMetadataJson = "{}")
@@ -371,6 +373,7 @@ public sealed class StoreManagementService : IStoreManagementService
         SetOptional(metadata, TargetMarketKey, context.TargetMarket);
         SetOptional(metadata, BrandDirectionKey, context.BrandDirection);
         SetOptional(metadata, PlanningContextKey, context.PlanningContext);
+        SetOptional(metadata, UrlKey, context.Url);
 
         return metadata.Count == 0 ? "{}" : JsonSerializer.Serialize(metadata);
     }

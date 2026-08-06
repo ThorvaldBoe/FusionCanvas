@@ -688,6 +688,119 @@ public class StoreManagementViewModelTests
         Assert.False(viewModel.HasUnsavedTagChanges);
     }
 
+    [Fact]
+    public async Task StoreEditor_UrlFieldIsBoundAndEditingMarksUnsavedChanges()
+    {
+        var store = NewStore("North Star Studio");
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single(store => store.Id == store.Id));
+
+        Assert.False(viewModel.HasUnsavedChanges);
+        Assert.Equal(string.Empty, viewModel.Url);
+
+        viewModel.Url = "https://mystore.example.com";
+
+        Assert.True(viewModel.HasUnsavedChanges);
+        Assert.True(viewModel.CanSaveSelectedStore);
+        Assert.Equal("https://mystore.example.com", viewModel.Url);
+    }
+
+    [Fact]
+    public async Task StoreEditor_UrlIncludedInCreatePayload()
+    {
+        var storeId = Guid.NewGuid();
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(
+            new InMemoryWorkspaceRepository(),
+            () => Now,
+            () => storeId));
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.StartCreateStore();
+        viewModel.NewStoreName = "North Star Studio";
+        viewModel.Url = "https://mystore.example.com";
+
+        await viewModel.SaveSelectedStoreAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(viewModel.SelectedStore?.Id != Guid.Empty);
+        Assert.Equal("https://mystore.example.com", viewModel.SelectedStore?.Context.Url);
+    }
+
+    [Fact]
+    public async Task StoreEditor_UrlIncludedInUpdatePayload()
+    {
+        var store = NewStore("North Star Studio");
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        await viewModel.SelectStoreAsync(viewModel.ActiveStores[0], TestContext.Current.CancellationToken);
+        viewModel.Url = "https://updated.example.com";
+
+        await viewModel.SaveSelectedStoreAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("https://updated.example.com", viewModel.SelectedStore?.Context.Url);
+    }
+
+    [Fact]
+    public async Task StoreEditor_ApplyingStoreRestoresUrlIntoField()
+    {
+        var storeId = Guid.NewGuid();
+        var store = new Store(storeId, "North Star Studio", null, false, Now, Now, """{"url":"https://mystore.example.com"}""");
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+
+        viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single(s => s.Id == storeId));
+
+        Assert.Equal("https://mystore.example.com", viewModel.Url);
+    }
+
+    [Fact]
+    public async Task StoreEditor_ClearingEditorStateBlanksUrl()
+    {
+        var store = NewStore("North Star Studio");
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single(s => s.Id == store.Id));
+
+        viewModel.StartCreateStore();
+
+        Assert.Equal(string.Empty, viewModel.Url);
+    }
+
+    [Fact]
+    public async Task StoreEditor_UnchangedExistingStoreWithEmptyUrl_KeepsSaveDisabled()
+    {
+        var store = NewStore("North Star Studio");
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single(s => s.Id == store.Id));
+
+        Assert.Equal(string.Empty, viewModel.Url);
+        Assert.False(viewModel.HasUnsavedChanges);
+        Assert.False(viewModel.CanSaveSelectedStore);
+    }
+
+    [Fact]
+    public async Task StoreEditor_NewStoreDraftSavesSuccessfullyWithEmptyUrl()
+    {
+        var storeId = Guid.NewGuid();
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(
+            new InMemoryWorkspaceRepository(),
+            () => Now,
+            () => storeId));
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.StartCreateStore();
+        viewModel.NewStoreName = "North Star Studio";
+
+        await viewModel.SaveSelectedStoreAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(viewModel.SelectedStore?.Id != Guid.Empty);
+        Assert.Null(viewModel.SelectedStore?.Context.Url);
+    }
+
     private static Store NewStore(string name, bool isArchived = false) =>
         new(Guid.NewGuid(), name, null, isArchived, Now, Now, "{}");
 
