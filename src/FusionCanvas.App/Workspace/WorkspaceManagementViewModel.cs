@@ -416,7 +416,9 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
 
     public async Task SelectWorkspaceAsync(WorkspaceSummary workspace, CancellationToken cancellationToken = default)
     {
-        var result = await _service.SelectWorkspaceAsync(workspace.Id, cancellationToken).ConfigureAwait(false);
+        // ApplyState raises bound property and workspace-change notifications, so resume on
+        // Avalonia's UI context when this operation originates from a workspace button.
+        var result = await _service.SelectWorkspaceAsync(workspace.Id, cancellationToken).ConfigureAwait(true);
         ApplyResult(result);
         if (result.Succeeded)
         {
