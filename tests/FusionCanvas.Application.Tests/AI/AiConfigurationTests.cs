@@ -129,6 +129,82 @@ public class AiConfigurationTests
         Assert.Contains("future_parameter", model.SupportedParameters);
     }
 
+    [Fact]
+    public void Validate_AcceptsRecognizedGatewayRangesAndKnownReasoningModes()
+    {
+        var profile = Profile("model") with
+        {
+            MaxCompletionTokens = 1024,
+            Temperature = 2,
+            TopP = 1,
+            TopK = 1,
+            MinP = 0,
+            TopA = 1,
+            FrequencyPenalty = -2,
+            PresencePenalty = 2,
+            RepetitionPenalty = 2,
+            Seed = 42,
+            StopSequences = ["stop"],
+            Reasoning = new AiReasoningSettings(AiReasoningMode.Effort, "high")
+        };
+        var model = Model("model", true,
+            AiParameterRegistry.MaxCompletionTokens,
+            AiParameterRegistry.Temperature,
+            AiParameterRegistry.TopP,
+            AiParameterRegistry.TopK,
+            AiParameterRegistry.MinP,
+            AiParameterRegistry.TopA,
+            AiParameterRegistry.FrequencyPenalty,
+            AiParameterRegistry.PresencePenalty,
+            AiParameterRegistry.RepetitionPenalty,
+            AiParameterRegistry.Seed,
+            AiParameterRegistry.Stop,
+            AiParameterRegistry.Reasoning) with
+        {
+            Reasoning = new AiReasoningCapabilities(false, true, ["low", "high"], "low", true)
+        };
+
+        Assert.Empty(AiParameterRegistry.Validate(profile, model));
+    }
+
+    [Fact]
+    public void Validate_RejectsOutOfRangeValuesAndUnsupportedReasoning()
+    {
+        var profile = Profile("model") with
+        {
+            MaxCompletionTokens = 0,
+            Temperature = 2.1,
+            TopP = -0.1,
+            TopK = 0,
+            MinP = 1.1,
+            FrequencyPenalty = -2.1,
+            StopSequences = ["", "a", "b", "c", "d"],
+            Reasoning = new AiReasoningSettings(AiReasoningMode.Effort, "unsupported")
+        };
+        var model = Model("model", true,
+            AiParameterRegistry.MaxCompletionTokens,
+            AiParameterRegistry.Temperature,
+            AiParameterRegistry.TopP,
+            AiParameterRegistry.TopK,
+            AiParameterRegistry.MinP,
+            AiParameterRegistry.FrequencyPenalty,
+            AiParameterRegistry.Reasoning) with
+        {
+            Reasoning = new AiReasoningCapabilities(false, true, ["low"], "low", false)
+        };
+
+        var errors = AiParameterRegistry.Validate(profile, model);
+
+        Assert.Contains(errors, error => error.Contains("max_completion_tokens", StringComparison.Ordinal));
+        Assert.Contains(errors, error => error.Contains("temperature", StringComparison.Ordinal));
+        Assert.Contains(errors, error => error.Contains("top_p", StringComparison.Ordinal));
+        Assert.Contains(errors, error => error.Contains("top_k", StringComparison.Ordinal));
+        Assert.Contains(errors, error => error.Contains("min_p", StringComparison.Ordinal));
+        Assert.Contains(errors, error => error.Contains("frequency_penalty", StringComparison.Ordinal));
+        Assert.Contains(errors, error => error.Contains("Stop sequences", StringComparison.Ordinal));
+        Assert.Contains(errors, error => error.Contains("reasoning effort", StringComparison.Ordinal));
+    }
+
     private static AiProfileSettings Profile(string id) => AiProfileSettings.Empty with { ModelId = id };
 
     private static AiModelDescriptor Model(string id, bool zdr, params string[] parameters) =>

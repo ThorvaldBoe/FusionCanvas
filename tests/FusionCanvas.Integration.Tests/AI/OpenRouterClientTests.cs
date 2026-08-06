@@ -140,6 +140,37 @@ public class OpenRouterClientTests
         Assert.Equal(2, handler.Requests.Count);
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized, AiCredentialValidationKind.Invalid)]
+    [InlineData(HttpStatusCode.Forbidden, AiCredentialValidationKind.PermissionDenied)]
+    [InlineData(HttpStatusCode.TooManyRequests, AiCredentialValidationKind.RateLimited)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, AiCredentialValidationKind.ServiceUnavailable)]
+    public async Task ValidateAsync_MapsKeyEndpointFailures(
+        HttpStatusCode status,
+        AiCredentialValidationKind expected)
+    {
+        var error = "{\"error\":{\"message\":\"secret-safe\"}}";
+        var responses = status is HttpStatusCode.TooManyRequests or >= HttpStatusCode.InternalServerError
+            ? new[] { Json(status, error), Json(status, error) }
+            : new[] { Json(status, error) };
+        var handler = new RecordingHandler(responses);
+        var result = await CreateClient(handler).ValidateAsync("secret", TestContext.Current.CancellationToken);
+
+        Assert.Equal(expected, result.Kind);
+        Assert.DoesNotContain("secret", result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetModelsAsync_CancellationPreventsAnyProviderCall()
+    {
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK, "{\"data\":[]}"));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            CreateClient(handler).GetModelsAsync("secret", true, new CancellationToken(canceled: true)));
+
+        Assert.Single(handler.Requests);
+    }
+
     [Fact]
     public async Task GenerateAsync_SendsStrictPrivateTypedRequestAndNormalizesUsage()
     {
@@ -177,6 +208,29 @@ public class OpenRouterClientTests
         Assert.False(body.RootElement.GetProperty("reasoning").TryGetProperty("max_tokens", out _));
         Assert.False(body.RootElement.TryGetProperty("tools", out _));
         Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_TreatsHostileProviderTextAsBoundedData()
+    {
+        var hostile = "<script>throw new Error('execute')</script>";
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK, $$"""
+            {"id":"gen-hostile","model":"model","choices":[{"message":{"content":"{{hostile}}"},"finish_reason":"stop"}]}
+            """));
+        var client = CreateClient(handler);
+
+        var result = await client.GenerateAsync(
+            new AiProviderTextRequest(
+                "secret",
+                "model",
+                [new AiTextMessage(AiMessageRole.User, "prompt")],
+                AiProfileSettings.Empty with { ModelId = "model" },
+                false),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(hostile, result.Text);
+        Assert.DoesNotContain("secret", result.Message, StringComparison.Ordinal);
     }
 
     [Theory]

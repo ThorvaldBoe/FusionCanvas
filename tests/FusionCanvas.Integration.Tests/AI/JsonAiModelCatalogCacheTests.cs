@@ -41,6 +41,72 @@ public class JsonAiModelCatalogCacheTests
         Assert.Null(loaded);
     }
 
+    [Fact]
+    public async Task LoadAsync_MarksOldCatalogsStaleAndRejectsUnsupportedVersions()
+    {
+        using var directory = new TemporaryDirectory();
+        var cache = new JsonAiModelCatalogCache(directory.Path);
+        var oldCatalog = new AiModelCatalog(
+            true,
+            DateTimeOffset.UtcNow.AddDays(-2),
+            [new AiModelDescriptor("model", "Model", null, null, ["text"], ["text"], [],
+                10, 5, null, null, true, null)]);
+
+        await cache.SaveAsync(oldCatalog, TestContext.Current.CancellationToken);
+        var loaded = await cache.LoadAsync(true, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(loaded);
+        Assert.True(loaded.IsStale);
+
+        await File.WriteAllTextAsync(
+            Path.Combine(directory.Path, "models-zdr.json"),
+            "{\"version\":99,\"catalog\":{}}",
+            TestContext.Current.CancellationToken);
+
+        Assert.Null(await cache.LoadAsync(true, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task LoadAndSaveAsync_HonorCancellation()
+    {
+        using var directory = new TemporaryDirectory();
+        var cache = new JsonAiModelCatalogCache(directory.Path);
+        var cancelled = new CancellationToken(canceled: true);
+        var catalog = new AiModelCatalog(true, DateTimeOffset.UtcNow, []);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => cache.LoadAsync(true, cancelled));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => cache.SaveAsync(catalog, cancelled));
+    }
+
+    [Fact]
+    public async Task SaveAsync_FailsWhenCacheDirectoryIsNotWritable()
+    {
+        using var directory = new TemporaryDirectory();
+        var occupiedPath = Path.Combine(directory.Path, "occupied");
+        await File.WriteAllTextAsync(occupiedPath, "file", TestContext.Current.CancellationToken);
+        var cache = new JsonAiModelCatalogCache(occupiedPath);
+
+        await Assert.ThrowsAnyAsync<IOException>(() => cache.SaveAsync(
+            new AiModelCatalog(true, DateTimeOffset.UtcNow, []),
+            TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task LoadAsync_RejectsContentBeyondBound()
+    {
+        using var directory = new TemporaryDirectory();
+        var path = Path.Combine(directory.Path, "models-zdr.json");
+        await File.WriteAllTextAsync(
+            path,
+            new string('x', 8 * 1024 * 1024 + 1),
+            TestContext.Current.CancellationToken);
+
+        var loaded = await new JsonAiModelCatalogCache(directory.Path)
+            .LoadAsync(true, TestContext.Current.CancellationToken);
+
+        Assert.Null(loaded);
+    }
+
     private sealed class TemporaryDirectory : IDisposable
     {
         public TemporaryDirectory()
