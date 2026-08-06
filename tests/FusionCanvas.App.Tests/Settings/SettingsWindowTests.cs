@@ -171,6 +171,27 @@ public class SettingsWindowTests
     }
 
     [AvaloniaFact]
+    public void ShellHeader_ControlsStayWithinHeaderAtMinimumWidth()
+    {
+        using var fixture = new MainWindowFixture(width: 900, height: 600);
+
+        var header = fixture.Window.GetVisualDescendants()
+            .OfType<Grid>()
+            .First(g => g.Name == "NavigationHeader");
+        var settingsButton = fixture.Window.GetVisualDescendants()
+            .OfType<Button>()
+            .First(b => AutomationProperties.GetName(b) == "Settings" && b.IsVisible);
+        var indicator = fixture.Window.GetVisualDescendants()
+            .OfType<Border>()
+            .First(b => ToolTip.GetTip(b) is string tip && tip == "Manage workspaces in settings");
+
+        Assert.True(settingsButton.Bounds.Right <= header.Bounds.Width + 1,
+            $"Settings button extends beyond header: {settingsButton.Bounds.Right} > {header.Bounds.Width}");
+        Assert.True(indicator.Bounds.Right <= header.Bounds.Width + 1,
+            $"Workspace indicator extends beyond header: {indicator.Bounds.Right} > {header.Bounds.Width}");
+    }
+
+    [AvaloniaFact]
     public void ShellHeader_ActivatingSettingsOpensOneOwnedSettingsInstance()
     {
         using var fixture = new MainWindowFixture();

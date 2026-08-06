@@ -88,6 +88,10 @@ The lifecycle is ordered, but Review, Implement, and Verify may loop until their
 - `fc-spec-writer` — performs `openspec explore` and `openspec propose`; calls `fc-reviewer` itself after each stage.
 - `fc-reviewer` — single reviewer covering explore, proposal, specs, and code; never edits.
 - `fc-architect` / `fc-ui-specialist` / `fc-business-analyst` — read-only consultants for architecture, UI/UX, and business/product strategy respectively; consulted only via you.
+- `fc-implementer` — implements approved task slices.
+- `fc-verifier` — final verification only; never performs git or GitHub mutations.
+
+All sub-agent contact other than `fc-spec-writer` calling `fc-reviewer` flows through you. Route questions to the appropriate consultant rather than answering speculatively.
 - `fc-image-viewer` — read-only vision specialist invoked when an image must be inspected, described, or answered about.
 - `fc-researcher` — read-only internet-research specialist invoked when current information or web research is needed.
 - `fc-implementer` — implements approved task slices.
