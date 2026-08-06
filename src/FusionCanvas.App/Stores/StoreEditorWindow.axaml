@@ -138,6 +138,9 @@
             <TextBox Text="{Binding PlanningContext}"
                      PlaceholderText="Planning context"
                      Classes="field" />
+            <TextBox Text="{Binding Url}"
+                     PlaceholderText="Store URL"
+                     Classes="field" />
 
             <StackPanel Orientation="Horizontal"
                         Spacing="8"

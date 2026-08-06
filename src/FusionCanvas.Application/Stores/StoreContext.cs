@@ -5,4 +5,5 @@ public sealed record StoreContext(
     string? Notes = null,
     string? TargetMarket = null,
     string? BrandDirection = null,
-    string? PlanningContext = null);
+    string? PlanningContext = null,
+    string? Url = null);

@@ -206,6 +206,88 @@ public class StoreManagementServiceTests
         Assert.Contains("active workspace", rejectedOtherWorkspaceStore.Error);
     }
 
+    [Fact]
+    public async Task CreateStoreAsync_PersistsUrlInMetadata()
+    {
+        var repository = new InMemoryWorkspaceRepository();
+        var service = new StoreManagementService(repository, () => Now, () => Guid.NewGuid());
+        var context = new StoreContext(
+            Description: "POD brand",
+            Notes: "Soft humor",
+            TargetMarket: "Coffee fans",
+            BrandDirection: "Warm vintage",
+            PlanningContext: "Fall launch",
+            Url: "https://mystore.example.com");
+
+        var result = await service.CreateStoreAsync(new StoreManagementCreateRequest("North Star Studio", context), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("https://mystore.example.com", result.Store?.Context.Url);
+        var saved = await repository.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("\"url\":\"https://mystore.example.com\"", Assert.Single(saved.Stores).MetadataJson);
+    }
+
+    [Fact]
+    public async Task UpdateStoreAsync_ChangesUrl()
+    {
+        var store = NewStore("North Star Studio");
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
+        var service = new StoreManagementService(repository, () => Now.AddMinutes(5));
+        var context = new StoreContext(Url: "https://updated.example.com");
+
+        var result = await service.UpdateStoreAsync(new StoreManagementUpdateRequest(store.Id, "North Star Studio", context), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("https://updated.example.com", result.Store?.Context.Url);
+        var saved = await repository.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("\"url\":\"https://updated.example.com\"", Assert.Single(saved.Stores).MetadataJson);
+    }
+
+    [Fact]
+    public async Task CreateStoreAsync_OmittingUrl_LeavesContextUrlNullAndSavesSuccessfully()
+    {
+        var repository = new InMemoryWorkspaceRepository();
+        var service = new StoreManagementService(repository, () => Now, () => Guid.NewGuid());
+
+        var result = await service.CreateStoreAsync(new StoreManagementCreateRequest("North Star Studio"), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Null(result.Store?.Context.Url);
+        var saved = await repository.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.DoesNotContain("\"url\"", Assert.Single(saved.Stores).MetadataJson);
+    }
+
+    [Fact]
+    public async Task StoreUrl_IsScopedToCreatedStore()
+    {
+        var repository = new InMemoryWorkspaceRepository();
+        var service = new StoreManagementService(repository, () => Now, () => Guid.NewGuid());
+        var store1Context = new StoreContext(Url: "https://store1.example.com");
+        var store2Context = new StoreContext(Url: "https://store2.example.com");
+
+        var result1 = await service.CreateStoreAsync(new StoreManagementCreateRequest("Store One", store1Context), TestContext.Current.CancellationToken);
+        var result2 = await service.CreateStoreAsync(new StoreManagementCreateRequest("Store Two", store2Context), TestContext.Current.CancellationToken);
+
+        Assert.True(result1.Succeeded);
+        Assert.True(result2.Succeeded);
+        Assert.Equal("https://store1.example.com", result1.Store?.Context.Url);
+        Assert.Equal("https://store2.example.com", result2.Store?.Context.Url);
+    }
+
+    [Fact]
+    public async Task StoreUrl_SurvivesReload()
+    {
+        var repository = new InMemoryWorkspaceRepository();
+        var service = new StoreManagementService(repository, () => Now, () => Guid.NewGuid());
+        var context = new StoreContext(Url: "https://persistent.example.com");
+
+        await service.CreateStoreAsync(new StoreManagementCreateRequest("North Star Studio", context), TestContext.Current.CancellationToken);
+
+        var loaded = await service.LoadAsync(TestContext.Current.CancellationToken);
+        var store = Assert.Single(loaded.ActiveStores);
+        Assert.Equal("https://persistent.example.com", store.Context.Url);
+    }
+
     private static Store NewStore(string name) =>
         new(Guid.NewGuid(), name, null, false, Now, Now, "{}");
 

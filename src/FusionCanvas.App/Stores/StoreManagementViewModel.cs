@@ -102,7 +102,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         string Notes,
         string TargetMarket,
         string BrandDirection,
-        string PlanningContext);
+        string PlanningContext,
+        string Url);
 
     private sealed record NicheEditorState(
         string Name,
@@ -153,6 +154,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private string _targetMarket = string.Empty;
     private string _brandDirection = string.Empty;
     private string _planningContext = string.Empty;
+    private string _url = string.Empty;
     private string _nicheName = string.Empty;
     private string _nicheDescription = string.Empty;
     private string _nicheAudience = string.Empty;
@@ -629,6 +631,18 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         set
         {
             if (SetField(ref _planningContext, value))
+            {
+                RaiseEditorStateProperties();
+            }
+        }
+    }
+
+    public string Url
+    {
+        get => _url;
+        set
+        {
+            if (SetField(ref _url, value))
             {
                 RaiseEditorStateProperties();
             }
@@ -2896,6 +2910,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         TargetMarket = store.Context.TargetMarket ?? string.Empty;
         BrandDirection = store.Context.BrandDirection ?? string.Empty;
         PlanningContext = store.Context.PlanningContext ?? string.Empty;
+        Url = store.Context.Url ?? string.Empty;
     }
 
     private void ApplySelectedNicheFields(NicheSummary? niche)
@@ -2925,6 +2940,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         TargetMarket = string.Empty;
         BrandDirection = string.Empty;
         PlanningContext = string.Empty;
+        Url = string.Empty;
     }
 
     private void ClearNicheEditorFields()
@@ -3158,7 +3174,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             EmptyToNull(Notes),
             EmptyToNull(TargetMarket),
             EmptyToNull(BrandDirection),
-            EmptyToNull(PlanningContext));
+            EmptyToNull(PlanningContext),
+            EmptyToNull(Url));
 
     private NicheContext CurrentNicheContext() =>
         new(
@@ -3172,7 +3189,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             EmptyToNull(NicheNotes));
 
     private EditorState CurrentEditorState() =>
-        new(NewStoreName, Description, Notes, TargetMarket, BrandDirection, PlanningContext);
+        new(NewStoreName, Description, Notes, TargetMarket, BrandDirection, PlanningContext, Url);
 
     private NicheEditorState CurrentNicheEditorState() =>
         new(NicheName, NicheDescription, NicheAudience, NicheHumorStyle, NicheVisualStyleGuidance, NicheConstraints, NicheRisks, NicheResearchNotes, NicheNotes);
@@ -3213,7 +3230,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanDeleteSelectedNiche));
     }
 
-    private static EditorState EmptyEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
+    private static EditorState EmptyEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
 
     private static NicheEditorState EmptyNicheEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
 
