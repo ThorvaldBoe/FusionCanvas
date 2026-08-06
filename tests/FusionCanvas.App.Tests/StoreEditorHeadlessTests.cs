@@ -83,6 +83,43 @@ public class StoreEditorHeadlessTests
         window.Close();
     }
 
+    [AvaloniaFact]
+    public void NicheDetailsFields_KeepTrailingMargin()
+    {
+        var window = CreateEditorWindow();
+
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectNichesTabCommand.Execute(null);
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        var nicheFields = window.GetVisualDescendants()
+            .OfType<TextBox>()
+            .Where(textBox => textBox.IsVisible &&
+                textBox.PlaceholderText is not null &&
+                textBox.PlaceholderText is
+                    "Niche name" or
+                    "Description" or
+                    "Audience" or
+                    "Humor style" or
+                    "Visual style guidance" or
+                    "Constraints" or
+                    "Risks" or
+                    "Research notes" or
+                    "Notes")
+            .ToArray();
+
+        Assert.NotEmpty(nicheFields);
+        Assert.All(nicheFields, textBox =>
+        {
+            var parent = Assert.IsAssignableFrom<Control>(textBox.Parent);
+            Assert.True(parent.Bounds.Width - textBox.Bounds.Right >= 16,
+                $"The {textBox.PlaceholderText} field should have a trailing margin.");
+        });
+
+        window.Close();
+    }
+
     private static StoreEditorWindow CreateEditorWindow()
     {
         var store = new Store(Guid.NewGuid(), "North Star", null, false, Now, Now, "{}");
