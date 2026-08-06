@@ -213,7 +213,8 @@
             </StackPanel>
 
             <StackPanel Grid.Column="1"
-                        Spacing="10">
+                        Spacing="10"
+                        Margin="0,0,16,0">
               <TextBlock Text="Niche details"
                          FontSize="16"
                          FontWeight="SemiBold"
