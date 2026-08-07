@@ -254,6 +254,7 @@ public class WorkspaceTreeViewModelTests
         viewModel.SelectNodeWithModifiers(itemNodes[0], toggle: false, range: false);
         viewModel.SelectNodeWithModifiers(itemNodes[1], toggle: true, range: false);
         var sources = viewModel.GetDragSelections(itemNodes[1]);
+        viewModel.SelectNodeWithModifiers(itemNodes[1], toggle: false, range: false);
 
         Assert.Equal(2, sources.Count);
         await viewModel.MoveSelectionAsync(sources, destination, new GroupPlacement());
