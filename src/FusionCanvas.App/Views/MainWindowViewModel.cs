@@ -970,9 +970,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         var commits = new List<Task>(2);
         if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Item }
             && ItemInspector.HasState
-            && ItemInspector.HasUnsavedChanges)
+            && !ItemInspector.IsReadOnly
+            && (ItemInspector.HasUnsavedChanges || ConceptRefinement.HasPendingWorkingEdits))
         {
-            commits.Add(ItemInspector.CommitEditsAsync());
+            commits.Add(CommitActiveItemDetailsAsync());
         }
 
         if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Group }
@@ -996,7 +997,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         await Task.WhenAll(commits).ConfigureAwait(true);
         if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Item }
             && ItemInspector.HasState
-            && ItemInspector.HasUnsavedChanges)
+            && (ItemInspector.HasUnsavedChanges || ConceptRefinement.HasPendingWorkingEdits))
         {
             RevertStatusSelector();
             return;
@@ -1037,13 +1038,19 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         if (ItemInspector.HasState && !ItemInspector.IsReadOnly)
         {
-            Run(ItemInspector.CommitEditsAsync());
+            Run(CommitActiveItemDetailsAsync());
         }
 
         if (GroupDetails.HasState && !GroupDetails.IsReadOnly)
         {
             Run(GroupDetails.CommitEditsAsync());
         }
+    }
+
+    private async Task CommitActiveItemDetailsAsync()
+    {
+        await ConceptRefinement.CommitPendingWorkingEditsAsync().ConfigureAwait(true);
+        await ItemInspector.CommitEditsAsync().ConfigureAwait(true);
     }
 
     private void HandleItemLifecycleChanged(ItemInspectorLifecycleEventArgs args)

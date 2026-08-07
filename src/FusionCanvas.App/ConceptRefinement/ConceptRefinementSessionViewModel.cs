@@ -25,6 +25,9 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
     private string _conceptIdeaInput = string.Empty;
     private string _phraseInput = string.Empty;
     private string _graphicDirectionInput = string.Empty;
+    private bool _conceptIdeaInputDirty;
+    private bool _phraseInputDirty;
+    private bool _graphicDirectionInputDirty;
     private string _conceptIdeaInstructions = string.Empty;
     private string _phraseInstructions = string.Empty;
     private string _graphicDirectionInstructions = string.Empty;
@@ -142,6 +145,10 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
+    public bool HasPendingWorkingEdits =>
+        _inspector.CanEditStage
+        && (_conceptIdeaInputDirty || _phraseInputDirty || _graphicDirectionInputDirty);
+
     // --- Local refinement inputs ---
 
     public string ConceptIdeaInput
@@ -151,6 +158,8 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
         {
             if (SetField(ref _conceptIdeaInput, value ?? string.Empty))
             {
+                _conceptIdeaInputDirty = true;
+                OnPropertyChanged(nameof(HasPendingWorkingEdits));
                 RaiseCommandStates();
             }
         }
@@ -163,6 +172,8 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
         {
             if (SetField(ref _phraseInput, value ?? string.Empty))
             {
+                _phraseInputDirty = true;
+                OnPropertyChanged(nameof(HasPendingWorkingEdits));
                 RaiseCommandStates();
             }
         }
@@ -175,6 +186,8 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
         {
             if (SetField(ref _graphicDirectionInput, value ?? string.Empty))
             {
+                _graphicDirectionInputDirty = true;
+                OnPropertyChanged(nameof(HasPendingWorkingEdits));
                 RaiseCommandStates();
             }
         }
@@ -341,6 +354,7 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
             _inspector.ConceptIdea,
             _inspector.Phrase,
             _inspector.GraphicDirection);
+        ClearWorkingInputDirtyFlags();
         SyncInputsFromInspector();
         ConceptIdeaInstructions = string.Empty;
         PhraseInstructions = string.Empty;
@@ -352,6 +366,39 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
         RecomputeScore();
         NotifyHistoryChanged();
+        RaiseCommandStates();
+    }
+
+    public async Task CommitPendingWorkingEditsAsync(CancellationToken cancellationToken = default)
+    {
+        if (!HasPendingWorkingEdits)
+        {
+            return;
+        }
+
+        if (_conceptIdeaInputDirty)
+        {
+            _inspector.ConceptIdea = ConceptIdeaInput;
+        }
+
+        if (_phraseInputDirty)
+        {
+            _inspector.Phrase = PhraseInput;
+        }
+
+        if (_graphicDirectionInputDirty)
+        {
+            _inspector.GraphicDirection = GraphicDirectionInput;
+        }
+
+        await _inspector.CommitEditsAsync(cancellationToken).ConfigureAwait(true);
+        if (!_inspector.HasError)
+        {
+            ClearWorkingInputDirtyFlags();
+            SyncInputsFromInspector();
+        }
+
+        RecomputeScore();
         RaiseCommandStates();
     }
 
@@ -462,9 +509,11 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
         try
         {
+            ClearWorkingInputDirtyFlags();
             _inspector.ConceptIdea = entry.ConceptIdea;
             _inspector.Phrase = entry.Phrase;
             _inspector.GraphicDirection = entry.GraphicDirection;
+            SyncInputsFromInspector();
             _currentIndex = targetIndex;
             await _inspector.CommitEditsAsync().ConfigureAwait(true);
             RecomputeScore();
@@ -518,6 +567,7 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
             if (singleCorner is { } corner)
             {
                 ApplySingleCornerValue(corner, result);
+                SyncWorkingInputFromInspector(corner);
                 ClearInstruction(corner);
             }
             else
@@ -526,16 +576,19 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
                 if (result.ConceptIdea is not null)
                 {
                     _inspector.ConceptIdea = result.ConceptIdea;
+                    SyncWorkingInputFromInspector(ConceptRefinementCorner.ConceptIdea);
                 }
 
                 if (result.Phrase is not null)
                 {
                     _inspector.Phrase = result.Phrase;
+                    SyncWorkingInputFromInspector(ConceptRefinementCorner.Phrase);
                 }
 
                 if (result.GraphicDirection is not null)
                 {
                     _inspector.GraphicDirection = result.GraphicDirection;
+                    SyncWorkingInputFromInspector(ConceptRefinementCorner.GraphicDirection);
                 }
             }
 
@@ -690,9 +743,51 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     private void SyncInputsFromInspector()
     {
-        SetField(ref _conceptIdeaInput, _inspector.ConceptIdea, nameof(ConceptIdeaInput));
-        SetField(ref _phraseInput, _inspector.Phrase, nameof(PhraseInput));
-        SetField(ref _graphicDirectionInput, _inspector.GraphicDirection, nameof(GraphicDirectionInput));
+        if (!_conceptIdeaInputDirty)
+        {
+            SetField(ref _conceptIdeaInput, _inspector.ConceptIdea, nameof(ConceptIdeaInput));
+        }
+
+        if (!_phraseInputDirty)
+        {
+            SetField(ref _phraseInput, _inspector.Phrase, nameof(PhraseInput));
+        }
+
+        if (!_graphicDirectionInputDirty)
+        {
+            SetField(ref _graphicDirectionInput, _inspector.GraphicDirection, nameof(GraphicDirectionInput));
+        }
+    }
+
+    private void SyncWorkingInputFromInspector(ConceptRefinementCorner corner)
+    {
+        switch (corner)
+        {
+            case ConceptRefinementCorner.ConceptIdea:
+                _conceptIdeaInputDirty = false;
+                SetField(ref _conceptIdeaInput, _inspector.ConceptIdea, nameof(ConceptIdeaInput));
+                break;
+            case ConceptRefinementCorner.Phrase:
+                _phraseInputDirty = false;
+                SetField(ref _phraseInput, _inspector.Phrase, nameof(PhraseInput));
+                break;
+            case ConceptRefinementCorner.GraphicDirection:
+                _graphicDirectionInputDirty = false;
+                SetField(ref _graphicDirectionInput, _inspector.GraphicDirection, nameof(GraphicDirectionInput));
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(corner), corner, "Unsupported refinement corner.");
+        }
+
+        OnPropertyChanged(nameof(HasPendingWorkingEdits));
+    }
+
+    private void ClearWorkingInputDirtyFlags()
+    {
+        _conceptIdeaInputDirty = false;
+        _phraseInputDirty = false;
+        _graphicDirectionInputDirty = false;
+        OnPropertyChanged(nameof(HasPendingWorkingEdits));
     }
 
     private void RaiseCommandStates()
@@ -734,19 +829,28 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
     {
         if (args.PropertyName is nameof(ItemInspectorViewModel.ConceptIdea))
         {
-            SetField(ref _conceptIdeaInput, _inspector.ConceptIdea, nameof(ConceptIdeaInput));
+            if (!_conceptIdeaInputDirty)
+            {
+                SetField(ref _conceptIdeaInput, _inspector.ConceptIdea, nameof(ConceptIdeaInput));
+            }
             RecomputeScore();
             RaiseCommandStates();
         }
         else if (args.PropertyName is nameof(ItemInspectorViewModel.Phrase))
         {
-            SetField(ref _phraseInput, _inspector.Phrase, nameof(PhraseInput));
+            if (!_phraseInputDirty)
+            {
+                SetField(ref _phraseInput, _inspector.Phrase, nameof(PhraseInput));
+            }
             RecomputeScore();
             RaiseCommandStates();
         }
         else if (args.PropertyName is nameof(ItemInspectorViewModel.GraphicDirection))
         {
-            SetField(ref _graphicDirectionInput, _inspector.GraphicDirection, nameof(GraphicDirectionInput));
+            if (!_graphicDirectionInputDirty)
+            {
+                SetField(ref _graphicDirectionInput, _inspector.GraphicDirection, nameof(GraphicDirectionInput));
+            }
             RecomputeScore();
             RaiseCommandStates();
         }
