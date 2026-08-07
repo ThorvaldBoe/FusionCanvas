@@ -7,7 +7,7 @@ using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Prompts;
 using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Domain.Products;
-
+ 
 namespace FusionCanvas.Domain.Workspace;
 
 public sealed record WorkspaceSnapshot(
@@ -32,7 +32,15 @@ public sealed record WorkspaceSnapshot(
 
     public IReadOnlyList<DesignArea> DesignAreas { get; init; } = [];
 
-    public IReadOnlyList<ItemDesignAreaTarget> ItemDesignAreaTargets { get; init; } = [];
+    public IReadOnlyList<ItemListingConfiguration> ItemListingConfigurations { get; init; } = [];
+
+    public IReadOnlyList<DesignSelectedColor> DesignSelectedColors { get; init; } = [];
+
+    public IReadOnlyList<DesignVariantRow> DesignVariantRows { get; init; } = [];
+
+    public IReadOnlyList<DesignVariantRowColor> DesignVariantRowColors { get; init; } = [];
+
+    public IReadOnlyList<DesignSlotAssignment> DesignSlotAssignments { get; init; } = [];
 
     public WorkspaceSnapshot(
         IReadOnlyList<Store> Stores,

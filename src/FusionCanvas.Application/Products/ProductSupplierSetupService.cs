@@ -133,12 +133,13 @@ public sealed class ProductSupplierSetupService : IProductSupplierSetupService
 
         var offeringIds = snapshot.FulfillmentOfferings.Where(offering => offering.StoreProductId == product.Id).Select(offering => offering.Id).ToHashSet();
         var areaIds = snapshot.DesignAreas.Where(area => offeringIds.Contains(area.FulfillmentOfferingId)).Select(area => area.Id).ToHashSet();
-        var isReferenced = snapshot.ItemDesignAreaTargets.Any(target => areaIds.Contains(target.DesignAreaId));
+        var isReferencedByConfig = snapshot.ItemListingConfigurations.Any(c => offeringIds.Contains(c.OfferingId));
+        var isReferencedBySlot = snapshot.DesignSlotAssignments.Any(a => areaIds.Contains(a.DesignAreaId));
 
-        if (offeringIds.Count > 0 || isReferenced)
+        if (offeringIds.Count > 0 || isReferencedByConfig || isReferencedBySlot)
         {
             return ProductSupplierSetupResult.Failure(
-                "This product is selected or contains dependent data. Clear its offerings and design targets first.",
+                "This product has offerings, configurations, or slot references. Remove those first.",
                 BuildState(snapshot, product.StoreId));
         }
 
@@ -275,12 +276,12 @@ public sealed class ProductSupplierSetupService : IProductSupplierSetupService
         var areaIds = snapshot.DesignAreas.Where(area => area.FulfillmentOfferingId == offering.Id).Select(area => area.Id).ToHashSet();
         var hasVariants = snapshot.ProductVariants.Any(variant => variant.FulfillmentOfferingId == offering.Id);
         var hasAreas = areaIds.Count > 0;
-        var isReferenced = snapshot.ItemDesignAreaTargets.Any(target => areaIds.Contains(target.DesignAreaId));
+        var isReferenced = snapshot.ItemListingConfigurations.Any(c => c.OfferingId == offering.Id);
 
         if (hasVariants || hasAreas || isReferenced)
         {
             return ProductSupplierSetupResult.Failure(
-                "This offering is selected or contains variants or design areas. Remove those first or replace the targets.",
+                "This offering is selected or contains variants or design areas. Remove those first or replace the configuration.",
                 BuildState(snapshot, storeId));
         }
 
@@ -506,11 +507,11 @@ public sealed class ProductSupplierSetupService : IProductSupplierSetupService
             return ProductSupplierSetupResult.Failure("Permanent deletion requires confirmation.", BuildState(snapshot, storeId));
         }
 
-        var isReferenced = snapshot.ItemDesignAreaTargets.Any(target => target.DesignAreaId == area.Id);
+        var isReferenced = snapshot.DesignSlotAssignments.Any(a => a.DesignAreaId == area.Id);
         if (isReferenced)
         {
             return ProductSupplierSetupResult.Failure(
-                "This printable area is selected by one or more Items. Clear or replace those targets first.",
+                "This printable area is referenced by one or more slot assignments. Clear those first.",
                 BuildState(snapshot, storeId));
         }
 
@@ -521,55 +522,6 @@ public sealed class ProductSupplierSetupService : IProductSupplierSetupService
         await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
 
         return ProductSupplierSetupResult.Success(BuildState(updated, storeId));
-    }
-
-    public async Task<DesignTargetSelectionState> LoadDesignTargetsAsync(Guid itemId, CancellationToken cancellationToken = default)
-    {
-        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        return BuildTargetState(snapshot, itemId);
-    }
-
-    public async Task<DesignTargetSelectionResult> ReplaceDesignTargetsAsync(ReplaceDesignTargetsRequest request, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var item = snapshot.Items.SingleOrDefault(candidate => candidate.Id == request.ItemId);
-        if (item is null)
-        {
-            return DesignTargetSelectionResult.Failure("Item was not found.", BuildTargetState(snapshot, request.ItemId));
-        }
-
-        var edit = ItemWorkflowPolicy.CanEditStage(item, WorkflowStage.Design);
-        if (!edit.IsAllowed)
-        {
-            return DesignTargetSelectionResult.Failure(edit.Reason, BuildTargetState(snapshot, item.Id));
-        }
-
-        var store = snapshot.Stores.SingleOrDefault(candidate => candidate.Id == item.StoreId);
-        if (store is { IsArchived: true })
-        {
-            return DesignTargetSelectionResult.Failure("This Item's Store is archived and its catalogs are read-only.", BuildTargetState(snapshot, item.Id));
-        }
-
-        var requested = request.DesignAreaIds.Distinct().ToArray();
-        var areaNotFound = requested.FirstOrDefault(areaId => snapshot.DesignAreas.All(area => area.Id != areaId));
-        if (areaNotFound != Guid.Empty)
-        {
-            return DesignTargetSelectionResult.Failure("A selected printable area was not found.", BuildTargetState(snapshot, item.Id));
-        }
-
-        var crossStore = requested.FirstOrDefault(areaId => StoreIdOfArea(snapshot, areaId) != item.StoreId);
-        if (crossStore != Guid.Empty)
-        {
-            return DesignTargetSelectionResult.Failure("Target selection refers to a printable area from another Store. No targets were changed.", BuildTargetState(snapshot, item.Id));
-        }
-
-        var remaining = snapshot.ItemDesignAreaTargets.Where(target => target.ItemId != item.Id).ToArray();
-        var added = requested.Select(areaId => new ItemDesignAreaTarget(item.Id, areaId)).ToArray();
-        var updated = snapshot with { ItemDesignAreaTargets = [.. remaining, .. added] };
-        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
-
-        return DesignTargetSelectionResult.Success(BuildTargetState(updated, item.Id));
     }
 
     private static IReadOnlyList<VariantOption> ToVariantOptions(IReadOnlyList<VariantOptionDraft> drafts) =>
@@ -598,23 +550,6 @@ public sealed class ProductSupplierSetupService : IProductSupplierSetupService
 
     private static Guid? ProductStoreIdOf(WorkspaceSnapshot snapshot, Guid productId) =>
         snapshot.StoreProducts.SingleOrDefault(candidate => candidate.Id == productId)?.StoreId;
-
-    private static Guid? StoreIdOfArea(WorkspaceSnapshot snapshot, Guid areaId)
-    {
-        var area = snapshot.DesignAreas.SingleOrDefault(candidate => candidate.Id == areaId);
-        if (area is null)
-        {
-            return null;
-        }
-
-        var offering = snapshot.FulfillmentOfferings.SingleOrDefault(candidate => candidate.Id == area.FulfillmentOfferingId);
-        if (offering is null)
-        {
-            return null;
-        }
-
-        return snapshot.StoreProducts.SingleOrDefault(candidate => candidate.Id == offering.StoreProductId)?.StoreId;
-    }
 
     private static string? ReadOnlyCheck(WorkspaceSnapshot snapshot, Guid? storeId)
     {
@@ -692,39 +627,5 @@ public sealed class ProductSupplierSetupService : IProductSupplierSetupService
         return new FulfillmentOfferingSummary(
             offering.Id, offering.StoreProductId, offering.Name, offering.Description, offering.Kind, offering.ProviderName,
             offering.ExternalOfferingId, variants, areas);
-    }
-
-    private DesignTargetSelectionState BuildTargetState(WorkspaceSnapshot snapshot, Guid itemId)
-    {
-        var item = snapshot.Items.SingleOrDefault(candidate => candidate.Id == itemId);
-        if (item is null)
-        {
-            return new DesignTargetSelectionState(itemId, true, []);
-        }
-
-        var store = snapshot.Stores.SingleOrDefault(candidate => candidate.Id == item.StoreId);
-        var edit = ItemWorkflowPolicy.CanEditStage(item, WorkflowStage.Design);
-        var isReadOnly = store is { IsArchived: true } || !edit.IsAllowed;
-
-        var selected = snapshot.ItemDesignAreaTargets
-            .Where(target => target.ItemId == item.Id)
-            .Select(target => target.DesignAreaId)
-            .ToHashSet();
-
-        var options = snapshot.DesignAreas
-            .Where(area => StoreIdOfArea(snapshot, area.Id) == item.StoreId)
-            .OrderBy(area => StoreIdOfArea(snapshot, area.Id))
-            .ThenBy(area => area.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(area =>
-            {
-                var offering = snapshot.FulfillmentOfferings.Single(candidate => candidate.Id == area.FulfillmentOfferingId);
-                var product = snapshot.StoreProducts.Single(candidate => candidate.Id == offering.StoreProductId);
-                return new DesignAreaTargetOption(
-                    area.Id, product.Name, offering.Name, area.Position, area.DecorationMethod,
-                    area.Width, area.Height, offering.Kind == FulfillmentKind.PrintifyChoiceNetwork, selected.Contains(area.Id));
-            })
-            .ToArray();
-
-        return new DesignTargetSelectionState(itemId, isReadOnly, options);
     }
 }

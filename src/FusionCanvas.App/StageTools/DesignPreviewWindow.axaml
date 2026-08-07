@@ -1,0 +1,39 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:stageTools="using:FusionCanvas.App.StageTools"
+        x:Class="FusionCanvas.App.StageTools.DesignPreviewWindow"
+        x:DataType="stageTools:DesignStageToolViewModel"
+        Title="Image Preview"
+        Width="800"
+        Height="600"
+        MinWidth="400"
+        MinHeight="300"
+        SizeToContent="WidthAndHeight"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ApplicationBackgroundBrush}"
+        CanResize="True">
+  <DockPanel LastChildFill="True" Margin="16">
+    <StackPanel DockPanel.Dock="Bottom"
+                Orientation="Horizontal"
+                HorizontalAlignment="Center"
+                Spacing="8"
+                Margin="0,12,0,0">
+      <Button Content="Close"
+              Click="OnCloseClick"
+              MinWidth="90"
+              Classes="storeAction" />
+    </StackPanel>
+    <Border Background="{DynamicResource ElevatedSurfaceBrush}"
+            BorderBrush="{DynamicResource ControlBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="6"
+            Padding="8"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch">
+      <Image Source="{Binding PreviewBitmap}"
+             Stretch="Uniform"
+             MaxWidth="740"
+             MaxHeight="540" />
+    </Border>
+  </DockPanel>
+</Window>

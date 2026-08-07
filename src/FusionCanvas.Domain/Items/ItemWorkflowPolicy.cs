@@ -66,6 +66,9 @@ public static class ItemWorkflowPolicy
                 ItemOperationKind.DesignFile => new ItemEditDecision(false, item.Status is ItemStatus.Published
                     ? "Pause the published item before changing Design files."
                     : "Recover the rejected item to Draft before changing Design files."),
+                ItemOperationKind.DesignStage => new ItemEditDecision(false, item.Status is ItemStatus.Published
+                    ? "Pause the published item before editing Design stage content."
+                    : "Recover the rejected item to Draft before editing Design stage content."),
                 ItemOperationKind.RelatedAssetLink => new ItemEditDecision(false, item.Status is ItemStatus.Published
                     ? "Pause the published item before changing related asset links."
                     : "Recover the rejected item to Draft before changing related asset links."),
@@ -92,6 +95,7 @@ public static class ItemWorkflowPolicy
             ItemOperationKind.Archive => new ItemEditDecision(true, "The item can be archived."),
             ItemOperationKind.StatusRecovery => new ItemEditDecision(true, "Status recovery is available."),
             ItemOperationKind.DesignFile => new ItemEditDecision(true, "Design files are editable."),
+            ItemOperationKind.DesignStage => new ItemEditDecision(true, "Design stage content is editable."),
             ItemOperationKind.RelatedAssetLink => new ItemEditDecision(true, "Related asset links are editable."),
             ItemOperationKind.StageMovement => new ItemEditDecision(true, "Adjacent stage movement is available."),
             _ => new ItemEditDecision(false, "Unsupported operation for this item state.")

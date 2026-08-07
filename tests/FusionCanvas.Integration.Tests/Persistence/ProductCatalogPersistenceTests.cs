@@ -13,7 +13,7 @@ public class ProductCatalogPersistenceTests
     private static readonly DateTimeOffset Now = new(2026, 7, 4, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task SaveAndLoadAsync_RoundTripsCatalogAndTargets()
+    public async Task SaveAndLoadAsync_RoundTripsCatalog()
     {
         using var tempDirectory = new TemporaryDirectory();
         var databasePath = tempDirectory.GetPath("catalog.db");
@@ -28,11 +28,10 @@ public class ProductCatalogPersistenceTests
         Assert.Equal(snapshot.FulfillmentOfferings.OrderBy(o => o.Id), loaded.FulfillmentOfferings.OrderBy(o => o.Id));
         Assert.Equal(snapshot.ProductVariants, loaded.ProductVariants);
         Assert.Equal(snapshot.DesignAreas, loaded.DesignAreas);
-        Assert.Equal(snapshot.ItemDesignAreaTargets, loaded.ItemDesignAreaTargets);
     }
 
     [Fact]
-    public async Task SaveAndLoadAsync_CreatesSchemaVersionNine()
+    public async Task SaveAndLoadAsync_CreatesSchemaVersionCurrent()
     {
         using var tempDirectory = new TemporaryDirectory();
         var databasePath = tempDirectory.GetPath("catalog.db");
@@ -40,11 +39,45 @@ public class ProductCatalogPersistenceTests
 
         await repository.SaveAsync(CreateCatalogSnapshot(), TestContext.Current.CancellationToken);
 
-        Assert.Equal(9, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(10, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
-    public async Task LoadAsync_MigratesVersionEightDatabaseToNine()
+    public async Task Migration_DropsItemDesignAreaTargetsTable()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("catalog.db");
+        await CreateVersionNineDatabaseAsync(databasePath);
+
+        // Verify old table exists before migration
+        using (var conn = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            await conn.OpenAsync(TestContext.Current.CancellationToken);
+            var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='item_design_area_targets'";
+            var before = (long)(await cmd.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
+            Assert.Equal(1, before);
+        }
+
+        // Run migration (load triggers migration to current)
+        await new SqliteWorkspaceRepository(databasePath)
+            .LoadAsync(TestContext.Current.CancellationToken);
+
+        // Verify table is dropped
+        using (var conn = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            await conn.OpenAsync(TestContext.Current.CancellationToken);
+            var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='item_design_area_targets'";
+            var after = (long)(await cmd.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
+            Assert.Equal(0, after);
+        }
+
+        Assert.Equal(10, await ReadUserVersionAsync(databasePath));
+    }
+
+    [Fact]
+    public async Task LoadAsync_MigratesVersionEightDatabaseToCurrent()
     {
         using var tempDirectory = new TemporaryDirectory();
         var databasePath = tempDirectory.GetPath("catalog.db");
@@ -54,10 +87,9 @@ public class ProductCatalogPersistenceTests
         var loaded = await new SqliteWorkspaceRepository(databasePath)
             .LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(9, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(10, await ReadUserVersionAsync(databasePath));
         Assert.Empty(loaded.StoreProducts);
         Assert.Empty(loaded.DesignAreas);
-        Assert.Empty(loaded.ItemDesignAreaTargets);
     }
 
     [Fact]
@@ -84,46 +116,36 @@ public class ProductCatalogPersistenceTests
     }
 
     [Fact]
-    public async Task SaveAsync_RejectsTargetToMissingArea()
+    public async Task SaveAsync_RoundTripsDesignStageDomain()
     {
         using var tempDirectory = new TemporaryDirectory();
         var databasePath = tempDirectory.GetPath("catalog.db");
         var repository = new SqliteWorkspaceRepository(databasePath);
         var snapshot = CreateCatalogSnapshot();
+        var itemId = snapshot.Items[0].Id;
+        var offeringId = snapshot.FulfillmentOfferings[0].Id;
+        var rowId = Guid.NewGuid();
+        var areaId = snapshot.DesignAreas[0].Id;
+
         snapshot = snapshot with
         {
-            ItemDesignAreaTargets = [.. snapshot.ItemDesignAreaTargets, new ItemDesignAreaTarget(snapshot.Items[0].Id, Guid.NewGuid())]
+            ItemListingConfigurations = [new ItemListingConfiguration(itemId, offeringId)],
+            DesignSelectedColors = [new DesignSelectedColor(itemId, "Black")],
+            DesignVariantRows = [new DesignVariantRow(rowId, itemId, true, 0)],
+            DesignVariantRowColors = [new DesignVariantRowColor(rowId, "Black")],
+            DesignSlotAssignments = [new DesignSlotAssignment(rowId, areaId, null)]
         };
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => repository.SaveAsync(snapshot, TestContext.Current.CancellationToken));
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Contains("existing design area", exception.Message);
-    }
-
-    [Fact]
-    public async Task SaveAsync_RejectsTargetToAreaFromAnotherStore()
-    {
-        using var tempDirectory = new TemporaryDirectory();
-        var repository = new SqliteWorkspaceRepository(tempDirectory.GetPath("catalog.db"));
-        var snapshot = CreateCatalogSnapshot();
-        var otherStore = new Store(Guid.NewGuid(), "Other", null, false, Now, Now, "{}");
-        var otherProduct = new StoreProduct(Guid.NewGuid(), otherStore.Id, "Other product", null, null, Now, Now, "{}");
-        var otherOffering = new FulfillmentOffering(Guid.NewGuid(), otherProduct.Id, "Provider", null, FulfillmentKind.FixedProvider, "Provider", null, Now, Now, "{}");
-        var otherArea = new DesignArea(Guid.NewGuid(), otherOffering.Id, "Front", null, "front", "DTG", 3000, 4000, [], Now, Now, "{}");
-        snapshot = snapshot with
-        {
-            Stores = [.. snapshot.Stores, otherStore],
-            StoreProducts = [.. snapshot.StoreProducts, otherProduct],
-            FulfillmentOfferings = [.. snapshot.FulfillmentOfferings, otherOffering],
-            DesignAreas = [.. snapshot.DesignAreas, otherArea],
-            ItemDesignAreaTargets = [new ItemDesignAreaTarget(snapshot.Items[0].Id, otherArea.Id)]
-        };
-
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => repository.SaveAsync(snapshot, TestContext.Current.CancellationToken));
-
-        Assert.Contains("own store", exception.Message);
+        Assert.Single(loaded.ItemListingConfigurations);
+        Assert.Single(loaded.DesignSelectedColors);
+        Assert.Single(loaded.DesignVariantRows);
+        Assert.Single(loaded.DesignVariantRowColors);
+        Assert.Single(loaded.DesignSlotAssignments);
+        Assert.Equal(itemId, loaded.ItemListingConfigurations[0].ItemId);
+        Assert.Equal(offeringId, loaded.ItemListingConfigurations[0].OfferingId);
     }
 
     [Fact]
@@ -159,14 +181,12 @@ public class ProductCatalogPersistenceTests
             StoreProducts = [],
             FulfillmentOfferings = [],
             ProductVariants = [],
-            DesignAreas = [],
-            ItemDesignAreaTargets = []
+            DesignAreas = []
         };
         await repository.SaveAsync(reduced, TestContext.Current.CancellationToken);
 
         var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
         Assert.Empty(loaded.StoreProducts);
-        Assert.Empty(loaded.ItemDesignAreaTargets);
         Assert.Equal(snapshot.Items, loaded.Items);
     }
 
@@ -179,7 +199,6 @@ public class ProductCatalogPersistenceTests
         var variant = new ProductVariant(Guid.NewGuid(), fixedOffering.Id, [new VariantOption("Color", "Black"), new VariantOption("Size", "M")], Now, Now);
         var area = new DesignArea(Guid.NewGuid(), fixedOffering.Id, "Front", null, "front", "DTG", 3000, 4500, [variant.Id], Now, Now, "{}");
         var item = new Item(Guid.NewGuid(), store.Id, null, null, "Tee", null, ItemStatus.Draft, WorkflowStage.Design, false, Now, Now, "{}");
-        var target = new ItemDesignAreaTarget(item.Id, area.Id);
 
         return new WorkspaceSnapshot(
             [WorkspaceSnapshot.DefaultWorkspace(Now)],
@@ -197,8 +216,7 @@ public class ProductCatalogPersistenceTests
             StoreProducts = [product],
             FulfillmentOfferings = [fixedOffering, choiceOffering],
             ProductVariants = [variant],
-            DesignAreas = [area],
-            ItemDesignAreaTargets = [target]
+            DesignAreas = [area]
         };
     }
 
@@ -246,8 +264,8 @@ public class ProductCatalogPersistenceTests
                 CREATE TABLE ideation_rejections (
                     id TEXT PRIMARY KEY,
                     store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-                    niche_id TEXT NOT NULL REFERENCES niches(id) ON DELETE CASCADE,
-                    group_id TEXT NULL REFERENCES groups(id) ON DELETE SET NULL,
+                    niche_id TEXT NULL,
+                    group_id TEXT NULL,
                     text TEXT NOT NULL,
                     reason TEXT NULL,
                     mode INTEGER NOT NULL,
@@ -255,6 +273,26 @@ public class ProductCatalogPersistenceTests
                     updated_at TEXT NULL
                 );
                 PRAGMA user_version = 8;
+                """;
+            await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    private static async Task CreateVersionNineDatabaseAsync(string databasePath)
+    {
+        // First create v8, then add the item_design_area_targets table and set version to 9
+        await CreateVersionEightDatabaseAsync(databasePath);
+        await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE IF NOT EXISTS item_design_area_targets (
+                    item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                    design_area_id TEXT NOT NULL REFERENCES design_areas(id) ON DELETE CASCADE,
+                    PRIMARY KEY (item_id, design_area_id)
+                );
+                PRAGMA user_version = 9;
                 """;
             await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
         }

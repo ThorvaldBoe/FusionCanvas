@@ -11,5 +11,6 @@ public enum ItemOperationKind
     StatusRecovery = 6,
     DesignFile = 7,
     RelatedAssetLink = 8,
-    StageMovement = 9
+    StageMovement = 9,
+    DesignStage = 10
 }

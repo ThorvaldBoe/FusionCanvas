@@ -1,4 +1,4 @@
-﻿using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Prompts;
 using FusionCanvas.Domain.Assets;
@@ -58,7 +58,7 @@ public class SqliteWorkspaceRepositoryTests
 
         await repository.SaveAsync(CreateCompleteSnapshot(), TestContext.Current.CancellationToken);
 
-        Assert.Equal(9, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -93,7 +93,7 @@ public class SqliteWorkspaceRepositoryTests
         Assert.Equal(2, loaded.Stores.Count);
         Assert.Equal(active, loaded.Stores.Single(store => store.Id == active.Id));
         Assert.Equal(archived, loaded.Stores.Single(store => store.Id == archived.Id));
-        Assert.Equal(9, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -112,7 +112,7 @@ public class SqliteWorkspaceRepositoryTests
 
         Assert.Equal(first.Id, Assert.Single(loaded.Stores).Id);
         Assert.DoesNotContain(loaded.Stores, store => store.Id == deleted.Id);
-        Assert.Equal(9, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public class SqliteWorkspaceRepositoryTests
         Assert.Equal(2, loaded.Niches.Count);
         Assert.Equal(active, loaded.Niches.Single(niche => niche.Id == active.Id));
         Assert.Equal(archived, loaded.Niches.Single(niche => niche.Id == archived.Id));
-        Assert.Equal(9, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -170,7 +170,7 @@ public class SqliteWorkspaceRepositoryTests
 
         Assert.Equal(kept.Id, Assert.Single(loaded.Niches).Id);
         Assert.DoesNotContain(loaded.Niches, niche => niche.Id == deleted.Id);
-        Assert.Equal(9, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -231,7 +231,7 @@ public class SqliteWorkspaceRepositoryTests
         Assert.Contains("Ready for art", loadedChild.MetadataJson);
         Assert.Equal(child.Group.Id, loadedListing.GroupId);
         Assert.Equal(destinationNiche.Id, loadedListing.NicheId);
-        Assert.Equal(9, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(databasePath));
     }
 
 
@@ -246,7 +246,7 @@ public class SqliteWorkspaceRepositoryTests
 
         await repository.LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(9, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -285,7 +285,7 @@ public class SqliteWorkspaceRepositoryTests
 
         var loaded = await new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(9, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(databasePath));
         Assert.Equal(nicheId, Assert.Single(loaded.Stores).DefaultNicheId);
         Assert.Equal(["Alpha", "Zulu"], loaded.Groups.OrderBy(group => group.SortOrder).Select(group => group.Name));
         Assert.Equal([0, 1], loaded.Groups.OrderBy(group => group.SortOrder).Select(group => group.SortOrder));
@@ -340,7 +340,7 @@ public class SqliteWorkspaceRepositoryTests
 
         var loaded = await new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(9, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(databasePath));
         var byName = loaded.Items.ToDictionary(listing => listing.Name);
         Assert.Equal(ItemStatus.Draft, byName["Active"].Status);
         Assert.Equal(WorkflowStage.Listing, byName["Active"].Stage);
@@ -361,7 +361,7 @@ public class SqliteWorkspaceRepositoryTests
     {
         using var tempDirectory = new TemporaryDirectory();
         var databasePath = tempDirectory.GetPath("workspace.db");
-        await SetUserVersionAsync(databasePath, 10);
+        await SetUserVersionAsync(databasePath, 99);
         var repository = new SqliteWorkspaceRepository(databasePath);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -391,7 +391,7 @@ public class SqliteWorkspaceRepositoryTests
         Assert.Equal(nullColor, loaded.Tags.Single(tag => tag.Id == nullColor.Id));
         Assert.Null(loaded.Tags.Single(tag => tag.Id == nullColor.Id).Color);
         Assert.Equal("#FF0000", loaded.Tags.Single(tag => tag.Id == expandedColor.Id).Color);
-        Assert.Equal(9, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -432,7 +432,7 @@ public class SqliteWorkspaceRepositoryTests
 
         var loaded = await new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(9, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(databasePath));
         var tag = Assert.Single(loaded.Tags);
         Assert.Equal(tagId, tag.Id);
         Assert.Equal(storeId, tag.StoreId);
@@ -579,7 +579,7 @@ public class SqliteWorkspaceRepositoryTests
 
         var loaded = await new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(9, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(databasePath));
         Assert.Equal(6, loaded.Items.Count);
         var byId = loaded.Items.ToDictionary(item => item.Id);
         Assert.Equal("Pumpkin espresso", byId[namedItemId].Name);

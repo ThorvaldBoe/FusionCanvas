@@ -54,7 +54,6 @@ internal static class SampleWorkspace
             FulfillmentOfferings = [offering],
             ProductVariants = [variant],
             DesignAreas = [area],
-            ItemDesignAreaTargets = []
         };
     }
 }
@@ -84,5 +83,18 @@ internal static class MainWindowViewModelFactory
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             new InMemoryWorkspaceRepository(SampleWorkspace.Create()),
             SampleWorkspace.Create(),
+            titleOptimizationService: titleOptimization);
+
+    internal static MainWindowViewModel CreateFromSnapshot(
+        WorkspaceSnapshot snapshot,
+        IWorkspaceRepository repository,
+        ITitleOptimizationService? titleOptimization = null) =>
+        new(
+            new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
+            new DocumentWindow.DocumentWindowViewModel(),
+            new ToolContextResolver(),
+            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
+            repository,
+            snapshot,
             titleOptimizationService: titleOptimization);
 }

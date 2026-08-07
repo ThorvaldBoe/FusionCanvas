@@ -1104,125 +1104,246 @@
                                  FontSize="14"
                                  FontWeight="SemiBold"
                                  Foreground="{DynamicResource StrongTextBrush}" />
-                      <TextBlock Text="Managed PNG Design files"
-                                 FontSize="12"
-                                 Foreground="{DynamicResource SecondaryTextBrush}" />
-                      <ListBox ItemsSource="{Binding DesignTool.Files}"
-                               SelectedItem="{Binding DesignTool.SelectedFile}"
-                               MinHeight="72"
-                               AutomationProperties.Name="Design files">
-                        <ListBox.ItemTemplate>
-                          <DataTemplate x:DataType="stageTools:DesignFileViewModel">
-                            <Grid ColumnDefinitions="*,Auto">
-                              <TextBlock Text="{Binding Name}" />
-                              <TextBlock Grid.Column="1"
-                                         IsVisible="{Binding IsMissing}"
-                                         Text="Missing"
-                                         Foreground="{DynamicResource DangerTextBrush}" />
-                            </Grid>
-                          </DataTemplate>
-                        </ListBox.ItemTemplate>
-                      </ListBox>
-                      <TextBlock Text="{Binding DesignTool.EmptyState}"
-                                 TextWrapping="Wrap"
-                                 FontSize="12"
-                                 Foreground="{DynamicResource MutedTextBrush}" />
+
+                      <!-- Read-only banner -->
                       <TextBlock IsVisible="{Binding DesignTool.IsReadOnly}"
                                  Text="{Binding DesignTool.ReadOnlyReason}"
                                  TextWrapping="Wrap"
                                  FontSize="12"
                                  Foreground="{DynamicResource DangerTextBrush}" />
-                      <Border IsVisible="{Binding DesignTool.HasTargets}"
-                              Padding="10"
-                              Background="{DynamicResource PanelSurfaceBrush}"
-                              BorderBrush="{DynamicResource SubtleBorderBrush}"
-                              BorderThickness="1"
-                              CornerRadius="6">
-                        <StackPanel Spacing="8">
-                          <TextBlock Text="Design areas"
-                                     FontSize="13"
-                                     FontWeight="SemiBold"
-                                     Foreground="{DynamicResource StrongTextBrush}" />
-                          <TextBlock Text="{Binding DesignTool.SelectedTargetsSummary}"
-                                     FontSize="12"
-                                     TextWrapping="Wrap"
-                                     Foreground="{DynamicResource MutedTextBrush}" />
-                          <ItemsControl ItemsSource="{Binding DesignTool.Targets}">
-                            <ItemsControl.ItemTemplate>
-                              <DataTemplate x:DataType="stageTools:DesignAreaTargetViewModel">
-                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                          IsEnabled="{Binding !IsReadOnly}"
-                                          Content="{Binding Summary}"
-                                          Foreground="{DynamicResource PrimaryTextBrush}" />
-                              </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                          </ItemsControl>
-                          <TextBlock IsVisible="{Binding DesignTool.HasSelectedChoiceTarget}"
-                                     Text="{Binding DesignTool.ChoiceNetworkWarning}"
-                                     TextWrapping="Wrap"
-                                     FontSize="12"
-                                     Foreground="{DynamicResource WarningTextBrush}" />
-                          <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button Content="Save design targets"
-                                    IsEnabled="{Binding !DesignTool.IsReadOnly}"
-                                    Command="{Binding DesignTool.SaveDesignTargetsCommand}"
-                                    AutomationProperties.Name="Save design targets"
-                                    Classes="storeAction" />
-                          </StackPanel>
-                          <TextBlock IsVisible="{Binding DesignTool.TargetErrorMessage}"
-                                     Text="{Binding DesignTool.TargetErrorMessage}"
-                                     TextWrapping="Wrap"
-                                     FontSize="12"
-                                     Foreground="{DynamicResource DangerTextBrush}" />
-                        </StackPanel>
-                      </Border>
-                      <TextBlock IsVisible="{Binding !DesignTool.HasTargets}"
-                                 Text="{Binding DesignTool.TargetEmptyState}"
-                                 TextWrapping="Wrap"
-                                 FontSize="12"
-                                 Foreground="{DynamicResource MutedTextBrush}" />
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="Import PNG…"
-                                IsEnabled="{Binding !DesignTool.IsReadOnly}"
-                                Click="OnImportDesignFiles"
-                                ToolTip.Tip="Import one or more PNG Design files"
-                                AutomationProperties.Name="Import PNG Design files"
-                                Classes="storeSecondary" />
-                        <Button Content="Preview"
-                                Click="OnPreviewDesignFile"
-                                ToolTip.Tip="Preview the selected managed PNG"
-                                Classes="storeSecondary" />
-                        <Button Content="Export copy…"
-                                Click="OnExportDesignFile"
-                                ToolTip.Tip="Export an independent copy"
-                                Classes="storeSecondary" />
-                        <Button Content="Remove…"
-                                IsEnabled="{Binding !DesignTool.IsReadOnly}"
-                                Click="OnRequestRemoveDesignFile"
-                                ToolTip.Tip="Remove the selected Design file"
-                                Classes="storeSecondary" />
+
+                      <!-- Configuration -->
+                      <TextBlock Text="Listing Configuration"
+                                 FontSize="13" FontWeight="SemiBold"
+                                 Foreground="{DynamicResource StrongTextBrush}" />
+
+                      <StackPanel IsVisible="{Binding !DesignTool.HasConfiguration}" Spacing="8">
+                        <TextBlock Text="Select a listing configuration to show the design slot grid."
+                                   TextWrapping="Wrap" FontSize="12"
+                                   Foreground="{DynamicResource MutedTextBrush}" />
+                        <ComboBox ItemsSource="{Binding DesignTool.AvailableOfferings}"
+                                  DisplayMemberBinding="{Binding Name}"
+                                  SelectedItem="{Binding DesignTool.SelectedOffering}"
+                                  IsEnabled="{Binding !DesignTool.IsReadOnly}"
+                                  AutomationProperties.Name="Select configuration" />
                       </StackPanel>
-                      <Border IsVisible="{Binding IsDesignRemoveConfirmationVisible}"
-                              Padding="10"
-                              Background="{DynamicResource DangerBackgroundBrush}"
-                              CornerRadius="6">
-                        <StackPanel Spacing="8">
-                          <TextBlock Text="Remove this Design file and its managed copy permanently?"
-                                     TextWrapping="Wrap" />
-                          <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button Content="Remove"
-                                    Command="{Binding ConfirmDesignRemoveCommand}"
-                                    Classes="storeAction" />
-                            <Button Content="Cancel"
-                                    Command="{Binding CancelDesignRemoveCommand}"
-                                    Classes="storeSecondary" />
-                          </StackPanel>
-                        </StackPanel>
-                      </Border>
+
+                      <StackPanel IsVisible="{Binding DesignTool.HasConfiguration}" Spacing="4">
+                        <ComboBox ItemsSource="{Binding DesignTool.AvailableOfferings}"
+                                  DisplayMemberBinding="{Binding Name}"
+                                  SelectedItem="{Binding DesignTool.SelectedOffering}"
+                                  IsEnabled="{Binding !DesignTool.IsReadOnly}"
+                                  AutomationProperties.Name="Change configuration" />
+<TextBlock Text="{Binding DesignTool.SelectedOfferingName, StringFormat='Selected: {0}'}"
+                                           FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <TextBlock Text="{Binding DesignTool.SelectedOfferingStatus}"
+                                   IsVisible="{Binding DesignTool.SelectedOfferingStatus, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                   FontSize="11" Foreground="{DynamicResource AccentBrush}" />
+                      </StackPanel>
+
+                      <!-- Color Working Set -->
+                      <StackPanel IsVisible="{Binding DesignTool.HasConfiguration}" Spacing="6">
+                        <TextBlock Text="Color Working Set" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource StrongTextBrush}" />
+                        <TextBlock Text="Select the colors this design will use." FontSize="11"
+                                   Foreground="{DynamicResource SecondaryTextBrush}" />
+
+                        <ItemsControl ItemsSource="{Binding DesignTool.AvailableColors}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="stageTools:DesignColorViewModel">
+                              <ToggleButton Content="{Binding ColorValue}"
+                                            IsChecked="{Binding IsSelected}"
+                                            IsEnabled="{Binding !IsReadOnly}"
+                                            Click="OnColorToggle"
+                                            Classes="compactChip" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Text="Selected colors" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource StrongTextBrush}" />
+                        <ItemsControl ItemsSource="{Binding DesignTool.SelectedColors}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="stageTools:DesignColorViewModel">
+                              <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
+                                <TextBlock Text="{Binding ColorValue}"
+                                           Foreground="{DynamicResource PrimaryTextBrush}" />
+                                <Button Grid.Column="1" Content="Make specific"
+                                        IsEnabled="{Binding !IsReadOnly}"
+                                        Click="OnMakeSpecificForColor"
+                                        Tag="{Binding ColorValue}" FontSize="11"
+                                        Classes="compactButton"
+                                        AutomationProperties.Name="Make specific design for color" />
+                              </Grid>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+
+                      <!-- Row x Area Slot Grid -->
+                      <StackPanel IsVisible="{Binding DesignTool.HasConfiguration}" Spacing="6">
+                        <TextBlock Text="Design Slot Grid" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource StrongTextBrush}" />
+                        <ItemsControl ItemsSource="{Binding DesignTool.Rows}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="stageTools:DesignRowViewModel">
+                              <Border Padding="8" Margin="0,4"
+                                      Background="{DynamicResource PanelSurfaceBrush}"
+                                      BorderBrush="{DynamicResource SubtleBorderBrush}"
+                                      BorderThickness="1" CornerRadius="6">
+                                <StackPanel Spacing="6">
+                                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                                    <TextBlock Text="{Binding ColorChips}" FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource PrimaryTextBrush}" />
+                                    <Button Grid.Column="1" Content="Remove row"
+                                            IsVisible="{Binding CanRemove}"
+                                            Click="OnRemoveSpecificRow"
+                                            Tag="{Binding RowId}" FontSize="11"
+                                            Classes="compactButton" />
+                                  </Grid>
+                                  <ItemsControl ItemsSource="{Binding Slots}">
+                                    <ItemsControl.ItemsPanel>
+                                      <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="4" />
+                                      </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                      <DataTemplate x:DataType="stageTools:DesignSlotViewModel">
+                                        <Border Padding="4"
+                                                Background="{DynamicResource SubtleSurfaceBrush}"
+                                                BorderBrush="{DynamicResource SubtleBorderBrush}"
+                                                BorderThickness="1" CornerRadius="4"
+                                                Width="120" MinHeight="100"
+                                                DragDrop.DragOver="OnSlotDragOver"
+                                                DragDrop.Drop="OnSlotDrop"
+                                                AutomationProperties.Name="{Binding AreaName}">
+                                          <StackPanel Spacing="4">
+                                            <TextBlock Text="{Binding AreaName}" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource SecondaryTextBrush}" />
+                                            <Border IsVisible="{Binding HasImage}" Width="80" Height="60"
+                                                    Background="{DynamicResource PanelSurfaceBrush}" CornerRadius="4">
+<Image Source="{Binding Thumbnail}" Stretch="Uniform" />
+                                            </Border>
+                                            <Border IsVisible="{Binding !HasImage}" Width="80" Height="60"
+                                                    Background="{DynamicResource SubtleSurfaceBrush}" CornerRadius="4"
+                                                    BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1">
+                                              <TextBlock Text="+ Add image" FontSize="11"
+                                                         Foreground="{DynamicResource MutedTextBrush}"
+                                                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+<StackPanel IsVisible="{Binding HasImage}"
+                                                          Orientation="Horizontal" Spacing="2"
+                                                          HorizontalAlignment="Center">
+                                              <Button Content="View" Click="OnViewSlotImage"
+                                                      Tag="{Binding .}"
+                                                      IsEnabled="{Binding CanPreview}"
+                                                      FontSize="10" Classes="miniButton" />
+                                              <Button Content="Download" Click="OnExportSlotImage"
+                                                      Tag="{Binding .}"
+                                                      IsEnabled="{Binding CanExport}"
+                                                      FontSize="10" Classes="miniButton" />
+                                              <Button Content="Remove" IsEnabled="{Binding !IsReadOnly}"
+                                                      Tag="{Binding .}"
+                                                      Click="OnRemoveSlotImage"
+                                                      FontSize="10" Classes="miniButton" />
+                                            </StackPanel>
+                                            <TextBlock IsVisible="{Binding IsMissing}" Text="Missing" FontSize="10"
+                                                       Foreground="{DynamicResource DangerTextBrush}" />
+                                          </StackPanel>
+                                        </Border>
+                                      </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                  </ItemsControl>
+                                </StackPanel>
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+
+                      <!-- Supporting Images -->
+                      <StackPanel Spacing="6">
+                        <TextBlock Text="Supporting Images" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource StrongTextBrush}" />
+                        <TextBlock Text="Sketches, references, and existing artwork." FontSize="11"
+                                   Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <Button Content="Import supporting image&#x2026;"
+                                IsEnabled="{Binding !DesignTool.IsReadOnly}"
+                                Click="OnImportSupportingImage"
+                                Classes="storeSecondary"
+                                AutomationProperties.Name="Import supporting image" />
+                        <ItemsControl ItemsSource="{Binding DesignTool.SupportingImages}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="stageTools:DesignSlotViewModel">
+                              <Border Padding="4" Margin="2"
+                                      Background="{DynamicResource SubtleSurfaceBrush}"
+                                      BorderBrush="{DynamicResource SubtleBorderBrush}"
+                                      BorderThickness="1" CornerRadius="4" Width="90">
+                                <StackPanel Spacing="2">
+                                  <Border Width="64" Height="48"
+                                          Background="{DynamicResource PanelSurfaceBrush}" CornerRadius="4">
+                                    <Image Source="{Binding Thumbnail}" Stretch="Uniform" />
+                                  </Border>
+                                  <TextBlock Text="{Binding AreaName}" FontSize="10"
+                                             Foreground="{DynamicResource PrimaryTextBrush}"
+                                             TextTrimming="CharacterEllipsis" MaxWidth="64" />
+                                  <StackPanel Orientation="Horizontal" Spacing="2">
+                                    <Button Content="View" Click="OnViewSupportingImage"
+                                            Tag="{Binding .}"
+                                            IsEnabled="{Binding CanPreview}"
+                                            FontSize="10" Classes="miniButton" />
+                                    <Button Content="Download" Click="OnExportSupportingImage"
+                                            Tag="{Binding .}"
+                                            IsEnabled="{Binding CanExport}"
+                                            FontSize="10" Classes="miniButton" />
+                                    <Button Content="Remove" IsEnabled="{Binding !IsReadOnly}"
+                                            Tag="{Binding .}"
+                                            Click="OnRemoveSupportingImage"
+                                            FontSize="10" Classes="miniButton" />
+                                  </StackPanel>
+                                </StackPanel>
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+
+                      <!-- Error message -->
                       <TextBlock IsVisible="{Binding DesignTool.ErrorMessage}"
                                  Text="{Binding DesignTool.ErrorMessage}"
                                  TextWrapping="Wrap"
                                  Foreground="{DynamicResource DangerTextBrush}" />
+
+                      <!-- Removal confirmation -->
+                      <Border IsVisible="{Binding DesignTool.IsRemovalConfirmationVisible}"
+                              Padding="12"
+                              Background="{DynamicResource SubtleSurfaceBrush}"
+                              BorderBrush="{DynamicResource ControlBorderBrush}"
+                              BorderThickness="1"
+                              CornerRadius="6">
+                        <StackPanel Spacing="8">
+                          <TextBlock Text="{Binding DesignTool.RemovalConfirmationMessage}"
+                                     TextWrapping="Wrap"
+                                     FontSize="12"
+                                     Foreground="{DynamicResource PrimaryTextBrush}" />
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="Confirm remove"
+                                    Classes="danger"
+                                    Click="OnConfirmRemoval"
+                                    AutomationProperties.Name="Confirm remove design image" />
+                            <Button Content="Cancel"
+                                    Classes="storeSecondary"
+                                    Click="OnCancelRemoval"
+                                    AutomationProperties.Name="Cancel design image removal" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
                     </StackPanel>
                   </Border>
 

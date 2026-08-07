@@ -14,6 +14,7 @@ using FusionCanvas.App.Items;
 using FusionCanvas.App.Items.Import;
 using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Settings;
+using FusionCanvas.App.StageTools;
 using FusionCanvas.App.Stores;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.Domain.Workspace;
@@ -87,6 +88,13 @@ public partial class MainWindow : Window
             if (args.PropertyName == nameof(IdeationViewModel.IsOpen))
             {
                 SyncIdeationWindow(viewModel.Ideation);
+            }
+        };
+        viewModel.DesignTool.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(DesignStageToolViewModel.ShowPreviewDialog))
+            {
+                SyncDesignPreviewWindow(viewModel.DesignTool);
             }
         };
         viewModel.Settings.PropertyChanged += (_, args) =>
@@ -239,6 +247,26 @@ public partial class MainWindow : Window
         if (!ideation.IsOpen && _ideationWindow is not null)
         {
             _ideationWindow.Close();
+        }
+    }
+
+    private void SyncDesignPreviewWindow(DesignStageToolViewModel designTool)
+    {
+        if (designTool.ShowPreviewDialog && _designPreviewWindow is null)
+        {
+            _designPreviewWindow = new DesignPreviewWindow { DataContext = designTool };
+            _designPreviewWindow.Closed += (_, _) =>
+            {
+                _designPreviewWindow = null;
+                designTool.ClosePreviewDialog();
+            };
+            _designPreviewWindow.Show(this);
+            return;
+        }
+
+        if (!designTool.ShowPreviewDialog && _designPreviewWindow is not null)
+        {
+            _designPreviewWindow.Close();
         }
     }
 
@@ -426,10 +454,192 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void OnImportDesignFiles(object? sender, RoutedEventArgs e)
+    // === Design Stage Tool event handlers ===
+
+    private async void OnColorToggle(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is not MainWindowViewModel viewModel
-            || viewModel.ItemInspector.LoadedItemId is not Guid itemId
+        if (DataContext is not MainWindowViewModel vm || sender is not ToggleButton { DataContext: DesignColorViewModel colorVM } toggle)
+            return;
+        await vm.DesignTool.ToggleColorAsync(colorVM.ColorValue, toggle.IsChecked ?? false);
+    }
+
+    private async void OnMakeSpecificForColor(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm || sender is not Button { Tag: string colorValue } btn)
+            return;
+        await vm.DesignTool.MakeSpecificForColorAsync(colorValue);
+    }
+
+    private async void OnRemoveSpecificRow(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm || sender is not Button { Tag: Guid rowId } btn)
+            return;
+        vm.DesignTool.RequestRemoveSpecificRow(rowId);
+    }
+
+    private void OnSlotDragOver(object? sender, DragEventArgs e)
+    {
+        if (sender is not Border { DataContext: DesignSlotViewModel { IsReadOnly: false } })
+            return;
+        // Accept file drops (validation happens on drop)
+        e.DragEffects = DragDropEffects.Copy;
+        e.Handled = true;
+    }
+
+    private async void OnSlotDrop(object? sender, DragEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm)
+            return;
+        var slotVm = FindSlotViewModel(sender);
+        if (slotVm is null)
+            return;
+
+        var files = e.DataTransfer?.TryGetFiles();
+        if (files is null || files.Length == 0)
+            return;
+
+        var file = files[0];
+        var path = file.TryGetLocalPath();
+        if (path is null)
+        {
+            vm.DesignTool.ErrorMessage = "Could not read the dropped file path.";
+            e.Handled = true;
+            return;
+        }
+
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        if (ext != ".png")
+        {
+            vm.DesignTool.ErrorMessage = "Only PNG files can be assigned to slots. The dropped file was not imported.";
+            e.Handled = true;
+            return;
+        }
+
+        var rowVM = vm.DesignTool.Rows.FirstOrDefault(r => r.Slots.Contains(slotVm));
+        if (rowVM is null)
+            return;
+
+        vm.DesignTool.ErrorMessage = null;
+        await vm.DesignTool.AssignSlotImageAsync(rowVM.RowId, slotVm.DesignAreaId, path);
+        e.Handled = true;
+    }
+
+    private static DesignSlotViewModel? FindSlotViewModel(object? sender)
+    {
+        if (sender is Border { DataContext: DesignSlotViewModel slot })
+            return slot;
+        // Walk visual tree
+        for (var element = sender as Avalonia.Visual; element is not null; element = element.GetVisualParent())
+        {
+            if (element is Border { DataContext: DesignSlotViewModel s })
+                return s;
+        }
+        return null;
+    }
+
+    private async void OnViewSlotImage(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm)
+            return;
+        var slot = FindSlotViewModel(sender);
+        if (slot is null || slot.AssetId is null)
+            return;
+        var rowVM = vm.DesignTool.Rows.FirstOrDefault(r => r.Slots.Contains(slot));
+        if (rowVM is null)
+            return;
+
+        await vm.DesignTool.PreviewSlotImageAsync(rowVM.RowId, slot.DesignAreaId);
+    }
+
+    private async void OnRemoveSlotImage(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm)
+            return;
+        var slot = FindSlotViewModel(sender);
+        if (slot is null)
+            return;
+        var rowVM = vm.DesignTool.Rows.FirstOrDefault(r => r.Slots.Contains(slot));
+        if (rowVM is null)
+            return;
+
+        vm.DesignTool.RequestRemoveSlotImage(rowVM.RowId, slot.DesignAreaId);
+    }
+
+    private async void OnExportSlotImage(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm)
+            return;
+        var slot = FindSlotViewModel(sender);
+        if (slot is null || slot.AssetId is null)
+            return;
+        var rowVM = vm.DesignTool.Rows.FirstOrDefault(r => r.Slots.Contains(slot));
+        if (rowVM is null)
+            return;
+
+        if (!StorageProvider.CanSave)
+            return;
+
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export slot image",
+            DefaultExtension = ".png",
+            FileTypeChoices = [new FilePickerFileType("PNG image") { Patterns = ["*.png"] }]
+        });
+
+        if (file?.TryGetLocalPath() is { } path)
+        {
+            await vm.DesignTool.ExportSlotImageAsync(rowVM.RowId, slot.DesignAreaId, path);
+        }
+    }
+
+    private async void OnExportSupportingImage(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm)
+            return;
+        var slot = FindSupportingImageViewModel(sender);
+        if (slot?.AssetId is null)
+            return;
+
+        if (!StorageProvider.CanSave)
+            return;
+
+        // Compute default extension from the actual managed file
+        var ext = slot.ThumbnailPath is not null
+            ? Path.GetExtension(slot.ThumbnailPath)?.TrimStart('.')
+            : null;
+        if (string.IsNullOrEmpty(ext)) ext = "png";
+
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export supporting image",
+            DefaultExtension = $".{ext}",
+            FileTypeChoices = [new FilePickerFileType("Image files") { Patterns = ["*.png", "*.jpg", "*.jpeg", "*.svg", "*.gif", "*.bmp"] }]
+        });
+
+        if (file?.TryGetLocalPath() is { } path)
+        {
+            await vm.DesignTool.ExportSupportingImageAsync(slot.AssetId.Value, path);
+        }
+    }
+
+    private async void OnConfirmRemoval(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm)
+            return;
+        await vm.DesignTool.ConfirmPendingRemovalAsync();
+    }
+
+    private void OnCancelRemoval(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm)
+            return;
+        vm.DesignTool.CancelPendingRemoval();
+    }
+
+    private async void OnImportSupportingImage(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm
+            || vm.ItemInspector.LoadedItemId is not Guid itemId
             || !StorageProvider.CanOpen)
         {
             return;
@@ -437,90 +647,51 @@ public partial class MainWindow : Window
 
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Import PNG Design files",
-            AllowMultiple = true,
+            Title = "Import supporting image",
+            AllowMultiple = false,
             FileTypeFilter =
             [
-                new FilePickerFileType("PNG images") { Patterns = ["*.png"] },
+                new FilePickerFileType("Image files") { Patterns = ["*.png", "*.jpg", "*.jpeg", "*.svg", "*.gif", "*.bmp"] },
                 FilePickerFileTypes.All
             ]
         });
 
-        foreach (var file in files)
+        if (files.Count == 1 && files[0].TryGetLocalPath() is { } path)
         {
-            if (file.TryGetLocalPath() is { } path)
-            {
-                await viewModel.DesignTool.ImportAsync(itemId, path);
-            }
-        }
-
-        if (sender is Button importButton)
-        {
-            importButton.Focus();
+            await vm.DesignTool.ImportSupportingImageAsync(path);
         }
     }
 
-    private async void OnPreviewDesignFile(object? sender, RoutedEventArgs e)
+    private async void OnViewSupportingImage(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is not MainWindowViewModel viewModel)
-        {
+        if (DataContext is not MainWindowViewModel vm)
             return;
-        }
-
-        await using var stream = await viewModel.DesignTool.PreviewAsync();
-        if (stream is null)
-        {
+        var slot = FindSupportingImageViewModel(sender);
+        if (slot?.AssetId is null)
             return;
-        }
-
-        var bitmap = new Bitmap(stream);
-        _designPreviewWindow?.Close();
-        _designPreviewWindow = new Window
-        {
-            Title = viewModel.DesignTool.SelectedFile?.Name ?? "Design preview",
-            Width = Math.Clamp(bitmap.PixelSize.Width + 32, 320, 1000),
-            Height = Math.Clamp(bitmap.PixelSize.Height + 48, 240, 800),
-            Content = new Image
-            {
-                Source = bitmap,
-                Stretch = Avalonia.Media.Stretch.Uniform,
-                Margin = new Thickness(12)
-            }
-        };
-        _designPreviewWindow.Closed += (_, _) =>
-        {
-            bitmap.Dispose();
-            _designPreviewWindow = null;
-        };
-        _designPreviewWindow.Show(this);
+        vm.DesignTool.PreviewSupportingImage(slot.AssetId.Value, slot.ThumbnailPath);
     }
 
-    private async void OnExportDesignFile(object? sender, RoutedEventArgs e)
+    private async void OnRemoveSupportingImage(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is not MainWindowViewModel viewModel || !StorageProvider.CanSave)
-        {
+        if (DataContext is not MainWindowViewModel vm)
             return;
-        }
-
-        var destination = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-        {
-            Title = "Export Design file copy",
-            SuggestedFileName = viewModel.DesignTool.SelectedFile?.Name ?? "design.png",
-            FileTypeChoices = [new FilePickerFileType("PNG image") { Patterns = ["*.png"] }]
-        });
-
-        if (destination?.TryGetLocalPath() is { } path)
-        {
-            await viewModel.DesignTool.ExportAsync(path);
-        }
+        var slot = FindSupportingImageViewModel(sender);
+        if (slot?.AssetId is null)
+            return;
+        vm.DesignTool.RequestRemoveSupportingImage(slot.AssetId.Value);
     }
 
-    private void OnRequestRemoveDesignFile(object? sender, RoutedEventArgs e)
+    private static DesignSlotViewModel? FindSupportingImageViewModel(object? sender)
     {
-        if (DataContext is MainWindowViewModel { DesignTool.SelectedFile: not null } viewModel)
+        if (sender is Control { DataContext: DesignSlotViewModel slot })
+            return slot;
+        for (var element = sender as Avalonia.Visual; element is not null; element = element.GetVisualParent())
         {
-            viewModel.IsDesignRemoveConfirmationVisible = true;
+            if (element is Control { DataContext: DesignSlotViewModel s })
+                return s;
         }
+        return null;
     }
 
     private void OnTreeEditorAttached(object? sender, VisualTreeAttachmentEventArgs e)
