@@ -776,7 +776,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         if (context.EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group or WorkspaceEntityKind.Item)
         {
-            WorkspaceTree.SelectEntity(\n                context.Id,\n                notifySelectionChanged: false,\n                replaceMultiSelection: false);
+            WorkspaceTree.SelectEntity(
+                context.Id,
+                notifySelectionChanged: false,
+                replaceMultiSelection: false);
         }
 
         if (context.NavigationLocation is not null)
