@@ -21,7 +21,7 @@ public sealed class ConceptRefinementViewTests
         var conceptBorders = fixture.Window.GetVisualDescendants()
             .OfType<Border>()
             .Where(b => b.Child is StackPanel panel
-                && panel.Children.OfType<TextBlock>().Any(tb => tb.Text == "Refine with AI"))
+                && panel.Children.OfType<TextBlock>().Any(tb => tb.Text == "Base idea"))
             .ToList();
 
         Assert.All(conceptBorders, b => Assert.False(b.IsVisible));
@@ -35,13 +35,27 @@ public sealed class ConceptRefinementViewTests
         fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Concept);
         fixture.PumpLayout();
 
-        var header = fixture.FindControlOrDefault<TextBlock>(tb =>
-            tb.Text == "Refine with AI" && tb.IsVisible);
-        Assert.NotNull(header);
+        var baseIdeaLabel = fixture.FindControlOrDefault<TextBlock>(tb =>
+            tb.Text == "Base idea" && tb.IsVisible);
+        Assert.NotNull(baseIdeaLabel);
+
+        var baseIdea = fixture.FindControlOrDefault<TextBox>(tb =>
+            AutomationProperties.GetName(tb) == "Base idea" && tb.IsVisible);
+        Assert.NotNull(baseIdea);
+        Assert.True(baseIdea!.IsReadOnly);
 
         var initializeButton = fixture.FindControlOrDefault<Button>(b =>
             AutomationProperties.GetName(b) == "Initialize from base idea" && b.IsVisible);
         Assert.NotNull(initializeButton);
+
+        Assert.Null(fixture.FindControlOrDefault<TextBlock>(tb =>
+            tb.Text == "Refine with AI" && tb.IsVisible));
+        Assert.Null(fixture.FindControlOrDefault<TextBox>(tb =>
+            AutomationProperties.GetName(tb) == "Concept idea" && tb.IsVisible));
+        Assert.Null(fixture.FindControlOrDefault<TextBox>(tb =>
+            AutomationProperties.GetName(tb) == "Concept phrase" && tb.IsVisible));
+        Assert.Null(fixture.FindControlOrDefault<TextBox>(tb =>
+            AutomationProperties.GetName(tb) == "Graphics description" && tb.IsVisible));
     }
 
     [AvaloniaFact]

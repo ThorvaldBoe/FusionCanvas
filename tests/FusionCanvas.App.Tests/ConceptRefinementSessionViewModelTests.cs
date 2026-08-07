@@ -251,6 +251,83 @@ public sealed class ConceptRefinementSessionViewModelTests
     }
 
     [Fact]
+    public async Task CommitPendingWorkingEdits_PersistsManualTriangleAndAddsOneHistoryEntry()
+    {
+        var inspector = CreateInspector();
+        var vm = CreateSessionViewModel(inspector);
+
+        await SetupLoadedInspectorAsync(
+            inspector,
+            conceptIdea: "Stored idea",
+            phrase: "Stored phrase",
+            graphicDirection: "Stored graphic");
+        vm.ResetSession();
+
+        vm.ConceptIdeaInput = "Manual idea";
+        vm.PhraseInput = "Manual phrase";
+        vm.GraphicDirectionInput = "Manual graphic";
+
+        await vm.CommitPendingWorkingEditsAsync();
+
+        Assert.Equal("Manual idea", inspector.ConceptIdea);
+        Assert.Equal("Manual phrase", inspector.Phrase);
+        Assert.Equal("Manual graphic", inspector.GraphicDirection);
+        Assert.False(vm.HasPendingWorkingEdits);
+        Assert.Single(vm.History);
+        Assert.Equal("Edited Concept fields", vm.History[0].Label);
+    }
+
+    [Fact]
+    public async Task CommitPendingWorkingEdits_WhenSaveFails_PreservesPendingValues()
+    {
+        var inspector = CreateInspector();
+        var vm = CreateSessionViewModel(inspector);
+
+        await SetupLoadedInspectorAsync(
+            inspector,
+            failSaves: true,
+            conceptIdea: "Stored idea",
+            phrase: "Stored phrase",
+            graphicDirection: "Stored graphic");
+        vm.ResetSession();
+        vm.ConceptIdeaInput = "Manual idea";
+
+        await vm.CommitPendingWorkingEditsAsync();
+
+        Assert.True(vm.HasPendingWorkingEdits);
+        Assert.Equal("Manual idea", vm.ConceptIdeaInput);
+        Assert.Equal("Manual idea", inspector.ConceptIdea);
+        Assert.True(inspector.HasError);
+    }
+
+    [Fact]
+    public async Task ManualWorkingEdits_PersistWhenAiIsUnavailable()
+    {
+        var inspector = CreateInspector();
+        var vm = new ConceptRefinementSessionViewModel(
+            new StubRefinementService(),
+            new StubRefinementAccess(false),
+            inspector);
+
+        await SetupLoadedInspectorAsync(inspector);
+        vm.ResetSession();
+
+        vm.ConceptIdeaInput = "Manual idea";
+        vm.PhraseInput = "Manual phrase";
+        vm.GraphicDirectionInput = "Manual graphic";
+
+        Assert.False(vm.CanInitialize);
+        Assert.False(vm.CanFineTuneConceptIdea);
+        Assert.False(vm.CanChangePhrase);
+
+        await vm.CommitPendingWorkingEditsAsync();
+
+        Assert.Equal("Manual idea", inspector.ConceptIdea);
+        Assert.Equal("Manual phrase", inspector.Phrase);
+        Assert.Equal("Manual graphic", inspector.GraphicDirection);
+    }
+
+    [Fact]
     public async Task RefinementFailure_PreservesWorkingInputsAndInspectorState()
     {
         var inspector = CreateInspector();
