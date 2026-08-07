@@ -8,7 +8,19 @@ Defines accepted behavior for the Concept refinement tool: AI-assisted iterative
 
 
 ### Requirement: Concept refinement lives in the Concept stage surface
-FusionCanvas SHALL present a Concept refinement section inside the existing Concept stage surface of the Item document, directly below the Concept idea, Phrase, and Graphics description fields. The section SHALL follow the visibility of the Concept stage surface and SHALL be disabled whenever the Concept fields are read-only.
+FusionCanvas SHALL present one continuous Concept editing surface inside the Item document. The surface SHALL show the original Base idea as read-only context, provide the manual Concept idea, Phrase, and Graphic direction working fields, and provide the Initialize, per-corner Fine tune and Change actions, per-corner Instructions fields, completeness score, and session history in that order. The surface SHALL follow the visibility of the Concept stage surface and SHALL make the three working fields and refinement actions read-only or disabled whenever the Concept fields are read-only. The surface SHALL NOT render a second upper set of Concept idea, Phrase, or Graphic direction editors or a separate `Refine with AI` section heading.
+
+#### Scenario: Unified Concept surface appears
+- **WHEN** an Item document shows the Concept stage surface
+- **THEN** the surface shows Base idea, Initialize from base idea, the three working fields, their refinement actions and Instructions fields, Triangle completeness, and refinement history in one continuous Concept surface
+- **AND** no duplicate upper Concept idea, Phrase, or Graphic direction editors are visible
+- **AND** no `Refine with AI` heading or separate refinement framing is visible
+
+#### Scenario: Base idea is visible but not editable in Concept
+- **WHEN** an Item document shows the Concept stage surface
+- **THEN** the Base idea field displays the Item's original Idea value
+- **AND** the Base idea field is read-only even when the Concept stage is current and editable
+- **AND** editing Concept content does not change the original Idea value
 
 #### Scenario: Section appears with the Concept stage surface
 - **WHEN** an Item document shows the Concept stage surface
@@ -91,7 +103,7 @@ FusionCanvas SHALL provide a `Fine tune` action and a `Change` action for each o
 - **AND** its Change action remains available
 
 ### Requirement: Per-corner refinement instruction fields guide Fine tune and Change
-FusionCanvas SHALL provide three small instruction text fields in the Refine with AI panel, one for each design-triangle corner (Concept idea, Phrase, Graphic direction), each unlabeled and placed just below that corner's Fine tune/Change button pair, using the placeholder text `Instructions`. When a field contains non-whitespace text, that instruction SHALL be included in the AI request for that corner's Fine tune or Change action as supplemental guidance. When a field is empty or whitespace-only, behavior SHALL be identical to today. After a Fine tune or Change action for a corner applies a successful result, FusionCanvas SHALL clear that corner's instruction field; a failed or cancelled operation SHALL preserve the instruction text. Instruction text SHALL NOT be persisted and SHALL NOT appear in history.
+FusionCanvas SHALL provide three small instruction text fields in the unified Concept surface, one for each design-triangle corner (Concept idea, Phrase, Graphic direction), each unlabeled and placed just below that corner's Fine tune/Change button pair, using the placeholder text `Instructions`. When a field contains non-whitespace text, that instruction SHALL be included in the AI request for that corner's Fine tune or Change action as supplemental guidance. When a field is empty or whitespace-only, behavior SHALL be identical to today. After a Fine tune or Change action for a corner applies a successful result, FusionCanvas SHALL clear that corner's instruction field; a failed or cancelled operation SHALL preserve the instruction text. Instruction text SHALL NOT be persisted and SHALL NOT appear in history.
 
 #### Scenario: Instruction steers a Fine tune
 - **WHEN** the Phrase instruction field contains "make the phrase shorter" and the user activates Fine tune for the Phrase
@@ -134,7 +146,7 @@ FusionCanvas SHALL provide three small instruction text fields in the Refine wit
 - **THEN** all three instruction fields are read-only
 
 ### Requirement: Refinement actions use readable editable working triangle values
-FusionCanvas SHALL present the Concept idea, Phrase, and Graphic direction values in the Refine with AI panel as complete, legible, editable working fields. The working fields SHALL initialize from the current Item inspector drafts, SHALL synchronize when the corresponding inspector draft changes, and SHALL remain session-local until an AI result is applied through the existing inspector draft and automatic-save path. Fine tune and Change SHALL capture all three working-field values at activation time and SHALL use that captured triangle as the current refinement context.
+FusionCanvas SHALL present the Concept idea, Phrase, and Graphic direction values in the unified Concept surface as complete, legible, editable working fields when the Concept stage is editable. The working fields SHALL initialize from the current Item inspector drafts and SHALL synchronize when the corresponding inspector draft changes. When a working field changes, the change SHALL remain a pending local draft until field exit or a required context transition, at which point it SHALL be copied to the corresponding inspector draft and committed through the existing automatic-save path. Fine tune and Change SHALL capture all three working-field values at activation time and SHALL use that captured triangle as the current refinement context.
 
 #### Scenario: Complete current values are legible
 - **WHEN** a Concept draft contains text longer than the available single-line panel width
@@ -157,9 +169,28 @@ FusionCanvas SHALL present the Concept idea, Phrase, and Graphic direction value
 - **THEN** the refinement request captures the three current working-field values
 - **AND** the selected corner and action are Change
 
-#### Scenario: Local editing has no persistence side effect
-- **WHEN** the user edits a refinement working field without applying a successful AI result
-- **THEN** the Item inspector draft, persisted Item, refinement history, and completeness score remain unchanged
+#### Scenario: Manual working-field edit commits on field exit
+- **WHEN** the Concept stage is editable and the user changes a refinement working field and moves focus away from it
+- **THEN** only the corresponding inspector draft is updated with the working-field value
+- **AND** the value is committed through the automatic-save path
+- **AND** the other two triangle values and Base idea remain unchanged
+
+#### Scenario: Manual Concept editing works without AI
+- **WHEN** Concept-purpose AI is unavailable but the Concept stage is editable
+- **THEN** the three working fields remain editable
+- **AND** a manual field edit can be committed and persisted
+- **AND** Initialize, Fine tune, and Change remain visible but disabled with actionable guidance
+
+#### Scenario: Pending working edits commit before context transition
+- **WHEN** a working field has a pending local edit and the user changes Item, tab, active view stage, lifecycle state, or closes the document
+- **THEN** FusionCanvas attempts to copy and commit the pending triangle values before completing the transition
+- **AND** it does not silently discard the pending value
+
+#### Scenario: Working-field commit failure preserves local input
+- **WHEN** a pending working-field commit fails validation or persistence
+- **THEN** the refinement working field retains the user's local value
+- **AND** an inline actionable error is shown
+- **AND** the affected context does not silently advance past the failed commit
 
 #### Scenario: Failure or cancellation preserves local input
 - **WHEN** Fine tune or Change fails or is cancelled before applying a result
