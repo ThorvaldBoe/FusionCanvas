@@ -271,16 +271,40 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnTreeNodePointerPressed(object? sender, PointerPressedEventArgs e)
+    private void OnWorkspaceTreePointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is not Control { DataContext: WorkspaceTreeNodeViewModel node } control ||
+        if (sender is not TreeView tree ||
             DataContext is not MainWindowViewModel viewModel ||
-            node.IsEditing)
+            e.Source is not Visual source)
         {
             return;
         }
 
-        var point = e.GetCurrentPoint(control);
+        var point = e.GetCurrentPoint(tree);
+        if (point.Properties.PointerUpdateKind == PointerUpdateKind.LeftButtonPressed &&
+            (source is ToggleButton || source.GetVisualAncestors().OfType<ToggleButton>().Any()))
+        {
+            var expander = tree.GetVisualDescendants()
+                .OfType<ToggleButton>()
+                .Select(button => new { Button = button, Node = button.DataContext as WorkspaceTreeNodeViewModel })
+                .FirstOrDefault(candidate => candidate.Node is { HasChildren: true } && IsWithinExpanderHitTarget(e, candidate.Button));
+            if (expander?.Node is { } expandedNode)
+            {
+                expandedNode.IsExpanded = !expandedNode.IsExpanded;
+                e.Handled = true;
+            }
+
+            return;
+        }
+
+        var row = (source as Border)?.Classes.Contains("treeRow") == true
+            ? (Border)source
+            : source.GetVisualAncestors().OfType<Border>().FirstOrDefault(border => border.Classes.Contains("treeRow"));
+        if (row?.DataContext is not WorkspaceTreeNodeViewModel node || node.IsEditing)
+        {
+            return;
+        }
+
         if (point.Properties.PointerUpdateKind == PointerUpdateKind.MiddleButtonPressed)
         {
             viewModel.WorkspaceTree.OpenInTabPreservingSelection(node);
@@ -297,35 +321,13 @@ public partial class MainWindow : Window
             var shiftPressed = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
             viewModel.WorkspaceTree.SelectNodeWithModifiers(node, controlPressed && !shiftPressed, shiftPressed, controlPressed);
             e.Handled = true;
-        }
 
-        if (node.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Item && point.Properties.IsLeftButtonPressed)
-        {
-            _dragPointerArgs = e;
-            _dragNode = node;
-            _dragStart = point.Position;
-        }
-    }
-
-    private void OnWorkspaceTreePointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (sender is not TreeView ||
-            !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed ||
-            e.Source is not Visual source ||
-            source is ToggleButton ||
-            source.GetVisualAncestors().OfType<ToggleButton>().Any())
-        {
-            return;
-        }
-
-        var expander = ((TreeView)sender).GetVisualDescendants()
-            .OfType<ToggleButton>()
-            .Select(button => new { Button = button, Node = button.DataContext as WorkspaceTreeNodeViewModel })
-            .FirstOrDefault(candidate => candidate.Node is { HasChildren: true } && IsWithinExpanderHitTarget(e, candidate.Button));
-        if (expander?.Node is { } node)
-        {
-            node.IsExpanded = !node.IsExpanded;
-            e.Handled = true;
+            if (node.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Item)
+            {
+                _dragPointerArgs = e;
+                _dragNode = node;
+                _dragStart = e.GetPosition(row);
+            }
         }
     }
 
