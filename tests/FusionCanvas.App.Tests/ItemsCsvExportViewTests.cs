@@ -11,6 +11,36 @@ namespace FusionCanvas.App.Tests;
 public class ItemsCsvExportViewTests
 {
     private const string ExportHeader = "Export to CSV...";
+    private const string NewGroupHeader = "New group";
+
+    [AvaloniaFact]
+    public void NewGroupMenuShowsOnNicheAndGroupRows_AndHidesOnItemRows()
+    {
+        using var fixture = new MainWindowFixture();
+        ExpandAll(fixture.ViewModel.WorkspaceTree.Roots);
+        fixture.PumpLayout();
+
+        var rowMenus = fixture.Window.GetVisualDescendants()
+            .OfType<Border>()
+            .Where(border => border.GetValue(ContextMenu.ContextMenuProperty) is not null)
+            .Where(border => border.DataContext is WorkspaceTreeNodeViewModel)
+            .Select(border => (Node: (WorkspaceTreeNodeViewModel)border.DataContext!,
+                Menu: border.GetValue(ContextMenu.ContextMenuProperty)!))
+            .GroupBy(entry => entry.Node.EntityKind)
+            .Select(group => group.First())
+            .ToArray();
+
+        foreach (var (node, menu) in rowMenus)
+        {
+            menu.Open();
+            fixture.PumpLayout();
+            var newGroupItem = EnumerateMenuItems(menu)
+                .FirstOrDefault(item => Equals(item.Header, NewGroupHeader));
+            Assert.NotNull(newGroupItem);
+            Assert.Equal(node.EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group,
+                newGroupItem!.IsVisible);
+        }
+    }
 
     [AvaloniaFact]
     public void ExportMenuShowsOnNicheAndGroupRows_AndHidesOnItemRows()

@@ -828,7 +828,7 @@ public partial class MainWindow : Window
 
     private async void OnContextNewGroup(object? sender, RoutedEventArgs e)
     {
-        if (TrySelectContextGroup(sender, out var viewModel, out _))
+        if (TrySelectContextTopic(sender, out var viewModel, out _))
         {
             await viewModel.WorkspaceTree.BeginCreateAsync();
             FocusVisibleTreeEditor();
