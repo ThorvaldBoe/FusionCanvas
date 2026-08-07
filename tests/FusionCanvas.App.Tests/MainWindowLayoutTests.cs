@@ -155,6 +155,39 @@ public class MainWindowConstructionTests
     }
 
     [AvaloniaFact]
+    public void TreePointerInput_PlainClickThenShiftClickSelectsContiguousRange()
+    {
+        using var fixture = new MainWindowFixture();
+        var tree = fixture.ViewModel.WorkspaceTree;
+        var root = Assert.Single(tree.Roots);
+        root.IsExpanded = true;
+        fixture.PumpLayout();
+
+        var rows = fixture.Window.GetVisualDescendants()
+            .OfType<Border>()
+            .Where(border => border.Classes.Contains("treeRow"))
+            .Select(border => new { Row = border, Node = border.DataContext as WorkspaceTreeNodeViewModel })
+            .Where(candidate => candidate.Node is { EntityKind: WorkspaceEntityKind.Group or WorkspaceEntityKind.Item })
+            .ToArray();
+        Assert.True(rows.Length >= 3);
+
+        var anchor = rows[0];
+        var clicked = rows[2];
+        var anchorPoint = anchor.Row.TranslatePoint(new Avalonia.Point(8, 8), fixture.Window);
+        var clickedPoint = clicked.Row.TranslatePoint(new Avalonia.Point(8, 8), fixture.Window);
+        Assert.True(anchorPoint.HasValue);
+        Assert.True(clickedPoint.HasValue);
+
+        HeadlessWindowExtensions.MouseDown(fixture.Window, anchorPoint!.Value, MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseUp(fixture.Window, anchorPoint.Value, MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseDown(fixture.Window, clickedPoint!.Value, MouseButton.Left, RawInputModifiers.Shift);
+        HeadlessWindowExtensions.MouseUp(fixture.Window, clickedPoint.Value, MouseButton.Left, RawInputModifiers.Shift);
+
+        Assert.Equal(3, tree.SelectedEntityCount);
+        Assert.Equal(clicked.Node!.EntityId, tree.SelectedNode!.EntityId);
+    }
+
+    [AvaloniaFact]
     public void WorkflowStageNavigation_ShowsCorrectStageTool()
     {
         using var fixture = new MainWindowFixture();
