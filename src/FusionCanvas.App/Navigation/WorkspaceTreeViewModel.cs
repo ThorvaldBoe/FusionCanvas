@@ -763,7 +763,10 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         RefreshProjection();
     }
 
-    public void SelectEntity(\n        Guid? entityId,\n        bool notifySelectionChanged = true,\n        bool replaceMultiSelection = true)
+    public void SelectEntity(
+        Guid? entityId,
+        bool notifySelectionChanged = true,
+        bool replaceMultiSelection = true)
     {
         Select(entityId is Guid id ? FindNode(id) : null, notifySelectionChanged, replaceMultiSelection);
     }
