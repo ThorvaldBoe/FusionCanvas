@@ -311,7 +311,7 @@
                       <MenuItem Header="{Binding SelectionCountLabel}"
                                 IsVisible="{Binding HasMultiSelectionContext}"
                                 IsEnabled="False" />
-                      <MenuItem Header="New group (subgroup)" IsVisible="{Binding IsGroupAndSingleSelection}" Click="OnContextNewGroup" />
+                      <MenuItem Header="New group" IsVisible="{Binding IsTopicAndSingleSelection}" Click="OnContextNewGroup" />
                       <MenuItem Header="New Item" IsVisible="{Binding IsSingleSelectionContext}" Click="OnContextNewItem" />
                       <MenuItem Header="Import…" IsVisible="{Binding IsTopicAndSingleSelection}" Click="OnContextImport" />
                       <Separator />
