@@ -34,6 +34,22 @@ public sealed class ItemCsvExportService : IItemCsvExportService
             .ToArray();
     }
 
+    public IReadOnlyList<ItemCsvRow> ProjectSelected(WorkspaceSnapshot snapshot, IReadOnlyList<Guid> itemIds)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(itemIds);
+
+        var selected = itemIds.ToHashSet();
+        return snapshot.Items
+            .Where(item => selected.Contains(item.Id))
+            .Where(item => ItemHierarchy.IsEffectivelyActive(snapshot, item))
+            .Where(item => !IsEmpty(snapshot, item))
+            .OrderBy(item => item.CreatedAt)
+            .ThenBy(item => item.Id)
+            .Select(item => ProjectRow(snapshot, item))
+            .ToArray();
+    }
+
     private static IReadOnlyList<Item> ProjectGroup(WorkspaceSnapshot snapshot, Guid groupId)
     {
         var group = snapshot.Groups.SingleOrDefault(candidate => candidate.Id == groupId);

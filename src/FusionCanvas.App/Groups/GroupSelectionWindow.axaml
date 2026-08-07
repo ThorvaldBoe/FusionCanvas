@@ -1,0 +1,41 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:groups="using:FusionCanvas.App.Groups"
+        x:Class="FusionCanvas.App.Groups.GroupSelectionWindow"
+        x:DataType="groups:GroupSelectionViewModel"
+        Title="Group selection"
+        Width="520"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner">
+  <Grid RowDefinitions="Auto,Auto,Auto" Margin="24" RowSpacing="16">
+    <StackPanel Spacing="8">
+      <TextBlock Text="Group selected entities"
+                 FontSize="20"
+                 FontWeight="SemiBold" />
+      <TextBlock Text="Create a group and move the selected Items and groups beneath it."
+                 TextWrapping="Wrap"
+                 Foreground="{DynamicResource SecondaryTextBrush}" />
+    </StackPanel>
+    <StackPanel Grid.Row="1" Spacing="10">
+      <TextBlock Text="Name" FontWeight="SemiBold" />
+      <TextBox Text="{Binding Name, Mode=TwoWay}"
+               PlaceholderText="Group name" />
+      <TextBlock Text="Destination" FontWeight="SemiBold" />
+      <ComboBox ItemsSource="{Binding Destinations}"
+                SelectedItem="{Binding SelectedDestination, Mode=TwoWay}"
+                DisplayMemberBinding="{Binding DisplayPath}" />
+      <TextBlock Text="{Binding ErrorMessage}"
+                 IsVisible="{Binding HasError}"
+                 Foreground="{DynamicResource DangerStrongBrush}"
+                 TextWrapping="Wrap" />
+    </StackPanel>
+    <StackPanel Grid.Row="2"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8">
+      <Button Content="Cancel" MinWidth="90" Click="OnCancelClick" />
+      <Button Content="Group" MinWidth="90" Click="OnConfirmClick" />
+    </StackPanel>
+  </Grid>
+</Window>

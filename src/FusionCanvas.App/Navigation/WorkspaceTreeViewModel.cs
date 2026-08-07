@@ -259,6 +259,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         SelectNodeCommand = new RelayCommand(parameter => Select(parameter as WorkspaceTreeNodeViewModel));
         OpenInTabCommand = new RelayCommand(parameter => OpenInTab(parameter as WorkspaceTreeNodeViewModel));
         OpenSelectedInTabsCommand = new RelayCommand(_ => OpenSelectedInTabs());
+        ExportSelectedCommand = new RelayCommand(_ => Run(ExportSelectedAsync()));
         BeginCreateCommand = new RelayCommand(_ => Run(BeginCreateAsync()));
         BeginCreateItemCommand = new RelayCommand(_ => Run(BeginCreateItemAsync()));
         BeginRenameCommand = new RelayCommand(_ => BeginRename());
@@ -296,6 +297,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     public ICommand SelectNodeCommand { get; }
     public ICommand OpenInTabCommand { get; }
     public ICommand OpenSelectedInTabsCommand { get; }
+    public ICommand ExportSelectedCommand { get; }
     public ICommand BeginCreateCommand { get; }
     public ICommand BeginCreateItemCommand { get; }
     public ICommand BeginRenameCommand { get; }
@@ -1409,7 +1411,14 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
         if (replaceMultiSelection)
         {
-            _multiSelection.Replace(node.EntityId);
+            if (node.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Item)
+            {
+                _multiSelection.Replace(node.EntityId);
+            }
+            else
+            {
+                _multiSelection.Clear();
+            }
         }
 
         SelectedNode = node;
@@ -1439,6 +1448,16 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         OpenInTabRequested?.Invoke(this, new WorkspaceTreeSelection(node.EntityKind, node.EntityId));
     }
 
+    public void OpenInTabPreservingSelection(WorkspaceTreeNodeViewModel? node)
+    {
+        if (node is null || node.IsDraft)
+        {
+            return;
+        }
+
+        OpenInTabRequested?.Invoke(this, new WorkspaceTreeSelection(node.EntityKind, node.EntityId));
+    }
+
     private void OpenSelectedInTabs()
     {
         var selections = _multiSelection.SelectedIds
@@ -1451,6 +1470,262 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             OpenSelectedInTabsRequested?.Invoke(this, selections);
         }
     }
+
+    public async Task ExportSelectedAsync()
+    {
+        if (IsBusy || !HasMultiSelection)
+        {
+            return;
+        }
+
+        var itemIds = new HashSet<Guid>();
+        var sources = WorkspaceTreeSelectionNormalizer.Normalize(
+            _snapshot,
+            _multiSelection.SelectedIds.Select(id => FindNode(id))
+                .Where(node => node is { IsDraft: false })
+                .Select(node => new WorkspaceTreeSelection(node!.EntityKind, node.EntityId)));
+        foreach (var source in sources)
+        {
+            if (source.Kind == WorkspaceEntityKind.Item)
+            {
+                itemIds.Add(source.Id);
+                continue;
+            }
+
+            if (_snapshot.Groups.SingleOrDefault(group => group.Id == source.Id) is { } group)
+            {
+                var groupIds = GroupHierarchy.GetDescendants(_snapshot, group)
+                    .Append(group)
+                    .Select(candidate => candidate.Id)
+                    .ToHashSet();
+                foreach (var item in _snapshot.Items.Where(item => item.GroupId is Guid groupId && groupIds.Contains(groupId)))
+                {
+                    itemIds.Add(item.Id);
+                }
+            }
+        }
+
+        var stream = await FilePicker.OpenExportAsync().ConfigureAwait(false);
+        if (stream is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using (stream)
+            {
+                await CsvCodec.WriteAsync(stream, _csvExport.ProjectSelected(_snapshot, [.. itemIds])).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            ErrorMessage = "The selected items could not be exported to CSV.";
+        }
+    }
+
+    public IReadOnlyList<GroupDestination> GetGroupDestinationsForSelection()
+    {
+        if (_storeId is not Guid storeId)
+        {
+            return [];
+        }
+
+        var selectedGroups = _multiSelection.SelectedIds
+            .Select(id => _snapshot.Groups.SingleOrDefault(group => group.Id == id))
+            .Where(group => group is not null)
+            .Select(group => group!.Id)
+            .ToHashSet();
+        var excluded = selectedGroups
+            .SelectMany(id => GroupHierarchy.GetDescendants(_snapshot, _snapshot.Groups.Single(group => group.Id == id)).Select(group => group.Id).Append(id))
+            .ToHashSet();
+        var destinations = new List<GroupDestination>();
+        foreach (var niche in _snapshot.Niches.Where(niche => niche.StoreId == storeId && !niche.IsArchived))
+        {
+            destinations.Add(new GroupDestination(new GroupParentReference(WorkspaceEntityKind.Niche, niche.Id), storeId, niche.Id, niche.Name));
+            foreach (var group in _snapshot.Groups
+                         .Where(group => group.StoreId == storeId && !group.IsArchived && !excluded.Contains(group.Id) &&
+                                         GroupHierarchy.IsEffectivelyActive(_snapshot, group) &&
+                                         GroupHierarchy.GetEffectiveNiche(_snapshot, group).Id == niche.Id)
+                         .OrderBy(group => group.SortOrder)
+                         .ThenBy(group => group.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                var path = GroupHierarchy.GetAncestors(_snapshot, group).Select(ancestor => ancestor.Name).Append(group.Name);
+                destinations.Add(new GroupDestination(new GroupParentReference(WorkspaceEntityKind.Group, group.Id), storeId, niche.Id, $"{niche.Name} / {string.Join(" / ", path)}"));
+            }
+        }
+
+        return destinations;
+    }
+
+    public GroupDestination? GetDefaultGroupDestination(IReadOnlyList<GroupDestination> destinations)
+    {
+        var sources = WorkspaceTreeSelectionNormalizer.Normalize(
+            _snapshot,
+            _multiSelection.SelectedIds.Select(id => FindNode(id))
+                .Where(node => node is { IsDraft: false })
+                .Select(node => new WorkspaceTreeSelection(node!.EntityKind, node.EntityId)));
+        if (sources.Count == 0)
+        {
+            return destinations.FirstOrDefault();
+        }
+
+        var parents = sources.Select(source => source.Kind == WorkspaceEntityKind.Group
+                ? new GroupParentReference(
+                    _snapshot.Groups.Single(group => group.Id == source.Id).NicheId is not null ? WorkspaceEntityKind.Niche : WorkspaceEntityKind.Group,
+                    _snapshot.Groups.Single(group => group.Id == source.Id).NicheId ?? _snapshot.Groups.Single(group => group.Id == source.Id).ParentGroupId!.Value)
+                : _snapshot.Items.Single(item => item.Id == source.Id).GroupId is Guid groupId
+                    ? new GroupParentReference(WorkspaceEntityKind.Group, groupId)
+                    : new GroupParentReference(WorkspaceEntityKind.Niche, _snapshot.Items.Single(item => item.Id == source.Id).NicheId!.Value))
+            .Distinct()
+            .ToArray();
+        return parents.Length == 1
+            ? destinations.SingleOrDefault(destination => destination.Parent == parents[0]) ?? destinations.FirstOrDefault()
+            : destinations.FirstOrDefault();
+    }
+
+    public async Task GroupSelectedAsync(string name, GroupDestination destination)
+    {
+        if (IsBusy || !HasMultiSelection || string.IsNullOrWhiteSpace(name))
+        {
+            return;
+        }
+
+        var sources = WorkspaceTreeSelectionNormalizer.Normalize(
+            _snapshot,
+            _multiSelection.SelectedIds.Select(id => FindNode(id))
+                .Where(node => node is { IsDraft: false })
+                .Select(node => new WorkspaceTreeSelection(node!.EntityKind, node.EntityId)));
+        if (sources.Count == 0)
+        {
+            ErrorMessage = "Select at least one active Item or group to group.";
+            return;
+        }
+
+        var originalSnapshot = _snapshot;
+        var originalSelectedIds = _multiSelection.SelectedIds.ToArray();
+        var originalActiveId = _multiSelection.ActiveId;
+        var originalAnchorId = _multiSelection.AnchorId;
+        IsBusy = true;
+        ErrorMessage = null;
+        var created = await _groups.CreateGroupAsync(new GroupManagementCreateRequest(destination.Parent, name.Trim())).ConfigureAwait(false);
+        if (!created.Succeeded || created.Group is null)
+        {
+            IsBusy = false;
+            ErrorMessage = created.Error ?? "The group could not be created.";
+            return;
+        }
+
+        var parent = new GroupParentReference(WorkspaceEntityKind.Group, created.Group.Id);
+        foreach (var source in sources)
+        {
+            var error = source.Kind == WorkspaceEntityKind.Item
+                ? (await _items.MoveItemAsync(new ItemManagementMoveRequest(source.Id, new ItemTopicReference(WorkspaceEntityKind.Group, created.Group.Id))).ConfigureAwait(false)).Error
+                : (await _groups.MoveGroupAsync(new GroupManagementMoveRequest(source.Id, parent)).ConfigureAwait(false)).Error;
+            if (!string.IsNullOrWhiteSpace(error))
+            {
+                await RestoreBatchFailureAsync(originalSnapshot, originalSelectedIds, originalActiveId, originalAnchorId, error).ConfigureAwait(false);
+                return;
+            }
+        }
+
+        IsBusy = false;
+        await ReloadAsync().ConfigureAwait(false);
+        _multiSelection.Restore(originalSelectedIds, originalActiveId, originalAnchorId);
+        ApplyMultiSelectionVisualState();
+        StructureChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public async Task ArchiveSelectedAsync()
+    {
+        if (IsBusy || !HasMultiSelection)
+        {
+            return;
+        }
+
+        var sources = GetEffectiveSelectedSources();
+        var originalSnapshot = _snapshot;
+        var originalSelectedIds = _multiSelection.SelectedIds.ToArray();
+        var originalActiveId = _multiSelection.ActiveId;
+        var originalAnchorId = _multiSelection.AnchorId;
+        IsBusy = true;
+        ErrorMessage = null;
+        foreach (var source in sources)
+        {
+            var error = source.Kind == WorkspaceEntityKind.Item
+                ? (await _items.ArchiveItemAsync(source.Id).ConfigureAwait(false)).Error
+                : (await _groups.ArchiveGroupAsync(source.Id).ConfigureAwait(false)).Error;
+            if (!string.IsNullOrWhiteSpace(error))
+            {
+                await RestoreBatchFailureAsync(originalSnapshot, originalSelectedIds, originalActiveId, originalAnchorId, error).ConfigureAwait(false);
+                return;
+            }
+        }
+
+        IsBusy = false;
+        await ReloadAsync().ConfigureAwait(false);
+        _multiSelection.Restore(originalSelectedIds, originalActiveId, originalAnchorId);
+        _multiSelection.Reconcile(SelectableEntityIdsForStore(_storeId!.Value));
+        ApplyMultiSelectionVisualState();
+        StructureChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public async Task DeleteSelectedAsync()
+    {
+        if (IsBusy || !HasMultiSelection)
+        {
+            return;
+        }
+
+        var sources = GetEffectiveSelectedSources();
+        var deletedIds = new HashSet<Guid>();
+        var originalSnapshot = _snapshot;
+        var originalSelectedIds = _multiSelection.SelectedIds.ToArray();
+        var originalActiveId = _multiSelection.ActiveId;
+        var originalAnchorId = _multiSelection.AnchorId;
+        IsBusy = true;
+        ErrorMessage = null;
+        foreach (var source in sources)
+        {
+            if (source.Kind == WorkspaceEntityKind.Item)
+            {
+                var result = await _items.DeleteItemAsync(new ItemManagementDeleteRequest(source.Id, true)).ConfigureAwait(false);
+                if (!result.Succeeded)
+                {
+                    await RestoreBatchFailureAsync(originalSnapshot, originalSelectedIds, originalActiveId, originalAnchorId, result.Error).ConfigureAwait(false);
+                    return;
+                }
+
+                deletedIds.Add(source.Id);
+            }
+            else
+            {
+                var impact = GetDeleteImpact(source.Id);
+                var result = await _groups.DeleteGroupAsync(new GroupManagementDeleteRequest(source.Id, true)).ConfigureAwait(false);
+                if (!result.Succeeded)
+                {
+                    await RestoreBatchFailureAsync(originalSnapshot, originalSelectedIds, originalActiveId, originalAnchorId, result.Error).ConfigureAwait(false);
+                    return;
+                }
+
+                deletedIds.UnionWith(impact.DeletedEntityIds);
+            }
+        }
+
+        IsBusy = false;
+        await ReloadAsync().ConfigureAwait(false);
+        _multiSelection.Reconcile(SelectableEntityIdsForStore(_storeId!.Value));
+        ApplyMultiSelectionVisualState();
+        EntitiesDeleted?.Invoke(this, deletedIds);
+        StructureChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private IReadOnlyList<WorkspaceTreeSelection> GetEffectiveSelectedSources() =>
+        WorkspaceTreeSelectionNormalizer.Normalize(
+            _snapshot,
+            _multiSelection.SelectedIds.Select(id => FindNode(id))
+                .Where(node => node is { IsDraft: false })
+                .Select(node => new WorkspaceTreeSelection(node!.EntityKind, node.EntityId)));
 
     private void InsertDraft(GroupParentReference parent)
     {
