@@ -9,7 +9,7 @@
 - [x] 2.1 Extend `WorkspaceTreeViewModel` to own or coordinate the selection model while preserving canonical active selection, inspector synchronization, existing clipboard behavior, and tab synchronization.
 - [x] 2.2 Update tree row state and theme classes/resources so the active row uses a brighter highlight and other selected rows use a dimmer highlight while inactive/archive and focus states remain readable.
 - [x] 2.3 Update `MainWindow.axaml` context-menu bindings and accessibility text for single-selection versus multi-selection actions, selected counts, and the new middle-click/Ctrl/Shift gestures.
-- [ ] 2.4 Add Avalonia headless tests for row construction, active-versus-selected visual state, selection-aware menu visibility, and preservation of selection when filtering or refreshing.
+- [x] 2.4 Add Avalonia headless tests for row construction, active-versus-selected visual state, selection-aware menu visibility, and preservation of selection when filtering or refreshing.
 
 ## 3. Pointer and keyboard interaction
 
@@ -23,9 +23,9 @@
 
 - [x] 4.1 Define narrow application-facing request/result contracts for captured selections, normalized sources, skipped entities, failures, and post-operation selection reconciliation.
 - [x] 4.2 Implement selection-aware Duplicate orchestration using existing Item/group services and effective-source semantics.
-- [ ] 4.3 Implement confirmed multi-entity Archive and Delete orchestration, including protected/ineligible entities, atomicity where supported, tab closure, and surviving-context selection.
-- [ ] 4.4 Implement selected-entity Export using the existing CSV/file-picker boundary and exact effective selection scope.
-- [ ] 4.5 Implement Group creation flow with name validation, common-parent defaulting, explicit destination selection for mixed parents, and atomic move under the new group.
+- [x] 4.3 Implement confirmed multi-entity Archive and Delete orchestration, including protected/ineligible entities, atomicity where supported, tab closure, and surviving-context selection.
+- [x] 4.4 Implement selected-entity Export using the existing CSV/file-picker boundary and exact effective selection scope.
+- [x] 4.5 Implement Group creation flow with name validation, common-parent defaulting, explicit destination selection for mixed parents, and atomic move under the new group.
 - [ ] 4.6 Add application tests for successful actions, cancellation, skipped entities, duplicate prevention, name/destination validation, partial-result reporting, and persistence failure recovery.
 
 ## 5. Multi-source drag and drop
@@ -39,6 +39,6 @@
 ## 6. Acceptance verification and quality gates
 
 - [ ] 6.1 Run criterion-level tests for every scenario in `multi-selection`, `group-actions`, and modified `group-management` delta specs; add or correct tests where any scenario lacks direct evidence.
-- [ ] 6.2 Review the changed scope for UI guideline alignment, keyboard/focus behavior, destructive confirmation, selection preservation, architecture boundaries, and no accidental bulk-edit/Shopify/AI scope.
+- [x] 6.2 Review the changed scope for UI guideline alignment, keyboard/focus behavior, destructive confirmation, selection preservation, architecture boundaries, and no accidental bulk-edit/Shopify/AI scope.
 - [x] 6.3 Run `openspec validate` and resolve all validation errors in the change artifacts.
-- [ ] 6.4 Run the required solution baseline `dotnet test .\\FusionCanvas.sln` and record the result for the completed change.
+- [x] 6.4 Run the required solution baseline `dotnet test .\\FusionCanvas.sln` and record the result for the completed change.

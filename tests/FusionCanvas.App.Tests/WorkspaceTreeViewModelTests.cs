@@ -64,6 +64,26 @@ public class WorkspaceTreeViewModelTests
     }
 
     [Fact]
+    public void MiddleClickOpenPreservesMultiSelection()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var repository = new TestRepository(sample.Snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+        var root = Assert.Single(viewModel.Roots);
+        var group = Assert.Single(root.Children);
+        var item = Assert.Single(group.Children);
+
+        viewModel.SelectNodeWithModifiers(group, toggle: false, range: false, extendRange: false);
+        viewModel.SelectNodeWithModifiers(item, toggle: true, range: false, extendRange: false);
+        viewModel.OpenInTabPreservingSelection(group);
+
+        Assert.Equal(2, viewModel.SelectedEntityCount);
+        Assert.Contains(group.EntityId, viewModel.SelectedEntityIds);
+        Assert.Contains(item.EntityId, viewModel.SelectedEntityIds);
+    }
+
+    [Fact]
     public async Task CutPasteMovesGroupToSelectedNicheAndClearsCutState()
     {
         var sample = Sample.Create(withGroup: true);
@@ -188,6 +208,25 @@ public class WorkspaceTreeViewModelTests
         Assert.False(filteredAllowed);
         Assert.Contains("filtering", filteredError, StringComparison.OrdinalIgnoreCase);
         Assert.True(viewModel.HasError);
+    }
+
+    [Fact]
+    public void MultiSelectionDropValidationRejectsSelectedHierarchy()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var root = Assert.Single(sample.Snapshot.Groups);
+        var child = new TopicGroup(Guid.NewGuid(), sample.Store.Id, null, root.Id, "Child", null, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Groups = [root, child] };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        var target = viewModel.Roots.Single().Children.Single().Children.Single();
+        var sources = new[] { new WorkspaceTreeSelection(WorkspaceEntityKind.Group, root.Id) };
+
+        var canDrop = viewModel.CanDrop(sources, target, new GroupPlacement(), out var error);
+
+        Assert.False(canDrop);
+        Assert.Contains("outside", error, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

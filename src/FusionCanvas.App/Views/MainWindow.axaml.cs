@@ -283,17 +283,20 @@ public partial class MainWindow : Window
         var point = e.GetCurrentPoint(control);
         if (point.Properties.PointerUpdateKind == PointerUpdateKind.MiddleButtonPressed)
         {
-            viewModel.WorkspaceTree.OpenInTabCommand.Execute(node);
+            viewModel.WorkspaceTree.OpenInTabPreservingSelection(node);
+            e.Handled = true;
         }
         else if (point.Properties.PointerUpdateKind == PointerUpdateKind.RightButtonPressed)
         {
             viewModel.WorkspaceTree.PrepareContextSelection(node);
+            e.Handled = true;
         }
-        else if (point.Properties.IsLeftButtonPressed)
+        else if (point.Properties.PointerUpdateKind == PointerUpdateKind.LeftButtonPressed)
         {
             var controlPressed = e.KeyModifiers.HasFlag(KeyModifiers.Control);
             var shiftPressed = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
             viewModel.WorkspaceTree.SelectNodeWithModifiers(node, controlPressed && !shiftPressed, shiftPressed, controlPressed);
+            e.Handled = true;
         }
 
         if (node.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Item && point.Properties.IsLeftButtonPressed)
@@ -907,6 +910,71 @@ public partial class MainWindow : Window
             node.HasMultiSelectionContext)
         {
             await viewModel.WorkspaceTree.DuplicateSelectedAsync();
+        }
+    }
+
+    private async void OnContextExportSelected(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem { DataContext: WorkspaceTreeNodeViewModel node } &&
+            DataContext is MainWindowViewModel viewModel &&
+            node.HasMultiSelectionContext)
+        {
+            await viewModel.WorkspaceTree.ExportSelectedAsync();
+        }
+    }
+
+    private async void OnContextGroupSelected(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { DataContext: WorkspaceTreeNodeViewModel node } ||
+            DataContext is not MainWindowViewModel viewModel ||
+            !node.HasMultiSelectionContext)
+        {
+            return;
+        }
+
+        var destinations = viewModel.WorkspaceTree.GetGroupDestinationsForSelection();
+        var dialog = new GroupSelectionWindow(
+            destinations,
+            viewModel.WorkspaceTree.GetDefaultGroupDestination(destinations));
+        if (await dialog.ShowDialog<bool>(this) && dialog.DataContext is GroupSelectionViewModel selection && selection.SelectedDestination is { } destination)
+        {
+            await viewModel.WorkspaceTree.GroupSelectedAsync(selection.Name, destination);
+        }
+    }
+
+    private async void OnContextArchiveSelected(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { DataContext: WorkspaceTreeNodeViewModel node } ||
+            DataContext is not MainWindowViewModel viewModel ||
+            !node.HasMultiSelectionContext)
+        {
+            return;
+        }
+
+        var dialog = new GroupActionConfirmationWindow(
+            "Archive selected entities",
+            $"Archive {node.SelectionCount} selected entities? They can be restored later.");
+        if (await dialog.ShowDialog<bool>(this))
+        {
+            await viewModel.WorkspaceTree.ArchiveSelectedAsync();
+        }
+    }
+
+    private async void OnContextDeleteSelected(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { DataContext: WorkspaceTreeNodeViewModel node } ||
+            DataContext is not MainWindowViewModel viewModel ||
+            !node.HasMultiSelectionContext)
+        {
+            return;
+        }
+
+        var dialog = new GroupActionConfirmationWindow(
+            "Delete selected entities",
+            $"Permanently delete {node.SelectionCount} selected entities and any contained descendants? This cannot be undone.");
+        if (await dialog.ShowDialog<bool>(this))
+        {
+            await viewModel.WorkspaceTree.DeleteSelectedAsync();
         }
     }
 

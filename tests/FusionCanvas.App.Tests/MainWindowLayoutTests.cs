@@ -85,6 +85,76 @@ public class MainWindowConstructionTests
     }
 
     [AvaloniaFact]
+    public void MultiSelection_RendersDimSelectedRowsAndBrighterActiveRow()
+    {
+        using var fixture = new MainWindowFixture();
+        var tree = fixture.ViewModel.WorkspaceTree;
+        var root = Assert.Single(tree.Roots);
+        var group = Assert.Single(root.Children);
+        var item = Assert.Single(group.Children);
+
+        tree.SelectNodeWithModifiers(group, toggle: false, range: false, extendRange: false);
+        tree.SelectNodeWithModifiers(item, toggle: true, range: false, extendRange: false);
+        fixture.PumpLayout();
+
+        var groupRow = fixture.FindControl<Border>(border =>
+            border.Classes.Contains("treeRow") &&
+            border.DataContext is WorkspaceTreeNodeViewModel node && node.EntityId == group.EntityId);
+        var itemRow = fixture.FindControl<Border>(border =>
+            border.Classes.Contains("treeRow") &&
+            border.DataContext is WorkspaceTreeNodeViewModel node && node.EntityId == item.EntityId);
+
+        Assert.True(groupRow.Classes.Contains("multiSelected"));
+        Assert.False(groupRow.Classes.Contains("selected"));
+        Assert.True(itemRow.Classes.Contains("multiSelected"));
+        Assert.True(itemRow.Classes.Contains("selected"));
+    }
+
+    [AvaloniaFact]
+    public void TreePointerInput_CtrlClickTogglesAndShiftClickSelectsRange()
+    {
+        using var fixture = new MainWindowFixture();
+        var tree = fixture.ViewModel.WorkspaceTree;
+        var root = Assert.Single(tree.Roots);
+        root.IsExpanded = true;
+        fixture.PumpLayout();
+
+        var selectableRows = fixture.Window.GetVisualDescendants()
+            .OfType<Border>()
+            .Where(border => border.Classes.Contains("treeRow"))
+            .Select(border => new
+            {
+                Row = border,
+                Node = border.DataContext as WorkspaceTreeNodeViewModel
+            })
+            .Where(candidate => candidate.Node is { EntityKind: WorkspaceEntityKind.Group or WorkspaceEntityKind.Item })
+            .ToArray();
+        Assert.True(selectableRows.Length >= 2);
+
+        var first = selectableRows[0];
+        var second = selectableRows[1];
+        var firstPoint = first.Row.TranslatePoint(new Avalonia.Point(8, 8), fixture.Window);
+        var secondPoint = second.Row.TranslatePoint(new Avalonia.Point(8, 8), fixture.Window);
+        Assert.True(firstPoint.HasValue);
+        Assert.True(secondPoint.HasValue);
+
+        HeadlessWindowExtensions.MouseDown(fixture.Window, firstPoint!.Value, MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseUp(fixture.Window, firstPoint.Value, MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseDown(fixture.Window, secondPoint!.Value, MouseButton.Left, RawInputModifiers.Control);
+        HeadlessWindowExtensions.MouseUp(fixture.Window, secondPoint.Value, MouseButton.Left, RawInputModifiers.Control);
+
+        Assert.Equal(2, tree.SelectedEntityCount);
+        Assert.Contains(first.Node!.EntityId, tree.SelectedEntityIds);
+        Assert.Contains(second.Node!.EntityId, tree.SelectedEntityIds);
+
+        HeadlessWindowExtensions.MouseDown(fixture.Window, firstPoint.Value, MouseButton.Left, RawInputModifiers.Shift);
+        HeadlessWindowExtensions.MouseUp(fixture.Window, firstPoint.Value, MouseButton.Left, RawInputModifiers.Shift);
+
+        Assert.Contains(first.Node.EntityId, tree.SelectedEntityIds);
+        Assert.Contains(second.Node.EntityId, tree.SelectedEntityIds);
+    }
+
+    [AvaloniaFact]
     public void WorkflowStageNavigation_ShowsCorrectStageTool()
     {
         using var fixture = new MainWindowFixture();

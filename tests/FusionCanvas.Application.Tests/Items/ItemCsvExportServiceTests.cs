@@ -110,6 +110,18 @@ public class ItemCsvExportServiceTests
     }
 
     [Fact]
+    public void ProjectSelected_ExportsOnlyRequestedActiveItems()
+    {
+        var sample = Sample.Create();
+        var archived = sample.ItemInRoot with { Id = Guid.NewGuid(), Name = "Archived", IsArchived = true };
+        var snapshot = sample.Snapshot with { Items = [.. sample.Snapshot.Items, archived] };
+
+        var rows = _service.ProjectSelected(snapshot, [sample.ItemInChild.Id, archived.Id]);
+
+        Assert.Equal([sample.ItemInChild.Name], rows.Select(row => row.Title));
+    }
+
+    [Fact]
     public void Project_ColumnsMapToFields()
     {
         var sample = Sample.Create();

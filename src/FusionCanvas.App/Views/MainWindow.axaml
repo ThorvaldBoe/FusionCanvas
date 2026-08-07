@@ -321,7 +321,11 @@
               <MenuItem Header="Cut" IsVisible="{Binding HasContextActionsAndSingleSelection}" Click="OnContextCut" />
               <MenuItem Header="Paste" IsVisible="{Binding IsSingleSelectionContext}" IsEnabled="{Binding CanPaste}" Click="OnContextPaste" />
               <MenuItem Header="Duplicate" IsVisible="{Binding IsItemAndSingleSelection}" Click="OnContextDuplicate" />
-              <MenuItem Header="Duplicate" IsVisible="{Binding HasMultiSelectionContext}" Click="OnContextDuplicateSelected" />
+                      <MenuItem Header="Duplicate" IsVisible="{Binding HasMultiSelectionContext}" Click="OnContextDuplicateSelected" />
+                      <MenuItem Header="Export" IsVisible="{Binding HasMultiSelectionContext}" Click="OnContextExportSelected" />
+                      <MenuItem Header="Group" IsVisible="{Binding HasMultiSelectionContext}" Click="OnContextGroupSelected" />
+                      <MenuItem Header="Archive" IsVisible="{Binding HasMultiSelectionContext}" Click="OnContextArchiveSelected" />
+                      <MenuItem Header="Delete" IsVisible="{Binding HasMultiSelectionContext}" Click="OnContextDeleteSelected" />
               <MenuItem Header="Assets…" IsVisible="{Binding IsSingleSelectionContext}" Click="OnContextAssets" />
               <MenuItem Header="Export to CSV..." IsVisible="{Binding IsTopicAndSingleSelection}" Click="OnContextExport" />
                       <Separator />
