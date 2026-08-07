@@ -763,9 +763,9 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         RefreshProjection();
     }
 
-    public void SelectEntity(Guid? entityId, bool notifySelectionChanged = true)
+    public void SelectEntity(\n        Guid? entityId,\n        bool notifySelectionChanged = true,\n        bool replaceMultiSelection = true)
     {
-        Select(entityId is Guid id ? FindNode(id) : null, notifySelectionChanged);
+        Select(entityId is Guid id ? FindNode(id) : null, notifySelectionChanged, replaceMultiSelection);
     }
 
     public async Task BeginCreateAsync()
