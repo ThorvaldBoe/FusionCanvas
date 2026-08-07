@@ -39,6 +39,7 @@
         <SolidColorBrush x:Key="IconButtonForegroundBrush" Color="#425066" />
 
         <SolidColorBrush x:Key="SelectionBackgroundBrush" Color="#E2EAF2" />
+        <SolidColorBrush x:Key="SelectionSubtleBackgroundBrush" Color="#F0F4F8" />
         <SolidColorBrush x:Key="HoverBackgroundBrush" Color="#F0F3F7" />
         <SolidColorBrush x:Key="DropTargetBackgroundBrush" Color="#DDF1E7" />
         <SolidColorBrush x:Key="AccentSoftBackgroundBrush" Color="#EEF6FF" />
@@ -90,6 +91,7 @@
         <SolidColorBrush x:Key="IconButtonForegroundBrush" Color="#C2CAD6" />
 
         <SolidColorBrush x:Key="SelectionBackgroundBrush" Color="#2F4258" />
+        <SolidColorBrush x:Key="SelectionSubtleBackgroundBrush" Color="#263442" />
         <SolidColorBrush x:Key="HoverBackgroundBrush" Color="#222833" />
         <SolidColorBrush x:Key="DropTargetBackgroundBrush" Color="#23402F" />
         <SolidColorBrush x:Key="AccentSoftBackgroundBrush" Color="#1E3A5C" />
