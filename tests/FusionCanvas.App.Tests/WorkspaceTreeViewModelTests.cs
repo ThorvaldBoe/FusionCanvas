@@ -230,6 +230,38 @@ public class WorkspaceTreeViewModelTests
     }
 
     [Fact]
+    public async Task MultiSelectionMove_MovesBothSelectedItemsToGroup()
+    {
+        var sample = Sample.Create();
+        var group = new TopicGroup(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Destination", null, false, sample.Now, sample.Now, "{}");
+        var first = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "First", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var second = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Second", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Groups = [group], Items = [first, second] };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(
+            repository,
+            new GroupManagementService(repository),
+            snapshot,
+            items: new ItemManagementService(repository));
+        viewModel.SetStore(sample.Store.Id, snapshot);
+
+        var itemNodes = viewModel.Roots.Single().Children
+            .Where(node => node.EntityKind == WorkspaceEntityKind.Item)
+            .ToArray();
+        var destination = viewModel.Roots.Single().Children.Single(node => node.EntityId == group.Id);
+        Assert.Equal(2, itemNodes.Length);
+
+        viewModel.SelectNodeWithModifiers(itemNodes[0], toggle: false, range: false);
+        viewModel.SelectNodeWithModifiers(itemNodes[1], toggle: true, range: false);
+        var sources = viewModel.GetDragSelections(itemNodes[1]);
+
+        Assert.Equal(2, sources.Count);
+        await viewModel.MoveSelectionAsync(sources, destination, new GroupPlacement());
+
+        Assert.All(repository.Snapshot.Items, item => Assert.Equal(group.Id, item.GroupId));
+    }
+
+    [Fact]
     public async Task MoveSaveFailureRetainsConfirmedTreeSelectionAndShowsRecoverableError()
     {
         var sample = Sample.Create(withGroup: true);
