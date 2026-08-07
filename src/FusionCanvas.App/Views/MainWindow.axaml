@@ -294,7 +294,6 @@
                         Classes.dropBefore="{Binding IsDropBefore}"
                         Classes.dropAfter="{Binding IsDropAfter}"
                         DragDrop.AllowDrop="True"
-                        PointerPressed="OnTreeNodePointerPressed"
                         PointerMoved="OnTreeNodePointerMoved"
                         DragDrop.DragOver="OnTreeNodeDragOver"
                         DragDrop.DragLeave="OnTreeNodeDragLeave"
