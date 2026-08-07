@@ -11,6 +11,7 @@ using FusionCanvas.App.Views;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.Domain.Workflow;
+using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.App.Tests;
 
