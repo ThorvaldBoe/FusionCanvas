@@ -53,6 +53,13 @@ public enum StoreManagementEditorTab
     Products
 }
 
+public enum CatalogEditorLevel
+{
+    Overview,
+    ProductDetail,
+    OfferingDetail
+}
+
 public sealed class StoreManagementViewModel : INotifyPropertyChanged
 {
     private enum PendingEditorAction
@@ -73,6 +80,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         SelectProduct,
         SelectOffering,
         StartNewOffering,
+        BackToProducts,
+        BackToProduct,
         SelectArea,
         SelectVariant
     }
@@ -148,6 +157,13 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private sealed record TagEditorState(string Name, string? Color, string? Description);
     private TagEditorState _originalTagEditorState = new(string.Empty, null, null);
     private StoreManagementEditorTab _selectedEditorTab;
+    private CatalogEditorLevel _catalogEditorLevel;
+    private bool _isBasicsSectionExpanded = true;
+    private bool _isVariantsSectionExpanded = true;
+    private bool _isDesignAreasSectionExpanded = true;
+    private bool _isAdvancedSectionExpanded;
+    private bool _isAddingVariant;
+    private bool _isAddingDesignArea;
     private string _newStoreName = string.Empty;
     private string _description = string.Empty;
     private string _notes = string.Empty;
@@ -327,7 +343,27 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         RequestDeleteSelectedProductCommand = new RelayCommand(_ => RequestDeleteSelectedProduct());
         ConfirmDeleteProductCommand = new RelayCommand(_ => Run(ConfirmDeleteProductAsync()));
         CancelDeleteProductCommand = new RelayCommand(_ => ClearProductDeleteWarning());
-        StartCreateOfferingCommand = new RelayCommand(_ => StartCreateOffering());
+         StartCreateOfferingCommand = new RelayCommand(_ => StartCreateOffering());
+         BackToProductsCommand = new RelayCommand(_ => BackToProducts());
+         BackToProductCommand = new RelayCommand(_ => BackToProduct());
+         OpenProductDetailCommand = new RelayCommand(parameter =>
+         {
+             if (parameter is StoreProductSummary product)
+             {
+                 SelectProductForEditing(product);
+             }
+         });
+         OpenOfferingDetailCommand = new RelayCommand(parameter =>
+         {
+             if (parameter is FulfillmentOfferingSummary offering)
+             {
+                 SelectOfferingForEditing(offering);
+             }
+         });
+         StartAddVariantCommand = new RelayCommand(_ => StartAddVariant());
+         CancelAddVariantCommand = new RelayCommand(_ => IsAddingVariant = false);
+         StartAddDesignAreaCommand = new RelayCommand(_ => StartAddDesignArea());
+         CancelAddDesignAreaCommand = new RelayCommand(_ => IsAddingDesignArea = false);
         SelectOfferingCommand = new RelayCommand(parameter =>
         {
             if (parameter is FulfillmentOfferingSummary offering)
@@ -469,6 +505,70 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public bool IsTagsTabSelected => SelectedEditorTab == StoreManagementEditorTab.Tags;
 
     public bool IsProductsTabSelected => SelectedEditorTab == StoreManagementEditorTab.Products;
+
+    public CatalogEditorLevel CatalogEditorLevel
+    {
+        get => _catalogEditorLevel;
+        private set
+        {
+            if (SetField(ref _catalogEditorLevel, value))
+            {
+                OnPropertyChanged(nameof(IsCatalogOverview));
+                OnPropertyChanged(nameof(IsProductDetail));
+                OnPropertyChanged(nameof(IsOfferingDetail));
+                OnPropertyChanged(nameof(CatalogBreadcrumb));
+            }
+        }
+    }
+
+    public bool IsCatalogOverview => CatalogEditorLevel == CatalogEditorLevel.Overview;
+
+    public bool IsProductDetail => CatalogEditorLevel == CatalogEditorLevel.ProductDetail;
+
+    public bool IsOfferingDetail => CatalogEditorLevel == CatalogEditorLevel.OfferingDetail;
+
+    public string CatalogBreadcrumb => CatalogEditorLevel switch
+    {
+        CatalogEditorLevel.ProductDetail => $"Products  /  {SelectedProduct?.Name ?? "Product"}",
+        CatalogEditorLevel.OfferingDetail => $"Products  /  {SelectedProduct?.Name ?? "Product"}  /  {SelectedOffering?.Name ?? "Offering"}",
+        _ => "Products"
+    };
+
+    public bool IsBasicsSectionExpanded
+    {
+        get => _isBasicsSectionExpanded;
+        set => SetField(ref _isBasicsSectionExpanded, value);
+    }
+
+    public bool IsVariantsSectionExpanded
+    {
+        get => _isVariantsSectionExpanded;
+        set => SetField(ref _isVariantsSectionExpanded, value);
+    }
+
+    public bool IsDesignAreasSectionExpanded
+    {
+        get => _isDesignAreasSectionExpanded;
+        set => SetField(ref _isDesignAreasSectionExpanded, value);
+    }
+
+    public bool IsAdvancedSectionExpanded
+    {
+        get => _isAdvancedSectionExpanded;
+        set => SetField(ref _isAdvancedSectionExpanded, value);
+    }
+
+    public bool IsAddingVariant
+    {
+        get => _isAddingVariant;
+        private set => SetField(ref _isAddingVariant, value);
+    }
+
+    public bool IsAddingDesignArea
+    {
+        get => _isAddingDesignArea;
+        private set => SetField(ref _isAddingDesignArea, value);
+    }
 
     public StoreManagementEditorTab SelectedEditorTab
     {
@@ -797,6 +897,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public IReadOnlyList<StoreProductSummary> Products { get; private set; } = [];
 
+    public bool HasProducts => Products.Count > 0;
+
     public IReadOnlyList<StoreProductSummary> EditorProducts =>
         _isCreatingNewProduct && _draftProductId is not null
             ? Products.Concat([DraftProduct()!]).ToArray()
@@ -825,9 +927,15 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             {
                 OnPropertyChanged(nameof(OfferingVariants));
                 OnPropertyChanged(nameof(OfferingDesignAreas));
+                OnPropertyChanged(nameof(HasOfferingVariants));
+                OnPropertyChanged(nameof(HasOfferingDesignAreas));
+                OnPropertyChanged(nameof(HasSelectedProductOfferings));
                 RefreshApplicableVariants();
                 OnPropertyChanged(nameof(HasSelectedOffering));
                 OnPropertyChanged(nameof(CanDeleteSelectedOffering));
+                OnPropertyChanged(nameof(SelectedOfferingVariantCount));
+                OnPropertyChanged(nameof(SelectedOfferingDesignAreaCount));
+                OnPropertyChanged(nameof(SelectedOfferingSummary));
             }
         }
     }
@@ -835,8 +943,26 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public IReadOnlyList<ProductVariantSummary> OfferingVariants =>
         SelectedOffering?.Variants ?? [];
 
+    public bool HasOfferingVariants => OfferingVariants.Count > 0;
+
     public IReadOnlyList<DesignAreaSummary> OfferingDesignAreas =>
         SelectedOffering?.DesignAreas ?? [];
+
+    public bool HasOfferingDesignAreas => OfferingDesignAreas.Count > 0;
+
+    public bool HasSelectedProductOfferings => SelectedProduct?.Offerings.Count > 0;
+
+    public int SelectedProductOfferingCount => SelectedProduct?.Offerings.Count ?? 0;
+
+    public int SelectedOfferingVariantCount => SelectedOffering?.Variants.Count ?? 0;
+
+    public int SelectedOfferingDesignAreaCount => SelectedOffering?.DesignAreas.Count ?? 0;
+
+    public string SelectedProductSummary =>
+        $"{SelectedProductOfferingCount} fulfillment offering{(SelectedProductOfferingCount == 1 ? string.Empty : "s")}";
+
+    public string SelectedOfferingSummary =>
+        $"{SelectedOfferingVariantCount} variant{(SelectedOfferingVariantCount == 1 ? string.Empty : "s")}  ·  {SelectedOfferingDesignAreaCount} printable area{(SelectedOfferingDesignAreaCount == 1 ? string.Empty : "s")}";
 
     public ObservableCollection<ApplicableVariantViewModel> ApplicableVariants { get; } = [];
 
@@ -1181,6 +1307,14 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public ICommand CancelDeleteProductCommand { get; }
 
     public ICommand StartCreateOfferingCommand { get; }
+    public ICommand BackToProductsCommand { get; }
+    public ICommand BackToProductCommand { get; }
+    public ICommand OpenProductDetailCommand { get; }
+    public ICommand OpenOfferingDetailCommand { get; }
+    public ICommand StartAddVariantCommand { get; }
+    public ICommand CancelAddVariantCommand { get; }
+    public ICommand StartAddDesignAreaCommand { get; }
+    public ICommand CancelAddDesignAreaCommand { get; }
 
     public ICommand SelectOfferingCommand { get; }
 
@@ -2151,10 +2285,9 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         }
 
         SelectedEditorTab = StoreManagementEditorTab.Products;
-        if (SelectedStore is { IsArchived: false } && _selectedProduct is null && Products.Count > 0)
-        {
-            SelectProductForEditing(Products[0]);
-        }
+        CatalogEditorLevel = CatalogEditorLevel.Overview;
+        IsAddingVariant = false;
+        IsAddingDesignArea = false;
 
         Run(LoadProductsForSelectedStoreAsync());
     }
@@ -2183,11 +2316,14 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         }
 
         OnPropertyChanged(nameof(Products));
+        OnPropertyChanged(nameof(HasProducts));
         OnPropertyChanged(nameof(EditorProducts));
         OnPropertyChanged(nameof(SelectedProduct));
         OnPropertyChanged(nameof(HasSelectedProduct));
         OnPropertyChanged(nameof(CanDeleteSelectedProduct));
         OnPropertyChanged(nameof(CanCreateCatalogItem));
+        OnPropertyChanged(nameof(SelectedProductOfferingCount));
+        OnPropertyChanged(nameof(SelectedProductSummary));
         if (SelectedProduct is not null)
         {
             ApplySelectedOfferingAfterProductChange();
@@ -2230,6 +2366,9 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(EditorProducts));
         OnPropertyChanged(nameof(HasSelectedProduct));
         OnPropertyChanged(nameof(CanDeleteSelectedProduct));
+        CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
+        OnPropertyChanged(nameof(SelectedProductOfferingCount));
+        OnPropertyChanged(nameof(SelectedProductSummary));
         RaiseProductEditorStateProperties();
     }
 
@@ -2289,7 +2428,65 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanDeleteSelectedOffering));
         OnPropertyChanged(nameof(OfferingVariants));
         OnPropertyChanged(nameof(OfferingDesignAreas));
+        CatalogEditorLevel = CatalogEditorLevel.OfferingDetail;
+        OnPropertyChanged(nameof(SelectedOfferingVariantCount));
+        OnPropertyChanged(nameof(SelectedOfferingDesignAreaCount));
+        OnPropertyChanged(nameof(SelectedOfferingSummary));
         RaiseOfferingEditorStateProperties();
+    }
+
+    private void BackToProducts()
+    {
+        if (HasAnyCatalogUnsavedChanges)
+        {
+            RequestDiscardBefore(PendingEditorAction.BackToProducts);
+            return;
+        }
+
+        CatalogEditorLevel = CatalogEditorLevel.Overview;
+    }
+
+    private void BackToProduct()
+    {
+        if (HasAnyCatalogUnsavedChanges)
+        {
+            RequestDiscardBefore(PendingEditorAction.BackToProduct);
+            return;
+        }
+
+        CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
+    }
+
+    private void StartAddVariant()
+    {
+        if (SelectedOffering is null)
+        {
+            ErrorMessage = "Select an offering before adding a variant.";
+            return;
+        }
+
+        IsVariantsSectionExpanded = true;
+        IsAddingVariant = true;
+        VariantColor = string.Empty;
+        VariantSize = string.Empty;
+    }
+
+    private void StartAddDesignArea()
+    {
+        if (SelectedOffering is null)
+        {
+            ErrorMessage = "Select an offering before adding a printable area.";
+            return;
+        }
+
+        IsDesignAreasSectionExpanded = true;
+        IsAddingDesignArea = true;
+        AreaName = string.Empty;
+        AreaPosition = string.Empty;
+        AreaDecorationMethod = string.Empty;
+        AreaWidth = string.Empty;
+        AreaHeight = string.Empty;
+        RefreshApplicableVariants();
     }
 
     public void StartCreateProduct()
@@ -2322,6 +2519,9 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(EditorProducts));
         OnPropertyChanged(nameof(HasSelectedProduct));
         OnPropertyChanged(nameof(CanDeleteSelectedProduct));
+        CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
+        OnPropertyChanged(nameof(SelectedProductOfferingCount));
+        OnPropertyChanged(nameof(SelectedProductSummary));
         RaiseProductEditorStateProperties();
         ProductNameFocusRequested?.Invoke(this, EventArgs.Empty);
     }
@@ -2423,6 +2623,11 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(EditorProducts));
         }
 
+        if (result.Succeeded && SelectedProduct is null)
+        {
+            CatalogEditorLevel = CatalogEditorLevel.Overview;
+        }
+
         ClearProductDeleteWarning();
     }
 
@@ -2464,6 +2669,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanDeleteSelectedOffering));
         OnPropertyChanged(nameof(OfferingVariants));
         OnPropertyChanged(nameof(OfferingDesignAreas));
+        CatalogEditorLevel = CatalogEditorLevel.OfferingDetail;
         RaiseOfferingEditorStateProperties();
     }
 
@@ -2578,6 +2784,11 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(OfferingDesignAreas));
         }
 
+        if (result.Succeeded && SelectedOffering is null)
+        {
+            CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
+        }
+
         ClearOfferingDeleteWarning();
     }
 
@@ -2617,6 +2828,12 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             new CreateVariantRequest(SelectedOffering.Id, options),
             cancellationToken).ConfigureAwait(false);
         ApplyProductResult(result);
+        if (result.Succeeded)
+        {
+            IsAddingVariant = false;
+            VariantColor = string.Empty;
+            VariantSize = string.Empty;
+        }
     }
 
     public async Task RemoveVariantAsync(ProductVariantSummary variant, CancellationToken cancellationToken = default)
@@ -2657,6 +2874,15 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 ApplicableVariants.Where(variant => variant.IsSelected).Select(variant => variant.Id).ToArray()),
             cancellationToken).ConfigureAwait(false);
         ApplyProductResult(result);
+        if (result.Succeeded)
+        {
+            IsAddingDesignArea = false;
+            AreaName = string.Empty;
+            AreaPosition = string.Empty;
+            AreaDecorationMethod = string.Empty;
+            AreaWidth = string.Empty;
+            AreaHeight = string.Empty;
+        }
     }
 
     public async Task RemoveDesignAreaAsync(DesignAreaSummary area, CancellationToken cancellationToken = default)
@@ -3057,6 +3283,12 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 break;
             case PendingEditorAction.StartNewOffering:
                 BeginCreateOfferingDraft();
+                break;
+            case PendingEditorAction.BackToProducts:
+                CatalogEditorLevel = CatalogEditorLevel.Overview;
+                break;
+            case PendingEditorAction.BackToProduct:
+                CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
                 break;
         }
     }

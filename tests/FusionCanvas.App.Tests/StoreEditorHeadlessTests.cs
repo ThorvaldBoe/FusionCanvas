@@ -64,6 +64,33 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void ProductsPanel_DisclosesProductAndOfferingActionsByLevel()
+    {
+        var window = CreateEditorWindow();
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+
+        viewModel.SelectProductsTabCommand.Execute(null);
+        window.UpdateLayout();
+        Assert.True(viewModel.IsCatalogOverview);
+        Assert.NotNull(FindButton(window, "New product"));
+        Assert.Null(FindButton(window, "Add fulfillment offering"));
+
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        window.UpdateLayout();
+        Assert.True(viewModel.IsProductDetail);
+        Assert.NotNull(FindButton(window, "Add fulfillment offering"));
+        Assert.Null(FindButton(window, "Add variant"));
+
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        window.UpdateLayout();
+        Assert.True(viewModel.IsOfferingDetail);
+        Assert.NotNull(FindButton(window, "Add variant"));
+        Assert.NotNull(FindButton(window, "Add printable area"));
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void StoreCreationControls_ExposeStableAutomationIdentifiers()
     {
         var window = CreateEditorWindow();
@@ -140,7 +167,21 @@ public class StoreEditorHeadlessTests
     private static Button? FindButton(Window window, string content) =>
         window.GetVisualDescendants()
             .OfType<Button>()
-            .FirstOrDefault(b => string.Equals(b.Content as string, content, System.StringComparison.Ordinal));
+            .FirstOrDefault(b => IsEffectivelyVisible(b) &&
+                string.Equals(b.Content as string, content, System.StringComparison.Ordinal));
+
+    private static bool IsEffectivelyVisible(Control control)
+    {
+        for (Control? current = control; current is not null; current = current.Parent as Control)
+        {
+            if (!current.IsVisible)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private static WorkspaceSnapshot Snapshot(Store store)
     {

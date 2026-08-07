@@ -31,6 +31,56 @@ public class ProductCatalogViewModelTests
         Assert.True(viewModel.IsProductsTabSelected);
         Assert.Single(viewModel.Products);
         Assert.Equal("Gildan 64000", viewModel.Products[0].Name);
+        Assert.True(viewModel.IsCatalogOverview);
+        Assert.False(viewModel.IsProductDetail);
+    }
+
+    [Fact]
+    public async Task ProductAndOfferingNavigation_ExposesProgressiveDisclosureSummaries()
+    {
+        var store = NewStore("North Star");
+        var repository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true));
+        var viewModel = NewStoreManagementViewModel(repository);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.OpenProductsTabCommand.Execute(null);
+
+        var product = Assert.Single(viewModel.Products);
+        viewModel.OpenProductDetailCommand.Execute(product);
+
+        Assert.True(viewModel.IsProductDetail);
+        Assert.Equal(2, viewModel.SelectedProductOfferingCount);
+        Assert.Contains("2 fulfillment offerings", viewModel.SelectedProductSummary);
+
+        var offering = Assert.Single(product.Offerings, item => item.Kind == FulfillmentKind.FixedProvider);
+        viewModel.OpenOfferingDetailCommand.Execute(offering);
+
+        Assert.True(viewModel.IsOfferingDetail);
+        Assert.Equal(1, viewModel.SelectedOfferingVariantCount);
+        Assert.Equal(1, viewModel.SelectedOfferingDesignAreaCount);
+        Assert.Contains("1 variant", viewModel.SelectedOfferingSummary);
+    }
+
+    [Fact]
+    public async Task CatalogBackNavigation_ReturnsToOverviewAndGuardsUnsavedOffering()
+    {
+        var store = NewStore("North Star");
+        var repository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true));
+        var viewModel = NewStoreManagementViewModel(repository);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.OpenProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(
+            viewModel.SelectedProduct!.Offerings,
+            offering => offering.Kind == FulfillmentKind.FixedProvider));
+
+        viewModel.OfferingName = "Edited offering";
+        viewModel.BackToProductCommand.Execute(null);
+
+        Assert.True(viewModel.DiscardChangesPromptVisible);
+        Assert.True(viewModel.IsOfferingDetail);
+
+        viewModel.KeepEditingCommand.Execute(null);
+        Assert.True(viewModel.IsOfferingDetail);
     }
 
     [Fact]

@@ -396,249 +396,296 @@
             </StackPanel>
           </Border>
 
-          <Grid IsVisible="{Binding IsProductsTabSelected}"
-                ColumnDefinitions="180,180,*"
-                ColumnSpacing="12">
-            <StackPanel Grid.Column="0"
-                        Spacing="10">
-              <TextBlock Text="Products"
-                         FontSize="13"
+          <StackPanel IsVisible="{Binding IsProductsTabSelected}"
+                      Spacing="12">
+            <StackPanel IsVisible="{Binding IsCatalogOverview}"
+                        Spacing="12">
+              <TextBlock Text="Products overview"
+                         FontSize="16"
                          FontWeight="SemiBold"
+                         Foreground="{DynamicResource StrongTextBrush}" />
+              <TextBlock Text="Define the products you sell, how they are fulfilled, and where designs can be printed."
+                         TextWrapping="Wrap"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
               <Button Content="New product"
                       Command="{Binding StartCreateProductCommand}"
                       IsEnabled="{Binding CanCreateCatalogItem}"
                       Classes="primary" />
-              <TextBlock IsVisible="{Binding !HasSelectedProduct}"
-                         Text="No products. Add a product blueprint."
-                         FontSize="12"
-                         TextWrapping="Wrap"
+              <TextBlock IsVisible="{Binding !HasProducts}"
+                         Text="No products yet. Add a product blueprint to begin."
                          Foreground="{DynamicResource SecondaryTextBrush}" />
               <ItemsControl ItemsSource="{Binding EditorProducts}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="appProducts:StoreProductSummary">
-                    <Button Content="{Binding Name}"
-                            Command="{Binding $parent[ItemsControl].DataContext.SelectProductCommand}"
+                    <Button Command="{Binding $parent[ItemsControl].DataContext.OpenProductDetailCommand}"
                             CommandParameter="{Binding}"
                             Classes="listItem"
-                            HorizontalContentAlignment="Left" />
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
-
-            <StackPanel Grid.Column="1"
-                        Spacing="10">
-              <TextBlock Text="Offerings"
-                         FontSize="13"
-                         FontWeight="SemiBold"
-                         Foreground="{DynamicResource SecondaryTextBrush}" />
-              <Button Content="New offering"
-                      Command="{Binding StartCreateOfferingCommand}"
-                      IsEnabled="{Binding CanCreateCatalogItem}"
-                      Classes="primary" />
-              <TextBlock IsVisible="{Binding !HasSelectedOffering}"
-                         Text="No offerings."
-                         FontSize="12"
-                         Foreground="{DynamicResource SecondaryTextBrush}" />
-              <ItemsControl ItemsSource="{Binding SelectedProduct.Offerings}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="appProducts:FulfillmentOfferingSummary">
-                    <Button Content="{Binding Name}"
-                            Command="{Binding $parent[ItemsControl].DataContext.SelectOfferingCommand}"
-                            CommandParameter="{Binding}"
-                            Classes="listItem"
-                            HorizontalContentAlignment="Left" />
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
-
-            <StackPanel Grid.Column="2"
-                        Spacing="8">
-              <TextBlock Text="Product editor"
-                         FontSize="13"
-                         FontWeight="SemiBold"
-                         Foreground="{DynamicResource SecondaryTextBrush}" />
-              <TextBox x:Name="ProductNameTextBox"
-                       Text="{Binding ProductName}"
-                       PlaceholderText="Product name"
-                       Classes="field" />
-              <TextBox Text="{Binding ProductDescription}"
-                       PlaceholderText="Description"
-                       AcceptsReturn="True"
-                       MinHeight="56"
-                       Classes="field" />
-              <TextBox Text="{Binding ExternalProductId}"
-                       PlaceholderText="External product ID"
-                       Classes="field" />
-              <StackPanel Orientation="Horizontal"
-                          Spacing="8">
-                <Button Content="Save product"
-                        Command="{Binding SaveSelectedProductCommand}"
-                        IsEnabled="{Binding CanSaveSelectedProduct}"
-                        Classes="primary fixedAction" />
-                <Button Content="Delete"
-                        Command="{Binding RequestDeleteSelectedProductCommand}"
-                        IsEnabled="{Binding CanDeleteSelectedProduct}"
-                        Classes="danger fixedAction" />
-              </StackPanel>
-
-              <TextBlock Text="Offering editor"
-                         FontSize="13"
-                         FontWeight="SemiBold"
-                         Foreground="{DynamicResource SecondaryTextBrush}"
-                         Margin="0,8,0,0" />
-              <TextBox Text="{Binding OfferingName}"
-                       PlaceholderText="Offering name"
-                       Classes="field" />
-              <ComboBox SelectedIndex="{Binding OfferingKindIndex}"
-                        Classes="field">
-                <ComboBoxItem Content="Fixed provider" />
-                <ComboBoxItem Content="Printify Choice network" />
-              </ComboBox>
-              <TextBox IsVisible="{Binding !IsChoiceNetworkOffering}"
-                       Text="{Binding OfferingProviderName}"
-                       PlaceholderText="Provider name"
-                       Classes="field" />
-              <TextBox Text="{Binding OfferingDescription}"
-                       PlaceholderText="Description"
-                       AcceptsReturn="True"
-                       MinHeight="44"
-                       Classes="field" />
-              <TextBox Text="{Binding OfferingExternalOfferingId}"
-                       PlaceholderText="External offering ID"
-                       Classes="field" />
-              <TextBlock IsVisible="{Binding IsChoiceNetworkOffering}"
-                         Text="Printify Choice is a variable fulfillment network; exact panel dimensions and placement can vary by fulfillment provider."
-                         FontSize="12"
-                         TextWrapping="Wrap"
-                         Foreground="{DynamicResource WarningTextBrush}" />
-              <StackPanel Orientation="Horizontal"
-                          Spacing="8">
-                <Button Content="Save offering"
-                        Command="{Binding SaveSelectedOfferingCommand}"
-                        IsEnabled="{Binding CanSaveSelectedOffering}"
-                        Classes="primary fixedAction" />
-                <Button Content="Delete"
-                        Command="{Binding RequestDeleteSelectedOfferingCommand}"
-                        IsEnabled="{Binding CanDeleteSelectedOffering}"
-                        Classes="danger fixedAction" />
-              </StackPanel>
-
-              <TextBlock Text="Variants"
-                         FontSize="13"
-                         FontWeight="SemiBold"
-                         Foreground="{DynamicResource SecondaryTextBrush}"
-                         Margin="0,8,0,0" />
-              <StackPanel Orientation="Horizontal"
-                          Spacing="8">
-                <TextBox Text="{Binding VariantColor}"
-                         PlaceholderText="Color"
-                         Width="90"
-                         Classes="field" />
-                <TextBox Text="{Binding VariantSize}"
-                         PlaceholderText="Size"
-                         Width="90"
-                         Classes="field" />
-                <Button Content="Add"
-                        Command="{Binding AddVariantCommand}"
-                        Classes="secondary" />
-              </StackPanel>
-              <ItemsControl ItemsSource="{Binding OfferingVariants}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="appProducts:ProductVariantSummary">
-                    <Button Classes="listItem"
                             HorizontalContentAlignment="Left">
-                      <StackPanel Orientation="Horizontal"
-                                  Spacing="6">
-                        <TextBlock Text="{Binding DisplayName}" />
-                        <Button Content="Remove"
-                                Command="{Binding $parent[ItemsControl].DataContext.RemoveSelectedVariantCommand}"
-                                CommandParameter="{Binding}"
-                                Classes="danger" />
-                      </StackPanel>
-                    </Button>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-
-              <TextBlock Text="Printable areas"
-                         FontSize="13"
-                         FontWeight="SemiBold"
-                         Foreground="{DynamicResource SecondaryTextBrush}"
-                         Margin="0,8,0,0" />
-              <StackPanel Orientation="Horizontal"
-                          Spacing="8">
-                <TextBox Text="{Binding AreaName}"
-                         PlaceholderText="Name (Front)"
-                         Width="120"
-                         Classes="field" />
-                <TextBox Text="{Binding AreaPosition}"
-                         PlaceholderText="Position"
-                         Width="90"
-                         Classes="field" />
-                <TextBox Text="{Binding AreaDecorationMethod}"
-                         PlaceholderText="Method (DTG)"
-                         Width="90"
-                         Classes="field" />
-              </StackPanel>
-              <StackPanel Orientation="Horizontal"
-                          Spacing="8">
-                <TextBox Text="{Binding AreaWidth}"
-                         PlaceholderText="Width px"
-                         Width="90"
-                         Classes="field" />
-                <TextBox Text="{Binding AreaHeight}"
-                         PlaceholderText="Height px"
-                         Width="90"
-                         Classes="field" />
-                <Button Content="Add area"
-                        Command="{Binding AddDesignAreaCommand}"
-                        Classes="secondary" />
-              </StackPanel>
-              <StackPanel IsVisible="{Binding HasSelectedVariant}"
-                          Spacing="4">
-                <TextBlock Text="Applicable variants (leave clear for all variants)"
-                           FontSize="12"
-                           Foreground="{DynamicResource SecondaryTextBrush}" />
-                <ItemsControl ItemsSource="{Binding ApplicableVariants}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="stores:ApplicableVariantViewModel">
-                      <CheckBox Content="{Binding Label}"
-                                IsChecked="{Binding IsSelected, Mode=TwoWay}" />
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </StackPanel>
-              <ItemsControl ItemsSource="{Binding OfferingDesignAreas}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="appProducts:DesignAreaSummary">
-                    <Button Classes="listItem"
-                            HorizontalContentAlignment="Left">
-                      <StackPanel Orientation="Horizontal"
-                                  Spacing="6">
-                        <TextBlock Text="{Binding Name}" />
-                        <TextBlock Text="·"
+                      <StackPanel Spacing="3">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding Offerings.Count, StringFormat='{}{0} fulfillment offering(s)'}"
+                                   FontSize="12"
                                    Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <TextBlock Text="{Binding Position}" />
-                        <TextBlock Text="{Binding Width, StringFormat='{}{0}px'}"
-                                   Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <TextBlock Text="×"
-                                   Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <TextBlock Text="{Binding Height, StringFormat='{}{0}px'}"
-                                   Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <Button Content="Remove"
-                                Command="{Binding $parent[ItemsControl].DataContext.RemoveSelectedDesignAreaCommand}"
-                                CommandParameter="{Binding}"
-                                Classes="danger" />
                       </StackPanel>
                     </Button>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
             </StackPanel>
-          </Grid>
+
+            <StackPanel IsVisible="{Binding IsProductDetail}"
+                        Spacing="12">
+              <Button Content="‹  Back to products"
+                      Command="{Binding BackToProductsCommand}"
+                      Classes="secondary" />
+              <TextBlock Text="{Binding CatalogBreadcrumb}"
+                         FontSize="12"
+                         Foreground="{DynamicResource SecondaryTextBrush}" />
+              <TextBlock Text="{Binding ProductName}"
+                         FontSize="20"
+                         FontWeight="SemiBold"
+                         Foreground="{DynamicResource StrongTextBrush}" />
+              <TextBlock Text="{Binding SelectedProductSummary}"
+                         Foreground="{DynamicResource SecondaryTextBrush}" />
+              <Border Classes="panel" Padding="12">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="Product details" FontWeight="SemiBold" />
+                  <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                  <TextBox x:Name="ProductNameTextBox"
+                           Text="{Binding ProductName}"
+                           PlaceholderText="Product name"
+                           Classes="field" />
+                  <TextBlock Text="Description" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                  <TextBox Text="{Binding ProductDescription}"
+                           AcceptsReturn="True"
+                           MinHeight="56"
+                           Classes="field" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Save product"
+                            Command="{Binding SaveSelectedProductCommand}"
+                            IsEnabled="{Binding CanSaveSelectedProduct}"
+                            Classes="primary fixedAction" />
+                    <Button Content="Delete product"
+                            Command="{Binding RequestDeleteSelectedProductCommand}"
+                            IsEnabled="{Binding CanDeleteSelectedProduct}"
+                            Classes="danger fixedAction" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+              <Border Classes="panel" Padding="12">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="Fulfillment offerings" FontWeight="SemiBold" />
+                  <TextBlock Text="An offering is one way this product is supplied."
+                             FontSize="12"
+                             Foreground="{DynamicResource SecondaryTextBrush}" />
+                  <Button Content="Add fulfillment offering"
+                          Command="{Binding StartCreateOfferingCommand}"
+                          IsEnabled="{Binding CanCreateCatalogItem}"
+                          Classes="primary" />
+                  <TextBlock IsVisible="{Binding !HasSelectedProductOfferings}"
+                             Text="No fulfillment offerings yet."
+                             Foreground="{DynamicResource SecondaryTextBrush}" />
+                  <ItemsControl ItemsSource="{Binding SelectedProduct.Offerings}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="appProducts:FulfillmentOfferingSummary">
+                        <Button Command="{Binding $parent[ItemsControl].DataContext.OpenOfferingDetailCommand}"
+                                CommandParameter="{Binding}"
+                                Classes="listItem"
+                                HorizontalContentAlignment="Left">
+                          <StackPanel Spacing="3">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Kind}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource SecondaryTextBrush}" />
+                          </StackPanel>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+
+            <StackPanel IsVisible="{Binding IsOfferingDetail}"
+                        Spacing="12">
+              <Button Content="‹  Back to product"
+                      Command="{Binding BackToProductCommand}"
+                      Classes="secondary" />
+              <TextBlock Text="{Binding CatalogBreadcrumb}"
+                         FontSize="12"
+                         Foreground="{DynamicResource SecondaryTextBrush}" />
+              <TextBlock Text="{Binding OfferingName}"
+                         FontSize="20"
+                         FontWeight="SemiBold"
+                         Foreground="{DynamicResource StrongTextBrush}" />
+              <TextBlock Text="{Binding SelectedOfferingSummary}"
+                         Foreground="{DynamicResource SecondaryTextBrush}" />
+
+              <Border Classes="panel" Padding="12">
+                <StackPanel Spacing="8">
+                  <ToggleButton Content="Basics"
+                                IsChecked="{Binding IsBasicsSectionExpanded, Mode=TwoWay}"
+                                HorizontalContentAlignment="Left" />
+                  <StackPanel IsVisible="{Binding IsBasicsSectionExpanded}" Spacing="8">
+                    <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBox Text="{Binding OfferingName}" PlaceholderText="Offering name" Classes="field" />
+                    <TextBlock Text="Fulfillment type" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <ComboBox SelectedIndex="{Binding OfferingKindIndex}" Classes="field">
+                      <ComboBoxItem Content="Fixed provider" />
+                      <ComboBoxItem Content="Printify Choice network" />
+                    </ComboBox>
+                    <TextBlock IsVisible="{Binding !IsChoiceNetworkOffering}" Text="Provider name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBox IsVisible="{Binding !IsChoiceNetworkOffering}"
+                             Text="{Binding OfferingProviderName}"
+                             PlaceholderText="Provider name"
+                             Classes="field" />
+                    <TextBlock Text="Description" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBox Text="{Binding OfferingDescription}" AcceptsReturn="True" MinHeight="44" Classes="field" />
+                    <TextBlock IsVisible="{Binding IsChoiceNetworkOffering}"
+                               Text="Printify Choice is a variable fulfillment network; exact panel dimensions and placement can vary by fulfillment provider."
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource WarningTextBrush}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Content="Save offering"
+                              Command="{Binding SaveSelectedOfferingCommand}"
+                              IsEnabled="{Binding CanSaveSelectedOffering}"
+                              Classes="primary fixedAction" />
+                      <Button Content="Delete offering"
+                              Command="{Binding RequestDeleteSelectedOfferingCommand}"
+                              IsEnabled="{Binding CanDeleteSelectedOffering}"
+                              Classes="danger fixedAction" />
+                    </StackPanel>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+
+              <Border Classes="panel" Padding="12">
+                <StackPanel Spacing="8">
+                  <ToggleButton Content="Variants"
+                                IsChecked="{Binding IsVariantsSectionExpanded, Mode=TwoWay}"
+                                HorizontalContentAlignment="Left" />
+                  <StackPanel IsVisible="{Binding IsVariantsSectionExpanded}" Spacing="8">
+                    <TextBlock Text="Concrete color and size options supported by this offering."
+                               FontSize="12"
+                               Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <Button Content="Add variant"
+                            Command="{Binding StartAddVariantCommand}"
+                            Classes="secondary" />
+                    <StackPanel IsVisible="{Binding IsAddingVariant}" Spacing="6">
+                      <TextBlock Text="Color" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <TextBox Text="{Binding VariantColor}" Classes="field" />
+                      <TextBlock Text="Size" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <TextBox Text="{Binding VariantSize}" Classes="field" />
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Add variant" Command="{Binding AddVariantCommand}" Classes="primary fixedAction" />
+                        <Button Content="Cancel" Command="{Binding CancelAddVariantCommand}" Classes="secondary fixedAction" />
+                      </StackPanel>
+                    </StackPanel>
+                    <TextBlock IsVisible="{Binding !HasOfferingVariants}" Text="No variants configured." Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <ItemsControl ItemsSource="{Binding OfferingVariants}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="appProducts:ProductVariantSummary">
+                          <Border Classes="listItem" Padding="8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" />
+                              <Button Content="Remove variant"
+                                      Command="{Binding $parent[ItemsControl].DataContext.RemoveSelectedVariantCommand}"
+                                      CommandParameter="{Binding}"
+                                      Classes="danger" />
+                            </StackPanel>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+
+              <Border Classes="panel" Padding="12">
+                <StackPanel Spacing="8">
+                  <ToggleButton Content="Printable areas"
+                                IsChecked="{Binding IsDesignAreasSectionExpanded, Mode=TwoWay}"
+                                HorizontalContentAlignment="Left" />
+                  <StackPanel IsVisible="{Binding IsDesignAreasSectionExpanded}" Spacing="8">
+                    <TextBlock Text="Design placement targets for this offering."
+                               FontSize="12"
+                               Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <Button Content="Add printable area"
+                            Command="{Binding StartAddDesignAreaCommand}"
+                            Classes="secondary" />
+                    <StackPanel IsVisible="{Binding IsAddingDesignArea}" Spacing="6">
+                      <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <TextBox Text="{Binding AreaName}" PlaceholderText="Front" Classes="field" />
+                      <TextBlock Text="Position" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <TextBox Text="{Binding AreaPosition}" Classes="field" />
+                      <TextBlock Text="Decoration method" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <TextBox Text="{Binding AreaDecorationMethod}" PlaceholderText="DTG" Classes="field" />
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <StackPanel Width="120" Spacing="4">
+                          <TextBlock Text="Width (px)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                          <TextBox Text="{Binding AreaWidth}" Classes="field" />
+                        </StackPanel>
+                        <StackPanel Width="120" Spacing="4">
+                          <TextBlock Text="Height (px)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                          <TextBox Text="{Binding AreaHeight}" Classes="field" />
+                        </StackPanel>
+                      </StackPanel>
+                      <StackPanel IsVisible="{Binding HasSelectedVariant}" Spacing="4">
+                        <TextBlock Text="Applies to (leave clear for all variants)"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <ItemsControl ItemsSource="{Binding ApplicableVariants}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="stores:ApplicableVariantViewModel">
+                              <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Add printable area" Command="{Binding AddDesignAreaCommand}" Classes="primary fixedAction" />
+                        <Button Content="Cancel" Command="{Binding CancelAddDesignAreaCommand}" Classes="secondary fixedAction" />
+                      </StackPanel>
+                    </StackPanel>
+                    <TextBlock IsVisible="{Binding !HasOfferingDesignAreas}" Text="No printable areas configured." Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <ItemsControl ItemsSource="{Binding OfferingDesignAreas}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="appProducts:DesignAreaSummary">
+                          <Border Classes="listItem" Padding="8">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <TextBlock Text="{Binding Name}" />
+                              <TextBlock Text="·" Foreground="{DynamicResource SecondaryTextBrush}" />
+                              <TextBlock Text="{Binding Position}" />
+                              <TextBlock Text="{Binding Width, StringFormat='{}{0}px'}" Foreground="{DynamicResource SecondaryTextBrush}" />
+                              <TextBlock Text="×" Foreground="{DynamicResource SecondaryTextBrush}" />
+                              <TextBlock Text="{Binding Height, StringFormat='{}{0}px'}" Foreground="{DynamicResource SecondaryTextBrush}" />
+                              <Button Content="Remove printable area"
+                                      Command="{Binding $parent[ItemsControl].DataContext.RemoveSelectedDesignAreaCommand}"
+                                      CommandParameter="{Binding}"
+                                      Classes="danger" />
+                            </StackPanel>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+
+              <Border Classes="panel" Padding="12">
+                <StackPanel Spacing="8">
+                  <ToggleButton Content="Advanced identifiers"
+                                IsChecked="{Binding IsAdvancedSectionExpanded, Mode=TwoWay}"
+                                HorizontalContentAlignment="Left" />
+                  <StackPanel IsVisible="{Binding IsAdvancedSectionExpanded}" Spacing="8">
+                    <TextBlock Text="External offering ID" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBox Text="{Binding OfferingExternalOfferingId}" Classes="field" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </StackPanel>
 
           <Border IsVisible="{Binding ProductDeleteWarningVisible}"
                   Background="{DynamicResource DangerBackgroundBrush}"
