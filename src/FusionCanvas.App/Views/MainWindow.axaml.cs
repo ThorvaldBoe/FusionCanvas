@@ -21,6 +21,7 @@ using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Application.Groups;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Items.Import;
+using FusionCanvas.Application.WorkspaceTree;
 
 namespace FusionCanvas.App.Views;
 
@@ -280,13 +281,19 @@ public partial class MainWindow : Window
         }
 
         var point = e.GetCurrentPoint(control);
-        if (point.Properties.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        if (point.Properties.PointerUpdateKind == PointerUpdateKind.MiddleButtonPressed)
         {
             viewModel.WorkspaceTree.OpenInTabCommand.Execute(node);
         }
-        else
+        else if (point.Properties.PointerUpdateKind == PointerUpdateKind.RightButtonPressed)
         {
-            viewModel.WorkspaceTree.SelectNodeCommand.Execute(node);
+            viewModel.WorkspaceTree.PrepareContextSelection(node);
+        }
+        else if (point.Properties.IsLeftButtonPressed)
+        {
+            var controlPressed = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+            var shiftPressed = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+            viewModel.WorkspaceTree.SelectNodeWithModifiers(node, controlPressed && !shiftPressed, shiftPressed, controlPressed);
         }
 
         if (node.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Item && point.Properties.IsLeftButtonPressed)
@@ -344,7 +351,10 @@ public partial class MainWindow : Window
         }
 
         var transfer = new DataTransfer();
-        transfer.Add(DataTransferItem.CreateText($"{_dragNode.EntityKind}:{_dragNode.EntityId}"));
+        var selections = (DataContext as MainWindowViewModel)?.WorkspaceTree.GetDragSelections(_dragNode)
+            ?? [new WorkspaceTreeSelection(_dragNode.EntityKind, _dragNode.EntityId)];
+        transfer.Add(DataTransferItem.CreateText(
+            $"FusionCanvasSelection|{string.Join(',', selections.Select(selection => $"{selection.Kind}:{selection.Id}"))}"));
         var pressedArgs = _dragPointerArgs;
         _dragPointerArgs = null;
         _dragNode = null;
@@ -355,11 +365,13 @@ public partial class MainWindow : Window
     {
         ClearDropTarget();
         if (DataContext is MainWindowViewModel viewModel &&
-            TryGetDraggedEntity(e, out var sourceKind, out var sourceId) &&
+            TryGetDraggedSelections(e, out var sources) &&
             sender is Control { DataContext: WorkspaceTreeNodeViewModel { EntityKind: WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group } target } control)
         {
-            var placement = sourceKind == WorkspaceEntityKind.Item ? new GroupPlacement() : PlacementFor(target, control, e);
-            if (viewModel.WorkspaceTree.CanDrop(sourceKind, sourceId, target, placement, out var error))
+            var placement = sources.Any(source => source.Kind == WorkspaceEntityKind.Item)
+                ? new GroupPlacement()
+                : PlacementFor(target, control, e);
+            if (viewModel.WorkspaceTree.CanDrop(sources, target, placement, out var error))
             {
                 viewModel.WorkspaceTree.ShowDropFeedback(null);
                 _dropTarget = target;
@@ -393,15 +405,24 @@ public partial class MainWindow : Window
     {
         if (DataContext is not MainWindowViewModel viewModel ||
             sender is not Control { DataContext: WorkspaceTreeNodeViewModel target } control ||
-            !TryGetDraggedEntity(e, out var sourceKind, out var sourceId) ||
-            sourceId == target.EntityId)
+            !TryGetDraggedSelections(e, out var sources) ||
+            sources.Any(source => source.Id == target.EntityId))
         {
             return;
         }
 
-        var placement = sourceKind == WorkspaceEntityKind.Item ? new GroupPlacement() : PlacementFor(target, control, e);
+        var placement = sources.Any(source => source.Kind == WorkspaceEntityKind.Item)
+            ? new GroupPlacement()
+            : PlacementFor(target, control, e);
 
-        await viewModel.WorkspaceTree.MoveAsync(sourceKind, sourceId, target, placement);
+        if (sources.Count == 1)
+        {
+            await viewModel.WorkspaceTree.MoveAsync(sources[0].Kind, sources[0].Id, target, placement);
+        }
+        else
+        {
+            await viewModel.WorkspaceTree.MoveSelectionAsync(sources, target, placement);
+        }
         ClearDropTarget();
         e.Handled = true;
     }
@@ -425,6 +446,31 @@ public partial class MainWindow : Window
         entityId = default;
         var parts = e.DataTransfer.TryGetText()?.Split(':', 2);
         return parts is { Length: 2 } && Enum.TryParse(parts[0], out kind) && Guid.TryParse(parts[1], out entityId);
+    }
+
+    private static bool TryGetDraggedSelections(DragEventArgs e, out IReadOnlyList<WorkspaceTreeSelection> selections)
+    {
+        selections = [];
+        var text = e.DataTransfer.TryGetText();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        if (!text.StartsWith("FusionCanvasSelection|", StringComparison.Ordinal))
+        {
+            return TryGetDraggedEntity(e, out var kind, out var id) &&
+                   (selections = [new WorkspaceTreeSelection(kind, id)]) is not null;
+        }
+
+        var parsed = text["FusionCanvasSelection|".Length..]
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(value => value.Split(':', 2))
+            .Where(parts => parts.Length == 2 && Enum.TryParse(parts[0], out WorkspaceEntityKind _) && Guid.TryParse(parts[1], out _))
+            .Select(parts => new WorkspaceTreeSelection(Enum.Parse<WorkspaceEntityKind>(parts[0]), Guid.Parse(parts[1])))
+            .ToArray();
+        selections = parsed;
+        return parsed.Length > 0;
     }
 
     private static GroupPlacement PlacementFor(
@@ -753,6 +799,10 @@ public partial class MainWindow : Window
             viewModel.WorkspaceTree.BeginRenameCommand.Execute(null);
             FocusVisibleTreeEditor();
         }
+        else if (e.Key == Key.A && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            viewModel.WorkspaceTree.SelectAllVisibleEntities();
+        }
         else if (e.Key == Key.C && e.KeyModifiers.HasFlag(KeyModifiers.Control))
         {
             viewModel.WorkspaceTree.CopyCommand.Execute(null);
@@ -779,6 +829,24 @@ public partial class MainWindow : Window
         {
             await viewModel.WorkspaceTree.BeginCreateAsync();
             FocusVisibleTreeEditor();
+        }
+    }
+
+    private void OnContextOpenInTab(object? sender, RoutedEventArgs e)
+    {
+        if (TrySelectContextNode(sender, out var viewModel, out var node))
+        {
+            viewModel.WorkspaceTree.OpenInTabCommand.Execute(node);
+        }
+    }
+
+    private void OnContextOpenSelectedInTabs(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem { DataContext: WorkspaceTreeNodeViewModel node } &&
+            DataContext is MainWindowViewModel viewModel &&
+            node.HasMultiSelectionContext)
+        {
+            viewModel.WorkspaceTree.OpenSelectedInTabsCommand.Execute(null);
         }
     }
 
@@ -829,6 +897,16 @@ public partial class MainWindow : Window
         if (TrySelectContextNode(sender, out var viewModel, out var node) && node.IsItem)
         {
             await viewModel.WorkspaceTree.DuplicateAsync();
+        }
+    }
+
+    private async void OnContextDuplicateSelected(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem { DataContext: WorkspaceTreeNodeViewModel node } &&
+            DataContext is MainWindowViewModel viewModel &&
+            node.HasMultiSelectionContext)
+        {
+            await viewModel.WorkspaceTree.DuplicateSelectedAsync();
         }
     }
 

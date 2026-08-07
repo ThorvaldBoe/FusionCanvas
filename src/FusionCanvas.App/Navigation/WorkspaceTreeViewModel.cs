@@ -21,6 +21,9 @@ public sealed class WorkspaceTreeNodeViewModel : INotifyPropertyChanged
 {
     private bool _isExpanded;
     private bool _isSelected;
+    private bool _isMultiSelected;
+    private bool _hasMultiSelectionContext;
+    private int _selectionCount;
     private bool _isEditing;
     private bool _isCut;
     private bool _isDropTarget;
@@ -114,6 +117,50 @@ public sealed class WorkspaceTreeNodeViewModel : INotifyPropertyChanged
         set => SetField(ref _isSelected, value);
     }
 
+    public bool IsMultiSelected
+    {
+        get => _isMultiSelected;
+        set => SetField(ref _isMultiSelected, value);
+    }
+
+    public bool HasMultiSelectionContext
+    {
+        get => _hasMultiSelectionContext;
+        set
+        {
+            if (_hasMultiSelectionContext == value)
+            {
+                return;
+            }
+
+            SetField(ref _hasMultiSelectionContext, value);
+            OnPropertyChanged(nameof(IsSingleSelectionContext));
+            OnPropertyChanged(nameof(IsGroupAndSingleSelection));
+            OnPropertyChanged(nameof(IsItemAndSingleSelection));
+        }
+    }
+
+    public bool IsSingleSelectionContext => !HasMultiSelectionContext;
+    public bool IsGroupAndSingleSelection => IsGroup && IsSingleSelectionContext;
+    public bool IsItemAndSingleSelection => IsItem && IsSingleSelectionContext;
+    public bool HasContextActionsAndSingleSelection => HasContextActions && IsSingleSelectionContext;
+    public bool IsTopicAndSingleSelection => IsTopic && IsSingleSelectionContext;
+
+    public int SelectionCount
+    {
+        get => _selectionCount;
+        set
+        {
+            if (_selectionCount != value)
+            {
+                SetField(ref _selectionCount, value);
+                OnPropertyChanged(nameof(SelectionCountLabel));
+            }
+        }
+    }
+
+    public string SelectionCountLabel => $"{SelectionCount} selected";
+
     public bool IsEditing
     {
         get => _isEditing;
@@ -165,6 +212,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     private readonly IGroupManagementService _groups;
     private readonly IItemManagementService _items;
     private readonly WorkspaceTreeSelectionCoordinator _selection;
+    private readonly WorkspaceTreeMultiSelection _multiSelection = new();
     private readonly WorkspaceTreeClipboard _clipboard;
     private readonly IItemCsvExportService _csvExport;
     private IItemCsvCodec _csvCodec;
@@ -210,6 +258,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         _clipboard = clipboard ?? new WorkspaceTreeClipboard();
         SelectNodeCommand = new RelayCommand(parameter => Select(parameter as WorkspaceTreeNodeViewModel));
         OpenInTabCommand = new RelayCommand(parameter => OpenInTab(parameter as WorkspaceTreeNodeViewModel));
+        OpenSelectedInTabsCommand = new RelayCommand(_ => OpenSelectedInTabs());
         BeginCreateCommand = new RelayCommand(_ => Run(BeginCreateAsync()));
         BeginCreateItemCommand = new RelayCommand(_ => Run(BeginCreateItemAsync()));
         BeginRenameCommand = new RelayCommand(_ => BeginRename());
@@ -237,6 +286,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler<WorkspaceTreeSelection>? OpenInTabRequested;
+    public event EventHandler<IReadOnlyList<WorkspaceTreeSelection>>? OpenSelectedInTabsRequested;
     public event EventHandler<WorkspaceTreeSelection>? SelectionChanged;
     public event EventHandler<WorkspaceTreeSelection>? ManageAssetsRequested;
     public event EventHandler? StructureChanged;
@@ -245,6 +295,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     public ObservableCollection<WorkspaceTreeNodeViewModel> Roots { get; } = [];
     public ICommand SelectNodeCommand { get; }
     public ICommand OpenInTabCommand { get; }
+    public ICommand OpenSelectedInTabsCommand { get; }
     public ICommand BeginCreateCommand { get; }
     public ICommand BeginCreateItemCommand { get; }
     public ICommand BeginRenameCommand { get; }
@@ -290,6 +341,8 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
                 _selectedNode.IsSelected = true;
             }
 
+            ApplyMultiSelectionVisualState();
+
             OnPropertyChanged();
             OnPropertyChanged(nameof(HasSelection));
             OnPropertyChanged(nameof(CanManageSelection));
@@ -302,6 +355,11 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     }
 
     public bool HasSelection => SelectedNode is not null;
+    public IReadOnlyList<Guid> SelectedEntityIds => _multiSelection.SelectedIds;
+    public int SelectedEntityCount => _multiSelection.Count;
+    public bool HasMultiSelection => _multiSelection.Count > 1;
+    public bool IsNodeMultiSelected(WorkspaceTreeNodeViewModel? node) =>
+        node is not null && _multiSelection.Contains(node.EntityId);
     public bool CanManageSelection => SelectedNode?.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Item;
     public bool HasEditingNode => _editingNode is not null;
     public IItemCsvFilePicker FilePicker { get; set; }
@@ -314,6 +372,68 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     public string InspectorKind => SelectedNode?.KindLabel ?? string.Empty;
     public string InspectorDescription => SelectedNode?.Description ?? "No additional properties have been set.";
     public string InspectorPath => SelectedNode is null ? string.Empty : BuildPath(SelectedNode.EntityId);
+
+    public void SelectNodeWithModifiers(
+        WorkspaceTreeNodeViewModel? node,
+        bool toggle,
+        bool range,
+        bool extendRange = false)
+    {
+        if (node is null || node.IsDraft || node.EntityKind is not (WorkspaceEntityKind.Group or WorkspaceEntityKind.Item))
+        {
+            return;
+        }
+
+        var visibleIds = SelectableVisibleNodes().Select(candidate => candidate.EntityId).ToArray();
+        if (range)
+        {
+            _multiSelection.SelectRange(visibleIds, node.EntityId, extendRange);
+        }
+        else if (toggle)
+        {
+            _multiSelection.Toggle(node.EntityId);
+        }
+        else
+        {
+            _multiSelection.Replace(node.EntityId);
+        }
+
+        var activeId = _multiSelection.ActiveId;
+        if (activeId is Guid id && FindNode(id) is { } activeNode)
+        {
+            Select(activeNode, notifySelectionChanged: true, replaceMultiSelection: false);
+        }
+        else
+        {
+            ApplyMultiSelectionVisualState();
+        }
+    }
+
+    public void SelectAllVisibleEntities()
+    {
+        _multiSelection.SelectAll(SelectableVisibleNodes().Select(node => node.EntityId).ToArray());
+        if (_multiSelection.ActiveId is Guid id && FindNode(id) is { } activeNode)
+        {
+            Select(activeNode, notifySelectionChanged: true, replaceMultiSelection: false);
+        }
+        else
+        {
+            ApplyMultiSelectionVisualState();
+        }
+    }
+
+    public void PrepareContextSelection(WorkspaceTreeNodeViewModel? node)
+    {
+        if (node is null || node.IsDraft || node.EntityKind is not (WorkspaceEntityKind.Group or WorkspaceEntityKind.Item))
+        {
+            return;
+        }
+
+        if (!_multiSelection.Contains(node.EntityId))
+        {
+            Select(node);
+        }
+    }
 
     public string QueryText
     {
@@ -880,6 +1000,78 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         StructureChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    public async Task DuplicateSelectedAsync()
+    {
+        if (IsBusy || !HasMultiSelection)
+        {
+            return;
+        }
+
+        var sources = WorkspaceTreeSelectionNormalizer.Normalize(
+            _snapshot,
+            _multiSelection.SelectedIds.Select(id => FindNode(id))
+                .Where(node => node is { IsDraft: false })
+                .Select(node => new WorkspaceTreeSelection(node!.EntityKind, node.EntityId)));
+        var originalSnapshot = _snapshot;
+        var originalSelectedIds = _multiSelection.SelectedIds.ToArray();
+        var originalActiveId = _multiSelection.ActiveId;
+        var originalAnchorId = _multiSelection.AnchorId;
+        IsBusy = true;
+        ErrorMessage = null;
+
+        foreach (var source in sources)
+        {
+            if (source.Kind == WorkspaceEntityKind.Item)
+            {
+                var result = await _items.DuplicateItemAsync(new ItemManagementDuplicateRequest(source.Id)).ConfigureAwait(false);
+                if (!result.Succeeded)
+                {
+                    await RestoreBatchFailureAsync(originalSnapshot, originalSelectedIds, originalActiveId, originalAnchorId, result.Error).ConfigureAwait(false);
+                    return;
+                }
+            }
+            else if (source.Kind == WorkspaceEntityKind.Group && FindNode(source.Id) is { } node)
+            {
+                var result = await _groups.CopyGroupAsync(new GroupManagementCopyRequest(source.Id, ParentOf(node))).ConfigureAwait(false);
+                if (!result.Succeeded)
+                {
+                    await RestoreBatchFailureAsync(originalSnapshot, originalSelectedIds, originalActiveId, originalAnchorId, result.Error).ConfigureAwait(false);
+                    return;
+                }
+            }
+        }
+
+        IsBusy = false;
+        await ReloadAsync().ConfigureAwait(false);
+        _multiSelection.Restore(originalSelectedIds, originalActiveId, originalAnchorId);
+        ApplyMultiSelectionVisualState();
+        StructureChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private async Task RestoreBatchFailureAsync(
+        WorkspaceSnapshot originalSnapshot,
+        IReadOnlyList<Guid> selectedIds,
+        Guid? activeId,
+        Guid? anchorId,
+        string? error)
+    {
+        try
+        {
+            await _repository.SaveAsync(originalSnapshot).ConfigureAwait(false);
+            _snapshot = originalSnapshot;
+            IsBusy = false;
+            await ReloadAsync().ConfigureAwait(false);
+            _multiSelection.Restore(selectedIds, activeId, anchorId);
+            ApplyMultiSelectionVisualState();
+            ErrorMessage = error ?? "The group action failed; the confirmed workspace was restored.";
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException)
+        {
+            IsBusy = false;
+            ErrorMessage = $"The group action failed and could not be restored: {ex.Message}";
+        }
+    }
+
     public GroupDeleteImpact GetDeleteImpact(Guid groupId)
     {
         var group = _snapshot.Groups.Single(candidate => candidate.Id == groupId);
@@ -962,6 +1154,55 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     public async Task MoveAsync(Guid sourceGroupId, WorkspaceTreeNodeViewModel target, GroupPlacement placement)
         => await MoveAsync(WorkspaceEntityKind.Group, sourceGroupId, target, placement).ConfigureAwait(false);
 
+    public async Task MoveSelectionAsync(
+        IReadOnlyList<WorkspaceTreeSelection> sources,
+        WorkspaceTreeNodeViewModel target,
+        GroupPlacement placement)
+    {
+        string? validationError = null;
+        if (IsBusy || !CanDrop(sources, target, placement, out validationError))
+        {
+            ErrorMessage = validationError;
+            return;
+        }
+
+        var originalSnapshot = _snapshot;
+        var originalSelectedIds = _multiSelection.SelectedIds.ToArray();
+        var originalActiveId = _multiSelection.ActiveId;
+        var originalAnchorId = _multiSelection.AnchorId;
+        ErrorMessage = null;
+        var effectiveSources = WorkspaceTreeSelectionNormalizer.Normalize(_snapshot, sources);
+        foreach (var source in effectiveSources)
+        {
+            await MoveAsync(source.Kind, source.Id, target, placement).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(ErrorMessage))
+            {
+                try
+                {
+                    await _repository.SaveAsync(originalSnapshot).ConfigureAwait(false);
+                    _snapshot = originalSnapshot;
+                    await ReloadAsync().ConfigureAwait(false);
+                    _multiSelection.Restore(originalSelectedIds, originalActiveId, originalAnchorId);
+                    ApplyMultiSelectionVisualState();
+                    ErrorMessage = "The multi-entity move could not be saved; the confirmed hierarchy was restored.";
+                }
+                catch (Exception ex) when (ex is IOException or InvalidOperationException)
+                {
+                    ErrorMessage = $"The multi-entity move failed and could not be restored: {ex.Message}";
+                }
+
+                return;
+            }
+        }
+
+        var storeId = target.EntityKind == WorkspaceEntityKind.Niche
+            ? _snapshot.Niches.Single(niche => niche.Id == target.EntityId).StoreId
+            : _snapshot.Groups.Single(group => group.Id == target.EntityId).StoreId;
+        _multiSelection.Restore(originalSelectedIds, originalActiveId, originalAnchorId);
+        _multiSelection.Reconcile(SelectableEntityIdsForStore(storeId));
+        ApplyMultiSelectionVisualState();
+    }
+
     public async Task MoveAsync(WorkspaceEntityKind sourceKind, Guid sourceId, WorkspaceTreeNodeViewModel target, GroupPlacement placement)
     {
         if (target.EntityKind is not (WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group) || IsBusy)
@@ -1016,6 +1257,69 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         WorkspaceTreeNodeViewModel target,
         GroupPlacement placement,
         out string? error) => CanDrop(WorkspaceEntityKind.Group, sourceGroupId, target, placement, out error);
+
+    public IReadOnlyList<WorkspaceTreeSelection> GetDragSelections(WorkspaceTreeNodeViewModel node)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+
+        var selected = _multiSelection.Contains(node.EntityId)
+            ? _multiSelection.SelectedIds
+                .Select(FindNode)
+                .Where(candidate => candidate is { IsDraft: false })
+                .Select(candidate => new WorkspaceTreeSelection(candidate!.EntityKind, candidate.EntityId))
+            : [new WorkspaceTreeSelection(node.EntityKind, node.EntityId)];
+        return WorkspaceTreeSelectionNormalizer.Normalize(_snapshot, selected);
+    }
+
+    public bool CanDrop(
+        IReadOnlyList<WorkspaceTreeSelection> sources,
+        WorkspaceTreeNodeViewModel target,
+        GroupPlacement placement,
+        out string? error)
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+        ArgumentNullException.ThrowIfNull(target);
+
+        var effectiveSources = WorkspaceTreeSelectionNormalizer.Normalize(_snapshot, sources);
+        if (effectiveSources.Count == 0)
+        {
+            error = "Select an active Item or group before dragging.";
+            return false;
+        }
+
+        if (effectiveSources.Any(source => source.Id == target.EntityId))
+        {
+            error = "The destination must be outside the selected hierarchy.";
+            return false;
+        }
+
+        if (effectiveSources.Any(source =>
+                source.Kind == WorkspaceEntityKind.Group &&
+                target.EntityKind == WorkspaceEntityKind.Group &&
+                GroupHierarchy.IsDescendant(_snapshot, target.EntityId, source.Id)))
+        {
+            error = "The destination must be outside the selected hierarchy.";
+            return false;
+        }
+
+        if (effectiveSources.Any(source => source.Kind == WorkspaceEntityKind.Item) &&
+            placement.Kind != GroupPlacementKind.Append)
+        {
+            error = "Items can only be moved inside a niche or group.";
+            return false;
+        }
+
+        foreach (var source in effectiveSources)
+        {
+            if (!CanDrop(source.Kind, source.Id, target, placement, out error))
+            {
+                return false;
+            }
+        }
+
+        error = null;
+        return true;
+    }
 
     public bool CanDrop(
         WorkspaceEntityKind sourceKind,
@@ -1093,11 +1397,19 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
     public void ShowDropFeedback(string? error) => ErrorMessage = error;
 
-    private void Select(WorkspaceTreeNodeViewModel? node, bool notifySelectionChanged = true)
+    private void Select(
+        WorkspaceTreeNodeViewModel? node,
+        bool notifySelectionChanged = true,
+        bool replaceMultiSelection = true)
     {
         if (node is null || node.IsDraft)
         {
             return;
+        }
+
+        if (replaceMultiSelection)
+        {
+            _multiSelection.Replace(node.EntityId);
         }
 
         SelectedNode = node;
@@ -1112,6 +1424,8 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         {
             SelectionChanged?.Invoke(this, selection);
         }
+
+        ApplyMultiSelectionVisualState();
     }
 
     private void OpenInTab(WorkspaceTreeNodeViewModel? node)
@@ -1123,6 +1437,19 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
         Select(node, notifySelectionChanged: false);
         OpenInTabRequested?.Invoke(this, new WorkspaceTreeSelection(node.EntityKind, node.EntityId));
+    }
+
+    private void OpenSelectedInTabs()
+    {
+        var selections = _multiSelection.SelectedIds
+            .Select(FindNode)
+            .Where(node => node is { IsDraft: false, EntityKind: WorkspaceEntityKind.Group or WorkspaceEntityKind.Item })
+            .Select(node => new WorkspaceTreeSelection(node!.EntityKind, node.EntityId))
+            .ToArray();
+        if (selections.Length > 0)
+        {
+            OpenSelectedInTabsRequested?.Invoke(this, selections);
+        }
     }
 
     private void InsertDraft(GroupParentReference parent)
@@ -1305,6 +1632,8 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
 
         SelectedNode = selectedId is Guid id ? FindNode(id) : null;
+        _multiSelection.Reconcile(SelectableEntityIdsForStore(storeId));
+        ApplyMultiSelectionVisualState();
         ApplyClipboardState();
         OnPropertyChanged(nameof(HasVisibleResults));
         OnPropertyChanged(nameof(HasEmptyFilterResults));
@@ -1332,6 +1661,33 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             isInactive: projected.IsInactive || (entity is Item item && item.Status == ItemStatus.Rejected));
         node.IsExpanded = _expandedIds.Contains(node.EntityId) || IsFiltering;
         return node;
+    }
+
+    private IEnumerable<WorkspaceTreeNodeViewModel> SelectableVisibleNodes() =>
+        Flatten(Roots).Where(node =>
+            !node.IsDraft &&
+            !node.IsInactive &&
+            node.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Item);
+
+    private IEnumerable<Guid> SelectableEntityIdsForStore(Guid storeId) =>
+        _snapshot.Groups
+            .Where(group => group.StoreId == storeId && !group.IsArchived && GroupHierarchy.IsEffectivelyActive(_snapshot, group))
+            .Select(group => group.Id)
+            .Concat(_snapshot.Items.Where(item => item.StoreId == storeId && !item.IsArchived).Select(item => item.Id));
+
+    private void ApplyMultiSelectionVisualState()
+    {
+        foreach (var node in Flatten(Roots))
+        {
+            node.IsMultiSelected = _multiSelection.Contains(node.EntityId);
+            node.HasMultiSelectionContext = HasMultiSelection && node.IsMultiSelected;
+            node.SelectionCount = SelectedEntityCount;
+            node.IsSelected = _multiSelection.ActiveId == node.EntityId;
+        }
+
+        OnPropertyChanged(nameof(SelectedEntityIds));
+        OnPropertyChanged(nameof(SelectedEntityCount));
+        OnPropertyChanged(nameof(HasMultiSelection));
     }
 
     private IReadOnlyList<string> ResolveItemTagColors(Guid itemId)

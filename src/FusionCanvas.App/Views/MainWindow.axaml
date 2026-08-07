@@ -287,6 +287,7 @@
               <TreeDataTemplate x:DataType="nav:WorkspaceTreeNodeViewModel" ItemsSource="{Binding Children}">
                 <Border Classes="treeRow"
                         Classes.selected="{Binding IsSelected}"
+                        Classes.multiSelected="{Binding IsMultiSelected}"
                         Classes.inactive="{Binding IsInactive}"
                         Classes.cut="{Binding IsCut}"
                         Classes.dropTarget="{Binding IsDropTarget}"
@@ -298,22 +299,33 @@
                         DragDrop.DragOver="OnTreeNodeDragOver"
                         DragDrop.DragLeave="OnTreeNodeDragLeave"
                         DragDrop.Drop="OnTreeNodeDrop"
-                        ToolTip.Tip="Right-click for actions; Ctrl-click opens a tab; F2 renames">
+                        ToolTip.Tip="Click to select; Ctrl-click toggles; Shift-click selects a range; middle-click opens a tab; F2 renames">
                   <Border.ContextMenu>
                     <ContextMenu IsVisible="{Binding HasAssetActions}">
-                      <MenuItem Header="New group (subgroup)" IsVisible="{Binding IsGroup}" Click="OnContextNewGroup" />
-                      <MenuItem Header="New Item" Click="OnContextNewItem" />
-                      <MenuItem Header="Import…" IsVisible="{Binding IsTopic}" Click="OnContextImport" />
+                      <MenuItem Header="Open in new tab"
+                                IsVisible="{Binding !HasMultiSelectionContext}"
+                                Click="OnContextOpenInTab" />
+                      <MenuItem Header="Open in new tabs"
+                                IsVisible="{Binding HasMultiSelectionContext}"
+                                Click="OnContextOpenSelectedInTabs" />
+                      <Separator IsVisible="{Binding HasMultiSelectionContext}" />
+                      <MenuItem Header="{Binding SelectionCountLabel}"
+                                IsVisible="{Binding HasMultiSelectionContext}"
+                                IsEnabled="False" />
+                      <MenuItem Header="New group (subgroup)" IsVisible="{Binding IsGroupAndSingleSelection}" Click="OnContextNewGroup" />
+                      <MenuItem Header="New Item" IsVisible="{Binding IsSingleSelectionContext}" Click="OnContextNewItem" />
+                      <MenuItem Header="Import…" IsVisible="{Binding IsTopicAndSingleSelection}" Click="OnContextImport" />
                       <Separator />
-              <MenuItem Header="Rename" IsVisible="{Binding HasContextActions}" Click="OnContextRename" />
-              <MenuItem Header="Copy" IsVisible="{Binding HasContextActions}" Click="OnContextCopy" />
-              <MenuItem Header="Cut" IsVisible="{Binding HasContextActions}" Click="OnContextCut" />
-              <MenuItem Header="Paste" IsEnabled="{Binding CanPaste}" Click="OnContextPaste" />
-              <MenuItem Header="Duplicate" IsVisible="{Binding IsItem}" Click="OnContextDuplicate" />
-              <MenuItem Header="Assets…" Click="OnContextAssets" />
-              <MenuItem Header="Export to CSV..." IsVisible="{Binding IsTopic}" Click="OnContextExport" />
+              <MenuItem Header="Rename" IsVisible="{Binding HasContextActionsAndSingleSelection}" Click="OnContextRename" />
+              <MenuItem Header="Copy" IsVisible="{Binding HasContextActionsAndSingleSelection}" Click="OnContextCopy" />
+              <MenuItem Header="Cut" IsVisible="{Binding HasContextActionsAndSingleSelection}" Click="OnContextCut" />
+              <MenuItem Header="Paste" IsVisible="{Binding IsSingleSelectionContext}" IsEnabled="{Binding CanPaste}" Click="OnContextPaste" />
+              <MenuItem Header="Duplicate" IsVisible="{Binding IsItemAndSingleSelection}" Click="OnContextDuplicate" />
+              <MenuItem Header="Duplicate" IsVisible="{Binding HasMultiSelectionContext}" Click="OnContextDuplicateSelected" />
+              <MenuItem Header="Assets…" IsVisible="{Binding IsSingleSelectionContext}" Click="OnContextAssets" />
+              <MenuItem Header="Export to CSV..." IsVisible="{Binding IsTopicAndSingleSelection}" Click="OnContextExport" />
                       <Separator />
-                      <MenuItem Header="Delete..." IsVisible="{Binding IsGroup}" Click="OnContextDelete" />
+                      <MenuItem Header="Delete..." IsVisible="{Binding IsGroupAndSingleSelection}" Click="OnContextDelete" />
                     </ContextMenu>
                   </Border.ContextMenu>
                   <Grid ColumnDefinitions="3,22,*,Auto" MinHeight="34">
@@ -1770,6 +1782,9 @@
     </Style>
     <Style Selector="Border.treeRow:pointerover">
       <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}" />
+    </Style>
+    <Style Selector="Border.treeRow.multiSelected">
+      <Setter Property="Background" Value="{DynamicResource SelectionSubtleBackgroundBrush}" />
     </Style>
     <Style Selector="Border.treeRow.selected">
       <Setter Property="Background" Value="{DynamicResource SelectionBackgroundBrush}" />

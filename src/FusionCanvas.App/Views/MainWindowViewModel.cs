@@ -840,6 +840,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         CreateGroupCommand = new RelayCommand(_ => Run(WorkspaceTree.BeginCreateAsync()));
         WorkspaceTree.OpenInTabRequested += (_, selection) => OpenTreeSelectionInTab(selection);
+        WorkspaceTree.OpenSelectedInTabsRequested += (_, selections) =>
+        {
+            foreach (var selection in selections)
+            {
+                OpenTreeSelectionInTab(selection);
+            }
+        };
         WorkspaceTree.SelectionChanged += (_, selection) => OpenTreeSelectionInCurrentTab(selection);
         WorkspaceTree.EntitiesDeleted += (_, entityIds) => CloseDeletedEntityTabs(entityIds);
         WorkspaceTree.StructureChanged += (_, _) => RefreshWorkspaceSnapshotAndInspector();
