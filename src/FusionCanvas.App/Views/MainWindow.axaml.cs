@@ -320,6 +320,9 @@ public partial class MainWindow : Window
         {
             var controlPressed = e.KeyModifiers.HasFlag(KeyModifiers.Control);
             var shiftPressed = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+            var dragSelections = node.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Item
+                ? viewModel.WorkspaceTree.GetDragSelections(node)
+                : null;
             viewModel.WorkspaceTree.SelectNodeWithModifiers(node, controlPressed && !shiftPressed, shiftPressed, controlPressed);
             e.Handled = true;
 
@@ -327,7 +330,7 @@ public partial class MainWindow : Window
             {
                 _dragPointerArgs = e;
                 _dragNode = node;
-                _dragSelections = viewModel.WorkspaceTree.GetDragSelections(node);
+                _dragSelections = dragSelections;
                 _dragStart = e.GetPosition(row);
             }
         }
