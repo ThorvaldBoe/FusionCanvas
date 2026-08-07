@@ -71,7 +71,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly ISllDocumentCodec _sllDocumentCodec;
     private ItemStatus? _pendingStatus;
     private bool _isStatusConfirmationVisible;
-    private bool _isDesignRemoveConfirmationVisible;
     private WorkspaceSnapshot _workspaceSnapshot;
     private IReadOnlyList<NavigationDocumentContext> _navigationContexts = [];
 
@@ -187,7 +186,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         GroupDetails = new GroupDetailsViewModel(_groupManagementService);
         AssetsManagement = new AssetsViewModel(_assetManagementService);
         ItemInspector = new ItemInspectorViewModel(_itemInspectorService, _itemManagementService, _tagManagementService, titleOptimizationService);
-        DesignTool = new DesignStageToolViewModel(new DesignFileService(workspaceRepository, fileStore), productService);
+        DesignTool = new DesignStageToolViewModel(
+            new DesignStageService(workspaceRepository, fileStore));
         ListingTool = new ListingStageToolViewModel();
         Ideation = new IdeationViewModel(_ideationService, _ideationAccessStatus, snowcloneLibrary, rejectedPhrases);
         ConceptRefinement = new ConceptRefinementSessionViewModel(
@@ -407,12 +407,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public string StatusConfirmationMessage { get; private set; } = string.Empty;
 
-    public bool IsDesignRemoveConfirmationVisible
-    {
-        get => _isDesignRemoveConfirmationVisible;
-        set => SetField(ref _isDesignRemoveConfirmationVisible, value);
-    }
-
     public bool ShowsIdeaStageTool => DocumentWindow.ActiveContext?.WorkflowStage == WorkflowStage.Idea;
     public bool ShowsConceptStageTool => DocumentWindow.ActiveContext?.WorkflowStage == WorkflowStage.Concept;
     public bool ShowsDesignStageTool => DocumentWindow.ActiveContext?.WorkflowStage == WorkflowStage.Design;
@@ -447,8 +441,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public ICommand ConfirmStatusChangeCommand { get; private set; } = null!;
     public ICommand CancelStatusChangeCommand { get; private set; } = null!;
-    public ICommand ConfirmDesignRemoveCommand { get; private set; } = null!;
-    public ICommand CancelDesignRemoveCommand { get; private set; } = null!;
     public ICommand RequestArchiveItemCommand { get; private set; } = null!;
     public ICommand RestoreItemCommand { get; private set; } = null!;
     public ICommand RequestDeleteItemCommand { get; private set; } = null!;
@@ -597,8 +589,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         });
         ConfirmStatusChangeCommand = new RelayCommand(_ => ConfirmStatusChange());
         CancelStatusChangeCommand = new RelayCommand(_ => CancelStatusChange());
-        ConfirmDesignRemoveCommand = new RelayCommand(_ => Run(ConfirmDesignRemoveAsync()));
-        CancelDesignRemoveCommand = new RelayCommand(_ => IsDesignRemoveConfirmationVisible = false);
         RequestArchiveItemCommand = new RelayCommand(_ =>
             GuardActiveItemInspectorLeave(() => ItemInspector.RequestArchiveCommand.Execute(null)));
         RestoreItemCommand = new RelayCommand(_ =>
@@ -1041,21 +1031,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(SelectedItemStatus));
         OnPropertyChanged(nameof(SelectedItemStatusLabel));
         OnPropertyChanged(nameof(SelectedItemStatusOption));
-    }
-
-    private async Task ConfirmDesignRemoveAsync()
-    {
-        if (ActiveItem is not { } item)
-        {
-            return;
-        }
-
-        IsDesignRemoveConfirmationVisible = false;
-        if (await DesignTool.RemoveAsync(item.Id).ConfigureAwait(true))
-        {
-            RefreshWorkspaceSnapshot();
-            RefreshActiveItemInspector();
-        }
     }
 
     public void CommitActiveDetailsEdits()

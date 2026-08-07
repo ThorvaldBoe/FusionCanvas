@@ -31,7 +31,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
 
-        foreach (var table in new[] { "item_design_area_targets", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
+        foreach (var table in new[] { "design_slot_assignments", "design_variant_row_colors", "design_variant_rows", "design_selected_colors", "item_listing_configuration", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
         {
             await ExecuteAsync(connection, transaction, $"DELETE FROM {table};", cancellationToken);
         }
@@ -111,9 +111,29 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await InsertAssetLinkAsync(connection, transaction, assetLink, cancellationToken);
         }
 
-        foreach (var target in snapshot.ItemDesignAreaTargets)
+        foreach (var config in snapshot.ItemListingConfigurations)
         {
-            await InsertItemDesignAreaTargetAsync(connection, transaction, target, cancellationToken);
+            await InsertItemListingConfigurationAsync(connection, transaction, config, cancellationToken);
+        }
+
+        foreach (var color in snapshot.DesignSelectedColors)
+        {
+            await InsertDesignSelectedColorAsync(connection, transaction, color, cancellationToken);
+        }
+
+        foreach (var row in snapshot.DesignVariantRows)
+        {
+            await InsertDesignVariantRowAsync(connection, transaction, row, cancellationToken);
+        }
+
+        foreach (var rowColor in snapshot.DesignVariantRowColors)
+        {
+            await InsertDesignVariantRowColorAsync(connection, transaction, rowColor, cancellationToken);
+        }
+
+        foreach (var assignment in snapshot.DesignSlotAssignments)
+        {
+            await InsertDesignSlotAssignmentAsync(connection, transaction, assignment, cancellationToken);
         }
 
         await transaction.CommitAsync(cancellationToken);
@@ -146,7 +166,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             FulfillmentOfferings = await LoadFulfillmentOfferingsAsync(connection, cancellationToken),
             ProductVariants = await LoadProductVariantsAsync(connection, cancellationToken),
             DesignAreas = await LoadDesignAreasAsync(connection, cancellationToken),
-            ItemDesignAreaTargets = await LoadItemDesignAreaTargetsAsync(connection, cancellationToken)
+            ItemListingConfigurations = await LoadItemListingConfigurationsAsync(connection, cancellationToken),
+            DesignSelectedColors = await LoadDesignSelectedColorsAsync(connection, cancellationToken),
+            DesignVariantRows = await LoadDesignVariantRowsAsync(connection, cancellationToken),
+            DesignVariantRowColors = await LoadDesignVariantRowColorsAsync(connection, cancellationToken),
+            DesignSlotAssignments = await LoadDesignSlotAssignmentsAsync(connection, cancellationToken)
         };
     }
 
@@ -340,10 +364,36 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 metadata_json TEXT NOT NULL
             );
 
-            CREATE TABLE IF NOT EXISTS item_design_area_targets (
+            CREATE TABLE IF NOT EXISTS item_listing_configuration (
                 item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                offering_id TEXT NOT NULL REFERENCES fulfillment_offerings(id) ON DELETE CASCADE,
+                PRIMARY KEY (item_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS design_selected_colors (
+                item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                color_value TEXT NOT NULL,
+                PRIMARY KEY (item_id, color_value)
+            );
+
+            CREATE TABLE IF NOT EXISTS design_variant_rows (
+                id TEXT PRIMARY KEY,
+                item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                is_default INTEGER NOT NULL,
+                sort_order INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS design_variant_row_colors (
+                row_id TEXT NOT NULL REFERENCES design_variant_rows(id) ON DELETE CASCADE,
+                color_value TEXT NOT NULL,
+                PRIMARY KEY (row_id, color_value)
+            );
+
+            CREATE TABLE IF NOT EXISTS design_slot_assignments (
+                row_id TEXT NOT NULL REFERENCES design_variant_rows(id) ON DELETE CASCADE,
                 design_area_id TEXT NOT NULL REFERENCES design_areas(id) ON DELETE CASCADE,
-                PRIMARY KEY (item_id, design_area_id)
+                asset_id TEXT NULL REFERENCES assets(id) ON DELETE SET NULL,
+                PRIMARY KEY (row_id, design_area_id)
             );
 
             CREATE TABLE IF NOT EXISTS snowclones (
@@ -395,6 +445,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         if (schemaVersion < 9)
         {
             await MigrateToVersion9Async(connection, cancellationToken);
+        }
+
+        if (schemaVersion < 10)
+        {
+            await MigrateToVersion10Async(connection, cancellationToken);
         }
 
         await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
@@ -520,6 +575,56 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                     design_area_id TEXT NOT NULL REFERENCES design_areas(id) ON DELETE CASCADE,
                     PRIMARY KEY (item_id, design_area_id)
                 );
+                """, cancellationToken);
+            await VerifyForeignKeyIntegrityAsync(connection, transaction, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    private static async Task MigrateToVersion10Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await ExecuteAsync(connection, transaction, """
+                CREATE TABLE IF NOT EXISTS item_listing_configuration (
+                    item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                    offering_id TEXT NOT NULL REFERENCES fulfillment_offerings(id) ON DELETE CASCADE,
+                    PRIMARY KEY (item_id)
+                );
+
+                CREATE TABLE IF NOT EXISTS design_selected_colors (
+                    item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                    color_value TEXT NOT NULL,
+                    PRIMARY KEY (item_id, color_value)
+                );
+
+                CREATE TABLE IF NOT EXISTS design_variant_rows (
+                    id TEXT PRIMARY KEY,
+                    item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                    is_default INTEGER NOT NULL,
+                    sort_order INTEGER NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS design_variant_row_colors (
+                    row_id TEXT NOT NULL REFERENCES design_variant_rows(id) ON DELETE CASCADE,
+                    color_value TEXT NOT NULL,
+                    PRIMARY KEY (row_id, color_value)
+                );
+
+                CREATE TABLE IF NOT EXISTS design_slot_assignments (
+                    row_id TEXT NOT NULL REFERENCES design_variant_rows(id) ON DELETE CASCADE,
+                    design_area_id TEXT NOT NULL REFERENCES design_areas(id) ON DELETE CASCADE,
+                    asset_id TEXT NULL REFERENCES assets(id) ON DELETE SET NULL,
+                    PRIMARY KEY (row_id, design_area_id)
+                );
+
+                DROP TABLE IF EXISTS item_design_area_targets;
                 """, cancellationToken);
             await VerifyForeignKeyIntegrityAsync(connection, transaction, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -992,8 +1097,20 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             ("$updated_at", area.UpdatedAt.ToString("O")),
             ("$metadata_json", area.MetadataJson));
 
-    private static Task InsertItemDesignAreaTargetAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, ItemDesignAreaTarget target, CancellationToken cancellationToken) =>
-        ExecuteAsync(connection, transaction, "INSERT INTO item_design_area_targets (item_id, design_area_id) VALUES ($item_id, $design_area_id);", cancellationToken, ("$item_id", target.ItemId.ToString()), ("$design_area_id", target.DesignAreaId.ToString()));
+    private static Task InsertItemListingConfigurationAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, ItemListingConfiguration config, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, "INSERT INTO item_listing_configuration (item_id, offering_id) VALUES ($item_id, $offering_id);", cancellationToken, ("$item_id", config.ItemId.ToString()), ("$offering_id", config.OfferingId.ToString()));
+
+    private static Task InsertDesignSelectedColorAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, DesignSelectedColor color, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, "INSERT INTO design_selected_colors (item_id, color_value) VALUES ($item_id, $color_value);", cancellationToken, ("$item_id", color.ItemId.ToString()), ("$color_value", color.ColorValue));
+
+    private static Task InsertDesignVariantRowAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, DesignVariantRow row, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, "INSERT INTO design_variant_rows (id, item_id, is_default, sort_order) VALUES ($id, $item_id, $is_default, $sort_order);", cancellationToken, ("$id", row.Id.ToString()), ("$item_id", row.ItemId.ToString()), ("$is_default", row.IsDefault ? 1 : 0), ("$sort_order", row.SortOrder));
+
+    private static Task InsertDesignVariantRowColorAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, DesignVariantRowColor rowColor, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, "INSERT INTO design_variant_row_colors (row_id, color_value) VALUES ($row_id, $color_value);", cancellationToken, ("$row_id", rowColor.RowId.ToString()), ("$color_value", rowColor.ColorValue));
+
+    private static Task InsertDesignSlotAssignmentAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, DesignSlotAssignment assignment, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, "INSERT INTO design_slot_assignments (row_id, design_area_id, asset_id) VALUES ($row_id, $design_area_id, $asset_id);", cancellationToken, ("$row_id", assignment.RowId.ToString()), ("$design_area_id", assignment.DesignAreaId.ToString()), ("$asset_id", assignment.AssetId?.ToString()));
 
     private static (string Name, object? Value)[] CommonParameters(WorkspaceEntity entity) =>
     [
@@ -1217,15 +1334,59 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         return areas;
     }
 
-    private static async Task<IReadOnlyList<ItemDesignAreaTarget>> LoadItemDesignAreaTargetsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    private static async Task<IReadOnlyList<ItemListingConfiguration>> LoadItemListingConfigurationsAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
-        var targets = new List<ItemDesignAreaTarget>();
-        await foreach (var reader in ReadAsync(connection, "SELECT * FROM item_design_area_targets;", cancellationToken))
+        var configs = new List<ItemListingConfiguration>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM item_listing_configuration;", cancellationToken))
         {
-            targets.Add(new ItemDesignAreaTarget(ReadGuid(reader, "item_id"), ReadGuid(reader, "design_area_id")));
+            configs.Add(new ItemListingConfiguration(ReadGuid(reader, "item_id"), ReadGuid(reader, "offering_id")));
         }
 
-        return targets;
+        return configs;
+    }
+
+    private static async Task<IReadOnlyList<DesignSelectedColor>> LoadDesignSelectedColorsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var colors = new List<DesignSelectedColor>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM design_selected_colors;", cancellationToken))
+        {
+            colors.Add(new DesignSelectedColor(ReadGuid(reader, "item_id"), ReadString(reader, "color_value")));
+        }
+
+        return colors;
+    }
+
+    private static async Task<IReadOnlyList<DesignVariantRow>> LoadDesignVariantRowsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var rows = new List<DesignVariantRow>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM design_variant_rows ORDER BY sort_order;", cancellationToken))
+        {
+            rows.Add(new DesignVariantRow(ReadGuid(reader, "id"), ReadGuid(reader, "item_id"), ReadBool(reader, "is_default"), ReadInt(reader, "sort_order")));
+        }
+
+        return rows;
+    }
+
+    private static async Task<IReadOnlyList<DesignVariantRowColor>> LoadDesignVariantRowColorsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var rowColors = new List<DesignVariantRowColor>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM design_variant_row_colors;", cancellationToken))
+        {
+            rowColors.Add(new DesignVariantRowColor(ReadGuid(reader, "row_id"), ReadString(reader, "color_value")));
+        }
+
+        return rowColors;
+    }
+
+    private static async Task<IReadOnlyList<DesignSlotAssignment>> LoadDesignSlotAssignmentsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var assignments = new List<DesignSlotAssignment>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM design_slot_assignments;", cancellationToken))
+        {
+            assignments.Add(new DesignSlotAssignment(ReadGuid(reader, "row_id"), ReadGuid(reader, "design_area_id"), ReadNullableGuid(reader, "asset_id")));
+        }
+
+        return assignments;
     }
 
     private static async IAsyncEnumerable<SqliteDataReader> ReadAsync(
@@ -1341,26 +1502,57 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             }
         }
 
-        var areaIds = snapshot.DesignAreas.Select(area => area.Id).ToHashSet();
-        foreach (var target in snapshot.ItemDesignAreaTargets)
+        var allOfferingIds = snapshot.FulfillmentOfferings.Select(offering => offering.Id).ToHashSet();
+        foreach (var config in snapshot.ItemListingConfigurations)
         {
-            var item = snapshot.Items.SingleOrDefault(item => item.Id == target.ItemId);
-            if (item is null)
+            if (!snapshot.Items.Any(item => item.Id == config.ItemId))
             {
-                throw new InvalidOperationException("Every item design-area target must reference an existing item before saving.");
+                throw new InvalidOperationException("Every item listing configuration must reference an existing item.");
             }
 
-            if (!areaIds.Contains(target.DesignAreaId))
+            if (!allOfferingIds.Contains(config.OfferingId))
             {
-                throw new InvalidOperationException("Every item design-area target must reference an existing design area before saving.");
+                throw new InvalidOperationException("Every item listing configuration must reference an existing fulfillment offering.");
+            }
+        }
+
+        foreach (var color in snapshot.DesignSelectedColors)
+        {
+            if (!snapshot.Items.Any(item => item.Id == color.ItemId))
+            {
+                throw new InvalidOperationException("Every design selected color must reference an existing item.");
+            }
+        }
+
+        var itemIds = snapshot.Items.Select(item => item.Id).ToHashSet();
+        foreach (var row in snapshot.DesignVariantRows)
+        {
+            if (!itemIds.Contains(row.ItemId))
+            {
+                throw new InvalidOperationException("Every design variant row must reference an existing item.");
+            }
+        }
+
+        var rowIds = snapshot.DesignVariantRows.Select(row => row.Id).ToHashSet();
+        var areaIds = snapshot.DesignAreas.Select(area => area.Id).ToHashSet();
+        foreach (var rowColor in snapshot.DesignVariantRowColors)
+        {
+            if (!rowIds.Contains(rowColor.RowId))
+            {
+                throw new InvalidOperationException("Every design variant row color must reference an existing row.");
+            }
+        }
+
+        foreach (var assignment in snapshot.DesignSlotAssignments)
+        {
+            if (!rowIds.Contains(assignment.RowId))
+            {
+                throw new InvalidOperationException("Every design slot assignment must reference an existing row.");
             }
 
-            var area = snapshot.DesignAreas.Single(area => area.Id == target.DesignAreaId);
-            var offering = snapshot.FulfillmentOfferings.Single(offering => offering.Id == area.FulfillmentOfferingId);
-            var product = snapshot.StoreProducts.Single(product => product.Id == offering.StoreProductId);
-            if (item.StoreId != product.StoreId)
+            if (!areaIds.Contains(assignment.DesignAreaId))
             {
-                throw new InvalidOperationException("Every item design-area target must reference a design area from the item's own store before saving.");
+                throw new InvalidOperationException("Every design slot assignment must reference an existing design area.");
             }
         }
     }

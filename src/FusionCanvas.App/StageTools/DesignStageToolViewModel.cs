@@ -1,57 +1,83 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.CompilerServices;
-using System.Windows.Input;
-using FusionCanvas.App.DocumentWindow;
+using Avalonia.Media.Imaging;
 using FusionCanvas.Application.DesignFiles;
-using FusionCanvas.Application.Products;
+using FusionCanvas.Domain.Products;
 
 namespace FusionCanvas.App.StageTools;
 
-public sealed class DesignFileViewModel : INotifyPropertyChanged
+public sealed class DesignColorViewModel : INotifyPropertyChanged
 {
-    private string _name = string.Empty;
-    private bool _isMissing;
-    private bool _canPreview;
-    private bool _canExport;
-    private bool _isBusy;
+    private bool _isSelected;
 
-    public DesignFileViewModel(DesignFileSummary summary)
+    public DesignColorViewModel(string colorValue, bool isSelected, bool isReadOnly)
     {
-        AssetId = summary.AssetId;
-        _name = summary.Name;
-        _isMissing = summary.IsMissing;
-        _canPreview = summary.CanPreview;
-        _canExport = summary.CanExport;
+        ColorValue = colorValue;
+        _isSelected = isSelected;
+        IsReadOnly = isReadOnly;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public Guid AssetId { get; }
+    public string ColorValue { get; }
 
-    public string Name
+    public bool IsReadOnly { get; }
+
+    public bool IsSelected
     {
-        get => _name;
-        private set { _name = value; OnPropertyChanged(); }
+        get => _isSelected;
+        set
+        {
+            if (!IsReadOnly && _isSelected != value)
+            {
+                _isSelected = value;
+                OnPropertyChanged();
+            }
+        }
     }
 
-    public bool IsMissing
+    private void OnPropertyChanged([CallerMemberName] string? name = null) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+}
+
+public sealed class DesignSlotViewModel : INotifyPropertyChanged, IDisposable
+{
+    private bool _isBusy;
+    private Bitmap? _thumbnail;
+
+    public DesignSlotViewModel(DesignSlotSummary summary, bool isReadOnly)
     {
-        get => _isMissing;
-        private set { _isMissing = value; OnPropertyChanged(); }
+        DesignAreaId = summary.DesignAreaId;
+        AreaName = summary.AreaName;
+        AssetId = summary.AssetId;
+        ThumbnailPath = summary.ThumbnailPath;
+        IsMissing = summary.IsMissing;
+        CanPreview = summary.CanPreview;
+        CanExport = summary.CanExport;
+        IsReadOnly = isReadOnly;
+
+        if (summary.ThumbnailPath is not null && File.Exists(summary.ThumbnailPath))
+        {
+            _thumbnail = new Bitmap(summary.ThumbnailPath);
+        }
     }
 
-    public bool CanPreview
-    {
-        get => _canPreview;
-        private set { _canPreview = value; OnPropertyChanged(); }
-    }
+    public event PropertyChangedEventHandler? PropertyChanged;
 
-    public bool CanExport
-    {
-        get => _canExport;
-        private set { _canExport = value; OnPropertyChanged(); }
-    }
+    public Guid DesignAreaId { get; }
+    public string AreaName { get; }
+    public Guid? AssetId { get; }
+    public string? ThumbnailPath { get; }
+    public bool IsMissing { get; }
+    public bool CanPreview { get; }
+    public bool CanExport { get; }
+    public bool IsReadOnly { get; }
+    public bool HasImage => AssetId is not null;
+
+    /// <summary>Bitmap for thumbnail display. May be null when the managed file is missing.</summary>
+    public Bitmap? Thumbnail => _thumbnail;
 
     public bool IsBusy
     {
@@ -59,75 +85,42 @@ public sealed class DesignFileViewModel : INotifyPropertyChanged
         set { _isBusy = value; OnPropertyChanged(); }
     }
 
+    public void Dispose()
+    {
+        var bmp = Interlocked.Exchange(ref _thumbnail, null);
+        bmp?.Dispose();
+    }
+
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
-/// <summary>A selectable store design-area target displayed in the Design tool.</summary>
-public sealed class DesignAreaTargetViewModel : INotifyPropertyChanged
+public sealed class DesignRowViewModel : INotifyPropertyChanged
 {
-    private bool _isSelected;
-
-    public DesignAreaTargetViewModel(DesignAreaTargetOption option, bool readOnly)
+    public DesignRowViewModel(DesignRowSummary summary, bool isReadOnly)
     {
-        DesignAreaId = option.DesignAreaId;
-        ProductName = option.ProductName;
-        OfferingName = option.OfferingName;
-        Position = option.Position;
-        DecorationMethod = option.DecorationMethod;
-        Width = option.Width;
-        Height = option.Height;
-        IsChoiceNetwork = option.IsChoiceNetwork;
-        _isSelected = option.IsSelected;
-        IsReadOnly = readOnly;
-        Summary = $"{option.ProductName} · {option.OfferingName} · {option.Position}, {option.Width}×{option.Height} ({option.DecorationMethod})";
+        RowId = summary.RowId;
+        IsDefault = summary.IsDefault;
+        SortOrder = summary.SortOrder;
+        ColorValues = [.. summary.ColorValues];
+        IsReadOnly = isReadOnly;
+        foreach (var s in summary.Slots)
+        {
+            Slots.Add(new DesignSlotViewModel(s, isReadOnly));
+        }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public Guid DesignAreaId { get; }
-
-    public string ProductName { get; }
-
-    public string OfferingName { get; }
-
-    public string Position { get; }
-
-    public string DecorationMethod { get; }
-
-    public int Width { get; }
-
-    public int Height { get; }
-
-    public bool IsChoiceNetwork { get; }
-
+    public Guid RowId { get; }
+    public bool IsDefault { get; }
+    public int SortOrder { get; }
     public bool IsReadOnly { get; }
+    public IReadOnlyList<string> ColorValues { get; }
+    public string ColorChips => ColorValues.Count > 0 ? string.Join(", ", ColorValues) : "(no colors)";
+    public ObservableCollection<DesignSlotViewModel> Slots { get; } = [];
 
-    public string Summary { get; }
-
-    public bool IsSelected
-    {
-        get => _isSelected;
-        set
-        {
-            if (!IsReadOnly && SetField(ref _isSelected, value))
-            {
-                OnPropertyChanged();
-            }
-        }
-    }
-
-    private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
-    {
-        if (EqualityComparer<T>.Default.Equals(field, value))
-        {
-            return false;
-        }
-
-        field = value;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        return true;
-    }
+    public bool CanRemove => !IsDefault && !IsReadOnly;
 
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
@@ -135,52 +128,94 @@ public sealed class DesignAreaTargetViewModel : INotifyPropertyChanged
 
 public sealed class DesignStageToolViewModel : INotifyPropertyChanged
 {
-    public string ChoiceNetworkWarning =>
-        "Printify Choice is a variable fulfillment network. Its panel dimensions and placement can vary by fulfillment provider.";
-
-    private readonly IDesignFileService _designFileService;
-    private readonly IProductSupplierSetupService? _productService;
-    private readonly Func<CancellationToken> _cancellationTokenProvider;
-    private string _emptyState = "No Design files yet. Import a PNG to begin.";
+    private readonly IDesignStageService _designStageService;
     private string _readOnlyReason = string.Empty;
     private bool _isReadOnly;
     private bool _isBusy;
-    private DesignFileViewModel? _selectedFile;
+    private bool _hasConfiguration;
+    private string _configPrompt = "Select a listing configuration to begin.";
+    private bool _showPreviewDialog;
+    private Guid _previewAssetId;
+    private Stream? _previewStream;
+    private Bitmap? _previewBitmap;
     private string? _errorMessage;
-    private string? _targetErrorMessage;
-    private bool _isSavingTargets;
+    private string _noConfigMessage = "No listing configuration selected. Select a configuration from the offerings below to show the design slot grid.";
     private Guid _itemId;
-    private string _targetEmptyState = "No printable areas configured for this item's Store.";
+    private FulfillmentOffering? _selectedOffering;
+    private Guid? _selectedOfferingId;
+    private string? _selectedOfferingName;
+    private PendingRemovalAction? _pendingRemoval;
+    private bool _isRemovalConfirmationVisible;
+    private string _removalConfirmationMessage = string.Empty;
 
-    public DesignStageToolViewModel(
-        IDesignFileService designFileService,
-        IProductSupplierSetupService? productService = null,
-        Func<CancellationToken>? cancellationTokenProvider = null)
+    public DesignStageToolViewModel(IDesignStageService designStageService)
     {
-        _designFileService = designFileService ?? throw new ArgumentNullException(nameof(designFileService));
-        _productService = productService;
-        _cancellationTokenProvider = cancellationTokenProvider ?? (() => CancellationToken.None);
-        SaveDesignTargetsCommand = new RelayCommand(_ => _ = SaveTargetsAsync());
+        _designStageService = designStageService ?? throw new ArgumentNullException(nameof(designStageService));
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public ICommand SaveDesignTargetsCommand { get; }
-
-    public ObservableCollection<DesignFileViewModel> Files { get; } = [];
-
-    public ObservableCollection<DesignAreaTargetViewModel> Targets { get; } = [];
-
-    public DesignFileViewModel? SelectedFile
+    // --- Configuration ---
+    public bool HasConfiguration
     {
-        get => _selectedFile;
-        set { _selectedFile = value; OnPropertyChanged(); }
+        get => _hasConfiguration;
+        private set { _hasConfiguration = value; OnPropertyChanged(); }
     }
 
-    public string EmptyState
+    public string ConfigPrompt
     {
-        get => _emptyState;
-        set { _emptyState = value; OnPropertyChanged(); }
+        get => _configPrompt;
+        set { _configPrompt = value; OnPropertyChanged(); }
+    }
+
+    public FulfillmentOffering? SelectedOffering
+    {
+        get => _selectedOffering;
+        set
+        {
+            if (_selectedOffering?.Id != value?.Id)
+            {
+                _selectedOffering = value;
+                OnPropertyChanged();
+                if (value is not null)
+                {
+                    _ = SelectConfigurationAsync(value.Id);
+                }
+            }
+        }
+    }
+
+    public Guid? SelectedOfferingId
+    {
+        get => _selectedOfferingId;
+        private set { _selectedOfferingId = value; OnPropertyChanged(); }
+    }
+
+    public string? SelectedOfferingName
+    {
+        get => _selectedOfferingName;
+        private set { _selectedOfferingName = value; OnPropertyChanged(); OnPropertyChanged(nameof(SelectedOfferingStatus)); }
+    }
+
+    public string? SelectedOfferingStatus
+    {
+        get
+        {
+            if (_selectedOfferingId is null) return null;
+            var offering = AvailableOfferings.SingleOrDefault(o => o.Id == _selectedOfferingId);
+            if (offering is null) return null;
+            return offering.Kind == FulfillmentKind.PrintifyChoiceNetwork
+                ? "Printify Choice network"
+                : offering.ProviderName is not null
+                    ? $"Fixed provider: {offering.ProviderName}"
+                    : null;
+        }
+    }
+
+    public string NoConfigMessage
+    {
+        get => _noConfigMessage;
+        set { _noConfigMessage = value; OnPropertyChanged(); }
     }
 
     public bool IsReadOnly
@@ -207,158 +242,127 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
         set { _errorMessage = value; OnPropertyChanged(); }
     }
 
-    public bool HasTargets => Targets.Count > 0;
-
-    public string TargetEmptyState
+    public bool ShowPreviewDialog
     {
-        get => _targetEmptyState;
-        set { _targetEmptyState = value; OnPropertyChanged(); }
+        get => _showPreviewDialog;
+        set { _showPreviewDialog = value; OnPropertyChanged(); }
     }
 
-    public string? TargetErrorMessage
+    public Guid PreviewAssetId
     {
-        get => _targetErrorMessage;
-        set { _targetErrorMessage = value; OnPropertyChanged(); }
+        get => _previewAssetId;
+        private set { _previewAssetId = value; OnPropertyChanged(); }
     }
 
-    public bool IsSavingTargets
+    /// <summary>Bitmap for the large preview dialog. Disposed when preview is closed or replaced.</summary>
+    public Bitmap? PreviewBitmap
     {
-        get => _isSavingTargets;
-        private set { _isSavingTargets = value; OnPropertyChanged(); }
+        get => _previewBitmap;
+        private set { _previewBitmap = value; OnPropertyChanged(); }
     }
 
-    public string SelectedTargetsSummary => HasSelectedChoiceTarget
-        ? "Design is set to one or more Printify Choice printable areas."
-        : HasTargets
-            ? $"{Targets.Count(o => o.IsSelected)} printable {Pluralize(Targets.Count(o => o.IsSelected), "area")} selected."
-            : "No printable area selected.";
-
-    public bool HasSelectedChoiceTarget => Targets.Any(target => target.IsSelected && target.IsChoiceNetwork);
-
-    public async Task LoadAsync(Guid itemId, bool canEdit, CancellationToken cancellationToken = default)
+    public Stream? PreviewStream
     {
-        IsReadOnly = !canEdit;
-        ReadOnlyReason = canEdit ? string.Empty : "Design files and targets are read-only while the item is protected or an earlier stage is being reviewed.";
-        _itemId = itemId;
-        var files = await _designFileService.ListForItemAsync(itemId, cancellationToken).ConfigureAwait(true);
-        Files.Clear();
-        foreach (var summary in files)
-        {
-            Files.Add(new DesignFileViewModel(summary));
-        }
-
-        SelectedFile = Files.FirstOrDefault();
-        EmptyState = Files.Count == 0 ? "No Design files yet. Import a PNG to begin." : string.Empty;
-        await LoadTargetsAsync(cancellationToken).ConfigureAwait(true);
+        get => _previewStream;
+        private set { _previewStream = value; OnPropertyChanged(); }
     }
 
-    public async Task<bool> SaveTargetsAsync(CancellationToken cancellationToken = default)
+    // --- Removal confirmation ---
+
+    public bool IsRemovalConfirmationVisible
     {
-        if (_productService is null || IsReadOnly || IsSavingTargets)
-        {
-            return false;
-        }
-
-        IsSavingTargets = true;
-        try
-        {
-            var requested = Targets.Where(target => target.IsSelected).Select(target => target.DesignAreaId).ToArray();
-            var result = await _productService.ReplaceDesignTargetsAsync(
-                new ReplaceDesignTargetsRequest(_itemId, requested),
-                cancellationToken).ConfigureAwait(true);
-            TargetErrorMessage = result.Error;
-            if (result.Succeeded)
-            {
-                ApplyTargetState(result.State);
-                return true;
-            }
-
-            ApplyTargetState(result.State);
-            return false;
-        }
-        finally
-        {
-            IsSavingTargets = false;
-        }
+        get => _isRemovalConfirmationVisible;
+        private set { _isRemovalConfirmationVisible = value; OnPropertyChanged(); }
     }
 
-    private async Task LoadTargetsAsync(CancellationToken cancellationToken)
+    public string RemovalConfirmationMessage
     {
-        if (_productService is null)
-        {
-            return;
-        }
-
-        try
-        {
-            var state = await _productService.LoadDesignTargetsAsync(_itemId, cancellationToken).ConfigureAwait(true);
-            ApplyTargetState(state);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            TargetErrorMessage = $"Design targets could not be loaded. {exception.Message}";
-        }
+        get => _removalConfirmationMessage;
+        private set { _removalConfirmationMessage = value; OnPropertyChanged(); }
     }
 
-    private void ApplyTargetState(DesignTargetSelectionState state)
+    public void RequestRemoveSlotImage(Guid rowId, Guid designAreaId)
     {
-        var targetsReadOnly = state.IsReadOnly || IsReadOnly;
-        Targets.Clear();
-        foreach (var option in state.Options)
-        {
-            Targets.Add(new DesignAreaTargetViewModel(option, targetsReadOnly));
-        }
-
-        TargetEmptyState = Targets.Count == 0 ? "No printable areas configured for this item's Store." : string.Empty;
-        OnPropertyChanged(nameof(HasTargets));
-        OnPropertyChanged(nameof(SelectedTargetsSummary));
-        OnPropertyChanged(nameof(HasSelectedChoiceTarget));
-        if (state.IsReadOnly)
-        {
-            IsReadOnly = true;
-            ReadOnlyReason = string.IsNullOrWhiteSpace(ReadOnlyReason)
-                ? "Design files and targets are read-only while the item is protected or an earlier stage is being reviewed."
-                : ReadOnlyReason;
-        }
-
-        foreach (var target in Targets)
-        {
-            target.PropertyChanged += (_, args) =>
-            {
-                if (args.PropertyName == nameof(DesignAreaTargetViewModel.IsSelected))
-                {
-                    OnPropertyChanged(nameof(SelectedTargetsSummary));
-                    OnPropertyChanged(nameof(HasSelectedChoiceTarget));
-                }
-            };
-        }
+        _pendingRemoval = new PendingRemovalAction(PendingRemovalKind.SlotImage, rowId, designAreaId, null);
+        RemovalConfirmationMessage = "Remove this slot image? This cannot be undone.";
+        IsRemovalConfirmationVisible = true;
     }
 
-    public async Task<bool> ImportAsync(Guid itemId, string sourcePath, CancellationToken cancellationToken = default)
+    public void RequestRemoveSupportingImage(Guid assetId)
     {
-        if (IsBusy || IsReadOnly)
-        {
-            return false;
-        }
+        _pendingRemoval = new PendingRemovalAction(PendingRemovalKind.SupportingImage, Guid.Empty, Guid.Empty, assetId);
+        RemovalConfirmationMessage = "Remove this supporting image? This cannot be undone.";
+        IsRemovalConfirmationVisible = true;
+    }
 
+    public void RequestRemoveSpecificRow(Guid rowId)
+    {
+        _pendingRemoval = new PendingRemovalAction(PendingRemovalKind.SpecificRow, rowId, Guid.Empty, null);
+        RemovalConfirmationMessage = "Remove this specific row? Its colors will move back to the default row.";
+        IsRemovalConfirmationVisible = true;
+    }
+
+    public async Task ConfirmPendingRemovalAsync(CancellationToken ct = default)
+    {
+        if (_pendingRemoval is null || IsBusy || IsReadOnly) return;
         IsBusy = true;
         try
         {
-            var result = await _designFileService.ImportAsync(itemId, sourcePath, cancellationToken).ConfigureAwait(true);
-            if (!result.Succeeded)
+            DesignStageResult? result = null;
+            switch (_pendingRemoval.Kind)
             {
-                ErrorMessage = result.Error;
-                return false;
+                case PendingRemovalKind.SlotImage:
+                    result = await _designStageService.RemoveSlotImageAsync(_itemId, _pendingRemoval.RowId, _pendingRemoval.DesignAreaId, ct).ConfigureAwait(true);
+                    break;
+                case PendingRemovalKind.SupportingImage:
+                    result = await _designStageService.RemoveSupportingImageAsync(_itemId, _pendingRemoval.AssetId!.Value, ct).ConfigureAwait(true);
+                    break;
+                case PendingRemovalKind.SpecificRow:
+                    result = await _designStageService.RemoveSpecificRowAsync(_itemId, _pendingRemoval.RowId, ct).ConfigureAwait(true);
+                    break;
             }
-
-            ErrorMessage = null;
-            await LoadAsync(itemId, !IsReadOnly, cancellationToken).ConfigureAwait(true);
-            if (result.File is not null)
+            ErrorMessage = result?.Error;
+            if (result?.Succeeded == true)
             {
-                SelectedFile = Files.SingleOrDefault(file => file.AssetId == result.File.AssetId);
+                await LoadAsync(_itemId, !IsReadOnly, ct).ConfigureAwait(true);
             }
+        }
+        finally
+        {
+            IsBusy = false;
+            _pendingRemoval = null;
+            IsRemovalConfirmationVisible = false;
+            RemovalConfirmationMessage = string.Empty;
+        }
+    }
 
-            return true;
+    public void CancelPendingRemoval()
+    {
+        _pendingRemoval = null;
+        IsRemovalConfirmationVisible = false;
+        RemovalConfirmationMessage = string.Empty;
+    }
+
+    // --- Collections ---
+    public ObservableCollection<FulfillmentOffering> AvailableOfferings { get; } = [];
+    public ObservableCollection<DesignColorViewModel> AvailableColors { get; } = [];
+    public ObservableCollection<DesignColorViewModel> SelectedColors { get; } = [];
+    public ObservableCollection<DesignRowViewModel> Rows { get; } = [];
+    public ObservableCollection<DesignSlotViewModel> SupportingImages { get; } = [];
+
+    // --- Commands ---
+    public async Task SelectConfigurationAsync(Guid offeringId, CancellationToken ct = default)
+    {
+        if (IsBusy || IsReadOnly) return;
+        IsBusy = true;
+        try
+        {
+            var result = await _designStageService.SelectConfigurationAsync(_itemId, offeringId, ct).ConfigureAwait(true);
+            ErrorMessage = result.Error;
+            if (result.Succeeded)
+            {
+                await LoadAsync(_itemId, !IsReadOnly, ct).ConfigureAwait(true);
+            }
         }
         finally
         {
@@ -366,84 +370,331 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
         }
     }
 
-    public async Task<Stream?> PreviewAsync(CancellationToken cancellationToken = default)
+    public async Task ToggleColorAsync(string colorValue, bool add, CancellationToken ct = default)
     {
-        if (SelectedFile is not { } file || !file.CanPreview || IsBusy)
-        {
-            return null;
-        }
-
-        file.IsBusy = true;
+        if (IsBusy || IsReadOnly) return;
+        IsBusy = true;
         try
         {
-            return await _designFileService.OpenPreviewAsync(file.AssetId, cancellationToken).ConfigureAwait(true);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            ErrorMessage = $"Preview could not be loaded. {exception.Message}";
-            return null;
-        }
-        finally
-        {
-            file.IsBusy = false;
-        }
-    }
-
-    public async Task<bool> ExportAsync(string destinationPath, CancellationToken cancellationToken = default)
-    {
-        if (SelectedFile is not { } file || !file.CanExport || IsBusy)
-        {
-            return false;
-        }
-
-        file.IsBusy = true;
-        try
-        {
-            await _designFileService.ExportCopyAsync(file.AssetId, destinationPath, cancellationToken).ConfigureAwait(true);
-            ErrorMessage = null;
-            return true;
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            ErrorMessage = $"Export failed. {exception.Message}";
-            return false;
-        }
-        finally
-        {
-            file.IsBusy = false;
-        }
-    }
-
-    public async Task<bool> RemoveAsync(Guid itemId, CancellationToken cancellationToken = default)
-    {
-        if (SelectedFile is not { } file || IsBusy || IsReadOnly)
-        {
-            return false;
-        }
-
-        file.IsBusy = true;
-        try
-        {
-            var result = await _designFileService.RemoveAsync(itemId, file.AssetId, cancellationToken).ConfigureAwait(true);
-            if (!result.Succeeded)
+            DesignStageResult result;
+            if (add)
             {
-                ErrorMessage = result.Error;
-                return false;
+                result = await _designStageService.AddSelectedColorAsync(_itemId, colorValue, ct).ConfigureAwait(true);
+            }
+            else
+            {
+                result = await _designStageService.RemoveSelectedColorAsync(_itemId, colorValue, ct).ConfigureAwait(true);
+            }
+            ErrorMessage = result.Error;
+            if (result.Succeeded)
+            {
+                await LoadAsync(_itemId, !IsReadOnly, ct).ConfigureAwait(true);
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public async Task MakeSpecificForColorAsync(string colorValue, CancellationToken ct = default)
+    {
+        if (IsBusy || IsReadOnly) return;
+        IsBusy = true;
+        try
+        {
+            var result = await _designStageService.MakeSpecificForColorAsync(_itemId, colorValue, ct).ConfigureAwait(true);
+            ErrorMessage = result.Error;
+            if (result.Succeeded)
+            {
+                await LoadAsync(_itemId, !IsReadOnly, ct).ConfigureAwait(true);
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public async Task RemoveSpecificRowAsync(Guid rowId, CancellationToken ct = default)
+    {
+        if (IsBusy || IsReadOnly) return;
+        IsBusy = true;
+        try
+        {
+            var result = await _designStageService.RemoveSpecificRowAsync(_itemId, rowId, ct).ConfigureAwait(true);
+            ErrorMessage = result.Error;
+            if (result.Succeeded)
+            {
+                await LoadAsync(_itemId, !IsReadOnly, ct).ConfigureAwait(true);
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public async Task AssignSlotImageAsync(Guid rowId, Guid designAreaId, string sourcePath, CancellationToken ct = default)
+    {
+        if (IsBusy || IsReadOnly) return;
+        IsBusy = true;
+        try
+        {
+            var result = await _designStageService.AssignSlotImageAsync(_itemId, rowId, designAreaId, sourcePath, ct).ConfigureAwait(true);
+            ErrorMessage = result.Error;
+            if (result.Succeeded)
+            {
+                await LoadAsync(_itemId, !IsReadOnly, ct).ConfigureAwait(true);
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public async Task RemoveSlotImageAsync(Guid rowId, Guid designAreaId, CancellationToken ct = default)
+    {
+        if (IsBusy || IsReadOnly) return;
+        IsBusy = true;
+        try
+        {
+            var result = await _designStageService.RemoveSlotImageAsync(_itemId, rowId, designAreaId, ct).ConfigureAwait(true);
+            ErrorMessage = result.Error;
+            if (result.Succeeded)
+            {
+                await LoadAsync(_itemId, !IsReadOnly, ct).ConfigureAwait(true);
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public async Task PreviewSlotImageAsync(Guid rowId, Guid designAreaId, CancellationToken ct = default)
+    {
+        if (IsBusy) return;
+        IsBusy = true;
+        try
+        {
+            var stream = await _designStageService.OpenSlotPreviewAsync(rowId, designAreaId, ct).ConfigureAwait(true);
+            PreviewStream?.Dispose();
+            PreviewBitmap?.Dispose();
+            PreviewStream = stream;
+            PreviewBitmap = stream is not null ? new Bitmap(stream) : null;
+            PreviewAssetId = Guid.Empty;
+            ShowPreviewDialog = true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            ErrorMessage = $"Preview failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public async Task ExportSlotImageAsync(Guid rowId, Guid designAreaId, string destinationPath, CancellationToken ct = default)
+    {
+        if (IsBusy) return;
+        IsBusy = true;
+        try
+        {
+            await _designStageService.ExportSlotImageAsync(rowId, designAreaId, destinationPath, ct).ConfigureAwait(true);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            ErrorMessage = $"Export failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public async Task ExportSupportingImageAsync(Guid assetId, string destinationPath, CancellationToken ct = default)
+    {
+        if (IsBusy) return;
+        IsBusy = true;
+        try
+        {
+            await _designStageService.ExportSupportingImageAsync(assetId, destinationPath, ct).ConfigureAwait(true);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            ErrorMessage = $"Export failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public async Task ImportSupportingImageAsync(string sourcePath, CancellationToken ct = default)
+    {
+        if (IsBusy || IsReadOnly) return;
+        IsBusy = true;
+        try
+        {
+            var result = await _designStageService.ImportSupportingImageAsync(_itemId, sourcePath, ct).ConfigureAwait(true);
+            ErrorMessage = result.Error;
+            if (result.Succeeded)
+            {
+                await LoadAsync(_itemId, !IsReadOnly, ct).ConfigureAwait(true);
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public void PreviewSupportingImage(Guid assetId, string? thumbnailPath)
+    {
+        // For supporting images, load the thumbnail directly from the managed file path
+        try
+        {
+            PreviewStream?.Dispose();
+            PreviewBitmap?.Dispose();
+            PreviewStream = null;
+
+            if (thumbnailPath is not null && File.Exists(thumbnailPath))
+            {
+                PreviewBitmap = new Bitmap(thumbnailPath);
+            }
+            else
+            {
+                PreviewBitmap = null;
+                ErrorMessage = "Could not open supporting image preview (file not found).";
             }
 
-            ErrorMessage = null;
-            await LoadAsync(itemId, !IsReadOnly, cancellationToken).ConfigureAwait(true);
-            SelectedFile = Files.FirstOrDefault();
-            return true;
+            PreviewAssetId = assetId;
+            ShowPreviewDialog = true;
         }
-        finally
+        catch (Exception ex)
         {
-            file.IsBusy = false;
+            ErrorMessage = $"Preview failed: {ex.Message}";
         }
     }
 
-    private static string Pluralize(int count, string word) => count == 1 ? word : $"{word}s";
+    public async Task RemoveSupportingImageAsync(Guid assetId, CancellationToken ct = default)
+    {
+        if (IsBusy || IsReadOnly) return;
+        IsBusy = true;
+        try
+        {
+            var result = await _designStageService.RemoveSupportingImageAsync(_itemId, assetId, ct).ConfigureAwait(true);
+            ErrorMessage = result.Error;
+            if (result.Succeeded)
+            {
+                await LoadAsync(_itemId, !IsReadOnly, ct).ConfigureAwait(true);
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public void ClosePreviewDialog()
+    {
+        ShowPreviewDialog = false;
+        PreviewBitmap?.Dispose();
+        PreviewBitmap = null;
+        PreviewStream?.Dispose();
+        PreviewStream = null;
+    }
+
+    // --- Load ---
+    public async Task LoadAsync(Guid itemId, bool canEdit, CancellationToken cancellationToken = default)
+    {
+        IsReadOnly = !canEdit;
+        ReadOnlyReason = canEdit ? string.Empty : "Design stage content is read-only while the item is protected or an earlier stage is being reviewed.";
+        _itemId = itemId;
+
+        var state = await _designStageService.LoadDesignStageStateAsync(itemId, cancellationToken).ConfigureAwait(true);
+
+        HasConfiguration = state.SelectedOfferingId is not null;
+        SelectedOfferingId = state.SelectedOfferingId;
+        SelectedOfferingName = state.SelectedOfferingName;
+        _selectedOffering = state.SelectedOfferingId is not null
+            ? state.AvailableOfferings.SingleOrDefault(o => o.Id == state.SelectedOfferingId.Value)
+            : null;
+        if (state.IsReadOnly)
+        {
+            IsReadOnly = true;
+            ReadOnlyReason = state.ReadOnlyReason;
+        }
+
+        // Available offerings
+        AvailableOfferings.Clear();
+        foreach (var offering in state.AvailableOfferings)
+        {
+            AvailableOfferings.Add(offering);
+        }
+
+        // Ensure SelectedOfferingStatus is re-evaluated now that offerings are populated
+        OnPropertyChanged(nameof(SelectedOfferingStatus));
+
+        // Available colors
+        AvailableColors.Clear();
+        foreach (var color in state.AvailableColors)
+        {
+            var isSelected = state.SelectedColors.Any(c => string.Equals(c, color, StringComparison.OrdinalIgnoreCase));
+            AvailableColors.Add(new DesignColorViewModel(color, isSelected, IsReadOnly));
+        }
+
+        // Selected colors
+        SelectedColors.Clear();
+        foreach (var color in state.SelectedColors)
+        {
+            SelectedColors.Add(new DesignColorViewModel(color, true, IsReadOnly));
+        }
+
+        // Rows — dispose old slot bitmaps first
+        foreach (var row in Rows)
+        {
+            foreach (var slot in row.Slots)
+            {
+                slot.Dispose();
+            }
+        }
+        Rows.Clear();
+        foreach (var row in state.Rows)
+        {
+            Rows.Add(new DesignRowViewModel(row, IsReadOnly));
+        }
+
+        // Supporting images — dispose old slot bitmaps first
+        foreach (var img in SupportingImages)
+        {
+            img.Dispose();
+        }
+        SupportingImages.Clear();
+        foreach (var img in state.SupportingImages)
+        {
+            SupportingImages.Add(new DesignSlotViewModel(img, IsReadOnly));
+        }
+    }
 
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
+
+/// <summary>Kind of removal pending user confirmation.</summary>
+internal enum PendingRemovalKind
+{
+    SlotImage,
+    SupportingImage,
+    SpecificRow
+}
+
+/// <summary>Describes a removal awaiting confirmation.</summary>
+internal sealed record PendingRemovalAction(
+    PendingRemovalKind Kind,
+    Guid RowId,
+    Guid DesignAreaId,
+    Guid? AssetId);

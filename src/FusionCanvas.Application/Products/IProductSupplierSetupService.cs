@@ -27,8 +27,4 @@ public interface IProductSupplierSetupService
     Task<ProductSupplierSetupResult> UpdateDesignAreaAsync(UpdateDesignAreaRequest request, CancellationToken cancellationToken = default);
 
     Task<ProductSupplierSetupResult> DeleteDesignAreaAsync(DeleteDesignAreaRequest request, CancellationToken cancellationToken = default);
-
-    Task<DesignTargetSelectionState> LoadDesignTargetsAsync(Guid itemId, CancellationToken cancellationToken = default);
-
-    Task<DesignTargetSelectionResult> ReplaceDesignTargetsAsync(ReplaceDesignTargetsRequest request, CancellationToken cancellationToken = default);
 }

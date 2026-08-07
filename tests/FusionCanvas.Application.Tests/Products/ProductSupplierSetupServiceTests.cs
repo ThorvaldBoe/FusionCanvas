@@ -159,17 +159,19 @@ public class ProductSupplierSetupServiceTests
         var areaId = Assert.Single(areaResult.State.Products[0].Offerings[0].DesignAreas).Id;
 
         var itemId = Guid.NewGuid();
+        var rowId = Guid.NewGuid();
         var item = new Item(itemId, StoreId, null, null, "Tee", null, ItemStatus.Draft, WorkflowStage.Design, false, Now, Now, "{}");
         repository.Snapshot = repository.Snapshot with
         {
             Items = [.. repository.Snapshot.Items, item],
-            ItemDesignAreaTargets = [.. repository.Snapshot.ItemDesignAreaTargets, new ItemDesignAreaTarget(itemId, areaId)]
+            DesignVariantRows = [new DesignVariantRow(rowId, itemId, true, 0)],
+            DesignSlotAssignments = [new DesignSlotAssignment(rowId, areaId, null)]
         };
 
         var result = await service.DeleteDesignAreaAsync(new DeleteDesignAreaRequest(areaId, Confirm: true), TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
-        Assert.Contains("selected", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("referenced", result.Error, StringComparison.OrdinalIgnoreCase);
         Assert.Single(await service.LoadForStoreAsync(StoreId, TestContext.Current.CancellationToken).ContinueWith(t => t.Result.Products[0].Offerings[0].DesignAreas));
     }
 
@@ -179,19 +181,65 @@ public class ProductSupplierSetupServiceTests
         var repository = new InMemoryWorkspaceRepository(SeedSnap());
         var service = New(repository);
         var (productId, offeringId) = await CreateProductOfferingAsync(service);
-        var areaResult = await service.CreateDesignAreaAsync(new CreateDesignAreaRequest(offeringId, "Front", "front", "DTG", 3000, 4500, null), TestContext.Current.CancellationToken);
-        var areaId = Assert.Single(areaResult.State.Products[0].Offerings[0].DesignAreas).Id;
         var itemId = Guid.NewGuid();
         repository.Snapshot = repository.Snapshot with
         {
             Items = [.. repository.Snapshot.Items, new Item(itemId, StoreId, null, null, "Tee", null, ItemStatus.Draft, WorkflowStage.Design, false, Now, Now, "{}")],
-            ItemDesignAreaTargets = [new ItemDesignAreaTarget(itemId, areaId)]
+            ItemListingConfigurations = [new ItemListingConfiguration(itemId, offeringId)]
         };
 
         var result = await service.DeleteProductAsync(new DeleteProductRequest(productId, Confirm: true), TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
         Assert.Single(await service.LoadForStoreAsync(StoreId, TestContext.Current.CancellationToken).ContinueWith(t => t.Result.Products));
+    }
+
+    [Fact]
+    public async Task RemoveReferencedOffering_IsBlocked()
+    {
+        var repository = new InMemoryWorkspaceRepository(SeedSnap());
+        var service = New(repository);
+        var (_, offeringId) = await CreateProductOfferingAsync(service);
+        var itemId = Guid.NewGuid();
+        repository.Snapshot = repository.Snapshot with
+        {
+            Items = [.. repository.Snapshot.Items, new Item(itemId, StoreId, null, null, "Tee", null, ItemStatus.Draft, WorkflowStage.Design, false, Now, Now, "{}")],
+            ItemListingConfigurations = [new ItemListingConfiguration(itemId, offeringId)]
+        };
+
+        var result = await service.DeleteOfferingAsync(new DeleteOfferingRequest(offeringId, Confirm: true), TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("configuration", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(await service.LoadForStoreAsync(StoreId, TestContext.Current.CancellationToken).ContinueWith(t => t.Result.Products[0].Offerings));
+    }
+
+    [Fact]
+    public async Task RemoveUnreferencedOffering_Succeeds()
+    {
+        var repository = new InMemoryWorkspaceRepository(SeedSnap());
+        var service = New(repository);
+        var (_, offeringId) = await CreateProductOfferingAsync(service);
+
+        var result = await service.DeleteOfferingAsync(new DeleteOfferingRequest(offeringId, Confirm: true), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Empty(await service.LoadForStoreAsync(StoreId, TestContext.Current.CancellationToken).ContinueWith(t => t.Result.Products[0].Offerings));
+    }
+
+    [Fact]
+    public async Task RemoveUnreferencedProduct_Succeeds()
+    {
+        var repository = new InMemoryWorkspaceRepository(SeedSnap());
+        var service = New(repository);
+        var (productId, offeringId) = await CreateProductOfferingAsync(service);
+        // Remove the offering first
+        await service.DeleteOfferingAsync(new DeleteOfferingRequest(offeringId, Confirm: true), TestContext.Current.CancellationToken);
+
+        var result = await service.DeleteProductAsync(new DeleteProductRequest(productId, Confirm: true), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Empty(await service.LoadForStoreAsync(StoreId, TestContext.Current.CancellationToken).ContinueWith(t => t.Result.Products));
     }
 
     [Fact]
@@ -233,83 +281,6 @@ public class ProductSupplierSetupServiceTests
 
         Assert.True(state.NeedsFirstProduct);
         Assert.Empty(state.Products);
-    }
-
-    [Fact]
-    public async Task MultipleCompatibleAreas_ArePersistedAtomicallyAndShownAfterReload()
-    {
-        var repository = new InMemoryWorkspaceRepository(SeedSnap());
-        var service = New(repository);
-        var (_, offeringId) = await CreateProductOfferingAsync(service);
-        var a = (await service.CreateDesignAreaAsync(new CreateDesignAreaRequest(offeringId, "Front", "front", "DTG", 3000, 4500, null), TestContext.Current.CancellationToken)).State.Products[0].Offerings[0].DesignAreas[0];
-        var b = (await service.CreateDesignAreaAsync(new CreateDesignAreaRequest(offeringId, "Back", "back", "DTG", 3000, 4500, null), TestContext.Current.CancellationToken)).State.Products[0].Offerings[0].DesignAreas[0];
-        var itemId = Guid.NewGuid();
-        repository.Snapshot = repository.Snapshot with
-        {
-            Items = [.. repository.Snapshot.Items, new Item(itemId, StoreId, null, null, "Tee", null, ItemStatus.Draft, WorkflowStage.Design, false, Now, Now, "{}")]
-        };
-
-        var result = await service.ReplaceDesignTargetsAsync(new ReplaceDesignTargetsRequest(itemId, [a.Id, b.Id]), TestContext.Current.CancellationToken);
-
-        Assert.True(result.Succeeded);
-        Assert.All(result.State.Options.Where(o => o.IsSelected), selected => Assert.Contains(selected.DesignAreaId, new[] { a.Id, b.Id }));
-        Assert.Equal(2, result.State.Options.Count(o => o.IsSelected));
-
-        var reloaded = await service.LoadDesignTargetsAsync(itemId, TestContext.Current.CancellationToken);
-        Assert.Equal(2, reloaded.Options.Count(o => o.IsSelected));
-        Assert.All(reloaded.Options.Where(o => o.IsSelected), selected => Assert.Contains(selected.DesignAreaId, new[] { a.Id, b.Id }));
-    }
-
-    [Fact]
-    public async Task CrossStoreTargetSelection_IsRejectedAndPreservesPriorTargets()
-    {
-        var repository = new InMemoryWorkspaceRepository(SeedSnap());
-        var service = New(repository);
-        repository.Snapshot = repository.Snapshot with
-        {
-            Stores = [.. repository.Snapshot.Stores, new Store(OtherStoreId, name: "Other Studio", null, false, Now, Now, "{}")]
-        };
-        var (_, offeringId) = await CreateProductOfferingAsync(service);
-        var area = (await service.CreateDesignAreaAsync(new CreateDesignAreaRequest(offeringId, "Front", "front", "DTG", 3000, 4500, null), TestContext.Current.CancellationToken)).State.Products[0].Offerings[0].DesignAreas[0];
-
-        var other = await service.CreateProductAsync(new CreateProductRequest(OtherStoreId, "Other"), TestContext.Current.CancellationToken);
-        Assert.True(other.Succeeded, other.Error);
-        var otherOffering = await service.CreateOfferingAsync(new CreateOfferingRequest(other.State.Products[0].Id, "O", FulfillmentKind.FixedProvider, "P"), TestContext.Current.CancellationToken);
-        var otherArea = (await service.CreateDesignAreaAsync(new CreateDesignAreaRequest(otherOffering.State.Products[0].Offerings[0].Id, "X", "x", "DTG", 1000, 1000, null), TestContext.Current.CancellationToken)).State.Products[0].Offerings[0].DesignAreas[0];
-
-        var itemId = Guid.NewGuid();
-        repository.Snapshot = repository.Snapshot with
-        {
-            Items = [.. repository.Snapshot.Items, new Item(itemId, StoreId, null, null, "Tee", null, ItemStatus.Draft, WorkflowStage.Design, false, Now, Now, "{}")],
-            ItemDesignAreaTargets = [new ItemDesignAreaTarget(itemId, area.Id)]
-        };
-
-        var result = await service.ReplaceDesignTargetsAsync(new ReplaceDesignTargetsRequest(itemId, [area.Id, otherArea.Id]), TestContext.Current.CancellationToken);
-
-        Assert.False(result.Succeeded);
-        Assert.Contains("another Store", result.Error);
-        var reloaded = await service.LoadDesignTargetsAsync(itemId, TestContext.Current.CancellationToken);
-        Assert.Single(reloaded.Options.Where(o => o.IsSelected));
-        Assert.Equal(area.Id, reloaded.Options.Single(o => o.IsSelected).DesignAreaId);
-    }
-
-    [Fact]
-    public async Task ProtectedItem_RejectsTargetMutation()
-    {
-        var repository = new InMemoryWorkspaceRepository(SeedSnap());
-        var service = New(repository);
-        var (_, offeringId) = await CreateProductOfferingAsync(service);
-        var area = (await service.CreateDesignAreaAsync(new CreateDesignAreaRequest(offeringId, "Front", "front", "DTG", 3000, 4500, null), TestContext.Current.CancellationToken)).State.Products[0].Offerings[0].DesignAreas[0];
-        var itemId = Guid.NewGuid();
-        repository.Snapshot = repository.Snapshot with
-        {
-            Items = [.. repository.Snapshot.Items, new Item(itemId, StoreId, null, null, "Tee", null, ItemStatus.Published, WorkflowStage.Design, false, Now, Now, "{}")]
-        };
-
-        var result = await service.ReplaceDesignTargetsAsync(new ReplaceDesignTargetsRequest(itemId, [area.Id]), TestContext.Current.CancellationToken);
-
-        Assert.False(result.Succeeded);
-        Assert.False((await service.LoadDesignTargetsAsync(itemId, TestContext.Current.CancellationToken)).Options.Any(o => o.IsSelected));
     }
 
     [Fact]

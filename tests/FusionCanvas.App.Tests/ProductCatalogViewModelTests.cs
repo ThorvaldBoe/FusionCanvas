@@ -122,78 +122,16 @@ public class ProductCatalogViewModelTests
     }
 
     [Fact]
-    public async Task DesignTool_LoadsTargetsAndRespectsReadOnly()
+    public async Task DesignTool_LoadsFiles()
     {
         var store = NewStore("North Star");
-        var repository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true, addItem: true));
+        var repository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true));
         var viewModel = NewDesignToolViewModel(repository);
-        var itemId = repository.Snapshot.Items[0].Id;
-
+        var itemId = Guid.NewGuid();
         await viewModel.LoadAsync(itemId, canEdit: true, TestContext.Current.CancellationToken);
 
-        Assert.True(viewModel.HasTargets);
-        Assert.Single(viewModel.Targets);
-        Assert.False(viewModel.Targets[0].IsReadOnly);
-        Assert.False(viewModel.Targets[0].IsSelected);
-        Assert.Contains("printable areas selected", viewModel.SelectedTargetsSummary);
-
-        var readOnlyVm = NewDesignToolViewModel(repository);
-        await readOnlyVm.LoadAsync(itemId, canEdit: false, TestContext.Current.CancellationToken);
-
-        Assert.True(readOnlyVm.IsReadOnly);
-        Assert.True(readOnlyVm.Targets[0].IsReadOnly);
-    }
-
-    [Fact]
-    public async Task DesignTool_ChoiceTargetReportsWarningWhenSelected()
-    {
-        var store = NewStore("North Star");
-        var repository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true, addItem: true, choiceArea: true));
-        var viewModel = NewDesignToolViewModel(repository);
-        var itemId = repository.Snapshot.Items[0].Id;
-
-        await viewModel.LoadAsync(itemId, canEdit: true, TestContext.Current.CancellationToken);
-
-        var target = Assert.Single(viewModel.Targets);
-        Assert.True(target.IsChoiceNetwork);
-        target.IsSelected = true;
-
-        Assert.True(viewModel.HasSelectedChoiceTarget);
-        Assert.NotEmpty(viewModel.ChoiceNetworkWarning);
-    }
-
-    [Fact]
-    public async Task DesignTool_SaveTargets_PersistsSelectionAtomically()
-    {
-        var store = NewStore("North Star");
-        var repository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true, addItem: true));
-        var viewModel = NewDesignToolViewModel(repository);
-        var itemId = repository.Snapshot.Items[0].Id;
-        await viewModel.LoadAsync(itemId, canEdit: true, TestContext.Current.CancellationToken);
-        var areaId = viewModel.Targets[0].DesignAreaId;
-        viewModel.Targets[0].IsSelected = true;
-
-        var succeeded = await viewModel.SaveTargetsAsync(TestContext.Current.CancellationToken);
-
-        Assert.True(succeeded);
-        var saved = await repository.LoadAsync(TestContext.Current.CancellationToken);
-        Assert.Equal([areaId], saved.ItemDesignAreaTargets.Where(t => t.ItemId == itemId).Select(t => t.DesignAreaId));
-    }
-
-    [Fact]
-    public async Task DesignTool_DoesNotCommitWhenReadOnly()
-    {
-        var store = NewStore("North Star");
-        var repository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true, addItem: true));
-        var viewModel = NewDesignToolViewModel(repository);
-        var itemId = repository.Snapshot.Items[0].Id;
-        await viewModel.LoadAsync(itemId, canEdit: false, TestContext.Current.CancellationToken);
-
-        var succeeded = await viewModel.SaveTargetsAsync(TestContext.Current.CancellationToken);
-
-        Assert.False(succeeded);
-        var saved = await repository.LoadAsync(TestContext.Current.CancellationToken);
-        Assert.Empty(saved.ItemDesignAreaTargets);
+        Assert.NotNull(viewModel);
+        Assert.False(viewModel.HasConfiguration);
     }
 
     private static StoreManagementViewModel NewStoreManagementViewModel(InMemoryWorkspaceRepository repository) =>
@@ -205,8 +143,7 @@ public class ProductCatalogViewModelTests
 
     private static DesignStageToolViewModel NewDesignToolViewModel(InMemoryWorkspaceRepository repository) =>
         new(
-            new EmptyDesignFileService(),
-            new ProductSupplierSetupService(repository, () => Now, () => Guid.NewGuid()));
+            new EmptyDesignStageService());
 
     private static WorkspaceSnapshot SnapshotWithCatalog(Store store, bool addProduct, bool addItem = false, bool choiceArea = false)
     {
@@ -274,6 +211,54 @@ public class ProductCatalogViewModelTests
 
         public Task<DesignFileRemoveResult> RemoveAsync(Guid itemId, Guid assetId, CancellationToken cancellationToken = default) =>
             Task.FromResult(DesignFileRemoveResult.Failure("No file service in tests."));
+    }
+
+    private sealed class EmptyDesignStageService : IDesignStageService
+    {
+        public Task<DesignStageState> LoadDesignStageStateAsync(Guid itemId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new DesignStageState(itemId, false, string.Empty, null, null, null, null, [], [], [], [], []));
+
+        public Task<DesignStageResult> SelectConfigurationAsync(Guid itemId, Guid offeringId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(DesignStageResult.Failure("Not implemented in tests."));
+
+        public Task<DesignStageResult> AddSelectedColorAsync(Guid itemId, string colorValue, CancellationToken cancellationToken = default) =>
+            Task.FromResult(DesignStageResult.Failure("Not implemented in tests."));
+
+        public Task<DesignStageResult> RemoveSelectedColorAsync(Guid itemId, string colorValue, CancellationToken cancellationToken = default) =>
+            Task.FromResult(DesignStageResult.Failure("Not implemented in tests."));
+
+        public Task<DesignStageResult> MakeSpecificForColorAsync(Guid itemId, string colorValue, CancellationToken cancellationToken = default) =>
+            Task.FromResult(DesignStageResult.Failure("Not implemented in tests."));
+
+        public Task<DesignStageResult> RemoveSpecificRowAsync(Guid itemId, Guid rowId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(DesignStageResult.Failure("Not implemented in tests."));
+
+        public Task<DesignStageResult> AssignSlotImageAsync(Guid itemId, Guid rowId, Guid designAreaId, string sourcePath, CancellationToken cancellationToken = default) =>
+            Task.FromResult(DesignStageResult.Failure("Not implemented in tests."));
+
+        public Task<DesignStageResult> ReplaceSlotImageAsync(Guid itemId, Guid rowId, Guid designAreaId, string sourcePath, CancellationToken cancellationToken = default) =>
+            Task.FromResult(DesignStageResult.Failure("Not implemented in tests."));
+
+        public Task<DesignStageResult> RemoveSlotImageAsync(Guid itemId, Guid rowId, Guid designAreaId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(DesignStageResult.Failure("Not implemented in tests."));
+
+        public Task<Stream> OpenSlotPreviewAsync(Guid rowId, Guid designAreaId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task ExportSlotImageAsync(Guid rowId, Guid designAreaId, string destinationPath, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task ExportSupportingImageAsync(Guid assetId, string destinationPath, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<IReadOnlyList<DesignSlotSummary>> ListSupportingImagesAsync(Guid itemId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<DesignSlotSummary>>([]);
+
+        public Task<DesignStageResult> ImportSupportingImageAsync(Guid itemId, string sourcePath, CancellationToken cancellationToken = default) =>
+            Task.FromResult(DesignStageResult.Failure("Not implemented in tests."));
+
+        public Task<DesignStageResult> RemoveSupportingImageAsync(Guid itemId, Guid assetId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(DesignStageResult.Failure("Not implemented in tests."));
     }
 
     private sealed class InMemoryWorkspaceRepository(WorkspaceSnapshot? snapshot = null) : IWorkspaceRepository

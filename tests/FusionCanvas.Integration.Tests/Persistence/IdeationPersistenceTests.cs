@@ -1,4 +1,4 @@
-﻿using FusionCanvas.Domain.Ideation;
+using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
@@ -36,7 +36,7 @@ public sealed class IdeationPersistenceTests : IDisposable
         await connection.OpenAsync(TestContext.Current.CancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version;";
-        Assert.Equal(9L, (long)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!);
+        Assert.Equal(10L, (long)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!);
     }
 
     [Fact]

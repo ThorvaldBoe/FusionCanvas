@@ -1,4 +1,4 @@
-﻿using FusionCanvas.Domain.Assets;
+using FusionCanvas.Domain.Assets;
 using FusionCanvas.Integration.Files;
 using FusionCanvas.Application.Workspaces;
 

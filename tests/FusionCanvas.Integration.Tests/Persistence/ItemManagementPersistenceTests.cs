@@ -1,4 +1,4 @@
-﻿using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Tags;
 using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Niches;

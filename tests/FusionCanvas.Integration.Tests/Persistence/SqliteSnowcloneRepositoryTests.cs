@@ -1,4 +1,4 @@
-﻿using FusionCanvas.Application.Snowclones;
+using FusionCanvas.Application.Snowclones;
 using FusionCanvas.Domain.Snowclones;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Integration.Persistence;
@@ -21,7 +21,7 @@ public sealed class SqliteSnowcloneRepositoryTests
 
         Assert.Empty(loaded.Snowclones);
         Assert.False(loaded.StarterLibraryInitialized);
-        Assert.Equal(9, await ReadUserVersionAsync(path));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(path));
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public sealed class SqliteSnowcloneRepositoryTests
         Assert.Empty(library.Snowclones);
         Assert.False(library.StarterLibraryInitialized);
         Assert.Equal(workspace.Workspaces, reloadedWorkspace.Workspaces);
-        Assert.Equal(9, await ReadUserVersionAsync(path));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(path));
     }
 
     [Fact]
@@ -163,8 +163,8 @@ public sealed class SqliteSnowcloneRepositoryTests
         Assert.Empty(firstLibrary.Snowclones);
         Assert.Empty(secondLibrary.Snowclones);
         Assert.Empty(secondWorkspace.Workspaces);
-        Assert.Equal(9, await ReadUserVersionAsync(firstPath));
-        Assert.Equal(9, await ReadUserVersionAsync(secondPath));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(firstPath));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(secondPath));
     }
 
     [Fact]
@@ -176,7 +176,7 @@ public sealed class SqliteSnowcloneRepositoryTests
         {
             await connection.OpenAsync(TestContext.Current.CancellationToken);
             await using var command = connection.CreateCommand();
-            command.CommandText = "PRAGMA user_version = 10;";
+            command.CommandText = "PRAGMA user_version = 99;";
             await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
         }
 
