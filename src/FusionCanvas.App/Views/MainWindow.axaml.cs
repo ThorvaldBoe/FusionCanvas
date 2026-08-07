@@ -35,6 +35,7 @@ public partial class MainWindow : Window
     private Window? _designPreviewWindow;
     private PointerPressedEventArgs? _dragPointerArgs;
     private WorkspaceTreeNodeViewModel? _dragNode;
+    private IReadOnlyList<WorkspaceTreeSelection>? _dragSelections;
     private Avalonia.Point _dragStart;
     private WorkspaceTreeNodeViewModel? _dropTarget;
 
@@ -326,6 +327,7 @@ public partial class MainWindow : Window
             {
                 _dragPointerArgs = e;
                 _dragNode = node;
+                _dragSelections = viewModel.WorkspaceTree.GetDragSelections(node);
                 _dragStart = e.GetPosition(row);
             }
         }
@@ -356,13 +358,14 @@ public partial class MainWindow : Window
         }
 
         var transfer = new DataTransfer();
-        var selections = (DataContext as MainWindowViewModel)?.WorkspaceTree.GetDragSelections(_dragNode)
+        var selections = _dragSelections
             ?? [new WorkspaceTreeSelection(_dragNode.EntityKind, _dragNode.EntityId)];
         transfer.Add(DataTransferItem.CreateText(
             $"FusionCanvasSelection|{string.Join(',', selections.Select(selection => $"{selection.Kind}:{selection.Id}"))}"));
         var pressedArgs = _dragPointerArgs;
         _dragPointerArgs = null;
         _dragNode = null;
+        _dragSelections = null;
         await DragDrop.DoDragDropAsync(pressedArgs, transfer, DragDropEffects.Move);
     }
 
