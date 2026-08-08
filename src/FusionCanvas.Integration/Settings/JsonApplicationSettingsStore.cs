@@ -87,11 +87,13 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
                 return ApplicationSettingsLoadResult.Success(new ApplicationSettings(darkMode));
             }
 
+            var activeWorkspaceId = TryReadGuid(root, "activeWorkspaceId");
+
             if (!TryGetProperty(root, "ai", out var aiElement))
             {
                 var noAiLayout = TryReadWindowLayout(root, out var noAiLayoutWarning);
                 return new ApplicationSettingsLoadResult(
-                    new ApplicationSettings(darkMode, AiConfigurationSettings.Default, noAiLayout),
+                    new ApplicationSettings(darkMode, AiConfigurationSettings.Default, noAiLayout, activeWorkspaceId),
                     UsedDefault: false,
                     noAiLayoutWarning);
             }
@@ -113,7 +115,7 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
             var layout = TryReadWindowLayout(root, out var layoutWarning);
             warning = CombineWarnings(warning, layoutWarning);
             return new ApplicationSettingsLoadResult(
-                new ApplicationSettings(darkMode, aiSettings, layout),
+                new ApplicationSettings(darkMode, aiSettings, layout, activeWorkspaceId),
                 UsedDefault: false,
                 warning);
         }
@@ -142,7 +144,8 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
                         Version = SupportedVersion,
                         DarkMode = settings.DarkMode,
                         Ai = settings.Ai,
-                        WindowLayout = settings.WindowLayout
+                        WindowLayout = settings.WindowLayout,
+                        ActiveWorkspaceId = settings.ActiveWorkspaceId
                     },
                     WriteOptions,
                     cancellationToken);
@@ -270,6 +273,15 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
         return true;
     }
 
+    private static Guid? TryReadGuid(JsonElement element, string name)
+    {
+        return TryGetProperty(element, name, out var property) &&
+               property.ValueKind == JsonValueKind.String &&
+               property.TryGetGuid(out var value)
+            ? value
+            : null;
+    }
+
     private static void TryDelete(string path)
     {
         try { File.Delete(path); }
@@ -282,5 +294,6 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
         public bool DarkMode { get; set; }
         public AiConfigurationSettings Ai { get; set; } = AiConfigurationSettings.Default;
         public WindowLayoutSettings? WindowLayout { get; set; }
+        public Guid? ActiveWorkspaceId { get; set; }
     }
 }
