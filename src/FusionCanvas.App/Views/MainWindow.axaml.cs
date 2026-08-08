@@ -282,13 +282,19 @@ public partial class MainWindow : Window
         }
 
         var point = e.GetCurrentPoint(tree);
-        if (point.Properties.PointerUpdateKind == PointerUpdateKind.LeftButtonPressed &&
-            (source is ToggleButton || source.GetVisualAncestors().OfType<ToggleButton>().Any()))
+        var treeItem = source is TreeViewItem item
+            ? item
+            : source.GetVisualAncestors().OfType<TreeViewItem>().FirstOrDefault();
+        var isExpanderSource = source is ToggleButton || source.GetVisualAncestors().OfType<ToggleButton>().Any();
+        if (point.Properties.PointerUpdateKind == PointerUpdateKind.LeftButtonPressed)
         {
-            var expander = tree.GetVisualDescendants()
+            var expander = treeItem?.GetVisualDescendants()
                 .OfType<ToggleButton>()
                 .Select(button => new { Button = button, Node = button.DataContext as WorkspaceTreeNodeViewModel })
-                .FirstOrDefault(candidate => candidate.Node is { HasChildren: true } && IsWithinExpanderHitTarget(e, candidate.Button));
+                .FirstOrDefault(candidate => candidate.Node is { HasChildren: true } &&
+                    (isExpanderSource
+                        ? IsWithinExpanderHitTarget(e, candidate.Button)
+                        : IsWithinExpanderExtension(e, candidate.Button)));
             if (expander?.Node is { } expandedNode)
             {
                 expandedNode.IsExpanded = !expandedNode.IsExpanded;
@@ -338,12 +344,20 @@ public partial class MainWindow : Window
 
     private static bool IsWithinExpanderHitTarget(PointerPressedEventArgs e, ToggleButton expander)
     {
-        const double ExpanderHitTargetSize = 32;
+        const double ExpanderHitTargetSize = 44;
         var position = e.GetPosition(expander);
         var horizontalPadding = Math.Max(0, (ExpanderHitTargetSize - expander.Bounds.Width) / 2);
         var verticalPadding = Math.Max(0, (ExpanderHitTargetSize - expander.Bounds.Height) / 2);
         return position.X >= -horizontalPadding && position.X <= expander.Bounds.Width + horizontalPadding &&
                position.Y >= -verticalPadding && position.Y <= expander.Bounds.Height + verticalPadding;
+    }
+
+    private static bool IsWithinExpanderExtension(PointerPressedEventArgs e, ToggleButton expander)
+    {
+        var position = e.GetPosition(expander);
+        return position.X >= expander.Bounds.Width &&
+               position.X <= expander.Bounds.Width + Math.Max(0, (44 - expander.Bounds.Width) / 2) &&
+               position.Y >= 0 && position.Y <= expander.Bounds.Height;
     }
 
     private async void OnTreeNodePointerMoved(object? sender, PointerEventArgs e)
