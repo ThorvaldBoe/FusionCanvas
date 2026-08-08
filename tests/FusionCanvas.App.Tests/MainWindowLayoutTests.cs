@@ -223,13 +223,16 @@ public class MainWindowLayoutTests
         Assert.Equal(fixture.ViewModel.WorkspaceTree.DesignCountLabel, label!.Text);
         Assert.Contains(" designs showing.", label.Text);
         Assert.True(label.IsVisible);
-        Assert.Contains(label.GetVisualAncestors(), ancestor => ancestor is DockPanel);
         Assert.DoesNotContain(label.GetVisualAncestors(), ancestor => ancestor is TreeViewItem);
 
         var statusBar = Assert.IsType<Border>(label.Parent);
         var tree = fixture.FindControl<TreeView>(treeView => treeView.Name == "WorkspaceTreeControl");
+        var navigationPane = Assert.IsType<Grid>(statusBar.Parent);
+        Assert.Equal(5, Grid.GetRow(statusBar));
+        Assert.Equal(4, Grid.GetRow(Assert.IsType<Grid>(tree.Parent)));
         Assert.True(statusBar.Bounds.Top >= tree.Bounds.Bottom,
             $"Expected navigation status bar ({statusBar.Bounds.Top}) below tree ({tree.Bounds.Bottom}).");
+        Assert.Equal(navigationPane.Bounds.Height, statusBar.Bounds.Bottom);
     }
 
     [AvaloniaFact]

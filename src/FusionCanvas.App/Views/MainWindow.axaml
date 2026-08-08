@@ -32,9 +32,9 @@
             BorderBrush="{DynamicResource ControlBorderBrush}"
             BorderThickness="0,0,1,0"
             Padding="18">
-      <DockPanel LastChildFill="True">
+      <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
         <Grid x:Name="NavigationHeader"
-              DockPanel.Dock="Top"
+              Grid.Row="0"
               ColumnDefinitions="Auto,*,Auto"
               ColumnSpacing="8"
               Margin="0,0,0,18">
@@ -71,7 +71,7 @@
                   AutomationProperties.Name="Settings" />
         </Grid>
 
-        <StackPanel DockPanel.Dock="Top"
+        <StackPanel Grid.Row="1"
                     Spacing="8"
                     Margin="0,0,0,18">
           <Grid ColumnDefinitions="*,Auto,Auto"
@@ -127,7 +127,7 @@
           </StackPanel>
         </StackPanel>
 
-        <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12">
+        <StackPanel Grid.Row="2" Spacing="8" Margin="0,0,0,12">
           <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
             <Button x:Name="GroupActionsButton"
                     Grid.Column="0"
@@ -253,7 +253,7 @@
         </StackPanel>
 
         <Border x:Name="TreeActionsToolbar"
-                DockPanel.Dock="Top"
+                Grid.Row="3"
                 Margin="0,0,0,8">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <Button x:Name="ExpandCollapseAllButton"
@@ -278,7 +278,7 @@
           </StackPanel>
         </Border>
 
-        <Border DockPanel.Dock="Bottom"
+        <Border Grid.Row="5"
                 Classes="navigationStatusBar"
                 Margin="0,8,0,0"
                 Padding="8,6"
@@ -291,7 +291,7 @@
                      Foreground="{DynamicResource SecondaryTextBrush}"
                      AutomationProperties.AutomationId="DesignCountLabel" />
         </Border>
-        <Grid>
+        <Grid Grid.Row="4">
           <TreeView x:Name="WorkspaceTreeControl"
                     ItemsSource="{Binding WorkspaceTree.Roots}"
                     Background="Transparent"
@@ -418,7 +418,7 @@
             </StackPanel>
           </Border>
         </Grid>
-      </DockPanel>
+      </Grid>
     </Border>
 
     <GridSplitter Grid.Column="1"
