@@ -19,6 +19,63 @@ namespace FusionCanvas.App.Tests;
 public class WorkspaceTreeViewModelTests
 {
     [Fact]
+    public async Task DesignCounts_TrackVisibleFiltersArchivedItemsStoresAndReloads()
+    {
+        var sample = Sample.Create();
+        var secondStore = new Store(Guid.NewGuid(), "Second", null, false, sample.Now, sample.Now, "{}", Guid.NewGuid());
+        var secondNiche = new Niche(secondStore.DefaultNicheId!.Value, secondStore.Id, "Second niche", null, false, sample.Now, sample.Now, "{}");
+        var visible = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Visible design", null, ItemStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}");
+        var otherStage = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Idea", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var archived = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Archived design", null, ItemStatus.Draft, WorkflowStage.Design, true, sample.Now, sample.Now, "{}");
+        var otherStoreDesign = new Item(Guid.NewGuid(), secondStore.Id, secondNiche.Id, null, "Other store design", null, ItemStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with
+        {
+            Stores = [sample.Store, secondStore],
+            Niches = [sample.Niche, secondNiche],
+            Items = [visible, otherStage, archived, otherStoreDesign]
+        };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        Assert.Equal("1/1 designs showing.", viewModel.DesignCountLabel);
+
+        viewModel.QueryText = "no match";
+        Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
+
+        viewModel.IncludeArchived = true;
+        Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
+        viewModel.QueryText = "Archived";
+        Assert.Equal("1/1 designs showing.", viewModel.DesignCountLabel);
+
+        viewModel.ClearAllFilters();
+        viewModel.SetStore(secondStore.Id, snapshot);
+        Assert.Equal("1/1 designs showing.", viewModel.DesignCountLabel);
+
+        repository.Snapshot = snapshot with { Items = [visible, otherStage, archived, otherStoreDesign, new Item(Guid.NewGuid(), secondStore.Id, secondNiche.Id, null, "Reloaded", null, ItemStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}")] };
+        viewModel.ClearAllFilters();
+        await viewModel.ReloadAsync();
+        Assert.Equal("2/2 designs showing.", viewModel.DesignCountLabel);
+    }
+
+    [Fact]
+    public async Task DesignCounts_RefreshWhenStructureChanges()
+    {
+        var sample = Sample.Create();
+        var item = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Design", null, ItemStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Items = [item] };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        Assert.Equal("1/1 designs showing.", viewModel.DesignCountLabel);
+
+        repository.Snapshot = snapshot with { Items = [] };
+        viewModel.SelectEntity(null);
+        await viewModel.ReloadAsync();
+        Assert.Equal("0/0 designs showing.", viewModel.DesignCountLabel);
+    }
+
+    [Fact]
     public async Task InlineCreate_CommitsAndStartsAnotherSiblingWithoutOpeningATab()
     {
         var sample = Sample.Create();
@@ -932,7 +989,7 @@ public class WorkspaceTreeViewModelTests
 
     private sealed class TestRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
     {
-        public WorkspaceSnapshot Snapshot { get; private set; } = snapshot;
+        public WorkspaceSnapshot Snapshot { get; set; } = snapshot;
         public bool FailSaves { get; init; }
 
         public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)

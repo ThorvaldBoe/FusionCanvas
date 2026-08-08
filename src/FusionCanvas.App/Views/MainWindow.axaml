@@ -405,6 +405,12 @@
             </StackPanel>
           </Border>
         </Grid>
+        <TextBlock DockPanel.Dock="Bottom"
+                   Text="{Binding WorkspaceTree.DesignCountLabel}"
+                   Margin="0,8,0,0"
+                   FontSize="11"
+                   Foreground="{DynamicResource SecondaryTextBrush}"
+                   AutomationProperties.AutomationId="DesignCountLabel" />
       </DockPanel>
     </Border>
 
