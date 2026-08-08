@@ -9,6 +9,7 @@ using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Domain.Products;
+using FusionCanvas.Domain.Listings;
 using Microsoft.Data.Sqlite;
 using FusionCanvas.Application.Workspaces;
 using System.Text.Json;
@@ -31,7 +32,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
 
-        foreach (var table in new[] { "design_slot_assignments", "design_variant_row_colors", "design_variant_rows", "design_selected_colors", "item_listing_configuration", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
+        foreach (var table in new[] { "listing_provider_states", "item_listing_profiles", "design_slot_assignments", "design_variant_row_colors", "design_variant_rows", "design_selected_colors", "item_listing_configuration", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
         {
             await ExecuteAsync(connection, transaction, $"DELETE FROM {table};", cancellationToken);
         }
@@ -89,6 +90,16 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         foreach (var listing in snapshot.Items)
         {
             await InsertItemAsync(connection, transaction, listing, cancellationToken);
+        }
+
+        foreach (var profile in snapshot.ItemListingProfiles)
+        {
+            await InsertItemListingProfileAsync(connection, transaction, profile, cancellationToken);
+        }
+
+        foreach (var providerState in snapshot.ListingProviderStates)
+        {
+            await InsertListingProviderStateAsync(connection, transaction, providerState, cancellationToken);
         }
 
         foreach (var asset in snapshot.Assets)
@@ -170,7 +181,9 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             DesignSelectedColors = await LoadDesignSelectedColorsAsync(connection, cancellationToken),
             DesignVariantRows = await LoadDesignVariantRowsAsync(connection, cancellationToken),
             DesignVariantRowColors = await LoadDesignVariantRowColorsAsync(connection, cancellationToken),
-            DesignSlotAssignments = await LoadDesignSlotAssignmentsAsync(connection, cancellationToken)
+            DesignSlotAssignments = await LoadDesignSlotAssignmentsAsync(connection, cancellationToken),
+            ItemListingProfiles = await LoadItemListingProfilesAsync(connection, cancellationToken),
+            ListingProviderStates = await LoadListingProviderStatesAsync(connection, cancellationToken)
         };
     }
 
@@ -274,6 +287,36 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 metadata_json TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS item_listing_profiles (
+                item_id TEXT PRIMARY KEY REFERENCES items(id) ON DELETE CASCADE,
+                strategy INTEGER NOT NULL DEFAULT 0,
+                price REAL NULL,
+                currency TEXT NULL,
+                readiness INTEGER NOT NULL DEFAULT 0,
+                publication INTEGER NOT NULL DEFAULT 0,
+                media_asset_ids_json TEXT NOT NULL,
+                variant_ids_json TEXT NOT NULL,
+                shared_metadata_json TEXT NOT NULL,
+                field_ownership_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS listing_provider_states (
+                item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                provider TEXT NOT NULL,
+                channel TEXT NOT NULL,
+                external_id TEXT NOT NULL,
+                sync_status INTEGER NOT NULL DEFAULT 0,
+                provider_metadata_json TEXT NOT NULL,
+                last_result TEXT NULL,
+                error_message TEXT NULL,
+                conflict_details TEXT NULL,
+                last_attempt_at TEXT NULL,
+                external_state_at TEXT NULL,
+                is_locked INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (item_id, provider, channel)
             );
 
             CREATE TABLE IF NOT EXISTS assets (
@@ -452,6 +495,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await MigrateToVersion10Async(connection, cancellationToken);
         }
 
+        if (schemaVersion < 11)
+        {
+            await MigrateToVersion11Async(connection, cancellationToken);
+        }
+
         await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
     }
 
@@ -625,6 +673,51 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 );
 
                 DROP TABLE IF EXISTS item_design_area_targets;
+                """, cancellationToken);
+            await VerifyForeignKeyIntegrityAsync(connection, transaction, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    private static async Task MigrateToVersion11Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await ExecuteAsync(connection, transaction, """
+                CREATE TABLE IF NOT EXISTS item_listing_profiles (
+                    item_id TEXT PRIMARY KEY REFERENCES items(id) ON DELETE CASCADE,
+                    strategy INTEGER NOT NULL DEFAULT 0,
+                    price REAL NULL,
+                    currency TEXT NULL,
+                    readiness INTEGER NOT NULL DEFAULT 0,
+                    publication INTEGER NOT NULL DEFAULT 0,
+                    media_asset_ids_json TEXT NOT NULL,
+                    variant_ids_json TEXT NOT NULL,
+                    shared_metadata_json TEXT NOT NULL,
+                    field_ownership_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS listing_provider_states (
+                    item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                    provider TEXT NOT NULL,
+                    channel TEXT NOT NULL,
+                    external_id TEXT NOT NULL,
+                    sync_status INTEGER NOT NULL DEFAULT 0,
+                    provider_metadata_json TEXT NOT NULL,
+                    last_result TEXT NULL,
+                    error_message TEXT NULL,
+                    conflict_details TEXT NULL,
+                    last_attempt_at TEXT NULL,
+                    external_state_at TEXT NULL,
+                    is_locked INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (item_id, provider, channel)
+                );
                 """, cancellationToken);
             await VerifyForeignKeyIntegrityAsync(connection, transaction, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -1020,6 +1113,41 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             VALUES ($id, $store_id, $niche_id, $group_id, $name, $description, $status, $workflow_stage, $is_archived, $created_at, $updated_at, $metadata_json);
             """, cancellationToken, [.. CommonParameters(listing), ("$store_id", listing.StoreId.ToString()), ("$niche_id", listing.NicheId?.ToString()), ("$group_id", listing.GroupId?.ToString()), ("$status", (int)listing.Status), ("$workflow_stage", (int)listing.Stage)]);
 
+    private static Task InsertItemListingProfileAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, ItemListingProfile profile, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO item_listing_profiles (item_id, strategy, price, currency, readiness, publication, media_asset_ids_json, variant_ids_json, shared_metadata_json, field_ownership_json, updated_at)
+            VALUES ($item_id, $strategy, $price, $currency, $readiness, $publication, $media_asset_ids_json, $variant_ids_json, $shared_metadata_json, $field_ownership_json, $updated_at);
+            """, cancellationToken,
+            ("$item_id", profile.ItemId.ToString()),
+            ("$strategy", (int)profile.Strategy),
+            ("$price", profile.Price),
+            ("$currency", profile.Currency),
+            ("$readiness", (int)profile.Readiness),
+            ("$publication", (int)profile.Publication),
+            ("$media_asset_ids_json", JsonSerializer.Serialize(profile.MediaAssetIds)),
+            ("$variant_ids_json", JsonSerializer.Serialize(profile.VariantIds)),
+            ("$shared_metadata_json", profile.SharedMetadataJson),
+            ("$field_ownership_json", profile.FieldOwnershipJson),
+            ("$updated_at", profile.UpdatedAt.ToString("O")));
+
+    private static Task InsertListingProviderStateAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, ListingProviderState state, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO listing_provider_states (item_id, provider, channel, external_id, sync_status, provider_metadata_json, last_result, error_message, conflict_details, last_attempt_at, external_state_at, is_locked)
+            VALUES ($item_id, $provider, $channel, $external_id, $sync_status, $provider_metadata_json, $last_result, $error_message, $conflict_details, $last_attempt_at, $external_state_at, $is_locked);
+            """, cancellationToken,
+            ("$item_id", state.ItemId.ToString()),
+            ("$provider", state.Provider),
+            ("$channel", state.Channel),
+            ("$external_id", state.ExternalId),
+            ("$sync_status", (int)state.SyncStatus),
+            ("$provider_metadata_json", state.ProviderMetadataJson),
+            ("$last_result", state.LastResult),
+            ("$error_message", state.ErrorMessage),
+            ("$conflict_details", state.ConflictDetails),
+            ("$last_attempt_at", state.LastAttemptAt?.ToString("O")),
+            ("$external_state_at", state.ExternalStateAt?.ToString("O")),
+            ("$is_locked", state.IsLocked ? 1 : 0));
+
     private static Task InsertAssetAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Asset asset, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
             INSERT INTO assets (id, store_id, name, description, kind, workspace_relative_path, original_source_path, is_missing, is_archived, created_at, updated_at, metadata_json)
@@ -1187,6 +1315,51 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         }
 
         return listings;
+    }
+
+    private static async Task<IReadOnlyList<ItemListingProfile>> LoadItemListingProfilesAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var profiles = new List<ItemListingProfile>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM item_listing_profiles;", cancellationToken))
+        {
+            profiles.Add(new ItemListingProfile(
+                ReadGuid(reader, "item_id"),
+                (ListingFulfillmentStrategy)ReadInt(reader, "strategy"),
+                ReadNullableDecimal(reader, "price"),
+                ReadNullableString(reader, "currency"),
+                (ListingReadinessState)ReadInt(reader, "readiness"),
+                (ListingPublicationState)ReadInt(reader, "publication"),
+                JsonSerializer.Deserialize<List<Guid>>(ReadString(reader, "media_asset_ids_json")) ?? [],
+                JsonSerializer.Deserialize<List<Guid>>(ReadString(reader, "variant_ids_json")) ?? [],
+                ReadString(reader, "shared_metadata_json"),
+                ReadString(reader, "field_ownership_json"),
+                ReadDate(reader, "updated_at")));
+        }
+
+        return profiles;
+    }
+
+    private static async Task<IReadOnlyList<ListingProviderState>> LoadListingProviderStatesAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var states = new List<ListingProviderState>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM listing_provider_states;", cancellationToken))
+        {
+            states.Add(new ListingProviderState(
+                ReadGuid(reader, "item_id"),
+                ReadString(reader, "provider"),
+                ReadString(reader, "channel"),
+                ReadString(reader, "external_id"),
+                (ListingSyncStatus)ReadInt(reader, "sync_status"),
+                ReadString(reader, "provider_metadata_json"),
+                ReadNullableString(reader, "last_result"),
+                ReadNullableString(reader, "error_message"),
+                ReadNullableString(reader, "conflict_details"),
+                ReadNullableDate(reader, "last_attempt_at"),
+                ReadNullableDate(reader, "external_state_at"),
+                ReadBool(reader, "is_locked")));
+        }
+
+        return states;
     }
 
     private static async Task<IReadOnlyList<IdeationRejection>> LoadIdeationRejectionsAsync(
@@ -1431,6 +1604,12 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         return reader.IsDBNull(ordinal) ? null : DateTimeOffset.Parse(reader.GetString(ordinal));
     }
 
+    private static decimal? ReadNullableDecimal(SqliteDataReader reader, string name)
+    {
+        var ordinal = reader.GetOrdinal(name);
+        return reader.IsDBNull(ordinal) ? null : Convert.ToDecimal(reader.GetValue(ordinal));
+    }
+
     private static void ValidateSnapshot(WorkspaceSnapshot snapshot)
     {
         var workspaceIds = snapshot.Workspaces.Select(workspace => workspace.Id).ToHashSet();
@@ -1463,6 +1642,38 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         }
 
         var storeIds = snapshot.Stores.Select(store => store.Id).ToHashSet();
+        var listingItemIds = snapshot.Items.Select(item => item.Id).ToHashSet();
+        foreach (var profile in snapshot.ItemListingProfiles)
+        {
+            if (!listingItemIds.Contains(profile.ItemId))
+            {
+                throw new InvalidOperationException("Every listing profile must reference an existing Item.");
+            }
+
+            var item = snapshot.Items.Single(item => item.Id == profile.ItemId);
+            var assetIds = snapshot.Assets.Select(asset => asset.Id).ToHashSet();
+            if (profile.MediaAssetIds.Any(assetId => !assetIds.Contains(assetId) || snapshot.Assets.Single(asset => asset.Id == assetId).StoreId != item.StoreId))
+            {
+                throw new InvalidOperationException("Listing media must belong to the Item's Store.");
+            }
+
+            var variants = snapshot.ProductVariants.Where(variant => profile.VariantIds.Contains(variant.Id)).ToArray();
+            if (variants.Length != profile.VariantIds.Count || variants.Any(variant =>
+                snapshot.FulfillmentOfferings.SingleOrDefault(offering => offering.Id == variant.FulfillmentOfferingId) is not { } offering
+                || snapshot.StoreProducts.SingleOrDefault(product => product.Id == offering.StoreProductId)?.StoreId != item.StoreId))
+            {
+                throw new InvalidOperationException("Listing variants must belong to a product offering in the Item's Store.");
+            }
+        }
+
+        foreach (var providerState in snapshot.ListingProviderStates)
+        {
+            if (!listingItemIds.Contains(providerState.ItemId))
+            {
+                throw new InvalidOperationException("Every listing provider state must reference an existing Item.");
+            }
+        }
+
         foreach (var product in snapshot.StoreProducts)
         {
             if (!storeIds.Contains(product.StoreId))

@@ -40,6 +40,7 @@ using FusionCanvas.Application.Workspaces.Transfer;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.ConceptRefinement;
 using FusionCanvas.Application.Products;
+using FusionCanvas.Application.Listings;
 using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.App.ConceptRefinement;
@@ -190,7 +191,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ItemInspector = new ItemInspectorViewModel(_itemInspectorService, _itemManagementService, _tagManagementService, titleOptimizationService);
         DesignTool = new DesignStageToolViewModel(
             new DesignStageService(workspaceRepository, fileStore));
-        ListingTool = new ListingStageToolViewModel();
+        ListingTool = new ListingStageToolViewModel(new ListingPreparationService(workspaceRepository));
         Ideation = new IdeationViewModel(_ideationService, _ideationAccessStatus, snowcloneLibrary, rejectedPhrases);
         ConceptRefinement = new ConceptRefinementSessionViewModel(
             _conceptRefinementService,
@@ -1115,7 +1116,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         var activeStage = DocumentWindow.ActiveContext?.WorkflowStage ?? item.Stage;
         var canEdit = ItemWorkflowPolicy.CanEditStage(item, activeStage).IsAllowed;
-        ListingTool.Load(item.Status, canEdit);
+        Run(ListingTool.LoadAsync(item.Id, canEdit));
         if (activeStage == WorkflowStage.Design)
         {
             Run(DesignTool.LoadAsync(item.Id, canEdit));

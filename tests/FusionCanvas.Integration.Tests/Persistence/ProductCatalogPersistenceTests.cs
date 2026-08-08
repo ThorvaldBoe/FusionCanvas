@@ -39,7 +39,7 @@ public class ProductCatalogPersistenceTests
 
         await repository.SaveAsync(CreateCatalogSnapshot(), TestContext.Current.CancellationToken);
 
-        Assert.Equal(10, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -73,7 +73,7 @@ public class ProductCatalogPersistenceTests
             Assert.Equal(0, after);
         }
 
-        Assert.Equal(10, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public class ProductCatalogPersistenceTests
         var loaded = await new SqliteWorkspaceRepository(databasePath)
             .LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(10, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(SqliteDatabaseSchema.CurrentVersion, await ReadUserVersionAsync(databasePath));
         Assert.Empty(loaded.StoreProducts);
         Assert.Empty(loaded.DesignAreas);
     }

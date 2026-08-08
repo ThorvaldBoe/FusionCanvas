@@ -7,6 +7,7 @@ using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Prompts;
 using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Domain.Products;
+using FusionCanvas.Domain.Listings;
  
 namespace FusionCanvas.Domain.Workspace;
 
@@ -41,6 +42,10 @@ public sealed record WorkspaceSnapshot(
     public IReadOnlyList<DesignVariantRowColor> DesignVariantRowColors { get; init; } = [];
 
     public IReadOnlyList<DesignSlotAssignment> DesignSlotAssignments { get; init; } = [];
+
+    public IReadOnlyList<ItemListingProfile> ItemListingProfiles { get; init; } = [];
+
+    public IReadOnlyList<ListingProviderState> ListingProviderStates { get; init; } = [];
 
     public WorkspaceSnapshot(
         IReadOnlyList<Store> Stores,

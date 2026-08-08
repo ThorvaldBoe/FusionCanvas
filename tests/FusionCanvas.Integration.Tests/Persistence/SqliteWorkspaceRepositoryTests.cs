@@ -7,6 +7,7 @@ using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
+using FusionCanvas.Domain.Listings;
 using FusionCanvas.Integration.Persistence;
 using Microsoft.Data.Sqlite;
 using FusionCanvas.Application.Groups;
@@ -36,6 +37,53 @@ public class SqliteWorkspaceRepositoryTests
         Assert.Equal(snapshot.Tags[0], Assert.Single(loaded.Tags));
         Assert.Equal(snapshot.ItemTags[0], Assert.Single(loaded.ItemTags));
         Assert.Equal(snapshot.AssetLinks[0], Assert.Single(loaded.AssetLinks));
+    }
+
+    [Fact]
+    public async Task SaveAndLoadAsync_RoundTripsListingProfileAndProviderDiagnostics()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var repository = new SqliteWorkspaceRepository(tempDirectory.GetPath("workspace.db"));
+        var snapshot = CreateCompleteSnapshot();
+        var item = snapshot.Items[0];
+        var profile = new ItemListingProfile(
+            item.Id,
+            ListingFulfillmentStrategy.ShopifyManual,
+            24.5m,
+            "USD",
+            ListingReadinessState.Ready,
+            mediaAssetIds: [snapshot.Assets[0].Id],
+            sharedMetadataJson: "{\"seoTitle\":\"Coffee\"}",
+            fieldOwnershipJson: "{\"price\":\"ManualOverride\"}");
+        var provider = new ListingProviderState(
+            item.Id,
+            "Shopify",
+            "Online Store",
+            "gid://shopify/Product/42",
+            ListingSyncStatus.Conflict,
+            lastResult: "partial",
+            errorMessage: "Price differs",
+            conflictDetails: "Manual price preserved");
+        snapshot = snapshot with { ItemListingProfiles = [profile], ListingProviderStates = [provider] };
+
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
+
+        var loadedProfile = Assert.Single(loaded.ItemListingProfiles);
+        var loadedProvider = Assert.Single(loaded.ListingProviderStates);
+        Assert.Equal(profile.ItemId, loadedProfile.ItemId);
+        Assert.Equal(profile.Strategy, loadedProfile.Strategy);
+        Assert.Equal(profile.Price, loadedProfile.Price);
+        Assert.Equal(profile.Currency, loadedProfile.Currency);
+        Assert.Equal(profile.MediaAssetIds, loadedProfile.MediaAssetIds);
+        Assert.Equal(profile.SharedMetadataJson, loadedProfile.SharedMetadataJson);
+        Assert.Equal(profile.FieldOwnershipJson, loadedProfile.FieldOwnershipJson);
+        Assert.Equal(provider.ItemId, loadedProvider.ItemId);
+        Assert.Equal(provider.Provider, loadedProvider.Provider);
+        Assert.Equal(provider.ExternalId, loadedProvider.ExternalId);
+        Assert.Equal(provider.SyncStatus, loadedProvider.SyncStatus);
+        Assert.Equal(provider.ErrorMessage, loadedProvider.ErrorMessage);
+        Assert.Equal(provider.ConflictDetails, loadedProvider.ConflictDetails);
     }
 
     [Fact]

@@ -36,7 +36,7 @@ public sealed class IdeationPersistenceTests : IDisposable
         await connection.OpenAsync(TestContext.Current.CancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version;";
-        Assert.Equal(10L, (long)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!);
+        Assert.Equal((long)SqliteDatabaseSchema.CurrentVersion, (long)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!);
     }
 
     [Fact]

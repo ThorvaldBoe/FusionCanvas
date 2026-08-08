@@ -18,6 +18,7 @@ using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.Integration.AI;
 using FusionCanvas.Integration.SllGeneration;
+using Microsoft.Data.Sqlite;
 
 namespace FusionCanvas.App.Workspace;
 
@@ -50,7 +51,21 @@ public static class AppWorkspaceFactory
     public const string WorkspaceRootEnvironmentVariable = "FUSIONCANVAS_WORKSPACE_ROOT";
 
     public static AppWorkspaceRuntime CreateDefault(IAiTextGenerationService ai)
-        => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()), ai);
+    {
+        var databasePath = DefaultDatabasePath();
+        try
+        {
+            return Create(databasePath, DefaultWorkspaceRoot(databasePath), ai);
+        }
+        catch (SqliteException exception) when (exception.SqliteErrorCode == 8)
+        {
+            var recoveryPath = Path.Combine(
+                Path.GetTempPath(),
+                "FusionCanvas",
+                $"workspace-recovery-{Environment.ProcessId}.db");
+            return Create(recoveryPath, DefaultWorkspaceRoot(recoveryPath), ai);
+        }
+    }
 
     public static AppWorkspaceRuntime Create(string databasePath, IAiTextGenerationService ai)
         => Create(databasePath, DefaultWorkspaceRoot(databasePath), ai);

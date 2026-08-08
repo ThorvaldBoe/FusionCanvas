@@ -4,6 +4,7 @@ using Avalonia.Threading;
 using FusionCanvas.App.Settings;
 using FusionCanvas.App.Stores;
 using FusionCanvas.App.Views;
+using Avalonia.Controls;
 
 namespace FusionCanvas.App;
 
@@ -68,7 +69,25 @@ public partial class App : Avalonia.Application
         IClassicDesktopStyleApplicationLifetime desktop,
         SplashWindow splash)
     {
-        RunWithSplashCleanup(splash, () => InitializeMainWindow(desktop));
+        try
+        {
+            InitializeMainWindow(desktop);
+        }
+        catch (Exception exception)
+        {
+            splash.Content = new TextBlock
+            {
+                Text = $"FusionCanvas could not start.\n\n{exception.Message}",
+                TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                Margin = new Avalonia.Thickness(24)
+            };
+            splash.Width = 520;
+            splash.Height = 220;
+            splash.Show();
+            return;
+        }
+
+        splash.Close();
     }
 
     private static bool IsUiTestMode() =>
