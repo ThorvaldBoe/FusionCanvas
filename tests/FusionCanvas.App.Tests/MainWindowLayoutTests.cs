@@ -233,6 +233,10 @@ public class MainWindowLayoutTests
         Assert.True(statusBar.Bounds.Top >= tree.Bounds.Bottom,
             $"Expected navigation status bar ({statusBar.Bounds.Top}) below tree ({tree.Bounds.Bottom}).");
         Assert.Equal(navigationPane.Bounds.Height, statusBar.Bounds.Bottom);
+        Assert.Equal(-18, statusBar.Margin.Left);
+        Assert.Equal(-18, statusBar.Margin.Right);
+        var navigationSurface = Assert.IsType<Border>(navigationPane.Parent);
+        Assert.Equal(0, navigationSurface.Padding.Bottom);
     }
 
     [AvaloniaFact]
@@ -282,16 +286,16 @@ public class MainWindowLayoutTests
 
         var label = fixture.FindControl<TextBlock>(textBlock =>
             AutomationProperties.GetAutomationId(textBlock) == "DesignCountLabel");
-        Assert.Equal("0/1 designs showing.", label.Text);
+        Assert.Equal("0/3 designs showing.", label.Text);
 
         var expander = fixture.Window.GetVisualDescendants()
             .OfType<ToggleButton>()
             .First(button => ReferenceEquals(button.DataContext, group));
         ClickExpander(fixture, expander);
-        Assert.Equal("1/1 designs showing.", label.Text);
+        Assert.Equal("3/3 designs showing.", label.Text);
 
         ClickExpander(fixture, expander);
-        Assert.Equal("0/1 designs showing.", label.Text);
+        Assert.Equal("0/3 designs showing.", label.Text);
     }
 
     private static void ClickExpander(MainWindowFixture fixture, ToggleButton expander)

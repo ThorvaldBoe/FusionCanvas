@@ -1952,12 +1952,11 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
     private void UpdateDesignCounts()
     {
-        var designItems = _snapshot.Items
+        var activeItems = _snapshot.Items
             .Where(item => item.StoreId == _storeId
-                && item.Stage == WorkflowStage.Design
                 && !item.IsArchived);
-        TotalDesignCount = designItems.Count();
-        VisibleDesignCount = designItems.Count(item => IsVisibleInTree(item.Id));
+        TotalDesignCount = activeItems.Count();
+        VisibleDesignCount = activeItems.Count(item => IsVisibleInTree(item.Id));
         OnPropertyChanged(nameof(VisibleDesignCount));
         OnPropertyChanged(nameof(TotalDesignCount));
         OnPropertyChanged(nameof(DesignCountLabel));

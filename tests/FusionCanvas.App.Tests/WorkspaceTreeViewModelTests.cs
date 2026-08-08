@@ -77,17 +77,17 @@ public class WorkspaceTreeViewModelTests
         var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
 
         viewModel.SetStore(sample.Store.Id, snapshot);
-        Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
+        Assert.Equal("0/2 designs showing.", viewModel.DesignCountLabel);
         Assert.Single(viewModel.Roots).IsExpanded = true;
-        Assert.Equal("1/1 designs showing.", viewModel.DesignCountLabel);
+        Assert.Equal("2/2 designs showing.", viewModel.DesignCountLabel);
 
         viewModel.QueryText = "no match";
-        Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
+        Assert.Equal("0/2 designs showing.", viewModel.DesignCountLabel);
 
         viewModel.IncludeArchived = true;
-        Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
+        Assert.Equal("0/2 designs showing.", viewModel.DesignCountLabel);
         viewModel.QueryText = "Archived";
-        Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
+        Assert.Equal("0/2 designs showing.", viewModel.DesignCountLabel);
 
         viewModel.ClearAllFilters();
         viewModel.SetStore(secondStore.Id, snapshot);
@@ -97,6 +97,31 @@ public class WorkspaceTreeViewModelTests
         viewModel.ClearAllFilters();
         await viewModel.ReloadAsync();
         Assert.Equal("0/2 designs showing.", viewModel.DesignCountLabel);
+    }
+
+    [Fact]
+    public void DesignCounts_IncludeAllActiveWorkflowStagesAndExcludeArchivedItems()
+    {
+        var sample = Sample.Create();
+        var activeItems = WorkflowStages.Ordered
+            .Select(stage => new Item(
+                Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, stage.ToString(), null,
+                ItemStatus.Draft, stage, false, sample.Now, sample.Now, "{}"))
+            .ToArray();
+        var archivedItems = WorkflowStages.Ordered.Take(2)
+            .Select(stage => new Item(
+                Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, $"Archived {stage}", null,
+                ItemStatus.Draft, stage, true, sample.Now, sample.Now, "{}"))
+            .ToArray();
+        var snapshot = sample.Snapshot with { Items = [.. activeItems, .. archivedItems] };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        Assert.Equal("0/4 designs showing.", viewModel.DesignCountLabel);
+
+        Assert.Single(viewModel.Roots).IsExpanded = true;
+        Assert.Equal("4/4 designs showing.", viewModel.DesignCountLabel);
     }
 
     [Fact]
