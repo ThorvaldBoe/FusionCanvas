@@ -1900,7 +1900,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         if (_storeId is not Guid storeId || _snapshot.Stores.All(store => store.Id != storeId || store.IsArchived))
         {
             SelectedNode = null;
-            UpdateDesignCounts(new HashSet<Guid>());
+            UpdateDesignCounts();
             OnPropertyChanged(nameof(HasVisibleResults));
             OnPropertyChanged(nameof(HasEmptyFilterResults));
             OnPropertyChanged(nameof(CanToggleExpandCollapseAll));
@@ -1909,11 +1909,11 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
 
         var projection = WorkspaceTreeProjector.Project(_snapshot, storeId, BuildQuery());
-        UpdateDesignCounts(projection.VisibleEntityIds);
         foreach (var root in projection.Roots)
         {
             Roots.Add(ToNode(root));
         }
+        UpdateDesignCounts();
 
         SelectedNode = selectedId is Guid id ? FindNode(id) : null;
         _multiSelection.Reconcile(SelectableEntityIdsForStore(storeId));
@@ -1925,16 +1925,41 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ExpandCollapseAllTooltip));
     }
 
-    private void UpdateDesignCounts(IReadOnlySet<Guid> visibleEntityIds)
+    private void UpdateDesignCounts()
     {
         var designItems = _snapshot.Items
             .Where(item => item.StoreId == _storeId
-                && item.Stage == WorkflowStage.Design);
-        TotalDesignCount = designItems.Count(item => !item.IsArchived);
-        VisibleDesignCount = designItems.Count(item => visibleEntityIds.Contains(item.Id));
+                && item.Stage == WorkflowStage.Design
+                && !item.IsArchived);
+        TotalDesignCount = designItems.Count();
+        VisibleDesignCount = designItems.Count(item => IsVisibleInTree(item.Id));
         OnPropertyChanged(nameof(VisibleDesignCount));
         OnPropertyChanged(nameof(TotalDesignCount));
         OnPropertyChanged(nameof(DesignCountLabel));
+    }
+
+    private bool IsVisibleInTree(Guid entityId) =>
+        IsVisibleInTree(Roots, entityId, ancestorExpanded: true);
+
+    private static bool IsVisibleInTree(
+        IEnumerable<WorkspaceTreeNodeViewModel> nodes,
+        Guid entityId,
+        bool ancestorExpanded)
+    {
+        foreach (var node in nodes)
+        {
+            if (node.EntityId == entityId)
+            {
+                return ancestorExpanded;
+            }
+
+            if (IsVisibleInTree(node.Children, entityId, ancestorExpanded && node.IsExpanded))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private WorkspaceTreeNodeViewModel ToNode(WorkspaceTreeProjectionNode projected)
@@ -1956,7 +1981,28 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             appliedTagColors: tagColors,
             isInactive: projected.IsInactive || (entity is Item item && item.Status == ItemStatus.Rejected));
         node.IsExpanded = _expandedIds.Contains(node.EntityId) || IsFiltering;
+        node.PropertyChanged += OnTreeNodePropertyChanged;
         return node;
+    }
+
+    private void OnTreeNodePropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName != nameof(WorkspaceTreeNodeViewModel.IsExpanded) ||
+            sender is not WorkspaceTreeNodeViewModel node)
+        {
+            return;
+        }
+
+        if (node.IsExpanded)
+        {
+            _expandedIds.Add(node.EntityId);
+        }
+        else
+        {
+            _expandedIds.Remove(node.EntityId);
+        }
+
+        UpdateDesignCounts();
     }
 
     private IEnumerable<WorkspaceTreeNodeViewModel> SelectableVisibleNodes() =>

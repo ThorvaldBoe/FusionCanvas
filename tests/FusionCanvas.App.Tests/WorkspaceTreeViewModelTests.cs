@@ -38,6 +38,8 @@ public class WorkspaceTreeViewModelTests
         var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
 
         viewModel.SetStore(sample.Store.Id, snapshot);
+        Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
+        Assert.Single(viewModel.Roots).IsExpanded = true;
         Assert.Equal("1/1 designs showing.", viewModel.DesignCountLabel);
 
         viewModel.QueryText = "no match";
@@ -46,16 +48,40 @@ public class WorkspaceTreeViewModelTests
         viewModel.IncludeArchived = true;
         Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
         viewModel.QueryText = "Archived";
-        Assert.Equal("1/1 designs showing.", viewModel.DesignCountLabel);
+        Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
 
         viewModel.ClearAllFilters();
         viewModel.SetStore(secondStore.Id, snapshot);
-        Assert.Equal("1/1 designs showing.", viewModel.DesignCountLabel);
+        Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
 
         repository.Snapshot = snapshot with { Items = [visible, otherStage, archived, otherStoreDesign, new Item(Guid.NewGuid(), secondStore.Id, secondNiche.Id, null, "Reloaded", null, ItemStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}")] };
         viewModel.ClearAllFilters();
         await viewModel.ReloadAsync();
-        Assert.Equal("2/2 designs showing.", viewModel.DesignCountLabel);
+        Assert.Equal("0/2 designs showing.", viewModel.DesignCountLabel);
+    }
+
+    [Fact]
+    public void DesignCounts_RefreshWhenGroupExpandsAndCollapses()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var design = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id,
+            sample.Snapshot.Groups.Single().Id, "Design", null, ItemStatus.Draft,
+            WorkflowStage.Design, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Items = [design] };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        var niche = Assert.Single(viewModel.Roots);
+        var group = Assert.Single(niche.Children);
+
+        Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
+        niche.IsExpanded = true;
+        Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
+        group.IsExpanded = true;
+        Assert.Equal("1/1 designs showing.", viewModel.DesignCountLabel);
+        group.IsExpanded = false;
+        Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
     }
 
     [Fact]
@@ -67,7 +93,7 @@ public class WorkspaceTreeViewModelTests
         var repository = new TestRepository(snapshot);
         var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
-        Assert.Equal("1/1 designs showing.", viewModel.DesignCountLabel);
+        Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
 
         repository.Snapshot = snapshot with { Items = [] };
         viewModel.SelectEntity(null);
