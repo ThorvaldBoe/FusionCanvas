@@ -354,9 +354,11 @@ public partial class MainWindow : Window
 
     private static bool IsWithinExpanderExtension(PointerPressedEventArgs e, ToggleButton expander)
     {
+        const double ExpanderHitTargetSize = 44;
         var position = e.GetPosition(expander);
-        return position.X >= expander.Bounds.Width &&
-               position.X <= expander.Bounds.Width + Math.Max(0, (44 - expander.Bounds.Width) / 2) &&
+        var horizontalPadding = Math.Max(0, (ExpanderHitTargetSize - expander.Bounds.Width) / 2);
+        return position.X >= -horizontalPadding &&
+               position.X <= expander.Bounds.Width + horizontalPadding &&
                position.Y >= 0 && position.Y <= expander.Bounds.Height;
     }
 
