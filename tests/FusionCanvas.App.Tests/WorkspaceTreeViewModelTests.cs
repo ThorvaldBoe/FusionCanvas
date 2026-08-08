@@ -19,6 +19,45 @@ namespace FusionCanvas.App.Tests;
 public class WorkspaceTreeViewModelTests
 {
     [Fact]
+    public void MultiSelection_DoesNotCrossTopLevelNicheBoundaries()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", Guid.NewGuid());
+        var coffee = new Niche(store.DefaultNicheId!.Value, store.Id, "Coffee", null, false, now, now, "{}");
+        var tea = new Niche(Guid.NewGuid(), store.Id, "Tea", null, false, now, now, "{}");
+        var coffeeGroup = new TopicGroup(Guid.NewGuid(), store.Id, coffee.Id, null, "Coffee group", null, false, now, now, "{}");
+        var teaGroup = new TopicGroup(Guid.NewGuid(), store.Id, tea.Id, null, "Tea group", null, false, now, now, "{}");
+        var coffeeFirst = new Item(Guid.NewGuid(), store.Id, coffee.Id, null, "Coffee first", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var coffeeSecond = new Item(Guid.NewGuid(), store.Id, coffee.Id, null, "Coffee second", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var teaItem = new Item(Guid.NewGuid(), store.Id, tea.Id, null, "Tea item", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var snapshot = new WorkspaceSnapshot([store], [coffee, tea], [coffeeGroup, teaGroup], [coffeeFirst, coffeeSecond, teaItem], [], [], [], [], []);
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(store.Id, snapshot);
+
+        var nodes = FlattenNodes(viewModel.Roots).ToDictionary(node => node.EntityId);
+        viewModel.SelectNodeWithModifiers(nodes[coffeeFirst.Id], toggle: false, range: false);
+        viewModel.SelectNodeWithModifiers(nodes[coffeeSecond.Id], toggle: true, range: false);
+        Assert.Equal([coffeeFirst.Id, coffeeSecond.Id], viewModel.SelectedEntityIds);
+
+        viewModel.SelectNodeWithModifiers(nodes[teaItem.Id], toggle: true, range: false);
+        Assert.Equal([teaItem.Id], viewModel.SelectedEntityIds);
+
+        viewModel.SelectNodeWithModifiers(nodes[coffeeGroup.Id], toggle: false, range: false);
+        viewModel.SelectNodeWithModifiers(nodes[teaGroup.Id], toggle: true, range: false);
+        Assert.Equal([teaGroup.Id], viewModel.SelectedEntityIds);
+
+        viewModel.SelectNodeWithModifiers(nodes[coffeeFirst.Id], toggle: false, range: false);
+        viewModel.SelectNodeWithModifiers(nodes[teaItem.Id], toggle: false, range: true);
+        Assert.Equal([teaItem.Id], viewModel.SelectedEntityIds);
+
+        viewModel.SelectNodeWithModifiers(nodes[coffeeFirst.Id], toggle: false, range: false);
+        viewModel.SelectAllVisibleEntities();
+        Assert.All(viewModel.SelectedEntityIds, id => Assert.Contains(id, new[] { coffeeGroup.Id, coffeeFirst.Id, coffeeSecond.Id }));
+        Assert.DoesNotContain(teaItem.Id, viewModel.SelectedEntityIds);
+    }
+
+    [Fact]
     public async Task DesignCounts_TrackVisibleFiltersArchivedItemsStoresAndReloads()
     {
         var sample = Sample.Create();
