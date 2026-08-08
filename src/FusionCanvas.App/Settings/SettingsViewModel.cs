@@ -113,6 +113,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
 
     public AiSettingsViewModel Ai { get; }
 
+    public WindowLayoutSettings? WindowLayout => _currentSettings.WindowLayout;
+
     public bool ConfirmDiscardCredentialDraft
     {
         get => _confirmDiscardCredentialDraft;
@@ -188,6 +190,17 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         catch
         {
         }
+    }
+
+    public void UpdateWindowLayout(WindowLayoutSettings? layout)
+    {
+        if (_currentSettings.WindowLayout == layout)
+        {
+            return;
+        }
+
+        _currentSettings = _currentSettings with { WindowLayout = layout };
+        QueueSave(_currentSettings);
     }
 
     private void OnActiveWorkspaceChanged(object? sender, WorkspaceSummary? workspace)
