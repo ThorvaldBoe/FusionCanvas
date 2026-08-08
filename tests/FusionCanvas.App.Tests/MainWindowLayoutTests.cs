@@ -225,6 +225,11 @@ public class MainWindowLayoutTests
         Assert.True(label.IsVisible);
         Assert.Contains(label.GetVisualAncestors(), ancestor => ancestor is DockPanel);
         Assert.DoesNotContain(label.GetVisualAncestors(), ancestor => ancestor is TreeViewItem);
+
+        var statusBar = Assert.IsType<Border>(label.Parent);
+        var tree = fixture.FindControl<TreeView>(treeView => treeView.Name == "WorkspaceTreeControl");
+        Assert.True(statusBar.Bounds.Top >= tree.Bounds.Bottom,
+            $"Expected navigation status bar ({statusBar.Bounds.Top}) below tree ({tree.Bounds.Bottom}).");
     }
 
     [AvaloniaFact]
@@ -261,6 +266,37 @@ public class MainWindowLayoutTests
         fixture.PumpLayout();
 
         Assert.True(node.IsExpanded);
+    }
+
+    [AvaloniaFact]
+    public void TreeGroupExpansion_UpdatesNavigationDesignCountInBothDirections()
+    {
+        using var fixture = new MainWindowFixture();
+        var niche = Assert.Single(fixture.ViewModel.WorkspaceTree.Roots);
+        niche.IsExpanded = true;
+        fixture.PumpLayout();
+        var group = Assert.Single(niche.Children);
+
+        var label = fixture.FindControl<TextBlock>(textBlock =>
+            AutomationProperties.GetAutomationId(textBlock) == "DesignCountLabel");
+        Assert.Equal("0/1 designs showing.", label.Text);
+
+        var expander = fixture.Window.GetVisualDescendants()
+            .OfType<ToggleButton>()
+            .First(button => ReferenceEquals(button.DataContext, group));
+        ClickExpander(fixture, expander);
+        Assert.Equal("1/1 designs showing.", label.Text);
+
+        ClickExpander(fixture, expander);
+        Assert.Equal("0/1 designs showing.", label.Text);
+    }
+
+    private static void ClickExpander(MainWindowFixture fixture, ToggleButton expander)
+    {
+        var clickPoint = GetExpanderClickPoint(expander, 6);
+        HeadlessWindowExtensions.MouseDown(fixture.Window, clickPoint, MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseUp(fixture.Window, clickPoint, MouseButton.Left, RawInputModifiers.None);
+        fixture.PumpLayout();
     }
 
     private static Avalonia.Point GetExpanderClickPoint(ToggleButton expander, double horizontalOffset)
