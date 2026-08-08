@@ -405,12 +405,19 @@
             </StackPanel>
           </Border>
         </Grid>
-        <TextBlock DockPanel.Dock="Bottom"
-                   Text="{Binding WorkspaceTree.DesignCountLabel}"
-                   Margin="0,8,0,0"
-                   FontSize="11"
-                   Foreground="{DynamicResource SecondaryTextBrush}"
-                   AutomationProperties.AutomationId="DesignCountLabel" />
+        <Border DockPanel.Dock="Bottom"
+                Classes="navigationStatusBar"
+                Margin="0,8,0,0"
+                Padding="8,6"
+                Background="{DynamicResource PanelSurfaceBrush}"
+                BorderBrush="{DynamicResource ControlBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="4">
+          <TextBlock Text="{Binding WorkspaceTree.DesignCountLabel}"
+                     FontSize="11"
+                     Foreground="{DynamicResource SecondaryTextBrush}"
+                     AutomationProperties.AutomationId="DesignCountLabel" />
+        </Border>
       </DockPanel>
     </Border>
 

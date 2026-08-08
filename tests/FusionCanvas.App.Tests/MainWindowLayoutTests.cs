@@ -223,6 +223,8 @@ public class MainWindowLayoutTests
         Assert.Equal(fixture.ViewModel.WorkspaceTree.DesignCountLabel, label!.Text);
         Assert.Contains(" designs showing.", label.Text);
         Assert.True(label.IsVisible);
+        Assert.Contains(label.GetVisualAncestors(), ancestor => ancestor is DockPanel);
+        Assert.DoesNotContain(label.GetVisualAncestors(), ancestor => ancestor is TreeViewItem);
     }
 
     [AvaloniaFact]
