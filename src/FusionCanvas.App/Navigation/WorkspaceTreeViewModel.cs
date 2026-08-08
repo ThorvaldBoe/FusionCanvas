@@ -387,7 +387,20 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
 
         var visibleIds = SelectableVisibleNodes().Select(candidate => candidate.EntityId).ToArray();
-        if (range)
+        var selectedNicheId = SelectedNicheId();
+        var clickedNicheId = TopLevelNicheId(node.EntityId);
+        var crossesNicheBoundary = selectedNicheId is Guid selectedNiche &&
+                                   clickedNicheId is Guid clickedNiche &&
+                                   selectedNiche != clickedNiche;
+
+        // A modifier gesture must never turn an existing selection into a
+        // cross-niche set. Treat a boundary crossing as a fresh single pick;
+        // this is predictable for both Ctrl-click and Shift-range gestures.
+        if (crossesNicheBoundary)
+        {
+            _multiSelection.Replace(node.EntityId);
+        }
+        else if (range)
         {
             _multiSelection.SelectRange(visibleIds, node.EntityId, extendRange);
         }
@@ -413,7 +426,15 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
     public void SelectAllVisibleEntities()
     {
-        _multiSelection.SelectAll(SelectableVisibleNodes().Select(node => node.EntityId).ToArray());
+        var visibleNodes = SelectableVisibleNodes().ToArray();
+        var nicheId = SelectedNicheId() ??
+                      (SelectedNode is { EntityKind: WorkspaceEntityKind.Group or WorkspaceEntityKind.Item }
+                          ? TopLevelNicheId(SelectedNode.EntityId)
+                          : visibleNodes.Select(node => TopLevelNicheId(node.EntityId)).FirstOrDefault(id => id.HasValue));
+        var visibleIds = visibleNodes
+            .Where(node => nicheId is null || TopLevelNicheId(node.EntityId) == nicheId)
+            .Select(node => node.EntityId);
+        _multiSelection.SelectAll(visibleIds);
         if (_multiSelection.ActiveId is Guid id && FindNode(id) is { } activeNode)
         {
             Select(activeNode, notifySelectionChanged: true, replaceMultiSelection: false);
@@ -1209,6 +1230,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             : _snapshot.Groups.Single(group => group.Id == target.EntityId).StoreId;
         _multiSelection.Restore(originalSelectedIds, originalActiveId, originalAnchorId);
         _multiSelection.Reconcile(SelectableEntityIdsForStore(storeId));
+        ConstrainSelectionToOneNiche();
         ApplyMultiSelectionVisualState();
     }
 
@@ -1673,6 +1695,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         await ReloadAsync().ConfigureAwait(false);
         _multiSelection.Restore(originalSelectedIds, originalActiveId, originalAnchorId);
         _multiSelection.Reconcile(SelectableEntityIdsForStore(_storeId!.Value));
+        ConstrainSelectionToOneNiche();
         ApplyMultiSelectionVisualState();
         StructureChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -1722,6 +1745,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         IsBusy = false;
         await ReloadAsync().ConfigureAwait(false);
         _multiSelection.Reconcile(SelectableEntityIdsForStore(_storeId!.Value));
+        ConstrainSelectionToOneNiche();
         ApplyMultiSelectionVisualState();
         EntitiesDeleted?.Invoke(this, deletedIds);
         StructureChanged?.Invoke(this, EventArgs.Empty);
@@ -1917,6 +1941,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
         SelectedNode = selectedId is Guid id ? FindNode(id) : null;
         _multiSelection.Reconcile(SelectableEntityIdsForStore(storeId));
+        ConstrainSelectionToOneNiche();
         ApplyMultiSelectionVisualState();
         ApplyClipboardState();
         OnPropertyChanged(nameof(HasVisibleResults));
@@ -2016,6 +2041,47 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             .Where(group => group.StoreId == storeId && !group.IsArchived && GroupHierarchy.IsEffectivelyActive(_snapshot, group))
             .Select(group => group.Id)
             .Concat(_snapshot.Items.Where(item => item.StoreId == storeId && !item.IsArchived).Select(item => item.Id));
+
+    private Guid? SelectedNicheId() =>
+        _multiSelection.SelectedIds
+            .Select(TopLevelNicheId)
+            .FirstOrDefault(nicheId => nicheId.HasValue);
+
+    private Guid? TopLevelNicheId(Guid entityId)
+    {
+        if (_snapshot.Niches.Any(niche => niche.Id == entityId))
+        {
+            return entityId;
+        }
+
+        if (_snapshot.Items.SingleOrDefault(item => item.Id == entityId) is { } item)
+        {
+            return item.NicheId;
+        }
+
+        if (_snapshot.Groups.SingleOrDefault(group => group.Id == entityId) is { } group)
+        {
+            return group.NicheId ??
+                   (group.ParentGroupId is Guid parentId ? TopLevelNicheId(parentId) : null);
+        }
+
+        return null;
+    }
+
+    private void ConstrainSelectionToOneNiche()
+    {
+        var nicheId = SelectedNicheId();
+        if (nicheId is not Guid selectedNicheId ||
+            _multiSelection.SelectedIds.All(id => TopLevelNicheId(id) == selectedNicheId))
+        {
+            return;
+        }
+
+        _multiSelection.Restore(
+            _multiSelection.SelectedIds.Where(id => TopLevelNicheId(id) == selectedNicheId),
+            _multiSelection.ActiveId,
+            _multiSelection.AnchorId);
+    }
 
     private void ApplyMultiSelectionVisualState()
     {
