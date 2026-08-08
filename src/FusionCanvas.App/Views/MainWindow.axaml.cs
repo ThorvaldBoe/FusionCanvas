@@ -392,9 +392,8 @@ public partial class MainWindow : Window
             {
                 expandedNode.IsExpanded = !expandedNode.IsExpanded;
                 e.Handled = true;
+                return;
             }
-
-            return;
         }
 
         var row = (source as Border)?.Classes.Contains("treeRow") == true
