@@ -3,9 +3,7 @@
 ## Purpose
 
 Defines the baseline expectations for the FusionCanvas desktop application foundation, including solution structure, Avalonia startup, and the first local workspace shell.
-
 ## Requirements
-
 ### Requirement: Visual Studio solution is present
 The repository SHALL include a Visual Studio solution for FusionCanvas that contains the Clean Architecture production projects and matching unit test projects.
 
@@ -97,11 +95,21 @@ The Clean Architecture solution foundation SHALL NOT implement product pipeline,
 - **THEN** placeholder code does not introduce product workflow behavior or speculative abstractions
 
 ### Requirement: Application starts to a main window
-The desktop application SHALL start to a main FusionCanvas window.
+The desktop application SHALL start to a main FusionCanvas window and SHALL apply only a valid, usable saved normal layout after that window has been created.
 
 #### Scenario: Contributor runs the app
 - **WHEN** a contributor launches the desktop application
 - **THEN** a main window opens for FusionCanvas
+
+#### Scenario: Main window has a valid saved layout
+- **WHEN** the application starts with valid saved normal bounds and navigation-pane width
+- **THEN** the main window applies those values after creation
+- **AND** the navigation pane remains within its supported minimum and maximum width
+
+#### Scenario: Main window has no usable saved layout
+- **WHEN** the application starts without layout values or with invalid, legacy, off-screen, maximized, or fullscreen layout state
+- **THEN** the main window uses its existing default bounds and splitter width or a clamped usable equivalent
+- **AND** the application remains usable without a restoration error
 
 ### Requirement: Main window presents an initial workspace shell
 The main window SHALL present a clean, mostly empty initial page suitable for an application with no workspace loaded.
@@ -167,3 +175,4 @@ The initial desktop foundation SHALL NOT implement product pipeline, persistence
 #### Scenario: User launches the initial application
 - **WHEN** the application starts
 - **THEN** it only displays the initial desktop shell and does not perform product workflow automation or external integration actions
+
