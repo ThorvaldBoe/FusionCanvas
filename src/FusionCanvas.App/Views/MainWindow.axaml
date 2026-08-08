@@ -31,7 +31,7 @@
             Background="{DynamicResource ElevatedSurfaceBrush}"
             BorderBrush="{DynamicResource ControlBorderBrush}"
             BorderThickness="0,0,1,0"
-            Padding="18">
+            Padding="18,18,18,0">
       <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
         <Grid x:Name="NavigationHeader"
               Grid.Row="0"
@@ -280,7 +280,7 @@
 
         <Border Grid.Row="5"
                 Classes="navigationStatusBar"
-                Margin="0,8,0,0"
+                Margin="-18,8,-18,0"
                 Padding="8,6"
                 Background="{DynamicResource PanelSurfaceBrush}"
                 BorderBrush="{DynamicResource ControlBorderBrush}"
