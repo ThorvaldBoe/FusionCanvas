@@ -5,10 +5,11 @@ namespace FusionCanvas.Application.Settings;
 public sealed record ApplicationSettings(
     bool DarkMode,
     AiConfigurationSettings Ai,
-    WindowLayoutSettings? WindowLayout = null)
+    WindowLayoutSettings? WindowLayout = null,
+    Guid? ActiveWorkspaceId = null)
 {
     public ApplicationSettings(bool DarkMode)
-        : this(DarkMode, AiConfigurationSettings.Default, null)
+        : this(DarkMode, AiConfigurationSettings.Default, null, null)
     {
     }
 

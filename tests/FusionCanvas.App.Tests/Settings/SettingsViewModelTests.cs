@@ -195,7 +195,8 @@ public class SettingsViewModelTests
         var management = NewWorkspaceManagement(new WorkspaceSnapshot([personal, client], [], [], [], [], [], [], [], [], []));
         await management.LoadAsync(TestContext.Current.CancellationToken);
 
-        var vm = NewViewModel();
+        var store = new RecordingStore();
+        var vm = new SettingsViewModel(store, new FakeThemeController(), ApplicationSettings.Default, loadWarning: null);
         vm.AttachWorkspaceManagement(management);
 
         await management.SelectWorkspaceAsync(
@@ -203,6 +204,9 @@ public class SettingsViewModelTests
             TestContext.Current.CancellationToken);
 
         Assert.Equal("Client", vm.WorkspaceName);
+        await vm.FlushAsync();
+
+        Assert.Equal(client.Id, store.LastSaved.ActiveWorkspaceId);
     }
 
     [Fact]

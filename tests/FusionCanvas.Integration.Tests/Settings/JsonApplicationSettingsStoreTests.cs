@@ -117,13 +117,17 @@ public class JsonApplicationSettingsStoreTests
         using var tempDirectory = new TemporaryDirectory();
         var path = tempDirectory.GetPath("settings.json");
         var store = new JsonApplicationSettingsStore(path);
+        var workspaceId = Guid.NewGuid();
 
-        var saved = await store.SaveAsync(new ApplicationSettings(DarkMode: true), TestContext.Current.CancellationToken);
+        var saved = await store.SaveAsync(
+            new ApplicationSettings(DarkMode: true, Ai: AiConfigurationSettings.Default, ActiveWorkspaceId: workspaceId),
+            TestContext.Current.CancellationToken);
         var reloaded = await store.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.True(saved.Saved);
         Assert.Null(saved.Warning);
         Assert.True(reloaded.Value.DarkMode);
+        Assert.Equal(workspaceId, reloaded.Value.ActiveWorkspaceId);
         Assert.False(reloaded.UsedDefault);
     }
 
