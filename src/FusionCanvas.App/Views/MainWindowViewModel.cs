@@ -152,7 +152,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         DocumentWindow = documentWindow;
         var fileStore = workspaceFileStore ?? new InMemoryWorkspaceFileStore();
         WorkspaceManagement = new WorkspaceManagementViewModel(
-            new WorkspaceManagementService(workspaceRepository),
+            new WorkspaceManagementService(
+                workspaceRepository,
+                initialActiveWorkspaceId: settings?.ActiveWorkspaceId),
             new WorkspaceTransferService(
                 workspaceRepository,
                 fileStore,

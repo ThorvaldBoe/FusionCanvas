@@ -113,6 +113,10 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
 
     public AiSettingsViewModel Ai { get; }
 
+    public WindowLayoutSettings? WindowLayout => _currentSettings.WindowLayout;
+
+    public Guid? ActiveWorkspaceId => _currentSettings.ActiveWorkspaceId;
+
     public bool ConfirmDiscardCredentialDraft
     {
         get => _confirmDiscardCredentialDraft;
@@ -190,8 +194,33 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         }
     }
 
+    public void UpdateWindowLayout(WindowLayoutSettings? layout)
+    {
+        if (_currentSettings.WindowLayout == layout)
+        {
+            return;
+        }
+
+        _currentSettings = _currentSettings with { WindowLayout = layout };
+        QueueSave(_currentSettings);
+    }
+
     private void OnActiveWorkspaceChanged(object? sender, WorkspaceSummary? workspace)
-        => UpdateWorkspaceName(workspace);
+    {
+        UpdateWorkspaceName(workspace);
+        UpdateActiveWorkspace(workspace?.Id);
+    }
+
+    public void UpdateActiveWorkspace(Guid? workspaceId)
+    {
+        if (_currentSettings.ActiveWorkspaceId == workspaceId)
+        {
+            return;
+        }
+
+        _currentSettings = _currentSettings with { ActiveWorkspaceId = workspaceId };
+        QueueSave(_currentSettings);
+    }
 
     private void UpdateWorkspaceName(WorkspaceSummary? workspace)
         => WorkspaceName = workspace is null ? "No workspace" : workspace.Name;

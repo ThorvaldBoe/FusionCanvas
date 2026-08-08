@@ -184,6 +184,18 @@ public class MainWindowViewModelTests
         Assert.DoesNotContain(viewModel.StoreManagement.ActiveStores, store => store.Id == personalStore.Id);
         Assert.Contains(viewModel.StoreManagement.ActiveStores, store => store.Id == clientStore.Id);
         Assert.Contains(viewModel.NavigationContexts, context => context.Context.Title == "Client Item");
+
+        var clientItemNode = viewModel.WorkspaceTree.Roots
+            .SelectMany(root => root.Children)
+            .Single(node => node.EntityId == clientItem.Id);
+        viewModel.WorkspaceTree.SelectNodeCommand.Execute(clientItemNode);
+
+        Assert.Equal(clientItem.Id, viewModel.DocumentWindow.ActiveContext?.Id);
+        Assert.Equal(clientItem.Id, viewModel.ItemInspector.LoadedItemId);
+
+        viewModel.WorkspaceTree.OpenInTabCommand.Execute(clientItemNode);
+
+        Assert.Contains(viewModel.DocumentWindow.Tabs, tab => tab.Context.Id == clientItem.Id);
     }
 
     [Fact]

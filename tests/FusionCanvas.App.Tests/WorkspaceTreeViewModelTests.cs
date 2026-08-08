@@ -19,6 +19,153 @@ namespace FusionCanvas.App.Tests;
 public class WorkspaceTreeViewModelTests
 {
     [Fact]
+    public void MultiSelection_DoesNotCrossTopLevelNicheBoundaries()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}", Guid.NewGuid());
+        var coffee = new Niche(store.DefaultNicheId!.Value, store.Id, "Coffee", null, false, now, now, "{}");
+        var tea = new Niche(Guid.NewGuid(), store.Id, "Tea", null, false, now, now, "{}");
+        var coffeeGroup = new TopicGroup(Guid.NewGuid(), store.Id, coffee.Id, null, "Coffee group", null, false, now, now, "{}");
+        var teaGroup = new TopicGroup(Guid.NewGuid(), store.Id, tea.Id, null, "Tea group", null, false, now, now, "{}");
+        var coffeeFirst = new Item(Guid.NewGuid(), store.Id, coffee.Id, null, "Coffee first", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var coffeeSecond = new Item(Guid.NewGuid(), store.Id, coffee.Id, null, "Coffee second", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var teaItem = new Item(Guid.NewGuid(), store.Id, tea.Id, null, "Tea item", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var snapshot = new WorkspaceSnapshot([store], [coffee, tea], [coffeeGroup, teaGroup], [coffeeFirst, coffeeSecond, teaItem], [], [], [], [], []);
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(store.Id, snapshot);
+
+        var nodes = FlattenNodes(viewModel.Roots).ToDictionary(node => node.EntityId);
+        viewModel.SelectNodeWithModifiers(nodes[coffeeFirst.Id], toggle: false, range: false);
+        viewModel.SelectNodeWithModifiers(nodes[coffeeSecond.Id], toggle: true, range: false);
+        Assert.Equal([coffeeFirst.Id, coffeeSecond.Id], viewModel.SelectedEntityIds);
+
+        viewModel.SelectNodeWithModifiers(nodes[teaItem.Id], toggle: true, range: false);
+        Assert.Equal([teaItem.Id], viewModel.SelectedEntityIds);
+
+        viewModel.SelectNodeWithModifiers(nodes[coffeeGroup.Id], toggle: false, range: false);
+        viewModel.SelectNodeWithModifiers(nodes[teaGroup.Id], toggle: true, range: false);
+        Assert.Equal([teaGroup.Id], viewModel.SelectedEntityIds);
+
+        viewModel.SelectNodeWithModifiers(nodes[coffeeFirst.Id], toggle: false, range: false);
+        viewModel.SelectNodeWithModifiers(nodes[teaItem.Id], toggle: false, range: true);
+        Assert.Equal([teaItem.Id], viewModel.SelectedEntityIds);
+
+        viewModel.SelectNodeWithModifiers(nodes[coffeeFirst.Id], toggle: false, range: false);
+        viewModel.SelectAllVisibleEntities();
+        Assert.All(viewModel.SelectedEntityIds, id => Assert.Contains(id, new[] { coffeeGroup.Id, coffeeFirst.Id, coffeeSecond.Id }));
+        Assert.DoesNotContain(teaItem.Id, viewModel.SelectedEntityIds);
+    }
+
+    [Fact]
+    public async Task DesignCounts_TrackVisibleFiltersArchivedItemsStoresAndReloads()
+    {
+        var sample = Sample.Create();
+        var secondStore = new Store(Guid.NewGuid(), "Second", null, false, sample.Now, sample.Now, "{}", Guid.NewGuid());
+        var secondNiche = new Niche(secondStore.DefaultNicheId!.Value, secondStore.Id, "Second niche", null, false, sample.Now, sample.Now, "{}");
+        var visible = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Visible design", null, ItemStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}");
+        var otherStage = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Idea", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var archived = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Archived design", null, ItemStatus.Draft, WorkflowStage.Design, true, sample.Now, sample.Now, "{}");
+        var otherStoreDesign = new Item(Guid.NewGuid(), secondStore.Id, secondNiche.Id, null, "Other store design", null, ItemStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with
+        {
+            Stores = [sample.Store, secondStore],
+            Niches = [sample.Niche, secondNiche],
+            Items = [visible, otherStage, archived, otherStoreDesign]
+        };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        Assert.Equal("0/2 designs showing.", viewModel.DesignCountLabel);
+        Assert.Single(viewModel.Roots).IsExpanded = true;
+        Assert.Equal("2/2 designs showing.", viewModel.DesignCountLabel);
+
+        viewModel.QueryText = "no match";
+        Assert.Equal("0/2 designs showing.", viewModel.DesignCountLabel);
+
+        viewModel.IncludeArchived = true;
+        Assert.Equal("0/2 designs showing.", viewModel.DesignCountLabel);
+        viewModel.QueryText = "Archived";
+        Assert.Equal("0/2 designs showing.", viewModel.DesignCountLabel);
+
+        viewModel.ClearAllFilters();
+        viewModel.SetStore(secondStore.Id, snapshot);
+        Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
+
+        repository.Snapshot = snapshot with { Items = [visible, otherStage, archived, otherStoreDesign, new Item(Guid.NewGuid(), secondStore.Id, secondNiche.Id, null, "Reloaded", null, ItemStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}")] };
+        viewModel.ClearAllFilters();
+        await viewModel.ReloadAsync();
+        Assert.Equal("0/2 designs showing.", viewModel.DesignCountLabel);
+    }
+
+    [Fact]
+    public void DesignCounts_IncludeAllActiveWorkflowStagesAndExcludeArchivedItems()
+    {
+        var sample = Sample.Create();
+        var activeItems = WorkflowStages.Ordered
+            .Select(stage => new Item(
+                Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, stage.ToString(), null,
+                ItemStatus.Draft, stage, false, sample.Now, sample.Now, "{}"))
+            .ToArray();
+        var archivedItems = WorkflowStages.Ordered.Take(2)
+            .Select(stage => new Item(
+                Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, $"Archived {stage}", null,
+                ItemStatus.Draft, stage, true, sample.Now, sample.Now, "{}"))
+            .ToArray();
+        var snapshot = sample.Snapshot with { Items = [.. activeItems, .. archivedItems] };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        Assert.Equal("0/4 designs showing.", viewModel.DesignCountLabel);
+
+        Assert.Single(viewModel.Roots).IsExpanded = true;
+        Assert.Equal("4/4 designs showing.", viewModel.DesignCountLabel);
+    }
+
+    [Fact]
+    public void DesignCounts_RefreshWhenGroupExpandsAndCollapses()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var design = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id,
+            sample.Snapshot.Groups.Single().Id, "Design", null, ItemStatus.Draft,
+            WorkflowStage.Design, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Items = [design] };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        var niche = Assert.Single(viewModel.Roots);
+        var group = Assert.Single(niche.Children);
+
+        Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
+        niche.IsExpanded = true;
+        Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
+        group.IsExpanded = true;
+        Assert.Equal("1/1 designs showing.", viewModel.DesignCountLabel);
+        group.IsExpanded = false;
+        Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
+    }
+
+    [Fact]
+    public async Task DesignCounts_RefreshWhenStructureChanges()
+    {
+        var sample = Sample.Create();
+        var item = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Design", null, ItemStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Items = [item] };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
+
+        repository.Snapshot = snapshot with { Items = [] };
+        viewModel.SelectEntity(null);
+        await viewModel.ReloadAsync();
+        Assert.Equal("0/0 designs showing.", viewModel.DesignCountLabel);
+    }
+
+    [Fact]
     public async Task InlineCreate_CommitsAndStartsAnotherSiblingWithoutOpeningATab()
     {
         var sample = Sample.Create();
@@ -932,7 +1079,7 @@ public class WorkspaceTreeViewModelTests
 
     private sealed class TestRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
     {
-        public WorkspaceSnapshot Snapshot { get; private set; } = snapshot;
+        public WorkspaceSnapshot Snapshot { get; set; } = snapshot;
         public bool FailSaves { get; init; }
 
         public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)

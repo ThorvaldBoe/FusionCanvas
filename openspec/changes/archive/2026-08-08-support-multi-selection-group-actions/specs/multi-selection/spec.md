@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Navigation supports familiar multi-selection
-FusionCanvas SHALL support separate active-context and multi-selection state in the workspace tree. Plain click SHALL replace the selection and make the clicked entity active; Ctrl-click SHALL toggle the clicked entity; Shift-click SHALL select the visible range from the selection anchor; Ctrl+Shift-click SHALL extend the current selection with that range; and Ctrl+A SHALL select all visible selectable entities.
+FusionCanvas SHALL support separate active-context and multi-selection state in the workspace tree. Plain click SHALL replace the selection and make the clicked entity active; Ctrl-click SHALL toggle the clicked entity; Shift-click SHALL select the visible range from the selection anchor; Ctrl+Shift-click SHALL extend the current selection with that range; and Ctrl+A SHALL select all visible selectable entities. A multi-selection SHALL contain Items and groups from only one top-level niche at a time. A modifier gesture that crosses a top-level niche boundary SHALL start a new single selection on the clicked entity, and Select All SHALL be limited to the current selection's top-level niche when one exists.
 
 #### Scenario: User selects one entity
 - **WHEN** the user clicks an active Item or group without a selection modifier
@@ -21,6 +21,16 @@ FusionCanvas SHALL support separate active-context and multi-selection state in 
 - **WHEN** the tree has keyboard focus and the user presses Ctrl+A outside a text editor
 - **THEN** FusionCanvas selects all visible selectable active Items and groups in the current store and filtered projection
 - **AND** does not select hidden, filtered-out, archived, or niche-root rows unless they are explicitly selectable under the current projection
+
+#### Scenario: User crosses a top-level niche with a modifier gesture
+- **WHEN** the user Ctrl-clicks or Shift-clicks an Item or group belonging to a different top-level niche than the current selection
+- **THEN** FusionCanvas replaces the previous multi-selection with only the clicked entity
+- **AND** the resulting selection contains no entities from more than one top-level niche
+
+#### Scenario: User selects all while the visible filter spans niches
+- **WHEN** the user presses Ctrl+A with an existing selection scoped to one top-level niche
+- **THEN** FusionCanvas selects all visible selectable Items and groups in that niche only
+- **AND** does not add visible entities from other top-level niches
 
 #### Scenario: User clears the active selection
 - **WHEN** the user Ctrl-clicks the only selected entity

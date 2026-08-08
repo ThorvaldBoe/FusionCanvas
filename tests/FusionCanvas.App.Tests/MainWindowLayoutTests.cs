@@ -211,6 +211,35 @@ public class MainWindowConstructionTests
 public class MainWindowLayoutTests
 {
     [AvaloniaFact]
+    public void DesignCountLabel_IsBoundAtBottomOfNavigationPane()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.PumpLayout();
+
+        var label = fixture.FindControl<TextBlock>(textBlock =>
+            AutomationProperties.GetAutomationId(textBlock) == "DesignCountLabel");
+
+        Assert.NotNull(label);
+        Assert.Equal(fixture.ViewModel.WorkspaceTree.DesignCountLabel, label!.Text);
+        Assert.Contains(" designs showing.", label.Text);
+        Assert.True(label.IsVisible);
+        Assert.DoesNotContain(label.GetVisualAncestors(), ancestor => ancestor is TreeViewItem);
+
+        var statusBar = Assert.IsType<Border>(label.Parent);
+        var tree = fixture.FindControl<TreeView>(treeView => treeView.Name == "WorkspaceTreeControl");
+        var navigationPane = Assert.IsType<Grid>(statusBar.Parent);
+        Assert.Equal(5, Grid.GetRow(statusBar));
+        Assert.Equal(4, Grid.GetRow(Assert.IsType<Grid>(tree.Parent)));
+        Assert.True(statusBar.Bounds.Top >= tree.Bounds.Bottom,
+            $"Expected navigation status bar ({statusBar.Bounds.Top}) below tree ({tree.Bounds.Bottom}).");
+        Assert.Equal(navigationPane.Bounds.Height, statusBar.Bounds.Bottom);
+        Assert.Equal(-18, statusBar.Margin.Left);
+        Assert.Equal(-18, statusBar.Margin.Right);
+        var navigationSurface = Assert.IsType<Border>(navigationPane.Parent);
+        Assert.Equal(0, navigationSurface.Padding.Bottom);
+    }
+
+    [AvaloniaFact]
     public void TreeExpander_ClickingOutsideTheGlyph_ExpandsItsGroup()
     {
         using var fixture = new MainWindowFixture();
@@ -219,10 +248,72 @@ public class MainWindowLayoutTests
             .OfType<ToggleButton>()
             .First(button => button.DataContext is WorkspaceTreeNodeViewModel { HasChildren: true, IsExpanded: false });
         var node = Assert.IsType<WorkspaceTreeNodeViewModel>(expander.DataContext);
-        var clickPoint = new Avalonia.Point(expander.Bounds.Right + 6, expander.Bounds.Center.Y);
+        var clickPoint = GetExpanderClickPoint(expander, 6);
+
+        HeadlessWindowExtensions.MouseDown(fixture.Window, clickPoint, MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseUp(fixture.Window, clickPoint, MouseButton.Left, RawInputModifiers.None);
+        fixture.PumpLayout();
+
+        Assert.True(node.IsExpanded);
+    }
+
+    [AvaloniaFact]
+    public void TreeExpander_ClickingLeftOfTheGlyph_ExpandsItsGroup()
+    {
+        using var fixture = new MainWindowFixture();
+
+        var expander = fixture.Window.GetVisualDescendants()
+            .OfType<ToggleButton>()
+            .First(button => button.DataContext is WorkspaceTreeNodeViewModel { HasChildren: true, IsExpanded: false });
+        var node = Assert.IsType<WorkspaceTreeNodeViewModel>(expander.DataContext);
+        var clickPoint = GetExpanderClickPoint(expander, -6);
+
+        HeadlessWindowExtensions.MouseDown(fixture.Window, clickPoint, MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseUp(fixture.Window, clickPoint, MouseButton.Left, RawInputModifiers.None);
+        fixture.PumpLayout();
+
+        Assert.True(node.IsExpanded);
+    }
+
+    [AvaloniaFact]
+    public void TreeGroupExpansion_UpdatesNavigationDesignCountInBothDirections()
+    {
+        using var fixture = new MainWindowFixture();
+        var niche = Assert.Single(fixture.ViewModel.WorkspaceTree.Roots);
+        niche.IsExpanded = true;
+        fixture.PumpLayout();
+        var group = Assert.Single(niche.Children);
+
+        var label = fixture.FindControl<TextBlock>(textBlock =>
+            AutomationProperties.GetAutomationId(textBlock) == "DesignCountLabel");
+        Assert.Equal("0/3 designs showing.", label.Text);
+
+        var expander = fixture.Window.GetVisualDescendants()
+            .OfType<ToggleButton>()
+            .First(button => ReferenceEquals(button.DataContext, group));
+        ClickExpander(fixture, expander);
+        Assert.Equal("3/3 designs showing.", label.Text);
+
+        ClickExpander(fixture, expander);
+        Assert.Equal("0/3 designs showing.", label.Text);
+    }
+
+    private static void ClickExpander(MainWindowFixture fixture, ToggleButton expander)
+    {
+        var clickPoint = GetExpanderClickPoint(expander, 6);
+        HeadlessWindowExtensions.MouseDown(fixture.Window, clickPoint, MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseUp(fixture.Window, clickPoint, MouseButton.Left, RawInputModifiers.None);
+        fixture.PumpLayout();
+    }
+
+    private static Avalonia.Point GetExpanderClickPoint(ToggleButton expander, double horizontalOffset)
+    {
+        var clickPoint = new Avalonia.Point(
+            horizontalOffset < 0 ? expander.Bounds.Left + horizontalOffset : expander.Bounds.Right + horizontalOffset,
+            expander.Bounds.Center.Y);
         foreach (var ancestor in expander.GetVisualAncestors())
         {
-            if (ReferenceEquals(ancestor, fixture.Window))
+            if (ancestor is Window)
             {
                 break;
             }
@@ -230,11 +321,7 @@ public class MainWindowLayoutTests
             clickPoint += ancestor.Bounds.Position;
         }
 
-        HeadlessWindowExtensions.MouseDown(fixture.Window, clickPoint, MouseButton.Left, RawInputModifiers.None);
-        HeadlessWindowExtensions.MouseUp(fixture.Window, clickPoint, MouseButton.Left, RawInputModifiers.None);
-        fixture.PumpLayout();
-
-        Assert.True(node.IsExpanded);
+        return clickPoint;
     }
 
     [AvaloniaFact]

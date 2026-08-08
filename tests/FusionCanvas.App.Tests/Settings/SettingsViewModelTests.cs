@@ -153,6 +153,19 @@ public class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task UpdateWindowLayout_QueuesLatestLayoutForSave()
+    {
+        var store = new RecordingStore();
+        var vm = new SettingsViewModel(store, new FakeThemeController(), ApplicationSettings.Default, loadWarning: null);
+        var layout = new WindowLayoutSettings(120, 80, 1400, 900, 380);
+
+        vm.UpdateWindowLayout(layout);
+        await vm.FlushAsync();
+
+        Assert.Equal(layout, store.LastSaved.WindowLayout);
+    }
+
+    [Fact]
     public async Task WorkspaceProjection_ShowsNoWorkspaceWhenNoneAttached()
     {
         var vm = NewViewModel();
@@ -182,7 +195,8 @@ public class SettingsViewModelTests
         var management = NewWorkspaceManagement(new WorkspaceSnapshot([personal, client], [], [], [], [], [], [], [], [], []));
         await management.LoadAsync(TestContext.Current.CancellationToken);
 
-        var vm = NewViewModel();
+        var store = new RecordingStore();
+        var vm = new SettingsViewModel(store, new FakeThemeController(), ApplicationSettings.Default, loadWarning: null);
         vm.AttachWorkspaceManagement(management);
 
         await management.SelectWorkspaceAsync(
@@ -190,6 +204,9 @@ public class SettingsViewModelTests
             TestContext.Current.CancellationToken);
 
         Assert.Equal("Client", vm.WorkspaceName);
+        await vm.FlushAsync();
+
+        Assert.Equal(client.Id, store.LastSaved.ActiveWorkspaceId);
     }
 
     [Fact]

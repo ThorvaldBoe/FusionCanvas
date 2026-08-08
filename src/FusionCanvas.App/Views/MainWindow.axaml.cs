@@ -21,6 +21,7 @@ using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Application.Groups;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Items.Import;
+using FusionCanvas.Application.Settings;
 using FusionCanvas.Application.WorkspaceTree;
 
 namespace FusionCanvas.App.Views;
@@ -38,11 +39,16 @@ public partial class MainWindow : Window
     private IReadOnlyList<WorkspaceTreeSelection>? _dragSelections;
     private Avalonia.Point _dragStart;
     private WorkspaceTreeNodeViewModel? _dropTarget;
+    private SettingsViewModel? _settings;
+    private WindowLayoutSettings? _normalLayout;
+    private bool _layoutReady;
+    private bool _applyingLayout;
 
     public MainWindow()
     {
         InitializeComponent();
         WorkspaceTreeControl.AddHandler(PointerPressedEvent, OnWorkspaceTreePointerPressed, RoutingStrategies.Tunnel);
+        InitializeWindowLayout(null);
     }
 
     public MainWindow(AppServices services)
@@ -50,6 +56,7 @@ public partial class MainWindow : Window
         ArgumentNullException.ThrowIfNull(services);
         InitializeComponent();
         WorkspaceTreeControl.AddHandler(PointerPressedEvent, OnWorkspaceTreePointerPressed, RoutingStrategies.Tunnel);
+        InitializeWindowLayout(services.Settings);
         var viewModel = MainWindowViewModel.CreateForDefaultWorkspace(
             services.Settings,
             services.AiTextGeneration);
@@ -112,6 +119,92 @@ public partial class MainWindow : Window
         SyncStoreEditorWindow(viewModel.StoreManagement);
         SyncAssetsWindow(viewModel.AssetsManagement);
         SyncIdeationWindow(viewModel.Ideation);
+    }
+
+    private void InitializeWindowLayout(SettingsViewModel? settings)
+    {
+        _settings = settings;
+        Opened += OnWindowOpened;
+        Closing += OnWindowClosing;
+        SizeChanged += (_, _) => CaptureNormalLayout();
+        PositionChanged += (_, _) => CaptureNormalLayout();
+    }
+
+    private void OnWindowOpened(object? sender, EventArgs e)
+    {
+        _layoutReady = true;
+        var saved = _settings?.WindowLayout;
+        if (saved is not null && TryNormalizeLayout(saved, out var normalized))
+        {
+            _applyingLayout = true;
+            try
+            {
+                Width = normalized.Width;
+                Height = normalized.Height;
+                Position = new PixelPoint(normalized.PositionX, normalized.PositionY);
+                MainLayoutGrid.ColumnDefinitions[0].Width =
+                    new GridLength(normalized.NavigationWidth, GridUnitType.Pixel);
+            }
+            finally
+            {
+                _applyingLayout = false;
+            }
+        }
+
+        MainLayoutGrid.ColumnDefinitions[0].PropertyChanged += OnNavigationColumnChanged;
+        CaptureNormalLayout();
+    }
+
+    private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
+    {
+        CaptureNormalLayout();
+        if (_settings is not null && _normalLayout is not null)
+        {
+            _settings.UpdateWindowLayout(_normalLayout);
+        }
+    }
+
+    private void OnNavigationColumnChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+        => CaptureNormalLayout();
+
+    private bool TryNormalizeLayout(WindowLayoutSettings saved, out WindowLayoutSettings normalized)
+    {
+        var screens = Screens.All
+            .Where(screen => screen.WorkingArea.Width > 0 && screen.WorkingArea.Height > 0)
+            .Select(screen => new ScreenLayoutInfo(screen.WorkingArea, screen.Scaling, screen.IsPrimary))
+            .ToArray();
+        return MainWindowLayoutNormalizer.TryNormalize(
+            saved,
+            screens,
+            MinWidth,
+            MinHeight,
+            out normalized);
+    }
+
+    private void CaptureNormalLayout()
+    {
+        var navigationColumn = MainLayoutGrid.ColumnDefinitions[0];
+        var navigationWidth = navigationColumn.ActualWidth;
+        if (!double.IsFinite(navigationWidth) || navigationWidth <= 0)
+        {
+            navigationWidth = navigationColumn.Width.Value;
+        }
+
+        if (!_layoutReady || _applyingLayout ||
+            !MainWindowLayoutNormalizer.TryCapture(
+                WindowState,
+                Position,
+                Width,
+                Height,
+                navigationWidth,
+                MinWidth,
+                MinHeight,
+                out var layout))
+        {
+            return;
+        }
+
+        _normalLayout = layout;
     }
 
     private void SyncSettingsWindow(SettingsViewModel settings)
@@ -282,20 +375,25 @@ public partial class MainWindow : Window
         }
 
         var point = e.GetCurrentPoint(tree);
-        if (point.Properties.PointerUpdateKind == PointerUpdateKind.LeftButtonPressed &&
-            (source is ToggleButton || source.GetVisualAncestors().OfType<ToggleButton>().Any()))
+        var treeItem = source is TreeViewItem item
+            ? item
+            : source.GetVisualAncestors().OfType<TreeViewItem>().FirstOrDefault();
+        var isExpanderSource = source is ToggleButton || source.GetVisualAncestors().OfType<ToggleButton>().Any();
+        if (point.Properties.PointerUpdateKind == PointerUpdateKind.LeftButtonPressed)
         {
-            var expander = tree.GetVisualDescendants()
+            var expander = treeItem?.GetVisualDescendants()
                 .OfType<ToggleButton>()
                 .Select(button => new { Button = button, Node = button.DataContext as WorkspaceTreeNodeViewModel })
-                .FirstOrDefault(candidate => candidate.Node is { HasChildren: true } && IsWithinExpanderHitTarget(e, candidate.Button));
+                .FirstOrDefault(candidate => candidate.Node is { HasChildren: true } &&
+                    (isExpanderSource
+                        ? IsWithinExpanderHitTarget(e, candidate.Button)
+                        : IsWithinExpanderExtension(e, candidate.Button)));
             if (expander?.Node is { } expandedNode)
             {
                 expandedNode.IsExpanded = !expandedNode.IsExpanded;
                 e.Handled = true;
+                return;
             }
-
-            return;
         }
 
         var row = (source as Border)?.Classes.Contains("treeRow") == true
@@ -338,12 +436,22 @@ public partial class MainWindow : Window
 
     private static bool IsWithinExpanderHitTarget(PointerPressedEventArgs e, ToggleButton expander)
     {
-        const double ExpanderHitTargetSize = 32;
+        const double ExpanderHitTargetSize = 44;
         var position = e.GetPosition(expander);
         var horizontalPadding = Math.Max(0, (ExpanderHitTargetSize - expander.Bounds.Width) / 2);
         var verticalPadding = Math.Max(0, (ExpanderHitTargetSize - expander.Bounds.Height) / 2);
         return position.X >= -horizontalPadding && position.X <= expander.Bounds.Width + horizontalPadding &&
                position.Y >= -verticalPadding && position.Y <= expander.Bounds.Height + verticalPadding;
+    }
+
+    private static bool IsWithinExpanderExtension(PointerPressedEventArgs e, ToggleButton expander)
+    {
+        const double ExpanderHitTargetSize = 44;
+        var position = e.GetPosition(expander);
+        var horizontalPadding = Math.Max(0, (ExpanderHitTargetSize - expander.Bounds.Width) / 2);
+        return position.X >= -horizontalPadding &&
+               position.X <= expander.Bounds.Width + horizontalPadding &&
+               position.Y >= 0 && position.Y <= expander.Bounds.Height;
     }
 
     private async void OnTreeNodePointerMoved(object? sender, PointerEventArgs e)

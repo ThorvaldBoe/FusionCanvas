@@ -15,11 +15,13 @@ public sealed class WorkspaceManagementService : IWorkspaceManagementService
     public WorkspaceManagementService(
         IWorkspaceRepository repository,
         Func<DateTimeOffset>? clock = null,
-        Func<Guid>? newId = null)
+        Func<Guid>? newId = null,
+        Guid? initialActiveWorkspaceId = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _newId = newId ?? Guid.NewGuid;
+        _activeWorkspaceId = initialActiveWorkspaceId;
     }
 
     public Guid? ActiveWorkspaceId => _activeWorkspaceId;

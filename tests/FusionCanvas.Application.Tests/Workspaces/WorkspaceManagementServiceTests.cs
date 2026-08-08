@@ -31,6 +31,21 @@ public class WorkspaceManagementServiceTests
     }
 
     [Fact]
+    public async Task LoadAsync_UsesPersistedActiveWorkspaceIdWhenItIsStillActive()
+    {
+        var personal = NewWorkspace("Personal");
+        var client = NewWorkspace("Client");
+        var repository = new InMemoryWorkspaceRepository(
+            new WorkspaceSnapshot([personal, client], [], [], [], [], [], [], [], [], []));
+        var service = new WorkspaceManagementService(repository, initialActiveWorkspaceId: client.Id);
+
+        var state = await service.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(client.Id, state.ActiveWorkspaceId);
+        Assert.Equal(client.Id, state.ActiveWorkspace?.Id);
+    }
+
+    [Fact]
     public async Task WorkspaceLifecycle_RequiresTypedConfirmationForNonEmptyDeleteAndRestoresArchives()
     {
         var active = NewWorkspace("Client");
