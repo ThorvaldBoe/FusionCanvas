@@ -211,6 +211,21 @@ public class MainWindowConstructionTests
 public class MainWindowLayoutTests
 {
     [AvaloniaFact]
+    public void DesignCountLabel_IsBoundAtBottomOfNavigationPane()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.PumpLayout();
+
+        var label = fixture.FindControl<TextBlock>(textBlock =>
+            AutomationProperties.GetAutomationId(textBlock) == "DesignCountLabel");
+
+        Assert.NotNull(label);
+        Assert.Equal(fixture.ViewModel.WorkspaceTree.DesignCountLabel, label!.Text);
+        Assert.Contains(" designs showing.", label.Text);
+        Assert.True(label.IsVisible);
+    }
+
+    [AvaloniaFact]
     public void TreeExpander_ClickingOutsideTheGlyph_ExpandsItsGroup()
     {
         using var fixture = new MainWindowFixture();
