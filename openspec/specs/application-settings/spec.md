@@ -3,9 +3,7 @@
 ## Purpose
 
 Defines the user-facing application-wide Settings surface and the local preference behavior that spans workspaces, such as application appearance.
-
 ## Requirements
-
 ### Requirement: Settings uses a focused sectioned surface
 FusionCanvas SHALL present application-wide preferences in a focused Settings window with a persistent section rail on the left and the selected section content on the right.
 
@@ -57,7 +55,7 @@ FusionCanvas SHALL provide a `Dark mode` toggle in the General section that sele
 - **AND** the most recent toggle state is the value retained for the next application start
 
 ### Requirement: Appearance preference persists locally
-FusionCanvas SHALL persist the selected appearance as an application-wide local preference that is independent of workspace data.
+FusionCanvas SHALL persist the selected appearance as an application-wide local preference that is independent of workspace data, while preserving readable appearance and AI settings when optional window-layout fields are absent or invalid.
 
 #### Scenario: Saved Dark preference survives restart
 - **WHEN** the user enables Dark mode, closes FusionCanvas, and starts it again
@@ -71,8 +69,13 @@ FusionCanvas SHALL persist the selected appearance as an application-wide local 
 
 #### Scenario: Saved preference cannot be read
 - **WHEN** the local settings file is missing, invalid, or unreadable at startup
-- **THEN** FusionCanvas starts with the Light appearance
+- **THEN** FusionCanvas starts with the Light appearance and existing main-window defaults
 - **AND** the user can select and save an appearance preference during the session
+
+#### Scenario: Optional layout cannot be read
+- **WHEN** the settings document has a readable appearance preference but its optional window-layout section is missing, malformed, or invalid
+- **THEN** FusionCanvas preserves the readable appearance and AI settings
+- **AND** it uses the existing main-window and splitter defaults
 
 #### Scenario: Preference cannot be saved
 - **WHEN** the user changes `Dark mode` and the local preference cannot be written
@@ -121,3 +124,4 @@ FusionCanvas SHALL include an About section in the Settings window that displays
 #### Scenario: About section is reachable by keyboard
 - **WHEN** keyboard focus enters the Settings window
 - **THEN** the `About` entry participates in the existing section rail and is reachable in a predictable tab order alongside the other sections
+
