@@ -101,7 +101,7 @@ public class JsonApplicationSettingsStoreTests
     {
         using var tempDirectory = new TemporaryDirectory();
         var path = tempDirectory.GetPath("settings.json");
-        await File.WriteAllTextAsync(path, "{\"version\":3,\"darkMode\":true}", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(path, "{\"version\":4,\"darkMode\":true}", TestContext.Current.CancellationToken);
         var store = new JsonApplicationSettingsStore(path);
 
         var result = await store.LoadAsync(TestContext.Current.CancellationToken);
@@ -239,9 +239,60 @@ public class JsonApplicationSettingsStoreTests
         Assert.Equal("idea/model", loaded.Value.Ai.Ideation.CustomProfile.ModelId);
         Assert.Equal("retained/model", loaded.Value.Ai.Concept.CustomProfile.ModelId);
         Assert.Equal("sll/model", loaded.Value.Ai.Sll.CustomProfile.ModelId);
-        Assert.Contains("\"version\": 2", json);
+        Assert.Contains("\"version\": 3", json);
         Assert.DoesNotContain("apiKey", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("secret", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Version3_RoundTripsWindowLayout()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var store = new JsonApplicationSettingsStore(tempDirectory.GetPath("settings.json"));
+        var layout = new WindowLayoutSettings(120, -40, 1400, 900, 380);
+
+        Assert.True((await store.SaveAsync(
+            new ApplicationSettings(true, AiConfigurationSettings.Default, layout),
+            TestContext.Current.CancellationToken)).Saved);
+
+        var loaded = await store.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(layout, loaded.Value.WindowLayout);
+        Assert.False(loaded.UsedDefault);
+    }
+
+    [Fact]
+    public async Task LoadAsync_LegacyVersionDefaultsWindowLayout()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var path = tempDirectory.GetPath("settings.json");
+        await File.WriteAllTextAsync(path, "{\"version\":2,\"darkMode\":true}", TestContext.Current.CancellationToken);
+
+        var loaded = await new JsonApplicationSettingsStore(path)
+            .LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(loaded.Value.DarkMode);
+        Assert.Null(loaded.Value.WindowLayout);
+        Assert.False(loaded.UsedDefault);
+    }
+
+    [Fact]
+    public async Task LoadAsync_InvalidWindowLayoutPreservesReadableSettings()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var path = tempDirectory.GetPath("settings.json");
+        await File.WriteAllTextAsync(
+            path,
+            "{\"version\":3,\"darkMode\":true,\"windowLayout\":{\"positionX\":10,\"positionY\":20,\"width\":\"NaN\",\"height\":800,\"navigationWidth\":320}}",
+            TestContext.Current.CancellationToken);
+
+        var loaded = await new JsonApplicationSettingsStore(path)
+            .LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(loaded.Value.DarkMode);
+        Assert.Null(loaded.Value.WindowLayout);
+        Assert.False(loaded.UsedDefault);
+        Assert.Contains("window layout", loaded.Warning, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

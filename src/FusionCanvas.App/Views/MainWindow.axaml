@@ -21,7 +21,7 @@
         MinWidth="900"
         MinHeight="600"
         Background="{DynamicResource ApplicationBackgroundBrush}">
-  <Grid>
+  <Grid x:Name="MainLayoutGrid">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="300" MinWidth="240" MaxWidth="560" />
       <ColumnDefinition Width="5" />

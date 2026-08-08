@@ -6,7 +6,7 @@ namespace FusionCanvas.Integration.Settings;
 
 public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
 {
-    private const int SupportedVersion = 2;
+    private const int SupportedVersion = 3;
 
     private static readonly JsonSerializerOptions WriteOptions = new()
     {
@@ -89,26 +89,33 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
 
             if (!TryGetProperty(root, "ai", out var aiElement))
             {
-                return ApplicationSettingsLoadResult.Success(new ApplicationSettings(darkMode));
+                var noAiLayout = TryReadWindowLayout(root, out var noAiLayoutWarning);
+                return new ApplicationSettingsLoadResult(
+                    new ApplicationSettings(darkMode, AiConfigurationSettings.Default, noAiLayout),
+                    UsedDefault: false,
+                    noAiLayoutWarning);
             }
 
+            AiConfigurationSettings aiSettings;
+            string? warning = null;
             try
             {
                 var ai = aiElement.Deserialize<AiConfigurationSettings>(ReadOptions);
-                return ai is null
-                    ? new ApplicationSettingsLoadResult(
-                        new ApplicationSettings(darkMode),
-                        UsedDefault: false,
-                        "The saved AI settings were invalid and were reset.")
-                    : ApplicationSettingsLoadResult.Success(new ApplicationSettings(darkMode, Normalize(ai)));
+                aiSettings = ai is null ? AiConfigurationSettings.Default : Normalize(ai);
+                warning = ai is null ? "The saved AI settings were invalid and were reset." : null;
             }
             catch (JsonException)
             {
-                return new ApplicationSettingsLoadResult(
-                    new ApplicationSettings(darkMode),
-                    UsedDefault: false,
-                    "The saved AI settings were invalid and were reset.");
+                aiSettings = AiConfigurationSettings.Default;
+                warning = "The saved AI settings were invalid and were reset.";
             }
+
+            var layout = TryReadWindowLayout(root, out var layoutWarning);
+            warning = CombineWarnings(warning, layoutWarning);
+            return new ApplicationSettingsLoadResult(
+                new ApplicationSettings(darkMode, aiSettings, layout),
+                UsedDefault: false,
+                warning);
         }
     }
 
@@ -134,7 +141,8 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
                     {
                         Version = SupportedVersion,
                         DarkMode = settings.DarkMode,
-                        Ai = settings.Ai
+                        Ai = settings.Ai,
+                        WindowLayout = settings.WindowLayout
                     },
                     WriteOptions,
                     cancellationToken);
@@ -191,7 +199,42 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
                     !Enum.IsDefined(settings.Reasoning.Mode)
                     ? AiReasoningSettings.ProviderDefault
                     : settings.Reasoning
-            };
+        };
+
+    private static WindowLayoutSettings? TryReadWindowLayout(JsonElement root, out string? warning)
+    {
+        warning = null;
+        if (!TryGetProperty(root, "windowLayout", out var element))
+        {
+            return null;
+        }
+
+        if (element.ValueKind != JsonValueKind.Object ||
+            !TryGetInt32(element, "positionX", out var positionX) ||
+            !TryGetInt32(element, "positionY", out var positionY) ||
+            !TryGetFinitePositiveDouble(element, "width", out var width) ||
+            !TryGetFinitePositiveDouble(element, "height", out var height) ||
+            !TryGetFinitePositiveDouble(element, "navigationWidth", out var navigationWidth))
+        {
+            warning = "The saved window layout was invalid and was reset.";
+            return null;
+        }
+
+        return new WindowLayoutSettings(positionX, positionY, width, height, navigationWidth);
+    }
+
+    private static bool TryGetFinitePositiveDouble(JsonElement element, string name, out double value)
+    {
+        value = default;
+        return TryGetProperty(element, name, out var property) &&
+               property.ValueKind == JsonValueKind.Number &&
+               property.TryGetDouble(out value) &&
+               double.IsFinite(value) &&
+               value > 0;
+    }
+
+    private static string? CombineWarnings(string? first, string? second) =>
+        first is null ? second : second is null ? first : $"{first} {second}";
 
     private static bool TryGetProperty(JsonElement element, string name, out JsonElement value)
     {
@@ -238,5 +281,6 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
         public int Version { get; set; }
         public bool DarkMode { get; set; }
         public AiConfigurationSettings Ai { get; set; } = AiConfigurationSettings.Default;
+        public WindowLayoutSettings? WindowLayout { get; set; }
     }
 }

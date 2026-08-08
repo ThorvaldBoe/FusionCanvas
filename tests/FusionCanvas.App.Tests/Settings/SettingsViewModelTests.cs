@@ -153,6 +153,19 @@ public class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task UpdateWindowLayout_QueuesLatestLayoutForSave()
+    {
+        var store = new RecordingStore();
+        var vm = new SettingsViewModel(store, new FakeThemeController(), ApplicationSettings.Default, loadWarning: null);
+        var layout = new WindowLayoutSettings(120, 80, 1400, 900, 380);
+
+        vm.UpdateWindowLayout(layout);
+        await vm.FlushAsync();
+
+        Assert.Equal(layout, store.LastSaved.WindowLayout);
+    }
+
+    [Fact]
     public async Task WorkspaceProjection_ShowsNoWorkspaceWhenNoneAttached()
     {
         var vm = NewViewModel();
