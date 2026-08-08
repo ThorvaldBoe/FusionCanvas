@@ -219,10 +219,41 @@ public class MainWindowLayoutTests
             .OfType<ToggleButton>()
             .First(button => button.DataContext is WorkspaceTreeNodeViewModel { HasChildren: true, IsExpanded: false });
         var node = Assert.IsType<WorkspaceTreeNodeViewModel>(expander.DataContext);
-        var clickPoint = new Avalonia.Point(expander.Bounds.Right + 6, expander.Bounds.Center.Y);
+        var clickPoint = GetExpanderClickPoint(expander, 6);
+
+        HeadlessWindowExtensions.MouseDown(fixture.Window, clickPoint, MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseUp(fixture.Window, clickPoint, MouseButton.Left, RawInputModifiers.None);
+        fixture.PumpLayout();
+
+        Assert.True(node.IsExpanded);
+    }
+
+    [AvaloniaFact]
+    public void TreeExpander_ClickingLeftOfTheGlyph_ExpandsItsGroup()
+    {
+        using var fixture = new MainWindowFixture();
+
+        var expander = fixture.Window.GetVisualDescendants()
+            .OfType<ToggleButton>()
+            .First(button => button.DataContext is WorkspaceTreeNodeViewModel { HasChildren: true, IsExpanded: false });
+        var node = Assert.IsType<WorkspaceTreeNodeViewModel>(expander.DataContext);
+        var clickPoint = GetExpanderClickPoint(expander, -6);
+
+        HeadlessWindowExtensions.MouseDown(fixture.Window, clickPoint, MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseUp(fixture.Window, clickPoint, MouseButton.Left, RawInputModifiers.None);
+        fixture.PumpLayout();
+
+        Assert.True(node.IsExpanded);
+    }
+
+    private static Avalonia.Point GetExpanderClickPoint(ToggleButton expander, double horizontalOffset)
+    {
+        var clickPoint = new Avalonia.Point(
+            horizontalOffset < 0 ? expander.Bounds.Left + horizontalOffset : expander.Bounds.Right + horizontalOffset,
+            expander.Bounds.Center.Y);
         foreach (var ancestor in expander.GetVisualAncestors())
         {
-            if (ReferenceEquals(ancestor, fixture.Window))
+            if (ancestor is Window)
             {
                 break;
             }
@@ -230,11 +261,7 @@ public class MainWindowLayoutTests
             clickPoint += ancestor.Bounds.Position;
         }
 
-        HeadlessWindowExtensions.MouseDown(fixture.Window, clickPoint, MouseButton.Left, RawInputModifiers.None);
-        HeadlessWindowExtensions.MouseUp(fixture.Window, clickPoint, MouseButton.Left, RawInputModifiers.None);
-        fixture.PumpLayout();
-
-        Assert.True(node.IsExpanded);
+        return clickPoint;
     }
 
     [AvaloniaFact]
