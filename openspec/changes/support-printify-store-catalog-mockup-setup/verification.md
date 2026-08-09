@@ -1,6 +1,6 @@
 # Verification: support-printify-store-catalog-mockup-setup
 
-Implementation is complete for the scoped Store/catalog/mockup-setup module. This record separates verified implementation evidence from the repository-wide baseline gate, which remains blocked by unrelated App tests.
+Implementation and repository-wide verification are complete for the scoped Store/catalog/mockup-setup module.
 
 ## Verified so far
 
@@ -24,11 +24,11 @@ Implementation is complete for the scoped Store/catalog/mockup-setup module. Thi
 | Design-stage normalized target presentation | Pass | Design-stage application tests pass; normalized Placeholder metadata now supplies position, decoration method, dimensions, Blueprint context, and a Printify Choice Provider-Network warning to the tool view model. |
 | Normalized catalog setup presentation | Pass | `CatalogSetupViewModelTests` passes 1/1, covering typed option selection, offering/Placeholder/template state, availability guards, and color-binding command state. |
 | Store Editor focused headless coverage | Pass | `StoreEditorHeadlessTests` passes 7/7, including Catalog & mockups navigation, strategy helper text, progressive sections, future template state, and layout margins after filtering non-laid-out hidden controls. |
-| Full solution no-build run | Partial / blocked by unrelated baseline | Domain 227/227, Application 367/367, and Integration 181/181 passed. App passed 481/487; six existing Workspace Tree/multi-selection/layout tests failed outside this change's Store/catalog scope. |
+| Full solution deterministic run | Pass | `dotnet test .\FusionCanvas.sln --no-restore -v minimal`; Domain 227/227, Application 367/367, Integration 181/181, and App 487/487 passed without external services, credentials, network access, or an interactive desktop. |
 
 ## Pending acceptance coverage
 
-The design artifact contains an exact traceability index for all 87 acceptance-scenario titles. The scoped application CRUD/lifecycle orchestration, normalized Store Editor catalog navigation, and focused UI state coverage are implemented. Future-contract scenarios for listing application, rendering, asset upload, placement editing, and Shopify publication remain not applicable until those future modules exist. The only open delivery gate is the repository-wide deterministic baseline because six unrelated App tests fail.
+The design artifact contains an exact traceability index for all 87 acceptance-scenario titles. The scoped application CRUD/lifecycle orchestration, normalized Store Editor catalog navigation, focused UI state coverage, and repository-wide deterministic baseline are verified. Future-contract scenarios for listing application, rendering, asset upload, placement editing, and Shopify publication remain not applicable until those future modules exist.
 
 ## Limitations
 
@@ -36,4 +36,4 @@ The design artifact contains an exact traceability index for all 87 acceptance-s
 - The current module intentionally does not implement listing-stage selection, rendering, asset upload, placement editing, per-variant overrides, generated-mockup records, external credentials, network communication, or Shopify publication.
 - No production rendering, source-image upload, placement editor, per-variant override, generated-mockup record, external credential, network, or Shopify behavior has been added.
 - The solution build passed with zero warnings and errors after restarting MSBuild/build services; no host telemetry limitation remains for the build gate.
-- A no-build solution test run reached all projects: Domain, Application, and Integration passed; the existing App test assembly reported 6 failures in unrelated workspace-tree/multi-selection/headless-layout baseline tests, so the deterministic repository-wide test gate remains open.
+- The workspace-tree/multi-selection/headless-layout tests were corrected where expectations were stale, and the multi-selection anchor behavior was fixed; the complete solution baseline now passes 487/487.

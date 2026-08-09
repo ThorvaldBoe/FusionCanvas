@@ -58,7 +58,7 @@
 - [x] 7.1 Run focused Domain, Application, Integration, ViewModel, and Avalonia headless test projects after each affected layer and correct failures without expanding scope.
 - [x] 7.2 Create and maintain `verification.md` mapping every acceptance scenario to its automated result or explicit future-contract not-applicable rationale, including migration IDs/counts and absence-of-scope evidence.
 - [x] 7.3 Run `dotnet build .\FusionCanvas.sln` and resolve all changed-scope errors and warnings.
-- [ ] 7.4 Run the deterministic baseline `dotnet test .\FusionCanvas.sln` without external services, credentials, network access, or an interactive desktop.
+- [x] 7.4 Run the deterministic baseline `dotnet test .\FusionCanvas.sln` without external services, credentials, network access, or an interactive desktop.
 - [x] 7.5 Run strict OpenSpec validation using the installed CLI's supported invocation and correct every proposal, design, delta-spec, task, or traceability error.
 - [x] 7.6 Perform scoped completion QA per `docs/qa-review.md`: acceptance evidence, changed-scope drift review, architecture, security, migration/rollback, Store isolation, UI state, and excluded-scope checks.
 - [x] 7.7 Confirm no unresolved high-impact decision was delegated to implementation and record any implementation-discovered ambiguity for review before proceeding.
