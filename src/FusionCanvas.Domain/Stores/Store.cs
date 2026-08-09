@@ -12,8 +12,9 @@ public sealed record Store : WorkspaceEntity
         DateTimeOffset createdAt,
         DateTimeOffset updatedAt,
         string metadataJson,
-        Guid? defaultNicheId = null)
-        : this(id, WorkspaceDefaults.DefaultWorkspaceId, name, description, isArchived, createdAt, updatedAt, metadataJson, defaultNicheId)
+        Guid? defaultNicheId = null,
+        FulfillmentStrategy fulfillmentStrategy = FulfillmentStrategy.Manual)
+        : this(id, WorkspaceDefaults.DefaultWorkspaceId, name, description, isArchived, createdAt, updatedAt, metadataJson, defaultNicheId, fulfillmentStrategy)
     {
     }
 
@@ -26,7 +27,8 @@ public sealed record Store : WorkspaceEntity
         DateTimeOffset createdAt,
         DateTimeOffset updatedAt,
         string metadataJson,
-        Guid? defaultNicheId = null)
+        Guid? defaultNicheId = null,
+        FulfillmentStrategy fulfillmentStrategy = FulfillmentStrategy.Manual)
         : base(id, name, description, isArchived, createdAt, updatedAt, metadataJson)
     {
         WorkspaceId = workspaceId == Guid.Empty
@@ -35,9 +37,14 @@ public sealed record Store : WorkspaceEntity
         DefaultNicheId = defaultNicheId == Guid.Empty
             ? throw new ArgumentException("Default niche identifier must not be empty.", nameof(defaultNicheId))
             : defaultNicheId;
+        FulfillmentStrategy = Enum.IsDefined(fulfillmentStrategy)
+            ? fulfillmentStrategy
+            : throw new ArgumentOutOfRangeException(nameof(fulfillmentStrategy), fulfillmentStrategy, "Fulfillment strategy is not supported.");
     }
 
     public Guid WorkspaceId { get; init; }
 
     public Guid? DefaultNicheId { get; init; }
+
+    public FulfillmentStrategy FulfillmentStrategy { get; init; }
 }

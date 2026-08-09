@@ -26,7 +26,7 @@ public class StoreEditorHeadlessTests
     {
         var window = CreateEditorWindow();
 
-        var button = FindButton(window, "Products & fulfillment");
+        var button = FindButton(window, "Catalog & mockups");
         Assert.NotNull(button);
 
         button!.Command!.Execute(button.CommandParameter);
@@ -36,7 +36,7 @@ public class StoreEditorHeadlessTests
         var viewModel = (StoreManagementViewModel)window.DataContext!;
         Assert.True(viewModel.IsProductsTabSelected);
 
-        var newProductButton = FindButton(window, "New product");
+        var newProductButton = FindButton(window, "New Blueprint");
         Assert.NotNull(newProductButton);
         Assert.True(newProductButton!.IsVisible);
 
@@ -56,7 +56,7 @@ public class StoreEditorHeadlessTests
         window.UpdateLayout();
         window.UpdateLayout();
 
-        var newProductButton = FindButton(window, "New product");
+        var newProductButton = FindButton(window, "New Blueprint");
         Assert.NotNull(newProductButton);
         Assert.True(newProductButton!.IsEnabled);
 
@@ -72,20 +72,65 @@ public class StoreEditorHeadlessTests
         viewModel.SelectProductsTabCommand.Execute(null);
         window.UpdateLayout();
         Assert.True(viewModel.IsCatalogOverview);
-        Assert.NotNull(FindButton(window, "New product"));
-        Assert.Null(FindButton(window, "Add fulfillment offering"));
+        Assert.NotNull(FindButton(window, "New Blueprint"));
+        Assert.Null(FindButton(window, "Add Blueprint Offering"));
 
         viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
         window.UpdateLayout();
         Assert.True(viewModel.IsProductDetail);
-        Assert.NotNull(FindButton(window, "Add fulfillment offering"));
+        Assert.NotNull(FindButton(window, "Add Blueprint Offering"));
         Assert.Null(FindButton(window, "Add variant"));
 
         viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
         window.UpdateLayout();
         Assert.True(viewModel.IsOfferingDetail);
         Assert.NotNull(FindButton(window, "Add variant"));
-        Assert.NotNull(FindButton(window, "Add printable area"));
+        Assert.NotNull(FindButton(window, "Add Placeholder"));
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void CatalogStrategyControlShowsManualAndExplainsFutureIntegrations()
+    {
+        var window = CreateEditorWindow();
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        window.UpdateLayout();
+
+        var strategy = window.GetVisualDescendants().OfType<ComboBox>()
+            .Single(control => AutomationProperties.GetAutomationId(control) == "StoreEditor.FulfillmentStrategy");
+        var text = string.Join(" ", window.GetVisualDescendants().OfType<TextBlock>().Select(block => block.Text));
+
+        Assert.Contains(FulfillmentStrategy.Manual, strategy.ItemsSource as IEnumerable<FulfillmentStrategy> ?? []);
+        Assert.Contains("Manual means", text, StringComparison.Ordinal);
+        Assert.Contains("Shopify + Printify", text, StringComparison.Ordinal);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void CatalogDetailExposesFutureTemplateStateWithoutRenderingControls()
+    {
+        var window = CreateEditorWindow();
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        window.UpdateLayout();
+
+        var text = string.Join(" ", window.GetVisualDescendants().OfType<TextBlock>().Select(block => block.Text));
+        Assert.Contains("Mockup Templates", text, StringComparison.Ordinal);
+        Assert.Contains("Source image: not configured", text, StringComparison.Ordinal);
+        Assert.NotNull(FindButton(window, "Add typed Option"));
+        Assert.NotNull(FindButton(window, "Add Option Value"));
+        Assert.NotNull(FindButton(window, "Create Mockup Template"));
+        Assert.NotNull(FindButton(window, "Link Color Option Value"));
+        var buttonLabels = string.Join(" ", window.GetVisualDescendants().OfType<Button>().Select(button => button.Content as string));
+        Assert.DoesNotContain("Upload", buttonLabels, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("placement", buttonLabels, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("renderer", buttonLabels, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("override", buttonLabels, StringComparison.OrdinalIgnoreCase);
 
         window.Close();
     }
@@ -133,7 +178,8 @@ public class StoreEditorHeadlessTests
                     "Constraints" or
                     "Risks" or
                     "Research notes" or
-                    "Notes")
+                    "Notes" &&
+                textBox.Bounds.Width > 0)
             .ToArray();
 
         Assert.NotEmpty(nicheFields);

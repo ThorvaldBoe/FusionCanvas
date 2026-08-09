@@ -40,6 +40,8 @@ using FusionCanvas.Application.Workspaces.Transfer;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.ConceptRefinement;
 using FusionCanvas.Application.Products;
+using FusionCanvas.Application.Catalog;
+using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.App.ConceptRefinement;
@@ -146,7 +148,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ITitleOptimizationService? titleOptimizationService = null,
         IProductSupplierSetupService? productSupplierSetupService = null,
         IItemCsvImportService? itemCsvImportService = null,
-        ISllDocumentCodec? sllDocumentCodec = null)
+        ISllDocumentCodec? sllDocumentCodec = null,
+        ICatalogSetupService? catalogSetupService = null,
+        IMockupTemplateSetupService? mockupTemplateSetupService = null)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
@@ -166,7 +170,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             new StoreManagementService(workspaceRepository),
             new NicheManagementService(workspaceRepository),
             new TagManagementService(workspaceRepository),
-            productService);
+            productService,
+            catalogSetupService ?? new CatalogSetupService(workspaceRepository),
+            mockupTemplateSetupService ?? new MockupTemplateSetupService(workspaceRepository));
         _groupManagementService = groupManagementService ?? new GroupManagementService(workspaceRepository);
         _itemManagementService = itemManagementService ?? new ItemManagementService(workspaceRepository);
         _itemCsvImportService = itemCsvImportService ?? new ItemCsvImportService(workspaceRepository);

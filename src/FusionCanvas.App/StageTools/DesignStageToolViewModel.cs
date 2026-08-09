@@ -51,6 +51,10 @@ public sealed class DesignSlotViewModel : INotifyPropertyChanged, IDisposable
     {
         DesignAreaId = summary.DesignAreaId;
         AreaName = summary.AreaName;
+        Position = summary.Position;
+        DecorationMethod = summary.DecorationMethod;
+        Width = summary.Width;
+        Height = summary.Height;
         AssetId = summary.AssetId;
         ThumbnailPath = summary.ThumbnailPath;
         IsMissing = summary.IsMissing;
@@ -68,6 +72,16 @@ public sealed class DesignSlotViewModel : INotifyPropertyChanged, IDisposable
 
     public Guid DesignAreaId { get; }
     public string AreaName { get; }
+    public string? Position { get; }
+    public string? DecorationMethod { get; }
+    public int? Width { get; }
+    public int? Height { get; }
+    public string PlaceholderDetails => string.Join(" · ", new[]
+    {
+        Position,
+        DecorationMethod,
+        Width is int width && Height is int height ? $"{width}×{height}px" : null
+    }.Where(value => !string.IsNullOrWhiteSpace(value)));
     public Guid? AssetId { get; }
     public string? ThumbnailPath { get; }
     public bool IsMissing { get; }
@@ -144,6 +158,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
     private FulfillmentOffering? _selectedOffering;
     private Guid? _selectedOfferingId;
     private string? _selectedOfferingName;
+    private string? _selectedBlueprintName;
+    private string? _providerNetworkWarning;
     private PendingRemovalAction? _pendingRemoval;
     private bool _isRemovalConfirmationVisible;
     private string _removalConfirmationMessage = string.Empty;
@@ -195,6 +211,18 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
     {
         get => _selectedOfferingName;
         private set { _selectedOfferingName = value; OnPropertyChanged(); OnPropertyChanged(nameof(SelectedOfferingStatus)); }
+    }
+
+    public string? SelectedBlueprintName
+    {
+        get => _selectedBlueprintName;
+        private set { _selectedBlueprintName = value; OnPropertyChanged(); }
+    }
+
+    public string? ProviderNetworkWarning
+    {
+        get => _providerNetworkWarning;
+        private set { _providerNetworkWarning = value; OnPropertyChanged(); }
     }
 
     public string? SelectedOfferingStatus
@@ -620,6 +648,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
         HasConfiguration = state.SelectedOfferingId is not null;
         SelectedOfferingId = state.SelectedOfferingId;
         SelectedOfferingName = state.SelectedOfferingName;
+        SelectedBlueprintName = state.SelectedBlueprintName;
+        ProviderNetworkWarning = state.ProviderNetworkWarning;
         _selectedOffering = state.SelectedOfferingId is not null
             ? state.AvailableOfferings.SingleOrDefault(o => o.Id == state.SelectedOfferingId.Value)
             : null;

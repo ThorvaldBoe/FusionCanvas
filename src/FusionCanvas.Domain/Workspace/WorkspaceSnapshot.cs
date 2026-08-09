@@ -7,6 +7,8 @@ using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Prompts;
 using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Domain.Products;
+using FusionCanvas.Domain.Catalog;
+using FusionCanvas.Domain.Mockups;
  
 namespace FusionCanvas.Domain.Workspace;
 
@@ -41,6 +43,28 @@ public sealed record WorkspaceSnapshot(
     public IReadOnlyList<DesignVariantRowColor> DesignVariantRowColors { get; init; } = [];
 
     public IReadOnlyList<DesignSlotAssignment> DesignSlotAssignments { get; init; } = [];
+
+    public IReadOnlyList<Blueprint> Blueprints { get; init; } = [];
+
+    public IReadOnlyList<PrintProvider> PrintProviders { get; init; } = [];
+
+    public IReadOnlyList<BlueprintOffering> BlueprintOfferings { get; init; } = [];
+
+    public IReadOnlyList<OfferingOption> OfferingOptions { get; init; } = [];
+
+    public IReadOnlyList<OfferingOptionValue> OfferingOptionValues { get; init; } = [];
+
+    public IReadOnlyList<OfferingVariant> OfferingVariants { get; init; } = [];
+
+    public IReadOnlyList<OfferingPlaceholder> OfferingPlaceholders { get; init; } = [];
+
+    public IReadOnlyList<MockupTemplate> MockupTemplates { get; init; } = [];
+
+    public IReadOnlyList<MockupTemplateColorVariant> MockupTemplateColorVariants { get; init; } = [];
+
+    public IReadOnlyList<MockupTemplateRevision> MockupTemplateRevisions { get; init; } = [];
+
+    public IReadOnlyList<MockupTemplateRevisionColor> MockupTemplateRevisionColors { get; init; } = [];
 
     public WorkspaceSnapshot(
         IReadOnlyList<Store> Stores,

@@ -459,11 +459,44 @@ Mockup
 - MetadataJson
 ```
 
-## Mockup Product Settings
+## Catalog and Mockup Setup
 
-Mockup product settings define the store-level products, templates, placement mappings, and color variants used by the Basic Listing Tool.
+Issue 185 replaces the earlier Mockup Product/Design Area sketch with a normalized,
+store-scoped catalog model using Printify terminology. A Store has a fulfillment strategy;
+Manual is the only currently available strategy and prevents external Shopify/Printify
+communication. Future strategies may add credentials and integration settings.
 
-These records are store-scoped because each store may sell different supplier products and color selections.
+The catalog hierarchy is Blueprint → Blueprint Offering → typed Options/Values and explicit
+concrete Variants. An Offering is either tied to a fixed Print Provider or to a stable Provider
+Network identity (for example, Printify Choice uses the durable code `printify-choice`, not only
+a mutable display name). Options have stable OptionKind values such as Color, Size, and Other;
+relationships must never infer semantics from editable labels.
+
+An OfferingPlaceholder has positive dimensions and an explicit compatibility set of concrete
+Variants. A MockupTemplate belongs to one Offering and must have a required TargetPlaceholderId
+from that same Offering. Each template-color record references exactly one Color Option Value
+from the same Offering. Compatible size Variants are derived through that Color Value, so adding
+or removing sizes does not require repairing template mappings. No per-Variant or size-specific
+override structure is part of this module.
+
+Templates use revisions. Changes to template configuration affect future generation only, while
+future generated output will retain the exact template revision and Color Value snapshot used.
+Source-image upload/import, rendering, composition, placement coordinates, and slot schemas are
+future work; the current model has only an empty future asset state and a future placement
+extension marker. Referenced catalog records are archived/deactivated rather than deleted, and
+dependents must be reassigned or removed before retirement.
+
+Legacy records migrate under Manual strategy. Existing Product Blueprints and offerings retain
+stable IDs where possible; inline variant options become typed Option/Value rows and design areas
+become same-ID Offering Placeholders with explicit or expanded Variant compatibility. Migration
+validates ownership and references before advancing the schema version and rolls back on failure.
+
+The future Shopify publisher is a separate adapter boundary. It will map Fusion Canvas's one
+primary mockup per Color to Shopify's color-and-size Variants, with explicit mapping rather than
+assuming option labels or identifiers match.
+
+The superseded earlier sketch is retained below only as historical context; its placement fields
+must not be implemented.
 
 Suggested fields:
 
@@ -487,17 +520,10 @@ MockupProduct
 ```text
 MockupTemplate
 - Id
-- MockupProductId
+- BlueprintOfferingId
+- TargetPlaceholderId
 - Name
-- TemplateAssetId
-- ViewName
-- DefaultColorName
-- PlacementX
-- PlacementY
-- PlacementWidth
-- PlacementHeight
-- PlacementScale
-- RotationDegrees
+- CurrentRevisionId
 - IsActive
 - CreatedAt
 - UpdatedAt
@@ -508,18 +534,16 @@ MockupTemplate
 MockupColorVariant
 - Id
 - MockupTemplateId
-- ProviderColorName
-- DisplayColorName
-- TemplateAssetId
-- SwatchHex
-- SortOrder
+- ColorOptionValueId
+- PositionKey (optional display/denormalized key only)
 - IsActive
 - CreatedAt
 - UpdatedAt
 - MetadataJson
 ```
 
-For the MVP, these settings may be manually entered and stored in dedicated tables or in store-level JSON metadata. Dedicated tables become more useful once users have multiple products, templates, and color variants per store.
+For the MVP, these settings are entered manually and stored in dedicated tables. There is no
+asset editor or renderer in this module.
 
 ## Phrase
 
@@ -779,7 +803,7 @@ Store
 - has many Items
 - has many Assets
 - has many Tags
-- has many MockupProducts
+- has many Blueprints and Blueprint Offerings
 ```
 
 Niche relationships:
@@ -823,21 +847,23 @@ Item
 - behaves as an Item in navigation
 ```
 
-Mockup product relationships:
+Catalog and mockup relationships:
 
 ```text
-MockupProduct
+Blueprint
 - belongs to Store
-- has many MockupTemplates
+- has many BlueprintOfferings
+
+BlueprintOffering
+- belongs to Blueprint and Store
+- has typed Options/Values and concrete Variants
+- has OfferingPlaceholders
+- may use a fixed Print Provider or stable Provider Network identity
 
 MockupTemplate
-- belongs to MockupProduct
-- may reference a TemplateAsset
-- has many MockupColorVariants
-
-MockupColorVariant
-- belongs to MockupTemplate
-- may reference a color-specific TemplateAsset
+- belongs to BlueprintOffering
+- has one authoritative TargetPlaceholderId
+- has revisions and color-level MockupTemplateColorVariants
 ```
 
 ## Workspace package and database compatibility
@@ -859,7 +885,7 @@ Any deliberate break in the database schema or workspace-package container must 
 - Should JSON metadata be indexed for selected fields?
 - Should archived data remain in the main tables or move to archive tables?
 - Should rejected generated ideas be stored as Idea records, Prompt metadata, plugin data, or a dedicated ideation history table?
-- Should mockup product settings start as dedicated tables, store metadata JSON, or a hybrid model?
+- Which future visual click-and-point editor should define placement semantics?
 
 ## Initial Recommendation
 
@@ -875,10 +901,15 @@ Design
 Asset
 Prompt
 Tag
-Mockup
-MockupProduct
+Blueprint
+BlueprintOffering
+OfferingOption
+OfferingOptionValue
+OfferingVariant
+OfferingPlaceholder
 MockupTemplate
-MockupColorVariant
+MockupTemplateRevision
+MockupTemplateColorVariant
 ```
 
 Use JSON metadata for everything else until the need for dedicated tables becomes clear.

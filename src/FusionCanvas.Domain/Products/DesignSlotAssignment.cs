@@ -20,4 +20,7 @@ public sealed record DesignSlotAssignment
     public Guid DesignAreaId { get; init; }
 
     public Guid? AssetId { get; init; }
+
+    /// <summary>Normalized catalog terminology for the same stable Placeholder relationship.</summary>
+    public Guid PlaceholderId => DesignAreaId;
 }

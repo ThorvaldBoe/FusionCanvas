@@ -9,6 +9,9 @@ using FusionCanvas.Application.Niches;
 using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.Products;
 using FusionCanvas.Domain.Products;
+using FusionCanvas.Domain.Stores;
+using FusionCanvas.Application.Catalog;
+using FusionCanvas.Application.Mockups;
 
 namespace FusionCanvas.App.Stores;
 
@@ -112,7 +115,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         string TargetMarket,
         string BrandDirection,
         string PlanningContext,
-        string Url);
+        string Url,
+        FulfillmentStrategy FulfillmentStrategy);
 
     private sealed record NicheEditorState(
         string Name,
@@ -171,6 +175,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private string _brandDirection = string.Empty;
     private string _planningContext = string.Empty;
     private string _url = string.Empty;
+    private FulfillmentStrategy _fulfillmentStrategy = FulfillmentStrategy.Manual;
     private string _nicheName = string.Empty;
     private string _nicheDescription = string.Empty;
     private string _nicheAudience = string.Empty;
@@ -213,12 +218,13 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private string _variantColor = string.Empty;
     private string _variantSize = string.Empty;
 
-    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null, ITagManagementService? tagService = null, IProductSupplierSetupService? productService = null)
+    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null, ITagManagementService? tagService = null, IProductSupplierSetupService? productService = null, ICatalogSetupService? catalogService = null, IMockupTemplateSetupService? mockupService = null)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _nicheService = nicheService;
         _tagService = tagService;
         _productService = productService;
+        CatalogSetup = catalogService is not null && mockupService is not null ? new CatalogSetupViewModel(catalogService, mockupService) : null;
         ToggleStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = !IsSelectorExpanded);
         ExpandStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = true);
         CollapseStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = false);
@@ -454,6 +460,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public StoreSummary? SelectedStore { get; private set; }
 
+    public CatalogSetupViewModel? CatalogSetup { get; }
+
     public NicheSummary? SelectedNiche { get; private set; }
 
     public bool NeedsFirstStore { get; private set; }
@@ -483,6 +491,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public bool HasAnyUnsavedChanges => HasUnsavedChanges || HasUnsavedNicheChanges || HasUnsavedTagChanges || HasAnyCatalogUnsavedChanges;
 
     public bool CanSaveSelectedStore => _isCreatingNewStore || (SelectedStore is not null && HasUnsavedChanges);
+
+    public bool CanEditStoreConfiguration => _isCreatingNewStore || SelectedStore is { IsArchived: false };
 
     public bool CanArchiveSelectedStore => SelectedStore is { IsArchived: false } && !_isCreatingNewStore;
 
@@ -673,6 +683,22 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             {
                 RaiseEditorStateProperties();
                 OnPropertyChanged(nameof(EditorActiveStores));
+            }
+        }
+    }
+
+    public IReadOnlyList<FulfillmentStrategy> AvailableFulfillmentStrategies => FulfillmentStrategyPolicy.AvailableStrategies;
+
+    public IReadOnlyList<FulfillmentStrategy> FulfillmentStrategies => Enum.GetValues<FulfillmentStrategy>();
+
+    public FulfillmentStrategy SelectedFulfillmentStrategy
+    {
+        get => _fulfillmentStrategy;
+        set
+        {
+            if (SetField(ref _fulfillmentStrategy, value))
+            {
+                RaiseEditorStateProperties();
             }
         }
     }
@@ -1006,7 +1032,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public string ProductDeleteWarningMessage => _pendingDeleteProduct is null
         ? "Permanent deletion cannot be undone."
-        : $"Delete product '{_pendingDeleteProduct.Name}' permanently? This cannot be undone.";
+        : $"Delete Blueprint '{_pendingDeleteProduct.Name}' permanently? This cannot be undone.";
 
     public string OfferingDeleteWarningMessage => _pendingDeleteOffering is null
         ? "Permanent deletion cannot be undone."
@@ -1340,6 +1366,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         ApplyState(state);
         await LoadNichesForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
         await LoadTagsForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
+        if (CatalogSetup is not null && SelectedStore is not null)
+            await CatalogSetup.LoadForStoreAsync(SelectedStore.Id, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task SetActiveWorkspaceAsync(Guid? workspaceId, CancellationToken cancellationToken = default)
@@ -1411,10 +1439,13 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(SelectedStore));
         OnPropertyChanged(nameof(EditorActiveStores));
         OnPropertyChanged(nameof(HasSelectedStore));
+        OnPropertyChanged(nameof(CanEditStoreConfiguration));
         OnPropertyChanged(nameof(CanRestoreSelectedStore));
         RaiseEditorActionProperties();
         Run(LoadNichesForSelectedStoreAsync());
         Run(LoadTagsForSelectedStoreAsync());
+        if (CatalogSetup is not null)
+            Run(CatalogSetup.LoadForStoreAsync(store.Id));
     }
 
     public void StartCreateStore()
@@ -1521,7 +1552,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         if (_isCreatingNewStore)
         {
             var createResult = await _service.CreateStoreAsync(
-                new StoreManagementCreateRequest(NewStoreName, CurrentContext()),
+                new StoreManagementCreateRequest(NewStoreName, CurrentContext(), SelectedFulfillmentStrategy),
                 cancellationToken).ConfigureAwait(false);
 
             if (createResult.Succeeded)
@@ -1549,7 +1580,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         }
 
         var result = await _service.UpdateStoreAsync(
-            new StoreManagementUpdateRequest(SelectedStore.Id, NewStoreName, CurrentContext()),
+            new StoreManagementUpdateRequest(SelectedStore.Id, NewStoreName, CurrentContext(), SelectedFulfillmentStrategy),
             cancellationToken).ConfigureAwait(false);
         ApplyResult(result);
     }
@@ -2691,7 +2722,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         if (_isCreatingNewOffering)
         {
             var result = await _productService.CreateOfferingAsync(
-                new CreateOfferingRequest(
+                new FusionCanvas.Application.Products.CreateOfferingRequest(
                     SelectedProduct.Id,
                     OfferingName,
                     kind,
@@ -3137,6 +3168,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         BrandDirection = store.Context.BrandDirection ?? string.Empty;
         PlanningContext = store.Context.PlanningContext ?? string.Empty;
         Url = store.Context.Url ?? string.Empty;
+        SelectedFulfillmentStrategy = store.FulfillmentStrategy;
     }
 
     private void ApplySelectedNicheFields(NicheSummary? niche)
@@ -3167,6 +3199,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         BrandDirection = string.Empty;
         PlanningContext = string.Empty;
         Url = string.Empty;
+        SelectedFulfillmentStrategy = FulfillmentStrategy.Manual;
     }
 
     private void ClearNicheEditorFields()
@@ -3191,7 +3224,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
         var now = DateTimeOffset.Now;
         var name = string.IsNullOrWhiteSpace(NewStoreName) ? "New store" : NewStoreName.Trim();
-        return new StoreSummary(id, SelectedStore?.WorkspaceId ?? WorkspaceDefaults.DefaultWorkspaceId, name, CurrentContext(), false, now, now);
+        return new StoreSummary(id, SelectedStore?.WorkspaceId ?? WorkspaceDefaults.DefaultWorkspaceId, name, CurrentContext(), false, now, now, SelectedFulfillmentStrategy);
     }
 
     private NicheSummary? DraftNiche()
@@ -3421,7 +3454,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             EmptyToNull(NicheNotes));
 
     private EditorState CurrentEditorState() =>
-        new(NewStoreName, Description, Notes, TargetMarket, BrandDirection, PlanningContext, Url);
+        new(NewStoreName, Description, Notes, TargetMarket, BrandDirection, PlanningContext, Url, SelectedFulfillmentStrategy);
 
     private NicheEditorState CurrentNicheEditorState() =>
         new(NicheName, NicheDescription, NicheAudience, NicheHumorStyle, NicheVisualStyleGuidance, NicheConstraints, NicheRisks, NicheResearchNotes, NicheNotes);
@@ -3462,7 +3495,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanDeleteSelectedNiche));
     }
 
-    private static EditorState EmptyEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
+    private static EditorState EmptyEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, FulfillmentStrategy.Manual);
 
     private static NicheEditorState EmptyNicheEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
 
