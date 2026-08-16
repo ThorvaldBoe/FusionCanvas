@@ -45,4 +45,35 @@ public sealed class CatalogSetupViewModelTests
         Assert.True(viewModel.CreateTemplateCommand.CanExecute(null));
         Assert.True(viewModel.AddTemplateColorCommand.CanExecute(null) == false);
     }
+
+    [Fact]
+    public async Task RequestedOfferingIdentityIsAuthoritativeAndNeverFallsBack()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
+        var first = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "First", null, BlueprintOfferingKind.ProviderNetwork, null, "first-network", null, null, false, now, now);
+        var requested = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Requested", null, BlueprintOfferingKind.ProviderNetwork, null, "requested-network", null, null, false, now, now);
+        var repository = new InMemoryWorkspaceRepository(snapshot with
+        {
+            Blueprints = [blueprint],
+            BlueprintOfferings = [first, requested]
+        });
+        var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository));
+
+        viewModel.SelectOffering(requested.Id);
+        await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+
+        Assert.Equal(requested.Id, viewModel.SelectedOfferingId);
+        Assert.True(viewModel.HasSelectedOffering);
+        Assert.False(viewModel.IsOfferingContextUnavailable);
+
+        viewModel.SelectOffering(Guid.NewGuid());
+        await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+
+        Assert.Null(viewModel.SelectedOffering);
+        Assert.False(viewModel.HasSelectedOffering);
+        Assert.True(viewModel.IsOfferingContextUnavailable);
+    }
 }

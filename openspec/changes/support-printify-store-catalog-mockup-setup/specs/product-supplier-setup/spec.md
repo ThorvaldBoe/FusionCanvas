@@ -105,6 +105,8 @@ The Store Editor catalog surface SHALL present focused levels for Blueprint over
 - **WHEN** the user selects a Blueprint Offering from Blueprint detail
 - **THEN** the editor shows a breadcrumb or equivalent path identifying the Blueprint and offering
 - **AND** it discloses offering Basics, Options and Values, Variants, Placeholders, Mockup Templates, and Advanced information without unrelated Blueprint lists
+- **AND** the opened offering is the authoritative context for all dependent sections without requiring another Blueprint Offering selection
+- **AND** if the normalized offering record is unavailable, the editor explains which dependent sections are unavailable instead of showing empty or unrelated selectors
 
 ### Requirement: Catalog controls use unambiguous terminology and ownership
 The Store Editor SHALL use the Printify-aligned terms Blueprint, Print Provider, Provider Network, Blueprint Offering, Option, Option Value, Variant, and Placeholder consistently in visible labels and actions. It SHALL explain non-intuitive terms through visible helper text or accessible tooltips and SHALL reserve Product for a later artwork-added sellable product concept.

@@ -21,6 +21,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private MockupTemplate? _selectedTemplate;
     private OfferingOptionValue? _selectedColor;
     private Blueprint? _selectedBlueprint;
+    private Guid? _requestedOfferingId;
     private string _optionName = string.Empty;
     private string _optionValue = string.Empty;
     private string _templateName = string.Empty;
@@ -62,12 +63,16 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             {
                 RefreshOfferingCollections();
                 OnPropertyChanged(nameof(SelectedOfferingId));
+                OnPropertyChanged(nameof(HasSelectedOffering));
+                OnPropertyChanged(nameof(IsOfferingContextUnavailable));
                 NotifyCommands();
             }
         }
     }
 
     public Guid? SelectedOfferingId => SelectedOffering?.Id;
+    public bool HasSelectedOffering => SelectedOffering is not null;
+    public bool IsOfferingContextUnavailable => IsAvailable && _requestedOfferingId is not null && SelectedOffering is null;
 
     public Blueprint? SelectedBlueprint { get => _selectedBlueprint; set { if (SetField(ref _selectedBlueprint, value)) NotifyCommands(); } }
 
@@ -139,7 +144,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             Replace(Placeholders, catalog.Placeholders);
             Replace(Templates, mockups.Templates);
             Replace(TemplateColors, mockups.Colors);
-            SelectedOffering = Offerings.FirstOrDefault(value => value.Id == SelectedOffering?.Id) ?? Offerings.FirstOrDefault();
+            SelectedOffering = ResolveSelectedOffering();
             SelectedBlueprint = Blueprints.FirstOrDefault(value => value.Id == SelectedBlueprint?.Id) ?? Blueprints.FirstOrDefault();
             RefreshOfferingCollections();
             SelectedTemplate = Templates.FirstOrDefault(value => value.Id == SelectedTemplate?.Id) ?? Templates.FirstOrDefault();
@@ -149,7 +154,16 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             IsAvailable = false;
             ErrorMessage = exception.Message;
         }
-        finally { IsBusy = false; OnPropertyChanged(nameof(IsAvailable)); OnPropertyChanged(nameof(CanEdit)); }
+        finally { IsBusy = false; OnPropertyChanged(nameof(IsAvailable)); OnPropertyChanged(nameof(CanEdit)); OnPropertyChanged(nameof(IsOfferingContextUnavailable)); }
+    }
+
+    public void SelectOffering(Guid? offeringId)
+    {
+        _requestedOfferingId = offeringId;
+        SelectedOffering = offeringId is null
+            ? null
+            : Offerings.FirstOrDefault(value => value.Id == offeringId.Value);
+        OnPropertyChanged(nameof(IsOfferingContextUnavailable));
     }
 
     private async Task CreateOptionAsync()
@@ -211,7 +225,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private void ApplyCatalog(CatalogSetupState state)
     {
         Replace(Blueprints, state.Blueprints); Replace(Offerings, state.Offerings); Replace(Options, state.Options); Replace(OptionValues, state.OptionValues); Replace(Variants, state.Variants); Replace(Placeholders, state.Placeholders);
-        SelectedOffering = Offerings.FirstOrDefault(value => value.Id == SelectedOffering?.Id) ?? Offerings.FirstOrDefault();
+        SelectedOffering = ResolveSelectedOffering();
         RefreshOfferingCollections();
     }
 
@@ -232,6 +246,16 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public IEnumerable<OfferingPlaceholder> AvailablePlaceholders => Placeholders.Where(value => value.OfferingId == SelectedOffering?.Id && !value.IsArchived);
     public IEnumerable<MockupTemplate> AvailableTemplates => Templates.Where(value => value.BlueprintOfferingId == SelectedOffering?.Id && !value.IsArchived);
     public IEnumerable<OfferingOptionValue> AvailableColors => OptionValues.Where(value => value.OfferingId == SelectedOffering?.Id && !value.IsArchived && Options.Any(option => option.Id == value.OptionId && option.OptionKind == OptionKind.Color));
+
+    private BlueprintOffering? ResolveSelectedOffering()
+    {
+        if (_requestedOfferingId is Guid requestedOfferingId)
+        {
+            return Offerings.FirstOrDefault(value => value.Id == requestedOfferingId);
+        }
+
+        return Offerings.FirstOrDefault(value => value.Id == SelectedOffering?.Id) ?? Offerings.FirstOrDefault();
+    }
 
     private static void Replace<T>(ObservableCollection<T> target, IEnumerable<T> values) { target.Clear(); foreach (var value in values) target.Add(value); }
     private void NotifyCommands() { (CreateOfferingCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged(); (SetDefaultPlaceholderCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged(); (CreateOptionCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged(); (CreateOptionValueCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged(); (CreateTemplateCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged(); (AddTemplateColorCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged(); }

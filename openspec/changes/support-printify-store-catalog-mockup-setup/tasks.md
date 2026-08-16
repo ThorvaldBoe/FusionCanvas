@@ -67,3 +67,9 @@
 
 - [x] 8.1 Remove the duplicate normalized-catalog Blueprint selector and raw Provider-Network offering form from Blueprint detail so the opened Blueprint remains the sole context and `Add Blueprint Offering` remains the sole creation action.
 - [x] 8.2 Add focused Avalonia headless regression coverage for the simplified Blueprint detail and update criterion-level verification evidence.
+
+## 9. Feedback-driven Blueprint Offering context correction
+
+- [x] 9.1 Synchronize normalized catalog presentation to the opened Blueprint Offering by stable ID without falling back to an unrelated offering when the requested identity is absent.
+- [x] 9.2 Remove the second Blueprint Offering selector, hide dependent normalized controls behind one clear unavailable state when no matching record exists, and remove the duplicate Advanced panel.
+- [x] 9.3 Add focused ViewModel and Avalonia headless regression coverage, update retrospective and criterion-level evidence, and run changed-scope validation.

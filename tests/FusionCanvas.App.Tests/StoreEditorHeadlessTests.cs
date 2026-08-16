@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Automation;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -14,6 +15,9 @@ using FusionCanvas.Application.Stores;
 using FusionCanvas.Application.Niches;
 using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.Products;
+using FusionCanvas.Application.Catalog;
+using FusionCanvas.Application.Mockups;
+using FusionCanvas.Domain.Catalog;
 
 namespace FusionCanvas.App.Tests;
 
@@ -133,6 +137,7 @@ public class StoreEditorHeadlessTests
         var text = string.Join(" ", window.GetVisualDescendants().OfType<TextBlock>().Select(block => block.Text));
         Assert.Contains("Mockup Templates", text, StringComparison.Ordinal);
         Assert.Contains("Source image: not configured", text, StringComparison.Ordinal);
+        Assert.Equal(viewModel.SelectedOffering!.Id, viewModel.CatalogSetup!.SelectedOfferingId);
         Assert.NotNull(FindButton(window, "Add typed Option"));
         Assert.NotNull(FindButton(window, "Add Option Value"));
         Assert.NotNull(FindButton(window, "Create Mockup Template"));
@@ -142,6 +147,35 @@ public class StoreEditorHeadlessTests
         Assert.DoesNotContain("placement", buttonLabels, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("renderer", buttonLabels, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("override", buttonLabels, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(
+            window.GetVisualDescendants().OfType<ComboBox>(),
+            comboBox => IsEffectivelyVisible(comboBox) && comboBox.PlaceholderText == "Select Blueprint Offering");
+        Assert.Single(
+            window.GetVisualDescendants().OfType<ToggleButton>(),
+            toggle => IsEffectivelyVisible(toggle) && string.Equals(toggle.Content as string, "Advanced", StringComparison.Ordinal));
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void OfferingDetailWithoutNormalizedRecordExplainsUnavailableSections()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: false);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        window.UpdateLayout();
+
+        var text = string.Join(" ", window.GetVisualDescendants().OfType<TextBlock>()
+            .Where(IsEffectivelyVisible)
+            .Select(block => block.Text));
+        Assert.Contains("has no matching normalized catalog record", text, StringComparison.Ordinal);
+        Assert.Null(FindButton(window, "Add typed Option"));
+        Assert.Null(FindButton(window, "Create Mockup Template"));
+        Assert.DoesNotContain(
+            window.GetVisualDescendants().OfType<ComboBox>(),
+            comboBox => IsEffectivelyVisible(comboBox) && comboBox.PlaceholderText == "Select Blueprint Offering");
 
         window.Close();
     }
@@ -204,15 +238,17 @@ public class StoreEditorHeadlessTests
         window.Close();
     }
 
-    private static StoreEditorWindow CreateEditorWindow()
+    private static StoreEditorWindow CreateEditorWindow(bool includeNormalizedCatalog = true)
     {
         var store = new Store(Guid.NewGuid(), "North Star", null, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(Snapshot(store));
+        var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog));
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository),
             new NicheManagementService(repository),
             new TagManagementService(repository),
-            new ProductSupplierSetupService(repository));
+            new ProductSupplierSetupService(repository),
+            new CatalogSetupService(repository),
+            new MockupTemplateSetupService(repository));
         viewModel.LoadAsync(default).GetAwaiter().GetResult();
         var window = new StoreEditorWindow { DataContext = viewModel };
         window.Show();
@@ -240,12 +276,12 @@ public class StoreEditorHeadlessTests
         return true;
     }
 
-    private static WorkspaceSnapshot Snapshot(Store store)
+    private static WorkspaceSnapshot Snapshot(Store store, bool includeNormalizedCatalog)
     {
         var product = new StoreProduct(Guid.NewGuid(), store.Id, "Gildan 64000", null, null, Now, Now, "{}");
         var offering = new FulfillmentOffering(Guid.NewGuid(), product.Id, "Printful", null, FulfillmentKind.FixedProvider, "Printful", null, Now, Now, "{}");
         var item = new Item(Guid.NewGuid(), store.Id, null, null, "Tee", null, ItemStatus.Draft, WorkflowStage.Design, false, Now, Now, "{}");
-        return new WorkspaceSnapshot(
+        var snapshot = new WorkspaceSnapshot(
             [WorkspaceSnapshot.DefaultWorkspace(Now)],
             [store],
             [],
@@ -259,6 +295,19 @@ public class StoreEditorHeadlessTests
         {
             StoreProducts = [product],
             FulfillmentOfferings = [offering]
+        };
+
+        if (!includeNormalizedCatalog)
+        {
+            return snapshot;
+        }
+
+        var blueprint = new Blueprint(product.Id, store.Id, product.Name, product.Description, false, Now, Now);
+        var normalizedOffering = new BlueprintOffering(offering.Id, blueprint.Id, store.Id, offering.Name, offering.Description, BlueprintOfferingKind.ProviderNetwork, null, "printful", null, offering.ExternalOfferingId, false, Now, Now);
+        return snapshot with
+        {
+            Blueprints = [blueprint],
+            BlueprintOfferings = [normalizedOffering]
         };
     }
 

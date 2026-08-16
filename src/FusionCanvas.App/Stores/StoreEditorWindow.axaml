@@ -552,6 +552,19 @@
                          Foreground="{DynamicResource StrongTextBrush}" />
               <TextBlock Text="{Binding SelectedOfferingSummary}"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
+              <Border IsVisible="{Binding CatalogSetup.IsOfferingContextUnavailable}"
+                      Background="{DynamicResource WarningBackgroundBrush}"
+                      BorderBrush="{DynamicResource WarningBorderBrush}"
+                      BorderThickness="1"
+                      Padding="12">
+                <TextBlock Text="Options, Option Values, and Mockup Templates are unavailable because this Blueprint Offering has no matching normalized catalog record. The offering selector was not changed."
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource WarningTextBrush}" />
+              </Border>
+              <TextBlock Text="{Binding CatalogSetup.ErrorMessage}"
+                         IsVisible="{Binding CatalogSetup.HasError}"
+                         TextWrapping="Wrap"
+                         Foreground="{DynamicResource DangerTextBrush}" />
 
               <Border Classes="panel" Padding="12">
                 <StackPanel Spacing="8">
@@ -634,7 +647,9 @@
                 </StackPanel>
               </Border>
 
-              <Border Classes="panel" Padding="12">
+              <Border Classes="panel"
+                      Padding="12"
+                      IsVisible="{Binding CatalogSetup.HasSelectedOffering}">
                 <StackPanel Spacing="8">
                   <ToggleButton Content="Options / Values"
                                 IsChecked="True"
@@ -643,10 +658,6 @@
                              TextWrapping="Wrap"
                              FontSize="12"
                              Foreground="{DynamicResource SecondaryTextBrush}" />
-                  <ComboBox ItemsSource="{Binding CatalogSetup.Offerings}"
-                            SelectedItem="{Binding CatalogSetup.SelectedOffering}"
-                            DisplayMemberBinding="{Binding Name}"
-                            PlaceholderText="Select Blueprint Offering" />
                   <TextBlock Text="Option kind" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                   <ComboBox ItemsSource="{Binding CatalogSetup.OptionKinds}"
                             SelectedItem="{Binding CatalogSetup.SelectedOptionKind}" />
@@ -664,10 +675,6 @@
                           Command="{Binding CatalogSetup.CreateOptionValueCommand}"
                           IsEnabled="{Binding CatalogSetup.CanEdit}"
                           Classes="secondary" />
-                  <TextBlock Text="{Binding CatalogSetup.ErrorMessage}"
-                             IsVisible="{Binding CatalogSetup.HasError}"
-                             TextWrapping="Wrap"
-                             Foreground="{DynamicResource DangerTextBrush}" />
                 </StackPanel>
               </Border>
 
@@ -718,10 +725,6 @@
                       </StackPanel>
                     </StackPanel>
                   <TextBlock IsVisible="{Binding !HasOfferingDesignAreas}" Text="No Placeholders configured." Foreground="{DynamicResource SecondaryTextBrush}" />
-                  <Button Content="Use selected normalized Placeholder as offering default"
-                          Command="{Binding CatalogSetup.SetDefaultPlaceholderCommand}"
-                          IsEnabled="{Binding CatalogSetup.CanEdit}"
-                          Classes="secondary" />
                     <ItemsControl ItemsSource="{Binding OfferingDesignAreas}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="appProducts:DesignAreaSummary">
@@ -746,7 +749,9 @@
                 </StackPanel>
               </Border>
 
-              <Border Classes="panel" Padding="12">
+              <Border Classes="panel"
+                      Padding="12"
+                      IsVisible="{Binding CatalogSetup.HasSelectedOffering}">
                 <StackPanel Spacing="8">
                   <ToggleButton Content="Mockup Templates"
                                 IsChecked="True"
@@ -763,6 +768,10 @@
                             SelectedItem="{Binding CatalogSetup.SelectedPlaceholder}"
                             DisplayMemberBinding="{Binding Name}"
                             PlaceholderText="Target Placeholder" />
+                  <Button Content="Set selected Placeholder as offering default"
+                          Command="{Binding CatalogSetup.SetDefaultPlaceholderCommand}"
+                          IsEnabled="{Binding CatalogSetup.CanEdit}"
+                          Classes="secondary" />
                   <TextBox Text="{Binding CatalogSetup.TemplateName}" PlaceholderText="Mockup Template name" Classes="field" />
                   <Button Content="Create Mockup Template"
                           Command="{Binding CatalogSetup.CreateTemplateCommand}"
@@ -786,21 +795,13 @@
               <Border Classes="panel" Padding="12">
                 <StackPanel Spacing="8">
                   <ToggleButton Content="Advanced"
-                                IsChecked="False"
-                                HorizontalContentAlignment="Left" />
-                  <TextBlock Text="Provider-network identity and external identifiers are preserved by the catalog model. Shopify publication and credentials are future integration work."
-                             TextWrapping="Wrap"
-                             FontSize="12"
-                             Foreground="{DynamicResource SecondaryTextBrush}" />
-                </StackPanel>
-              </Border>
-
-              <Border Classes="panel" Padding="12">
-                <StackPanel Spacing="8">
-                  <ToggleButton Content="Advanced identifiers"
                                 IsChecked="{Binding IsAdvancedSectionExpanded, Mode=TwoWay}"
                                 HorizontalContentAlignment="Left" />
                   <StackPanel IsVisible="{Binding IsAdvancedSectionExpanded}" Spacing="8">
+                    <TextBlock Text="Provider-network identity and external identifiers are preserved by the catalog model. Shopify publication and credentials are future integration work."
+                               TextWrapping="Wrap"
+                               FontSize="12"
+                               Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBlock Text="External offering ID" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBox Text="{Binding OfferingExternalOfferingId}" Classes="field" />
                   </StackPanel>

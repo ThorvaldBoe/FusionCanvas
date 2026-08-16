@@ -2407,6 +2407,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     {
         var offerings = SelectedProduct?.Offerings ?? [];
         SelectedOffering = offerings.FirstOrDefault(offering => offering.Id == SelectedOffering?.Id) ?? offerings.FirstOrDefault();
+        CatalogSetup?.SelectOffering(SelectedOffering?.Id);
         if (SelectedOffering is not null)
         {
             ApplySelectedOfferingFields(SelectedOffering);
@@ -2451,6 +2452,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         _isCreatingNewOffering = false;
         _draftOfferingId = null;
         SelectedOffering = offering;
+        CatalogSetup?.SelectOffering(offering.Id);
         ApplySelectedOfferingFields(offering);
         ClearOfferingDeleteWarning();
         ClearDiscardChangesPrompt();
@@ -2934,6 +2936,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         _isCreatingNewOffering = false;
         _draftOfferingId = null;
         SelectedOffering = null;
+        CatalogSetup?.SelectOffering(null);
         ClearOfferingEditingFields();
         OnPropertyChanged(nameof(SelectedOffering));
         OnPropertyChanged(nameof(HasSelectedOffering));

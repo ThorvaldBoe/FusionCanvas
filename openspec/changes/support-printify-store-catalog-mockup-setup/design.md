@@ -135,6 +135,8 @@ Blueprint and Placeholder helper text is visible in first-use/empty contexts; re
 
 On Blueprint detail, the opened Blueprint is the authoritative context for offering creation. The surface must not expose a second Blueprint selector, normalized-model implementation label, provider-network identity field, or duplicate create-offering action alongside the focused `Add Blueprint Offering` flow.
 
+On Blueprint Offering detail, the opened offering identity is likewise authoritative. The compatibility editor and normalized catalog presentation synchronize by the preserved offering ID. Dependent normalized sections never fall back to the first unrelated offering, and the surface does not expose a second offering selector. If no normalized record with that identity is loaded, normalized Options/Values and Mockup Template controls remain hidden behind one explanatory unavailable state. This correction does not invent an automatic repair or duplicate-record flow; missing normalized data remains a visible integrity condition to address through the catalog model.
+
 The strategy and catalog editor are occasional administration and consume no persistent area in the main creative workspace. Avalonia headless tests cover construction, compiled bindings, visibility, disabled choices, focus, selection, cancellation, read-only state, and blocked confirmation surfaces.
 
 ### Placement and source-image behavior are intentionally absent
@@ -213,6 +215,7 @@ None. Per-Variant/size mockup overrides and placement-coordinate semantics are e
 - Add a top-level strategy selector with Manual enabled and the two future strategies disabled with accessible explanatory text.
 - Extend progressive navigation through Blueprint Offering details and Mockup Template detail. Keep one clear create action at each level and disclose Options, Variants, Placeholders, templates, and colors only inside their owner.
 - Use the opened Blueprint directly on Blueprint detail; do not expose a second normalized-catalog Blueprint selector or duplicate raw offering form.
+- Synchronize the opened compatibility offering to normalized presentation state by stable offering ID, remove the second offering selector, suppress dependent normalized controls when no matching record exists, and show a concise integrity message without selecting an unrelated fallback.
 - Provide initial/empty, populated, draft, busy, success, validation-error, persistence-error, blocked-dependency, archived/read-only, and post-delete states. Focus the first required field for new drafts; preserve drafts/selection/focus on cancelled transitions.
 - Show the future source image as an unconfigured informational state. Add no file picker, upload/import action, coordinates, placement fields, rendering command, preview compositor, or override UI.
 - Update Design Stage Tool labels and bindings from design areas/printable areas to selected Placeholders while retaining existing network warnings and editability.
