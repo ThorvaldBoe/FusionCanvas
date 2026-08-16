@@ -124,6 +124,29 @@ public class ProductCatalogPersistenceTests
     }
 
     [Fact]
+    public async Task LoadAsync_RepairsCurrentVersionDatabaseMissingFulfillmentStrategyColumn()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("missing-fulfillment-column.db");
+        var snapshot = CreateCatalogSnapshot();
+        await new SqliteWorkspaceRepository(databasePath).SaveAsync(snapshot, TestContext.Current.CancellationToken);
+
+        await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = $"ALTER TABLE stores DROP COLUMN fulfillment_strategy; PRAGMA user_version = {SqliteWorkspaceRepository.CurrentSchemaVersion};";
+            await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+
+        var loaded = await new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken);
+
+        var store = Assert.Single(loaded.Stores);
+        Assert.Equal(snapshot.Stores[0].Id, store.Id);
+        Assert.Equal(FulfillmentStrategy.Manual, store.FulfillmentStrategy);
+    }
+
+    [Fact]
     public async Task NewSchemaHasNoRenderingOverrideOrExternalIntegrationTables()
     {
         using var tempDirectory = new TemporaryDirectory();

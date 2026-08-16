@@ -99,6 +99,7 @@ The Store Editor catalog surface SHALL present focused levels for Blueprint over
 - **WHEN** the user selects a Blueprint from the overview
 - **THEN** the editor shows Blueprint identity, explanatory Blueprint helper text, compact catalog summary, Blueprint details, and its Blueprint Offerings
 - **AND** the primary creation action is scoped to adding a Blueprint Offering
+- **AND** the editor uses the opened Blueprint as the offering-creation context without showing another Blueprint selector or a duplicate raw offering form
 
 #### Scenario: User opens a Blueprint Offering
 - **WHEN** the user selects a Blueprint Offering from Blueprint detail

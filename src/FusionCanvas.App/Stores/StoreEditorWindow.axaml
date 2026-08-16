@@ -510,19 +510,6 @@
                   <TextBlock Text="An Offering is one way this Blueprint is supplied."
                              FontSize="12"
                              Foreground="{DynamicResource SecondaryTextBrush}" />
-                  <TextBlock Text="Normalized catalog setup" FontWeight="SemiBold" />
-                  <ComboBox ItemsSource="{Binding CatalogSetup.Blueprints}"
-                            SelectedItem="{Binding CatalogSetup.SelectedBlueprint}"
-                            DisplayMemberBinding="{Binding Name}"
-                            PlaceholderText="Select Blueprint" />
-                  <TextBox Text="{Binding CatalogSetup.OfferingName}" PlaceholderText="Offering name" Classes="field" />
-                  <TextBox Text="{Binding CatalogSetup.ProviderNetworkCode}"
-                           PlaceholderText="Provider Network code (for example, printify-choice)"
-                           Classes="field" />
-                  <Button Content="Add Provider-Network Offering"
-                          Command="{Binding CatalogSetup.CreateOfferingCommand}"
-                          IsEnabled="{Binding CatalogSetup.CanEdit}"
-                          Classes="secondary" />
                   <Button Content="Add Blueprint Offering"
                           Command="{Binding StartCreateOfferingCommand}"
                           IsEnabled="{Binding CanCreateCatalogItem}"

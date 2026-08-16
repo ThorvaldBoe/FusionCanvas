@@ -79,6 +79,17 @@ public class StoreEditorHeadlessTests
         window.UpdateLayout();
         Assert.True(viewModel.IsProductDetail);
         Assert.NotNull(FindButton(window, "Add Blueprint Offering"));
+        Assert.Null(FindButton(window, "Add Provider-Network Offering"));
+        Assert.DoesNotContain(
+            window.GetVisualDescendants().OfType<ComboBox>(),
+            comboBox => IsEffectivelyVisible(comboBox) && comboBox.PlaceholderText == "Select Blueprint");
+        Assert.DoesNotContain(
+            window.GetVisualDescendants().OfType<TextBox>(),
+            textBox => IsEffectivelyVisible(textBox) && textBox.PlaceholderText?.StartsWith("Provider Network code", StringComparison.Ordinal) == true);
+        var blueprintDetailText = string.Join(" ", window.GetVisualDescendants().OfType<TextBlock>()
+            .Where(IsEffectivelyVisible)
+            .Select(block => block.Text));
+        Assert.DoesNotContain("Normalized catalog setup", blueprintDetailText, StringComparison.Ordinal);
         Assert.Null(FindButton(window, "Add variant"));
 
         viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));

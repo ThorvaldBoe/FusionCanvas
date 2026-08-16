@@ -62,3 +62,8 @@
 - [x] 7.5 Run strict OpenSpec validation using the installed CLI's supported invocation and correct every proposal, design, delta-spec, task, or traceability error.
 - [x] 7.6 Perform scoped completion QA per `docs/qa-review.md`: acceptance evidence, changed-scope drift review, architecture, security, migration/rollback, Store isolation, UI state, and excluded-scope checks.
 - [x] 7.7 Confirm no unresolved high-impact decision was delegated to implementation and record any implementation-discovered ambiguity for review before proceeding.
+
+## 8. Feedback-driven Blueprint detail correction
+
+- [x] 8.1 Remove the duplicate normalized-catalog Blueprint selector and raw Provider-Network offering form from Blueprint detail so the opened Blueprint remains the sole context and `Add Blueprint Offering` remains the sole creation action.
+- [x] 8.2 Add focused Avalonia headless regression coverage for the simplified Blueprint detail and update criterion-level verification evidence.

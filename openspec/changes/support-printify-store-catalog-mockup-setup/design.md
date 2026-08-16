@@ -133,6 +133,8 @@ Catalog & mockups
 
 Blueprint and Placeholder helper text is visible in first-use/empty contexts; repeated compact controls may use accessible tooltips. Each level has one clear creation owner. Starting a draft focuses its first required control. Navigation, selection changes, Store changes, tab changes, and closing use the existing guarded-draft pattern. Successful mutations refresh from persisted state and retain the closest valid selection. Blocked dependency actions explain the required reassignment/archive step. Archived Stores render all configuration read-only.
 
+On Blueprint detail, the opened Blueprint is the authoritative context for offering creation. The surface must not expose a second Blueprint selector, normalized-model implementation label, provider-network identity field, or duplicate create-offering action alongside the focused `Add Blueprint Offering` flow.
+
 The strategy and catalog editor are occasional administration and consume no persistent area in the main creative workspace. Avalonia headless tests cover construction, compiled bindings, visibility, disabled choices, focus, selection, cancellation, read-only state, and blocked confirmation surfaces.
 
 ### Placement and source-image behavior are intentionally absent
@@ -210,6 +212,7 @@ None. Per-Variant/size mockup overrides and placement-coordinate semantics are e
 - Rename the tab and visible terminology to Catalog & mockups, Blueprint, Print Provider, Provider Network, Option, Variant, and Placeholder. Add concise helper text/tooltips for Blueprint and Placeholder.
 - Add a top-level strategy selector with Manual enabled and the two future strategies disabled with accessible explanatory text.
 - Extend progressive navigation through Blueprint Offering details and Mockup Template detail. Keep one clear create action at each level and disclose Options, Variants, Placeholders, templates, and colors only inside their owner.
+- Use the opened Blueprint directly on Blueprint detail; do not expose a second normalized-catalog Blueprint selector or duplicate raw offering form.
 - Provide initial/empty, populated, draft, busy, success, validation-error, persistence-error, blocked-dependency, archived/read-only, and post-delete states. Focus the first required field for new drafts; preserve drafts/selection/focus on cancelled transitions.
 - Show the future source image as an unconfigured informational state. Add no file picker, upload/import action, coordinates, placement fields, rendering command, preview compositor, or override UI.
 - Update Design Stage Tool labels and bindings from design areas/printable areas to selected Placeholders while retaining existing network warnings and editability.

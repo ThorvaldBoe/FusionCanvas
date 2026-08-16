@@ -24,6 +24,7 @@ Implementation and repository-wide verification are complete for the scoped Stor
 | Design-stage normalized target presentation | Pass | Design-stage application tests pass; normalized Placeholder metadata now supplies position, decoration method, dimensions, Blueprint context, and a Printify Choice Provider-Network warning to the tool view model. |
 | Normalized catalog setup presentation | Pass | `CatalogSetupViewModelTests` passes 1/1, covering typed option selection, offering/Placeholder/template state, availability guards, and color-binding command state. |
 | Store Editor focused headless coverage | Pass | `StoreEditorHeadlessTests` passes 7/7, including Catalog & mockups navigation, strategy helper text, progressive sections, future template state, and layout margins after filtering non-laid-out hidden controls. |
+| Blueprint detail uses one authoritative context | Pass | `StoreEditorHeadlessTests.ProductsPanel_DisclosesProductAndOfferingActionsByLevel` verifies Blueprint detail retains one `Add Blueprint Offering` action and exposes no second Blueprint selector, normalized implementation label, provider-network code field, or duplicate Provider-Network action. Focused class run passed 7/7. |
 | Full solution deterministic run | Pass | `dotnet test .\FusionCanvas.sln --no-restore -v minimal`; Domain 227/227, Application 367/367, Integration 181/181, and App 487/487 passed without external services, credentials, network access, or an interactive desktop. |
 
 ## Pending acceptance coverage

@@ -518,6 +518,16 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             """;
 
         await ExecuteAsync(connection, null, sql, cancellationToken);
+
+        // A database can report the current schema version while still missing
+        // a column if it was created by an interrupted or pre-release build.
+        // Reconcile this required column independently of user_version so the
+        // startup loader never queries a column that is absent physically.
+        if (!await ColumnExistsAsync(connection, "stores", "fulfillment_strategy", cancellationToken))
+        {
+            await ExecuteAsync(connection, null, "ALTER TABLE stores ADD COLUMN fulfillment_strategy INTEGER NOT NULL DEFAULT 0;", cancellationToken);
+        }
+
         if (!isFreshDatabase && schemaVersion < 2)
         {
             await MigrateToVersion2Async(connection, cancellationToken);
