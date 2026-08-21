@@ -73,3 +73,12 @@
 - [x] 9.1 Synchronize normalized catalog presentation to the opened Blueprint Offering by stable ID without falling back to an unrelated offering when the requested identity is absent.
 - [x] 9.2 Remove the second Blueprint Offering selector, hide dependent normalized controls behind one clear unavailable state when no matching record exists, and remove the duplicate Advanced panel.
 - [x] 9.3 Add focused ViewModel and Avalonia headless regression coverage, update retrospective and criterion-level evidence, and run changed-scope validation.
+
+## 10. Unified normalized Blueprint Offering editor
+
+- [x] 10.1 Add an idempotent application compatibility synchronizer that repairs missing normalized schema-11 catalog records from legacy same-ID records and mirrors authoritative normalized offering Basics, Variants, and Placeholders for compatibility readers.
+- [x] 10.2 Invoke compatibility repair during Store catalog loading and after legacy Blueprint/offering creation, preserving stable equivalent IDs and never fabricating Mockup Templates.
+- [x] 10.3 Extend `CatalogSetupViewModel` with normalized offering Basics editing, progressive Option/Value forms, explicit Variant Option-Value selection, Placeholder Variant-compatibility selection, lifecycle actions, and prerequisite/empty states.
+- [x] 10.4 Replace the mixed offering-detail Avalonia surface with ordered normalized Basics, Options & Values, Variants, Placeholders, Mockup Templates, and Advanced sections; remove legacy free-text Variant/design-area controls and duplicate summaries.
+- [x] 10.5 Add focused application, ViewModel, and Avalonia headless tests for repair idempotence, stable IDs, normalized mutations, section order, progressive forms, missing prerequisites, and absence of legacy controls.
+- [x] 10.6 Run full deterministic build/tests, strict OpenSpec validation, changed-scope QA, and update retrospective plus criterion-level verification.

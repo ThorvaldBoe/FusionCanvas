@@ -28,7 +28,7 @@ public sealed record CreateOptionValueRequest(Guid OfferingId, Guid OptionId, st
 public sealed record CreateOfferingVariantRequest(Guid OfferingId, string Name, IReadOnlyList<Guid> OptionValueIds);
 public sealed record CreateOfferingPlaceholderRequest(Guid OfferingId, string Name, string Position, string DecorationMethod, int Width, int Height, IReadOnlyList<Guid> VariantIds, string? Description = null);
 public sealed record ArchiveCatalogRecordRequest(Guid StoreId, CatalogRecordKind Kind, Guid RecordId);
-public sealed record UpdateCatalogRecordRequest(Guid StoreId, CatalogRecordKind Kind, Guid RecordId, string? Name = null, string? Description = null, string? Position = null, string? DecorationMethod = null, int? Width = null, int? Height = null, string? ProviderNetworkCode = null, Guid? DefaultPlaceholderId = null);
+public sealed record UpdateCatalogRecordRequest(Guid StoreId, CatalogRecordKind Kind, Guid RecordId, string? Name = null, string? Description = null, string? Position = null, string? DecorationMethod = null, int? Width = null, int? Height = null, string? ProviderNetworkCode = null, Guid? DefaultPlaceholderId = null, string? ExternalOfferingId = null);
 
 public enum CatalogRecordKind
 {

@@ -30,11 +30,14 @@ public sealed class CatalogSetupViewModelTests
         var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository));
 
         await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
-        viewModel.SelectedOffering = offering;
+        viewModel.SelectOffering(offering.Id);
         viewModel.SelectedOption = option;
         viewModel.SelectedPlaceholder = placeholder;
+        viewModel.StartAddOptionCommand.Execute(null);
         viewModel.OptionName = "Size";
+        viewModel.StartAddOptionValueCommand.Execute(null);
         viewModel.OptionValue = "M";
+        viewModel.StartAddTemplateCommand.Execute(null);
         viewModel.TemplateName = "Front mockup";
 
         Assert.True(viewModel.IsAvailable);

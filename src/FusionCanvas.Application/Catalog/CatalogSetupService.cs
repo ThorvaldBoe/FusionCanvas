@@ -21,7 +21,13 @@ public sealed class CatalogSetupService : ICatalogSetupService
     public async Task<CatalogSetupState> LoadForStoreAsync(Guid storeId, CancellationToken cancellationToken = default)
     {
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        return BuildState(snapshot, storeId);
+        var synchronized = CatalogCompatibilitySynchronizer.SynchronizeStore(snapshot, storeId, _clock, _newId);
+        if (synchronized.Changed)
+        {
+            await _repository.SaveAsync(synchronized.Snapshot, cancellationToken).ConfigureAwait(false);
+        }
+
+        return BuildState(synchronized.Snapshot, storeId);
     }
 
     public Task<CatalogSetupResult> CreateBlueprintAsync(CreateBlueprintRequest request, CancellationToken cancellationToken = default) =>
@@ -207,11 +213,19 @@ public sealed class CatalogSetupService : ICatalogSetupService
             if (request.Kind == CatalogRecordKind.Offering && request.DefaultPlaceholderId is Guid placeholderId &&
                 snapshot.OfferingPlaceholders.All(value => value.Id != placeholderId || value.OfferingId != request.RecordId || value.IsArchived))
                 return Failure(snapshot, request.StoreId, "The default Placeholder must belong to the offering and be active.");
+            if (request.Kind == CatalogRecordKind.Offering && request.ProviderNetworkCode is not null)
+            {
+                var offering = snapshot.BlueprintOfferings.Single(value => value.Id == request.RecordId);
+                if (offering.Kind != BlueprintOfferingKind.ProviderNetwork)
+                    return Failure(snapshot, request.StoreId, "Only a Provider-Network offering has a provider-network code.");
+                if (string.IsNullOrWhiteSpace(request.ProviderNetworkCode))
+                    return Failure(snapshot, request.StoreId, "A Provider-Network offering requires a stable provider-network code.");
+            }
             var updated = request.Kind switch
             {
                 CatalogRecordKind.Blueprint => snapshot with { Blueprints = snapshot.Blueprints.Select(value => value.Id == request.RecordId && value.StoreId == request.StoreId ? value with { Name = Required(request.Name, value.Name), Description = request.Description ?? value.Description, UpdatedAt = now } : value).ToArray() },
                 CatalogRecordKind.PrintProvider => snapshot with { PrintProviders = snapshot.PrintProviders.Select(value => value.Id == request.RecordId && value.StoreId == request.StoreId ? value with { Name = Required(request.Name, value.Name), UpdatedAt = now } : value).ToArray() },
-                CatalogRecordKind.Offering => snapshot with { BlueprintOfferings = snapshot.BlueprintOfferings.Select(value => value.Id == request.RecordId && value.StoreId == request.StoreId ? value with { Name = Required(request.Name, value.Name), Description = request.Description ?? value.Description, DefaultPlaceholderId = request.DefaultPlaceholderId ?? value.DefaultPlaceholderId, UpdatedAt = now } : value).ToArray() },
+                CatalogRecordKind.Offering => snapshot with { BlueprintOfferings = snapshot.BlueprintOfferings.Select(value => value.Id == request.RecordId && value.StoreId == request.StoreId ? value with { Name = Required(request.Name, value.Name), Description = request.Description ?? value.Description, ProviderNetworkCode = request.ProviderNetworkCode?.Trim().ToLowerInvariant() ?? value.ProviderNetworkCode, DefaultPlaceholderId = request.DefaultPlaceholderId ?? value.DefaultPlaceholderId, ExternalOfferingId = request.ExternalOfferingId ?? value.ExternalOfferingId, UpdatedAt = now } : value).ToArray() },
                 CatalogRecordKind.Option => snapshot with { OfferingOptions = snapshot.OfferingOptions.Select(value => value.Id == request.RecordId ? value with { Name = Required(request.Name, value.Name) } : value).ToArray() },
                 CatalogRecordKind.OptionValue => snapshot with { OfferingOptionValues = snapshot.OfferingOptionValues.Select(value => value.Id == request.RecordId ? value with { Value = Required(request.Name, value.Value) } : value).ToArray() },
                 CatalogRecordKind.Variant => snapshot with { OfferingVariants = snapshot.OfferingVariants.Select(value => value.Id == request.RecordId ? value with { Name = Required(request.Name, value.Name), UpdatedAt = now } : value).ToArray() },
@@ -226,8 +240,10 @@ public sealed class CatalogSetupService : ICatalogSetupService
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
         var result = mutation(snapshot);
         if (!result.Succeeded) return result;
-        await _repository.SaveAsync(ToSnapshot(result), cancellationToken).ConfigureAwait(false);
-        return CatalogSetupResult.Success(BuildState(ToSnapshot(result), storeId ?? result.State.StoreId));
+        var targetStoreId = storeId ?? result.State.StoreId;
+        var synchronized = CatalogCompatibilitySynchronizer.SynchronizeStore(ToSnapshot(result), targetStoreId, _clock, _newId);
+        await _repository.SaveAsync(synchronized.Snapshot, cancellationToken).ConfigureAwait(false);
+        return CatalogSetupResult.Success(BuildState(synchronized.Snapshot, targetStoreId));
     }
 
     private static WorkspaceSnapshot ToSnapshot(CatalogSetupResult result) => result.Snapshot ?? throw new InvalidOperationException("Catalog mutation did not produce a snapshot.");

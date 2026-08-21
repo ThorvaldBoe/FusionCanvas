@@ -1,6 +1,7 @@
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Catalog;
+using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Workspace;
 
@@ -90,12 +91,57 @@ public sealed class CatalogSetupServiceTests
         Assert.True(deleted.State.Blueprints.Single().IsArchived);
     }
 
+    [Fact]
+    public async Task LoadsLegacyOnlyOfferingByRepairingAnIdempotentNormalizedGraph()
+    {
+        var storeId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var offeringId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+        var areaId = Guid.NewGuid();
+        var repository = new MemoryRepository(new WorkspaceSnapshot(
+            [WorkspaceSnapshot.DefaultWorkspace(Now)],
+            [NewStore(storeId, "First")], [], [], [], [], [], [], [], [])
+        {
+            StoreProducts = [new StoreProduct(productId, storeId, "Gildan 64000", null, null, Now, Now, "{}")],
+            FulfillmentOfferings = [new FulfillmentOffering(offeringId, productId, "G64000", null, FulfillmentKind.FixedProvider, "Print Provider", null, Now, Now, "{}")],
+            ProductVariants = [new ProductVariant(variantId, offeringId, [new VariantOption("Color", "Black"), new VariantOption("Size", "M")], Now, Now)],
+            DesignAreas = [new DesignArea(areaId, offeringId, "Front", null, "front", "DTG", 1200, 1400, [], Now, Now, "{}")]
+        });
+        var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
+
+        var first = await service.LoadForStoreAsync(storeId, TestContext.Current.CancellationToken);
+        var second = await service.LoadForStoreAsync(storeId, TestContext.Current.CancellationToken);
+
+        Assert.Equal(productId, Assert.Single(first.Blueprints).Id);
+        Assert.Equal(offeringId, Assert.Single(first.Offerings).Id);
+        Assert.Equal(variantId, Assert.Single(first.Variants).Id);
+        Assert.Equal(areaId, Assert.Single(first.Placeholders).Id);
+        Assert.Contains(first.Options, option => option.OptionKind == OptionKind.Color);
+        Assert.Contains(first.Options, option => option.OptionKind == OptionKind.Size);
+        Assert.Equal(first.Blueprints.Count, second.Blueprints.Count);
+        Assert.Equal(first.Offerings.Count, second.Offerings.Count);
+        Assert.Equal(first.Options.Count, second.Options.Count);
+        Assert.Equal(first.OptionValues.Count, second.OptionValues.Count);
+        Assert.Equal(1, repository.SaveCount);
+
+        var updated = await service.UpdateAsync(
+            new UpdateCatalogRecordRequest(storeId, CatalogRecordKind.Offering, offeringId, Name: "Updated G64000"),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(updated.Succeeded);
+        Assert.Equal("Updated G64000", repository.Current.BlueprintOfferings.Single(value => value.Id == offeringId).Name);
+        Assert.Equal("Updated G64000", repository.Current.FulfillmentOfferings.Single(value => value.Id == offeringId).Name);
+    }
+
     private static Store NewStore(Guid id, string name) => new(id, name, null, false, Now, Now, "{}");
 
     private sealed class MemoryRepository(WorkspaceSnapshot? initial = null) : IWorkspaceRepository
     {
         private WorkspaceSnapshot _snapshot = initial ?? WorkspaceSnapshot.Empty;
+        public int SaveCount { get; private set; }
+        public WorkspaceSnapshot Current => _snapshot;
         public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(_snapshot);
-        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default) { _snapshot = snapshot; return Task.CompletedTask; }
+        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default) { _snapshot = snapshot; SaveCount++; return Task.CompletedTask; }
     }
 }

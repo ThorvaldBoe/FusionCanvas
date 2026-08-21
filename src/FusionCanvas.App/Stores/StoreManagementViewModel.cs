@@ -996,6 +996,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public bool HasSelectedOffering => SelectedOffering is not null;
 
+    public bool IsCreatingNewOffering => _isCreatingNewOffering;
+
     public bool HasSelectedVariant => SelectedOffering?.Variants.Any() == true;
 
     public bool HasSelectedDesignArea => SelectedOffering?.DesignAreas.Any() == true;
@@ -2691,6 +2693,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private void BeginCreateOfferingDraft()
     {
         _isCreatingNewOffering = true;
+        OnPropertyChanged(nameof(IsCreatingNewOffering));
         _draftOfferingId = Guid.NewGuid();
         ClearOfferingEditingFields();
         SelectedOffering = DraftOffering();
@@ -2736,9 +2739,15 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             {
                 _isCreatingNewOffering = false;
                 _draftOfferingId = null;
+                OnPropertyChanged(nameof(IsCreatingNewOffering));
             }
 
             ApplyOfferingResult(result);
+            if (result.Succeeded && CatalogSetup is not null && SelectedStore is not null)
+            {
+                await CatalogSetup.LoadForStoreAsync(SelectedStore.Id, cancellationToken).ConfigureAwait(false);
+                CatalogSetup.SelectOffering(result.Offering?.Id);
+            }
             return;
         }
 
@@ -2934,6 +2943,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private void ClearOfferingSelection()
     {
         _isCreatingNewOffering = false;
+        OnPropertyChanged(nameof(IsCreatingNewOffering));
         _draftOfferingId = null;
         SelectedOffering = null;
         CatalogSetup?.SelectOffering(null);

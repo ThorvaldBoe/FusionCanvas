@@ -94,12 +94,12 @@ public class StoreEditorHeadlessTests
             .Where(IsEffectivelyVisible)
             .Select(block => block.Text));
         Assert.DoesNotContain("Normalized catalog setup", blueprintDetailText, StringComparison.Ordinal);
-        Assert.Null(FindButton(window, "Add variant"));
+        Assert.Null(FindButton(window, "Add Variant"));
 
         viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
         window.UpdateLayout();
         Assert.True(viewModel.IsOfferingDetail);
-        Assert.NotNull(FindButton(window, "Add variant"));
+        Assert.NotNull(FindButton(window, "Add Variant"));
         Assert.NotNull(FindButton(window, "Add Placeholder"));
 
         window.Close();
@@ -138,10 +138,16 @@ public class StoreEditorHeadlessTests
         Assert.Contains("Mockup Templates", text, StringComparison.Ordinal);
         Assert.Contains("Source image: not configured", text, StringComparison.Ordinal);
         Assert.Equal(viewModel.SelectedOffering!.Id, viewModel.CatalogSetup!.SelectedOfferingId);
-        Assert.NotNull(FindButton(window, "Add typed Option"));
-        Assert.NotNull(FindButton(window, "Add Option Value"));
-        Assert.NotNull(FindButton(window, "Create Mockup Template"));
+        var addOption = FindButton(window, "Add Option");
+        Assert.NotNull(addOption);
+        Assert.Null(FindButton(window, "Add Option Value"));
+        Assert.NotNull(FindButton(window, "Add Mockup Template"));
+        Assert.Null(FindButton(window, "Save Mockup Template"));
         Assert.NotNull(FindButton(window, "Link Color Option Value"));
+        addOption!.Command!.Execute(addOption.CommandParameter);
+        window.UpdateLayout();
+        Assert.NotNull(FindButton(window, "Save Option"));
+        Assert.NotNull(FindButton(window, "Cancel"));
         var buttonLabels = string.Join(" ", window.GetVisualDescendants().OfType<Button>().Select(button => button.Content as string));
         Assert.DoesNotContain("Upload", buttonLabels, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("placement", buttonLabels, StringComparison.OrdinalIgnoreCase);
@@ -150,15 +156,20 @@ public class StoreEditorHeadlessTests
         Assert.DoesNotContain(
             window.GetVisualDescendants().OfType<ComboBox>(),
             comboBox => IsEffectivelyVisible(comboBox) && comboBox.PlaceholderText == "Select Blueprint Offering");
-        Assert.Single(
-            window.GetVisualDescendants().OfType<ToggleButton>(),
-            toggle => IsEffectivelyVisible(toggle) && string.Equals(toggle.Content as string, "Advanced", StringComparison.Ordinal));
+        var sections = window.GetVisualDescendants().OfType<ToggleButton>()
+            .Where(IsEffectivelyVisible)
+            .Select(toggle => toggle.Content as string)
+            .Where(content => content is not null)
+            .ToArray();
+        Assert.Equal(
+            ["Basics", "Options & Values", "Variants", "Placeholders", "Mockup Templates", "Advanced"],
+            sections.Where(content => content is "Basics" or "Options & Values" or "Variants" or "Placeholders" or "Mockup Templates" or "Advanced"));
 
         window.Close();
     }
 
     [AvaloniaFact]
-    public void OfferingDetailWithoutNormalizedRecordExplainsUnavailableSections()
+    public void OfferingDetailWithoutNormalizedRecordRepairsAndShowsNormalizedEditor()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: false);
         var viewModel = (StoreManagementViewModel)window.DataContext!;
@@ -170,9 +181,10 @@ public class StoreEditorHeadlessTests
         var text = string.Join(" ", window.GetVisualDescendants().OfType<TextBlock>()
             .Where(IsEffectivelyVisible)
             .Select(block => block.Text));
-        Assert.Contains("has no matching normalized catalog record", text, StringComparison.Ordinal);
-        Assert.Null(FindButton(window, "Add typed Option"));
-        Assert.Null(FindButton(window, "Create Mockup Template"));
+        Assert.DoesNotContain("could not be repaired", text, StringComparison.Ordinal);
+        Assert.NotNull(FindButton(window, "Add Option"));
+        Assert.NotNull(FindButton(window, "Add Mockup Template"));
+        Assert.Equal(viewModel.SelectedOffering!.Id, viewModel.CatalogSetup!.SelectedOfferingId);
         Assert.DoesNotContain(
             window.GetVisualDescendants().OfType<ComboBox>(),
             comboBox => IsEffectivelyVisible(comboBox) && comboBox.PlaceholderText == "Select Blueprint Offering");

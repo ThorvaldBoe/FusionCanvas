@@ -160,6 +160,18 @@ The Blueprint Offering detail surface SHALL group controls in dependency order: 
 - **THEN** the editor keeps the variable-network warning visible near offering or Placeholder guidance
 - **AND** does not show or fabricate a fixed Print Provider
 
+#### Scenario: User reviews the normalized offering editor
+- **WHEN** a Blueprint Offering detail surface is active
+- **THEN** Basics, Options and Values, Variants, Placeholders, Mockup Templates, and Advanced read and mutate the normalized catalog graph for that offering
+- **AND** the editor does not expose legacy free-text Color/Size Variant creation or legacy design-area controls
+- **AND** each creation form remains collapsed until its specifically named Add action is activated
+
+#### Scenario: Current-schema Store contains compatibility-only catalog records
+- **WHEN** FusionCanvas loads a Store containing a legacy Blueprint or offering identity that has no normalized equivalent because it was created by an earlier schema-11 build
+- **THEN** FusionCanvas repairs the missing normalized Blueprint, offering, Option, Option Value, Variant, and Placeholder records atomically using the preserved compatibility identities
+- **AND** subsequent normalized edits keep compatibility readers aligned without making the compatibility graph an independent UI editing source
+- **AND** repair does not overwrite an existing normalized record or fabricate mockup templates
+
 ### Requirement: Catalog navigation preserves editing safeguards
 The progressive-disclosure Store Editor SHALL treat back navigation, breadcrumbs, level changes, tab changes, Store changes, and selection changes as guarded transitions. It SHALL preserve drafts when the user cancels a transition and SHALL use explicit save/discard behavior before abandoning meaningful unsaved catalog or Mockup Template edits.
 
