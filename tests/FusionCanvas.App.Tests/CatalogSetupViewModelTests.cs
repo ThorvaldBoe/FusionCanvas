@@ -79,4 +79,69 @@ public sealed class CatalogSetupViewModelTests
         Assert.False(viewModel.HasSelectedOffering);
         Assert.True(viewModel.IsOfferingContextUnavailable);
     }
+
+    [Fact]
+    public async Task FocusedTemplateDraftRequiresProviderImageDesignAreaColorAndBoundedMapping()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "SwiftPOD", null, BlueprintOfferingKind.ProviderNetwork, null, "printify-choice", null, null, false, now, now);
+        var colorOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
+        var sizeOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Size, "Size", 1);
+        var black = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "Black", 0);
+        var medium = new OfferingOptionValue(Guid.NewGuid(), sizeOption.Id, offering.Id, "M", 0);
+        var variant = new OfferingVariant(Guid.NewGuid(), offering.Id, "Black / M", [black.Id, medium.Id], false, now, now);
+        var area = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 4500, 5400, [variant.Id], false, now, now);
+        var populated = snapshot with
+        {
+            Blueprints = [blueprint], BlueprintOfferings = [offering], OfferingOptions = [colorOption, sizeOption],
+            OfferingOptionValues = [black, medium], OfferingVariants = [variant], OfferingPlaceholders = [area]
+        };
+        var repository = new InMemoryWorkspaceRepository(populated);
+        var context = new OfferingContext(store.Id, blueprint.Id, offering.Id);
+        var source = new StubProviderCatalog(new ProviderCatalogCandidateDescriptor(context, true, null,
+            new HashSet<ProviderCatalogCombination> { new(black.Id, medium.Id) },
+            [new ProviderMockupCandidateDescriptor("front-black", "Front — Black", 1000, 1200, new HashSet<Guid> { black.Id })]));
+        var viewModel = new CatalogSetupViewModel(
+            new CatalogSetupService(repository), new MockupTemplateSetupService(repository),
+            new OfferingManagementService(repository, source), source);
+
+        await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+        viewModel.SelectedPlaceholder = area;
+        viewModel.StartAddTemplateCommand.Execute(null);
+        viewModel.TemplateName = "Front mockup";
+        Assert.Single(viewModel.TemplateColorChoices).IsSelected = true;
+
+        Assert.True(viewModel.HasProviderMockupCandidates);
+        Assert.Equal(1000, viewModel.MappingImageWidth);
+        Assert.Equal(1200, viewModel.MappingImageHeight);
+        Assert.True(viewModel.CreateTemplateCommand.CanExecute(null));
+
+        viewModel.MappingWidth = 2000;
+        Assert.False(viewModel.CreateTemplateCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void DesignAreaPhysicalSizeIsUnavailableWithoutDpiAndDerivedWhenProvided()
+    {
+        var viewModel = new CatalogSetupViewModel(
+            new CatalogSetupService(new InMemoryWorkspaceRepository(SampleWorkspace.Create())),
+            new MockupTemplateSetupService(new InMemoryWorkspaceRepository(SampleWorkspace.Create())));
+        viewModel.PlaceholderWidth = "4500";
+        viewModel.PlaceholderHeight = "5400";
+
+        Assert.Contains("unavailable", viewModel.PhysicalSizeSummary, StringComparison.OrdinalIgnoreCase);
+
+        viewModel.ArtworkDpi = "300";
+        Assert.Contains("15", viewModel.PhysicalSizeSummary, StringComparison.Ordinal);
+        Assert.Contains("mm", viewModel.PhysicalSizeSummary, StringComparison.Ordinal);
+    }
+
+    private sealed class StubProviderCatalog(ProviderCatalogCandidateDescriptor descriptor) : IProviderCatalogCandidateSource
+    {
+        public Task<ProviderCatalogCandidateDescriptor> LoadAsync(OfferingContext context, CancellationToken cancellationToken = default) =>
+            Task.FromResult(descriptor);
+    }
 }

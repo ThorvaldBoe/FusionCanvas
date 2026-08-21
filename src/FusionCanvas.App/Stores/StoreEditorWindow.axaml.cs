@@ -28,6 +28,7 @@ public partial class StoreEditorWindow : Window
         {
             _subscribedViewModel.StoreNameFocusRequested -= OnStoreNameFocusRequested;
             _subscribedViewModel.ProductNameFocusRequested -= OnProductNameFocusRequested;
+            _subscribedViewModel.OfferingNameFocusRequested -= OnOfferingNameFocusRequested;
             _subscribedViewModel = null;
         }
 
@@ -39,6 +40,7 @@ public partial class StoreEditorWindow : Window
         _subscribedViewModel = viewModel;
         viewModel.StoreNameFocusRequested += OnStoreNameFocusRequested;
         viewModel.ProductNameFocusRequested += OnProductNameFocusRequested;
+        viewModel.OfferingNameFocusRequested += OnOfferingNameFocusRequested;
     }
 
     private void OnStoreNameFocusRequested(object? sender, EventArgs e)
@@ -59,6 +61,15 @@ public partial class StoreEditorWindow : Window
                 ProductNameTextBox.Focus();
                 ProductNameTextBox.SelectAll();
             }
+        });
+    }
+
+    private void OnOfferingNameFocusRequested(object? sender, EventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            OfferingNameTextBox.Focus();
+            OfferingNameTextBox.SelectAll();
         });
     }
 }

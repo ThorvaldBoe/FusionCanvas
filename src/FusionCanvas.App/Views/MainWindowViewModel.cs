@@ -166,13 +166,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 new ZipWorkspacePackageReader()));
         Settings = CreateSettings(settings);
         var productService = productSupplierSetupService ?? new ProductSupplierSetupService(workspaceRepository);
+        var providerCatalog = new UnavailableProviderCatalogCandidateSource();
         StoreManagement = new StoreManagementViewModel(
             new StoreManagementService(workspaceRepository),
             new NicheManagementService(workspaceRepository),
             new TagManagementService(workspaceRepository),
             productService,
             catalogSetupService ?? new CatalogSetupService(workspaceRepository),
-            mockupTemplateSetupService ?? new MockupTemplateSetupService(workspaceRepository));
+            mockupTemplateSetupService ?? new MockupTemplateSetupService(workspaceRepository),
+            new OfferingManagementService(workspaceRepository, providerCatalog),
+            providerCatalog);
         _groupManagementService = groupManagementService ?? new GroupManagementService(workspaceRepository);
         _itemManagementService = itemManagementService ?? new ItemManagementService(workspaceRepository);
         _itemCsvImportService = itemCsvImportService ?? new ItemCsvImportService(workspaceRepository);

@@ -13,6 +13,19 @@ The workflow belongs in the dedicated Store Editor, not the primary creative wor
 
 The design does not copy wireframe geometry or add the wireframes as repository assets. It supersedes the earlier “future placement extension only” boundary only for revisioned image-space mapping; it does not reopen artwork composition, rendering, upload, or per-concrete-Variant override decisions.
 
+### Implementation baseline audit
+
+- The current persistence baseline is SQLite schema version 11. Catalog tables and compatibility repair are implemented in `SqliteWorkspaceRepository`, `CatalogSetupService`, and `CatalogCompatibilitySynchronizer`.
+- Authoritative catalog types are `Blueprint`, `BlueprintOffering`, `PrintProvider`, `OfferingOption`, `OfferingOptionValue`, `OfferingVariant`, and `OfferingPlaceholder`. Mockup types are `MockupTemplate`, `MockupTemplateColorVariant`, `MockupTemplateRevision`, and `MockupTemplateRevisionColor`.
+- `MockupTemplateRevision` currently snapshots target Placeholder and colors but has no image reference or placement mapping. `OfferingPlaceholder` currently has no structured provider reference or artwork-guidance projection.
+- Store catalog navigation currently has `Overview`, `ProductDetail`, and `OfferingDetail` levels in `StoreManagementViewModel`; focused Variant, Design Area, and Mockup Template levels must be added without label-based fallback.
+- Existing Store/Product/Offering draft transitions use `HasAnyCatalogUnsavedChanges`, `RequestDiscardBefore`, `PendingEditorAction`, and the shared discard prompt. Nested normalized forms in `CatalogSetupViewModel` currently cancel locally but are not all represented by the shared transition guard.
+- Issue #185's visible “Placeholder” terminology is intentionally refined here: the domain identity remains `OfferingPlaceholder`, while the focused creator-facing surface uses “Design Area” with supplementary text that it corresponds to the provider/Printify Placeholder concept.
+- Issue #185's empty future placement state is intentionally advanced only to revision-owned provider-image mapping. Source upload, artwork placement/composition, rendering, and per-concrete-Variant overrides remain excluded.
+- Existing template color-level applicability remains authoritative; “applicable Variants” in this change is a derived summary and compatibility check, not a new per-size binding model.
+
+No high-impact ambiguity was found in the baseline. These reconciliations are binding implementation constraints.
+
 ## Goals / Non-Goals
 
 **Goals:**

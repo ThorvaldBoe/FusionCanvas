@@ -74,6 +74,35 @@ public sealed class CatalogSetupServiceTests
     }
 
     [Fact]
+    public async Task CreatesDesignAreaForAllActiveVariantsWithProviderGuidance()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprint = new Blueprint(Guid.NewGuid(), storeId, "T-shirt", null, false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, storeId, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "printify-choice", null, null, false, Now, Now);
+        var colorOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
+        var black = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "Black", 0);
+        var white = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "White", 1);
+        var active = new OfferingVariant(Guid.NewGuid(), offering.Id, "Black", [black.Id], false, Now, Now);
+        var archived = new OfferingVariant(Guid.NewGuid(), offering.Id, "White", [white.Id], true, Now, Now);
+        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "First")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint], BlueprintOfferings = [offering], OfferingOptions = [colorOption], OfferingOptionValues = [black, white], OfferingVariants = [active, archived]
+        });
+        var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
+        var guidance = new DesignAreaArtworkGuidance(4500, 5400, 300, "PNG", "Transparent");
+
+        var result = await service.CreatePlaceholderAsync(new CreateOfferingPlaceholderRequest(
+            offering.Id, "Front", "front", "DTG", 3000, 4500, [], UseAllActiveVariants: true,
+            ProviderReference: "front-area", ArtworkGuidance: guidance), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        var area = Assert.Single(result.State.Placeholders);
+        Assert.Equal([active.Id], area.VariantIds);
+        Assert.Equal("front-area", area.ProviderReference);
+        Assert.Equal(guidance, area.ArtworkGuidance);
+    }
+
+    [Fact]
     public async Task UpdatesCatalogRecordsAndRoutesDeleteThroughArchivalPolicy()
     {
         var storeId = Guid.NewGuid();

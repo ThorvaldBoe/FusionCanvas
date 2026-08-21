@@ -46,10 +46,10 @@ public class ProductCatalogPersistenceTests
         var black = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "Black", 0);
         var medium = new OfferingOptionValue(Guid.NewGuid(), sizeOption.Id, offering.Id, "M", 0);
         var variant = new OfferingVariant(Guid.NewGuid(), offering.Id, "Black / M", [black.Id, medium.Id], false, Now, Now);
-        var placeholder = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 3000, 4500, [variant.Id], false, Now, Now);
+        var placeholder = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 3000, 4500, [variant.Id], false, Now, Now, providerReference: "front-print-area", artworkGuidance: new DesignAreaArtworkGuidance(4500, 5400, 300, "PNG", "Transparent"));
         var template = new MockupTemplate(Guid.NewGuid(), offering.Id, placeholder.Id, "Front mockup", null, 1, false, Now, Now);
         var templateColor = new MockupTemplateColorVariant(Guid.NewGuid(), template.Id, black.Id, false, Now, Now);
-        var revision = new MockupTemplateRevision(Guid.NewGuid(), template.Id, 1, placeholder.Id, Now);
+        var revision = new MockupTemplateRevision(Guid.NewGuid(), template.Id, 1, placeholder.Id, Now, providerMockupReference: "provider-image-front-black", imageMapping: new MockupImageSpaceMapping(1200, 1200, 360, 240, 480, 600));
         var revisionColor = new MockupTemplateRevisionColor(Guid.NewGuid(), revision.Id, black.Id);
         var snapshot = new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [store], [], [], [], [], [], [], [], [])
         {
@@ -71,9 +71,13 @@ public class ProductCatalogPersistenceTests
         Assert.Equal(snapshot.OfferingVariants[0].OptionValueIds.OrderBy(value => value), loaded.OfferingVariants[0].OptionValueIds.OrderBy(value => value));
         Assert.Equal(snapshot.OfferingPlaceholders.Select(value => value.Id).OrderBy(value => value), loaded.OfferingPlaceholders.Select(value => value.Id).OrderBy(value => value));
         Assert.Equal(snapshot.OfferingPlaceholders[0].VariantIds, loaded.OfferingPlaceholders[0].VariantIds);
+        Assert.Equal(placeholder.ProviderReference, loaded.OfferingPlaceholders[0].ProviderReference);
+        Assert.Equal(placeholder.ArtworkGuidance, loaded.OfferingPlaceholders[0].ArtworkGuidance);
         Assert.Equal(snapshot.MockupTemplates, loaded.MockupTemplates);
         Assert.Equal(snapshot.MockupTemplateColorVariants, loaded.MockupTemplateColorVariants);
         Assert.Equal(snapshot.MockupTemplateRevisions, loaded.MockupTemplateRevisions);
+        Assert.Equal(revision.ProviderMockupReference, loaded.MockupTemplateRevisions[0].ProviderMockupReference);
+        Assert.Equal(revision.ImageMapping, loaded.MockupTemplateRevisions[0].ImageMapping);
         Assert.Equal(snapshot.MockupTemplateRevisionColors, loaded.MockupTemplateRevisionColors);
     }
 
@@ -121,6 +125,53 @@ public class ProductCatalogPersistenceTests
         }
 
         Assert.Equal(SqliteWorkspaceRepository.CurrentSchemaVersion, await ReadUserVersionAsync(databasePath));
+    }
+
+    [Fact]
+    public async Task LoadAsync_MigratesSchemaElevenWithExplicitUnconfiguredUxFields()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("schema-eleven.db");
+        await new SqliteWorkspaceRepository(databasePath).SaveAsync(CreateCatalogSnapshot(), TestContext.Current.CancellationToken);
+
+        await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                ALTER TABLE offering_placeholders DROP COLUMN provider_reference;
+                ALTER TABLE offering_placeholders DROP COLUMN recommended_width_px;
+                ALTER TABLE offering_placeholders DROP COLUMN recommended_height_px;
+                ALTER TABLE offering_placeholders DROP COLUMN recommended_dpi;
+                ALTER TABLE offering_placeholders DROP COLUMN recommended_format;
+                ALTER TABLE offering_placeholders DROP COLUMN recommended_background;
+                ALTER TABLE mockup_template_revisions DROP COLUMN provider_mockup_reference;
+                ALTER TABLE mockup_template_revisions DROP COLUMN image_width;
+                ALTER TABLE mockup_template_revisions DROP COLUMN image_height;
+                ALTER TABLE mockup_template_revisions DROP COLUMN mapping_x;
+                ALTER TABLE mockup_template_revisions DROP COLUMN mapping_y;
+                ALTER TABLE mockup_template_revisions DROP COLUMN mapping_width;
+                ALTER TABLE mockup_template_revisions DROP COLUMN mapping_height;
+                PRAGMA user_version = 11;
+                """;
+            await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+
+        var loaded = await new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(SqliteWorkspaceRepository.CurrentSchemaVersion, await ReadUserVersionAsync(databasePath));
+        Assert.All(loaded.OfferingPlaceholders, value =>
+        {
+            Assert.Null(value.ProviderReference);
+            Assert.Null(value.ArtworkGuidance);
+        });
+        Assert.All(loaded.MockupTemplateRevisions, value =>
+        {
+            Assert.Null(value.ProviderMockupReference);
+            Assert.Null(value.ImageMapping);
+        });
+        Assert.Contains("recommended_width_px", await ReadColumnNamesAsync(databasePath, "offering_placeholders"));
+        Assert.Contains("mapping_width", await ReadColumnNamesAsync(databasePath, "mockup_template_revisions"));
     }
 
     [Fact]
@@ -270,6 +321,7 @@ public class ProductCatalogPersistenceTests
         var databasePath = tempDirectory.GetPath("catalog.db");
         var repository = new SqliteWorkspaceRepository(databasePath);
         var snapshot = CreateCatalogSnapshot();
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
         var choiceOffering = snapshot.FulfillmentOfferings.Single(o => o.Kind == FulfillmentKind.PrintifyChoiceNetwork);
         var fixedOfferingVariant = snapshot.ProductVariants[0];
         var crossArea = new DesignArea(
@@ -284,6 +336,38 @@ public class ProductCatalogPersistenceTests
             () => repository.SaveAsync(snapshot, TestContext.Current.CancellationToken));
 
         Assert.Contains("own offering", exception.Message);
+        var unchanged = await repository.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.DoesNotContain(unchanged.DesignAreas, value => value.Id == crossArea.Id);
+    }
+
+    [Fact]
+    public async Task LoadAsync_RejectsPersistedMockupMappingOutsideImageBounds()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("invalid-mapping.db");
+        var repository = new SqliteWorkspaceRepository(databasePath);
+        var store = new Store(Guid.NewGuid(), "Store", null, false, Now, Now, "{}");
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "printify-choice", null, null, false, Now, Now);
+        var area = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 3000, 4500, [], false, Now, Now);
+        var template = new MockupTemplate(Guid.NewGuid(), offering.Id, area.Id, "Front", null, 1, false, Now, Now);
+        var revision = new MockupTemplateRevision(Guid.NewGuid(), template.Id, 1, area.Id, Now, providerMockupReference: "front", imageMapping: new MockupImageSpaceMapping(1200, 1200, 300, 200, 500, 650));
+        var snapshot = new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [store], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint], BlueprintOfferings = [offering], OfferingPlaceholders = [area], MockupTemplates = [template], MockupTemplateRevisions = [revision]
+        };
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+
+        await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE mockup_template_revisions SET mapping_width = image_width WHERE id = $id;";
+            command.Parameters.AddWithValue("$id", revision.Id.ToString());
+            await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => repository.LoadAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -485,6 +569,19 @@ public class ProductCatalogPersistenceTests
         await using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version;";
         return Convert.ToInt32(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken));
+    }
+
+    private static async Task<IReadOnlyList<string>> ReadColumnNamesAsync(string databasePath, string table)
+    {
+        await using var connection = new SqliteConnection($"Data Source={databasePath}");
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"PRAGMA table_info({table});";
+        var result = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+        while (await reader.ReadAsync(TestContext.Current.CancellationToken))
+            result.Add(reader.GetString(1));
+        return result;
     }
 
     private sealed class TemporaryDirectory : IDisposable

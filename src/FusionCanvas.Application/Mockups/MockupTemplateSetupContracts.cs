@@ -10,11 +10,11 @@ public sealed record MockupTemplateSetupResult(bool Succeeded, string? Error, Mo
     public static MockupTemplateSetupResult Failure(string error, MockupTemplateSetupState state) => new(false, error, state);
 }
 
-public sealed record CreateMockupTemplateRequest(Guid StoreId, Guid OfferingId, string Name, Guid TargetPlaceholderId, string? Description = null, string? PositionKey = null);
+public sealed record CreateMockupTemplateRequest(Guid StoreId, Guid OfferingId, string Name, Guid TargetPlaceholderId, string? Description = null, string? PositionKey = null, string? ProviderMockupReference = null, MockupImageSpaceMapping? ImageMapping = null);
 public sealed record AddMockupTemplateColorRequest(Guid StoreId, Guid TemplateId, Guid ColorOptionValueId);
 public sealed record ArchiveMockupTemplateColorRequest(Guid StoreId, Guid TemplateColorId);
 public sealed record ArchiveMockupTemplateRequest(Guid StoreId, Guid TemplateId);
-public sealed record UpdateMockupTemplateRequest(Guid StoreId, Guid TemplateId, string? Name = null, string? Description = null, Guid? TargetPlaceholderId = null, string? PositionKey = null);
+public sealed record UpdateMockupTemplateRequest(Guid StoreId, Guid TemplateId, string? Name = null, string? Description = null, Guid? TargetPlaceholderId = null, string? PositionKey = null, bool ReplaceProviderImage = false, string? ProviderMockupReference = null, MockupImageSpaceMapping? ImageMapping = null, IReadOnlyList<Guid>? ReplaceColorOptionValueIds = null);
 
 public interface IMockupTemplateSetupService
 {

@@ -84,6 +84,54 @@ public class ProductCatalogViewModelTests
     }
 
     [Fact]
+    public async Task OfferingOverview_RoutesToFocusedManagementWithoutChangingContext()
+    {
+        var store = NewStore("North Star");
+        var repository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true));
+        var viewModel = NewStoreManagementViewModel(repository);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.OpenProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        var offering = Assert.Single(viewModel.SelectedProduct!.Offerings, item => item.Kind == FulfillmentKind.FixedProvider);
+        viewModel.OpenOfferingDetailCommand.Execute(offering);
+
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        Assert.True(viewModel.IsVariantManagement);
+        Assert.Equal(offering.Id, viewModel.SelectedOffering!.Id);
+
+        viewModel.BackToOfferingOverviewCommand.Execute(null);
+        viewModel.OpenDesignAreaManagementCommand.Execute(null);
+        Assert.True(viewModel.IsDesignAreaManagement);
+        Assert.Equal(offering.Id, viewModel.SelectedOffering!.Id);
+
+        viewModel.BackToOfferingOverviewCommand.Execute(null);
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        Assert.True(viewModel.IsMockupTemplateManagement);
+        Assert.Equal(offering.Id, viewModel.SelectedOffering!.Id);
+    }
+
+    [Fact]
+    public async Task UnsavedOfferingBasics_BlockFocusedManagementRoute()
+    {
+        var store = NewStore("North Star");
+        var repository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true));
+        var viewModel = NewStoreManagementViewModel(repository);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.OpenProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings, item => item.Kind == FulfillmentKind.FixedProvider));
+        viewModel.OfferingName = "Unsaved name";
+
+        viewModel.OpenVariantManagementCommand.Execute(null);
+
+        Assert.True(viewModel.IsOfferingDetail);
+        Assert.True(viewModel.DiscardChangesPromptVisible);
+
+        viewModel.KeepEditingCommand.Execute(null);
+        Assert.True(viewModel.IsOfferingDetail);
+    }
+
+    [Fact]
     public async Task EmptyStore_ProductsTabShowsNoProductsAndCanCreateDraft()
     {
         var store = NewStore("North Star");
@@ -148,6 +196,29 @@ public class ProductCatalogViewModelTests
         viewModel.StartCreateProductCommand.Execute(null);
 
         Assert.Equal(1, focusRequests);
+    }
+
+    [Fact]
+    public async Task NewOfferingDraft_RequestsFocusAndCanBeCancelled()
+    {
+        var store = NewStore("North Star");
+        var repository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true));
+        var viewModel = NewStoreManagementViewModel(repository);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.OpenProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        var focusRequests = 0;
+        viewModel.OfferingNameFocusRequested += (_, _) => focusRequests++;
+
+        viewModel.StartCreateOfferingCommand.Execute(null);
+
+        Assert.True(viewModel.IsCreatingNewOffering);
+        Assert.Equal(1, focusRequests);
+
+        viewModel.CancelNewOfferingCommand.Execute(null);
+
+        Assert.False(viewModel.IsCreatingNewOffering);
+        Assert.True(viewModel.IsProductDetail);
     }
 
     [Fact]

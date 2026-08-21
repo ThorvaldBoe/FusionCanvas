@@ -60,7 +60,10 @@ public enum CatalogEditorLevel
 {
     Overview,
     ProductDetail,
-    OfferingDetail
+    OfferingDetail,
+    VariantManagement,
+    DesignAreaManagement,
+    MockupTemplateManagement
 }
 
 public sealed class StoreManagementViewModel : INotifyPropertyChanged
@@ -86,7 +89,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         BackToProducts,
         BackToProduct,
         SelectArea,
-        SelectVariant
+        SelectVariant,
+        NavigateCatalog
     }
 
     private sealed record ProductDraft(
@@ -162,6 +166,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private TagEditorState _originalTagEditorState = new(string.Empty, null, null);
     private StoreManagementEditorTab _selectedEditorTab;
     private CatalogEditorLevel _catalogEditorLevel;
+    private CatalogEditorLevel _pendingCatalogLevel;
     private bool _isBasicsSectionExpanded = true;
     private bool _isVariantsSectionExpanded = true;
     private bool _isDesignAreasSectionExpanded = true;
@@ -218,13 +223,13 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private string _variantColor = string.Empty;
     private string _variantSize = string.Empty;
 
-    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null, ITagManagementService? tagService = null, IProductSupplierSetupService? productService = null, ICatalogSetupService? catalogService = null, IMockupTemplateSetupService? mockupService = null)
+    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null, ITagManagementService? tagService = null, IProductSupplierSetupService? productService = null, ICatalogSetupService? catalogService = null, IMockupTemplateSetupService? mockupService = null, IOfferingManagementService? offeringManagementService = null, IProviderCatalogCandidateSource? providerCatalog = null)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _nicheService = nicheService;
         _tagService = tagService;
         _productService = productService;
-        CatalogSetup = catalogService is not null && mockupService is not null ? new CatalogSetupViewModel(catalogService, mockupService) : null;
+        CatalogSetup = catalogService is not null && mockupService is not null ? new CatalogSetupViewModel(catalogService, mockupService, offeringManagementService, providerCatalog) : null;
         ToggleStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = !IsSelectorExpanded);
         ExpandStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = true);
         CollapseStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = false);
@@ -350,8 +355,13 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         ConfirmDeleteProductCommand = new RelayCommand(_ => Run(ConfirmDeleteProductAsync()));
         CancelDeleteProductCommand = new RelayCommand(_ => ClearProductDeleteWarning());
          StartCreateOfferingCommand = new RelayCommand(_ => StartCreateOffering());
+         CancelNewOfferingCommand = new RelayCommand(_ => CancelNewOffering());
          BackToProductsCommand = new RelayCommand(_ => BackToProducts());
          BackToProductCommand = new RelayCommand(_ => BackToProduct());
+         BackToOfferingOverviewCommand = new RelayCommand(_ => NavigateOfferingCatalog(CatalogEditorLevel.OfferingDetail));
+         OpenVariantManagementCommand = new RelayCommand(_ => OpenOfferingManagement(CatalogEditorLevel.VariantManagement));
+         OpenDesignAreaManagementCommand = new RelayCommand(_ => OpenOfferingManagement(CatalogEditorLevel.DesignAreaManagement));
+         OpenMockupTemplateManagementCommand = new RelayCommand(_ => OpenOfferingManagement(CatalogEditorLevel.MockupTemplateManagement));
          OpenProductDetailCommand = new RelayCommand(parameter =>
          {
              if (parameter is StoreProductSummary product)
@@ -408,6 +418,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public event EventHandler? StoreNameFocusRequested;
 
     public event EventHandler? ProductNameFocusRequested;
+    public event EventHandler? OfferingNameFocusRequested;
 
     public IReadOnlyList<StoreSummary> ActiveStores { get; private set; } = [];
 
@@ -526,6 +537,10 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(IsCatalogOverview));
                 OnPropertyChanged(nameof(IsProductDetail));
                 OnPropertyChanged(nameof(IsOfferingDetail));
+                OnPropertyChanged(nameof(IsOfferingContext));
+                OnPropertyChanged(nameof(IsVariantManagement));
+                OnPropertyChanged(nameof(IsDesignAreaManagement));
+                OnPropertyChanged(nameof(IsMockupTemplateManagement));
                 OnPropertyChanged(nameof(CatalogBreadcrumb));
             }
         }
@@ -537,10 +552,24 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public bool IsOfferingDetail => CatalogEditorLevel == CatalogEditorLevel.OfferingDetail;
 
+    public bool IsOfferingContext => CatalogEditorLevel is CatalogEditorLevel.OfferingDetail
+        or CatalogEditorLevel.VariantManagement
+        or CatalogEditorLevel.DesignAreaManagement
+        or CatalogEditorLevel.MockupTemplateManagement;
+
+    public bool IsVariantManagement => CatalogEditorLevel == CatalogEditorLevel.VariantManagement;
+
+    public bool IsDesignAreaManagement => CatalogEditorLevel == CatalogEditorLevel.DesignAreaManagement;
+
+    public bool IsMockupTemplateManagement => CatalogEditorLevel == CatalogEditorLevel.MockupTemplateManagement;
+
     public string CatalogBreadcrumb => CatalogEditorLevel switch
     {
         CatalogEditorLevel.ProductDetail => $"Products  /  {SelectedProduct?.Name ?? "Product"}",
         CatalogEditorLevel.OfferingDetail => $"Products  /  {SelectedProduct?.Name ?? "Product"}  /  {SelectedOffering?.Name ?? "Offering"}",
+        CatalogEditorLevel.VariantManagement => $"Products  /  {SelectedProduct?.Name ?? "Product"}  /  {SelectedOffering?.Name ?? "Offering"}  /  Variants",
+        CatalogEditorLevel.DesignAreaManagement => $"Products  /  {SelectedProduct?.Name ?? "Product"}  /  {SelectedOffering?.Name ?? "Offering"}  /  Design Areas",
+        CatalogEditorLevel.MockupTemplateManagement => $"Products  /  {SelectedProduct?.Name ?? "Product"}  /  {SelectedOffering?.Name ?? "Offering"}  /  Mockup Templates",
         _ => "Products"
     };
 
@@ -1335,8 +1364,13 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public ICommand CancelDeleteProductCommand { get; }
 
     public ICommand StartCreateOfferingCommand { get; }
+    public ICommand CancelNewOfferingCommand { get; }
     public ICommand BackToProductsCommand { get; }
     public ICommand BackToProductCommand { get; }
+    public ICommand BackToOfferingOverviewCommand { get; }
+    public ICommand OpenVariantManagementCommand { get; }
+    public ICommand OpenDesignAreaManagementCommand { get; }
+    public ICommand OpenMockupTemplateManagementCommand { get; }
     public ICommand OpenProductDetailCommand { get; }
     public ICommand OpenOfferingDetailCommand { get; }
     public ICommand StartAddVariantCommand { get; }
@@ -2492,6 +2526,35 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
     }
 
+    private void OpenOfferingManagement(CatalogEditorLevel level)
+    {
+        if (SelectedOffering is null || _isCreatingNewOffering)
+        {
+            ErrorMessage = "Save the Blueprint Offering before managing its catalog setup.";
+            return;
+        }
+
+        if (HasUnsavedOfferingChanges || CatalogSetup?.HasActiveDraft == true)
+        {
+            _pendingCatalogLevel = level;
+            RequestDiscardBefore(PendingEditorAction.NavigateCatalog);
+            return;
+        }
+
+        CatalogEditorLevel = level;
+    }
+
+    private void NavigateOfferingCatalog(CatalogEditorLevel level)
+    {
+        if (HasUnsavedOfferingChanges || CatalogSetup?.HasActiveDraft == true)
+        {
+            _pendingCatalogLevel = level;
+            RequestDiscardBefore(PendingEditorAction.NavigateCatalog);
+            return;
+        }
+        CatalogEditorLevel = level;
+    }
+
     private void StartAddVariant()
     {
         if (SelectedOffering is null)
@@ -2706,6 +2769,32 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(OfferingVariants));
         OnPropertyChanged(nameof(OfferingDesignAreas));
         CatalogEditorLevel = CatalogEditorLevel.OfferingDetail;
+        RaiseOfferingEditorStateProperties();
+        OfferingNameFocusRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void CancelNewOffering()
+    {
+        if (!_isCreatingNewOffering)
+        {
+            return;
+        }
+
+        _isCreatingNewOffering = false;
+        _draftOfferingId = null;
+        SelectedOffering = SelectedProduct?.Offerings.FirstOrDefault();
+        CatalogSetup?.SelectOffering(SelectedOffering?.Id);
+        if (SelectedOffering is not null)
+        {
+            ApplySelectedOfferingFields(SelectedOffering);
+        }
+        else
+        {
+            ClearOfferingEditingFields();
+        }
+
+        CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
+        OnPropertyChanged(nameof(IsCreatingNewOffering));
         RaiseOfferingEditorStateProperties();
     }
 
@@ -3335,6 +3424,10 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 break;
             case PendingEditorAction.BackToProduct:
                 CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
+                break;
+            case PendingEditorAction.NavigateCatalog:
+                CatalogSetup?.CancelActiveDrafts();
+                CatalogEditorLevel = _pendingCatalogLevel;
                 break;
         }
     }

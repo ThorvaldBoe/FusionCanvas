@@ -107,4 +107,66 @@ public sealed class CatalogModelTests
         Assert.True(MockupTemplatePolicy.IsOutputAffectingChange(placeholder, Guid.NewGuid(), new HashSet<Guid> { color }, new HashSet<Guid> { color }));
         Assert.True(MockupTemplatePolicy.IsOutputAffectingChange(placeholder, placeholder, new HashSet<Guid> { color }, new HashSet<Guid> { Guid.NewGuid() }));
     }
+
+    [Fact]
+    public void DesignAreaGuidanceKeepsPixelsAuthoritativeAndDerivesPhysicalSize()
+    {
+        var guidance = new DesignAreaArtworkGuidance(4500, 5400, 300, "PNG", "Transparent background");
+        var placeholder = new OfferingPlaceholder(
+            Guid.NewGuid(), Guid.NewGuid(), "Front", null, "front", "DTG", 4500, 5400, [], false, Now, Now,
+            providerReference: "print-area-front", artworkGuidance: guidance);
+
+        Assert.Equal(4500, placeholder.Width);
+        Assert.Equal("print-area-front", placeholder.ProviderReference);
+        Assert.Equal("PNG", placeholder.ArtworkGuidance!.FileFormat);
+        Assert.Equal(15, placeholder.MaximumPhysicalSize!.Value.WidthInches, 6);
+        Assert.Equal(381, placeholder.MaximumPhysicalSize.Value.WidthMillimetres, 6);
+    }
+
+    [Fact]
+    public void DesignAreaGuidanceDoesNotInventPhysicalSizeWithoutDpi()
+    {
+        var guidance = new DesignAreaArtworkGuidance(4500, 5400, fileFormat: "PNG");
+        var placeholder = new OfferingPlaceholder(
+            Guid.NewGuid(), Guid.NewGuid(), "Front", null, "front", "DTG", 4500, 5400, [], false, Now, Now,
+            artworkGuidance: guidance);
+
+        Assert.Null(placeholder.MaximumPhysicalSize);
+        Assert.Throws<ArgumentException>(() => new DesignAreaArtworkGuidance(4500, null));
+    }
+
+    [Fact]
+    public void ImageSpaceMappingRequiresPositiveContainedRectangle()
+    {
+        var mapping = new MockupImageSpaceMapping(2000, 2000, 620, 480, 700, 910);
+
+        Assert.Equal(620, mapping.X);
+        Assert.Equal(910, mapping.Height);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new MockupImageSpaceMapping(2000, 2000, 1500, 0, 600, 100));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new MockupImageSpaceMapping(2000, 2000, 0, -1, 100, 100));
+    }
+
+    [Fact]
+    public void RevisionOwnsProviderImageMappingAsSnapshotConfiguration()
+    {
+        var mapping = new MockupImageSpaceMapping(2000, 2000, 620, 480, 700, 910);
+        var revision = new MockupTemplateRevision(Guid.NewGuid(), Guid.NewGuid(), 2, Guid.NewGuid(), Now, "Mapped", "printify-mockup-123", mapping);
+
+        Assert.Equal("printify-mockup-123", revision.ProviderMockupReference);
+        Assert.Equal(mapping, revision.ImageMapping);
+        Assert.Throws<ArgumentException>(() => new MockupTemplateRevision(Guid.NewGuid(), Guid.NewGuid(), 2, Guid.NewGuid(), Now, providerMockupReference: "image-only"));
+    }
+
+    [Fact]
+    public void RevisionPolicyDetectsProviderImageOrMappingChanges()
+    {
+        var placeholder = Guid.NewGuid();
+        var colors = new HashSet<Guid> { Guid.NewGuid() };
+        var mapping = new MockupImageSpaceMapping(2000, 2000, 620, 480, 700, 910);
+        var moved = new MockupImageSpaceMapping(2000, 2000, 621, 480, 700, 910);
+
+        Assert.False(MockupTemplatePolicy.IsOutputAffectingChange(placeholder, placeholder, colors, colors, "mockup", "mockup", mapping, mapping));
+        Assert.True(MockupTemplatePolicy.IsOutputAffectingChange(placeholder, placeholder, colors, colors, "mockup", "other", mapping, mapping));
+        Assert.True(MockupTemplatePolicy.IsOutputAffectingChange(placeholder, placeholder, colors, colors, "mockup", "mockup", mapping, moved));
+    }
 }

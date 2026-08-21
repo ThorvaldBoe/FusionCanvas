@@ -35,7 +35,15 @@ public sealed class MockupTemplateSetupService : IMockupTemplateSetupService
             if (offering.IsArchived || placeholder.IsArchived) return Failure(snapshot, request.StoreId, "Archived catalog records are read-only.");
             var now = _clock();
             var template = new MockupTemplate(_newId(), offering.Id, placeholder.Id, request.Name, request.Description, 1, false, now, now, request.PositionKey, null);
-            var revision = new MockupTemplateRevision(_newId(), template.Id, 1, placeholder.Id, now, "Initial template configuration");
+            MockupTemplateRevision revision;
+            try
+            {
+                revision = new MockupTemplateRevision(_newId(), template.Id, 1, placeholder.Id, now, "Initial template configuration", request.ProviderMockupReference, request.ImageMapping);
+            }
+            catch (ArgumentException exception)
+            {
+                return Failure(snapshot, request.StoreId, exception.Message);
+            }
             var updated = snapshot with { MockupTemplates = [.. snapshot.MockupTemplates, template], MockupTemplateRevisions = [.. snapshot.MockupTemplateRevisions, revision] };
             return Success(updated, request.StoreId);
         }, cancellationToken);
@@ -58,7 +66,8 @@ public sealed class MockupTemplateSetupService : IMockupTemplateSetupService
             var binding = new MockupTemplateColorVariant(_newId(), template.Id, value.Id, false, now, now);
             var nextColors = snapshot.MockupTemplateColorVariants.Where(candidate => candidate.MockupTemplateId == template.Id && !candidate.IsArchived).Select(candidate => candidate.ColorOptionValueId).Append(value.Id).ToHashSet();
             var revisionNumber = template.CurrentRevision + 1;
-            var revision = new MockupTemplateRevision(_newId(), template.Id, revisionNumber, template.TargetPlaceholderId, now, "Color configuration changed");
+            var previousRevision = CurrentRevision(snapshot, template);
+            var revision = new MockupTemplateRevision(_newId(), template.Id, revisionNumber, template.TargetPlaceholderId, now, "Color configuration changed", previousRevision?.ProviderMockupReference, previousRevision?.ImageMapping);
             var revisionColors = nextColors.Select(colorId => new MockupTemplateRevisionColor(_newId(), revision.Id, colorId)).ToArray();
             var updatedTemplate = template with { CurrentRevision = revisionNumber, UpdatedAt = now };
             var updated = snapshot with
@@ -82,7 +91,23 @@ public sealed class MockupTemplateSetupService : IMockupTemplateSetupService
             var offering = template is null ? null : snapshot.BlueprintOfferings.SingleOrDefault(value => value.Id == template.BlueprintOfferingId && value.StoreId == request.StoreId);
             if (template is null || offering is null)
                 return Failure(snapshot, request.StoreId, "Template does not belong to the selected Store.");
-            var updated = snapshot with { MockupTemplateColorVariants = snapshot.MockupTemplateColorVariants.Select(value => value.Id == binding.Id ? value with { IsArchived = true, UpdatedAt = _clock() } : value).ToArray() };
+            if (binding.IsArchived) return Failure(snapshot, request.StoreId, "Template color is already archived.");
+            var now = _clock();
+            var revisionNumber = template.CurrentRevision + 1;
+            var previousRevision = CurrentRevision(snapshot, template);
+            var remainingColors = snapshot.MockupTemplateColorVariants
+                .Where(value => value.MockupTemplateId == template.Id && value.Id != binding.Id && !value.IsArchived)
+                .Select(value => value.ColorOptionValueId)
+                .ToArray();
+            var revision = new MockupTemplateRevision(_newId(), template.Id, revisionNumber, template.TargetPlaceholderId, now, "Color configuration changed", previousRevision?.ProviderMockupReference, previousRevision?.ImageMapping);
+            var revisionColors = remainingColors.Select(colorId => new MockupTemplateRevisionColor(_newId(), revision.Id, colorId)).ToArray();
+            var updated = snapshot with
+            {
+                MockupTemplates = snapshot.MockupTemplates.Select(value => value.Id == template.Id ? value with { CurrentRevision = revisionNumber, UpdatedAt = now } : value).ToArray(),
+                MockupTemplateColorVariants = snapshot.MockupTemplateColorVariants.Select(value => value.Id == binding.Id ? value with { IsArchived = true, UpdatedAt = now } : value).ToArray(),
+                MockupTemplateRevisions = [.. snapshot.MockupTemplateRevisions, revision],
+                MockupTemplateRevisionColors = [.. snapshot.MockupTemplateRevisionColors, .. revisionColors]
+            };
             return Success(updated, request.StoreId);
         }, cancellationToken);
 
@@ -131,7 +156,33 @@ public sealed class MockupTemplateSetupService : IMockupTemplateSetupService
             var placeholder = snapshot.OfferingPlaceholders.SingleOrDefault(value => value.Id == targetId && value.OfferingId == template.BlueprintOfferingId && !value.IsArchived);
             if (placeholder is null) return Failure(snapshot, request.StoreId, "Target Placeholder must belong to the template's Blueprint Offering.");
             var now = _clock();
-            var revisionNumber = template.CurrentRevision + 1;
+            var currentRevision = CurrentRevision(snapshot, template);
+            var providerReference = request.ReplaceProviderImage ? request.ProviderMockupReference : currentRevision?.ProviderMockupReference;
+            var imageMapping = request.ReplaceProviderImage ? request.ImageMapping : currentRevision?.ImageMapping;
+            var activeBindings = snapshot.MockupTemplateColorVariants.Where(value => value.MockupTemplateId == template.Id && !value.IsArchived).ToArray();
+            var activeColors = activeBindings.Select(value => value.ColorOptionValueId).ToHashSet();
+            var nextColors = request.ReplaceColorOptionValueIds?.Distinct().ToHashSet() ?? activeColors;
+            if (request.ReplaceColorOptionValueIds is not null && nextColors.Count == 0)
+                return Failure(snapshot, request.StoreId, "Select at least one applicable Color.");
+            var validColors = snapshot.OfferingOptionValues.Where(value => nextColors.Contains(value.Id) && value.OfferingId == template.BlueprintOfferingId && !value.IsArchived)
+                .Where(value => snapshot.OfferingOptions.Any(option => option.Id == value.OptionId && option.OptionKind == OptionKind.Color && !option.IsArchived))
+                .Select(value => value.Id).ToHashSet();
+            if (nextColors.Count > 0 && !validColors.SetEquals(nextColors))
+                return Failure(snapshot, request.StoreId, "Template applicability may only use active Color values from the same Offering.");
+            var impliedVariants = snapshot.OfferingVariants.Where(value => value.OfferingId == template.BlueprintOfferingId && !value.IsArchived && value.OptionValueIds.Any(nextColors.Contains)).ToArray();
+            var incompatibleVariants = impliedVariants.Where(value => !placeholder.VariantIds.Contains(value.Id)).Select(value => value.Name).ToArray();
+            if (incompatibleVariants.Length > 0)
+                return Failure(snapshot, request.StoreId, $"The target Design Area is incompatible with: {string.Join(", ", incompatibleVariants)}.");
+            var outputChanged = MockupTemplatePolicy.IsOutputAffectingChange(
+                template.TargetPlaceholderId,
+                targetId,
+                activeColors,
+                nextColors,
+                currentRevision?.ProviderMockupReference,
+                providerReference,
+                currentRevision?.ImageMapping,
+                imageMapping);
+            var revisionNumber = outputChanged ? template.CurrentRevision + 1 : template.CurrentRevision;
             var updatedTemplate = template with
             {
                 Name = string.IsNullOrWhiteSpace(request.Name) ? template.Name : request.Name.Trim(),
@@ -141,13 +192,31 @@ public sealed class MockupTemplateSetupService : IMockupTemplateSetupService
                 CurrentRevision = revisionNumber,
                 UpdatedAt = now
             };
-            var revision = new MockupTemplateRevision(_newId(), template.Id, revisionNumber, targetId, now, "Template configuration changed");
-            var activeColors = snapshot.MockupTemplateColorVariants.Where(value => value.MockupTemplateId == template.Id && !value.IsArchived).Select(value => value.ColorOptionValueId).ToArray();
-            var revisionColors = activeColors.Select(colorId => new MockupTemplateRevisionColor(_newId(), revision.Id, colorId)).ToArray();
+            MockupTemplateRevision? revision = null;
+            MockupTemplateRevisionColor[] revisionColors = [];
+            if (outputChanged)
+            {
+                try
+                {
+                    revision = new MockupTemplateRevision(_newId(), template.Id, revisionNumber, targetId, now, "Template configuration changed", providerReference, imageMapping);
+                }
+                catch (ArgumentException exception)
+                {
+                    return Failure(snapshot, request.StoreId, exception.Message);
+                }
+                revisionColors = nextColors.Select(colorId => new MockupTemplateRevisionColor(_newId(), revision.Id, colorId)).ToArray();
+            }
+            var colorsChanged = !activeColors.SetEquals(nextColors);
+            var nextBindings = colorsChanged
+                ? nextColors.Select(colorId => new MockupTemplateColorVariant(_newId(), template.Id, colorId, false, now, now)).ToArray()
+                : [];
             var updated = snapshot with
             {
                 MockupTemplates = snapshot.MockupTemplates.Select(value => value.Id == template.Id ? updatedTemplate : value).ToArray(),
-                MockupTemplateRevisions = [.. snapshot.MockupTemplateRevisions, revision],
+                MockupTemplateColorVariants = colorsChanged
+                    ? [.. snapshot.MockupTemplateColorVariants.Select(value => value.MockupTemplateId == template.Id && !value.IsArchived ? value with { IsArchived = true, UpdatedAt = now } : value), .. nextBindings]
+                    : snapshot.MockupTemplateColorVariants,
+                MockupTemplateRevisions = revision is null ? snapshot.MockupTemplateRevisions : [.. snapshot.MockupTemplateRevisions, revision],
                 MockupTemplateRevisionColors = [.. snapshot.MockupTemplateRevisionColors, .. revisionColors]
             };
             return Success(updated, request.StoreId);
@@ -170,5 +239,7 @@ public sealed class MockupTemplateSetupService : IMockupTemplateSetupService
 
     private static MockupTemplateSetupResult Failure(WorkspaceSnapshot snapshot, Guid storeId, string error) => new(false, error, BuildState(snapshot, storeId));
     private static MockupTemplateSetupResult Success(WorkspaceSnapshot snapshot, Guid storeId) => new(true, null, BuildState(snapshot, storeId), snapshot);
+    private static MockupTemplateRevision? CurrentRevision(WorkspaceSnapshot snapshot, MockupTemplate template) =>
+        snapshot.MockupTemplateRevisions.SingleOrDefault(value => value.MockupTemplateId == template.Id && value.RevisionNumber == template.CurrentRevision);
     private static MockupTemplateSetupState BuildState(WorkspaceSnapshot snapshot, Guid storeId) => new(storeId, snapshot.Stores.SingleOrDefault(value => value.Id == storeId)?.IsArchived ?? false, snapshot.MockupTemplates.Where(value => snapshot.BlueprintOfferings.Any(offering => offering.Id == value.BlueprintOfferingId && offering.StoreId == storeId)).ToArray(), snapshot.MockupTemplateColorVariants.Where(value => snapshot.MockupTemplates.Any(template => template.Id == value.MockupTemplateId && snapshot.BlueprintOfferings.Any(offering => offering.Id == template.BlueprintOfferingId && offering.StoreId == storeId))).ToArray(), snapshot.MockupTemplateRevisions.Where(value => snapshot.MockupTemplates.Any(template => template.Id == value.MockupTemplateId && snapshot.BlueprintOfferings.Any(offering => offering.Id == template.BlueprintOfferingId && offering.StoreId == storeId))).ToArray());
 }

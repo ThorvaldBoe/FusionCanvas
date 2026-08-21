@@ -128,12 +128,23 @@ public sealed class CatalogSetupService : ICatalogSetupService
             var storeCheck = EnsureWritableStore(snapshot, offering.StoreId);
             if (storeCheck is not null) return Failure(snapshot, offering.StoreId, storeCheck);
             if (offering.IsArchived) return Failure(snapshot, offering.StoreId, "Archived catalog records are read-only.");
-            if (request.VariantIds.Any(id => snapshot.OfferingVariants.All(value => value.Id != id || value.OfferingId != offering.Id)))
+            var variantIds = request.UseAllActiveVariants
+                ? snapshot.OfferingVariants.Where(value => value.OfferingId == offering.Id && !value.IsArchived).Select(value => value.Id).ToArray()
+                : request.VariantIds.Distinct().ToArray();
+            if (variantIds.Any(id => snapshot.OfferingVariants.All(value => value.Id != id || value.OfferingId != offering.Id)))
                 return Failure(snapshot, offering.StoreId, "Placeholder compatibility must reference Variants from the same offering.");
-            if (request.VariantIds.Any(id => snapshot.OfferingVariants.Any(value => value.Id == id && value.IsArchived)))
+            if (variantIds.Any(id => snapshot.OfferingVariants.Any(value => value.Id == id && value.IsArchived)))
                 return Failure(snapshot, offering.StoreId, "Placeholder compatibility cannot reference archived Variants.");
             var now = _clock();
-            var placeholder = new OfferingPlaceholder(_newId(), offering.Id, request.Name, request.Description, request.Position, request.DecorationMethod, request.Width, request.Height, request.VariantIds, false, now, now);
+            OfferingPlaceholder placeholder;
+            try
+            {
+                placeholder = new OfferingPlaceholder(_newId(), offering.Id, request.Name, request.Description, request.Position, request.DecorationMethod, request.Width, request.Height, variantIds, false, now, now, providerReference: request.ProviderReference, artworkGuidance: request.ArtworkGuidance);
+            }
+            catch (ArgumentException exception)
+            {
+                return Failure(snapshot, offering.StoreId, exception.Message);
+            }
             return Success(snapshot with { OfferingPlaceholders = [.. snapshot.OfferingPlaceholders, placeholder] }, offering.StoreId);
         }, cancellationToken);
 

@@ -232,7 +232,27 @@ public sealed class WorkspaceTransferService(
             [.. live.ItemTags, .. imported.ItemTags],
             [.. live.AssetLinks, .. imported.AssetLinks])
         {
-            IdeationRejections = [.. live.IdeationRejections, .. imported.IdeationRejections]
+            IdeationRejections = [.. live.IdeationRejections, .. imported.IdeationRejections],
+            StoreProducts = [.. live.StoreProducts, .. imported.StoreProducts],
+            FulfillmentOfferings = [.. live.FulfillmentOfferings, .. imported.FulfillmentOfferings],
+            ProductVariants = [.. live.ProductVariants, .. imported.ProductVariants],
+            DesignAreas = [.. live.DesignAreas, .. imported.DesignAreas],
+            ItemListingConfigurations = [.. live.ItemListingConfigurations, .. imported.ItemListingConfigurations],
+            DesignSelectedColors = [.. live.DesignSelectedColors, .. imported.DesignSelectedColors],
+            DesignVariantRows = [.. live.DesignVariantRows, .. imported.DesignVariantRows],
+            DesignVariantRowColors = [.. live.DesignVariantRowColors, .. imported.DesignVariantRowColors],
+            DesignSlotAssignments = [.. live.DesignSlotAssignments, .. imported.DesignSlotAssignments],
+            Blueprints = [.. live.Blueprints, .. imported.Blueprints],
+            PrintProviders = [.. live.PrintProviders, .. imported.PrintProviders],
+            BlueprintOfferings = [.. live.BlueprintOfferings, .. imported.BlueprintOfferings],
+            OfferingOptions = [.. live.OfferingOptions, .. imported.OfferingOptions],
+            OfferingOptionValues = [.. live.OfferingOptionValues, .. imported.OfferingOptionValues],
+            OfferingVariants = [.. live.OfferingVariants, .. imported.OfferingVariants],
+            OfferingPlaceholders = [.. live.OfferingPlaceholders, .. imported.OfferingPlaceholders],
+            MockupTemplates = [.. live.MockupTemplates, .. imported.MockupTemplates],
+            MockupTemplateColorVariants = [.. live.MockupTemplateColorVariants, .. imported.MockupTemplateColorVariants],
+            MockupTemplateRevisions = [.. live.MockupTemplateRevisions, .. imported.MockupTemplateRevisions],
+            MockupTemplateRevisionColors = [.. live.MockupTemplateRevisionColors, .. imported.MockupTemplateRevisionColors]
         };
 
     internal static IReadOnlyDictionary<string, int> CountEntities(WorkspaceSnapshot snapshot) =>
@@ -248,7 +268,12 @@ public sealed class WorkspaceTransferService(
             ["tags"] = snapshot.Tags.Count,
             ["itemTags"] = snapshot.ItemTags.Count,
             ["assetLinks"] = snapshot.AssetLinks.Count,
-            ["ideationRejections"] = snapshot.IdeationRejections.Count
+            ["ideationRejections"] = snapshot.IdeationRejections.Count,
+            ["blueprints"] = snapshot.Blueprints.Count,
+            ["blueprintOfferings"] = snapshot.BlueprintOfferings.Count,
+            ["offeringVariants"] = snapshot.OfferingVariants.Count,
+            ["designAreas"] = snapshot.OfferingPlaceholders.Count,
+            ["mockupTemplates"] = snapshot.MockupTemplates.Count
         };
 
     private static IReadOnlyList<string> BuildWarnings(

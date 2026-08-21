@@ -573,7 +573,51 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await MigrateToVersion11Async(connection, cancellationToken);
         }
 
+        if (schemaVersion < 12)
+        {
+            await MigrateToVersion12Async(connection, cancellationToken);
+        }
+
         await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
+    }
+
+    private static async Task MigrateToVersion12Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var columns = new (string Table, string Name, string Definition)[]
+            {
+                ("offering_placeholders", "provider_reference", "TEXT NULL"),
+                ("offering_placeholders", "recommended_width_px", "INTEGER NULL"),
+                ("offering_placeholders", "recommended_height_px", "INTEGER NULL"),
+                ("offering_placeholders", "recommended_dpi", "INTEGER NULL"),
+                ("offering_placeholders", "recommended_format", "TEXT NULL"),
+                ("offering_placeholders", "recommended_background", "TEXT NULL"),
+                ("mockup_template_revisions", "provider_mockup_reference", "TEXT NULL"),
+                ("mockup_template_revisions", "image_width", "INTEGER NULL"),
+                ("mockup_template_revisions", "image_height", "INTEGER NULL"),
+                ("mockup_template_revisions", "mapping_x", "INTEGER NULL"),
+                ("mockup_template_revisions", "mapping_y", "INTEGER NULL"),
+                ("mockup_template_revisions", "mapping_width", "INTEGER NULL"),
+                ("mockup_template_revisions", "mapping_height", "INTEGER NULL")
+            };
+
+            foreach (var column in columns)
+            {
+                if (!await ColumnExistsAsync(connection, column.Table, column.Name, cancellationToken))
+                    await ExecuteAsync(connection, transaction, $"ALTER TABLE {column.Table} ADD COLUMN {column.Name} {column.Definition};", cancellationToken);
+            }
+
+            await VerifyForeignKeyIntegrityAsync(connection, transaction, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw new InvalidOperationException(
+                "The workspace database could not be upgraded from schema version 11 to 12. Restore a backup or use an older FusionCanvas version.", exception);
+        }
     }
 
     private static async Task MigrateToVersion11Async(SqliteConnection connection, CancellationToken cancellationToken)
@@ -1363,14 +1407,14 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
 
     private static async Task InsertOfferingPlaceholderAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingPlaceholder value, CancellationToken ct)
     {
-        await ExecuteAsync(c, t, "INSERT INTO offering_placeholders (id, offering_id, name, description, position, decoration_method, width, height, is_archived, created_at, updated_at, metadata_json) VALUES ($id,$offering_id,$name,$description,$position,$decoration_method,$width,$height,$is_archived,$created_at,$updated_at,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$offering_id", value.OfferingId.ToString()), ("$name", value.Name), ("$description", value.Description), ("$position", value.Position), ("$decoration_method", value.DecorationMethod), ("$width", value.Width), ("$height", value.Height), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$metadata_json", value.MetadataJson));
+        await ExecuteAsync(c, t, "INSERT INTO offering_placeholders (id, offering_id, name, description, position, decoration_method, width, height, is_archived, created_at, updated_at, metadata_json, provider_reference, recommended_width_px, recommended_height_px, recommended_dpi, recommended_format, recommended_background) VALUES ($id,$offering_id,$name,$description,$position,$decoration_method,$width,$height,$is_archived,$created_at,$updated_at,$metadata_json,$provider_reference,$recommended_width_px,$recommended_height_px,$recommended_dpi,$recommended_format,$recommended_background);", ct, ("$id", value.Id.ToString()), ("$offering_id", value.OfferingId.ToString()), ("$name", value.Name), ("$description", value.Description), ("$position", value.Position), ("$decoration_method", value.DecorationMethod), ("$width", value.Width), ("$height", value.Height), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$metadata_json", value.MetadataJson), ("$provider_reference", value.ProviderReference), ("$recommended_width_px", value.ArtworkGuidance?.RecommendedWidthPixels), ("$recommended_height_px", value.ArtworkGuidance?.RecommendedHeightPixels), ("$recommended_dpi", value.ArtworkGuidance?.DotsPerInch), ("$recommended_format", value.ArtworkGuidance?.FileFormat), ("$recommended_background", value.ArtworkGuidance?.Background));
         foreach (var variantId in value.VariantIds)
             await ExecuteAsync(c, t, "INSERT INTO placeholder_variants (placeholder_id, variant_id) VALUES ($placeholder_id,$variant_id);", ct, ("$placeholder_id", value.Id.ToString()), ("$variant_id", variantId.ToString()));
     }
 
     private static Task InsertMockupTemplateAsync(SqliteConnection c, System.Data.Common.DbTransaction t, MockupTemplate value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO mockup_templates (id, offering_id, target_placeholder_id, name, description, current_revision, is_archived, created_at, updated_at, position_key, future_asset_state, metadata_json) VALUES ($id,$offering_id,$target_placeholder_id,$name,$description,$current_revision,$is_archived,$created_at,$updated_at,$position_key,$future_asset_state,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$offering_id", value.BlueprintOfferingId.ToString()), ("$target_placeholder_id", value.TargetPlaceholderId.ToString()), ("$name", value.Name), ("$description", value.Description), ("$current_revision", value.CurrentRevision), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$position_key", value.PositionKey), ("$future_asset_state", value.FutureAssetState), ("$metadata_json", value.MetadataJson));
     private static Task InsertMockupTemplateColorAsync(SqliteConnection c, System.Data.Common.DbTransaction t, MockupTemplateColorVariant value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO mockup_template_colors (id, template_id, color_option_value_id, is_archived, created_at, updated_at, source_asset_id) VALUES ($id,$template_id,$color_option_value_id,$is_archived,$created_at,$updated_at,$source_asset_id);", ct, ("$id", value.Id.ToString()), ("$template_id", value.MockupTemplateId.ToString()), ("$color_option_value_id", value.ColorOptionValueId.ToString()), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$source_asset_id", value.SourceAssetId?.ToString()));
-    private static Task InsertMockupTemplateRevisionAsync(SqliteConnection c, System.Data.Common.DbTransaction t, MockupTemplateRevision value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO mockup_template_revisions (id, template_id, revision_number, target_placeholder_id, created_at, note) VALUES ($id,$template_id,$revision_number,$target_placeholder_id,$created_at,$note);", ct, ("$id", value.Id.ToString()), ("$template_id", value.MockupTemplateId.ToString()), ("$revision_number", value.RevisionNumber), ("$target_placeholder_id", value.TargetPlaceholderId.ToString()), ("$created_at", value.CreatedAt.ToString("O")), ("$note", value.Note));
+    private static Task InsertMockupTemplateRevisionAsync(SqliteConnection c, System.Data.Common.DbTransaction t, MockupTemplateRevision value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO mockup_template_revisions (id, template_id, revision_number, target_placeholder_id, created_at, note, provider_mockup_reference, image_width, image_height, mapping_x, mapping_y, mapping_width, mapping_height) VALUES ($id,$template_id,$revision_number,$target_placeholder_id,$created_at,$note,$provider_mockup_reference,$image_width,$image_height,$mapping_x,$mapping_y,$mapping_width,$mapping_height);", ct, ("$id", value.Id.ToString()), ("$template_id", value.MockupTemplateId.ToString()), ("$revision_number", value.RevisionNumber), ("$target_placeholder_id", value.TargetPlaceholderId.ToString()), ("$created_at", value.CreatedAt.ToString("O")), ("$note", value.Note), ("$provider_mockup_reference", value.ProviderMockupReference), ("$image_width", value.ImageMapping?.ImageWidth), ("$image_height", value.ImageMapping?.ImageHeight), ("$mapping_x", value.ImageMapping?.X), ("$mapping_y", value.ImageMapping?.Y), ("$mapping_width", value.ImageMapping?.Width), ("$mapping_height", value.ImageMapping?.Height));
     private static Task InsertMockupTemplateRevisionColorAsync(SqliteConnection c, System.Data.Common.DbTransaction t, MockupTemplateRevisionColor value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO mockup_template_revision_colors (id, revision_id, color_option_value_id, source_asset_id) VALUES ($id,$revision_id,$color_option_value_id,$source_asset_id);", ct, ("$id", value.Id.ToString()), ("$revision_id", value.RevisionId.ToString()), ("$color_option_value_id", value.ColorOptionValueId.ToString()), ("$source_asset_id", value.SourceAssetId?.ToString()));
 
     private static Task InsertItemListingConfigurationAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, ItemListingConfiguration config, CancellationToken cancellationToken) =>
@@ -1468,7 +1512,14 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         {
             var variantId = ReadGuid(r, "id");
             var ids = new List<Guid>();
-            await foreach (var membership in ReadAsync(c, $"SELECT option_value_id FROM offering_variant_values WHERE variant_id = '{variantId}';", ct))
+            await foreach (var membership in ReadAsync(c, $"""
+                SELECT membership.option_value_id
+                FROM offering_variant_values AS membership
+                INNER JOIN offering_option_values AS value ON value.id = membership.option_value_id
+                INNER JOIN offering_options AS option ON option.id = value.option_id
+                WHERE membership.variant_id = '{variantId}'
+                ORDER BY option.sort_order, value.sort_order, value.id;
+                """, ct))
                 ids.Add(ReadGuid(membership, "option_value_id"));
             result.Add(new OfferingVariant(variantId, ReadGuid(r, "offering_id"), ReadString(r, "name"), ids, ReadBool(r, "is_archived"), ReadDate(r, "created_at"), ReadDate(r, "updated_at"), ReadString(r, "metadata_json")));
         }
@@ -1484,7 +1535,15 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             var ids = new List<Guid>();
             await foreach (var membership in ReadAsync(c, $"SELECT variant_id FROM placeholder_variants WHERE placeholder_id = '{placeholderId}';", ct))
                 ids.Add(ReadGuid(membership, "variant_id"));
-            result.Add(new OfferingPlaceholder(placeholderId, ReadGuid(r, "offering_id"), ReadString(r, "name"), ReadNullableString(r, "description"), ReadString(r, "position"), ReadString(r, "decoration_method"), ReadInt(r, "width"), ReadInt(r, "height"), ids, ReadBool(r, "is_archived"), ReadDate(r, "created_at"), ReadDate(r, "updated_at"), ReadString(r, "metadata_json")));
+            var recommendedWidth = ReadNullableInt(r, "recommended_width_px");
+            var recommendedHeight = ReadNullableInt(r, "recommended_height_px");
+            var recommendedDpi = ReadNullableInt(r, "recommended_dpi");
+            var recommendedFormat = ReadNullableString(r, "recommended_format");
+            var recommendedBackground = ReadNullableString(r, "recommended_background");
+            var guidance = recommendedWidth is null && recommendedHeight is null && recommendedDpi is null && recommendedFormat is null && recommendedBackground is null
+                ? null
+                : new DesignAreaArtworkGuidance(recommendedWidth, recommendedHeight, recommendedDpi, recommendedFormat, recommendedBackground);
+            result.Add(new OfferingPlaceholder(placeholderId, ReadGuid(r, "offering_id"), ReadString(r, "name"), ReadNullableString(r, "description"), ReadString(r, "position"), ReadString(r, "decoration_method"), ReadInt(r, "width"), ReadInt(r, "height"), ids, ReadBool(r, "is_archived"), ReadDate(r, "created_at"), ReadDate(r, "updated_at"), ReadString(r, "metadata_json"), ReadNullableString(r, "provider_reference"), guidance));
         }
         return result;
     }
@@ -1509,7 +1568,13 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     {
         var result = new List<MockupTemplateRevision>();
         await foreach (var r in ReadAsync(c, "SELECT * FROM mockup_template_revisions ORDER BY revision_number;", ct))
-            result.Add(new MockupTemplateRevision(ReadGuid(r, "id"), ReadGuid(r, "template_id"), ReadInt(r, "revision_number"), ReadGuid(r, "target_placeholder_id"), ReadDate(r, "created_at"), ReadNullableString(r, "note")));
+        {
+            var imageWidth = ReadNullableInt(r, "image_width");
+            var mapping = imageWidth is int width
+                ? new MockupImageSpaceMapping(width, ReadInt(r, "image_height"), ReadInt(r, "mapping_x"), ReadInt(r, "mapping_y"), ReadInt(r, "mapping_width"), ReadInt(r, "mapping_height"))
+                : null;
+            result.Add(new MockupTemplateRevision(ReadGuid(r, "id"), ReadGuid(r, "template_id"), ReadInt(r, "revision_number"), ReadGuid(r, "target_placeholder_id"), ReadDate(r, "created_at"), ReadNullableString(r, "note"), ReadNullableString(r, "provider_mockup_reference"), mapping));
+        }
         return result;
     }
 
@@ -1798,6 +1863,12 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     }
 
     private static int ReadInt(SqliteDataReader reader, string name) => reader.GetInt32(reader.GetOrdinal(name));
+
+    private static int? ReadNullableInt(SqliteDataReader reader, string name)
+    {
+        var ordinal = reader.GetOrdinal(name);
+        return reader.IsDBNull(ordinal) ? null : reader.GetInt32(ordinal);
+    }
 
     private static bool ReadBool(SqliteDataReader reader, string name) => ReadInt(reader, name) == 1;
 

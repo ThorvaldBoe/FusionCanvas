@@ -70,7 +70,7 @@ public sealed class MockupTemplateSetupServiceTests
     }
 
     [Fact]
-    public async Task UpdatesTemplateConfigurationAndCreatesRevisionSnapshot()
+    public async Task DisplayOnlyUpdateDoesNotCreateOutputRevision()
     {
         var storeId = Guid.NewGuid();
         var blueprint = new Blueprint(Guid.NewGuid(), storeId, "T-shirt", null, false, Now, Now);
@@ -87,8 +87,57 @@ public sealed class MockupTemplateSetupServiceTests
 
         Assert.True(updated.Succeeded);
         Assert.Equal("Front updated", updated.State.Templates.Single().Name);
-        Assert.Equal(2, updated.State.Templates.Single().CurrentRevision);
-        Assert.Equal(2, updated.State.Revisions.Count);
+        Assert.Equal(1, updated.State.Templates.Single().CurrentRevision);
+        Assert.Single(updated.State.Revisions);
+    }
+
+    [Fact]
+    public async Task ProviderImageMappingUpdateCreatesRevisionAndColorChangesPreserveIt()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprint = new Blueprint(Guid.NewGuid(), storeId, "T-shirt", null, false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, storeId, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "printify-choice", null, null, false, Now, Now);
+        var colorOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
+        var black = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "Black", 0);
+        var placeholder = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 3000, 4500, [], false, Now, Now);
+        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [new Store(storeId, "Store", null, false, Now, Now, "{}")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint], BlueprintOfferings = [offering], OfferingOptions = [colorOption], OfferingOptionValues = [black], OfferingPlaceholders = [placeholder]
+        });
+        var service = new MockupTemplateSetupService(repository, () => Now, Guid.NewGuid);
+        var created = await service.CreateTemplateAsync(new CreateMockupTemplateRequest(storeId, offering.Id, "Front", placeholder.Id), TestContext.Current.CancellationToken);
+        var templateId = created.State.Templates.Single().Id;
+        var mapping = new MockupImageSpaceMapping(1200, 1200, 300, 250, 500, 600);
+
+        var mapped = await service.UpdateTemplateAsync(new UpdateMockupTemplateRequest(storeId, templateId, ReplaceProviderImage: true, ProviderMockupReference: "front-black", ImageMapping: mapping), TestContext.Current.CancellationToken);
+        var colored = await service.AddColorAsync(new AddMockupTemplateColorRequest(storeId, templateId, black.Id), TestContext.Current.CancellationToken);
+        var archived = await service.ArchiveColorAsync(new ArchiveMockupTemplateColorRequest(storeId, colored.State.Colors.Single().Id), TestContext.Current.CancellationToken);
+
+        Assert.True(mapped.Succeeded);
+        Assert.Equal(mapping, mapped.State.Revisions.Single(value => value.RevisionNumber == 2).ImageMapping);
+        Assert.Equal("front-black", colored.State.Revisions.Single(value => value.RevisionNumber == 3).ProviderMockupReference);
+        Assert.Equal(mapping, archived.State.Revisions.Single(value => value.RevisionNumber == 4).ImageMapping);
+        Assert.Equal(4, archived.State.Templates.Single().CurrentRevision);
+    }
+
+    [Fact]
+    public async Task IncompleteProviderImageConfigurationIsRejectedWithoutRevision()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprint = new Blueprint(Guid.NewGuid(), storeId, "T-shirt", null, false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, storeId, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "printify-choice", null, null, false, Now, Now);
+        var placeholder = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 3000, 4500, [], false, Now, Now);
+        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [new Store(storeId, "Store", null, false, Now, Now, "{}")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint], BlueprintOfferings = [offering], OfferingPlaceholders = [placeholder]
+        });
+        var service = new MockupTemplateSetupService(repository, () => Now, Guid.NewGuid);
+        var created = await service.CreateTemplateAsync(new CreateMockupTemplateRequest(storeId, offering.Id, "Front", placeholder.Id), TestContext.Current.CancellationToken);
+
+        var result = await service.UpdateTemplateAsync(new UpdateMockupTemplateRequest(storeId, created.State.Templates.Single().Id, ReplaceProviderImage: true, ProviderMockupReference: "front-black"), TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Single(result.State.Revisions);
     }
 
     private sealed class MemoryRepository(WorkspaceSnapshot initial) : IWorkspaceRepository

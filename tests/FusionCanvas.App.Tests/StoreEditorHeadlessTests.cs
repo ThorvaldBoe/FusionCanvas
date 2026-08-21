@@ -99,8 +99,16 @@ public class StoreEditorHeadlessTests
         viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
         window.UpdateLayout();
         Assert.True(viewModel.IsOfferingDetail);
+        Assert.NotNull(FindButton(window, "Manage Variants"));
+        Assert.NotNull(FindButton(window, "Manage Design Areas"));
+        Assert.NotNull(FindButton(window, "Manage Mockup Templates"));
+        Assert.Null(FindButton(window, "Add Variant"));
+
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+        Assert.True(viewModel.IsVariantManagement);
         Assert.NotNull(FindButton(window, "Add Variant"));
-        Assert.NotNull(FindButton(window, "Add Placeholder"));
+        Assert.Null(FindButton(window, "Add Placeholder"));
 
         window.Close();
     }
@@ -134,16 +142,27 @@ public class StoreEditorHeadlessTests
         viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
         window.UpdateLayout();
 
-        var text = string.Join(" ", window.GetVisualDescendants().OfType<TextBlock>().Select(block => block.Text));
-        Assert.Contains("Mockup Templates", text, StringComparison.Ordinal);
-        Assert.Contains("Source image: not configured", text, StringComparison.Ordinal);
+        var text = string.Join(" ", window.GetVisualDescendants().OfType<TextBlock>().Where(IsEffectivelyVisible).Select(block => block.Text));
+        Assert.Contains("Manage Mockup Templates", text, StringComparison.Ordinal);
         Assert.Equal(viewModel.SelectedOffering!.Id, viewModel.CatalogSetup!.SelectedOfferingId);
+        Assert.Null(FindButton(window, "Add Option"));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
         var addOption = FindButton(window, "Add Option");
         Assert.NotNull(addOption);
         Assert.Null(FindButton(window, "Add Option Value"));
+        Assert.Null(FindButton(window, "Add Mockup Template"));
+        viewModel.BackToOfferingOverviewCommand.Execute(null);
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
         Assert.NotNull(FindButton(window, "Add Mockup Template"));
         Assert.Null(FindButton(window, "Save Mockup Template"));
-        Assert.NotNull(FindButton(window, "Link Color Option Value"));
+        Assert.Null(FindButton(window, "Link Color Option Value"));
+        var mockupText = string.Join(" ", window.GetVisualDescendants().OfType<TextBlock>().Where(IsEffectivelyVisible).Select(block => block.Text));
+        Assert.Contains("Provider mockup catalog data is not available", mockupText, StringComparison.Ordinal);
+        viewModel.BackToOfferingOverviewCommand.Execute(null);
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
         addOption!.Command!.Execute(addOption.CommandParameter);
         window.UpdateLayout();
         Assert.NotNull(FindButton(window, "Save Option"));
@@ -156,14 +175,8 @@ public class StoreEditorHeadlessTests
         Assert.DoesNotContain(
             window.GetVisualDescendants().OfType<ComboBox>(),
             comboBox => IsEffectivelyVisible(comboBox) && comboBox.PlaceholderText == "Select Blueprint Offering");
-        var sections = window.GetVisualDescendants().OfType<ToggleButton>()
-            .Where(IsEffectivelyVisible)
-            .Select(toggle => toggle.Content as string)
-            .Where(content => content is not null)
-            .ToArray();
-        Assert.Equal(
-            ["Basics", "Options & Values", "Variants", "Placeholders", "Mockup Templates", "Advanced"],
-            sections.Where(content => content is "Basics" or "Options & Values" or "Variants" or "Placeholders" or "Mockup Templates" or "Advanced"));
+        Assert.DoesNotContain("Placeholders", window.GetVisualDescendants().OfType<ToggleButton>()
+            .Where(IsEffectivelyVisible).Select(toggle => toggle.Content as string));
 
         window.Close();
     }
@@ -182,8 +195,8 @@ public class StoreEditorHeadlessTests
             .Where(IsEffectivelyVisible)
             .Select(block => block.Text));
         Assert.DoesNotContain("could not be repaired", text, StringComparison.Ordinal);
-        Assert.NotNull(FindButton(window, "Add Option"));
-        Assert.NotNull(FindButton(window, "Add Mockup Template"));
+        Assert.NotNull(FindButton(window, "Manage Variants"));
+        Assert.NotNull(FindButton(window, "Manage Mockup Templates"));
         Assert.Equal(viewModel.SelectedOffering!.Id, viewModel.CatalogSetup!.SelectedOfferingId);
         Assert.DoesNotContain(
             window.GetVisualDescendants().OfType<ComboBox>(),
@@ -273,7 +286,9 @@ public class StoreEditorHeadlessTests
         window.GetVisualDescendants()
             .OfType<Button>()
             .FirstOrDefault(b => IsEffectivelyVisible(b) &&
-                string.Equals(b.Content as string, content, System.StringComparison.Ordinal));
+                (string.Equals(b.Content as string, content, System.StringComparison.Ordinal) ||
+                 b.GetVisualDescendants().OfType<TextBlock>().Any(text =>
+                     string.Equals(text.Text, content, System.StringComparison.Ordinal))));
 
     private static bool IsEffectivelyVisible(Control control)
     {
