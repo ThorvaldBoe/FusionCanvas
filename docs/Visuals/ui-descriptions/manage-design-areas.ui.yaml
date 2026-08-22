@@ -1,0 +1,216 @@
+schemaVersion: 1
+tokenProfile: fusioncanvas-wireframe-v1
+screen:
+  id: manage-design-areas
+  title: Catalog & Mockups - Manage Design Areas
+  viewport:
+    width: 1200
+    height: 850
+  root:
+    id: page
+    kind: stack
+    gap: section
+    padding: window
+    children:
+      - id: page-header
+        kind: stack
+        gap: tight
+        children:
+          - id: page-title
+            kind: text
+            variant: screen-heading
+            text: Catalog & Mockups - Manage Design Areas
+          - id: page-subtitle
+            kind: text
+            variant: supporting
+            text: Version 2 - pixels first, with physical print size and artwork guidance
+      - id: master-detail
+        kind: grid
+        columns: [690, fill]
+        rowTracks: [fill]
+        gap: region
+        height: fill
+        children:
+          - id: area-collection
+            kind: panel
+            variant: canvas
+            height: fill
+            gap: section
+            padding: window
+            column: 0
+            row: 0
+            children:
+              - id: collection-context
+                kind: text
+                variant: supporting
+                text: Standard print shirt / Offering overview
+              - id: collection-header
+                kind: grid
+                columns: [fill, content]
+                rowTracks: [content]
+                gap: section
+                children:
+                  - id: collection-title-group
+                    kind: stack
+                    gap: tight
+                    column: 0
+                    row: 0
+                    children:
+                      - id: collection-title
+                        kind: text
+                        variant: screen-heading
+                        text: Design areas
+                      - id: collection-help
+                        kind: text
+                        variant: supporting
+                        text: SwiftPOD - A design area is a place where artwork can be used for this offering.
+                  - id: add-area
+                    kind: button
+                    variant: primary
+                    text: + Add area
+                    width: content
+                    column: 1
+                    row: 0
+              - id: collection-divider
+                kind: divider
+                variant: standard
+              - id: front-area-card
+                kind: panel
+                variant: summary-card
+                height: 120
+                padding: section
+                children:
+                  - id: front-area-layout
+                    kind: grid
+                    columns: [fill, content]
+                    rowTracks: [content, content, content]
+                    gap: tight
+                    children:
+                      - { id: front-area-title, kind: text, variant: section-heading, text: Front print area, column: 0, row: 0 }
+                      - { id: front-area-edit, kind: button, variant: secondary, text: Edit, width: content, column: 1, row: 0, rowSpan: 2 }
+                      - { id: front-area-placement, kind: text, variant: supporting, text: Front - primary placement, column: 0, row: 1 }
+                      - id: front-area-meta
+                        kind: grid
+                        columns: [fill, fill]
+                        rowTracks: [content]
+                        column: 0
+                        columnSpan: 2
+                        row: 2
+                        children:
+                          - { id: front-area-size, kind: text, variant: emphasis, text: "4,500 × 5,400 px", column: 0, row: 0 }
+                          - { id: front-area-compatibility, kind: text, variant: supporting, text: 12 compatible variants, column: 1, row: 0 }
+              - id: back-area-card
+                kind: panel
+                variant: summary-card
+                height: 120
+                padding: section
+                children:
+                  - id: back-area-layout
+                    kind: grid
+                    columns: [fill, content]
+                    rowTracks: [content, content, content]
+                    gap: tight
+                    children:
+                      - { id: back-area-title, kind: text, variant: section-heading, text: Back print area, column: 0, row: 0 }
+                      - { id: back-area-edit, kind: button, variant: secondary, text: Edit, width: content, column: 1, row: 0, rowSpan: 2 }
+                      - { id: back-area-placement, kind: text, variant: supporting, text: Back - primary placement, column: 0, row: 1 }
+                      - id: back-area-meta
+                        kind: grid
+                        columns: [fill, fill]
+                        rowTracks: [content]
+                        column: 0
+                        columnSpan: 2
+                        row: 2
+                        children:
+                          - { id: back-area-size, kind: text, variant: emphasis, text: "4,500 × 5,400 px", column: 0, row: 0 }
+                          - { id: back-area-compatibility, kind: text, variant: supporting, text: 12 compatible variants, column: 1, row: 0 }
+              - id: chest-area-card
+                kind: panel
+                variant: summary-card
+                height: 120
+                padding: section
+                children:
+                  - id: chest-area-layout
+                    kind: grid
+                    columns: [fill, content]
+                    rowTracks: [content, content, content]
+                    gap: tight
+                    children:
+                      - { id: chest-area-title, kind: text, variant: section-heading, text: Left chest print area, column: 0, row: 0 }
+                      - { id: chest-area-edit, kind: button, variant: secondary, text: Edit, width: content, column: 1, row: 0, rowSpan: 2 }
+                      - { id: chest-area-placement, kind: text, variant: supporting, text: Front - small placement, column: 0, row: 1 }
+                      - id: chest-area-meta
+                        kind: grid
+                        columns: [fill, fill]
+                        rowTracks: [content]
+                        column: 0
+                        columnSpan: 2
+                        row: 2
+                        children:
+                          - { id: chest-area-size, kind: text, variant: emphasis, text: "1,800 × 1,800 px", column: 0, row: 0 }
+                          - { id: chest-area-compatibility, kind: text, variant: supporting, text: 8 compatible variants, column: 1, row: 0 }
+              - id: empty-collection-message
+                kind: message
+                variant: empty
+                text: No design areas configured.
+                visible: false
+          - id: area-editor
+            kind: panel
+            variant: canvas
+            height: fill
+            gap: compact
+            padding: window
+            column: 1
+            row: 0
+            children:
+              - { id: editor-title, kind: text, variant: section-heading, text: Edit design area }
+              - { id: editor-area-name, kind: text, variant: subheading, text: Front print area }
+              - { id: editor-help, kind: text, variant: supporting, text: A clear label for the user }
+              - { id: editor-divider, kind: divider, variant: standard }
+              - { id: name-label, kind: text, variant: label, text: Name }
+              - { id: name-field, kind: field, variant: single-line, text: Front print area }
+              - { id: placement-label, kind: text, variant: label, text: Placement }
+              - id: placement-select
+                kind: select
+                variant: standard
+                text: Front
+                items: [Front, Back, Left chest]
+              - { id: maximum-label, kind: text, variant: label, text: Maximum design size }
+              - { id: maximum-pixels, kind: text, variant: emphasis, text: "4,500 × 5,400 px" }
+              - { id: maximum-physical, kind: text, variant: supporting, text: 15 × 18 in · 381 × 457 mm }
+              - { id: artwork-label, kind: text, variant: label, text: Recommended artwork }
+              - { id: artwork-size, kind: text, variant: emphasis, text: "At least 4,500 × 5,400 px" }
+              - { id: artwork-format, kind: text, variant: supporting, text: PNG · 300 DPI · transparent background }
+              - { id: compatibility-label, kind: text, variant: label, text: Compatibility }
+              - { id: compatibility-summary, kind: text, variant: supporting, text: Available for 12 of 12 variants }
+              - id: manage-compatible
+                kind: button
+                variant: secondary
+                text: Manage compatible variants
+                width: content
+              - id: editor-spacer
+                kind: stack
+                height: fill
+                children: []
+              - id: editor-save-row
+                kind: grid
+                columns: [fill, content]
+                rowTracks: [content]
+                children:
+                  - id: save-area
+                    kind: button
+                    variant: primary
+                    text: Save
+                    width: content
+                    column: 1
+                    row: 0
+states:
+  default:
+    overrides: []
+  empty-collection:
+    overrides:
+      - { target: front-area-card, visible: false }
+      - { target: back-area-card, visible: false }
+      - { target: chest-area-card, visible: false }
+      - { target: empty-collection-message, visible: true }
+      - { target: area-editor, visible: false }

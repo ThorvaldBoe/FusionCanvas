@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="850" viewBox="0 0 1200 850" role="img" aria-label="Catalog &amp; Mockups - Manage Design Areas">
+  <rect width="100%" height="100%" fill="#f4f6f8" />
+  <g data-ui-id="page" data-ui-kind="stack" data-enabled="true">
+    <g data-ui-id="page-header" data-ui-kind="stack" data-enabled="true">
+      <g data-ui-id="page-title" data-ui-kind="text" data-enabled="true">
+        <text x="48" y="74" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="600">Catalog &amp; Mockups - Manage Design Areas</text>
+      </g>
+      <g data-ui-id="page-subtitle" data-ui-kind="text" data-enabled="true">
+        <text x="48" y="98" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Version 2 - pixels first, with physical print size and artwork guidance</text>
+      </g>
+    </g>
+    <g data-ui-id="master-detail" data-ui-kind="grid" data-enabled="true">
+      <g data-ui-id="area-collection" data-ui-kind="panel" data-enabled="true">
+        <rect x="48" y="120" width="690" height="682" rx="10" fill="#ffffff" stroke="#b8c4d2" stroke-width="1" />
+        <g data-ui-id="collection-context" data-ui-kind="text" data-enabled="true">
+          <text x="96" y="182" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Standard print shirt / Offering overview</text>
+        </g>
+        <g data-ui-id="collection-header" data-ui-kind="grid" data-enabled="true">
+          <g data-ui-id="collection-title-group" data-ui-kind="stack" data-enabled="true">
+            <g data-ui-id="collection-title" data-ui-kind="text" data-enabled="true">
+              <text x="96" y="230" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="600">Design areas</text>
+            </g>
+            <g data-ui-id="collection-help" data-ui-kind="text" data-enabled="true">
+              <text x="96" y="254" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">SwiftPOD - A design area is a place where artwork can be used for this offering.</text>
+            </g>
+          </g>
+          <g data-ui-id="add-area" data-ui-kind="button" data-enabled="true">
+            <rect x="587" y="204" width="103" height="38" rx="7" fill="#214f7d" stroke="#214f7d" stroke-width="1" />
+            <text x="599" y="228" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">+ Add area</text>
+          </g>
+        </g>
+        <g data-ui-id="collection-divider" data-ui-kind="divider" data-enabled="true">
+          <line x1="96" y1="276" x2="690" y2="276" stroke="#c5ced8" stroke-width="1" />
+        </g>
+        <g data-ui-id="front-area-card" data-ui-kind="panel" data-enabled="true">
+          <rect x="96" y="293" width="594" height="120" rx="9" fill="#ffffff" stroke="#bdc8d5" stroke-width="1" />
+          <g data-ui-id="front-area-layout" data-ui-kind="grid" data-enabled="true">
+            <g data-ui-id="front-area-title" data-ui-kind="text" data-enabled="true">
+              <text x="112" y="329" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">Front print area</text>
+            </g>
+            <g data-ui-id="front-area-edit" data-ui-kind="button" data-enabled="true">
+              <rect x="618" y="309" width="56" height="38" rx="7" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+              <text x="630" y="333" fill="#214f7d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Edit</text>
+            </g>
+            <g data-ui-id="front-area-placement" data-ui-kind="text" data-enabled="true">
+              <text x="112" y="353" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Front - primary placement</text>
+            </g>
+            <g data-ui-id="front-area-meta" data-ui-kind="grid" data-enabled="true">
+              <g data-ui-id="front-area-size" data-ui-kind="text" data-enabled="true">
+                <text x="112" y="377" fill="#153f69" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">4,500 × 5,400 px</text>
+              </g>
+              <g data-ui-id="front-area-compatibility" data-ui-kind="text" data-enabled="true">
+                <text x="393" y="377" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">12 compatible variants</text>
+              </g>
+            </g>
+          </g>
+        </g>
+        <g data-ui-id="back-area-card" data-ui-kind="panel" data-enabled="true">
+          <rect x="96" y="429" width="594" height="120" rx="9" fill="#ffffff" stroke="#bdc8d5" stroke-width="1" />
+          <g data-ui-id="back-area-layout" data-ui-kind="grid" data-enabled="true">
+            <g data-ui-id="back-area-title" data-ui-kind="text" data-enabled="true">
+              <text x="112" y="465" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">Back print area</text>
+            </g>
+            <g data-ui-id="back-area-edit" data-ui-kind="button" data-enabled="true">
+              <rect x="618" y="445" width="56" height="38" rx="7" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+              <text x="630" y="469" fill="#214f7d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Edit</text>
+            </g>
+            <g data-ui-id="back-area-placement" data-ui-kind="text" data-enabled="true">
+              <text x="112" y="489" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Back - primary placement</text>
+            </g>
+            <g data-ui-id="back-area-meta" data-ui-kind="grid" data-enabled="true">
+              <g data-ui-id="back-area-size" data-ui-kind="text" data-enabled="true">
+                <text x="112" y="513" fill="#153f69" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">4,500 × 5,400 px</text>
+              </g>
+              <g data-ui-id="back-area-compatibility" data-ui-kind="text" data-enabled="true">
+                <text x="393" y="513" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">12 compatible variants</text>
+              </g>
+            </g>
+          </g>
+        </g>
+        <g data-ui-id="chest-area-card" data-ui-kind="panel" data-enabled="true">
+          <rect x="96" y="565" width="594" height="120" rx="9" fill="#ffffff" stroke="#bdc8d5" stroke-width="1" />
+          <g data-ui-id="chest-area-layout" data-ui-kind="grid" data-enabled="true">
+            <g data-ui-id="chest-area-title" data-ui-kind="text" data-enabled="true">
+              <text x="112" y="601" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">Left chest print area</text>
+            </g>
+            <g data-ui-id="chest-area-edit" data-ui-kind="button" data-enabled="true">
+              <rect x="618" y="581" width="56" height="38" rx="7" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+              <text x="630" y="605" fill="#214f7d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Edit</text>
+            </g>
+            <g data-ui-id="chest-area-placement" data-ui-kind="text" data-enabled="true">
+              <text x="112" y="625" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Front - small placement</text>
+            </g>
+            <g data-ui-id="chest-area-meta" data-ui-kind="grid" data-enabled="true">
+              <g data-ui-id="chest-area-size" data-ui-kind="text" data-enabled="true">
+                <text x="112" y="649" fill="#153f69" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">1,800 × 1,800 px</text>
+              </g>
+              <g data-ui-id="chest-area-compatibility" data-ui-kind="text" data-enabled="true">
+                <text x="393" y="649" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">8 compatible variants</text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g data-ui-id="area-editor" data-ui-kind="panel" data-enabled="true">
+        <rect x="762" y="120" width="390" height="682" rx="10" fill="#ffffff" stroke="#b8c4d2" stroke-width="1" />
+        <g data-ui-id="editor-title" data-ui-kind="text" data-enabled="true">
+          <text x="810" y="188" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">Edit design area</text>
+        </g>
+        <g data-ui-id="editor-area-name" data-ui-kind="text" data-enabled="true">
+          <text x="810" y="218" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="600">Front print area</text>
+        </g>
+        <g data-ui-id="editor-help" data-ui-kind="text" data-enabled="true">
+          <text x="810" y="246" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">A clear label for the user</text>
+        </g>
+        <g data-ui-id="editor-divider" data-ui-kind="divider" data-enabled="true">
+          <line x1="810" y1="260" x2="1104" y2="260" stroke="#c5ced8" stroke-width="1" />
+        </g>
+        <g data-ui-id="name-label" data-ui-kind="text" data-enabled="true">
+          <text x="810" y="282" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Name</text>
+        </g>
+        <g data-ui-id="name-field" data-ui-kind="field" data-enabled="true">
+          <rect x="810" y="295" width="294" height="38" rx="5" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+          <text x="822" y="319" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Front print area</text>
+        </g>
+        <g data-ui-id="placement-label" data-ui-kind="text" data-enabled="true">
+          <text x="810" y="354" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Placement</text>
+        </g>
+        <g data-ui-id="placement-select" data-ui-kind="select" data-enabled="true">
+          <rect x="810" y="367" width="294" height="38" rx="5" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+          <text x="822" y="391" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Front</text>
+          <text x="1082" y="391" fill="#415870" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">▾</text>
+        </g>
+        <g data-ui-id="maximum-label" data-ui-kind="text" data-enabled="true">
+          <text x="810" y="426" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Maximum design size</text>
+        </g>
+        <g data-ui-id="maximum-pixels" data-ui-kind="text" data-enabled="true">
+          <text x="810" y="453" fill="#153f69" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">4,500 × 5,400 px</text>
+        </g>
+        <g data-ui-id="maximum-physical" data-ui-kind="text" data-enabled="true">
+          <text x="810" y="481" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">15 × 18 in · 381 × 457 mm</text>
+        </g>
+        <g data-ui-id="artwork-label" data-ui-kind="text" data-enabled="true">
+          <text x="810" y="508" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Recommended artwork</text>
+        </g>
+        <g data-ui-id="artwork-size" data-ui-kind="text" data-enabled="true">
+          <text x="810" y="535" fill="#153f69" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">At least 4,500 × 5,400 px</text>
+        </g>
+        <g data-ui-id="artwork-format" data-ui-kind="text" data-enabled="true">
+          <text x="810" y="563" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">PNG · 300 DPI · transparent background</text>
+        </g>
+        <g data-ui-id="compatibility-label" data-ui-kind="text" data-enabled="true">
+          <text x="810" y="590" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Compatibility</text>
+        </g>
+        <g data-ui-id="compatibility-summary" data-ui-kind="text" data-enabled="true">
+          <text x="810" y="617" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Available for 12 of 12 variants</text>
+        </g>
+        <g data-ui-id="manage-compatible" data-ui-kind="button" data-enabled="true">
+          <rect x="810" y="631" width="228" height="38" rx="7" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+          <text x="822" y="655" fill="#214f7d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Manage compatible variants</text>
+        </g>
+        <g data-ui-id="editor-spacer" data-ui-kind="stack" data-enabled="true">
+        </g>
+        <g data-ui-id="editor-save-row" data-ui-kind="grid" data-enabled="true">
+          <g data-ui-id="save-area" data-ui-kind="button" data-enabled="true">
+            <rect x="1048" y="716" width="56" height="38" rx="7" fill="#214f7d" stroke="#214f7d" stroke-width="1" />
+            <text x="1060" y="740" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Save</text>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>
