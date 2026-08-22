@@ -84,6 +84,7 @@ public sealed class OfferingManagementService : IOfferingManagementService
                     colorIds,
                     variants.Where(variant => !variant.IsArchived && variant.OptionValueIds.Any(colorIds.Contains)).Select(variant => variant.Id).ToArray(),
                     revision?.ProviderMockupReference,
+                    template.CurrentRevision,
                     template.IsArchived);
             }).ToArray());
     }

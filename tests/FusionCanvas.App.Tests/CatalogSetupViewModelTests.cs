@@ -139,6 +139,57 @@ public sealed class CatalogSetupViewModelTests
         Assert.Contains("mm", viewModel.PhysicalSizeSummary, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task VariantEditorsAreOnDemandAndMutuallyExclusive()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "SwiftPOD", null, BlueprintOfferingKind.ProviderNetwork, null, "printify-choice", null, null, false, now, now);
+        var colorOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Shade", 0);
+        var sizeOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Size, "Dimensions", 1);
+        var black = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "Black", 0);
+        var medium = new OfferingOptionValue(Guid.NewGuid(), sizeOption.Id, offering.Id, "M", 0);
+        var variant = new OfferingVariant(Guid.NewGuid(), offering.Id, "Black / M", [black.Id, medium.Id], false, now, now);
+        var repository = new InMemoryWorkspaceRepository(snapshot with
+        {
+            Blueprints = [blueprint],
+            BlueprintOfferings = [offering],
+            OfferingOptions = [colorOption, sizeOption],
+            OfferingOptionValues = [black, medium],
+            OfferingVariants = [variant]
+        });
+        var viewModel = new CatalogSetupViewModel(
+            new CatalogSetupService(repository),
+            new MockupTemplateSetupService(repository),
+            new OfferingManagementService(repository));
+
+        await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+        viewModel.SelectOffering(offering.Id);
+
+        Assert.False(viewModel.IsManagingOptionValues);
+        Assert.Equal("Black", Assert.Single(viewModel.SellableVariantRows).Color);
+
+        viewModel.ManageOptionCommand.Execute(colorOption);
+        Assert.True(viewModel.IsManagingOptionValues);
+        Assert.Equal(colorOption.Id, viewModel.SelectedOptionId);
+        viewModel.CloseOptionValueManagementCommand.Execute(null);
+        Assert.False(viewModel.IsManagingOptionValues);
+
+        viewModel.StartAddVariantCommand.Execute(null);
+        Assert.True(viewModel.IsAddingVariant);
+        Assert.False(viewModel.IsAddingBulkVariants);
+
+        viewModel.StartBulkVariantsCommand.Execute(null);
+        Assert.False(viewModel.IsAddingVariant);
+        Assert.True(viewModel.IsAddingBulkVariants);
+
+        viewModel.CancelBulkVariantsCommand.Execute(null);
+        Assert.False(viewModel.IsAddingBulkVariants);
+        Assert.False(viewModel.HasActiveDraft);
+    }
+
     private sealed class StubProviderCatalog(ProviderCatalogCandidateDescriptor descriptor) : IProviderCatalogCandidateSource
     {
         public Task<ProviderCatalogCandidateDescriptor> LoadAsync(OfferingContext context, CancellationToken cancellationToken = default) =>

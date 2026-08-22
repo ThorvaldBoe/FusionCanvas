@@ -201,6 +201,7 @@ public sealed class OfferingManagementServiceTests
         Assert.Single(repository.Snapshot.MockupTemplateColorVariants);
         var summary = result.State.MockupTemplateSummaries.Single(value => value.Name == "Front black");
         Assert.Equal("front-black", summary.ProviderMockupReference);
+        Assert.Equal(1, summary.CurrentRevision);
         Assert.Equal(color.Id, Assert.Single(summary.ColorOptionValueIds));
         Assert.Equal(fixture.Snapshot.OfferingVariants.Single().Id, Assert.Single(summary.CompatibleVariantIds));
         Assert.Equal(mapping, repository.Snapshot.MockupTemplateRevisions.Single().ImageMapping);

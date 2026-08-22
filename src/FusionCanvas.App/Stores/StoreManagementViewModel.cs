@@ -137,6 +137,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private readonly INicheManagementService? _nicheService;
     private readonly ITagManagementService? _tagService;
     private readonly IProductSupplierSetupService? _productService;
+    private readonly IOfferingManagementService? _offeringManagementService;
     private bool _isSelectorExpanded;
     private bool _isStoreEditorOpen;
     private bool _firstStorePromptDismissed;
@@ -168,6 +169,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private CatalogEditorLevel _catalogEditorLevel;
     private CatalogEditorLevel _pendingCatalogLevel;
     private bool _isBasicsSectionExpanded = true;
+    private bool _isBlueprintBasicsExpanded;
     private bool _isVariantsSectionExpanded = true;
     private bool _isDesignAreasSectionExpanded = true;
     private bool _isAdvancedSectionExpanded;
@@ -229,6 +231,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         _nicheService = nicheService;
         _tagService = tagService;
         _productService = productService;
+        _offeringManagementService = offeringManagementService;
         CatalogSetup = catalogService is not null && mockupService is not null ? new CatalogSetupViewModel(catalogService, mockupService, offeringManagementService, providerCatalog) : null;
         ToggleStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = !IsSelectorExpanded);
         ExpandStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = true);
@@ -382,7 +385,11 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
          CancelAddDesignAreaCommand = new RelayCommand(_ => IsAddingDesignArea = false);
         SelectOfferingCommand = new RelayCommand(parameter =>
         {
-            if (parameter is FulfillmentOfferingSummary offering)
+            if (parameter is BlueprintOfferingCardViewModel card && SelectedProduct?.Offerings.FirstOrDefault(value => value.Id == card.Id) is { } cardOffering)
+            {
+                SelectOfferingForEditing(cardOffering);
+            }
+            else if (parameter is FulfillmentOfferingSummary offering)
             {
                 SelectOfferingForEditing(offering);
             }
@@ -577,6 +584,12 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     {
         get => _isBasicsSectionExpanded;
         set => SetField(ref _isBasicsSectionExpanded, value);
+    }
+
+    public bool IsBlueprintBasicsExpanded
+    {
+        get => _isBlueprintBasicsExpanded;
+        set => SetField(ref _isBlueprintBasicsExpanded, value);
     }
 
     public bool IsVariantsSectionExpanded
@@ -951,6 +964,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     }
 
     public IReadOnlyList<StoreProductSummary> Products { get; private set; } = [];
+    public ObservableCollection<BlueprintOfferingCardViewModel> BlueprintOfferingCards { get; } = [];
+    public bool HasBlueprintOfferingCards => BlueprintOfferingCards.Count > 0;
 
     public bool HasProducts => Products.Count > 0;
 
@@ -1041,11 +1056,11 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public bool CanSaveSelectedOffering => _productService is not null && SelectedProduct is not null && SelectedStore is { IsArchived: false } && HasUnsavedOfferingChanges;
 
-    public bool CanDeleteSelectedProduct => _productService is not null && SelectedProduct is not null && !_isCreatingNewProduct;
+    public bool CanDeleteSelectedProduct => _productService is not null && SelectedProduct is not null && !_isCreatingNewProduct && SelectedStore is { IsArchived: false };
 
     public bool CanArchiveSelectedProduct => false;
 
-    public bool CanDeleteSelectedOffering => _productService is not null && SelectedOffering is not null && !_isCreatingNewOffering;
+    public bool CanDeleteSelectedOffering => _productService is not null && SelectedOffering is not null && !_isCreatingNewOffering && SelectedStore is { IsArchived: false };
 
     public bool CanCreateCatalogItem => _productService is not null && SelectedStore is { IsArchived: false } && !_isCreatingNewStore;
 
@@ -2452,6 +2467,52 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         {
             ClearOfferingEditingFields();
         }
+        Run(RefreshBlueprintOfferingCardsAsync());
+    }
+
+    private async Task RefreshBlueprintOfferingCardsAsync()
+    {
+        var store = SelectedStore;
+        var blueprint = SelectedProduct;
+        IReadOnlyList<BlueprintOfferingCardViewModel> cards;
+        if (store is null || blueprint is null || _isCreatingNewProduct)
+        {
+            cards = [];
+        }
+        else if (_offeringManagementService is not null)
+        {
+            try
+            {
+                cards = (await _offeringManagementService.LoadForBlueprintAsync(store.Id, blueprint.Id).ConfigureAwait(true))
+                    .Select(BlueprintOfferingCardViewModel.From)
+                    .ToArray();
+                if (SelectedStore?.Id != store.Id || SelectedProduct?.Id != blueprint.Id)
+                    return;
+            }
+            catch (Exception exception)
+            {
+                if (SelectedStore?.Id != store.Id || SelectedProduct?.Id != blueprint.Id)
+                    return;
+                ErrorMessage = exception.Message;
+                return;
+            }
+        }
+        else
+        {
+            cards = blueprint.Offerings.Select(offering => new BlueprintOfferingCardViewModel(
+                offering.Id,
+                offering.Name,
+                offering.ProviderName ?? "Provider not configured",
+                offering.Kind != FulfillmentKind.FixedProvider,
+                "Setup incomplete",
+                offering.Variants.Count,
+                offering.DesignAreas.Count,
+                0)).ToArray();
+        }
+
+        BlueprintOfferingCards.Clear();
+        foreach (var card in cards) BlueprintOfferingCards.Add(card);
+        OnPropertyChanged(nameof(HasBlueprintOfferingCards));
     }
 
     private void ApplySelectedOfferingFields(FulfillmentOfferingSummary offering)
@@ -2524,6 +2585,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         }
 
         CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
+        Run(RefreshBlueprintOfferingCardsAsync());
     }
 
     private void OpenOfferingManagement(CatalogEditorLevel level)
@@ -2553,6 +2615,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             return;
         }
         CatalogEditorLevel = level;
+        if (level == CatalogEditorLevel.OfferingDetail)
+            Run(RefreshBlueprintOfferingCardsAsync());
     }
 
     private void StartAddVariant()

@@ -18,6 +18,7 @@ using FusionCanvas.Application.Products;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Domain.Catalog;
+using FusionCanvas.Domain.Mockups;
 
 namespace FusionCanvas.App.Tests;
 
@@ -152,6 +153,69 @@ public class StoreEditorHeadlessTests
         window.UpdateLayout();
         AssertEffectivelyVisible(window, "Catalog.MockupTemplateList");
         AssertEffectivelyVisible(window, "Catalog.MockupTemplateEditor");
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void CatalogEditorsUseCompactBasicsOnDemandDraftsAndSummaryFirstRegions()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        window.UpdateLayout();
+
+        AssertEffectivelyVisible(window, "Catalog.BlueprintBasics");
+        AssertEffectivelyVisible(window, "Catalog.BlueprintOfferingList");
+        Assert.False(viewModel.IsBlueprintBasicsExpanded);
+        Assert.Equal("Ready", Assert.Single(viewModel.BlueprintOfferingCards).Status);
+        viewModel.IsBlueprintBasicsExpanded = true;
+        window.UpdateLayout();
+        Assert.True(viewModel.IsBlueprintBasicsExpanded);
+
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        window.UpdateLayout();
+        AssertEffectivelyVisible(window, "Catalog.OfferingStatus");
+
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+        var optionEditor = window.GetVisualDescendants().OfType<Control>()
+            .Single(value => AutomationProperties.GetAutomationId(value) == "Catalog.OptionValueEditor");
+        Assert.False(IsEffectivelyVisible(optionEditor));
+        FindButton(window, "Manage values")!.Command!.Execute(FindButton(window, "Manage values")!.CommandParameter);
+        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.True(IsEffectivelyVisible(optionEditor));
+        Assert.True(window.FindControl<Button>("OptionValueDoneButton")!.IsFocused);
+        Assert.Null(FindButton(window, "Preview valid Variants"));
+        FindButton(window, "Bulk add")!.Command!.Execute(null);
+        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        AssertEffectivelyVisible(window, "Catalog.BulkVariantEditor");
+        Assert.True(window.FindControl<ComboBox>("BulkColorComboBox")!.IsFocused);
+        Assert.Null(FindButton(window, "Save Variant"));
+        viewModel.CatalogSetup.CancelBulkVariantsCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.True(window.FindControl<Button>("BulkAddVariantButton")!.IsFocused);
+
+        viewModel.BackToOfferingOverviewCommand.Execute(null);
+        viewModel.OpenDesignAreaManagementCommand.Execute(null);
+        window.UpdateLayout();
+        var designCard = Assert.Single(viewModel.CatalogSetup!.DesignAreaCards);
+        Assert.Equal("All active Variants", designCard.CompatibilitySummary);
+        Assert.Contains("px", designCard.MaximumSizeSummary, StringComparison.Ordinal);
+
+        viewModel.BackToOfferingOverviewCommand.Execute(null);
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+        var templateCard = Assert.Single(viewModel.CatalogSetup.MockupTemplateCards);
+        Assert.Equal("Front", templateCard.TargetDesignArea);
+        Assert.Equal(1, templateCard.CurrentRevision);
+        viewModel.CatalogSetup.StartAddTemplateCommand.Execute(null);
+        window.UpdateLayout();
+        AssertEffectivelyVisible(window, "Catalog.MockupPreviewRegion");
+        AssertEffectivelyVisible(window, "Catalog.MockupConfigurationRegion");
 
         window.Close();
     }
@@ -319,7 +383,8 @@ public class StoreEditorHeadlessTests
             new TagManagementService(repository),
             new ProductSupplierSetupService(repository),
             new CatalogSetupService(repository),
-            new MockupTemplateSetupService(repository));
+            new MockupTemplateSetupService(repository),
+            new OfferingManagementService(repository));
         viewModel.LoadAsync(default).GetAwaiter().GetResult();
         var window = new StoreEditorWindow { DataContext = viewModel };
         window.Show();
@@ -397,20 +462,26 @@ public class StoreEditorHeadlessTests
             null, offering.ExternalOfferingId, false, Now, Now);
         var colorOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
         var sizeOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Size, "Size", 1);
+        var black = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "Black", 0);
+        var small = new OfferingOptionValue(Guid.NewGuid(), sizeOption.Id, offering.Id, "S", 0);
+        var medium = new OfferingOptionValue(Guid.NewGuid(), sizeOption.Id, offering.Id, "M", 1);
+        var variant = new OfferingVariant(Guid.NewGuid(), offering.Id, "Black / S", [black.Id, small.Id], false, Now, Now);
+        var area = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 4500, 5400, [variant.Id], false, Now, Now);
+        var template = new MockupTemplate(Guid.NewGuid(), offering.Id, area.Id, "Front black", null, 1, false, Now, Now);
+        var revision = new MockupTemplateRevision(Guid.NewGuid(), template.Id, 1, area.Id, Now, providerMockupReference: "front-black", imageMapping: new MockupImageSpaceMapping(1200, 1200, 250, 200, 600, 700));
+        var templateColor = new MockupTemplateColorVariant(Guid.NewGuid(), template.Id, black.Id, false, Now, Now);
         return snapshot with
         {
             Blueprints = [blueprint],
             BlueprintOfferings = [normalizedOffering],
             PrintProviders = useFixedProviderOffering ? [provider] : [],
             OfferingOptions = includeOfferingOptions ? [colorOption, sizeOption] : [],
-            OfferingOptionValues = includeOfferingOptions
-                ?
-                [
-                    new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "Black", 0),
-                    new OfferingOptionValue(Guid.NewGuid(), sizeOption.Id, offering.Id, "S", 0),
-                    new OfferingOptionValue(Guid.NewGuid(), sizeOption.Id, offering.Id, "M", 1)
-                ]
-                : []
+            OfferingOptionValues = includeOfferingOptions ? [black, small, medium] : [],
+            OfferingVariants = includeOfferingOptions ? [variant] : [],
+            OfferingPlaceholders = includeOfferingOptions ? [area] : [],
+            MockupTemplates = includeOfferingOptions ? [template] : [],
+            MockupTemplateColorVariants = includeOfferingOptions ? [templateColor] : [],
+            MockupTemplateRevisions = includeOfferingOptions ? [revision] : []
         };
     }
 
