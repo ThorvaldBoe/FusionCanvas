@@ -1,0 +1,128 @@
+schemaVersion: 1
+tokenProfile: fusioncanvas-wireframe-v1
+screen:
+  id: offering-overview
+  title: Catalog & Mockups - Offering Overview
+  viewport:
+    width: 760
+    height: 1400
+  root:
+    id: page
+    kind: stack
+    gap: section
+    padding: window
+    children:
+      - id: page-header
+        kind: stack
+        gap: tight
+        children:
+          - { id: page-title, kind: text, variant: screen-heading, text: Catalog & Mockups - Offering Overview }
+          - { id: page-subtitle, kind: text, variant: supporting, text: One concise summary with focused routes into each setup responsibility. }
+      - id: overview-workspace
+        kind: panel
+        variant: canvas
+        height: fill
+        gap: section
+        padding: window
+        children:
+          - { id: breadcrumb, kind: text, variant: supporting, text: Gildan 64000 / Blueprint Offerings }
+          - id: overview-title-row
+            kind: grid
+            columns: [fill, content]
+            rowTracks: [content]
+            gap: section
+            children:
+              - id: overview-title-group
+                kind: stack
+                gap: tight
+                column: 0
+                row: 0
+                children:
+                  - { id: offering-name, kind: text, variant: screen-heading, text: Standard print shirt }
+                  - { id: offering-status, kind: text, variant: emphasis, text: Active }
+              - { id: save-offering, kind: button, variant: primary, text: Save changes, width: content, column: 1, row: 0 }
+          - { id: title-divider, kind: divider, variant: standard }
+          - id: basics-section
+            kind: panel
+            variant: standard
+            gap: compact
+            padding: section
+            children:
+              - { id: basics-title, kind: text, variant: section-heading, text: Basics }
+              - { id: name-label, kind: text, variant: label, text: Name }
+              - { id: name-field, kind: field, variant: single-line, text: Standard print shirt }
+              - { id: provider-label, kind: text, variant: label, text: Print Provider }
+              - id: provider-row
+                kind: grid
+                columns: [fill, content]
+                rowTracks: [content]
+                gap: control
+                children:
+                  - { id: provider-select, kind: select, variant: standard, text: SwiftPOD, items: [SwiftPOD, Monster Digital], column: 0, row: 0 }
+                  - { id: add-provider, kind: button, variant: secondary, text: Add Provider, width: content, column: 1, row: 0 }
+              - { id: description-label, kind: text, variant: label, text: Description }
+              - { id: description-field, kind: field, variant: multiline, text: Standard DTG shirt supplied by SwiftPOD. }
+          - id: setup-section
+            kind: stack
+            gap: compact
+            children:
+              - { id: setup-title, kind: text, variant: section-heading, text: Setup }
+              - { id: setup-help, kind: text, variant: supporting, text: Configure each relationship in its focused management screen. }
+              - id: variants-route
+                kind: panel
+                variant: summary-card
+                padding: section
+                children:
+                  - id: variants-route-layout
+                    kind: grid
+                    columns: [fill, content, content]
+                    rowTracks: [content, content]
+                    gap: control
+                    children:
+                      - { id: variants-route-title, kind: text, variant: subheading, text: Variants, column: 0, row: 0 }
+                      - { id: variants-route-help, kind: text, variant: supporting, text: Possible choices and explicit sellable combinations., column: 0, row: 1 }
+                      - { id: variants-route-count, kind: text, variant: supporting, text: 12 configured, column: 1, row: 0, rowSpan: 2 }
+                      - { id: manage-variants, kind: button, variant: secondary, text: Manage Variants, width: content, column: 2, row: 0, rowSpan: 2 }
+              - id: areas-route
+                kind: panel
+                variant: summary-card
+                padding: section
+                children:
+                  - id: areas-route-layout
+                    kind: grid
+                    columns: [fill, content, content]
+                    rowTracks: [content, content]
+                    gap: control
+                    children:
+                      - { id: areas-route-title, kind: text, variant: subheading, text: Design Areas, column: 0, row: 0 }
+                      - { id: areas-route-help, kind: text, variant: supporting, text: Printable regions and compatible Variants., column: 0, row: 1 }
+                      - { id: areas-route-count, kind: text, variant: supporting, text: 2 configured, column: 1, row: 0, rowSpan: 2 }
+                      - { id: manage-areas, kind: button, variant: secondary, text: Manage Design Areas, width: content, column: 2, row: 0, rowSpan: 2 }
+              - id: templates-route
+                kind: panel
+                variant: summary-card
+                padding: section
+                children:
+                  - id: templates-route-layout
+                    kind: grid
+                    columns: [fill, content, content]
+                    rowTracks: [content, content]
+                    gap: control
+                    children:
+                      - { id: templates-route-title, kind: text, variant: subheading, text: Mockup Templates, column: 0, row: 0 }
+                      - { id: templates-route-help, kind: text, variant: supporting, text: Provider images linked to Design Areas and Colors., column: 0, row: 1 }
+                      - { id: templates-route-count, kind: text, variant: supporting, text: 3 configured, column: 1, row: 0, rowSpan: 2 }
+                      - { id: manage-templates, kind: button, variant: secondary, text: Manage Mockup Templates, width: content, column: 2, row: 0, rowSpan: 2 }
+          - { id: advanced-divider, kind: divider, variant: standard }
+          - { id: advanced-action, kind: button, variant: link, text: Advanced provider identifiers, width: content }
+states:
+  default:
+    overrides: []
+  archived-store:
+    overrides:
+      - { target: offering-status, text: Archived - read only }
+      - { target: save-offering, enabled: false }
+      - { target: name-field, enabled: false }
+      - { target: provider-select, enabled: false }
+      - { target: add-provider, enabled: false }
+      - { target: description-field, enabled: false }

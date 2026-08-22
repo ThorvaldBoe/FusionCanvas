@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="1400" viewBox="0 0 760 1400" role="img" aria-label="Catalog &amp; Mockups - Offering Overview">
+  <rect width="100%" height="100%" fill="#f4f6f8" />
+  <g data-ui-id="page" data-ui-kind="stack" data-enabled="true">
+    <g data-ui-id="page-header" data-ui-kind="stack" data-enabled="true">
+      <g data-ui-id="page-title" data-ui-kind="text" data-enabled="true">
+        <text x="48" y="74" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="600">Catalog &amp; Mockups - Offering Overview</text>
+      </g>
+      <g data-ui-id="page-subtitle" data-ui-kind="text" data-enabled="true">
+        <text x="48" y="98" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">One concise summary with focused routes into each setup responsibility.</text>
+      </g>
+    </g>
+    <g data-ui-id="overview-workspace" data-ui-kind="panel" data-enabled="true">
+      <rect x="48" y="120" width="664" height="1232" rx="10" fill="#ffffff" stroke="#b8c4d2" stroke-width="1" />
+      <g data-ui-id="breadcrumb" data-ui-kind="text" data-enabled="true">
+        <text x="96" y="182" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Gildan 64000 / Blueprint Offerings</text>
+      </g>
+      <g data-ui-id="overview-title-row" data-ui-kind="grid" data-enabled="true">
+        <g data-ui-id="overview-title-group" data-ui-kind="stack" data-enabled="true">
+          <g data-ui-id="offering-name" data-ui-kind="text" data-enabled="true">
+            <text x="96" y="230" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="600">Standard print shirt</text>
+          </g>
+          <g data-ui-id="offering-status" data-ui-kind="text" data-enabled="true">
+            <text x="96" y="254" fill="#153f69" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Archived - read only</text>
+          </g>
+        </g>
+        <g data-ui-id="save-offering" data-ui-kind="button" data-enabled="false">
+          <rect x="545" y="204" width="119" height="38" rx="7" fill="#e2e6eb" stroke="#c2c9d1" stroke-width="1" />
+          <text x="557" y="228" fill="#7f8994" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Save changes</text>
+        </g>
+      </g>
+      <g data-ui-id="title-divider" data-ui-kind="divider" data-enabled="true">
+        <line x1="96" y1="276" x2="664" y2="276" stroke="#c5ced8" stroke-width="1" />
+      </g>
+      <g data-ui-id="basics-section" data-ui-kind="panel" data-enabled="true">
+        <rect x="96" y="293" width="568" height="332" rx="9" fill="#ffffff" stroke="#c3cdd8" stroke-width="1" />
+        <g data-ui-id="basics-title" data-ui-kind="text" data-enabled="true">
+          <text x="112" y="329" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">Basics</text>
+        </g>
+        <g data-ui-id="name-label" data-ui-kind="text" data-enabled="true">
+          <text x="112" y="356" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Name</text>
+        </g>
+        <g data-ui-id="name-field" data-ui-kind="field" data-enabled="false">
+          <rect x="112" y="369" width="536" height="38" rx="5" fill="#e4e8ed" stroke="#9fb0c3" stroke-width="1" />
+          <text x="124" y="393" fill="#7c8795" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Standard print shirt</text>
+        </g>
+        <g data-ui-id="provider-label" data-ui-kind="text" data-enabled="true">
+          <text x="112" y="428" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Print Provider</text>
+        </g>
+        <g data-ui-id="provider-row" data-ui-kind="grid" data-enabled="true">
+          <g data-ui-id="provider-select" data-ui-kind="select" data-enabled="false">
+            <rect x="112" y="441" width="405" height="38" rx="5" fill="#e4e8ed" stroke="#9fb0c3" stroke-width="1" />
+            <text x="124" y="465" fill="#7c8795" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">SwiftPOD</text>
+            <text x="495" y="465" fill="#415870" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">▾</text>
+          </g>
+          <g data-ui-id="add-provider" data-ui-kind="button" data-enabled="false">
+            <rect x="529" y="441" width="119" height="38" rx="7" fill="#e2e6eb" stroke="#c2c9d1" stroke-width="1" />
+            <text x="541" y="465" fill="#7f8994" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Add Provider</text>
+          </g>
+        </g>
+        <g data-ui-id="description-label" data-ui-kind="text" data-enabled="true">
+          <text x="112" y="500" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Description</text>
+        </g>
+        <g data-ui-id="description-field" data-ui-kind="field" data-enabled="false">
+          <rect x="112" y="513" width="536" height="96" rx="5" fill="#e4e8ed" stroke="#9fb0c3" stroke-width="1" />
+          <text x="124" y="537" fill="#7c8795" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Standard DTG shirt supplied by SwiftPOD.</text>
+        </g>
+      </g>
+      <g data-ui-id="setup-section" data-ui-kind="stack" data-enabled="true">
+        <g data-ui-id="setup-title" data-ui-kind="text" data-enabled="true">
+          <text x="96" y="661" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">Setup</text>
+        </g>
+        <g data-ui-id="setup-help" data-ui-kind="text" data-enabled="true">
+          <text x="96" y="689" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Configure each relationship in its focused management screen.</text>
+        </g>
+        <g data-ui-id="variants-route" data-ui-kind="panel" data-enabled="true">
+          <rect x="96" y="703" width="568" height="86" rx="9" fill="#ffffff" stroke="#bdc8d5" stroke-width="1" />
+          <g data-ui-id="variants-route-layout" data-ui-kind="grid" data-enabled="true">
+            <g data-ui-id="variants-route-title" data-ui-kind="text" data-enabled="true">
+              <text x="112" y="735" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="600">Variants</text>
+            </g>
+            <g data-ui-id="variants-route-help" data-ui-kind="text" data-enabled="true">
+              <text x="112" y="767" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Possible choices and explicit sellable combinations.</text>
+            </g>
+            <g data-ui-id="variants-route-count" data-ui-kind="text" data-enabled="true">
+              <text x="393" y="733" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">12 configured</text>
+            </g>
+            <g data-ui-id="manage-variants" data-ui-kind="button" data-enabled="true">
+              <rect x="506" y="719" width="142" height="38" rx="7" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+              <text x="518" y="743" fill="#214f7d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Manage Variants</text>
+            </g>
+          </g>
+        </g>
+        <g data-ui-id="areas-route" data-ui-kind="panel" data-enabled="true">
+          <rect x="96" y="797" width="568" height="86" rx="9" fill="#ffffff" stroke="#bdc8d5" stroke-width="1" />
+          <g data-ui-id="areas-route-layout" data-ui-kind="grid" data-enabled="true">
+            <g data-ui-id="areas-route-title" data-ui-kind="text" data-enabled="true">
+              <text x="112" y="829" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="600">Design Areas</text>
+            </g>
+            <g data-ui-id="areas-route-help" data-ui-kind="text" data-enabled="true">
+              <text x="112" y="861" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Printable regions and compatible Variants.</text>
+            </g>
+            <g data-ui-id="areas-route-count" data-ui-kind="text" data-enabled="true">
+              <text x="370" y="827" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">2 configured</text>
+            </g>
+            <g data-ui-id="manage-areas" data-ui-kind="button" data-enabled="true">
+              <rect x="475" y="813" width="173" height="38" rx="7" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+              <text x="487" y="837" fill="#214f7d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Manage Design Areas</text>
+            </g>
+          </g>
+        </g>
+        <g data-ui-id="templates-route" data-ui-kind="panel" data-enabled="true">
+          <rect x="96" y="891" width="568" height="86" rx="9" fill="#ffffff" stroke="#bdc8d5" stroke-width="1" />
+          <g data-ui-id="templates-route-layout" data-ui-kind="grid" data-enabled="true">
+            <g data-ui-id="templates-route-title" data-ui-kind="text" data-enabled="true">
+              <text x="112" y="923" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="600">Mockup Templates</text>
+            </g>
+            <g data-ui-id="templates-route-help" data-ui-kind="text" data-enabled="true">
+              <text x="112" y="955" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Provider images linked to Design Areas and Colors.</text>
+            </g>
+            <g data-ui-id="templates-route-count" data-ui-kind="text" data-enabled="true">
+              <text x="338" y="921" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">3 configured</text>
+            </g>
+            <g data-ui-id="manage-templates" data-ui-kind="button" data-enabled="true">
+              <rect x="443" y="907" width="205" height="38" rx="7" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+              <text x="455" y="931" fill="#214f7d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Manage Mockup Templates</text>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g data-ui-id="advanced-divider" data-ui-kind="divider" data-enabled="true">
+        <line x1="96" y1="993" x2="664" y2="993" stroke="#c5ced8" stroke-width="1" />
+      </g>
+      <g data-ui-id="advanced-action" data-ui-kind="button" data-enabled="true">
+        <rect x="96" y="1010" width="252" height="38" rx="7" fill="transparent" stroke="transparent" stroke-width="1" />
+        <text x="108" y="1034" fill="#214f7d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Advanced provider identifiers</text>
+      </g>
+    </g>
+  </g>
+</svg>

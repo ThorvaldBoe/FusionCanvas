@@ -1,0 +1,197 @@
+schemaVersion: 1
+tokenProfile: fusioncanvas-wireframe-v1
+screen:
+  id: manage-mockup-templates
+  title: Catalog & Mockups - Manage Mockup Templates
+  viewport:
+    width: 1280
+    height: 1040
+  root:
+    id: page
+    kind: stack
+    gap: section
+    padding: window
+    children:
+      - id: page-header
+        kind: stack
+        gap: tight
+        children:
+          - { id: page-title, kind: text, variant: screen-heading, text: Catalog & Mockups - Manage Mockup Templates }
+          - { id: page-subtitle, kind: text, variant: supporting, text: Link one provider mockup image to a Design Area and map its image-space placement. }
+      - id: master-detail
+        kind: grid
+        columns: [400, fill]
+        rowTracks: [fill]
+        gap: region
+        height: fill
+        children:
+          - id: template-collection
+            kind: panel
+            variant: canvas
+            height: fill
+            gap: section
+            padding: window
+            column: 0
+            row: 0
+            children:
+              - { id: collection-context, kind: text, variant: supporting, text: Standard print shirt / Offering overview }
+              - id: collection-header
+                kind: grid
+                columns: [fill, content]
+                rowTracks: [content]
+                gap: control
+                children:
+                  - id: collection-title-group
+                    kind: stack
+                    gap: tight
+                    column: 0
+                    row: 0
+                    children:
+                      - { id: collection-title, kind: text, variant: screen-heading, text: Mockup Templates }
+                      - { id: collection-count, kind: text, variant: supporting, text: 3 configured }
+                  - { id: add-template, kind: button, variant: primary, text: + Add Template, width: content, column: 1, row: 0 }
+              - { id: collection-divider, kind: divider, variant: standard }
+              - id: black-front-card
+                kind: panel
+                variant: summary-card
+                height: 112
+                gap: tight
+                padding: section
+                children:
+                  - { id: black-front-title, kind: text, variant: section-heading, text: Front - Black }
+                  - { id: black-front-summary, kind: text, variant: supporting, text: Front print area - Black - all enabled sizes }
+                  - { id: black-front-status, kind: text, variant: emphasis, text: Primary }
+              - id: white-front-card
+                kind: panel
+                variant: summary-card
+                height: 112
+                gap: tight
+                padding: section
+                children:
+                  - { id: white-front-title, kind: text, variant: section-heading, text: Front - White }
+                  - { id: white-front-summary, kind: text, variant: supporting, text: Front print area - White - all enabled sizes }
+                  - { id: white-front-status, kind: text, variant: emphasis, text: Active }
+              - id: black-back-card
+                kind: panel
+                variant: summary-card
+                height: 112
+                gap: tight
+                padding: section
+                children:
+                  - { id: black-back-title, kind: text, variant: section-heading, text: Back - Black }
+                  - { id: black-back-summary, kind: text, variant: supporting, text: Back print area - Black - all enabled sizes }
+                  - { id: black-back-status, kind: text, variant: supporting, text: Draft }
+              - { id: collection-empty, kind: message, variant: empty, text: No Mockup Templates configured., visible: false }
+          - id: template-editor
+            kind: panel
+            variant: canvas
+            height: fill
+            gap: section
+            padding: window
+            column: 1
+            row: 0
+            children:
+              - id: editor-header
+                kind: grid
+                columns: [fill, content]
+                rowTracks: [content]
+                gap: section
+                children:
+                  - id: editor-title-group
+                    kind: stack
+                    gap: tight
+                    column: 0
+                    row: 0
+                    children:
+                      - { id: editor-title, kind: text, variant: section-heading, text: Edit Mockup Template }
+                      - { id: editor-template-name, kind: text, variant: subheading, text: Front - Black }
+                  - { id: save-template, kind: button, variant: primary, text: Save, width: content, column: 1, row: 0 }
+              - { id: editor-divider, kind: divider, variant: standard }
+              - id: editor-body
+                kind: grid
+                columns: [fill, fill]
+                rowTracks: [fill]
+                gap: region
+                height: fill
+                children:
+                  - id: image-and-placement
+                    kind: stack
+                    gap: compact
+                    height: fill
+                    column: 0
+                    row: 0
+                    children:
+                      - { id: mockup-image-label, kind: text, variant: subheading, text: Provider mockup image }
+                      - id: mockup-image-preview
+                        kind: panel
+                        variant: choice-card
+                        height: 340
+                        gap: section
+                        padding: window
+                        children:
+                          - { id: preview-provider-image, kind: text, variant: supporting, text: "SwiftPOD front-view catalog image - 2,000 x 2,000 px" }
+                          - id: placement-box
+                            kind: panel
+                            variant: summary-card
+                            height: 170
+                            gap: tight
+                            padding: section
+                            children:
+                              - { id: placement-box-title, kind: text, variant: emphasis, text: Editable Design Area placement rectangle }
+                              - { id: placement-box-help, kind: text, variant: supporting, text: Drag to move; resize from the lower-right handle. }
+                      - { id: source-label, kind: text, variant: label, text: Mockup image source }
+                      - id: source-row
+                        kind: grid
+                        columns: [fill, content]
+                        rowTracks: [content]
+                        gap: control
+                        children:
+                          - { id: source-summary, kind: text, variant: supporting, text: Provider catalog image, column: 0, row: 0 }
+                          - { id: choose-provider-image, kind: button, variant: secondary, text: Choose Provider Image, width: content, column: 1, row: 0 }
+                  - id: template-fields
+                    kind: stack
+                    gap: compact
+                    height: fill
+                    column: 1
+                    row: 0
+                    children:
+                      - { id: template-name-label, kind: text, variant: label, text: Template name }
+                      - { id: template-name-field, kind: field, variant: single-line, text: Front - Black }
+                      - { id: area-label, kind: text, variant: label, text: Design Area }
+                      - { id: area-select, kind: select, variant: standard, text: Front print area, items: [Front print area, Back print area, Left chest print area] }
+                      - { id: applies-label, kind: text, variant: label, text: Applies to Colors }
+                      - { id: applies-summary, kind: text, variant: emphasis, text: Black - all enabled sizes are derived }
+                      - { id: manage-colors, kind: button, variant: secondary, text: Manage Colors, width: content }
+                      - { id: placement-title, kind: text, variant: subheading, text: Placement in provider image }
+                      - { id: placement-guidance, kind: text, variant: supporting, text: Image-space values support the visual editor and use source-image pixels. }
+                      - id: coordinate-grid
+                        kind: grid
+                        columns: [fill, fill]
+                        rowTracks: [content, content, content, content]
+                        gap: control
+                        children:
+                          - { id: x-label, kind: text, variant: label, text: X, column: 0, row: 0 }
+                          - { id: y-label, kind: text, variant: label, text: Y, column: 1, row: 0 }
+                          - { id: x-field, kind: field, variant: single-line, text: 620 px, column: 0, row: 1 }
+                          - { id: y-field, kind: field, variant: single-line, text: 480 px, column: 1, row: 1 }
+                          - { id: width-label, kind: text, variant: label, text: Width, column: 0, row: 2 }
+                          - { id: height-label, kind: text, variant: label, text: Height, column: 1, row: 2 }
+                          - { id: width-field, kind: field, variant: single-line, text: 710 px, column: 0, row: 3 }
+                          - { id: height-field, kind: field, variant: single-line, text: 910 px, column: 1, row: 3 }
+                      - { id: provider-reference-label, kind: text, variant: label, text: Advanced provider mockup reference }
+                      - { id: provider-reference, kind: field, variant: single-line, text: printify-mockup-12345 }
+                      - id: fields-spacer
+                        kind: stack
+                        height: fill
+                        children: []
+                      - { id: remove-template, kind: button, variant: danger, text: Remove Mockup Template, width: content }
+states:
+  default:
+    overrides: []
+  empty-collection:
+    overrides:
+      - { target: black-front-card, visible: false }
+      - { target: white-front-card, visible: false }
+      - { target: black-back-card, visible: false }
+      - { target: collection-empty, visible: true }
+      - { target: template-editor, visible: false }

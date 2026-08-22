@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="900" viewBox="0 0 760 900" role="img" aria-label="Catalog &amp; Mockups - Blueprint Offerings">
+  <rect width="100%" height="100%" fill="#f4f6f8" />
+  <g data-ui-id="page" data-ui-kind="stack" data-enabled="true">
+    <g data-ui-id="page-header" data-ui-kind="stack" data-enabled="true">
+      <g data-ui-id="page-title" data-ui-kind="text" data-enabled="true">
+        <text x="48" y="74" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="600">Catalog &amp; Mockups - Blueprint Offerings</text>
+      </g>
+      <g data-ui-id="page-subtitle" data-ui-kind="text" data-enabled="true">
+        <text x="48" y="98" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">One Blueprint-scoped collection; each card opens a focused Offering overview.</text>
+      </g>
+    </g>
+    <g data-ui-id="offering-workspace" data-ui-kind="panel" data-enabled="true">
+      <rect x="48" y="120" width="664" height="732" rx="10" fill="#ffffff" stroke="#b8c4d2" stroke-width="1" />
+      <g data-ui-id="back-to-blueprints" data-ui-kind="button" data-enabled="true">
+        <rect x="96" y="168" width="166" height="38" rx="7" fill="transparent" stroke="transparent" stroke-width="1" />
+        <text x="108" y="192" fill="#214f7d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Back to Blueprints</text>
+      </g>
+      <g data-ui-id="blueprint-heading" data-ui-kind="stack" data-enabled="true">
+        <g data-ui-id="blueprint-name" data-ui-kind="text" data-enabled="true">
+          <text x="96" y="248" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="600">Gildan 64000</text>
+        </g>
+        <g data-ui-id="blueprint-description" data-ui-kind="text" data-enabled="true">
+          <text x="96" y="272" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Basic unisex T-shirt</text>
+        </g>
+      </g>
+      <g data-ui-id="blueprint-divider" data-ui-kind="divider" data-enabled="true">
+        <line x1="96" y1="294" x2="664" y2="294" stroke="#c5ced8" stroke-width="1" />
+      </g>
+      <g data-ui-id="offering-header" data-ui-kind="grid" data-enabled="true">
+        <g data-ui-id="offering-heading-group" data-ui-kind="stack" data-enabled="true">
+          <g data-ui-id="offering-title" data-ui-kind="text" data-enabled="true">
+            <text x="96" y="331" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">Blueprint Offerings</text>
+          </g>
+          <g data-ui-id="offering-help" data-ui-kind="text" data-enabled="true">
+            <text x="96" y="355" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">An Offering is one concrete fulfillment choice for this Blueprint.</text>
+          </g>
+        </g>
+        <g data-ui-id="add-offering" data-ui-kind="button" data-enabled="true">
+          <rect x="530" y="311" width="134" height="38" rx="7" fill="#214f7d" stroke="#214f7d" stroke-width="1" />
+          <text x="542" y="335" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">+ Add Offering</text>
+        </g>
+      </g>
+      <g data-ui-id="standard-offering-card" data-ui-kind="panel" data-enabled="true">
+        <rect x="96" y="377" width="568" height="124" rx="9" fill="#ffffff" stroke="#bdc8d5" stroke-width="1" />
+        <g data-ui-id="standard-offering-layout" data-ui-kind="grid" data-enabled="true">
+          <g data-ui-id="standard-offering-name" data-ui-kind="text" data-enabled="true">
+            <text x="112" y="413" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">Standard print shirt</text>
+          </g>
+          <g data-ui-id="open-standard-offering" data-ui-kind="button" data-enabled="true">
+            <rect x="592" y="393" width="56" height="38" rx="7" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+            <text x="604" y="417" fill="#214f7d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Open</text>
+          </g>
+          <g data-ui-id="standard-provider" data-ui-kind="text" data-enabled="true">
+            <text x="112" y="437" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">SwiftPOD - 12 variants - 2 design areas - 3 mockup templates</text>
+          </g>
+          <g data-ui-id="standard-status" data-ui-kind="text" data-enabled="true">
+            <text x="112" y="461" fill="#153f69" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Active</text>
+          </g>
+        </g>
+      </g>
+      <g data-ui-id="premium-offering-card" data-ui-kind="panel" data-enabled="true">
+        <rect x="96" y="517" width="568" height="124" rx="9" fill="#ffffff" stroke="#bdc8d5" stroke-width="1" />
+        <g data-ui-id="premium-offering-layout" data-ui-kind="grid" data-enabled="true">
+          <g data-ui-id="premium-offering-name" data-ui-kind="text" data-enabled="true">
+            <text x="112" y="553" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">Premium print shirt</text>
+          </g>
+          <g data-ui-id="open-premium-offering" data-ui-kind="button" data-enabled="true">
+            <rect x="592" y="533" width="56" height="38" rx="7" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+            <text x="604" y="557" fill="#214f7d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Open</text>
+          </g>
+          <g data-ui-id="premium-provider" data-ui-kind="text" data-enabled="true">
+            <text x="112" y="577" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Monster Digital - Not configured yet</text>
+          </g>
+          <g data-ui-id="premium-status" data-ui-kind="text" data-enabled="true">
+            <text x="112" y="601" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Draft</text>
+          </g>
+        </g>
+      </g>
+      <g data-ui-id="collection-spacer" data-ui-kind="stack" data-enabled="true">
+      </g>
+      <g data-ui-id="collection-guidance" data-ui-kind="text" data-enabled="true">
+        <text x="96" y="798" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Complex catalog relationships are configured only after opening an Offering.</text>
+      </g>
+    </g>
+  </g>
+</svg>
