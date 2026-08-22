@@ -9,6 +9,13 @@ FusionCanvas SHALL provide focused management of Mockup Templates for one Bluepr
 - **AND** each template summary identifies its name, target Design Area, applicable Color or Variant summary, and lifecycle state
 - **AND** the selected template opens in a focused editor
 
+#### Scenario: Mockup Template management preserves master-detail composition
+- **WHEN** Mockup Template management has one or more records or an active draft
+- **THEN** FusionCanvas presents the template collection and one focused selected-or-new editor as visually distinct peer regions
+- **AND** makes the provider mockup image and visual Design Area mapping prominent within the editor
+- **AND** keeps identity, Design Area, Color applicability, numeric mapping, advanced provider data, and save actions grouped around that editor
+- **AND** may stack the list and editor only when available width requires it
+
 #### Scenario: User creates a template from a provider-catalog image
 - **WHEN** the user chooses an available provider-catalog mockup image, a Design Area from the same Offering, and valid color-level applicability
 - **THEN** FusionCanvas creates a template draft linked to that image and authoritative Design Area identity

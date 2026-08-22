@@ -232,11 +232,19 @@ public sealed class CatalogSetupService : ICatalogSetupService
                 if (string.IsNullOrWhiteSpace(request.ProviderNetworkCode))
                     return Failure(snapshot, request.StoreId, "A Provider-Network offering requires a stable provider-network code.");
             }
+            if (request.Kind == CatalogRecordKind.Offering && request.PrintProviderId is Guid printProviderId)
+            {
+                var offering = snapshot.BlueprintOfferings.Single(value => value.Id == request.RecordId);
+                if (offering.Kind != BlueprintOfferingKind.FixedPrintProvider)
+                    return Failure(snapshot, request.StoreId, "Only a fixed-provider offering can select a Print Provider.");
+                if (!snapshot.PrintProviders.Any(value => value.Id == printProviderId && value.StoreId == request.StoreId && !value.IsArchived))
+                    return Failure(snapshot, request.StoreId, "The selected Print Provider must be active and belong to this Store.");
+            }
             var updated = request.Kind switch
             {
                 CatalogRecordKind.Blueprint => snapshot with { Blueprints = snapshot.Blueprints.Select(value => value.Id == request.RecordId && value.StoreId == request.StoreId ? value with { Name = Required(request.Name, value.Name), Description = request.Description ?? value.Description, UpdatedAt = now } : value).ToArray() },
                 CatalogRecordKind.PrintProvider => snapshot with { PrintProviders = snapshot.PrintProviders.Select(value => value.Id == request.RecordId && value.StoreId == request.StoreId ? value with { Name = Required(request.Name, value.Name), UpdatedAt = now } : value).ToArray() },
-                CatalogRecordKind.Offering => snapshot with { BlueprintOfferings = snapshot.BlueprintOfferings.Select(value => value.Id == request.RecordId && value.StoreId == request.StoreId ? value with { Name = Required(request.Name, value.Name), Description = request.Description ?? value.Description, ProviderNetworkCode = request.ProviderNetworkCode?.Trim().ToLowerInvariant() ?? value.ProviderNetworkCode, DefaultPlaceholderId = request.DefaultPlaceholderId ?? value.DefaultPlaceholderId, ExternalOfferingId = request.ExternalOfferingId ?? value.ExternalOfferingId, UpdatedAt = now } : value).ToArray() },
+                CatalogRecordKind.Offering => snapshot with { BlueprintOfferings = snapshot.BlueprintOfferings.Select(value => value.Id == request.RecordId && value.StoreId == request.StoreId ? value with { Name = Required(request.Name, value.Name), Description = request.Description ?? value.Description, PrintProviderId = request.PrintProviderId ?? value.PrintProviderId, ProviderNetworkCode = request.ProviderNetworkCode?.Trim().ToLowerInvariant() ?? value.ProviderNetworkCode, DefaultPlaceholderId = request.DefaultPlaceholderId ?? value.DefaultPlaceholderId, ExternalOfferingId = request.ExternalOfferingId ?? value.ExternalOfferingId, UpdatedAt = now } : value).ToArray() },
                 CatalogRecordKind.Option => snapshot with { OfferingOptions = snapshot.OfferingOptions.Select(value => value.Id == request.RecordId ? value with { Name = Required(request.Name, value.Name) } : value).ToArray() },
                 CatalogRecordKind.OptionValue => snapshot with { OfferingOptionValues = snapshot.OfferingOptionValues.Select(value => value.Id == request.RecordId ? value with { Value = Required(request.Name, value.Value) } : value).ToArray() },
                 CatalogRecordKind.Variant => snapshot with { OfferingVariants = snapshot.OfferingVariants.Select(value => value.Id == request.RecordId ? value with { Name = Required(request.Name, value.Name), UpdatedAt = now } : value).ToArray() },

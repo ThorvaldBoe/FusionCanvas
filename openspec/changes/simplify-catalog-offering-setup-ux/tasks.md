@@ -66,3 +66,14 @@
 - [x] 8.5 Perform scoped completion QA from `docs/qa-review.md`, including criterion evidence, spec drift, architecture, security, Store isolation, migration/rollback, persistence, UI states, accessibility, and excluded-scope checks.
 - [x] 8.6 Review whether an optional disposable live desktop pass would add information unavailable from deterministic tests; it was not run because headless coverage exercises visual placement drag/resize, keyboard input, numeric synchronization, navigation, and density-bearing view construction.
 - [x] 8.7 Update `verification.md` with final criterion-level evidence and create a retrospective capturing implementation-discovered lessons or ambiguities before archive.
+
+## 9. Manual-review composition refinement
+
+- [x] 9.1 Update the proposal, design, delta specs, verification matrix, and retrospective so approved wireframe region order, grouping, prominence, and master-detail relationships are authoritative without prescribing pixel-perfect geometry.
+- [x] 9.2 Make fixed Print Provider assignment editable in Offering Basics by stable Store-owned identity, include an adjacent Provider creation route, and test successful save plus cross-Store/archived rejection.
+- [x] 9.3 Replace the inert Options & Values toggle and restructure Variant management into a distinct upper Available choices region grouped by Color/Size/Other and a lower Sellable Variants region containing individual and bulk actions.
+- [x] 9.4 Refine the Blueprint Offering list and Offering overview to preserve the wireframe's list-card hierarchy, Basics-first flow, consolidated three-route setup summary, and visible counts/status.
+- [x] 9.5 Refine Design Area management into a responsive master-detail composition with a scannable list and one focused selected-or-new editor.
+- [x] 9.6 Refine Mockup Template management into a responsive master-detail composition with a scannable list and a prominent visual mapping editor.
+- [x] 9.7 Add focused ViewModel and Avalonia headless tests for Provider editing, meaningful interactive controls, region ordering/grouping, master-detail visibility, and retained Offering identity.
+- [x] 9.8 Run focused and full deterministic tests, build, strict OpenSpec validation, and changed-scope UI/spec/accessibility QA; update final verification evidence.

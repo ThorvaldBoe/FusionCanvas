@@ -11,7 +11,8 @@ Blueprint Offering setup currently concentrates too many catalog relationships i
 - Provide focused Mockup Template management that links a provider mockup image, one selected Design Area, applicable Variants, and an image-space placement mapping editable visually with X/Y/width/height technical values.
 - Use “Provider” only for the actual fulfillment partner, such as SwiftPOD or Monster Digital; Printify remains the integration and catalog source.
 - Preserve explicit drafts, guarded transitions, empty/blocked/error states, Store isolation, archived/read-only behavior, and catalog lifecycle safeguards across the focused surfaces.
-- Treat the approved wireframes as conceptual references for information hierarchy and user journeys only; exact geometry, labels, styling, colors, and button text remain implementation decisions unless behaviorally essential.
+- Treat the approved wireframes as behavioral references for broad screen composition: major regions, their order, grouping, relative prominence, and list-versus-editor relationships SHALL remain recognizable. Exact geometry, dimensions, labels, styling, colors, spacing, and button text remain implementation decisions unless behaviorally essential.
+- Allow the fixed Print Provider assigned to an existing Blueprint Offering to be changed from Offering Basics, using active Store-owned Provider identities and an adjacent route to create a Provider when needed.
 - Exclude artwork selection by color or listing, rendering/composition execution, source-image upload, Shopify/listing publication, and unrelated integration expansion.
 
 This is one cohesive delivery module because all five surfaces form one independently reviewable outcome: a user can configure one Blueprint Offering without confronting the entire catalog graph at once. They share the same Offering context, navigation model, draft safeguards, terminology, and deterministic headless verification surface.

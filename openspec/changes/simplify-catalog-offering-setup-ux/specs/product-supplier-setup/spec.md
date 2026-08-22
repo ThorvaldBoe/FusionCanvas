@@ -33,6 +33,18 @@ The Blueprint Offering overview SHALL prioritize Offering identity and fulfillme
 - **AND** setup summaries report the configured state of Variants, Design Areas, and Mockup Templates
 - **AND** each setup summary provides one focused management route
 
+#### Scenario: Offering overview preserves the approved composition
+- **WHEN** a Blueprint Offering overview is active
+- **THEN** FusionCanvas presents Offering Basics before one consolidated setup region
+- **AND** the setup region groups Variants, Design Areas, and Mockup Templates with their status or counts and corresponding management actions
+- **AND** does not scatter those routes among unrelated forms
+
+#### Scenario: User changes a fixed Print Provider
+- **WHEN** the user edits Basics for a fixed-provider Offering
+- **THEN** FusionCanvas allows selection of an active Print Provider belonging to the same Store
+- **AND** provides an explicit adjacent route to create a Store-owned Print Provider when needed
+- **AND** saving updates the Offering's stable Print Provider identity and refreshed fulfillment summary
+
 #### Scenario: User reviews incomplete setup
 - **WHEN** an Offering has no sellable Variants, no Design Areas, or no Mockup Templates
 - **THEN** the overview identifies each incomplete area without presenting its full creation form

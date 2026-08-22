@@ -121,6 +121,68 @@ public sealed class CatalogSetupServiceTests
     }
 
     [Fact]
+    public async Task UpdatesFixedOfferingPrintProviderAndSynchronizesLegacyOffering()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprintId = Guid.NewGuid();
+        var offeringId = Guid.NewGuid();
+        var firstProvider = new PrintProvider(Guid.NewGuid(), storeId, "First Provider", null, false, Now, Now);
+        var secondProvider = new PrintProvider(Guid.NewGuid(), storeId, "Second Provider", null, false, Now, Now);
+        var repository = new MemoryRepository(new WorkspaceSnapshot(
+            [WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "First")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [new Blueprint(blueprintId, storeId, "T-shirt", null, false, Now, Now)],
+            PrintProviders = [firstProvider, secondProvider],
+            BlueprintOfferings =
+            [
+                new BlueprintOffering(offeringId, blueprintId, storeId, "Tee", null,
+                    BlueprintOfferingKind.FixedPrintProvider, firstProvider.Id, null, null, null, false, Now, Now)
+            ]
+        });
+        var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
+
+        var result = await service.UpdateAsync(new UpdateCatalogRecordRequest(
+            storeId, CatalogRecordKind.Offering, offeringId, PrintProviderId: secondProvider.Id),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(secondProvider.Id, Assert.Single(result.State.Offerings).PrintProviderId);
+        Assert.Equal(secondProvider.Id, Assert.Single(repository.Current.BlueprintOfferings).PrintProviderId);
+        Assert.Equal("Second Provider", Assert.Single(repository.Current.FulfillmentOfferings).ProviderName);
+    }
+
+    [Fact]
+    public async Task RejectsPrintProviderFromAnotherStoreWhenUpdatingOffering()
+    {
+        var storeId = Guid.NewGuid();
+        var otherStoreId = Guid.NewGuid();
+        var blueprintId = Guid.NewGuid();
+        var offeringId = Guid.NewGuid();
+        var currentProvider = new PrintProvider(Guid.NewGuid(), storeId, "Current Provider", null, false, Now, Now);
+        var foreignProvider = new PrintProvider(Guid.NewGuid(), otherStoreId, "Foreign Provider", null, false, Now, Now);
+        var repository = new MemoryRepository(new WorkspaceSnapshot(
+            [WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "First"), NewStore(otherStoreId, "Second")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [new Blueprint(blueprintId, storeId, "T-shirt", null, false, Now, Now)],
+            PrintProviders = [currentProvider, foreignProvider],
+            BlueprintOfferings =
+            [
+                new BlueprintOffering(offeringId, blueprintId, storeId, "Tee", null,
+                    BlueprintOfferingKind.FixedPrintProvider, currentProvider.Id, null, null, null, false, Now, Now)
+            ]
+        });
+        var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
+
+        var result = await service.UpdateAsync(new UpdateCatalogRecordRequest(
+            storeId, CatalogRecordKind.Offering, offeringId, PrintProviderId: foreignProvider.Id),
+            TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("belong", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(currentProvider.Id, Assert.Single(repository.Current.BlueprintOfferings).PrintProviderId);
+    }
+
+    [Fact]
     public async Task LoadsLegacyOnlyOfferingByRepairingAnIdempotentNormalizedGraph()
     {
         var storeId = Guid.NewGuid();

@@ -48,6 +48,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private readonly IProviderCatalogCandidateSource? _providerCatalog;
     private BlueprintOffering? _selectedOffering;
     private OfferingOption? _selectedOption;
+    private PrintProvider? _selectedPrintProvider;
     private OfferingPlaceholder? _selectedPlaceholder;
     private MockupTemplate? _selectedTemplate;
     private OfferingOptionValue? _selectedColor;
@@ -55,6 +56,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private string _offeringName = string.Empty;
     private string _offeringDescription = string.Empty;
     private string _providerNetworkCode = string.Empty;
+    private string _newPrintProviderName = string.Empty;
     private string _externalOfferingId = string.Empty;
     private string _optionName = string.Empty;
     private string _optionValue = string.Empty;
@@ -76,6 +78,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private string _error = string.Empty;
     private bool _isBusy;
     private bool _isAddingOption;
+    private bool _isAddingPrintProvider;
     private bool _isAddingOptionValue;
     private bool _isAddingVariant;
     private bool _isAddingPlaceholder;
@@ -98,8 +101,12 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         _offeringManagement = offeringManagement;
         _providerCatalog = providerCatalog;
 
-        SaveOfferingCommand = new AsyncRelayCommand(SaveOfferingAsync, () => CanEdit && SelectedOffering is not null && !string.IsNullOrWhiteSpace(OfferingName));
+        SaveOfferingCommand = new AsyncRelayCommand(SaveOfferingAsync, CanSaveOffering);
+        StartAddPrintProviderCommand = new RelayCommand(_ => IsAddingPrintProvider = true, () => CanEdit && SelectedOffering is not null && !IsProviderNetworkOffering);
+        CancelAddPrintProviderCommand = new RelayCommand(_ => { IsAddingPrintProvider = false; NewPrintProviderName = string.Empty; });
+        CreatePrintProviderCommand = new AsyncRelayCommand(CreatePrintProviderAsync, () => CanEdit && IsAddingPrintProvider && !string.IsNullOrWhiteSpace(NewPrintProviderName));
         StartAddOptionCommand = new RelayCommand(_ => IsAddingOption = true, () => CanEdit && SelectedOffering is not null);
+        ManageOptionCommand = new RelayCommand(parameter => SelectedOption = parameter as OfferingOption, () => CanEdit);
         CancelAddOptionCommand = new RelayCommand(_ => { IsAddingOption = false; OptionName = string.Empty; });
         CreateOptionCommand = new AsyncRelayCommand(CreateOptionAsync, () => CanEdit && IsAddingOption && SelectedOffering is not null && !string.IsNullOrWhiteSpace(OptionName));
         StartAddOptionValueCommand = new RelayCommand(_ => IsAddingOptionValue = true, () => CanEdit && SelectedOption is not null);
@@ -141,6 +148,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ObservableCollection<MockupTemplateColorVariant> TemplateColors { get; } = [];
     public ObservableCollection<MockupTemplateRevision> TemplateRevisions { get; } = [];
     public ObservableCollection<OptionKind> OptionKinds { get; } = [OptionKind.Color, OptionKind.Size, OptionKind.Other];
+    public ObservableCollection<OfferingChoiceGroupViewModel> AvailableChoiceGroups { get; } = [];
     public ObservableCollection<OptionValueChoiceViewModel> VariantValueChoices { get; } = [];
     public ObservableCollection<VariantChoiceViewModel> PlaceholderVariantChoices { get; } = [];
     public ObservableCollection<BulkSizeChoiceViewModel> BulkSizeChoices { get; } = [];
@@ -174,6 +182,17 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public string ProviderDisplayName => SelectedOffering?.PrintProviderId is Guid id
         ? PrintProviders.FirstOrDefault(value => value.Id == id)?.Name ?? "Unknown Print Provider"
         : string.Empty;
+    public IEnumerable<PrintProvider> AvailablePrintProviders => PrintProviders.Where(value => !value.IsArchived).OrderBy(value => value.Name, StringComparer.OrdinalIgnoreCase);
+    public PrintProvider? SelectedPrintProvider
+    {
+        get => _selectedPrintProvider;
+        set
+        {
+            if (!SetField(ref _selectedPrintProvider, value)) return;
+            OnPropertyChanged(nameof(ProviderDisplayName));
+            NotifyCommands();
+        }
+    }
 
     public OfferingOption? SelectedOption
     {
@@ -254,6 +273,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public string OfferingName { get => _offeringName; set { if (SetField(ref _offeringName, value)) NotifyCommands(); } }
     public string OfferingDescription { get => _offeringDescription; set => SetField(ref _offeringDescription, value); }
     public string ProviderNetworkCode { get => _providerNetworkCode; set => SetField(ref _providerNetworkCode, value); }
+    public string NewPrintProviderName { get => _newPrintProviderName; set { if (SetField(ref _newPrintProviderName, value)) NotifyCommands(); } }
     public string ExternalOfferingId { get => _externalOfferingId; set => SetField(ref _externalOfferingId, value); }
     public string OptionName { get => _optionName; set { if (SetField(ref _optionName, value)) NotifyCommands(); } }
     public string OptionValue { get => _optionValue; set { if (SetField(ref _optionValue, value)) NotifyCommands(); } }
@@ -285,6 +305,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public OptionKind SelectedOptionKind { get => _selectedOptionKind; set => SetField(ref _selectedOptionKind, value); }
 
     public bool IsAddingOption { get => _isAddingOption; private set { if (SetField(ref _isAddingOption, value)) NotifyCommands(); } }
+    public bool IsAddingPrintProvider { get => _isAddingPrintProvider; private set { if (SetField(ref _isAddingPrintProvider, value)) NotifyCommands(); } }
     public bool IsAddingOptionValue { get => _isAddingOptionValue; private set { if (SetField(ref _isAddingOptionValue, value)) NotifyCommands(); } }
     public bool IsAddingVariant { get => _isAddingVariant; private set { if (SetField(ref _isAddingVariant, value)) NotifyCommands(); } }
     public bool IsAddingPlaceholder { get => _isAddingPlaceholder; private set { if (SetField(ref _isAddingPlaceholder, value)) NotifyCommands(); } }
@@ -295,10 +316,12 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public bool IsBusy { get => _isBusy; private set { if (SetField(ref _isBusy, value)) { OnPropertyChanged(nameof(CanEdit)); NotifyCommands(); } } }
     public string ErrorMessage { get => _error; private set { if (SetField(ref _error, value)) OnPropertyChanged(nameof(HasError)); } }
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
-    public bool HasActiveDraft => IsAddingOption || IsAddingOptionValue || IsAddingVariant || IsAddingPlaceholder || IsAddingTemplate || _bulkPreview is not null;
+    public bool HasActiveDraft => IsAddingPrintProvider || IsAddingOption || IsAddingOptionValue || IsAddingVariant || IsAddingPlaceholder || IsAddingTemplate || _bulkPreview is not null;
 
     public void CancelActiveDrafts()
     {
+        IsAddingPrintProvider = false;
+        NewPrintProviderName = string.Empty;
         IsAddingOption = false;
         IsAddingOptionValue = false;
         ResetVariantDraft();
@@ -319,9 +342,16 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public bool HasAvailableVariants => AvailableVariants.Any();
     public bool HasAvailablePlaceholders => AvailablePlaceholders.Any();
     public bool HasAvailableTemplates => AvailableTemplates.Any();
+    public int AvailableVariantCount => AvailableVariants.Count();
+    public int AvailableDesignAreaCount => AvailablePlaceholders.Count();
+    public int AvailableTemplateCount => AvailableTemplates.Count();
 
     public ICommand SaveOfferingCommand { get; }
+    public ICommand StartAddPrintProviderCommand { get; }
+    public ICommand CancelAddPrintProviderCommand { get; }
+    public ICommand CreatePrintProviderCommand { get; }
     public ICommand StartAddOptionCommand { get; }
+    public ICommand ManageOptionCommand { get; }
     public ICommand CancelAddOptionCommand { get; }
     public ICommand CreateOptionCommand { get; }
     public ICommand StartAddOptionValueCommand { get; }
@@ -427,7 +457,19 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             Name: OfferingName,
             Description: EmptyToNull(OfferingDescription),
             ProviderNetworkCode: IsProviderNetworkOffering ? ProviderNetworkCode : null,
-            ExternalOfferingId: EmptyToNull(ExternalOfferingId)))).ConfigureAwait(true);
+            ExternalOfferingId: EmptyToNull(ExternalOfferingId),
+            PrintProviderId: IsProviderNetworkOffering ? null : SelectedPrintProvider?.Id))).ConfigureAwait(true);
+    }
+
+    private async Task CreatePrintProviderAsync()
+    {
+        if (SelectedOffering is null) return;
+        var requestedName = NewPrintProviderName.Trim();
+        await RunMutationAsync(() => _catalog.CreatePrintProviderAsync(new CreatePrintProviderRequest(SelectedOffering.StoreId, requestedName))).ConfigureAwait(true);
+        if (HasError) return;
+        SelectedPrintProvider = AvailablePrintProviders.FirstOrDefault(value => string.Equals(value.Name, requestedName, StringComparison.OrdinalIgnoreCase));
+        IsAddingPrintProvider = false;
+        NewPrintProviderName = string.Empty;
     }
 
     private async Task CreateOptionAsync()
@@ -713,6 +755,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     {
         Replace(Blueprints, state.Blueprints);
         Replace(PrintProviders, state.PrintProviders);
+        OnPropertyChanged(nameof(AvailablePrintProviders));
         Replace(Offerings, state.Offerings);
         Replace(Options, state.Options);
         Replace(OptionValues, state.OptionValues);
@@ -748,7 +791,16 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         OfferingDescription = SelectedOffering?.Description ?? string.Empty;
         ProviderNetworkCode = SelectedOffering?.ProviderNetworkCode ?? string.Empty;
         ExternalOfferingId = SelectedOffering?.ExternalOfferingId ?? string.Empty;
+        _selectedPrintProvider = SelectedOffering?.PrintProviderId is Guid providerId
+            ? PrintProviders.FirstOrDefault(value => value.Id == providerId)
+            : null;
+        OnPropertyChanged(nameof(SelectedPrintProvider));
+        IsAddingPrintProvider = false;
+        NewPrintProviderName = string.Empty;
     }
+
+    private bool CanSaveOffering() => CanEdit && SelectedOffering is not null && !string.IsNullOrWhiteSpace(OfferingName)
+        && (IsProviderNetworkOffering ? !string.IsNullOrWhiteSpace(ProviderNetworkCode) : SelectedPrintProvider is not null);
 
     private void RefreshOfferingCollections()
     {
@@ -763,6 +815,13 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(HasAvailableVariants));
         OnPropertyChanged(nameof(HasAvailablePlaceholders));
         OnPropertyChanged(nameof(HasAvailableTemplates));
+        OnPropertyChanged(nameof(AvailableVariantCount));
+        OnPropertyChanged(nameof(AvailableDesignAreaCount));
+        OnPropertyChanged(nameof(AvailableTemplateCount));
+        var groups = AvailableOptions.Select(option => new OfferingChoiceGroupViewModel(
+            option,
+            OptionValues.Where(value => value.OptionId == option.Id && !value.IsArchived).OrderBy(value => value.SortOrder).ToArray()));
+        Replace(AvailableChoiceGroups, groups);
         RebuildChoices();
     }
 
@@ -908,7 +967,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     {
         foreach (var command in new ICommand[]
         {
-            SaveOfferingCommand, StartAddOptionCommand, CreateOptionCommand, StartAddOptionValueCommand,
+            SaveOfferingCommand, StartAddPrintProviderCommand, CreatePrintProviderCommand, StartAddOptionCommand, ManageOptionCommand, CreateOptionCommand, StartAddOptionValueCommand,
             CreateOptionValueCommand, StartAddVariantCommand, CreateVariantCommand, StartAddPlaceholderCommand,
             CreatePlaceholderCommand, SetDefaultPlaceholderCommand, StartAddTemplateCommand, CreateTemplateCommand,
             AddTemplateColorCommand, PreviewBulkVariantsCommand, ConfirmBulkVariantsCommand

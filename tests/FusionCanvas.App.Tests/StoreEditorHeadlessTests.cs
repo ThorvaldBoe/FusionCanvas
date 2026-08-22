@@ -114,6 +114,49 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void OfferingAndFocusedEditorsPreserveApprovedBroadComposition()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        window.UpdateLayout();
+
+        AssertEffectivelyVisible(window, "Catalog.OfferingBasics");
+        AssertEffectivelyVisible(window, "Catalog.OfferingSetup");
+        AssertEffectivelyVisible(window, "Catalog.OfferingProvider");
+
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+        var available = AssertEffectivelyVisible(window, "Catalog.VariantAvailableChoices");
+        var sellable = AssertEffectivelyVisible(window, "Catalog.VariantSellableVariants");
+        Assert.True(available.Bounds.Top <= sellable.Bounds.Top,
+            "Available choices should be presented before sellable variants.");
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<ToggleButton>(), toggle =>
+            IsEffectivelyVisible(toggle) && string.Equals(toggle.Content as string, "Options & Values", StringComparison.Ordinal));
+        var variantText = string.Join(" ", window.GetVisualDescendants().OfType<TextBlock>()
+            .Where(IsEffectivelyVisible).Select(block => block.Text));
+        Assert.Contains("Color", variantText, StringComparison.Ordinal);
+        Assert.Contains("Size", variantText, StringComparison.Ordinal);
+        Assert.NotNull(FindButton(window, "Manage values"));
+
+        viewModel.BackToOfferingOverviewCommand.Execute(null);
+        viewModel.OpenDesignAreaManagementCommand.Execute(null);
+        window.UpdateLayout();
+        AssertEffectivelyVisible(window, "Catalog.DesignAreaList");
+        AssertEffectivelyVisible(window, "Catalog.DesignAreaEditor");
+
+        viewModel.BackToOfferingOverviewCommand.Execute(null);
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+        AssertEffectivelyVisible(window, "Catalog.MockupTemplateList");
+        AssertEffectivelyVisible(window, "Catalog.MockupTemplateEditor");
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void CatalogStrategyControlShowsManualAndExplainsFutureIntegrations()
     {
         var window = CreateEditorWindow();
@@ -263,10 +306,13 @@ public class StoreEditorHeadlessTests
         window.Close();
     }
 
-    private static StoreEditorWindow CreateEditorWindow(bool includeNormalizedCatalog = true)
+    private static StoreEditorWindow CreateEditorWindow(
+        bool includeNormalizedCatalog = true,
+        bool useFixedProviderOffering = false,
+        bool includeOfferingOptions = false)
     {
         var store = new Store(Guid.NewGuid(), "North Star", null, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog));
+        var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog, useFixedProviderOffering, includeOfferingOptions));
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository),
             new NicheManagementService(repository),
@@ -303,7 +349,19 @@ public class StoreEditorHeadlessTests
         return true;
     }
 
-    private static WorkspaceSnapshot Snapshot(Store store, bool includeNormalizedCatalog)
+    private static Control AssertEffectivelyVisible(Window window, string automationId)
+    {
+        var control = window.GetVisualDescendants().OfType<Control>()
+            .Single(value => AutomationProperties.GetAutomationId(value) == automationId);
+        Assert.True(IsEffectivelyVisible(control), $"{automationId} should be visible.");
+        return control;
+    }
+
+    private static WorkspaceSnapshot Snapshot(
+        Store store,
+        bool includeNormalizedCatalog,
+        bool useFixedProviderOffering,
+        bool includeOfferingOptions)
     {
         var product = new StoreProduct(Guid.NewGuid(), store.Id, "Gildan 64000", null, null, Now, Now, "{}");
         var offering = new FulfillmentOffering(Guid.NewGuid(), product.Id, "Printful", null, FulfillmentKind.FixedProvider, "Printful", null, Now, Now, "{}");
@@ -330,11 +388,29 @@ public class StoreEditorHeadlessTests
         }
 
         var blueprint = new Blueprint(product.Id, store.Id, product.Name, product.Description, false, Now, Now);
-        var normalizedOffering = new BlueprintOffering(offering.Id, blueprint.Id, store.Id, offering.Name, offering.Description, BlueprintOfferingKind.ProviderNetwork, null, "printful", null, offering.ExternalOfferingId, false, Now, Now);
+        var provider = new PrintProvider(Guid.NewGuid(), store.Id, "Printful", null, false, Now, Now);
+        var normalizedOffering = new BlueprintOffering(
+            offering.Id, blueprint.Id, store.Id, offering.Name, offering.Description,
+            useFixedProviderOffering ? BlueprintOfferingKind.FixedPrintProvider : BlueprintOfferingKind.ProviderNetwork,
+            useFixedProviderOffering ? provider.Id : null,
+            useFixedProviderOffering ? null : "printful",
+            null, offering.ExternalOfferingId, false, Now, Now);
+        var colorOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
+        var sizeOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Size, "Size", 1);
         return snapshot with
         {
             Blueprints = [blueprint],
-            BlueprintOfferings = [normalizedOffering]
+            BlueprintOfferings = [normalizedOffering],
+            PrintProviders = useFixedProviderOffering ? [provider] : [],
+            OfferingOptions = includeOfferingOptions ? [colorOption, sizeOption] : [],
+            OfferingOptionValues = includeOfferingOptions
+                ?
+                [
+                    new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "Black", 0),
+                    new OfferingOptionValue(Guid.NewGuid(), sizeOption.Id, offering.Id, "S", 0),
+                    new OfferingOptionValue(Guid.NewGuid(), sizeOption.Id, offering.Id, "M", 1)
+                ]
+                : []
         };
     }
 

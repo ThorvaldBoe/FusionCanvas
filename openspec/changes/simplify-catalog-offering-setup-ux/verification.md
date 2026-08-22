@@ -60,13 +60,23 @@ Criterion-level evidence was finalized after implementation. Every scenario belo
 | mockup-template-management | User leaves with unsaved template changes | Shared transition-guard and focus tests | Pass — covered by the cited focused verification. |
 | mockup-template-management | User reviews an archived Store | Headless read-only mapping/template state tests | Pass — covered by the cited focused verification. |
 
+## Feedback refinement criteria
+
+| Capability | Acceptance scenario | Planned verification | Result |
+| --- | --- | --- | --- |
+| product-supplier-setup | Offering overview preserves the approved composition | Avalonia headless region order, consolidated setup summary, and three-route visibility tests | Pass — `StoreEditorHeadlessTests.OfferingAndFocusedEditorsPreserveApprovedBroadComposition` verifies visible Basics and consolidated Setup regions; existing focused-routing coverage verifies all three routes. |
+| product-supplier-setup | User changes a fixed Print Provider | Application ownership/update tests plus ViewModel and headless selection/save tests | Pass — `CatalogSetupServiceTests` verifies successful stable-ID reassignment, legacy synchronization, and cross-Store rejection; the headless composition test verifies the bound Provider selector is visible in Offering Basics. |
+| variant-management | Variant management preserves available-then-sellable composition | Avalonia headless region-order, grouped-choice, lower-action, and no-inert-toggle tests | Pass — the new headless test verifies Available choices precedes Sellable Variants, Color and Size groups are visible, Manage values is actionable, and no inert Options & Values toggle remains. |
+| design-area-management | Design Area management preserves master-detail composition | Avalonia headless peer-region and selected/new editor visibility tests | Pass — the new headless test verifies the Design Area list and selected/new editor are simultaneously visible peer regions. |
+| mockup-template-management | Mockup Template management preserves master-detail composition | Avalonia headless peer-region and prominent placement-editor tests | Pass — the new headless test verifies the template list and focused editor are simultaneously visible peer regions; existing placement-editor headless tests verify prominent visual/numeric mapping behavior. |
+
 ## Completion gates
 
 - Domain foundation: `dotnet test .\tests\FusionCanvas.Domain.Tests\FusionCanvas.Domain.Tests.csproj --no-restore -v minimal` passed 232/232 after provider-reference, artwork-guidance, image-mapping, and revision-policy tests were added.
 - Persistence and package compatibility: focused Integration run passed 26/26, covering schema 11 migration, normalized round-trip, invalid persisted mapping rejection, rollback, Store isolation, and package export/import.
 - Focused Domain, Application, Integration, ViewModel, and Avalonia headless suites: Pass.
 - `dotnet build .\FusionCanvas.sln`: Pass (0 errors; repository-existing analyzer warnings only).
-- `dotnet test .\FusionCanvas.sln`: Pass — 1,295 tests (232 Domain, 382 Application, 184 Integration, 497 App/headless).
+- `dotnet test .\FusionCanvas.sln --no-restore -m:1 -v minimal`: Pass — 1,298 tests (232 Domain, 384 Application, 184 Integration, 498 App/headless), including the manual-review refinement coverage.
 - Strict OpenSpec validation: Pass — `openspec validate simplify-catalog-offering-setup-ux --strict`.
 - Scoped completion QA and excluded-scope schema review: Pass — no changed-scope architecture, security, persistence, migration, or excluded-scope finding remained.
 - Optional live desktop visual-density/drag-feel review: Not required; perform only if it adds information unavailable from deterministic tests.

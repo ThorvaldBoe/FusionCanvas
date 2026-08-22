@@ -9,6 +9,13 @@ FusionCanvas SHALL distinguish provider-catalog Options and Option Values that m
 - **AND** identifies the actual fulfillment Provider or Provider-Network context
 - **AND** does not present these choices as global Store configuration
 
+#### Scenario: Variant management preserves available-then-sellable composition
+- **WHEN** Variant management is displayed
+- **THEN** FusionCanvas presents a visually distinct Available choices region before a visually distinct Sellable Variants region
+- **AND** groups available values by stable semantic Option such as Color and Size
+- **AND** keeps individual and bulk Variant actions with the Sellable Variants region
+- **AND** does not use an interactive-looking section label that performs no action
+
 #### Scenario: User enables provider-catalog choices
 - **WHEN** the user selects Color, Size, or other Option Values available from the provider catalog for the Offering
 - **THEN** FusionCanvas records those values as possible choices for that Offering

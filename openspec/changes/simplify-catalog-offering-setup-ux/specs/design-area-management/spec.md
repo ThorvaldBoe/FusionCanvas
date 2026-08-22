@@ -9,6 +9,12 @@ FusionCanvas SHALL provide focused management of Design Areas for one Blueprint 
 - **AND** each list item summarizes placement, maximum pixel dimensions, and compatibility
 - **AND** the selected Design Area opens in a focused editor without showing Variant or Mockup Template creation forms
 
+#### Scenario: Design Area management preserves master-detail composition
+- **WHEN** Design Area management has one or more records or an active draft
+- **THEN** FusionCanvas presents the Design Area collection and one focused selected-or-new editor as visually distinct peer regions
+- **AND** keeps list summaries scannable while the editor prioritizes name, placement, pixel dimensions, artwork guidance, compatibility, and save actions
+- **AND** may stack those regions only when available width requires it
+
 #### Scenario: User creates a Design Area for all Variants
 - **WHEN** the user creates a Design Area and accepts the common all-Variants compatibility choice
 - **THEN** FusionCanvas associates the Design Area with every compatible active Variant in that Offering

@@ -614,7 +614,8 @@
                 </StackPanel>
               </Border>
 
-              <Border Classes="panel" Padding="12" IsVisible="{Binding IsOfferingDetail}">
+              <Border Classes="panel" Padding="12" IsVisible="{Binding IsOfferingDetail}"
+                      AutomationProperties.AutomationId="Catalog.OfferingBasics">
                 <StackPanel Spacing="8">
                   <ToggleButton Content="Basics" IsChecked="{Binding IsBasicsSectionExpanded, Mode=TwoWay}" HorizontalContentAlignment="Left" />
                   <StackPanel IsVisible="{Binding IsBasicsSectionExpanded}" Spacing="8">
@@ -624,7 +625,31 @@
                     <TextBlock Text="{Binding CatalogSetup.OfferingKindLabel}" />
                     <StackPanel IsVisible="{Binding !CatalogSetup.IsProviderNetworkOffering}" Spacing="4">
                       <TextBlock Text="Print Provider" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                      <TextBlock Text="{Binding CatalogSetup.ProviderDisplayName}" />
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <ComboBox Grid.Column="0"
+                                  ItemsSource="{Binding CatalogSetup.AvailablePrintProviders}"
+                                  SelectedItem="{Binding CatalogSetup.SelectedPrintProvider}"
+                                  DisplayMemberBinding="{Binding Name}"
+                                  PlaceholderText="Select Print Provider"
+                                  AutomationProperties.AutomationId="Catalog.OfferingProvider" />
+                        <Button Grid.Column="1" Content="Add Provider"
+                                Command="{Binding CatalogSetup.StartAddPrintProviderCommand}"
+                                Classes="secondary" />
+                      </Grid>
+                      <StackPanel IsVisible="{Binding CatalogSetup.IsAddingPrintProvider}" Spacing="6">
+                        <TextBlock Text="New Print Provider" FontWeight="SemiBold" />
+                        <TextBox Text="{Binding CatalogSetup.NewPrintProviderName}"
+                                 PlaceholderText="Provider name, for example SwiftPOD"
+                                 Classes="field" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Button Content="Create and select Provider"
+                                  Command="{Binding CatalogSetup.CreatePrintProviderCommand}"
+                                  Classes="primary" />
+                          <Button Content="Cancel"
+                                  Command="{Binding CatalogSetup.CancelAddPrintProviderCommand}"
+                                  Classes="secondary" />
+                        </StackPanel>
+                      </StackPanel>
                     </StackPanel>
                     <StackPanel IsVisible="{Binding CatalogSetup.IsProviderNetworkOffering}" Spacing="4">
                       <TextBlock Text="Provider Network code" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -639,7 +664,8 @@
                 </StackPanel>
               </Border>
 
-              <StackPanel IsVisible="{Binding IsOfferingDetail}" Spacing="10">
+              <StackPanel IsVisible="{Binding IsOfferingDetail}" Spacing="10"
+                          AutomationProperties.AutomationId="Catalog.OfferingSetup">
                 <TextBlock Text="Setup" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
                 <TextBlock Text="Configure each part of this Offering in a focused screen. Provider means the fulfillment partner that produces the item; Printify is the catalog and integration source."
                            TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -653,43 +679,77 @@
                 <TextBlock IsVisible="{Binding SelectedStore.IsArchived}"
                            Text="This Store is archived. Catalog setup is available for review but cannot be changed."
                            TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
-                <Button Command="{Binding OpenVariantManagementCommand}" Classes="listItem" HorizontalContentAlignment="Left">
-                  <StackPanel Spacing="3">
-                    <TextBlock Text="Manage Variants" FontWeight="SemiBold" />
-                    <TextBlock Text="Define possible Color and Size values, then create explicit sellable combinations."
-                               TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                  </StackPanel>
-                </Button>
-                <Button Command="{Binding OpenDesignAreaManagementCommand}" Classes="listItem" HorizontalContentAlignment="Left">
-                  <StackPanel Spacing="3">
-                    <TextBlock Text="Manage Design Areas" FontWeight="SemiBold" />
-                    <TextBlock Text="Describe printable regions and which Variants each region supports."
-                               TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                  </StackPanel>
-                </Button>
-                <Button Command="{Binding OpenMockupTemplateManagementCommand}" Classes="listItem" HorizontalContentAlignment="Left">
-                  <StackPanel Spacing="3">
-                    <TextBlock Text="Manage Mockup Templates" FontWeight="SemiBold" />
-                    <TextBlock Text="Link provider mockup images to Design Areas and applicable Colors."
-                               TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                  </StackPanel>
-                </Button>
+                <Border Classes="listItem" Padding="10">
+                  <Grid ColumnDefinitions="2*,Auto,Auto" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="3">
+                      <TextBlock Text="Variants" FontWeight="SemiBold" />
+                      <TextBlock Text="Possible choices and explicit sellable combinations."
+                                 TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                               Text="{Binding CatalogSetup.AvailableVariantCount, StringFormat='{}{0} configured'}"
+                               Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <Button Grid.Column="2" Content="Manage Variants" Command="{Binding OpenVariantManagementCommand}" Classes="secondary" />
+                  </Grid>
+                </Border>
+                <Border Classes="listItem" Padding="10">
+                  <Grid ColumnDefinitions="2*,Auto,Auto" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="3">
+                      <TextBlock Text="Design Areas" FontWeight="SemiBold" />
+                      <TextBlock Text="Printable regions and compatible Variants."
+                                 TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                               Text="{Binding CatalogSetup.AvailableDesignAreaCount, StringFormat='{}{0} configured'}"
+                               Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <Button Grid.Column="2" Content="Manage Design Areas" Command="{Binding OpenDesignAreaManagementCommand}" Classes="secondary" />
+                  </Grid>
+                </Border>
+                <Border Classes="listItem" Padding="10">
+                  <Grid ColumnDefinitions="2*,Auto,Auto" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="3">
+                      <TextBlock Text="Mockup Templates" FontWeight="SemiBold" />
+                      <TextBlock Text="Provider images linked to Design Areas and Colors."
+                                 TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                               Text="{Binding CatalogSetup.AvailableTemplateCount, StringFormat='{}{0} configured'}"
+                               Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <Button Grid.Column="2" Content="Manage Mockup Templates" Command="{Binding OpenMockupTemplateManagementCommand}" Classes="secondary" />
+                  </Grid>
+                </Border>
               </StackPanel>
 
-              <Border Classes="panel" Padding="12" IsVisible="{Binding IsVariantManagement}">
+              <Border Classes="panel" Padding="12" IsVisible="{Binding IsVariantManagement}"
+                      AutomationProperties.AutomationId="Catalog.VariantAvailableChoices">
                 <StackPanel Spacing="8">
-                  <ToggleButton Content="Options &amp; Values" IsChecked="True" HorizontalContentAlignment="Left" />
-                  <TextBlock Text="Options define stable meanings such as Color and Size. Add Values inside an Option before creating concrete Variants."
+                  <TextBlock Text="1. Available choices" FontSize="18" FontWeight="SemiBold" />
+                  <TextBlock Text="Define which Color, Size, and other values may be combined. This does not make every combination sellable."
                              TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                   <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailableOptions}" Text="No Options configured." Foreground="{DynamicResource SecondaryTextBrush}" />
-                  <ItemsControl ItemsSource="{Binding CatalogSetup.AvailableOptions}">
+                  <ItemsControl ItemsSource="{Binding CatalogSetup.AvailableChoiceGroups}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="catalog:OfferingOption">
-                        <Border Classes="listItem" Padding="8">
-                          <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding OptionKind}" Foreground="{DynamicResource SecondaryTextBrush}" />
-                            <Button Content="Archive Option" Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ArchiveOptionCommand}" CommandParameter="{Binding}" Classes="danger" />
+                      <DataTemplate x:DataType="stores:OfferingChoiceGroupViewModel">
+                        <Border Classes="listItem" Padding="10" Width="300" Margin="0,0,10,10">
+                          <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                              <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" />
+                              <TextBlock Grid.Column="1" Text="{Binding KindLabel}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                            </Grid>
+                            <TextBlock Text="{Binding ValuesSummary}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <Button Content="Manage values"
+                                      Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ManageOptionCommand}"
+                                      CommandParameter="{Binding Option}" Classes="secondary" />
+                              <Button Content="Archive Option"
+                                      Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ArchiveOptionCommand}"
+                                      CommandParameter="{Binding Option}" Classes="danger" />
+                            </StackPanel>
                           </StackPanel>
                         </Border>
                       </DataTemplate>
@@ -732,12 +792,10 @@
                 </StackPanel>
               </Border>
 
-              <Border Classes="panel" Padding="12" IsVisible="{Binding IsVariantManagement}">
+              <Border Classes="panel" Padding="12" IsVisible="{Binding IsVariantManagement}"
+                      AutomationProperties.AutomationId="Catalog.VariantSellableVariants">
                 <StackPanel Spacing="8">
-                  <ToggleButton Content="Variants"
-                                IsChecked="{Binding IsVariantsSectionExpanded, Mode=TwoWay}"
-                                HorizontalContentAlignment="Left" />
-                  <StackPanel IsVisible="{Binding IsVariantsSectionExpanded}" Spacing="8">
+                  <TextBlock Text="2. Sellable Variants" FontSize="18" FontWeight="SemiBold" />
                     <TextBlock Text="A Variant is one concrete combination of Option Values, such as Black and Medium."
                                TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailableOptions}" Text="Add Options and Values before creating Variants." Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -809,23 +867,17 @@
                                 Classes="primary" />
                       </StackPanel>
                     </Border>
-                  </StackPanel>
                 </StackPanel>
               </Border>
 
-              <Border Classes="panel" Padding="12" IsVisible="{Binding IsDesignAreaManagement}">
-                <StackPanel Spacing="8">
-                  <ToggleButton Content="Design Areas"
-                                IsChecked="{Binding IsDesignAreasSectionExpanded, Mode=TwoWay}"
-                                HorizontalContentAlignment="Left" />
-                  <StackPanel IsVisible="{Binding IsDesignAreasSectionExpanded}" Spacing="8">
-                    <TextBlock Text="A Design Area is an actual printable region on this Offering, such as Front or Back."
-                               FontSize="12"
-                               TextWrapping="Wrap"
-                               Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <Button Content="Add Design Area"
-                            Command="{Binding CatalogSetup.StartAddPlaceholderCommand}"
-                            Classes="secondary" />
+              <Grid IsVisible="{Binding IsDesignAreaManagement}" ColumnDefinitions="3*,2*" ColumnSpacing="12">
+                <Border Grid.Column="1" Classes="panel" Padding="12"
+                        AutomationProperties.AutomationId="Catalog.DesignAreaEditor">
+                  <StackPanel Spacing="8">
+                    <TextBlock Text="Design Area editor" FontSize="18" FontWeight="SemiBold" />
+                    <TextBlock IsVisible="{Binding !CatalogSetup.IsAddingPlaceholder}"
+                               Text="Select Edit on a Design Area, or add a new one."
+                               TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <StackPanel IsVisible="{Binding CatalogSetup.IsAddingPlaceholder}" Spacing="6">
                       <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                       <TextBox Text="{Binding CatalogSetup.PlaceholderName}" PlaceholderText="Front" Classes="field" />
@@ -883,7 +935,19 @@
                         <Button Content="Cancel" Command="{Binding CatalogSetup.CancelAddPlaceholderCommand}" Classes="secondary fixedAction" />
                       </StackPanel>
                     </StackPanel>
-                  <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailablePlaceholders}" Text="No Design Areas configured." Foreground="{DynamicResource SecondaryTextBrush}" />
+                  </StackPanel>
+                </Border>
+                <Border Grid.Column="0" Classes="panel" Padding="12"
+                        AutomationProperties.AutomationId="Catalog.DesignAreaList">
+                  <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Grid.Column="0" Spacing="3">
+                        <TextBlock Text="Design Areas" FontSize="18" FontWeight="SemiBold" />
+                        <TextBlock Text="Printable regions for this Offering." Foreground="{DynamicResource SecondaryTextBrush}" />
+                      </StackPanel>
+                      <Button Grid.Column="1" Content="Add Design Area" Command="{Binding CatalogSetup.StartAddPlaceholderCommand}" Classes="primary" />
+                    </Grid>
+                    <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailablePlaceholders}" Text="No Design Areas configured." Foreground="{DynamicResource SecondaryTextBrush}" />
                     <ItemsControl ItemsSource="{Binding CatalogSetup.AvailablePlaceholders}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="catalog:OfferingPlaceholder">
@@ -909,16 +973,14 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                   </StackPanel>
-                </StackPanel>
-              </Border>
+                </Border>
+              </Grid>
 
-              <Border Classes="panel"
-                      Padding="12"
-                      IsVisible="{Binding IsMockupTemplateManagement}">
-                <StackPanel Spacing="8">
-                  <ToggleButton Content="Mockup Templates"
-                                IsChecked="True"
-                                HorizontalContentAlignment="Left" />
+              <Grid IsVisible="{Binding IsMockupTemplateManagement}" ColumnDefinitions="2*,3*" ColumnSpacing="12">
+                <Border Grid.Column="0" Classes="panel" Padding="12"
+                        AutomationProperties.AutomationId="Catalog.MockupTemplateList">
+                  <StackPanel Spacing="8">
+                  <TextBlock Text="Mockup Templates" FontSize="18" FontWeight="SemiBold" />
                   <TextBlock Text="Each template links one provider mockup image to one Design Area and one or more Colors. Compatible concrete Variants are derived from those Colors."
                              TextWrapping="Wrap"
                              FontSize="12"
@@ -954,6 +1016,15 @@
                     </StackPanel>
                   </Border>
                   <Button Content="Add Mockup Template" Command="{Binding CatalogSetup.StartAddTemplateCommand}" Classes="secondary" />
+                  </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Classes="panel" Padding="12"
+                        AutomationProperties.AutomationId="Catalog.MockupTemplateEditor">
+                  <StackPanel Spacing="8">
+                  <TextBlock Text="Mockup Template editor" FontSize="18" FontWeight="SemiBold" />
+                  <TextBlock IsVisible="{Binding !CatalogSetup.IsAddingTemplate}"
+                             Text="Select Edit on a template, or add a new one."
+                             TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
                   <StackPanel IsVisible="{Binding CatalogSetup.IsAddingTemplate}" Spacing="6">
                     <TextBox Text="{Binding CatalogSetup.TemplateName}" PlaceholderText="Mockup Template name" Classes="field" />
                     <ComboBox ItemsSource="{Binding CatalogSetup.ProviderMockupCandidates}"
@@ -1002,8 +1073,9 @@
                               Classes="secondary fixedAction" />
                     </StackPanel>
                   </StackPanel>
-                </StackPanel>
-              </Border>
+                  </StackPanel>
+                </Border>
+              </Grid>
 
               <Border Classes="panel" Padding="12" IsVisible="{Binding IsOfferingDetail}">
                 <StackPanel Spacing="8">
@@ -1018,10 +1090,10 @@
                     <TextBlock Text="External offering ID" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBox Text="{Binding CatalogSetup.ExternalOfferingId}" Classes="field" />
                   </StackPanel>
-                </StackPanel>
-              </Border>
+                  </StackPanel>
+                </Border>
+              </StackPanel>
             </StackPanel>
-          </StackPanel>
 
           <Border IsVisible="{Binding ProductDeleteWarningVisible}"
                   Background="{DynamicResource DangerBackgroundBrush}"

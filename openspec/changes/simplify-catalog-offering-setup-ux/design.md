@@ -8,8 +8,8 @@ The workflow belongs in the dedicated Store Editor, not the primary creative wor
 
 1. Existing domain model and invariants are authoritative: Store ownership, Blueprint and Blueprint Offering identity, actual Print Provider versus Provider Network, typed Options/Values, explicit Variants, Design Area/Placeholder compatibility, required template target, color-level template bindings, revision attribution, and lifecycle safeguards.
 2. The behavioral requirements in this OpenSpec change govern the redesigned user journeys and any narrowly required model extensions.
-3. The approved wireframes are illustrative UX references only. They inform information hierarchy, progressive disclosure, focused sub-editors, relationships, and journeys.
-4. Detailed labels, button text, exact control placement, geometry, colors, spacing, and styling are implementation decisions unless a specification makes them essential to behavior.
+3. The approved wireframes are behavioral references for broad composition. Their major regions, order, grouping, relative prominence, and list-versus-editor relationships are authoritative where reflected in the capability specifications.
+4. Detailed labels, button text, exact control placement, dimensions, geometry, colors, spacing, and styling are implementation decisions unless a specification makes them essential to behavior. Implementations may adapt columns to available window width, but SHALL preserve the recognizable hierarchy rather than flattening every screen into one undifferentiated vertical form.
 
 The design does not copy wireframe geometry or add the wireframes as repository assets. It supersedes the earlier “future placement extension only” boundary only for revisioned image-space mapping; it does not reopen artwork composition, rendering, upload, or per-concrete-Variant override decisions.
 
@@ -47,6 +47,18 @@ No high-impact ambiguity was found in the baseline. These reconciliations are bi
 - Fetching Printify data over the network, adding credentials, or implementing a Printify adapter in this module.
 - Shopify or marketplace publication, listing-stage behavior, or cross-system option mapping.
 - Pixel-perfect reproduction of the conceptual wireframes.
+
+### Feedback-driven composition refinement
+
+Manual review of the first implementation showed that preserving only navigation and data relationships was insufficient. Generic stacked panels technically separated the concepts but lost the wireframes' clarity. The following broad compositions are therefore binding while exact measurements remain flexible:
+
+- Blueprint detail presents the Offering list as the primary working region; complex Offering editing remains elsewhere.
+- Offering overview presents Basics first and one consolidated setup summary containing the three focused routes.
+- Variant management presents available choices first as a distinct upper region grouped by semantic Option, then explicit sellable Variants as a distinct lower region with individual and bulk actions.
+- Design Area management uses a recognizable master-detail relationship between the Offering's Design Area list and one focused editor.
+- Mockup Template management uses a recognizable master-detail relationship between the template list and one focused editor, with the provider image mapping visually prominent.
+
+Controls that only label a region are headings, not buttons or toggles. Any control styled as interactive SHALL perform a meaningful action and expose that state accessibly.
 
 ## Decisions
 
@@ -121,6 +133,12 @@ Archive/read-only Store context disables all mutations while preserving navigati
 
 The alternative—independent ad hoc draft behavior in each view—was rejected because it causes inconsistent loss of work and difficult headless verification.
 
+### 9. Existing fixed Provider assignment is editable from Basics
+
+For a fixed-provider Offering, Basics exposes the active Store-owned Print Providers as selectable identities and provides an adjacent, explicit route for creating a new Print Provider when the required identity does not yet exist. Saving changes updates the authoritative `BlueprintOffering.PrintProviderId`; it does not store a free-text Provider label on the Offering. Provider-Network Offerings continue to show their stable network identity instead of a fabricated fixed Provider selector.
+
+Rendering the Provider as read-only text after creation was rejected because occasional catalog maintenance includes correcting or changing the fulfillment partner. Editing only a free-text label was rejected because the normalized Provider identity is authoritative and may be shared.
+
 ## Risks / Trade-offs
 
 - **[Risk] The active Issue #185 change is not yet archived and may alter the accepted baseline.** → Implement only after reconciling this change against Issue #185's final accepted specs and model; preserve the authority hierarchy and update deltas rather than duplicating records.
@@ -165,8 +183,8 @@ The alternative—independent ad hoc draft behavior in each view—was rejected 
 
 ### App and navigation
 
-- Refactor `StoreManagementViewModel`/catalog navigation state so Blueprint detail owns the Offering list and Offering overview owns focused route commands. Do not use mutable labels or fallback selection to resolve context.
-- Replace the dense Offering composition in `StoreEditorWindow.axaml` with a concise overview and focused child views or view components for Variants, Design Areas, and Mockup Templates. Reuse the dedicated Store Editor window; do not add permanent main-workspace UI.
+- Refactor `StoreManagementViewModel`/catalog navigation state so Blueprint detail owns the Offering list and Offering overview owns focused route commands. Do not use mutable labels or fallback selection to resolve context. Fixed Provider changes use Store-owned Provider IDs and the existing catalog mutation boundary.
+- Replace the dense Offering composition in `StoreEditorWindow.axaml` with a concise overview and focused child views or view components for Variants, Design Areas, and Mockup Templates. Preserve the wireframes' broad region order, grouping, relative prominence, and master-detail relationships while allowing responsive sizing and repository-native styling. Reuse the dedicated Store Editor window; do not add permanent main-workspace UI.
 - Split `CatalogSetupViewModel` into focused Offering/Variant/DesignArea/MockupTemplate presentation responsibilities where practical. Share a small draft-transition coordinator instead of duplicating unsaved-change logic.
 - Implement progressive forms, prerequisite guidance, read-only states, selection aftermath, keyboard invocation, initial focus, predictable tab order, and focus restoration.
 - Implement visual mapping with an Avalonia control that manipulates one ViewModel draft rectangle; keep numeric controls synchronized and accessible. The control edits configuration only and performs no rendering/composition.
@@ -182,7 +200,7 @@ The alternative—independent ad hoc draft behavior in each view—was rejected 
 6. Implement focused Mockup Template management and visual mapping.
 7. Run criterion-level verification, strict OpenSpec validation, complete solution build/tests, and scoped QA.
 
-Do not reopen: actual Provider terminology; normalized model ownership; explicit sellable Variants; color-level mockup applicability; one authoritative Design Area target per template; revision ownership; no per-listing artwork selection; no rendering, upload, Shopify, or network integration; and no pixel-layout mandate from the wireframes.
+Do not reopen: actual Provider terminology; normalized model ownership; explicit sellable Variants; color-level mockup applicability; one authoritative Design Area target per template; revision ownership; no per-listing artwork selection; no rendering, upload, Shopify, or network integration; and no pixel-perfect layout mandate from the wireframes. Broad screen composition is authoritative after the feedback-driven refinement above.
 
 ## Planned Verification
 
