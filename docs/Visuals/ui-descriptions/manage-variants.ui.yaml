@@ -1,0 +1,229 @@
+schemaVersion: 1
+tokenProfile: fusioncanvas-wireframe-v1
+screen:
+  id: manage-variants
+  title: Catalog & Mockups - Manage Variants
+  viewport:
+    width: 1200
+    height: 820
+  root:
+    id: page
+    kind: stack
+    gap: section
+    padding: window
+    children:
+      - id: page-header
+        kind: stack
+        gap: tight
+        children:
+          - id: page-title
+            kind: text
+            variant: screen-heading
+            text: Catalog & Mockups - Manage Variants
+          - id: page-subtitle
+            kind: text
+            variant: supporting
+            text: Low-fidelity UX concept - one focused working screen
+      - id: workspace
+        kind: panel
+        variant: canvas
+        height: fill
+        gap: section
+        padding: window
+        children:
+          - id: breadcrumb
+            kind: text
+            variant: supporting
+            text: Standard print shirt / Offering overview
+          - id: variants-title-row
+            kind: grid
+            columns: [fill, content]
+            rowTracks: [content]
+            gap: section
+            children:
+              - id: variants-title-group
+                kind: stack
+                gap: tight
+                column: 0
+                row: 0
+                children:
+                  - id: variants-title
+                    kind: text
+                    variant: screen-heading
+                    text: Variants
+                  - id: variants-context
+                    kind: text
+                    variant: supporting
+                    text: SwiftPOD - Variants are the sellable color + size combinations.
+              - id: save-changes
+                kind: button
+                variant: primary
+                text: Save changes
+                width: content
+                column: 1
+                row: 0
+          - id: title-divider
+            kind: divider
+            variant: standard
+          - id: available-section
+            kind: stack
+            gap: tight
+            children:
+              - id: available-title
+                kind: text
+                variant: section-heading
+                text: 1. Available choices
+              - id: available-help
+                kind: text
+                variant: supporting
+                text: Define what may be combined. This does not create every combination automatically.
+              - id: choice-grid
+                kind: grid
+                columns: [fill, fill]
+                rowTracks: [106]
+                gap: section
+                children:
+                  - id: color-card
+                    kind: panel
+                    variant: choice-card
+                    height: fill
+                    gap: compact
+                    padding: section
+                    column: 0
+                    row: 0
+                    children:
+                      - id: color-card-layout
+                        kind: grid
+                        columns: [fill, content]
+                        rowTracks: [content, content]
+                        gap: tight
+                        children:
+                          - id: color-title
+                            kind: text
+                            variant: subheading
+                            text: Color
+                            column: 0
+                            row: 0
+                          - id: manage-colors
+                            kind: button
+                            variant: secondary
+                            text: Manage colors
+                            width: content
+                            column: 1
+                            row: 0
+                            rowSpan: 2
+                          - id: color-values
+                            kind: text
+                            variant: supporting
+                            text: Black     White     Navy
+                            column: 0
+                            row: 1
+                  - id: size-card
+                    kind: panel
+                    variant: choice-card
+                    height: fill
+                    gap: compact
+                    padding: section
+                    column: 1
+                    row: 0
+                    children:
+                      - id: size-card-layout
+                        kind: grid
+                        columns: [fill, content]
+                        rowTracks: [content, content]
+                        gap: tight
+                        children:
+                          - id: size-title
+                            kind: text
+                            variant: subheading
+                            text: Size
+                            column: 0
+                            row: 0
+                          - id: manage-sizes
+                            kind: button
+                            variant: secondary
+                            text: Manage sizes
+                            width: content
+                            column: 1
+                            row: 0
+                            rowSpan: 2
+                          - id: size-values
+                            kind: text
+                            variant: supporting
+                            text: S     M     L     XL
+                            column: 0
+                            row: 1
+          - id: section-divider
+            kind: divider
+            variant: standard
+          - id: sellable-section
+            kind: stack
+            gap: compact
+            height: fill
+            children:
+              - id: sellable-header
+                kind: grid
+                columns: [fill, content]
+                rowTracks: [content]
+                gap: section
+                children:
+                  - id: sellable-title-group
+                    kind: stack
+                    gap: tight
+                    column: 0
+                    row: 0
+                    children:
+                      - id: sellable-title
+                        kind: text
+                        variant: section-heading
+                        text: 2. Sellable variants
+                      - id: sellable-count
+                        kind: text
+                        variant: supporting
+                        text: 12 configured
+                  - id: sellable-actions
+                    kind: stack
+                    variant: action-group
+                    axis: horizontal
+                    gap: control
+                    width: content
+                    column: 1
+                    row: 0
+                    children:
+                      - id: add-variant
+                        kind: button
+                        variant: primary
+                        text: + Add variant
+                        width: content
+                      - id: bulk-add
+                        kind: button
+                        variant: secondary
+                        text: Bulk add
+                        width: content
+              - id: variants-table
+                kind: table
+                variant: data-table
+                height: fill
+                tableColumns:
+                  - { header: Color, width: fill }
+                  - { header: Size, width: 160 }
+                  - { header: Provider SKU, width: fill }
+                  - { header: Available, width: 190 }
+                  - { header: Actions, width: 170 }
+                tableRows:
+                  - [Black, M, SWP-G64000-BLK-M, Yes, Edit]
+                  - [Black, L, SWP-G64000-BLK-L, Yes, Edit]
+                  - [White, M, SWP-G64000-WHT-M, Yes, Edit]
+states:
+  default:
+    overrides: []
+  provider-unavailable:
+    overrides:
+      - target: color-values
+        text: Provider catalog unavailable
+      - target: size-values
+        text: Provider catalog unavailable
+      - target: manage-colors
+        enabled: false
+      - target: manage-sizes
+        enabled: false

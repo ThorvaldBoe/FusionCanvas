@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="820" viewBox="0 0 1200 820" role="img" aria-label="Catalog &amp; Mockups - Manage Variants">
+  <rect width="100%" height="100%" fill="#f4f6f8" />
+  <g data-ui-id="page" data-ui-kind="stack" data-enabled="true">
+    <g data-ui-id="page-header" data-ui-kind="stack" data-enabled="true">
+      <g data-ui-id="page-title" data-ui-kind="text" data-enabled="true">
+        <text x="48" y="74" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="600">Catalog &amp; Mockups - Manage Variants</text>
+      </g>
+      <g data-ui-id="page-subtitle" data-ui-kind="text" data-enabled="true">
+        <text x="48" y="98" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Low-fidelity UX concept - one focused working screen</text>
+      </g>
+    </g>
+    <g data-ui-id="workspace" data-ui-kind="panel" data-enabled="true">
+      <rect x="48" y="120" width="1104" height="652" rx="10" fill="#ffffff" stroke="#b8c4d2" stroke-width="1" />
+      <g data-ui-id="breadcrumb" data-ui-kind="text" data-enabled="true">
+        <text x="96" y="182" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Standard print shirt / Offering overview</text>
+      </g>
+      <g data-ui-id="variants-title-row" data-ui-kind="grid" data-enabled="true">
+        <g data-ui-id="variants-title-group" data-ui-kind="stack" data-enabled="true">
+          <g data-ui-id="variants-title" data-ui-kind="text" data-enabled="true">
+            <text x="96" y="230" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="600">Variants</text>
+          </g>
+          <g data-ui-id="variants-context" data-ui-kind="text" data-enabled="true">
+            <text x="96" y="254" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">SwiftPOD - Variants are the sellable color + size combinations.</text>
+          </g>
+        </g>
+        <g data-ui-id="save-changes" data-ui-kind="button" data-enabled="true">
+          <rect x="985" y="204" width="119" height="38" rx="7" fill="#214f7d" stroke="#214f7d" stroke-width="1" />
+          <text x="997" y="228" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Save changes</text>
+        </g>
+      </g>
+      <g data-ui-id="title-divider" data-ui-kind="divider" data-enabled="true">
+        <line x1="96" y1="276" x2="1104" y2="276" stroke="#c5ced8" stroke-width="1" />
+      </g>
+      <g data-ui-id="available-section" data-ui-kind="stack" data-enabled="true">
+        <g data-ui-id="available-title" data-ui-kind="text" data-enabled="true">
+          <text x="96" y="313" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">1. Available choices</text>
+        </g>
+        <g data-ui-id="available-help" data-ui-kind="text" data-enabled="true">
+          <text x="96" y="337" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Define what may be combined. This does not create every combination automatically.</text>
+        </g>
+        <g data-ui-id="choice-grid" data-ui-kind="grid" data-enabled="true">
+          <g data-ui-id="color-card" data-ui-kind="panel" data-enabled="true">
+            <rect x="96" y="347" width="496" height="106" rx="9" fill="#ffffff" stroke="#b8c4d2" stroke-width="1" />
+            <g data-ui-id="color-card-layout" data-ui-kind="grid" data-enabled="true">
+              <g data-ui-id="color-title" data-ui-kind="text" data-enabled="true">
+                <text x="112" y="379" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="600">Color</text>
+              </g>
+              <g data-ui-id="manage-colors" data-ui-kind="button" data-enabled="true">
+                <rect x="450" y="363" width="126" height="38" rx="7" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+                <text x="462" y="387" fill="#214f7d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Manage colors</text>
+              </g>
+              <g data-ui-id="color-values" data-ui-kind="text" data-enabled="true">
+                <text x="112" y="403" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Black     White     Navy</text>
+              </g>
+            </g>
+          </g>
+          <g data-ui-id="size-card" data-ui-kind="panel" data-enabled="true">
+            <rect x="608" y="347" width="496" height="106" rx="9" fill="#ffffff" stroke="#b8c4d2" stroke-width="1" />
+            <g data-ui-id="size-card-layout" data-ui-kind="grid" data-enabled="true">
+              <g data-ui-id="size-title" data-ui-kind="text" data-enabled="true">
+                <text x="624" y="379" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="600">Size</text>
+              </g>
+              <g data-ui-id="manage-sizes" data-ui-kind="button" data-enabled="true">
+                <rect x="969" y="363" width="119" height="38" rx="7" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+                <text x="981" y="387" fill="#214f7d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Manage sizes</text>
+              </g>
+              <g data-ui-id="size-values" data-ui-kind="text" data-enabled="true">
+                <text x="624" y="403" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">S     M     L     XL</text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g data-ui-id="section-divider" data-ui-kind="divider" data-enabled="true">
+        <line x1="96" y1="469" x2="1104" y2="469" stroke="#c5ced8" stroke-width="1" />
+      </g>
+      <g data-ui-id="sellable-section" data-ui-kind="stack" data-enabled="true">
+        <g data-ui-id="sellable-header" data-ui-kind="grid" data-enabled="true">
+          <g data-ui-id="sellable-title-group" data-ui-kind="stack" data-enabled="true">
+            <g data-ui-id="sellable-title" data-ui-kind="text" data-enabled="true">
+              <text x="96" y="506" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">2. Sellable variants</text>
+            </g>
+            <g data-ui-id="sellable-count" data-ui-kind="text" data-enabled="true">
+              <text x="96" y="530" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">12 configured</text>
+            </g>
+          </g>
+          <g data-ui-id="sellable-actions" data-ui-kind="stack" data-enabled="true">
+            <g data-ui-id="add-variant" data-ui-kind="button" data-enabled="true">
+              <rect x="879" y="486" width="126" height="38" rx="7" fill="#214f7d" stroke="#214f7d" stroke-width="1" />
+              <text x="891" y="510" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">+ Add variant</text>
+            </g>
+            <g data-ui-id="bulk-add" data-ui-kind="button" data-enabled="true">
+              <rect x="1017" y="486" width="87" height="38" rx="7" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+              <text x="1029" y="510" fill="#214f7d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Bulk add</text>
+            </g>
+          </g>
+        </g>
+        <g data-ui-id="variants-table" data-ui-kind="table" data-enabled="true">
+          <rect x="96" y="544" width="1008" height="45" rx="5" fill="#e9eef3" stroke="#c2ccd7" stroke-width="1" />
+            <text x="108" y="571" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">Color</text>
+            <text x="352" y="571" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">Size</text>
+            <text x="512" y="571" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">Provider SKU</text>
+            <text x="756" y="571" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">Available</text>
+            <text x="946" y="571" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">Actions</text>
+          <rect x="96" y="589" width="1008" height="45" rx="0" fill="#ffffff" stroke="#d2d9e1" stroke-width="1" />
+            <text x="108" y="616" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Black</text>
+            <text x="352" y="616" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">M</text>
+            <text x="512" y="616" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">SWP-G64000-BLK-M</text>
+            <text x="756" y="616" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Yes</text>
+            <text x="946" y="616" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Edit</text>
+          <rect x="96" y="634" width="1008" height="45" rx="0" fill="#ffffff" stroke="#d2d9e1" stroke-width="1" />
+            <text x="108" y="661" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Black</text>
+            <text x="352" y="661" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">L</text>
+            <text x="512" y="661" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">SWP-G64000-BLK-L</text>
+            <text x="756" y="661" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Yes</text>
+            <text x="946" y="661" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Edit</text>
+          <rect x="96" y="679" width="1008" height="45" rx="0" fill="#ffffff" stroke="#d2d9e1" stroke-width="1" />
+            <text x="108" y="706" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">White</text>
+            <text x="352" y="706" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">M</text>
+            <text x="512" y="706" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">SWP-G64000-WHT-M</text>
+            <text x="756" y="706" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Yes</text>
+            <text x="946" y="706" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Edit</text>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>
