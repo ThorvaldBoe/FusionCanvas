@@ -1436,6 +1436,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         ApplyState(state);
         await LoadNichesForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
         await LoadTagsForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
+        if (CatalogSetup is not null && SelectedStore is not null)
+            Run(CatalogSetup.LoadForStoreAsync(SelectedStore.Id, cancellationToken));
     }
 
     public async Task CreateStoreAsync(CancellationToken cancellationToken = default)
