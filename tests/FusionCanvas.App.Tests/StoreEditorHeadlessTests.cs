@@ -158,6 +158,32 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void BlueprintOfferingCard_ClickOpensOfferingOverview()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        window.UpdateLayout();
+
+        var card = Assert.Single(viewModel.BlueprintOfferingCards);
+        var offeringButton = window.GetVisualDescendants()
+            .OfType<Button>()
+            .Single(button => ReferenceEquals(button.DataContext, card));
+
+        Assert.NotNull(offeringButton.Command);
+        Assert.Same(card, offeringButton.CommandParameter);
+        offeringButton.Command.Execute(offeringButton.CommandParameter);
+        window.UpdateLayout();
+
+        Assert.True(viewModel.IsOfferingDetail);
+        Assert.Equal(card.Id, viewModel.SelectedOffering?.Id);
+        AssertEffectivelyVisible(window, "Catalog.OfferingStatus");
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void CatalogEditorsUseCompactBasicsOnDemandDraftsAndSummaryFirstRegions()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);

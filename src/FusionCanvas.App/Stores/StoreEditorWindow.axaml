@@ -531,8 +531,9 @@
                   <ItemsControl ItemsSource="{Binding BlueprintOfferingCards}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="stores:BlueprintOfferingCardViewModel">
-                        <Button Command="{Binding $parent[ItemsControl].DataContext.OpenOfferingDetailCommand}"
+                        <Button Command="{Binding $parent[ItemsControl].DataContext.SelectOfferingCommand}"
                                 CommandParameter="{Binding}"
+                                AutomationProperties.AutomationId="Catalog.OpenOffering"
                                 Classes="listItem"
                                 HorizontalContentAlignment="Left">
                           <StackPanel Spacing="3">

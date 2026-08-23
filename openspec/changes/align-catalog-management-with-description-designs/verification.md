@@ -12,7 +12,7 @@ Status: Complete. All acceptance scenarios have deterministic evidence; no live 
 | Blueprint Offering List | User reviews an archived Store | Pass | `CatalogPresentationModelsTests.OfferingCardDerivesLifecycleAndAllSetupCounts`; `StoreEditorHeadlessTests.ProductsPanel_DisclosesProductAndOfferingActionsByLevel`; `CatalogEditorsUseCompactBasicsOnDemandDraftsAndSummaryFirstRegions`. |
 | Catalog progressive disclosure | User opens the catalog editor | Pass | `CatalogPresentationModelsTests.OfferingCardDerivesLifecycleAndAllSetupCounts`; `StoreEditorHeadlessTests.ProductsPanel_DisclosesProductAndOfferingActionsByLevel`; `CatalogEditorsUseCompactBasicsOnDemandDraftsAndSummaryFirstRegions`. |
 | Catalog progressive disclosure | User opens a Blueprint | Pass | `CatalogPresentationModelsTests.OfferingCardDerivesLifecycleAndAllSetupCounts`; `StoreEditorHeadlessTests.ProductsPanel_DisclosesProductAndOfferingActionsByLevel`; `CatalogEditorsUseCompactBasicsOnDemandDraftsAndSummaryFirstRegions`. |
-| Catalog progressive disclosure | User opens a Blueprint Offering | Pass | `CatalogPresentationModelsTests.OfferingCardDerivesLifecycleAndAllSetupCounts`; `StoreEditorHeadlessTests.ProductsPanel_DisclosesProductAndOfferingActionsByLevel`; `CatalogEditorsUseCompactBasicsOnDemandDraftsAndSummaryFirstRegions`. |
+| Catalog progressive disclosure | User opens a Blueprint Offering | Pass | `CatalogPresentationModelsTests.OfferingCardDerivesLifecycleAndAllSetupCounts`; `StoreEditorHeadlessTests.BlueprintOfferingCard_ClickOpensOfferingOverview`; `ProductsPanel_DisclosesProductAndOfferingActionsByLevel`; `CatalogEditorsUseCompactBasicsOnDemandDraftsAndSummaryFirstRegions`. |
 | Catalog progressive disclosure | User opens a focused management surface | Pass | `CatalogPresentationModelsTests.OfferingCardDerivesLifecycleAndAllSetupCounts`; `StoreEditorHeadlessTests.ProductsPanel_DisclosesProductAndOfferingActionsByLevel`; `CatalogEditorsUseCompactBasicsOnDemandDraftsAndSummaryFirstRegions`. |
 | Offering overview | User reviews an Offering overview | Pass | `StoreEditorHeadlessTests.OfferingAndFocusedEditorsPreserveApprovedBroadComposition`; `CatalogEditorsUseCompactBasicsOnDemandDraftsAndSummaryFirstRegions`; existing Provider selection/read-only regressions. |
 | Offering overview | Offering overview preserves the approved composition | Pass | `StoreEditorHeadlessTests.OfferingAndFocusedEditorsPreserveApprovedBroadComposition`; `CatalogEditorsUseCompactBasicsOnDemandDraftsAndSummaryFirstRegions`; existing Provider selection/read-only regressions. |
@@ -55,7 +55,8 @@ Status: Complete. All acceptance scenarios have deterministic evidence; no live 
 ## Commands
 
 - Focused catalog suites: passed — 22 App/view-model/headless tests and 11 Application catalog tests.
-- `dotnet test .\FusionCanvas.sln --no-restore -v minimal`: passed — 1,334 tests (232 Domain, 384 Application, 184 Integration, 507 App, 27 UI-description tooling).
+- Feedback regression: `StoreEditorHeadlessTests.BlueprintOfferingCard_ClickOpensOfferingOverview` passed against the rendered Offering-card command and parameter binding.
+- `dotnet test .\FusionCanvas.sln --no-restore -v minimal`: passed — 1,335 tests (232 Domain, 384 Application, 184 Integration, 508 App, 27 UI-description tooling).
 - `openspec validate align-catalog-management-with-description-designs --strict`: passed after implementation.
 
 ## Limitations and optional evidence
