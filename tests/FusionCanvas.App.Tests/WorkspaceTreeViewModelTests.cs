@@ -214,9 +214,12 @@ public class WorkspaceTreeViewModelTests
     public void MiddleClickOpenPreservesMultiSelection()
     {
         var sample = Sample.Create(withGroup: true);
-        var repository = new TestRepository(sample.Snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
-        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+        var groupId = sample.Snapshot.Groups.Single().Id;
+        var itemRecord = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, groupId, "Item", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Items = [itemRecord] };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(sample.Store.Id, snapshot);
         var root = Assert.Single(viewModel.Roots);
         var group = Assert.Single(root.Children);
         var item = Assert.Single(group.Children);

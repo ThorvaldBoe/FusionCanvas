@@ -55,6 +55,16 @@ The evaluation fixtures and their preserved references are under `docs/Visuals/u
 - PNG copies of the approved source wireframes under `references/`; and
 - PNG previews rasterized from the two default SVGs for convenient visual inspection.
 
+## Expanded Issue #185 exploration designs
+
+The later Issue #185 design-to-code exploration adds three non-golden semantic descriptions so every approved wireframe screen has a deterministic design source:
+
+- `blueprint-offering-list.ui.yaml`, with `default` and `empty-collection` states;
+- `offering-overview.ui.yaml`, with `default` and `archived-store` states; and
+- `manage-mockup-templates.ui.yaml`, with `default` and `empty-collection` states.
+
+Together with the two prototype fixtures, these form a five-screen exploration set. Their generated SVGs are checked-in review artifacts, but the original two fixtures remain the prototype's byte-for-byte golden-test scope. See `issue-185-design-code-comparison.md` for the grounded comparison with the Avalonia implementation and the resulting adjustment opportunities.
+
 Regenerate all state outputs with the documented `render` command, then run:
 
 ```powershell

@@ -1145,6 +1145,13 @@
                         <TextBlock Text="{Binding DesignTool.SelectedOfferingStatus}"
                                    IsVisible="{Binding DesignTool.SelectedOfferingStatus, Converter={x:Static ObjectConverters.IsNotNull}}"
                                    FontSize="11" Foreground="{DynamicResource AccentBrush}" />
+                        <TextBlock Text="{Binding DesignTool.SelectedBlueprintName, StringFormat='Blueprint: {0}'}"
+                                   IsVisible="{Binding DesignTool.SelectedBlueprintName, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                   FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <TextBlock Text="{Binding DesignTool.ProviderNetworkWarning}"
+                                   IsVisible="{Binding DesignTool.ProviderNetworkWarning, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                   TextWrapping="Wrap"
+                                   FontSize="11" Foreground="{DynamicResource WarningTextBrush}" />
                       </StackPanel>
 
                       <!-- Color Working Set -->
@@ -1229,6 +1236,9 @@
                                           <StackPanel Spacing="4">
                                             <TextBlock Text="{Binding AreaName}" FontSize="11" FontWeight="SemiBold"
                                                        Foreground="{DynamicResource SecondaryTextBrush}" />
+                                            <TextBlock Text="{Binding PlaceholderDetails}" FontSize="9"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource MutedTextBrush}" />
                                             <Border IsVisible="{Binding HasImage}" Width="80" Height="60"
                                                     Background="{DynamicResource PanelSurfaceBrush}" CornerRadius="4">
 <Image Source="{Binding Thumbnail}" Stretch="Uniform" />

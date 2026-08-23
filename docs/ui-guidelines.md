@@ -232,14 +232,17 @@ Mockup setup belongs at the store configuration level.
 
 It should support:
 
-- mockup products
-- templates
-- color variants
-- exact provider color names
-- design area dimensions
-- placement coordinates and size
+- Blueprint Offerings and their Print Providers or Provider Networks
+- typed Options and Values, including explicit Color Values
+- concrete Variants and compatible Placeholders
+- Mockup Templates linked to one authoritative target Placeholder
+- color-level template bindings that apply to compatible size Variants
+- template revisions and an explicitly empty future source-image state
 
-The first version can use numeric placement fields. A later visual placement editor can improve this.
+The first version does not include image upload, rendering, artwork composition, placement
+coordinates, slot schemas, or per-Variant mockup overrides. A later visual click-and-point
+template editor will define placement semantics. Use helper text or tooltips for Printify terms
+such as Blueprint, Provider Network, Offering, Variant, and Placeholder.
 
 ### Store and Niche Setup
 

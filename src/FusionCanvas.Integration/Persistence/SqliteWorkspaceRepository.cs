@@ -9,6 +9,8 @@ using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Domain.Products;
+using FusionCanvas.Domain.Catalog;
+using FusionCanvas.Domain.Mockups;
 using Microsoft.Data.Sqlite;
 using FusionCanvas.Application.Workspaces;
 using System.Text.Json;
@@ -31,7 +33,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
 
-        foreach (var table in new[] { "design_slot_assignments", "design_variant_row_colors", "design_variant_rows", "design_selected_colors", "item_listing_configuration", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
+        foreach (var table in new[] { "mockup_template_revision_colors", "mockup_template_revisions", "mockup_template_colors", "mockup_templates", "placeholder_variants", "offering_placeholders", "offering_variant_values", "offering_variants", "offering_option_values", "offering_options", "blueprint_offerings", "print_providers", "catalog_blueprints", "design_slot_assignments", "design_variant_row_colors", "design_variant_rows", "design_selected_colors", "item_listing_configuration", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
         {
             await ExecuteAsync(connection, transaction, $"DELETE FROM {table};", cancellationToken);
         }
@@ -65,6 +67,29 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         {
             await InsertDesignAreaAsync(connection, transaction, area, cancellationToken);
         }
+
+        foreach (var blueprint in snapshot.Blueprints)
+            await InsertBlueprintAsync(connection, transaction, blueprint, cancellationToken);
+        foreach (var provider in snapshot.PrintProviders)
+            await InsertPrintProviderAsync(connection, transaction, provider, cancellationToken);
+        foreach (var offering in snapshot.BlueprintOfferings)
+            await InsertBlueprintOfferingAsync(connection, transaction, offering, cancellationToken);
+        foreach (var option in snapshot.OfferingOptions)
+            await InsertOfferingOptionAsync(connection, transaction, option, cancellationToken);
+        foreach (var value in snapshot.OfferingOptionValues)
+            await InsertOfferingOptionValueAsync(connection, transaction, value, cancellationToken);
+        foreach (var variant in snapshot.OfferingVariants)
+            await InsertOfferingVariantAsync(connection, transaction, variant, cancellationToken);
+        foreach (var placeholder in snapshot.OfferingPlaceholders)
+            await InsertOfferingPlaceholderAsync(connection, transaction, placeholder, cancellationToken);
+        foreach (var template in snapshot.MockupTemplates)
+            await InsertMockupTemplateAsync(connection, transaction, template, cancellationToken);
+        foreach (var color in snapshot.MockupTemplateColorVariants)
+            await InsertMockupTemplateColorAsync(connection, transaction, color, cancellationToken);
+        foreach (var revision in snapshot.MockupTemplateRevisions)
+            await InsertMockupTemplateRevisionAsync(connection, transaction, revision, cancellationToken);
+        foreach (var color in snapshot.MockupTemplateRevisionColors)
+            await InsertMockupTemplateRevisionColorAsync(connection, transaction, color, cancellationToken);
 
         foreach (var tag in snapshot.Tags)
         {
@@ -171,6 +196,17 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             DesignVariantRows = await LoadDesignVariantRowsAsync(connection, cancellationToken),
             DesignVariantRowColors = await LoadDesignVariantRowColorsAsync(connection, cancellationToken),
             DesignSlotAssignments = await LoadDesignSlotAssignmentsAsync(connection, cancellationToken)
+            ,Blueprints = await LoadBlueprintsAsync(connection, cancellationToken)
+            ,PrintProviders = await LoadPrintProvidersAsync(connection, cancellationToken)
+            ,BlueprintOfferings = await LoadBlueprintOfferingsAsync(connection, cancellationToken)
+            ,OfferingOptions = await LoadOfferingOptionsAsync(connection, cancellationToken)
+            ,OfferingOptionValues = await LoadOfferingOptionValuesAsync(connection, cancellationToken)
+            ,OfferingVariants = await LoadOfferingVariantsAsync(connection, cancellationToken)
+            ,OfferingPlaceholders = await LoadOfferingPlaceholdersAsync(connection, cancellationToken)
+            ,MockupTemplates = await LoadMockupTemplatesAsync(connection, cancellationToken)
+            ,MockupTemplateColorVariants = await LoadMockupTemplateColorsAsync(connection, cancellationToken)
+            ,MockupTemplateRevisions = await LoadMockupTemplateRevisionsAsync(connection, cancellationToken)
+            ,MockupTemplateRevisionColors = await LoadMockupTemplateRevisionColorsAsync(connection, cancellationToken)
         };
     }
 
@@ -221,7 +257,8 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 is_archived INTEGER NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                metadata_json TEXT NOT NULL
+                metadata_json TEXT NOT NULL,
+                fulfillment_strategy INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS tags (
@@ -396,6 +433,75 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 PRIMARY KEY (row_id, design_area_id)
             );
 
+            CREATE TABLE IF NOT EXISTS catalog_blueprints (
+                id TEXT PRIMARY KEY, store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                name TEXT NOT NULL, description TEXT NULL, is_archived INTEGER NOT NULL,
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS print_providers (
+                id TEXT PRIMARY KEY, store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                name TEXT NOT NULL, external_provider_id TEXT NULL, is_archived INTEGER NOT NULL,
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS blueprint_offerings (
+                id TEXT PRIMARY KEY, blueprint_id TEXT NOT NULL REFERENCES catalog_blueprints(id) ON DELETE CASCADE,
+                store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE, name TEXT NOT NULL,
+                description TEXT NULL, kind INTEGER NOT NULL, print_provider_id TEXT NULL REFERENCES print_providers(id) ON DELETE RESTRICT,
+                provider_network_code TEXT NULL, default_placeholder_id TEXT NULL, external_offering_id TEXT NULL,
+                is_archived INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS offering_options (
+                id TEXT PRIMARY KEY, offering_id TEXT NOT NULL REFERENCES blueprint_offerings(id) ON DELETE CASCADE,
+                option_kind INTEGER NOT NULL, name TEXT NOT NULL, sort_order INTEGER NOT NULL, is_archived INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS offering_option_values (
+                id TEXT PRIMARY KEY, option_id TEXT NOT NULL REFERENCES offering_options(id) ON DELETE CASCADE,
+                offering_id TEXT NOT NULL REFERENCES blueprint_offerings(id) ON DELETE CASCADE,
+                value TEXT NOT NULL, sort_order INTEGER NOT NULL, is_archived INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS offering_variants (
+                id TEXT PRIMARY KEY, offering_id TEXT NOT NULL REFERENCES blueprint_offerings(id) ON DELETE CASCADE,
+                name TEXT NOT NULL, is_archived INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS offering_variant_values (
+                variant_id TEXT NOT NULL REFERENCES offering_variants(id) ON DELETE CASCADE,
+                option_value_id TEXT NOT NULL REFERENCES offering_option_values(id) ON DELETE RESTRICT,
+                PRIMARY KEY (variant_id, option_value_id)
+            );
+            CREATE TABLE IF NOT EXISTS offering_placeholders (
+                id TEXT PRIMARY KEY, offering_id TEXT NOT NULL REFERENCES blueprint_offerings(id) ON DELETE CASCADE,
+                name TEXT NOT NULL, description TEXT NULL, position TEXT NOT NULL, decoration_method TEXT NOT NULL,
+                width INTEGER NOT NULL, height INTEGER NOT NULL, is_archived INTEGER NOT NULL,
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS placeholder_variants (
+                placeholder_id TEXT NOT NULL REFERENCES offering_placeholders(id) ON DELETE CASCADE,
+                variant_id TEXT NOT NULL REFERENCES offering_variants(id) ON DELETE RESTRICT,
+                PRIMARY KEY (placeholder_id, variant_id)
+            );
+            CREATE TABLE IF NOT EXISTS mockup_templates (
+                id TEXT PRIMARY KEY, offering_id TEXT NOT NULL REFERENCES blueprint_offerings(id) ON DELETE CASCADE,
+                target_placeholder_id TEXT NOT NULL REFERENCES offering_placeholders(id) ON DELETE RESTRICT,
+                name TEXT NOT NULL, description TEXT NULL, current_revision INTEGER NOT NULL,
+                is_archived INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+                position_key TEXT NULL, future_asset_state TEXT NULL, metadata_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS mockup_template_colors (
+                id TEXT PRIMARY KEY, template_id TEXT NOT NULL REFERENCES mockup_templates(id) ON DELETE CASCADE,
+                color_option_value_id TEXT NOT NULL REFERENCES offering_option_values(id) ON DELETE RESTRICT,
+                is_archived INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, source_asset_id TEXT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_mockup_template_active_color ON mockup_template_colors(template_id, color_option_value_id) WHERE is_archived = 0;
+            CREATE TABLE IF NOT EXISTS mockup_template_revisions (
+                id TEXT PRIMARY KEY, template_id TEXT NOT NULL REFERENCES mockup_templates(id) ON DELETE RESTRICT,
+                revision_number INTEGER NOT NULL, target_placeholder_id TEXT NOT NULL REFERENCES offering_placeholders(id) ON DELETE RESTRICT,
+                created_at TEXT NOT NULL, note TEXT NULL
+            );
+            CREATE TABLE IF NOT EXISTS mockup_template_revision_colors (
+                id TEXT PRIMARY KEY, revision_id TEXT NOT NULL REFERENCES mockup_template_revisions(id) ON DELETE RESTRICT,
+                color_option_value_id TEXT NOT NULL REFERENCES offering_option_values(id) ON DELETE RESTRICT, source_asset_id TEXT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS snowclones (
                 id TEXT PRIMARY KEY,
                 phrase TEXT NOT NULL,
@@ -412,6 +518,16 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             """;
 
         await ExecuteAsync(connection, null, sql, cancellationToken);
+
+        // A database can report the current schema version while still missing
+        // a column if it was created by an interrupted or pre-release build.
+        // Reconcile this required column independently of user_version so the
+        // startup loader never queries a column that is absent physically.
+        if (!await ColumnExistsAsync(connection, "stores", "fulfillment_strategy", cancellationToken))
+        {
+            await ExecuteAsync(connection, null, "ALTER TABLE stores ADD COLUMN fulfillment_strategy INTEGER NOT NULL DEFAULT 0;", cancellationToken);
+        }
+
         if (!isFreshDatabase && schemaVersion < 2)
         {
             await MigrateToVersion2Async(connection, cancellationToken);
@@ -452,7 +568,179 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await MigrateToVersion10Async(connection, cancellationToken);
         }
 
+        if (!isFreshDatabase && schemaVersion < 11)
+        {
+            await MigrateToVersion11Async(connection, cancellationToken);
+        }
+
+        if (schemaVersion < 12)
+        {
+            await MigrateToVersion12Async(connection, cancellationToken);
+        }
+
         await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
+    }
+
+    private static async Task MigrateToVersion12Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var columns = new (string Table, string Name, string Definition)[]
+            {
+                ("offering_placeholders", "provider_reference", "TEXT NULL"),
+                ("offering_placeholders", "recommended_width_px", "INTEGER NULL"),
+                ("offering_placeholders", "recommended_height_px", "INTEGER NULL"),
+                ("offering_placeholders", "recommended_dpi", "INTEGER NULL"),
+                ("offering_placeholders", "recommended_format", "TEXT NULL"),
+                ("offering_placeholders", "recommended_background", "TEXT NULL"),
+                ("mockup_template_revisions", "provider_mockup_reference", "TEXT NULL"),
+                ("mockup_template_revisions", "image_width", "INTEGER NULL"),
+                ("mockup_template_revisions", "image_height", "INTEGER NULL"),
+                ("mockup_template_revisions", "mapping_x", "INTEGER NULL"),
+                ("mockup_template_revisions", "mapping_y", "INTEGER NULL"),
+                ("mockup_template_revisions", "mapping_width", "INTEGER NULL"),
+                ("mockup_template_revisions", "mapping_height", "INTEGER NULL")
+            };
+
+            foreach (var column in columns)
+            {
+                if (!await ColumnExistsAsync(connection, column.Table, column.Name, cancellationToken))
+                    await ExecuteAsync(connection, transaction, $"ALTER TABLE {column.Table} ADD COLUMN {column.Name} {column.Definition};", cancellationToken);
+            }
+
+            await VerifyForeignKeyIntegrityAsync(connection, transaction, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw new InvalidOperationException(
+                "The workspace database could not be upgraded from schema version 11 to 12. Restore a backup or use an older FusionCanvas version.", exception);
+        }
+    }
+
+    private static async Task MigrateToVersion11Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            if (!await ColumnExistsAsync(connection, "stores", "fulfillment_strategy", cancellationToken))
+            {
+                await ExecuteAsync(connection, transaction, "ALTER TABLE stores ADD COLUMN fulfillment_strategy INTEGER NOT NULL DEFAULT 0;", cancellationToken);
+            }
+
+        // Existing catalog rows remain available to the compatibility model, while
+        // these inserts establish the normalized identity graph for future use.
+        await ExecuteAsync(connection, transaction, """
+            INSERT OR IGNORE INTO catalog_blueprints (id, store_id, name, description, is_archived, created_at, updated_at, metadata_json)
+            SELECT id, store_id, name, description, 0, created_at, updated_at, metadata_json
+            FROM product_blueprints;
+            """, cancellationToken);
+
+        var providerIds = new Dictionary<(Guid StoreId, string Name), Guid>();
+        await foreach (var reader in ReadAsync(connection, "SELECT id, store_product_id, name, description, kind, provider_name, external_offering_id, created_at, updated_at, metadata_json FROM fulfillment_offerings;", cancellationToken, transaction))
+        {
+            var offeringId = ReadGuid(reader, "id");
+            var blueprintId = ReadGuid(reader, "store_product_id");
+            var storeId = await ReadSingleGuidInTransactionAsync(connection, "SELECT store_id FROM product_blueprints WHERE id = $id;", cancellationToken, transaction, ("$id", blueprintId.ToString()));
+            var kind = ReadInt(reader, "kind") == (int)FulfillmentKind.PrintifyChoiceNetwork
+                ? BlueprintOfferingKind.ProviderNetwork
+                : BlueprintOfferingKind.FixedPrintProvider;
+            Guid? providerId = null;
+            if (kind == BlueprintOfferingKind.FixedPrintProvider)
+            {
+                var providerName = ReadNullableString(reader, "provider_name") ?? "Unspecified Print Provider";
+                var key = (storeId, providerName.Trim().ToUpperInvariant());
+                if (!providerIds.TryGetValue(key, out var existingProviderId))
+                {
+                    existingProviderId = Guid.NewGuid();
+                    providerIds[key] = existingProviderId;
+                    await ExecuteAsync(connection, transaction, "INSERT INTO print_providers (id, store_id, name, external_provider_id, is_archived, created_at, updated_at, metadata_json) VALUES ($id,$store_id,$name,NULL,0,$created_at,$updated_at,'{}');", cancellationToken, ("$id", existingProviderId.ToString()), ("$store_id", storeId.ToString()), ("$name", providerName), ("$created_at", DateTimeOffset.UtcNow.ToString("O")), ("$updated_at", DateTimeOffset.UtcNow.ToString("O")));
+                }
+                providerId = existingProviderId;
+            }
+
+            await ExecuteAsync(connection, transaction, "INSERT OR IGNORE INTO blueprint_offerings (id, blueprint_id, store_id, name, description, kind, print_provider_id, provider_network_code, default_placeholder_id, external_offering_id, is_archived, created_at, updated_at, metadata_json) VALUES ($id,$blueprint_id,$store_id,$name,$description,$kind,$print_provider_id,$provider_network_code,NULL,$external_offering_id,0,$created_at,$updated_at,$metadata_json);", cancellationToken,
+                ("$id", offeringId.ToString()), ("$blueprint_id", blueprintId.ToString()), ("$store_id", storeId.ToString()), ("$name", ReadString(reader, "name")), ("$description", ReadNullableString(reader, "description")), ("$kind", (int)kind), ("$print_provider_id", providerId?.ToString()), ("$provider_network_code", kind == BlueprintOfferingKind.ProviderNetwork ? "printify-choice" : null), ("$external_offering_id", ReadNullableString(reader, "external_offering_id")), ("$created_at", ReadDate(reader, "created_at").ToString("O")), ("$updated_at", ReadDate(reader, "updated_at").ToString("O")), ("$metadata_json", ReadString(reader, "metadata_json")));
+        }
+
+        var optionIds = new Dictionary<(Guid OfferingId, OptionKind Kind), Guid>();
+        var optionValueIds = new Dictionary<(Guid OptionId, string Value), Guid>();
+        await foreach (var reader in ReadAsync(connection, "SELECT id, fulfillment_offering_id, options_json, created_at, updated_at FROM product_variants;", cancellationToken, transaction))
+        {
+            var variantId = ReadGuid(reader, "id");
+            var offeringId = ReadGuid(reader, "fulfillment_offering_id");
+            var optionValues = new List<Guid>();
+            var displayValues = new List<string>();
+            using var document = JsonDocument.Parse(ReadString(reader, "options_json"));
+            foreach (var optionElement in document.RootElement.EnumerateArray())
+            {
+                var name = optionElement.GetProperty("Name").GetString() ?? "Other";
+                var valueText = optionElement.GetProperty("Value").GetString() ?? string.Empty;
+                var kind = name.Equals("Color", StringComparison.OrdinalIgnoreCase) ? OptionKind.Color : name.Equals("Size", StringComparison.OrdinalIgnoreCase) ? OptionKind.Size : OptionKind.Other;
+                if (!optionIds.TryGetValue((offeringId, kind), out var optionId))
+                {
+                    optionId = Guid.NewGuid();
+                    optionIds[(offeringId, kind)] = optionId;
+                    await ExecuteAsync(connection, transaction, "INSERT INTO offering_options (id, offering_id, option_kind, name, sort_order, is_archived) VALUES ($id,$offering_id,$option_kind,$name,$sort_order,0);", cancellationToken, ("$id", optionId.ToString()), ("$offering_id", offeringId.ToString()), ("$option_kind", (int)kind), ("$name", name.Trim()), ("$sort_order", (int)kind));
+                }
+
+                var valueKey = (optionId, valueText.Trim().ToUpperInvariant());
+                if (!optionValueIds.TryGetValue(valueKey, out var optionValueId))
+                {
+                    optionValueId = Guid.NewGuid();
+                    optionValueIds[valueKey] = optionValueId;
+                    await ExecuteAsync(connection, transaction, "INSERT INTO offering_option_values (id, option_id, offering_id, value, sort_order, is_archived) VALUES ($id,$option_id,$offering_id,$value,0,0);", cancellationToken, ("$id", optionValueId.ToString()), ("$option_id", optionId.ToString()), ("$offering_id", offeringId.ToString()), ("$value", valueText.Trim()));
+                }
+
+                optionValues.Add(optionValueId);
+                displayValues.Add(valueText.Trim());
+            }
+
+            await ExecuteAsync(connection, transaction, "INSERT OR IGNORE INTO offering_variants (id, offering_id, name, is_archived, created_at, updated_at, metadata_json) VALUES ($id,$offering_id,$name,0,$created_at,$updated_at,'{}');", cancellationToken, ("$id", variantId.ToString()), ("$offering_id", offeringId.ToString()), ("$name", string.Join(" / ", displayValues)), ("$created_at", ReadDate(reader, "created_at").ToString("O")), ("$updated_at", ReadDate(reader, "updated_at").ToString("O")));
+            foreach (var optionValueId in optionValues)
+                await ExecuteAsync(connection, transaction, "INSERT OR IGNORE INTO offering_variant_values (variant_id, option_value_id) VALUES ($variant_id,$option_value_id);", cancellationToken, ("$variant_id", variantId.ToString()), ("$option_value_id", optionValueId.ToString()));
+        }
+
+        await foreach (var reader in ReadAsync(connection, "SELECT id, fulfillment_offering_id, name, description, position, decoration_method, width, height, variant_ids_json, created_at, updated_at, metadata_json FROM design_areas;", cancellationToken, transaction))
+        {
+            var placeholderId = ReadGuid(reader, "id");
+            var offeringId = ReadGuid(reader, "fulfillment_offering_id");
+            await ExecuteAsync(connection, transaction, "INSERT OR IGNORE INTO offering_placeholders (id, offering_id, name, description, position, decoration_method, width, height, is_archived, created_at, updated_at, metadata_json) VALUES ($id,$offering_id,$name,$description,$position,$decoration_method,$width,$height,0,$created_at,$updated_at,$metadata_json);", cancellationToken, ("$id", placeholderId.ToString()), ("$offering_id", offeringId.ToString()), ("$name", ReadString(reader, "name")), ("$description", ReadNullableString(reader, "description")), ("$position", ReadString(reader, "position")), ("$decoration_method", ReadString(reader, "decoration_method")), ("$width", ReadInt(reader, "width")), ("$height", ReadInt(reader, "height")), ("$created_at", ReadDate(reader, "created_at").ToString("O")), ("$updated_at", ReadDate(reader, "updated_at").ToString("O")), ("$metadata_json", ReadString(reader, "metadata_json")));
+            var legacyVariantIds = JsonSerializer.Deserialize<Guid[]>(ReadString(reader, "variant_ids_json")) ?? [];
+            if (legacyVariantIds.Length == 0)
+            {
+                await foreach (var variant in ReadAsync(connection, $"SELECT id FROM offering_variants WHERE offering_id = '{offeringId}';", cancellationToken, transaction))
+                    legacyVariantIds = [.. legacyVariantIds, ReadGuid(variant, "id")];
+            }
+            foreach (var variantId in legacyVariantIds)
+                await ExecuteAsync(connection, transaction, "INSERT OR IGNORE INTO placeholder_variants (placeholder_id, variant_id) VALUES ($placeholder_id,$variant_id);", cancellationToken, ("$placeholder_id", placeholderId.ToString()), ("$variant_id", variantId.ToString()));
+        }
+
+            await VerifyForeignKeyIntegrityAsync(connection, transaction, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw new InvalidOperationException(
+                "The workspace database could not be upgraded from schema version 10 to 11. Restore a backup or use an older FusionCanvas version.", exception);
+        }
+    }
+
+    private static Task<Guid> ReadSingleGuidAsync(SqliteConnection connection, string sql, CancellationToken cancellationToken, params (string Name, object? Value)[] parameters) =>
+        ReadSingleGuidInTransactionAsync(connection, sql, cancellationToken, null, parameters);
+
+    private static async Task<Guid> ReadSingleGuidInTransactionAsync(SqliteConnection connection, string sql, CancellationToken cancellationToken, System.Data.Common.DbTransaction? transaction, params (string Name, object? Value)[] parameters)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction?)transaction;
+        command.CommandText = sql;
+        foreach (var (name, parameterValue) in parameters)
+            command.Parameters.AddWithValue(name, parameterValue ?? DBNull.Value);
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        return result is string textValue && Guid.TryParse(textValue, out var id) ? id : throw new InvalidOperationException("Legacy catalog ownership reference is invalid.");
     }
 
     private static async Task<bool> HasUserTablesAsync(
@@ -944,9 +1232,9 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
 
     private static Task InsertStoreAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Store store, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
-            INSERT INTO stores (id, workspace_id, default_niche_id, name, description, is_archived, created_at, updated_at, metadata_json)
-            VALUES ($id, $workspace_id, $default_niche_id, $name, $description, $is_archived, $created_at, $updated_at, $metadata_json);
-            """, cancellationToken, [.. CommonParameters(store), ("$workspace_id", store.WorkspaceId.ToString()), ("$default_niche_id", store.DefaultNicheId?.ToString())]);
+            INSERT INTO stores (id, workspace_id, default_niche_id, name, description, is_archived, created_at, updated_at, metadata_json, fulfillment_strategy)
+            VALUES ($id, $workspace_id, $default_niche_id, $name, $description, $is_archived, $created_at, $updated_at, $metadata_json, $fulfillment_strategy);
+            """, cancellationToken, [.. CommonParameters(store), ("$workspace_id", store.WorkspaceId.ToString()), ("$default_niche_id", store.DefaultNicheId?.ToString()), ("$fulfillment_strategy", (int)store.FulfillmentStrategy)]);
 
     private static Task InsertTagAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Tag tag, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
@@ -1097,6 +1385,38 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             ("$updated_at", area.UpdatedAt.ToString("O")),
             ("$metadata_json", area.MetadataJson));
 
+    private static Task InsertBlueprintAsync(SqliteConnection c, System.Data.Common.DbTransaction t, Blueprint value, CancellationToken ct) =>
+        ExecuteAsync(c, t, "INSERT INTO catalog_blueprints (id, store_id, name, description, is_archived, created_at, updated_at, metadata_json) VALUES ($id,$store_id,$name,$description,$is_archived,$created_at,$updated_at,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$store_id", value.StoreId.ToString()), ("$name", value.Name), ("$description", value.Description), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$metadata_json", value.MetadataJson));
+
+    private static Task InsertPrintProviderAsync(SqliteConnection c, System.Data.Common.DbTransaction t, PrintProvider value, CancellationToken ct) =>
+        ExecuteAsync(c, t, "INSERT INTO print_providers (id, store_id, name, external_provider_id, is_archived, created_at, updated_at, metadata_json) VALUES ($id,$store_id,$name,$external_provider_id,$is_archived,$created_at,$updated_at,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$store_id", value.StoreId.ToString()), ("$name", value.Name), ("$external_provider_id", value.ExternalProviderId), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$metadata_json", value.MetadataJson));
+
+    private static Task InsertBlueprintOfferingAsync(SqliteConnection c, System.Data.Common.DbTransaction t, BlueprintOffering value, CancellationToken ct) =>
+        ExecuteAsync(c, t, "INSERT INTO blueprint_offerings (id, blueprint_id, store_id, name, description, kind, print_provider_id, provider_network_code, default_placeholder_id, external_offering_id, is_archived, created_at, updated_at, metadata_json) VALUES ($id,$blueprint_id,$store_id,$name,$description,$kind,$print_provider_id,$provider_network_code,$default_placeholder_id,$external_offering_id,$is_archived,$created_at,$updated_at,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$blueprint_id", value.BlueprintId.ToString()), ("$store_id", value.StoreId.ToString()), ("$name", value.Name), ("$description", value.Description), ("$kind", (int)value.Kind), ("$print_provider_id", value.PrintProviderId?.ToString()), ("$provider_network_code", value.ProviderNetworkCode), ("$default_placeholder_id", value.DefaultPlaceholderId?.ToString()), ("$external_offering_id", value.ExternalOfferingId), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$metadata_json", value.MetadataJson));
+
+    private static Task InsertOfferingOptionAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingOption value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO offering_options (id, offering_id, option_kind, name, sort_order, is_archived) VALUES ($id,$offering_id,$option_kind,$name,$sort_order,$is_archived);", ct, ("$id", value.Id.ToString()), ("$offering_id", value.OfferingId.ToString()), ("$option_kind", (int)value.OptionKind), ("$name", value.Name), ("$sort_order", value.SortOrder), ("$is_archived", value.IsArchived ? 1 : 0));
+    private static Task InsertOfferingOptionValueAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingOptionValue value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO offering_option_values (id, option_id, offering_id, value, sort_order, is_archived) VALUES ($id,$option_id,$offering_id,$value,$sort_order,$is_archived);", ct, ("$id", value.Id.ToString()), ("$option_id", value.OptionId.ToString()), ("$offering_id", value.OfferingId.ToString()), ("$value", value.Value), ("$sort_order", value.SortOrder), ("$is_archived", value.IsArchived ? 1 : 0));
+
+    private static Task InsertOfferingVariantAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingVariant value, CancellationToken ct) => InsertOfferingVariantCoreAsync(c, t, value, ct);
+    private static async Task InsertOfferingVariantCoreAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingVariant value, CancellationToken ct)
+    {
+        await ExecuteAsync(c, t, "INSERT INTO offering_variants (id, offering_id, name, is_archived, created_at, updated_at, metadata_json) VALUES ($id,$offering_id,$name,$is_archived,$created_at,$updated_at,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$offering_id", value.OfferingId.ToString()), ("$name", value.Name), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$metadata_json", value.MetadataJson));
+        foreach (var optionValueId in value.OptionValueIds)
+            await ExecuteAsync(c, t, "INSERT INTO offering_variant_values (variant_id, option_value_id) VALUES ($variant_id,$option_value_id);", ct, ("$variant_id", value.Id.ToString()), ("$option_value_id", optionValueId.ToString()));
+    }
+
+    private static async Task InsertOfferingPlaceholderAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingPlaceholder value, CancellationToken ct)
+    {
+        await ExecuteAsync(c, t, "INSERT INTO offering_placeholders (id, offering_id, name, description, position, decoration_method, width, height, is_archived, created_at, updated_at, metadata_json, provider_reference, recommended_width_px, recommended_height_px, recommended_dpi, recommended_format, recommended_background) VALUES ($id,$offering_id,$name,$description,$position,$decoration_method,$width,$height,$is_archived,$created_at,$updated_at,$metadata_json,$provider_reference,$recommended_width_px,$recommended_height_px,$recommended_dpi,$recommended_format,$recommended_background);", ct, ("$id", value.Id.ToString()), ("$offering_id", value.OfferingId.ToString()), ("$name", value.Name), ("$description", value.Description), ("$position", value.Position), ("$decoration_method", value.DecorationMethod), ("$width", value.Width), ("$height", value.Height), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$metadata_json", value.MetadataJson), ("$provider_reference", value.ProviderReference), ("$recommended_width_px", value.ArtworkGuidance?.RecommendedWidthPixels), ("$recommended_height_px", value.ArtworkGuidance?.RecommendedHeightPixels), ("$recommended_dpi", value.ArtworkGuidance?.DotsPerInch), ("$recommended_format", value.ArtworkGuidance?.FileFormat), ("$recommended_background", value.ArtworkGuidance?.Background));
+        foreach (var variantId in value.VariantIds)
+            await ExecuteAsync(c, t, "INSERT INTO placeholder_variants (placeholder_id, variant_id) VALUES ($placeholder_id,$variant_id);", ct, ("$placeholder_id", value.Id.ToString()), ("$variant_id", variantId.ToString()));
+    }
+
+    private static Task InsertMockupTemplateAsync(SqliteConnection c, System.Data.Common.DbTransaction t, MockupTemplate value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO mockup_templates (id, offering_id, target_placeholder_id, name, description, current_revision, is_archived, created_at, updated_at, position_key, future_asset_state, metadata_json) VALUES ($id,$offering_id,$target_placeholder_id,$name,$description,$current_revision,$is_archived,$created_at,$updated_at,$position_key,$future_asset_state,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$offering_id", value.BlueprintOfferingId.ToString()), ("$target_placeholder_id", value.TargetPlaceholderId.ToString()), ("$name", value.Name), ("$description", value.Description), ("$current_revision", value.CurrentRevision), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$position_key", value.PositionKey), ("$future_asset_state", value.FutureAssetState), ("$metadata_json", value.MetadataJson));
+    private static Task InsertMockupTemplateColorAsync(SqliteConnection c, System.Data.Common.DbTransaction t, MockupTemplateColorVariant value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO mockup_template_colors (id, template_id, color_option_value_id, is_archived, created_at, updated_at, source_asset_id) VALUES ($id,$template_id,$color_option_value_id,$is_archived,$created_at,$updated_at,$source_asset_id);", ct, ("$id", value.Id.ToString()), ("$template_id", value.MockupTemplateId.ToString()), ("$color_option_value_id", value.ColorOptionValueId.ToString()), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$source_asset_id", value.SourceAssetId?.ToString()));
+    private static Task InsertMockupTemplateRevisionAsync(SqliteConnection c, System.Data.Common.DbTransaction t, MockupTemplateRevision value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO mockup_template_revisions (id, template_id, revision_number, target_placeholder_id, created_at, note, provider_mockup_reference, image_width, image_height, mapping_x, mapping_y, mapping_width, mapping_height) VALUES ($id,$template_id,$revision_number,$target_placeholder_id,$created_at,$note,$provider_mockup_reference,$image_width,$image_height,$mapping_x,$mapping_y,$mapping_width,$mapping_height);", ct, ("$id", value.Id.ToString()), ("$template_id", value.MockupTemplateId.ToString()), ("$revision_number", value.RevisionNumber), ("$target_placeholder_id", value.TargetPlaceholderId.ToString()), ("$created_at", value.CreatedAt.ToString("O")), ("$note", value.Note), ("$provider_mockup_reference", value.ProviderMockupReference), ("$image_width", value.ImageMapping?.ImageWidth), ("$image_height", value.ImageMapping?.ImageHeight), ("$mapping_x", value.ImageMapping?.X), ("$mapping_y", value.ImageMapping?.Y), ("$mapping_width", value.ImageMapping?.Width), ("$mapping_height", value.ImageMapping?.Height));
+    private static Task InsertMockupTemplateRevisionColorAsync(SqliteConnection c, System.Data.Common.DbTransaction t, MockupTemplateRevisionColor value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO mockup_template_revision_colors (id, revision_id, color_option_value_id, source_asset_id) VALUES ($id,$revision_id,$color_option_value_id,$source_asset_id);", ct, ("$id", value.Id.ToString()), ("$revision_id", value.RevisionId.ToString()), ("$color_option_value_id", value.ColorOptionValueId.ToString()), ("$source_asset_id", value.SourceAssetId?.ToString()));
+
     private static Task InsertItemListingConfigurationAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, ItemListingConfiguration config, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, "INSERT INTO item_listing_configuration (item_id, offering_id) VALUES ($item_id, $offering_id);", cancellationToken, ("$item_id", config.ItemId.ToString()), ("$offering_id", config.OfferingId.ToString()));
 
@@ -1139,10 +1459,131 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         var stores = new List<Store>();
         await foreach (var reader in ReadAsync(connection, "SELECT * FROM stores ORDER BY name;", cancellationToken))
         {
-            stores.Add(new Store(ReadGuid(reader, "id"), ReadGuid(reader, "workspace_id"), ReadString(reader, "name"), ReadNullableString(reader, "description"), ReadBool(reader, "is_archived"), ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json"), ReadNullableGuid(reader, "default_niche_id")));
+            stores.Add(new Store(ReadGuid(reader, "id"), ReadGuid(reader, "workspace_id"), ReadString(reader, "name"), ReadNullableString(reader, "description"), ReadBool(reader, "is_archived"), ReadDate(reader, "created_at"), ReadDate(reader, "updated_at"), ReadString(reader, "metadata_json"), ReadNullableGuid(reader, "default_niche_id"), (FulfillmentStrategy)ReadInt(reader, "fulfillment_strategy")));
         }
 
         return stores;
+    }
+
+    private static async Task<IReadOnlyList<Blueprint>> LoadBlueprintsAsync(SqliteConnection c, CancellationToken ct)
+    {
+        var result = new List<Blueprint>();
+        await foreach (var r in ReadAsync(c, "SELECT * FROM catalog_blueprints ORDER BY name;", ct))
+            result.Add(new Blueprint(ReadGuid(r, "id"), ReadGuid(r, "store_id"), ReadString(r, "name"), ReadNullableString(r, "description"), ReadBool(r, "is_archived"), ReadDate(r, "created_at"), ReadDate(r, "updated_at"), ReadString(r, "metadata_json")));
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<PrintProvider>> LoadPrintProvidersAsync(SqliteConnection c, CancellationToken ct)
+    {
+        var result = new List<PrintProvider>();
+        await foreach (var r in ReadAsync(c, "SELECT * FROM print_providers ORDER BY name;", ct))
+            result.Add(new PrintProvider(ReadGuid(r, "id"), ReadGuid(r, "store_id"), ReadString(r, "name"), ReadNullableString(r, "external_provider_id"), ReadBool(r, "is_archived"), ReadDate(r, "created_at"), ReadDate(r, "updated_at"), ReadString(r, "metadata_json")));
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<BlueprintOffering>> LoadBlueprintOfferingsAsync(SqliteConnection c, CancellationToken ct)
+    {
+        var result = new List<BlueprintOffering>();
+        await foreach (var r in ReadAsync(c, "SELECT * FROM blueprint_offerings ORDER BY name;", ct))
+            result.Add(new BlueprintOffering(ReadGuid(r, "id"), ReadGuid(r, "blueprint_id"), ReadGuid(r, "store_id"), ReadString(r, "name"), ReadNullableString(r, "description"), (BlueprintOfferingKind)ReadInt(r, "kind"), ReadNullableGuid(r, "print_provider_id"), ReadNullableString(r, "provider_network_code"), ReadNullableGuid(r, "default_placeholder_id"), ReadNullableString(r, "external_offering_id"), ReadBool(r, "is_archived"), ReadDate(r, "created_at"), ReadDate(r, "updated_at"), ReadString(r, "metadata_json")));
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<OfferingOption>> LoadOfferingOptionsAsync(SqliteConnection c, CancellationToken ct)
+    {
+        var result = new List<OfferingOption>();
+        await foreach (var r in ReadAsync(c, "SELECT * FROM offering_options ORDER BY sort_order;", ct))
+            result.Add(new OfferingOption(ReadGuid(r, "id"), ReadGuid(r, "offering_id"), (OptionKind)ReadInt(r, "option_kind"), ReadString(r, "name"), ReadInt(r, "sort_order"), ReadBool(r, "is_archived")));
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<OfferingOptionValue>> LoadOfferingOptionValuesAsync(SqliteConnection c, CancellationToken ct)
+    {
+        var result = new List<OfferingOptionValue>();
+        await foreach (var r in ReadAsync(c, "SELECT * FROM offering_option_values ORDER BY sort_order;", ct))
+            result.Add(new OfferingOptionValue(ReadGuid(r, "id"), ReadGuid(r, "option_id"), ReadGuid(r, "offering_id"), ReadString(r, "value"), ReadInt(r, "sort_order"), ReadBool(r, "is_archived")));
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<OfferingVariant>> LoadOfferingVariantsAsync(SqliteConnection c, CancellationToken ct)
+    {
+        var result = new List<OfferingVariant>();
+        await foreach (var r in ReadAsync(c, "SELECT * FROM offering_variants ORDER BY created_at;", ct))
+        {
+            var variantId = ReadGuid(r, "id");
+            var ids = new List<Guid>();
+            await foreach (var membership in ReadAsync(c, $"""
+                SELECT membership.option_value_id
+                FROM offering_variant_values AS membership
+                INNER JOIN offering_option_values AS value ON value.id = membership.option_value_id
+                INNER JOIN offering_options AS option ON option.id = value.option_id
+                WHERE membership.variant_id = '{variantId}'
+                ORDER BY option.sort_order, value.sort_order, value.id;
+                """, ct))
+                ids.Add(ReadGuid(membership, "option_value_id"));
+            result.Add(new OfferingVariant(variantId, ReadGuid(r, "offering_id"), ReadString(r, "name"), ids, ReadBool(r, "is_archived"), ReadDate(r, "created_at"), ReadDate(r, "updated_at"), ReadString(r, "metadata_json")));
+        }
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<OfferingPlaceholder>> LoadOfferingPlaceholdersAsync(SqliteConnection c, CancellationToken ct)
+    {
+        var result = new List<OfferingPlaceholder>();
+        await foreach (var r in ReadAsync(c, "SELECT * FROM offering_placeholders ORDER BY name;", ct))
+        {
+            var placeholderId = ReadGuid(r, "id");
+            var ids = new List<Guid>();
+            await foreach (var membership in ReadAsync(c, $"SELECT variant_id FROM placeholder_variants WHERE placeholder_id = '{placeholderId}';", ct))
+                ids.Add(ReadGuid(membership, "variant_id"));
+            var recommendedWidth = ReadNullableInt(r, "recommended_width_px");
+            var recommendedHeight = ReadNullableInt(r, "recommended_height_px");
+            var recommendedDpi = ReadNullableInt(r, "recommended_dpi");
+            var recommendedFormat = ReadNullableString(r, "recommended_format");
+            var recommendedBackground = ReadNullableString(r, "recommended_background");
+            var guidance = recommendedWidth is null && recommendedHeight is null && recommendedDpi is null && recommendedFormat is null && recommendedBackground is null
+                ? null
+                : new DesignAreaArtworkGuidance(recommendedWidth, recommendedHeight, recommendedDpi, recommendedFormat, recommendedBackground);
+            result.Add(new OfferingPlaceholder(placeholderId, ReadGuid(r, "offering_id"), ReadString(r, "name"), ReadNullableString(r, "description"), ReadString(r, "position"), ReadString(r, "decoration_method"), ReadInt(r, "width"), ReadInt(r, "height"), ids, ReadBool(r, "is_archived"), ReadDate(r, "created_at"), ReadDate(r, "updated_at"), ReadString(r, "metadata_json"), ReadNullableString(r, "provider_reference"), guidance));
+        }
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<MockupTemplate>> LoadMockupTemplatesAsync(SqliteConnection c, CancellationToken ct)
+    {
+        var result = new List<MockupTemplate>();
+        await foreach (var r in ReadAsync(c, "SELECT * FROM mockup_templates ORDER BY name;", ct))
+            result.Add(new MockupTemplate(ReadGuid(r, "id"), ReadGuid(r, "offering_id"), ReadGuid(r, "target_placeholder_id"), ReadString(r, "name"), ReadNullableString(r, "description"), ReadInt(r, "current_revision"), ReadBool(r, "is_archived"), ReadDate(r, "created_at"), ReadDate(r, "updated_at"), ReadNullableString(r, "position_key"), ReadNullableString(r, "future_asset_state"), ReadString(r, "metadata_json")));
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<MockupTemplateColorVariant>> LoadMockupTemplateColorsAsync(SqliteConnection c, CancellationToken ct)
+    {
+        var result = new List<MockupTemplateColorVariant>();
+        await foreach (var r in ReadAsync(c, "SELECT * FROM mockup_template_colors ORDER BY created_at;", ct))
+            result.Add(new MockupTemplateColorVariant(ReadGuid(r, "id"), ReadGuid(r, "template_id"), ReadGuid(r, "color_option_value_id"), ReadBool(r, "is_archived"), ReadDate(r, "created_at"), ReadDate(r, "updated_at"), ReadNullableGuid(r, "source_asset_id")));
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<MockupTemplateRevision>> LoadMockupTemplateRevisionsAsync(SqliteConnection c, CancellationToken ct)
+    {
+        var result = new List<MockupTemplateRevision>();
+        await foreach (var r in ReadAsync(c, "SELECT * FROM mockup_template_revisions ORDER BY revision_number;", ct))
+        {
+            var imageWidth = ReadNullableInt(r, "image_width");
+            var mapping = imageWidth is int width
+                ? new MockupImageSpaceMapping(width, ReadInt(r, "image_height"), ReadInt(r, "mapping_x"), ReadInt(r, "mapping_y"), ReadInt(r, "mapping_width"), ReadInt(r, "mapping_height"))
+                : null;
+            result.Add(new MockupTemplateRevision(ReadGuid(r, "id"), ReadGuid(r, "template_id"), ReadInt(r, "revision_number"), ReadGuid(r, "target_placeholder_id"), ReadDate(r, "created_at"), ReadNullableString(r, "note"), ReadNullableString(r, "provider_mockup_reference"), mapping));
+        }
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<MockupTemplateRevisionColor>> LoadMockupTemplateRevisionColorsAsync(SqliteConnection c, CancellationToken ct)
+    {
+        var result = new List<MockupTemplateRevisionColor>();
+        await foreach (var r in ReadAsync(c, "SELECT * FROM mockup_template_revision_colors ORDER BY id;", ct))
+            result.Add(new MockupTemplateRevisionColor(ReadGuid(r, "id"), ReadGuid(r, "revision_id"), ReadGuid(r, "color_option_value_id"), ReadNullableGuid(r, "source_asset_id")));
+        return result;
     }
 
     private static async Task<IReadOnlyList<Tag>> LoadTagsAsync(SqliteConnection connection, CancellationToken cancellationToken)
@@ -1392,9 +1833,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     private static async IAsyncEnumerable<SqliteDataReader> ReadAsync(
         SqliteConnection connection,
         string sql,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken,
+        System.Data.Common.DbTransaction? transaction = null)
     {
         await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction?)transaction;
         command.CommandText = sql;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
@@ -1420,6 +1863,12 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     }
 
     private static int ReadInt(SqliteDataReader reader, string name) => reader.GetInt32(reader.GetOrdinal(name));
+
+    private static int? ReadNullableInt(SqliteDataReader reader, string name)
+    {
+        var ordinal = reader.GetOrdinal(name);
+        return reader.IsDBNull(ordinal) ? null : reader.GetInt32(ordinal);
+    }
 
     private static bool ReadBool(SqliteDataReader reader, string name) => ReadInt(reader, name) == 1;
 
@@ -1554,6 +2003,44 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             {
                 throw new InvalidOperationException("Every design slot assignment must reference an existing design area.");
             }
+        }
+
+        var blueprints = snapshot.Blueprints.ToDictionary(value => value.Id);
+        var providers = snapshot.PrintProviders.ToDictionary(value => value.Id);
+        var blueprintOfferings = snapshot.BlueprintOfferings.ToDictionary(value => value.Id);
+        foreach (var blueprint in snapshot.Blueprints)
+        {
+            if (!storeIds.Contains(blueprint.StoreId))
+                throw new InvalidOperationException("Every Blueprint must belong to an existing Store.");
+        }
+        foreach (var provider in snapshot.PrintProviders)
+        {
+            if (!storeIds.Contains(provider.StoreId))
+                throw new InvalidOperationException("Every Print Provider must belong to an existing Store.");
+        }
+        foreach (var offering in snapshot.BlueprintOfferings)
+        {
+            if (!blueprints.TryGetValue(offering.BlueprintId, out var blueprint) || blueprint.StoreId != offering.StoreId)
+                throw new InvalidOperationException("Every Blueprint Offering must belong to its Blueprint and Store.");
+            var provider = offering.PrintProviderId is Guid providerId && providers.TryGetValue(providerId, out var foundProvider) ? foundProvider : null;
+            CatalogRelationshipPolicy.ValidateOffering( offering, blueprint, provider, snapshot.OfferingOptions, snapshot.OfferingOptionValues, snapshot.OfferingVariants, snapshot.OfferingPlaceholders);
+        }
+        foreach (var template in snapshot.MockupTemplates)
+        {
+            if (!blueprintOfferings.TryGetValue(template.BlueprintOfferingId, out var offering) ||
+                snapshot.OfferingPlaceholders.All(placeholder => placeholder.Id != template.TargetPlaceholderId || placeholder.OfferingId != offering.Id))
+                throw new InvalidOperationException("Every mockup template target Placeholder must belong to the template offering.");
+        }
+        MockupTemplatePolicy.EnsureUniqueActiveColor(snapshot.MockupTemplateColorVariants);
+        foreach (var binding in snapshot.MockupTemplateColorVariants.Where(value => !value.IsArchived))
+        {
+            var template = snapshot.MockupTemplates.SingleOrDefault(value => value.Id == binding.MockupTemplateId)
+                ?? throw new InvalidOperationException("Every template color must reference an existing Mockup Template.");
+            var colorValue = snapshot.OfferingOptionValues.SingleOrDefault(value => value.Id == binding.ColorOptionValueId)
+                ?? throw new InvalidOperationException("Every template color must reference an existing Color Option Value.");
+            var colorOption = snapshot.OfferingOptions.SingleOrDefault(value => value.Id == colorValue.OptionId)
+                ?? throw new InvalidOperationException("Every template color must reference an existing Color Option.");
+            CatalogRelationshipPolicy.ValidateMockupTemplateColor(template.BlueprintOfferingId, colorValue, colorOption, template);
         }
     }
 }

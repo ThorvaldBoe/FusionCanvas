@@ -69,10 +69,9 @@ public sealed class ParsingAndValidationTests
     [Fact]
     public void Validator_rejects_unknown_state_targets_and_incompatible_overrides()
     {
-        var source = TestSupport.MinimalYaml.Replace(
-            "target: action\n        enabled: false",
-            "target: missing\n        enabled: false\n      - target: heading\n        enabled: false",
-            StringComparison.Ordinal);
+        var source = TestSupport.MinimalYaml
+            .Replace("target: action", "target: missing", StringComparison.Ordinal)
+            .Replace("text: Unavailable", "text: Unavailable\n      - target: heading\n        enabled: false", StringComparison.Ordinal);
         var parsed = new UiDescriptionParser().Parse(source);
 
         var result = new UiDescriptionValidator().Validate(parsed.Document!);

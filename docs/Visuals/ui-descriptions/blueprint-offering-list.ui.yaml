@@ -1,0 +1,98 @@
+schemaVersion: 1
+tokenProfile: fusioncanvas-wireframe-v1
+screen:
+  id: blueprint-offering-list
+  title: Catalog & Mockups - Blueprint Offerings
+  viewport:
+    width: 760
+    height: 900
+  root:
+    id: page
+    kind: stack
+    gap: section
+    padding: window
+    children:
+      - id: page-header
+        kind: stack
+        gap: tight
+        children:
+          - { id: page-title, kind: text, variant: screen-heading, text: Catalog & Mockups - Blueprint Offerings }
+          - { id: page-subtitle, kind: text, variant: supporting, text: One Blueprint-scoped collection; each card opens a focused Offering overview. }
+      - id: offering-workspace
+        kind: panel
+        variant: canvas
+        height: fill
+        gap: section
+        padding: window
+        children:
+          - { id: back-to-blueprints, kind: button, variant: link, text: Back to Blueprints, width: content }
+          - id: blueprint-heading
+            kind: stack
+            gap: tight
+            children:
+              - { id: blueprint-name, kind: text, variant: screen-heading, text: Gildan 64000 }
+              - { id: blueprint-description, kind: text, variant: supporting, text: Basic unisex T-shirt }
+          - { id: blueprint-divider, kind: divider, variant: standard }
+          - id: offering-header
+            kind: grid
+            columns: [fill, content]
+            rowTracks: [content]
+            gap: section
+            children:
+              - id: offering-heading-group
+                kind: stack
+                gap: tight
+                column: 0
+                row: 0
+                children:
+                  - { id: offering-title, kind: text, variant: section-heading, text: Blueprint Offerings }
+                  - { id: offering-help, kind: text, variant: supporting, text: An Offering is one concrete fulfillment choice for this Blueprint. }
+              - { id: add-offering, kind: button, variant: primary, text: + Add Offering, width: content, column: 1, row: 0 }
+          - id: standard-offering-card
+            kind: panel
+            variant: summary-card
+            height: 124
+            gap: compact
+            padding: section
+            children:
+              - id: standard-offering-layout
+                kind: grid
+                columns: [fill, content]
+                rowTracks: [content, content, content]
+                gap: tight
+                children:
+                  - { id: standard-offering-name, kind: text, variant: section-heading, text: Standard print shirt, column: 0, row: 0 }
+                  - { id: open-standard-offering, kind: button, variant: secondary, text: Open, width: content, column: 1, row: 0, rowSpan: 3 }
+                  - { id: standard-provider, kind: text, variant: supporting, text: SwiftPOD - 12 variants - 2 design areas - 3 mockup templates, column: 0, row: 1 }
+                  - { id: standard-status, kind: text, variant: emphasis, text: Active, column: 0, row: 2 }
+          - id: premium-offering-card
+            kind: panel
+            variant: summary-card
+            height: 124
+            gap: compact
+            padding: section
+            children:
+              - id: premium-offering-layout
+                kind: grid
+                columns: [fill, content]
+                rowTracks: [content, content, content]
+                gap: tight
+                children:
+                  - { id: premium-offering-name, kind: text, variant: section-heading, text: Premium print shirt, column: 0, row: 0 }
+                  - { id: open-premium-offering, kind: button, variant: secondary, text: Open, width: content, column: 1, row: 0, rowSpan: 3 }
+                  - { id: premium-provider, kind: text, variant: supporting, text: Monster Digital - Not configured yet, column: 0, row: 1 }
+                  - { id: premium-status, kind: text, variant: supporting, text: Draft, column: 0, row: 2 }
+          - { id: offering-empty, kind: message, variant: empty, text: No Blueprint Offerings yet. Add one to configure fulfillment., visible: false }
+          - id: collection-spacer
+            kind: stack
+            height: fill
+            children: []
+          - { id: collection-guidance, kind: text, variant: supporting, text: Complex catalog relationships are configured only after opening an Offering. }
+states:
+  default:
+    overrides: []
+  empty-collection:
+    overrides:
+      - { target: standard-offering-card, visible: false }
+      - { target: premium-offering-card, visible: false }
+      - { target: offering-empty, visible: true }

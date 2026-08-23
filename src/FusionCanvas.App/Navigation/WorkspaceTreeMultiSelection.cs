@@ -33,13 +33,12 @@ public sealed class WorkspaceTreeMultiSelection
         if (_selectedIds.Remove(id))
         {
             ActiveId = _selectedIds.Count == 0 ? ActiveId : id;
-            AnchorId = id;
             return;
         }
 
         _selectedIds.Add(id);
         ActiveId = id;
-        AnchorId = id;
+        AnchorId ??= id;
     }
 
     public void SelectRange(IReadOnlyList<Guid> visibleIds, Guid id, bool extend)

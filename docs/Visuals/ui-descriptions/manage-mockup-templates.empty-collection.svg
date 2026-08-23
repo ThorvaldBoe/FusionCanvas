@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1040" viewBox="0 0 1280 1040" role="img" aria-label="Catalog &amp; Mockups - Manage Mockup Templates">
+  <rect width="100%" height="100%" fill="#f4f6f8" />
+  <g data-ui-id="page" data-ui-kind="stack" data-enabled="true">
+    <g data-ui-id="page-header" data-ui-kind="stack" data-enabled="true">
+      <g data-ui-id="page-title" data-ui-kind="text" data-enabled="true">
+        <text x="48" y="74" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="600">Catalog &amp; Mockups - Manage Mockup Templates</text>
+      </g>
+      <g data-ui-id="page-subtitle" data-ui-kind="text" data-enabled="true">
+        <text x="48" y="98" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Link one provider mockup image to a Design Area and map its image-space placement.</text>
+      </g>
+    </g>
+    <g data-ui-id="master-detail" data-ui-kind="grid" data-enabled="true">
+      <g data-ui-id="template-collection" data-ui-kind="panel" data-enabled="true">
+        <rect x="48" y="120" width="400" height="872" rx="10" fill="#ffffff" stroke="#b8c4d2" stroke-width="1" />
+        <g data-ui-id="collection-context" data-ui-kind="text" data-enabled="true">
+          <text x="96" y="182" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Standard print shirt / Offering overview</text>
+        </g>
+        <g data-ui-id="collection-header" data-ui-kind="grid" data-enabled="true">
+          <g data-ui-id="collection-title-group" data-ui-kind="stack" data-enabled="true">
+            <g data-ui-id="collection-title" data-ui-kind="text" data-enabled="true">
+              <text x="96" y="230" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="600">Mockup Templates</text>
+            </g>
+            <g data-ui-id="collection-count" data-ui-kind="text" data-enabled="true">
+              <text x="96" y="254" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">3 configured</text>
+            </g>
+          </g>
+          <g data-ui-id="add-template" data-ui-kind="button" data-enabled="true">
+            <rect x="266" y="204" width="134" height="38" rx="7" fill="#214f7d" stroke="#214f7d" stroke-width="1" />
+            <text x="278" y="228" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">+ Add Template</text>
+          </g>
+        </g>
+        <g data-ui-id="collection-divider" data-ui-kind="divider" data-enabled="true">
+          <line x1="96" y1="276" x2="400" y2="276" stroke="#c5ced8" stroke-width="1" />
+        </g>
+        <g data-ui-id="collection-empty" data-ui-kind="message" data-enabled="true">
+          <rect x="96" y="293" width="304" height="48" rx="7" fill="#f2f4f7" stroke="#c8d0da" stroke-width="1" />
+          <text x="108" y="321" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">No Mockup Templates configured.</text>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

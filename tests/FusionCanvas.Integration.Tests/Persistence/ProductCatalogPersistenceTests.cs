@@ -3,6 +3,8 @@ using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Products;
+using FusionCanvas.Domain.Catalog;
+using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Integration.Persistence;
 using Microsoft.Data.Sqlite;
 
@@ -31,6 +33,55 @@ public class ProductCatalogPersistenceTests
     }
 
     [Fact]
+    public async Task SaveAndLoadAsync_RoundTripsNormalizedOfferingAndMockupModel()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var repository = new SqliteWorkspaceRepository(tempDirectory.GetPath("normalized.db"));
+        var store = new Store(Guid.NewGuid(), "Catalog Store", null, false, Now, Now, "{}");
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, Now, Now);
+        var provider = new PrintProvider(Guid.NewGuid(), store.Id, "Printful", null, false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Printful Tee", null, BlueprintOfferingKind.FixedPrintProvider, provider.Id, null, null, null, false, Now, Now);
+        var colorOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
+        var sizeOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Size, "Size", 1);
+        var black = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "Black", 0);
+        var medium = new OfferingOptionValue(Guid.NewGuid(), sizeOption.Id, offering.Id, "M", 0);
+        var variant = new OfferingVariant(Guid.NewGuid(), offering.Id, "Black / M", [black.Id, medium.Id], false, Now, Now);
+        var placeholder = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 3000, 4500, [variant.Id], false, Now, Now, providerReference: "front-print-area", artworkGuidance: new DesignAreaArtworkGuidance(4500, 5400, 300, "PNG", "Transparent"));
+        var template = new MockupTemplate(Guid.NewGuid(), offering.Id, placeholder.Id, "Front mockup", null, 1, false, Now, Now);
+        var templateColor = new MockupTemplateColorVariant(Guid.NewGuid(), template.Id, black.Id, false, Now, Now);
+        var revision = new MockupTemplateRevision(Guid.NewGuid(), template.Id, 1, placeholder.Id, Now, providerMockupReference: "provider-image-front-black", imageMapping: new MockupImageSpaceMapping(1200, 1200, 360, 240, 480, 600));
+        var revisionColor = new MockupTemplateRevisionColor(Guid.NewGuid(), revision.Id, black.Id);
+        var snapshot = new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [store], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint], PrintProviders = [provider], BlueprintOfferings = [offering],
+            OfferingOptions = [colorOption, sizeOption], OfferingOptionValues = [black, medium],
+            OfferingVariants = [variant], OfferingPlaceholders = [placeholder], MockupTemplates = [template],
+            MockupTemplateColorVariants = [templateColor], MockupTemplateRevisions = [revision], MockupTemplateRevisionColors = [revisionColor]
+        };
+
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(snapshot.Blueprints, loaded.Blueprints);
+        Assert.Equal(snapshot.PrintProviders, loaded.PrintProviders);
+        Assert.Equal(snapshot.BlueprintOfferings, loaded.BlueprintOfferings);
+        Assert.Equal(snapshot.OfferingOptions, loaded.OfferingOptions);
+        Assert.Equal(snapshot.OfferingOptionValues, loaded.OfferingOptionValues);
+        Assert.Equal(snapshot.OfferingVariants.Select(value => value.Id).OrderBy(value => value), loaded.OfferingVariants.Select(value => value.Id).OrderBy(value => value));
+        Assert.Equal(snapshot.OfferingVariants[0].OptionValueIds.OrderBy(value => value), loaded.OfferingVariants[0].OptionValueIds.OrderBy(value => value));
+        Assert.Equal(snapshot.OfferingPlaceholders.Select(value => value.Id).OrderBy(value => value), loaded.OfferingPlaceholders.Select(value => value.Id).OrderBy(value => value));
+        Assert.Equal(snapshot.OfferingPlaceholders[0].VariantIds, loaded.OfferingPlaceholders[0].VariantIds);
+        Assert.Equal(placeholder.ProviderReference, loaded.OfferingPlaceholders[0].ProviderReference);
+        Assert.Equal(placeholder.ArtworkGuidance, loaded.OfferingPlaceholders[0].ArtworkGuidance);
+        Assert.Equal(snapshot.MockupTemplates, loaded.MockupTemplates);
+        Assert.Equal(snapshot.MockupTemplateColorVariants, loaded.MockupTemplateColorVariants);
+        Assert.Equal(snapshot.MockupTemplateRevisions, loaded.MockupTemplateRevisions);
+        Assert.Equal(revision.ProviderMockupReference, loaded.MockupTemplateRevisions[0].ProviderMockupReference);
+        Assert.Equal(revision.ImageMapping, loaded.MockupTemplateRevisions[0].ImageMapping);
+        Assert.Equal(snapshot.MockupTemplateRevisionColors, loaded.MockupTemplateRevisionColors);
+    }
+
+    [Fact]
     public async Task SaveAndLoadAsync_CreatesSchemaVersionCurrent()
     {
         using var tempDirectory = new TemporaryDirectory();
@@ -39,7 +90,7 @@ public class ProductCatalogPersistenceTests
 
         await repository.SaveAsync(CreateCatalogSnapshot(), TestContext.Current.CancellationToken);
 
-        Assert.Equal(10, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(SqliteWorkspaceRepository.CurrentSchemaVersion, await ReadUserVersionAsync(databasePath));
     }
 
     [Fact]
@@ -73,7 +124,178 @@ public class ProductCatalogPersistenceTests
             Assert.Equal(0, after);
         }
 
-        Assert.Equal(10, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(SqliteWorkspaceRepository.CurrentSchemaVersion, await ReadUserVersionAsync(databasePath));
+    }
+
+    [Fact]
+    public async Task LoadAsync_MigratesSchemaElevenWithExplicitUnconfiguredUxFields()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("schema-eleven.db");
+        await new SqliteWorkspaceRepository(databasePath).SaveAsync(CreateCatalogSnapshot(), TestContext.Current.CancellationToken);
+
+        await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                ALTER TABLE offering_placeholders DROP COLUMN provider_reference;
+                ALTER TABLE offering_placeholders DROP COLUMN recommended_width_px;
+                ALTER TABLE offering_placeholders DROP COLUMN recommended_height_px;
+                ALTER TABLE offering_placeholders DROP COLUMN recommended_dpi;
+                ALTER TABLE offering_placeholders DROP COLUMN recommended_format;
+                ALTER TABLE offering_placeholders DROP COLUMN recommended_background;
+                ALTER TABLE mockup_template_revisions DROP COLUMN provider_mockup_reference;
+                ALTER TABLE mockup_template_revisions DROP COLUMN image_width;
+                ALTER TABLE mockup_template_revisions DROP COLUMN image_height;
+                ALTER TABLE mockup_template_revisions DROP COLUMN mapping_x;
+                ALTER TABLE mockup_template_revisions DROP COLUMN mapping_y;
+                ALTER TABLE mockup_template_revisions DROP COLUMN mapping_width;
+                ALTER TABLE mockup_template_revisions DROP COLUMN mapping_height;
+                PRAGMA user_version = 11;
+                """;
+            await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+
+        var loaded = await new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(SqliteWorkspaceRepository.CurrentSchemaVersion, await ReadUserVersionAsync(databasePath));
+        Assert.All(loaded.OfferingPlaceholders, value =>
+        {
+            Assert.Null(value.ProviderReference);
+            Assert.Null(value.ArtworkGuidance);
+        });
+        Assert.All(loaded.MockupTemplateRevisions, value =>
+        {
+            Assert.Null(value.ProviderMockupReference);
+            Assert.Null(value.ImageMapping);
+        });
+        Assert.Contains("recommended_width_px", await ReadColumnNamesAsync(databasePath, "offering_placeholders"));
+        Assert.Contains("mapping_width", await ReadColumnNamesAsync(databasePath, "mockup_template_revisions"));
+    }
+
+    [Fact]
+    public async Task LoadAsync_RepairsCurrentVersionDatabaseMissingFulfillmentStrategyColumn()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("missing-fulfillment-column.db");
+        var snapshot = CreateCatalogSnapshot();
+        await new SqliteWorkspaceRepository(databasePath).SaveAsync(snapshot, TestContext.Current.CancellationToken);
+
+        await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = $"ALTER TABLE stores DROP COLUMN fulfillment_strategy; PRAGMA user_version = {SqliteWorkspaceRepository.CurrentSchemaVersion};";
+            await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+
+        var loaded = await new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken);
+
+        var store = Assert.Single(loaded.Stores);
+        Assert.Equal(snapshot.Stores[0].Id, store.Id);
+        Assert.Equal(FulfillmentStrategy.Manual, store.FulfillmentStrategy);
+    }
+
+    [Fact]
+    public async Task NewSchemaHasNoRenderingOverrideOrExternalIntegrationTables()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("scope.db");
+        await new SqliteWorkspaceRepository(databasePath).SaveAsync(CreateCatalogSnapshot(), TestContext.Current.CancellationToken);
+
+        await using var connection = new SqliteConnection($"Data Source={databasePath}");
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%';";
+        var tables = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+        while (await reader.ReadAsync(TestContext.Current.CancellationToken)) tables.Add(reader.GetString(0));
+
+        Assert.DoesNotContain(tables, name => name.Contains("coordinate", StringComparison.OrdinalIgnoreCase) || name.Contains("override", StringComparison.OrdinalIgnoreCase) || name.Contains("generated_mockup", StringComparison.OrdinalIgnoreCase) || name.Contains("shopify", StringComparison.OrdinalIgnoreCase) || name.Contains("credential", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task LoadAsync_MigratesPopulatedSchemaTenCatalogToNormalizedModel()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("legacy-catalog.db");
+        var legacy = CreateCatalogSnapshot();
+        await new SqliteWorkspaceRepository(databasePath).SaveAsync(legacy, TestContext.Current.CancellationToken);
+        await DowngradeStoreTableAndSetSchemaTenAsync(databasePath);
+
+        var loaded = await new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(SqliteWorkspaceRepository.CurrentSchemaVersion, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(legacy.StoreProducts.Select(value => value.Id), loaded.Blueprints.Select(value => value.Id));
+        Assert.Equal(legacy.FulfillmentOfferings.Select(value => value.Id).OrderBy(value => value), loaded.BlueprintOfferings.Select(value => value.Id).OrderBy(value => value));
+        Assert.Equal(legacy.ProductVariants.Select(value => value.Id), loaded.OfferingVariants.Select(value => value.Id));
+        Assert.Equal(legacy.DesignAreas.Select(value => value.Id), loaded.OfferingPlaceholders.Select(value => value.Id));
+        Assert.Equal("printify-choice", loaded.BlueprintOfferings.Single(value => value.Kind == BlueprintOfferingKind.ProviderNetwork).ProviderNetworkCode);
+        Assert.Equal(2, loaded.OfferingOptions.Count);
+        Assert.Equal(2, loaded.OfferingOptionValues.Count);
+        Assert.Equal(2, loaded.OfferingVariants.Single().OptionValueIds.Count);
+        Assert.Single(loaded.OfferingPlaceholders.Single().VariantIds);
+    }
+
+    [Fact]
+    public async Task LoadAsync_MigrationPreservesArchivedStoreAndItemDesignRelationships()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("legacy-relations.db");
+        var legacy = CreateCatalogSnapshot();
+        var item = legacy.Items[0];
+        var offering = legacy.FulfillmentOfferings[0];
+        var area = legacy.DesignAreas[0];
+        var rowId = Guid.NewGuid();
+        var archivedStore = new Store(Guid.NewGuid(), "Archived Store", null, true, Now, Now, "{}");
+        var archivedItem = item with { Id = Guid.NewGuid(), StoreId = archivedStore.Id, IsArchived = true };
+        legacy = legacy with
+        {
+            Stores = [.. legacy.Stores, archivedStore],
+            Items = [.. legacy.Items, archivedItem],
+            ItemListingConfigurations = [new ItemListingConfiguration(item.Id, offering.Id)],
+            DesignVariantRows = [new DesignVariantRow(rowId, item.Id, true, 0)],
+            DesignVariantRowColors = [new DesignVariantRowColor(rowId, "Black")],
+            DesignSlotAssignments = [new DesignSlotAssignment(rowId, area.Id, null)]
+        };
+        await new SqliteWorkspaceRepository(databasePath).SaveAsync(legacy, TestContext.Current.CancellationToken);
+        await DowngradeStoreTableAndSetSchemaTenAsync(databasePath);
+
+        var loaded = await new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(loaded.Stores.Single(store => store.Id == archivedStore.Id).IsArchived);
+        Assert.Contains(loaded.Items, value => value.Id == archivedItem.Id && value.StoreId == archivedStore.Id);
+        Assert.Contains(loaded.ItemListingConfigurations, value => value.ItemId == item.Id && value.OfferingId == offering.Id);
+        Assert.Contains(loaded.DesignSlotAssignments, value => value.RowId == rowId && value.DesignAreaId == area.Id);
+    }
+
+    [Fact]
+    public async Task LoadAsync_MalformedSchemaTenCatalogRollsBackNormalizedMigration()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("malformed-legacy-catalog.db");
+        await new SqliteWorkspaceRepository(databasePath).SaveAsync(CreateCatalogSnapshot(), TestContext.Current.CancellationToken);
+        await DowngradeStoreTableAndSetSchemaTenAsync(databasePath);
+
+        await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE product_variants SET options_json = 'not-json';";
+            await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken));
+
+        await using var verification = new SqliteConnection($"Data Source={databasePath}");
+        await verification.OpenAsync(TestContext.Current.CancellationToken);
+        await using var versionCommand = verification.CreateCommand();
+        versionCommand.CommandText = "PRAGMA user_version;";
+        Assert.Equal(10, Convert.ToInt32(await versionCommand.ExecuteScalarAsync(TestContext.Current.CancellationToken)));
+        await using var blueprintCommand = verification.CreateCommand();
+        blueprintCommand.CommandText = "SELECT COUNT(*) FROM catalog_blueprints;";
+        Assert.Equal(0, Convert.ToInt32(await blueprintCommand.ExecuteScalarAsync(TestContext.Current.CancellationToken)));
     }
 
     [Fact]
@@ -87,7 +309,7 @@ public class ProductCatalogPersistenceTests
         var loaded = await new SqliteWorkspaceRepository(databasePath)
             .LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(10, await ReadUserVersionAsync(databasePath));
+        Assert.Equal(SqliteWorkspaceRepository.CurrentSchemaVersion, await ReadUserVersionAsync(databasePath));
         Assert.Empty(loaded.StoreProducts);
         Assert.Empty(loaded.DesignAreas);
     }
@@ -99,6 +321,7 @@ public class ProductCatalogPersistenceTests
         var databasePath = tempDirectory.GetPath("catalog.db");
         var repository = new SqliteWorkspaceRepository(databasePath);
         var snapshot = CreateCatalogSnapshot();
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
         var choiceOffering = snapshot.FulfillmentOfferings.Single(o => o.Kind == FulfillmentKind.PrintifyChoiceNetwork);
         var fixedOfferingVariant = snapshot.ProductVariants[0];
         var crossArea = new DesignArea(
@@ -113,6 +336,38 @@ public class ProductCatalogPersistenceTests
             () => repository.SaveAsync(snapshot, TestContext.Current.CancellationToken));
 
         Assert.Contains("own offering", exception.Message);
+        var unchanged = await repository.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.DoesNotContain(unchanged.DesignAreas, value => value.Id == crossArea.Id);
+    }
+
+    [Fact]
+    public async Task LoadAsync_RejectsPersistedMockupMappingOutsideImageBounds()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("invalid-mapping.db");
+        var repository = new SqliteWorkspaceRepository(databasePath);
+        var store = new Store(Guid.NewGuid(), "Store", null, false, Now, Now, "{}");
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "printify-choice", null, null, false, Now, Now);
+        var area = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 3000, 4500, [], false, Now, Now);
+        var template = new MockupTemplate(Guid.NewGuid(), offering.Id, area.Id, "Front", null, 1, false, Now, Now);
+        var revision = new MockupTemplateRevision(Guid.NewGuid(), template.Id, 1, area.Id, Now, providerMockupReference: "front", imageMapping: new MockupImageSpaceMapping(1200, 1200, 300, 200, 500, 650));
+        var snapshot = new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [store], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint], BlueprintOfferings = [offering], OfferingPlaceholders = [area], MockupTemplates = [template], MockupTemplateRevisions = [revision]
+        };
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+
+        await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE mockup_template_revisions SET mapping_width = image_width WHERE id = $id;";
+            command.Parameters.AddWithValue("$id", revision.Id.ToString());
+            await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => repository.LoadAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -298,6 +553,15 @@ public class ProductCatalogPersistenceTests
         }
     }
 
+    private static async Task DowngradeStoreTableAndSetSchemaTenAsync(string databasePath)
+    {
+        await using var connection = new SqliteConnection($"Data Source={databasePath}");
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA user_version = 10;";
+        await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+    }
+
     private static async Task<int> ReadUserVersionAsync(string databasePath)
     {
         await using var connection = new SqliteConnection($"Data Source={databasePath}");
@@ -305,6 +569,19 @@ public class ProductCatalogPersistenceTests
         await using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version;";
         return Convert.ToInt32(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken));
+    }
+
+    private static async Task<IReadOnlyList<string>> ReadColumnNamesAsync(string databasePath, string table)
+    {
+        await using var connection = new SqliteConnection($"Data Source={databasePath}");
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"PRAGMA table_info({table});";
+        var result = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+        while (await reader.ReadAsync(TestContext.Current.CancellationToken))
+            result.Add(reader.GetString(1));
+        return result;
     }
 
     private sealed class TemporaryDirectory : IDisposable

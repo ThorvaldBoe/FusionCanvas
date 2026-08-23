@@ -1,4 +1,5 @@
 using FusionCanvas.Domain.Products;
+using FusionCanvas.Domain.Catalog;
 
 namespace FusionCanvas.Application.DesignFiles;
 
@@ -10,7 +11,14 @@ public sealed record DesignSlotSummary(
     string? ThumbnailPath,
     bool IsMissing,
     bool CanPreview,
-    bool CanExport);
+    bool CanExport)
+{
+    public Guid PlaceholderId => DesignAreaId;
+    public string? Position { get; init; }
+    public string? DecorationMethod { get; init; }
+    public int? Width { get; init; }
+    public int? Height { get; init; }
+}
 
 /// <summary>Summary of a design variant row for the UI.</summary>
 public sealed record DesignRowSummary(
@@ -33,4 +41,11 @@ public sealed record DesignStageState(
     IReadOnlyList<string> AvailableColors, // deduplicated from offering
     IReadOnlyList<string> SelectedColors,
     IReadOnlyList<DesignRowSummary> Rows,
-    IReadOnlyList<DesignSlotSummary> SupportingImages);
+    IReadOnlyList<DesignSlotSummary> SupportingImages)
+{
+    public IReadOnlyList<BlueprintOffering> AvailableBlueprintOfferings { get; init; } = [];
+    public IReadOnlyList<OfferingPlaceholder> AvailablePlaceholders { get; init; } = [];
+    public string? SelectedProviderNetworkCode { get; init; }
+    public string? SelectedBlueprintName { get; init; }
+    public string? ProviderNetworkWarning { get; init; }
+}

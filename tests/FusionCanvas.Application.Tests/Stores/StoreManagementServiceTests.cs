@@ -95,6 +95,22 @@ public class StoreManagementServiceTests
     }
 
     [Fact]
+    public async Task UpdateStoreAsync_RejectsUnavailableExternalStrategy()
+    {
+        var store = NewStore("North Star Studio");
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
+        var service = new StoreManagementService(repository);
+
+        var result = await service.UpdateStoreAsync(
+            new StoreManagementUpdateRequest(store.Id, store.Name, FulfillmentStrategy: FulfillmentStrategy.ShopifyPrintify),
+            TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("not available", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(FulfillmentStrategy.Manual, Assert.Single((await repository.LoadAsync(TestContext.Current.CancellationToken)).Stores).FulfillmentStrategy);
+    }
+
+    [Fact]
     public async Task ArchiveAndRestoreStoreAsync_SeparateActiveAndArchivedStores()
     {
         var store = NewStore("North Star Studio");

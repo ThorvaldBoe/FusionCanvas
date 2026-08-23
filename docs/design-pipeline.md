@@ -123,7 +123,9 @@ A listing may contain:
 
 The listing stage separates product presentation from design creation.
 
-The basic Listing tool should support local mockup generation and listing preparation. Direct Printify, Shopify, Etsy, or other marketplace publishing belongs to later integrations or optional plugins.
+The catalog/setup module prepares Blueprint Offerings, Placeholders, and color-level Mockup
+Template relationships. Listing-stage color selection, mockup generation, rendering/composition,
+source-image upload, and direct Printify/Shopify publication remain future modules or adapters.
 
 ### Archive
 

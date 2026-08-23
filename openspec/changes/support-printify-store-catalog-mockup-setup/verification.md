@@ -1,0 +1,42 @@
+# Verification: support-printify-store-catalog-mockup-setup
+
+Implementation and repository-wide verification are complete for the scoped Store/catalog/mockup-setup module.
+
+## Verified so far
+
+| Area | Result | Evidence |
+| --- | --- | --- |
+| Domain strategy and model construction | Pass | `dotnet test .\tests\FusionCanvas.Domain.Tests\FusionCanvas.Domain.Tests.csproj --no-restore`; 227 passed, including Placeholder dimensions/coverage, stable template targets, and revision-change invariants. |
+| Provider-Network identity | Pass | Domain test verifies `Printify-Choice` normalizes to stable `printify-choice` and has no Print Provider. |
+| Color-only mockup binding | Pass | Domain tests reject Size values and exercise one Color binding shared by multiple concrete sizes. |
+| Active template-color uniqueness | Pass | Domain test rejects duplicate active `(template, color)` records. |
+| Schema 11 store strategy persistence | Pass | Existing schema migration tests pass and Store round-trip includes `FulfillmentStrategy`; Store Editor now exposes Manual with future strategies explained as unavailable. |
+| Normalized catalog/mockup SQLite round-trip | Pass | `ProductCatalogPersistenceTests` verifies Blueprints, Print Providers, Offerings, typed Options/Values, Variants, Placeholders, Templates, Colors, Revisions, and revision colors. |
+| SQLite catalog invariants | Pass | Repository validation rejects cross-offering ownership and enforces template target/color relationships before save; schema-scope test confirms no rendering, override, credential, or Shopify tables. |
+| Schema 10-to-11 migration bridge | Pass for implemented bridge | Populated schema-10 fixture preserves legacy Blueprint/Offering/Variant/Placeholder IDs, maps Choice to `printify-choice`, normalizes Color/Size values, preserves restricted compatibility, and malformed JSON rolls back without advancing the version. |
+| Focused integration persistence suite | Pass | `dotnet test .\tests\FusionCanvas.Integration.Tests\FusionCanvas.Integration.Tests.csproj --no-restore --filter FullyQualifiedName~ProductCatalogPersistence`; 11 passed. |
+| Changed-scope builds | Pass | `dotnet build .\FusionCanvas.sln --no-restore -v normal`; solution build passed with 0 warnings and 0 errors after restarting the build services. |
+| Store strategy application policy | Pass | `StoreManagementServiceTests` strategy coverage passes; unavailable Shopify strategy changes are rejected and Manual remains persisted. |
+| Catalog application contracts and lifecycle foundations | Pass | `CatalogSetupServiceTests` covers Store-scoped Blueprint/provider/offering creation, typed Option/Value/Variant creation, duplicate Variant rejection, Store isolation, dependency reporting, default Placeholder assignment, restore, and compatibility synchronization; 5 passed. |
+| Current-schema compatibility repair | Pass | `CatalogSetupServiceTests.LoadsLegacyOnlyOfferingByRepairingAnIdempotentNormalizedGraph` verifies same-ID Blueprint/Offering/Variant/Placeholder repair, explicit Color/Size normalization, one-time persistence, idempotent reload, and normalized-to-legacy offering mirroring. No Mockup Template is created by the repair path. |
+| Mockup template application foundation | Pass | `MockupTemplateSetupServiceTests` covers same-offering Placeholder targeting, color binding, revision creation, template archive/restore, and archived-Store read-only behavior; focused suite passes. |
+| Application baseline | Pass | `dotnet test .\tests\FusionCanvas.Application.Tests\FusionCanvas.Application.Tests.csproj --no-restore`; 368 passed. |
+| Integration baseline | Pass | `dotnet test .\tests\FusionCanvas.Integration.Tests\FusionCanvas.Integration.Tests.csproj --no-restore`; 182 passed. |
+| Design-stage normalized target presentation | Pass | Design-stage application tests pass; normalized Placeholder metadata now supplies position, decoration method, dimensions, Blueprint context, and a Printify Choice Provider-Network warning to the tool view model. |
+| Normalized catalog setup presentation | Pass | `CatalogSetupViewModelTests` passes 2/2, covering typed option selection, offering/Placeholder/template state, availability guards, color-binding command state, authoritative requested-offering selection, and no unrelated fallback when that identity is absent. |
+| Store Editor focused headless coverage | Pass | `StoreEditorHeadlessTests` passes 8/8, including Catalog & mockups navigation, strategy helper text, ordered normalized offering sections, progressive create forms, automatic legacy-only repair, future template state, and layout margins after filtering non-laid-out hidden controls. |
+| Blueprint detail uses one authoritative context | Pass | `StoreEditorHeadlessTests.ProductsPanel_DisclosesProductAndOfferingActionsByLevel` verifies Blueprint detail retains one `Add Blueprint Offering` action and exposes no second Blueprint selector, normalized implementation label, provider-network code field, or duplicate Provider-Network action. Focused class run passed 8/8. |
+| Blueprint Offering detail uses one authoritative context | Pass | `CatalogSetupViewModelTests` and the offering-detail headless tests verify stable-ID synchronization, absence of a second offering selector, normalized Basics/Options/Variants/Placeholders/Templates ownership, progressive forms, and one consolidated Advanced section. Focused combined run passed 10/10; complete App suite passed 489/489. |
+| Full solution deterministic run | Pass | `dotnet test .\FusionCanvas.sln --no-restore -v minimal`; Domain 227/227, Application 368/368, Integration 182/182, and App 489/489 passed without external services, credentials, network access, or an interactive desktop. |
+
+## Acceptance coverage
+
+The design artifact contains an exact traceability index for all 87 acceptance-scenario titles. The scoped application CRUD/lifecycle orchestration, normalized Store Editor catalog navigation, focused UI state coverage, and repository-wide deterministic baseline are verified. Future-contract scenarios for listing application, rendering, asset upload, placement editing, and Shopify publication remain not applicable until those future modules exist.
+
+## Limitations
+
+- The new normalized catalog is additive to the existing compatibility model; legacy records remain available after migration while the new normalized graph is populated.
+- The current module intentionally does not implement listing-stage selection, rendering, asset upload, placement editing, per-variant overrides, generated-mockup records, external credentials, network communication, or Shopify publication.
+- No production rendering, source-image upload, placement editor, per-variant override, generated-mockup record, external credential, network, or Shopify behavior has been added.
+- The solution build passed with zero warnings and errors after restarting MSBuild/build services; no host telemetry limitation remains for the build gate.
+- The workspace-tree/multi-selection/headless-layout tests were corrected where expectations were stale, and the multi-selection anchor behavior was fixed; the complete solution baseline now passes 1,266/1,266.

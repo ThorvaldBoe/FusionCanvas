@@ -69,9 +69,14 @@ public sealed class StoreManagementService : IStoreManagementService
             return StoreManagementResult.Failure(validation, BuildState(snapshot));
         }
 
+        if (!Enum.IsDefined(request.FulfillmentStrategy) || !FulfillmentStrategyPolicy.IsAvailable(request.FulfillmentStrategy))
+        {
+            return StoreManagementResult.Failure("That fulfillment strategy is not available yet. Manual is currently the only supported strategy.", BuildState(snapshot));
+        }
+
         var now = _clock();
         var context = request.Context ?? new StoreContext();
-        var store = new Store(_newId(), _activeWorkspaceId!.Value, normalizedName, NormalizeOptional(context.Description), false, now, now, ToMetadataJson(context));
+        var store = new Store(_newId(), _activeWorkspaceId!.Value, normalizedName, NormalizeOptional(context.Description), false, now, now, ToMetadataJson(context), null, request.FulfillmentStrategy);
         var workspaces = snapshot.Workspaces.Any(workspace => workspace.Id == store.WorkspaceId)
             ? snapshot.Workspaces
             : [.. snapshot.Workspaces, WorkspaceSnapshot.DefaultWorkspace(now)];
@@ -108,10 +113,17 @@ public sealed class StoreManagementService : IStoreManagementService
         }
 
         var context = request.Context ?? ToContext(existing);
+        var fulfillmentStrategy = request.FulfillmentStrategy ?? existing.FulfillmentStrategy;
+        if (!Enum.IsDefined(fulfillmentStrategy) || !FulfillmentStrategyPolicy.IsAvailable(fulfillmentStrategy))
+        {
+            return StoreManagementResult.Failure("That fulfillment strategy is not available yet. Manual is currently the only supported strategy.", BuildState(snapshot));
+        }
+
         var updatedStore = existing with
         {
             Name = normalizedName,
             Description = NormalizeOptional(context.Description),
+            FulfillmentStrategy = fulfillmentStrategy,
             UpdatedAt = _clock(),
             MetadataJson = ToMetadataJson(context, existing.MetadataJson)
         };
@@ -352,7 +364,7 @@ public sealed class StoreManagementService : IStoreManagementService
         };
 
     private static StoreSummary ToSummary(Store store) =>
-        new(store.Id, store.WorkspaceId, store.Name, ToContext(store), store.IsArchived, store.CreatedAt, store.UpdatedAt);
+        new(store.Id, store.WorkspaceId, store.Name, ToContext(store), store.IsArchived, store.CreatedAt, store.UpdatedAt, store.FulfillmentStrategy);
 
     private static StoreContext ToContext(Store store)
     {

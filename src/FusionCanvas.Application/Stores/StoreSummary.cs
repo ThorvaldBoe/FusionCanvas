@@ -1,3 +1,5 @@
+using FusionCanvas.Domain.Stores;
+
 namespace FusionCanvas.Application.Stores;
 
 public sealed record StoreSummary(
@@ -7,4 +9,5 @@ public sealed record StoreSummary(
     StoreContext Context,
     bool IsArchived,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    FulfillmentStrategy FulfillmentStrategy = FulfillmentStrategy.Manual);

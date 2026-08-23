@@ -5,6 +5,9 @@
         xmlns:appNiches="clr-namespace:FusionCanvas.Application.Niches;assembly=FusionCanvas.Application"
         xmlns:appTags="clr-namespace:FusionCanvas.Application.Tags;assembly=FusionCanvas.Application"
         xmlns:appProducts="clr-namespace:FusionCanvas.Application.Products;assembly=FusionCanvas.Application"
+        xmlns:catalogApplication="clr-namespace:FusionCanvas.Application.Catalog;assembly=FusionCanvas.Application"
+        xmlns:catalog="clr-namespace:FusionCanvas.Domain.Catalog;assembly=FusionCanvas.Domain"
+        xmlns:mockups="clr-namespace:FusionCanvas.Domain.Mockups;assembly=FusionCanvas.Domain"
         x:Class="FusionCanvas.App.Stores.StoreEditorWindow"
         x:DataType="stores:StoreManagementViewModel"
         Title="Store Editor"
@@ -104,7 +107,7 @@
                     Command="{Binding SelectTagsTabCommand}"
                     Classes="tabButton"
                     Classes.selected="{Binding IsTagsTabSelected}" />
-            <Button Content="Products &amp; fulfillment"
+            <Button Content="Catalog &amp; mockups"
                     Command="{Binding SelectProductsTabCommand}"
                     Classes="tabButton"
                     Classes.selected="{Binding IsProductsTabSelected}" />
@@ -123,9 +126,26 @@
                      Classes="field" />
             <TextBox Text="{Binding Description}"
                      PlaceholderText="Description"
+                     Margin="0,0,16,0"
                      Classes="field" />
+            <StackPanel Spacing="4">
+              <TextBlock Text="Fulfillment strategy"
+                         FontWeight="SemiBold" />
+              <ComboBox ItemsSource="{Binding AvailableFulfillmentStrategies}"
+                        SelectedItem="{Binding SelectedFulfillmentStrategy}"
+                        IsEnabled="{Binding CanEditStoreConfiguration}"
+                        AutomationProperties.AutomationId="StoreEditor.FulfillmentStrategy" />
+              <TextBlock Text="Shopify manual — future strategy"
+                         Foreground="{DynamicResource DisabledTextBrush}" />
+              <TextBlock Text="Shopify + Printify — future strategy"
+                         Foreground="{DynamicResource DisabledTextBrush}" />
+              <TextBlock Text="Manual means Fusion Canvas records catalog data locally and does not communicate with Shopify or Printify. Future strategies will add their own configuration."
+                         TextWrapping="Wrap"
+                         Foreground="{DynamicResource SecondaryTextBrush}" />
+            </StackPanel>
             <TextBox Text="{Binding Notes}"
                      PlaceholderText="Notes"
+                     Margin="0,0,16,0"
                      AcceptsReturn="True"
                      MinHeight="84"
                      Classes="field" />
@@ -224,32 +244,41 @@
                          Foreground="{DynamicResource StrongTextBrush}" />
               <TextBox Text="{Binding NicheName}"
                        PlaceholderText="Niche name"
+                       Margin="0,0,16,0"
                        Classes="field" />
               <TextBox Text="{Binding NicheDescription}"
                        PlaceholderText="Description"
+                       Margin="0,0,16,0"
                        Classes="field" />
               <TextBox Text="{Binding NicheAudience}"
                        PlaceholderText="Audience"
+                       Margin="0,0,16,0"
                        Classes="field" />
               <TextBox Text="{Binding NicheHumorStyle}"
                        PlaceholderText="Humor style"
+                       Margin="0,0,16,0"
                        Classes="field" />
               <TextBox Text="{Binding NicheVisualStyleGuidance}"
                        PlaceholderText="Visual style guidance"
+                       Margin="0,0,16,0"
                        Classes="field" />
               <TextBox Text="{Binding NicheConstraints}"
                        PlaceholderText="Constraints"
+                       Margin="0,0,16,0"
                        Classes="field" />
               <TextBox Text="{Binding NicheRisks}"
                        PlaceholderText="Risks"
+                       Margin="0,0,16,0"
                        Classes="field" />
               <TextBox Text="{Binding NicheResearchNotes}"
                        PlaceholderText="Research notes"
+                       Margin="0,0,16,0"
                        AcceptsReturn="True"
                        MinHeight="70"
                        Classes="field" />
               <TextBox Text="{Binding NicheNotes}"
                        PlaceholderText="Notes"
+                       Margin="0,0,16,0"
                        AcceptsReturn="True"
                        MinHeight="70"
                        Classes="field" />
@@ -328,7 +357,8 @@
             </StackPanel>
 
             <StackPanel Grid.Column="1"
-                        Spacing="10">
+                        Spacing="10"
+                        Margin="0,0,16,0">
               <TextBlock Text="Tag details"
                          FontSize="16"
                          FontWeight="SemiBold"
@@ -347,6 +377,7 @@
               </StackPanel>
               <TextBox Text="{Binding TagDescription}"
                        PlaceholderText="Description"
+                       Margin="0,0,64,0"
                        Classes="field" />
 
               <StackPanel Orientation="Horizontal"
@@ -400,19 +431,19 @@
                       Spacing="12">
             <StackPanel IsVisible="{Binding IsCatalogOverview}"
                         Spacing="12">
-              <TextBlock Text="Products overview"
+              <TextBlock Text="Catalog overview"
                          FontSize="16"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource StrongTextBrush}" />
-              <TextBlock Text="Define the products you sell, how they are fulfilled, and where designs can be printed."
+              <TextBlock Text="Define Blueprints, fulfillment offerings, Variants, and Placeholders. Blueprint is Printify terminology for the base product; Placeholder is the named design target on an offering."
                          TextWrapping="Wrap"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
-              <Button Content="New product"
+              <Button Content="New Blueprint"
                       Command="{Binding StartCreateProductCommand}"
                       IsEnabled="{Binding CanCreateCatalogItem}"
                       Classes="primary" />
               <TextBlock IsVisible="{Binding !HasProducts}"
-                         Text="No products yet. Add a product blueprint to begin."
+                         Text="No Blueprints yet. Add a Blueprint to begin."
                          Foreground="{DynamicResource SecondaryTextBrush}" />
               <ItemsControl ItemsSource="{Binding EditorProducts}">
                 <ItemsControl.ItemTemplate>
@@ -423,7 +454,7 @@
                             HorizontalContentAlignment="Left">
                       <StackPanel Spacing="3">
                         <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                        <TextBlock Text="{Binding Offerings.Count, StringFormat='{}{0} fulfillment offering(s)'}"
+                        <TextBlock Text="{Binding Offerings.Count, StringFormat='{}{0} Blueprint Offering(s)'}"
                                    FontSize="12"
                                    Foreground="{DynamicResource SecondaryTextBrush}" />
                       </StackPanel>
@@ -435,7 +466,7 @@
 
             <StackPanel IsVisible="{Binding IsProductDetail}"
                         Spacing="12">
-              <Button Content="‹  Back to products"
+              <Button Content="‹  Back to Blueprints"
                       Command="{Binding BackToProductsCommand}"
                       Classes="secondary" />
               <TextBlock Text="{Binding CatalogBreadcrumb}"
@@ -447,54 +478,73 @@
                          Foreground="{DynamicResource StrongTextBrush}" />
               <TextBlock Text="{Binding SelectedProductSummary}"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
-              <Border Classes="panel" Padding="12">
+              <Border Classes="panel" Padding="12"
+                      AutomationProperties.AutomationId="Catalog.BlueprintBasics">
                 <StackPanel Spacing="8">
-                  <TextBlock Text="Product details" FontWeight="SemiBold" />
-                  <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                  <TextBox x:Name="ProductNameTextBox"
-                           Text="{Binding ProductName}"
-                           PlaceholderText="Product name"
-                           Classes="field" />
-                  <TextBlock Text="Description" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                  <TextBox Text="{Binding ProductDescription}"
-                           AcceptsReturn="True"
-                           MinHeight="56"
-                           Classes="field" />
-                  <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Content="Save product"
-                            Command="{Binding SaveSelectedProductCommand}"
-                            IsEnabled="{Binding CanSaveSelectedProduct}"
-                            Classes="primary fixedAction" />
-                    <Button Content="Delete product"
-                            Command="{Binding RequestDeleteSelectedProductCommand}"
-                            IsEnabled="{Binding CanDeleteSelectedProduct}"
-                            Classes="danger fixedAction" />
+                  <ToggleButton Content="Basic"
+                                IsChecked="{Binding IsBlueprintBasicsExpanded, Mode=TwoWay}"
+                                HorizontalContentAlignment="Left"
+                                ToolTip.Tip="Edit the Blueprint name and description without leaving this page." />
+                  <StackPanel IsVisible="{Binding IsBlueprintBasicsExpanded}" IsEnabled="{Binding !SelectedStore.IsArchived}" Spacing="8">
+                    <TextBlock Text="Blueprint is Printify's term for the base product definition."
+                               TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBox x:Name="ProductNameTextBox"
+                             Text="{Binding ProductName}"
+                             PlaceholderText="Blueprint name"
+                             Classes="field" />
+                    <TextBlock Text="Description" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBox Text="{Binding ProductDescription}"
+                             AcceptsReturn="True"
+                             MinHeight="56"
+                             Classes="field" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Content="Save Blueprint"
+                              Command="{Binding SaveSelectedProductCommand}"
+                              IsEnabled="{Binding CanSaveSelectedProduct}"
+                              Classes="primary fixedAction" />
+                      <Button Content="Delete Blueprint"
+                              Command="{Binding RequestDeleteSelectedProductCommand}"
+                              IsEnabled="{Binding CanDeleteSelectedProduct}"
+                              Classes="danger fixedAction" />
+                    </StackPanel>
                   </StackPanel>
                 </StackPanel>
               </Border>
-              <Border Classes="panel" Padding="12">
+              <Border Classes="panel" Padding="12"
+                      AutomationProperties.AutomationId="Catalog.BlueprintOfferingList">
                 <StackPanel Spacing="8">
-                  <TextBlock Text="Fulfillment offerings" FontWeight="SemiBold" />
-                  <TextBlock Text="An offering is one way this product is supplied."
+                  <TextBlock Text="Blueprint Offerings"
+                             FontWeight="SemiBold"
+                             ToolTip.Tip="An Offering is a concrete fulfillment choice for a Blueprint." />
+                  <TextBlock Text="An Offering is one way this Blueprint is supplied."
                              FontSize="12"
                              Foreground="{DynamicResource SecondaryTextBrush}" />
-                  <Button Content="Add fulfillment offering"
+                  <Button Content="Add Blueprint Offering"
                           Command="{Binding StartCreateOfferingCommand}"
                           IsEnabled="{Binding CanCreateCatalogItem}"
                           Classes="primary" />
-                  <TextBlock IsVisible="{Binding !HasSelectedProductOfferings}"
-                             Text="No fulfillment offerings yet."
+                  <TextBlock IsVisible="{Binding !HasBlueprintOfferingCards}"
+                             Text="No Blueprint Offerings yet. Add an Offering to connect this Blueprint to a fulfillment setup."
+                             TextWrapping="Wrap"
                              Foreground="{DynamicResource SecondaryTextBrush}" />
-                  <ItemsControl ItemsSource="{Binding SelectedProduct.Offerings}">
+                  <ItemsControl ItemsSource="{Binding BlueprintOfferingCards}">
                     <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="appProducts:FulfillmentOfferingSummary">
-                        <Button Command="{Binding $parent[ItemsControl].DataContext.OpenOfferingDetailCommand}"
+                      <DataTemplate x:DataType="stores:BlueprintOfferingCardViewModel">
+                        <Button Command="{Binding $parent[ItemsControl].DataContext.SelectOfferingCommand}"
                                 CommandParameter="{Binding}"
+                                AutomationProperties.AutomationId="Catalog.OpenOffering"
                                 Classes="listItem"
                                 HorizontalContentAlignment="Left">
                           <StackPanel Spacing="3">
-                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding Kind}"
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                              <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" />
+                              <TextBlock Grid.Column="1" Text="{Binding Status}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                            </Grid>
+                            <TextBlock Text="{Binding FulfillmentContext}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource SecondaryTextBrush}" />
+                            <TextBlock Text="{Binding SetupSummary}"
                                        FontSize="12"
                                        Foreground="{DynamicResource SecondaryTextBrush}" />
                           </StackPanel>
@@ -506,186 +556,588 @@
               </Border>
             </StackPanel>
 
-            <StackPanel IsVisible="{Binding IsOfferingDetail}"
+            <StackPanel IsVisible="{Binding IsOfferingContext}"
                         Spacing="12">
-              <Button Content="‹  Back to product"
+              <Button Content="‹  Back to Blueprint"
                       Command="{Binding BackToProductCommand}"
+                      IsVisible="{Binding IsOfferingDetail}"
+                      Classes="secondary" />
+              <Button Content="Back to Offering overview"
+                      Command="{Binding BackToOfferingOverviewCommand}"
+                      IsVisible="{Binding !IsOfferingDetail}"
                       Classes="secondary" />
               <TextBlock Text="{Binding CatalogBreadcrumb}"
                          FontSize="12"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
               <TextBlock Text="{Binding OfferingName}"
+                         IsVisible="{Binding IsCreatingNewOffering}"
                          FontSize="20"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource StrongTextBrush}" />
-              <TextBlock Text="{Binding SelectedOfferingSummary}"
-                         Foreground="{DynamicResource SecondaryTextBrush}" />
+              <TextBlock Text="{Binding CatalogSetup.OfferingName}"
+                         IsVisible="{Binding CatalogSetup.HasSelectedOffering}"
+                         FontSize="20"
+                         FontWeight="SemiBold"
+                         Foreground="{DynamicResource StrongTextBrush}" />
+              <TextBlock Text="{Binding CatalogSetup.OfferingReadinessStatus}"
+                         IsVisible="{Binding CatalogSetup.HasSelectedOffering}"
+                         FontSize="12"
+                         Foreground="{DynamicResource SecondaryTextBrush}"
+                         AutomationProperties.AutomationId="Catalog.OfferingStatus" />
+              <Border IsVisible="{Binding CatalogSetup.IsOfferingContextUnavailable}"
+                      Background="{DynamicResource WarningBackgroundBrush}"
+                      BorderBrush="{DynamicResource WarningBorderBrush}"
+                      BorderThickness="1"
+                      Padding="12">
+                <TextBlock Text="This Blueprint Offering could not be repaired into the normalized catalog. Return to the Blueprint and reopen it, or review the catalog error below."
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource WarningTextBrush}" />
+              </Border>
+              <TextBlock Text="{Binding CatalogSetup.ErrorMessage}"
+                         IsVisible="{Binding CatalogSetup.HasError}"
+                         TextWrapping="Wrap"
+                         Foreground="{DynamicResource DangerTextBrush}" />
 
-              <Border Classes="panel" Padding="12">
+              <Border Classes="panel" Padding="12" IsVisible="{Binding IsCreatingNewOffering}">
                 <StackPanel Spacing="8">
-                  <ToggleButton Content="Basics"
-                                IsChecked="{Binding IsBasicsSectionExpanded, Mode=TwoWay}"
-                                HorizontalContentAlignment="Left" />
-                  <StackPanel IsVisible="{Binding IsBasicsSectionExpanded}" Spacing="8">
+                  <TextBlock Text="New Blueprint Offering" FontWeight="SemiBold" />
+                  <TextBlock Text="Choose the fulfillment relationship first. After saving, Options, Variants, Placeholders, and Mockup Templates become available."
+                             TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                  <StackPanel Spacing="8">
                     <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <TextBox Text="{Binding OfferingName}" PlaceholderText="Offering name" Classes="field" />
+                    <TextBox x:Name="OfferingNameTextBox" Text="{Binding OfferingName}" PlaceholderText="Offering name" Classes="field" />
                     <TextBlock Text="Fulfillment type" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <ComboBox SelectedIndex="{Binding OfferingKindIndex}" Classes="field">
-                      <ComboBoxItem Content="Fixed provider" />
-                      <ComboBoxItem Content="Printify Choice network" />
+                      <ComboBoxItem Content="Fixed Print Provider" />
+                      <ComboBoxItem Content="Printify Choice Provider Network" />
                     </ComboBox>
-                    <TextBlock IsVisible="{Binding !IsChoiceNetworkOffering}" Text="Provider name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock IsVisible="{Binding !IsChoiceNetworkOffering}" Text="Print Provider name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBox IsVisible="{Binding !IsChoiceNetworkOffering}"
                              Text="{Binding OfferingProviderName}"
-                             PlaceholderText="Provider name"
+                             PlaceholderText="Print Provider name"
                              Classes="field" />
                     <TextBlock Text="Description" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBox Text="{Binding OfferingDescription}" AcceptsReturn="True" MinHeight="44" Classes="field" />
-                    <TextBlock IsVisible="{Binding IsChoiceNetworkOffering}"
-                               Text="Printify Choice is a variable fulfillment network; exact panel dimensions and placement can vary by fulfillment provider."
-                               FontSize="12"
-                               TextWrapping="Wrap"
-                               Foreground="{DynamicResource WarningTextBrush}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Content="Save offering"
+                      <Button Content="Save Blueprint Offering"
                               Command="{Binding SaveSelectedOfferingCommand}"
                               IsEnabled="{Binding CanSaveSelectedOffering}"
                               Classes="primary fixedAction" />
-                      <Button Content="Delete offering"
-                              Command="{Binding RequestDeleteSelectedOfferingCommand}"
-                              IsEnabled="{Binding CanDeleteSelectedOffering}"
-                              Classes="danger fixedAction" />
+                      <Button Content="Cancel"
+                              Command="{Binding CancelNewOfferingCommand}"
+                              Classes="secondary fixedAction" />
                     </StackPanel>
                   </StackPanel>
                 </StackPanel>
               </Border>
 
-              <Border Classes="panel" Padding="12">
+              <Border Classes="panel" Padding="12" IsVisible="{Binding IsOfferingDetail}"
+                      AutomationProperties.AutomationId="Catalog.OfferingBasics">
                 <StackPanel Spacing="8">
-                  <ToggleButton Content="Variants"
-                                IsChecked="{Binding IsVariantsSectionExpanded, Mode=TwoWay}"
-                                HorizontalContentAlignment="Left" />
-                  <StackPanel IsVisible="{Binding IsVariantsSectionExpanded}" Spacing="8">
-                    <TextBlock Text="Concrete color and size options supported by this offering."
-                               FontSize="12"
-                               Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <Button Content="Add variant"
-                            Command="{Binding StartAddVariantCommand}"
-                            Classes="secondary" />
-                    <StackPanel IsVisible="{Binding IsAddingVariant}" Spacing="6">
-                      <TextBlock Text="Color" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                      <TextBox Text="{Binding VariantColor}" Classes="field" />
-                      <TextBlock Text="Size" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                      <TextBox Text="{Binding VariantSize}" Classes="field" />
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="Add variant" Command="{Binding AddVariantCommand}" Classes="primary fixedAction" />
-                        <Button Content="Cancel" Command="{Binding CancelAddVariantCommand}" Classes="secondary fixedAction" />
+                  <ToggleButton Content="Basics" IsChecked="{Binding IsBasicsSectionExpanded, Mode=TwoWay}" HorizontalContentAlignment="Left" />
+                  <StackPanel IsVisible="{Binding IsBasicsSectionExpanded}" Spacing="8">
+                    <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBox Text="{Binding CatalogSetup.OfferingName}" PlaceholderText="Offering name" Classes="field" />
+                    <TextBlock Text="Fulfillment type" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock Text="{Binding CatalogSetup.OfferingKindLabel}" />
+                    <StackPanel IsVisible="{Binding !CatalogSetup.IsProviderNetworkOffering}" Spacing="4">
+                      <TextBlock Text="Print Provider" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <ComboBox Grid.Column="0"
+                                  ItemsSource="{Binding CatalogSetup.AvailablePrintProviders}"
+                                  SelectedItem="{Binding CatalogSetup.SelectedPrintProvider}"
+                                  DisplayMemberBinding="{Binding Name}"
+                                  PlaceholderText="Select Print Provider"
+                                  AutomationProperties.AutomationId="Catalog.OfferingProvider" />
+                        <Button Grid.Column="1" Content="Add Provider"
+                                Command="{Binding CatalogSetup.StartAddPrintProviderCommand}"
+                                Classes="secondary" />
+                      </Grid>
+                      <StackPanel IsVisible="{Binding CatalogSetup.IsAddingPrintProvider}" Spacing="6">
+                        <TextBlock Text="New Print Provider" FontWeight="SemiBold" />
+                        <TextBox Text="{Binding CatalogSetup.NewPrintProviderName}"
+                                 PlaceholderText="Provider name, for example SwiftPOD"
+                                 Classes="field" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Button Content="Create and select Provider"
+                                  Command="{Binding CatalogSetup.CreatePrintProviderCommand}"
+                                  Classes="primary" />
+                          <Button Content="Cancel"
+                                  Command="{Binding CatalogSetup.CancelAddPrintProviderCommand}"
+                                  Classes="secondary" />
+                        </StackPanel>
                       </StackPanel>
                     </StackPanel>
-                    <TextBlock IsVisible="{Binding !HasOfferingVariants}" Text="No variants configured." Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <ItemsControl ItemsSource="{Binding OfferingVariants}">
+                    <StackPanel IsVisible="{Binding CatalogSetup.IsProviderNetworkOffering}" Spacing="4">
+                      <TextBlock Text="Provider Network code" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <TextBox Text="{Binding CatalogSetup.ProviderNetworkCode}" Classes="field" />
+                      <TextBlock Text="A Provider Network can route fulfillment through different Print Providers. Its stable code preserves identity if the display label changes."
+                                 TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    </StackPanel>
+                    <TextBlock Text="Description" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBox Text="{Binding CatalogSetup.OfferingDescription}" AcceptsReturn="True" MinHeight="44" Classes="field" />
+                    <Button Content="Save Blueprint Offering" Command="{Binding CatalogSetup.SaveOfferingCommand}" Classes="primary fixedAction" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+
+              <StackPanel IsVisible="{Binding IsOfferingDetail}" Spacing="10"
+                          AutomationProperties.AutomationId="Catalog.OfferingSetup">
+                <TextBlock Text="Setup" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
+                <TextBlock Text="Configure each part of this Offering in a focused screen. Provider means the fulfillment partner that produces the item; Printify is the catalog and integration source."
+                           TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+                <Border IsVisible="{Binding IsChoiceNetworkOffering}"
+                        Background="{DynamicResource WarningBackgroundBrush}"
+                        BorderBrush="{DynamicResource WarningBorderBrush}"
+                        BorderThickness="1" Padding="10">
+                  <TextBlock Text="Printify Choice is a Provider Network, not a single Print Provider. The actual fulfillment partner may vary by order or catalog availability."
+                             TextWrapping="Wrap" Foreground="{DynamicResource WarningTextBrush}" />
+                </Border>
+                <TextBlock IsVisible="{Binding SelectedStore.IsArchived}"
+                           Text="This Store is archived. Catalog setup is available for review but cannot be changed."
+                           TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+                <Border Classes="listItem" Padding="10">
+                  <Grid ColumnDefinitions="2*,Auto,Auto" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="3">
+                      <TextBlock Text="Variants" FontWeight="SemiBold" />
+                      <TextBlock Text="Possible choices and explicit sellable combinations."
+                                 TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                               Text="{Binding CatalogSetup.AvailableVariantCount, StringFormat='{}{0} configured'}"
+                               Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <Button Grid.Column="2" Content="Manage Variants" Command="{Binding OpenVariantManagementCommand}" Classes="secondary" />
+                  </Grid>
+                </Border>
+                <Border Classes="listItem" Padding="10">
+                  <Grid ColumnDefinitions="2*,Auto,Auto" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="3">
+                      <TextBlock Text="Design Areas" FontWeight="SemiBold" />
+                      <TextBlock Text="Printable regions and compatible Variants."
+                                 TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                               Text="{Binding CatalogSetup.AvailableDesignAreaCount, StringFormat='{}{0} configured'}"
+                               Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <Button Grid.Column="2" Content="Manage Design Areas" Command="{Binding OpenDesignAreaManagementCommand}" Classes="secondary" />
+                  </Grid>
+                </Border>
+                <Border Classes="listItem" Padding="10">
+                  <Grid ColumnDefinitions="2*,Auto,Auto" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="3">
+                      <TextBlock Text="Mockup Templates" FontWeight="SemiBold" />
+                      <TextBlock Text="Provider images linked to Design Areas and Colors."
+                                 TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                               Text="{Binding CatalogSetup.AvailableTemplateCount, StringFormat='{}{0} configured'}"
+                               Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <Button Grid.Column="2" Content="Manage Mockup Templates" Command="{Binding OpenMockupTemplateManagementCommand}" Classes="secondary" />
+                  </Grid>
+                </Border>
+              </StackPanel>
+
+              <Border Classes="panel" Padding="12" IsVisible="{Binding IsVariantManagement}"
+                      AutomationProperties.AutomationId="Catalog.VariantAvailableChoices">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="1. Available choices" FontSize="18" FontWeight="SemiBold" />
+                  <TextBlock Text="Define which Color, Size, and other values may be combined. This does not make every combination sellable."
+                             TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                  <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailableOptions}" Text="No Options configured." Foreground="{DynamicResource SecondaryTextBrush}" />
+                  <ItemsControl ItemsSource="{Binding CatalogSetup.AvailableChoiceGroups}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="stores:OfferingChoiceGroupViewModel">
+                        <Border Classes="listItem" Padding="10" Width="300" Margin="0,0,10,10">
+                          <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                              <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" />
+                              <TextBlock Grid.Column="1" Text="{Binding KindLabel}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                            </Grid>
+                            <TextBlock Text="{Binding ValuesSummary}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <Button Content="Manage values"
+                                      Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ManageOptionCommand}"
+                                      CommandParameter="{Binding Option}" Classes="secondary" />
+                              <Button Content="Archive Option"
+                                      Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ArchiveOptionCommand}"
+                                      CommandParameter="{Binding Option}" Classes="danger" />
+                            </StackPanel>
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <Button x:Name="AddOptionButton" Content="Add Option" Command="{Binding CatalogSetup.StartAddOptionCommand}" Classes="secondary" />
+                  <StackPanel IsVisible="{Binding CatalogSetup.IsAddingOption}" Spacing="6">
+                    <ComboBox ItemsSource="{Binding CatalogSetup.OptionKinds}" SelectedItem="{Binding CatalogSetup.SelectedOptionKind}" />
+                    <TextBox Text="{Binding CatalogSetup.OptionName}" PlaceholderText="Option name" Classes="field" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Content="Save Option" Command="{Binding CatalogSetup.CreateOptionCommand}" Classes="primary fixedAction" />
+                      <Button Content="Cancel" Command="{Binding CatalogSetup.CancelAddOptionCommand}" Classes="secondary fixedAction" />
+                    </StackPanel>
+                  </StackPanel>
+                  <Border IsVisible="{Binding CatalogSetup.IsManagingOptionValues}" Classes="panel" Padding="10"
+                          AutomationProperties.AutomationId="Catalog.OptionValueEditor">
+                  <StackPanel Spacing="6">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Text="Manage values" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding CatalogSetup.SelectedOption.Name}" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      </StackPanel>
+                      <Button x:Name="OptionValueDoneButton" Grid.Column="1" Content="Done" Command="{Binding CatalogSetup.CloseOptionValueManagementCommand}" Classes="secondary" />
+                    </Grid>
+                    <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailableValues}" Text="No Values configured for this Option." Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <ItemsControl ItemsSource="{Binding CatalogSetup.AvailableValues}">
                       <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="appProducts:ProductVariantSummary">
+                        <DataTemplate x:DataType="catalog:OfferingOptionValue">
                           <Border Classes="listItem" Padding="8">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                              <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" />
-                              <Button Content="Remove variant"
-                                      Command="{Binding $parent[ItemsControl].DataContext.RemoveSelectedVariantCommand}"
-                                      CommandParameter="{Binding}"
-                                      Classes="danger" />
+                              <TextBlock Text="{Binding Value}" />
+                              <Button Content="Archive Option Value" Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ArchiveOptionValueCommand}" CommandParameter="{Binding}" Classes="danger" />
                             </StackPanel>
                           </Border>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    <Button x:Name="AddOptionValueButton" Content="Add Option Value" Command="{Binding CatalogSetup.StartAddOptionValueCommand}" Classes="secondary" />
+                    <StackPanel IsVisible="{Binding CatalogSetup.IsAddingOptionValue}" Spacing="6">
+                      <TextBox x:Name="OptionValueTextBox" Text="{Binding CatalogSetup.OptionValue}" PlaceholderText="Option Value" Classes="field" />
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Save Option Value" Command="{Binding CatalogSetup.CreateOptionValueCommand}" Classes="primary fixedAction" />
+                        <Button Content="Cancel" Command="{Binding CatalogSetup.CancelAddOptionValueCommand}" Classes="secondary fixedAction" />
+                      </StackPanel>
+                    </StackPanel>
                   </StackPanel>
+                  </Border>
                 </StackPanel>
               </Border>
 
-              <Border Classes="panel" Padding="12">
+              <Border Classes="panel" Padding="12" IsVisible="{Binding IsVariantManagement}"
+                      AutomationProperties.AutomationId="Catalog.VariantSellableVariants">
                 <StackPanel Spacing="8">
-                  <ToggleButton Content="Printable areas"
-                                IsChecked="{Binding IsDesignAreasSectionExpanded, Mode=TwoWay}"
-                                HorizontalContentAlignment="Left" />
-                  <StackPanel IsVisible="{Binding IsDesignAreasSectionExpanded}" Spacing="8">
-                    <TextBlock Text="Design placement targets for this offering."
-                               FontSize="12"
-                               Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <Button Content="Add printable area"
-                            Command="{Binding StartAddDesignAreaCommand}"
-                            Classes="secondary" />
-                    <StackPanel IsVisible="{Binding IsAddingDesignArea}" Spacing="6">
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                      <TextBlock Text="2. Sellable Variants" FontSize="18" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding CatalogSetup.AvailableVariantCount, StringFormat='{}{0} configured'}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                      <Button x:Name="AddVariantButton" Content="Add Variant" Command="{Binding CatalogSetup.StartAddVariantCommand}" Classes="secondary" />
+                      <Button x:Name="BulkAddVariantButton" Content="Bulk add" Command="{Binding CatalogSetup.StartBulkVariantsCommand}" Classes="secondary" />
+                    </StackPanel>
+                  </Grid>
+                    <TextBlock Text="A Variant is one concrete combination of Option Values, such as Black and Medium."
+                               TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailableOptions}" Text="Add Options and Values before creating Variants." Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailableVariants}" Text="No concrete Variants configured." Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <ItemsControl ItemsSource="{Binding CatalogSetup.SellableVariantRows}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="stores:SellableVariantRowViewModel">
+                          <Border Classes="listItem" Padding="8">
+                            <Grid ColumnDefinitions="2*,3*,Auto" ColumnSpacing="12">
+                              <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" />
+                              <TextBlock Grid.Column="1" Text="{Binding SemanticSummary}" Foreground="{DynamicResource SecondaryTextBrush}" />
+                              <Button Grid.Column="2" Content="Archive" Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ArchiveVariantCommand}" CommandParameter="{Binding}" Classes="danger" />
+                            </Grid>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <StackPanel IsVisible="{Binding CatalogSetup.IsAddingVariant}" Spacing="6">
+                      <TextBox x:Name="VariantNameTextBox" Text="{Binding CatalogSetup.VariantName}" PlaceholderText="Variant name (optional)" Classes="field" />
+                      <TextBlock Text="Option Values" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <ItemsControl ItemsSource="{Binding CatalogSetup.VariantValueChoices}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="stores:OptionValueChoiceViewModel">
+                            <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Save Variant" Command="{Binding CatalogSetup.CreateVariantCommand}" Classes="primary fixedAction" />
+                        <Button Content="Cancel" Command="{Binding CatalogSetup.CancelAddVariantCommand}" Classes="secondary fixedAction" />
+                      </StackPanel>
+                    </StackPanel>
+                    <Border Classes="panel" Padding="10" IsVisible="{Binding CatalogSetup.IsAddingBulkVariants}"
+                            AutomationProperties.AutomationId="Catalog.BulkVariantEditor">
+                      <StackPanel Spacing="8">
+                        <TextBlock Text="Add all valid sizes for a Color" FontWeight="SemiBold" />
+                        <TextBlock Text="Select an enabled Color and the Sizes you want to sell. Fusion Canvas previews only combinations confirmed by the provider catalog before creating anything."
+                                   TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <ComboBox x:Name="BulkColorComboBox" ItemsSource="{Binding CatalogSetup.AvailableColors}"
+                                  SelectedItem="{Binding CatalogSetup.BulkColor}"
+                                  DisplayMemberBinding="{Binding Value}"
+                                  PlaceholderText="Select Color" />
+                        <ItemsControl ItemsSource="{Binding CatalogSetup.BulkSizeChoices}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="stores:BulkSizeChoiceViewModel">
+                              <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Button Content="Preview valid Variants" Command="{Binding CatalogSetup.PreviewBulkVariantsCommand}" Classes="secondary" />
+                          <Button Content="Cancel" Command="{Binding CatalogSetup.CancelBulkVariantsCommand}" Classes="secondary fixedAction" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding CatalogSetup.BulkResultMessage}"
+                                   IsVisible="{Binding CatalogSetup.HasBulkResultMessage}"
+                                   TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <ItemsControl ItemsSource="{Binding CatalogSetup.BulkPreviewCandidates}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="catalogApplication:BulkVariantCandidate">
+                              <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="{Binding SizeName}" />
+                                <TextBlock Text="{Binding ExclusionReason}" Foreground="{DynamicResource SecondaryTextBrush}" />
+                              </StackPanel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Content="Create previewed Variants"
+                                IsVisible="{Binding CatalogSetup.HasBulkPreview}"
+                                Command="{Binding CatalogSetup.ConfirmBulkVariantsCommand}"
+                                Classes="primary" />
+                      </StackPanel>
+                    </Border>
+                </StackPanel>
+              </Border>
+
+              <Grid IsVisible="{Binding IsDesignAreaManagement}" ColumnDefinitions="3*,2*" ColumnSpacing="12">
+                <Border Grid.Column="1" Classes="panel" Padding="12"
+                        AutomationProperties.AutomationId="Catalog.DesignAreaEditor">
+                  <StackPanel Spacing="8">
+                    <TextBlock Text="Design Area editor" FontSize="18" FontWeight="SemiBold" />
+                    <TextBlock IsVisible="{Binding !CatalogSetup.IsAddingPlaceholder}"
+                               Text="Select Edit on a Design Area, or add a new one."
+                               TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <StackPanel IsVisible="{Binding CatalogSetup.IsAddingPlaceholder}" Spacing="6">
+                      <TextBlock Text="Identity" FontWeight="SemiBold" />
                       <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                      <TextBox Text="{Binding AreaName}" PlaceholderText="Front" Classes="field" />
+                      <TextBox Text="{Binding CatalogSetup.PlaceholderName}" PlaceholderText="Front" Classes="field" />
                       <TextBlock Text="Position" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                      <TextBox Text="{Binding AreaPosition}" Classes="field" />
+                      <TextBox Text="{Binding CatalogSetup.PlaceholderPosition}" PlaceholderText="front" Classes="field" />
                       <TextBlock Text="Decoration method" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                      <TextBox Text="{Binding AreaDecorationMethod}" PlaceholderText="DTG" Classes="field" />
+                      <TextBox Text="{Binding CatalogSetup.PlaceholderDecorationMethod}" PlaceholderText="DTG" Classes="field" />
+                      <TextBlock Text="Description (optional)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <TextBox Text="{Binding CatalogSetup.PlaceholderDescription}" AcceptsReturn="True" MinHeight="44" Classes="field" />
+                      <TextBlock Text="Maximum design size" FontWeight="SemiBold" Margin="0,6,0,0" />
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <StackPanel Width="120" Spacing="4">
                           <TextBlock Text="Width (px)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                          <TextBox Text="{Binding AreaWidth}" Classes="field" />
+                          <TextBox Text="{Binding CatalogSetup.PlaceholderWidth}" Classes="field" />
                         </StackPanel>
                         <StackPanel Width="120" Spacing="4">
                           <TextBlock Text="Height (px)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                          <TextBox Text="{Binding AreaHeight}" Classes="field" />
+                          <TextBox Text="{Binding CatalogSetup.PlaceholderHeight}" Classes="field" />
                         </StackPanel>
                       </StackPanel>
-                      <StackPanel IsVisible="{Binding HasSelectedVariant}" Spacing="4">
-                        <TextBlock Text="Applies to (leave clear for all variants)"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <ItemsControl ItemsSource="{Binding ApplicableVariants}">
+                      <TextBlock Text="{Binding CatalogSetup.PhysicalSizeSummary}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <TextBlock Text="Recommended artwork" FontWeight="SemiBold" Margin="0,6,0,0" />
+                      <TextBlock Text="Maximum printable dimensions are shown in pixels first. Inches and millimetres are derived only when reliable DPI metadata is available."
+                                 TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBox Width="130" Text="{Binding CatalogSetup.ArtworkWidth}" PlaceholderText="Width (px)" Classes="field" />
+                        <TextBox Width="130" Text="{Binding CatalogSetup.ArtworkHeight}" PlaceholderText="Height (px)" Classes="field" />
+                        <TextBox Width="100" Text="{Binding CatalogSetup.ArtworkDpi}" PlaceholderText="DPI" Classes="field" />
+                      </StackPanel>
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBox Width="130" Text="{Binding CatalogSetup.ArtworkFormat}" PlaceholderText="Format (PNG)" Classes="field" />
+                        <TextBox Width="210" Text="{Binding CatalogSetup.ArtworkBackground}" PlaceholderText="Background (transparent)" Classes="field" />
+                      </StackPanel>
+                      <TextBlock Text="Compatibility" FontWeight="SemiBold" Margin="0,6,0,0" />
+                      <CheckBox Content="Compatible with all current Variants"
+                                IsChecked="{Binding CatalogSetup.PlaceholderUsesAllVariants, Mode=TwoWay}" />
+                      <StackPanel IsVisible="{Binding !CatalogSetup.PlaceholderUsesAllVariants}" Spacing="4">
+                        <TextBlock Text="Compatible Variants" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <ItemsControl ItemsSource="{Binding CatalogSetup.PlaceholderVariantChoices}">
                           <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="stores:ApplicableVariantViewModel">
+                            <DataTemplate x:DataType="stores:VariantChoiceViewModel">
                               <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" />
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
                       </StackPanel>
+                      <Expander Header="Advanced provider data">
+                        <TextBox Text="{Binding CatalogSetup.PlaceholderProviderReference}"
+                                 PlaceholderText="Provider Design Area reference"
+                                 Classes="field"
+                                 ToolTip.Tip="Normally populated from the Printify catalog integration." />
+                      </Expander>
                       <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="Add printable area" Command="{Binding AddDesignAreaCommand}" Classes="primary fixedAction" />
-                        <Button Content="Cancel" Command="{Binding CancelAddDesignAreaCommand}" Classes="secondary fixedAction" />
+                        <Button Content="Save Design Area" Command="{Binding CatalogSetup.CreatePlaceholderCommand}" Classes="primary fixedAction" />
+                        <Button Content="Cancel" Command="{Binding CatalogSetup.CancelAddPlaceholderCommand}" Classes="secondary fixedAction" />
                       </StackPanel>
                     </StackPanel>
-                    <TextBlock IsVisible="{Binding !HasOfferingDesignAreas}" Text="No printable areas configured." Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <ItemsControl ItemsSource="{Binding OfferingDesignAreas}">
+                  </StackPanel>
+                </Border>
+                <Border Grid.Column="0" Classes="panel" Padding="12"
+                        AutomationProperties.AutomationId="Catalog.DesignAreaList">
+                  <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Grid.Column="0" Spacing="3">
+                        <TextBlock Text="Design Areas" FontSize="18" FontWeight="SemiBold" />
+                        <TextBlock Text="Printable regions for this Offering." Foreground="{DynamicResource SecondaryTextBrush}" />
+                      </StackPanel>
+                      <Button Grid.Column="1" Content="Add Design Area" Command="{Binding CatalogSetup.StartAddPlaceholderCommand}" Classes="primary" />
+                    </Grid>
+                    <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailablePlaceholders}" Text="No Design Areas configured." Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <ItemsControl ItemsSource="{Binding CatalogSetup.DesignAreaCards}">
                       <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="appProducts:DesignAreaSummary">
+                        <DataTemplate x:DataType="stores:DesignAreaCardViewModel">
                           <Border Classes="listItem" Padding="8">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                              <TextBlock Text="{Binding Name}" />
-                              <TextBlock Text="·" Foreground="{DynamicResource SecondaryTextBrush}" />
-                              <TextBlock Text="{Binding Position}" />
-                              <TextBlock Text="{Binding Width, StringFormat='{}{0}px'}" Foreground="{DynamicResource SecondaryTextBrush}" />
-                              <TextBlock Text="×" Foreground="{DynamicResource SecondaryTextBrush}" />
-                              <TextBlock Text="{Binding Height, StringFormat='{}{0}px'}" Foreground="{DynamicResource SecondaryTextBrush}" />
-                              <Button Content="Remove printable area"
-                                      Command="{Binding $parent[ItemsControl].DataContext.RemoveSelectedDesignAreaCommand}"
-                                      CommandParameter="{Binding}"
-                                      Classes="danger" />
-                            </StackPanel>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                              <StackPanel Grid.Column="0" Spacing="3">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Placement}" Foreground="{DynamicResource SecondaryTextBrush}" />
+                                <TextBlock Text="{Binding MaximumSizeSummary}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                                <TextBlock Text="{Binding CompatibilitySummary}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                              </StackPanel>
+                              <StackPanel Grid.Column="1" Spacing="6">
+                                <Button Content="Edit" Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.EditPlaceholderCommand}" CommandParameter="{Binding}" Classes="secondary" />
+                                <Button Content="Archive" Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ArchivePlaceholderCommand}" CommandParameter="{Binding}" Classes="danger" />
+                              </StackPanel>
+                            </Grid>
                           </Border>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                   </StackPanel>
-                </StackPanel>
-              </Border>
+                </Border>
+              </Grid>
 
-              <Border Classes="panel" Padding="12">
+              <Grid IsVisible="{Binding IsMockupTemplateManagement}" ColumnDefinitions="2*,3*" ColumnSpacing="12">
+                <Border Grid.Column="0" Classes="panel" Padding="12"
+                        AutomationProperties.AutomationId="Catalog.MockupTemplateList">
+                  <StackPanel Spacing="8">
+                  <TextBlock Text="Mockup Templates" FontSize="18" FontWeight="SemiBold" />
+                  <TextBlock Text="Each template links one provider mockup image to one Design Area and one or more Colors. Compatible concrete Variants are derived from those Colors."
+                             TextWrapping="Wrap"
+                             FontSize="12"
+                             Foreground="{DynamicResource SecondaryTextBrush}" />
+                  <TextBlock Text="{Binding CatalogSetup.ProviderCatalogMessage}"
+                             IsVisible="{Binding CatalogSetup.HasProviderCatalogMessage}"
+                             TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+                  <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailableTemplates}" Text="No Mockup Templates configured." Foreground="{DynamicResource SecondaryTextBrush}" />
+                  <ItemsControl ItemsSource="{Binding CatalogSetup.MockupTemplateCards}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="stores:MockupTemplateCardViewModel">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Button Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.EditTemplateCommand}"
+                                  CommandParameter="{Binding}" Classes="listItem" HorizontalContentAlignment="Left">
+                            <StackPanel Spacing="3">
+                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                              <TextBlock Text="{Binding TargetDesignArea, StringFormat='Design Area: {0}'}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                              <TextBlock Text="{Binding ColorSummary, StringFormat='Colors: {0}'}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                              <TextBlock Text="{Binding VariantSummary}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                              <TextBlock Text="{Binding RevisionSummary}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                            </StackPanel>
+                          </Button>
+                          <Button Content="Archive"
+                                  Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ArchiveTemplateCommand}"
+                                  CommandParameter="{Binding}" Classes="danger" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <Border IsVisible="{Binding !CatalogSetup.HasAvailablePlaceholders}"
+                          Background="{DynamicResource WarningBackgroundBrush}"
+                          BorderBrush="{DynamicResource WarningBorderBrush}" BorderThickness="1" Padding="10">
+                    <StackPanel Spacing="6">
+                      <TextBlock Text="Create a Design Area before configuring Mockup Templates." TextWrapping="Wrap" Foreground="{DynamicResource WarningTextBrush}" />
+                      <Button Content="Manage Design Areas" Command="{Binding OpenDesignAreaManagementCommand}" Classes="secondary" />
+                    </StackPanel>
+                  </Border>
+                  <Button Content="Add Mockup Template" Command="{Binding CatalogSetup.StartAddTemplateCommand}" Classes="secondary" />
+                  </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Classes="panel" Padding="12"
+                        AutomationProperties.AutomationId="Catalog.MockupTemplateEditor">
+                  <StackPanel Spacing="8">
+                  <TextBlock Text="Mockup Template editor" FontSize="18" FontWeight="SemiBold" />
+                  <TextBlock IsVisible="{Binding !CatalogSetup.IsAddingTemplate}"
+                             Text="Select Edit on a template, or add a new one."
+                             TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+                  <Grid IsVisible="{Binding CatalogSetup.IsAddingTemplate}" ColumnDefinitions="3*,2*" ColumnSpacing="12">
+                    <Border Grid.Column="0" Classes="listItem" Padding="10"
+                            AutomationProperties.AutomationId="Catalog.MockupPreviewRegion">
+                      <StackPanel Spacing="6">
+                        <TextBlock Text="Provider image and placement" FontWeight="SemiBold" />
+                        <TextBlock IsVisible="{Binding !CatalogSetup.HasProviderMockupCandidates}"
+                                   Text="{Binding CatalogSetup.ProviderCatalogMessage}"
+                                   TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <TextBlock Text="Drag the rectangle to move it, drag its lower-right handle to resize, or use arrow keys. Hold Shift with arrow keys to resize."
+                                   TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <stores:MockupPlacementEditor Height="320"
+                                                       IsEnabled="{Binding CatalogSetup.CanEdit}"
+                                                       PlacementX="{Binding CatalogSetup.MappingX, Mode=TwoWay}"
+                                                       PlacementY="{Binding CatalogSetup.MappingY, Mode=TwoWay}"
+                                                       PlacementWidth="{Binding CatalogSetup.MappingWidth, Mode=TwoWay}"
+                                                       PlacementHeight="{Binding CatalogSetup.MappingHeight, Mode=TwoWay}"
+                                                       ImageWidth="{Binding CatalogSetup.MappingImageWidth}"
+                                                       ImageHeight="{Binding CatalogSetup.MappingImageHeight}" />
+                      </StackPanel>
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="6"
+                                AutomationProperties.AutomationId="Catalog.MockupConfigurationRegion">
+                      <TextBlock Text="Configuration" FontWeight="SemiBold" />
+                      <TextBox Text="{Binding CatalogSetup.TemplateName}" PlaceholderText="Mockup Template name" Classes="field" />
+                      <ComboBox ItemsSource="{Binding CatalogSetup.ProviderMockupCandidates}"
+                                SelectedItem="{Binding CatalogSetup.SelectedProviderMockup}"
+                                DisplayMemberBinding="{Binding DisplayName}"
+                                PlaceholderText="Provider mockup image" />
+                      <ComboBox ItemsSource="{Binding CatalogSetup.AvailablePlaceholders}"
+                                SelectedItem="{Binding CatalogSetup.SelectedPlaceholder}"
+                                DisplayMemberBinding="{Binding Name}"
+                                PlaceholderText="Linked Design Area" />
+                      <TextBlock Text="Applicable Colors" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <ItemsControl ItemsSource="{Binding CatalogSetup.TemplateColorChoices}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="stores:OptionValueChoiceViewModel">
+                            <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <TextBlock Text="Image-space mapping (pixels)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8">
+                        <TextBox Grid.Row="0" Grid.Column="0" Text="{Binding CatalogSetup.MappingX}" PlaceholderText="X (px)" Classes="field" />
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding CatalogSetup.MappingY}" PlaceholderText="Y (px)" Classes="field" />
+                        <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding CatalogSetup.MappingWidth}" PlaceholderText="Width (px)" Classes="field" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CatalogSetup.MappingHeight}" PlaceholderText="Height (px)" Classes="field" />
+                      </Grid>
+                      <Expander Header="Advanced provider data">
+                        <TextBlock Text="{Binding CatalogSetup.SelectedProviderMockup.ProviderReference}"
+                                   ToolTip.Tip="Stable provider mockup reference from the Printify catalog." />
+                      </Expander>
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Save Mockup Template" Command="{Binding CatalogSetup.CreateTemplateCommand}" Classes="primary fixedAction" />
+                        <Button Content="Cancel" Command="{Binding CatalogSetup.CancelAddTemplateCommand}" Classes="secondary fixedAction" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Grid>
+                  </StackPanel>
+                </Border>
+              </Grid>
+
+              <Border Classes="panel" Padding="12" IsVisible="{Binding IsOfferingDetail}">
                 <StackPanel Spacing="8">
-                  <ToggleButton Content="Advanced identifiers"
+                  <ToggleButton Content="Advanced"
                                 IsChecked="{Binding IsAdvancedSectionExpanded, Mode=TwoWay}"
                                 HorizontalContentAlignment="Left" />
                   <StackPanel IsVisible="{Binding IsAdvancedSectionExpanded}" Spacing="8">
+                    <TextBlock Text="Provider-network identity and external identifiers are preserved by the catalog model. Shopify publication and credentials are future integration work."
+                               TextWrapping="Wrap"
+                               FontSize="12"
+                               Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBlock Text="External offering ID" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <TextBox Text="{Binding OfferingExternalOfferingId}" Classes="field" />
+                    <TextBox Text="{Binding CatalogSetup.ExternalOfferingId}" Classes="field" />
                   </StackPanel>
-                </StackPanel>
-              </Border>
+                  </StackPanel>
+                </Border>
+              </StackPanel>
             </StackPanel>
-          </StackPanel>
 
           <Border IsVisible="{Binding ProductDeleteWarningVisible}"
                   Background="{DynamicResource DangerBackgroundBrush}"

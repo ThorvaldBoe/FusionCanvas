@@ -47,13 +47,21 @@ public sealed class DesignStageService : IDesignStageService
             return DesignStageResult.Failure(editDecision.Reason, BuildState(snapshot, itemId));
         }
 
-        if (!DesignStagePolicy.IsValidConfiguration(snapshot, itemId, offeringId))
+        var normalizedOffering = snapshot.BlueprintOfferings.SingleOrDefault(offering => offering.Id == offeringId);
+        var normalizedConfigurationIsValid = normalizedOffering is null
+            || (normalizedOffering.StoreId == item.StoreId
+                && !normalizedOffering.IsArchived
+                && snapshot.Blueprints.Any(blueprint => blueprint.Id == normalizedOffering.BlueprintId && blueprint.StoreId == item.StoreId && !blueprint.IsArchived));
+        var legacyConfigurationIsValid = normalizedOffering is not null || DesignStagePolicy.IsValidConfiguration(snapshot, itemId, offeringId);
+        if (!normalizedConfigurationIsValid || !legacyConfigurationIsValid)
         {
             return DesignStageResult.Failure("The selected configuration is not valid for this item.", BuildState(snapshot, itemId));
         }
 
         // Clear existing slot assignments for areas not in the new offering
-        var newAreaIds = DesignStagePolicy.AreaIdsForOffering(snapshot.DesignAreas, offeringId).ToHashSet();
+        var newAreaIds = snapshot.OfferingPlaceholders.Any(placeholder => placeholder.OfferingId == offeringId)
+            ? snapshot.OfferingPlaceholders.Where(placeholder => placeholder.OfferingId == offeringId && !placeholder.IsArchived).Select(placeholder => placeholder.Id).ToHashSet()
+            : DesignStagePolicy.AreaIdsForOffering(snapshot.DesignAreas, offeringId).ToHashSet();
         var oldConfig = snapshot.ItemListingConfigurations.SingleOrDefault(c => c.ItemId == itemId);
         var oldRows = snapshot.DesignVariantRows.Where(r => r.ItemId == itemId).Select(r => r.Id).ToHashSet();
 
@@ -117,7 +125,7 @@ public sealed class DesignStageService : IDesignStageService
         // Get area IDs for slot creation (if config is available)
         var config = snapshot.ItemListingConfigurations.SingleOrDefault(c => c.ItemId == itemId);
         var areaIds = config is not null
-            ? DesignStagePolicy.AreaIdsForOffering(snapshot.DesignAreas, config.OfferingId)
+            ? PlaceholderIdsForOffering(snapshot, config.OfferingId)
             : [];
 
         if (defaultRow is null)
@@ -263,7 +271,7 @@ public sealed class DesignStageService : IDesignStageService
             .ToArray();
 
         // Create empty slots for the new row for each design area
-        var areaIds = DesignStagePolicy.AreaIdsForOffering(snapshot.DesignAreas, config.OfferingId);
+        var areaIds = PlaceholderIdsForOffering(snapshot, config.OfferingId);
         var newAssignments = areaIds
             .Select(areaId => new DesignSlotAssignment(newRowId, areaId, null))
             .ToArray();
@@ -750,7 +758,7 @@ public sealed class DesignStageService : IDesignStageService
                     .ToArray();
 
                 var areaIds = configOfferingId is not null
-                    ? DesignStagePolicy.AreaIdsForOffering(snapshot.DesignAreas, configOfferingId.Value)
+                    ? PlaceholderIdsForOffering(snapshot, configOfferingId.Value)
                     : [];
 
                 var slots = areaIds.Select(areaId =>
@@ -762,6 +770,7 @@ public sealed class DesignStageService : IDesignStageService
                         ? snapshot.Assets.SingleOrDefault(a => a.Id == assignment.AssetId)
                         : null;
 
+                    var normalizedPlaceholder = snapshot.OfferingPlaceholders.SingleOrDefault(placeholder => placeholder.Id == areaId);
                     return new DesignSlotSummary(
                         areaId,
                         area.Name,
@@ -769,7 +778,13 @@ public sealed class DesignStageService : IDesignStageService
                         ResolveThumbnailPath(asset),
                         asset?.IsMissing ?? false,
                         asset is not null && !asset.IsMissing,
-                        asset is not null && !asset.IsMissing);
+                        asset is not null && !asset.IsMissing)
+                    {
+                        Position = normalizedPlaceholder?.Position ?? area.Position,
+                        DecorationMethod = normalizedPlaceholder?.DecorationMethod ?? area.DecorationMethod,
+                        Width = normalizedPlaceholder?.Width ?? area.Width,
+                        Height = normalizedPlaceholder?.Height ?? area.Height
+                    };
                 }).ToArray();
 
                 return new DesignRowSummary(r.Id, r.IsDefault, r.SortOrder, colorValues, slots);
@@ -789,7 +804,7 @@ public sealed class DesignStageService : IDesignStageService
             ? availableOfferings.SingleOrDefault(o => o.Id == configOfferingId)?.ProviderName
             : null;
 
-        return new DesignStageState(
+        var state = new DesignStageState(
             itemId,
             isReadOnly,
             readOnlyReason,
@@ -802,6 +817,32 @@ public sealed class DesignStageService : IDesignStageService
             selectedColors,
             rows,
             supportingImages);
+
+        var normalizedOfferings = snapshot.BlueprintOfferings
+            .Where(offering => offering.StoreId == item.StoreId && !offering.IsArchived)
+            .ToArray();
+        var normalizedPlaceholders = configOfferingId is Guid selectedOfferingId
+            ? snapshot.OfferingPlaceholders.Where(placeholder => placeholder.OfferingId == selectedOfferingId && !placeholder.IsArchived).ToArray()
+            : [];
+        var selectedNetworkCode = configOfferingId is Guid selectedId
+            ? normalizedOfferings.SingleOrDefault(offering => offering.Id == selectedId)?.ProviderNetworkCode
+            : null;
+        var selectedBlueprintName = configOfferingId is Guid selectedOfferingIdForBlueprint
+            ? snapshot.BlueprintOfferings.SingleOrDefault(offering => offering.Id == selectedOfferingIdForBlueprint)?.BlueprintId is Guid blueprintId
+                ? snapshot.Blueprints.SingleOrDefault(blueprint => blueprint.Id == blueprintId)?.Name
+                : null
+            : null;
+
+        return state with
+        {
+            AvailableBlueprintOfferings = normalizedOfferings,
+            AvailablePlaceholders = normalizedPlaceholders,
+            SelectedProviderNetworkCode = selectedNetworkCode,
+            SelectedBlueprintName = selectedBlueprintName,
+            ProviderNetworkWarning = selectedNetworkCode is not null
+                ? "Printify Choice is a Provider Network; the final Print Provider may vary."
+                : null
+        };
     }
 
     private IReadOnlyList<DesignSlotSummary> ListSupportingImages(WorkspaceSnapshot snapshot, Guid itemId)
@@ -821,6 +862,11 @@ public sealed class DesignStageService : IDesignStageService
                 !a.IsMissing))
             .ToArray();
     }
+
+    private static IReadOnlyList<Guid> PlaceholderIdsForOffering(WorkspaceSnapshot snapshot, Guid offeringId) =>
+        snapshot.OfferingPlaceholders.Any(placeholder => placeholder.OfferingId == offeringId)
+            ? snapshot.OfferingPlaceholders.Where(placeholder => placeholder.OfferingId == offeringId && !placeholder.IsArchived).Select(placeholder => placeholder.Id).ToArray()
+            : DesignStagePolicy.AreaIdsForOffering(snapshot.DesignAreas, offeringId);
 
     private string? ResolveThumbnailPath(Asset? asset)
     {

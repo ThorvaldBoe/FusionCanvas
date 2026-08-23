@@ -3,7 +3,9 @@ using System.Text.Json;
 using FusionCanvas.Application.Workspaces.Transfer;
 using FusionCanvas.Application.Snowclones;
 using FusionCanvas.Domain.Assets;
+using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Ideation;
+using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Snowclones;
 using FusionCanvas.Domain.Stores;
@@ -25,7 +27,7 @@ public class WorkspacePackageIntegrationTests
         using var temp = new TemporaryDirectory();
         var sourceRepository = new SqliteWorkspaceRepository(temp.GetPath("source.db"));
         var sourceFiles = new LocalWorkspaceFileStore(temp.GetPath("source-files"));
-        var snapshot = CreateSnapshot("Round trip", "assets/design.png", archivedAsset: true);
+        var snapshot = AddNormalizedCatalog(CreateSnapshot("Round trip", "assets/design.png", archivedAsset: true));
         await sourceRepository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
         await sourceFiles.RestoreAsync("assets/design.png", new MemoryStream([1, 2, 3, 4]), TestContext.Current.CancellationToken);
         var packagePath = temp.GetPath("roundtrip.fcworkspace");
@@ -57,6 +59,14 @@ public class WorkspacePackageIntegrationTests
         Assert.Equal(snapshot.Tags, restored.Tags);
         Assert.Equal(snapshot.ItemTags, restored.ItemTags);
         Assert.Equal(snapshot.AssetLinks, restored.AssetLinks);
+        Assert.Equal(snapshot.Blueprints, restored.Blueprints);
+        Assert.Equal(snapshot.BlueprintOfferings, restored.BlueprintOfferings);
+        Assert.Equal(snapshot.OfferingVariants, restored.OfferingVariants);
+        Assert.Equal(snapshot.OfferingPlaceholders, restored.OfferingPlaceholders);
+        Assert.Equal(snapshot.MockupTemplates, restored.MockupTemplates);
+        Assert.Equal(snapshot.MockupTemplateColorVariants, restored.MockupTemplateColorVariants);
+        Assert.Equal(snapshot.MockupTemplateRevisions, restored.MockupTemplateRevisions);
+        Assert.Equal(snapshot.MockupTemplateRevisionColors, restored.MockupTemplateRevisionColors);
         Assert.Equal([1, 2, 3, 4], await ReadBytesAsync(destinationFiles, "assets/design.png"));
     }
 
@@ -391,6 +401,38 @@ public class WorkspacePackageIntegrationTests
         {
             Niches = [niche],
             IdeationRejections = [rejection]
+        };
+    }
+
+    private static WorkspaceSnapshot AddNormalizedCatalog(WorkspaceSnapshot snapshot)
+    {
+        var store = Assert.Single(snapshot.Stores);
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, Now, Now);
+        var provider = new PrintProvider(Guid.NewGuid(), store.Id, "SwiftPOD", "provider-42", false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Tee", null, BlueprintOfferingKind.FixedPrintProvider, provider.Id, null, null, "offering-42", false, Now, Now);
+        var colorOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
+        var sizeOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Size, "Size", 1);
+        var black = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "Black", 0);
+        var medium = new OfferingOptionValue(Guid.NewGuid(), sizeOption.Id, offering.Id, "M", 0);
+        var variant = new OfferingVariant(Guid.NewGuid(), offering.Id, "Black / M", [black.Id, medium.Id], false, Now, Now);
+        var area = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 3000, 4500, [variant.Id], false, Now, Now, providerReference: "front-area", artworkGuidance: new DesignAreaArtworkGuidance(4500, 5400, 300, "PNG", "Transparent"));
+        var template = new MockupTemplate(Guid.NewGuid(), offering.Id, area.Id, "Front black", null, 1, false, Now, Now);
+        var binding = new MockupTemplateColorVariant(Guid.NewGuid(), template.Id, black.Id, false, Now, Now);
+        var revision = new MockupTemplateRevision(Guid.NewGuid(), template.Id, 1, area.Id, Now, providerMockupReference: "front-black", imageMapping: new MockupImageSpaceMapping(1200, 1200, 300, 200, 500, 650));
+        var revisionColor = new MockupTemplateRevisionColor(Guid.NewGuid(), revision.Id, black.Id);
+        return snapshot with
+        {
+            Blueprints = [blueprint],
+            PrintProviders = [provider],
+            BlueprintOfferings = [offering],
+            OfferingOptions = [colorOption, sizeOption],
+            OfferingOptionValues = [black, medium],
+            OfferingVariants = [variant],
+            OfferingPlaceholders = [area],
+            MockupTemplates = [template],
+            MockupTemplateColorVariants = [binding],
+            MockupTemplateRevisions = [revision],
+            MockupTemplateRevisionColors = [revisionColor]
         };
     }
 

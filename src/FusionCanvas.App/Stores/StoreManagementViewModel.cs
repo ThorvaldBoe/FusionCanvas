@@ -9,6 +9,9 @@ using FusionCanvas.Application.Niches;
 using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.Products;
 using FusionCanvas.Domain.Products;
+using FusionCanvas.Domain.Stores;
+using FusionCanvas.Application.Catalog;
+using FusionCanvas.Application.Mockups;
 
 namespace FusionCanvas.App.Stores;
 
@@ -57,7 +60,10 @@ public enum CatalogEditorLevel
 {
     Overview,
     ProductDetail,
-    OfferingDetail
+    OfferingDetail,
+    VariantManagement,
+    DesignAreaManagement,
+    MockupTemplateManagement
 }
 
 public sealed class StoreManagementViewModel : INotifyPropertyChanged
@@ -83,7 +89,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         BackToProducts,
         BackToProduct,
         SelectArea,
-        SelectVariant
+        SelectVariant,
+        NavigateCatalog
     }
 
     private sealed record ProductDraft(
@@ -112,7 +119,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         string TargetMarket,
         string BrandDirection,
         string PlanningContext,
-        string Url);
+        string Url,
+        FulfillmentStrategy FulfillmentStrategy);
 
     private sealed record NicheEditorState(
         string Name,
@@ -129,6 +137,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private readonly INicheManagementService? _nicheService;
     private readonly ITagManagementService? _tagService;
     private readonly IProductSupplierSetupService? _productService;
+    private readonly IOfferingManagementService? _offeringManagementService;
     private bool _isSelectorExpanded;
     private bool _isStoreEditorOpen;
     private bool _firstStorePromptDismissed;
@@ -158,7 +167,9 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private TagEditorState _originalTagEditorState = new(string.Empty, null, null);
     private StoreManagementEditorTab _selectedEditorTab;
     private CatalogEditorLevel _catalogEditorLevel;
+    private CatalogEditorLevel _pendingCatalogLevel;
     private bool _isBasicsSectionExpanded = true;
+    private bool _isBlueprintBasicsExpanded;
     private bool _isVariantsSectionExpanded = true;
     private bool _isDesignAreasSectionExpanded = true;
     private bool _isAdvancedSectionExpanded;
@@ -171,6 +182,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private string _brandDirection = string.Empty;
     private string _planningContext = string.Empty;
     private string _url = string.Empty;
+    private FulfillmentStrategy _fulfillmentStrategy = FulfillmentStrategy.Manual;
     private string _nicheName = string.Empty;
     private string _nicheDescription = string.Empty;
     private string _nicheAudience = string.Empty;
@@ -213,12 +225,14 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private string _variantColor = string.Empty;
     private string _variantSize = string.Empty;
 
-    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null, ITagManagementService? tagService = null, IProductSupplierSetupService? productService = null)
+    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null, ITagManagementService? tagService = null, IProductSupplierSetupService? productService = null, ICatalogSetupService? catalogService = null, IMockupTemplateSetupService? mockupService = null, IOfferingManagementService? offeringManagementService = null, IProviderCatalogCandidateSource? providerCatalog = null)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _nicheService = nicheService;
         _tagService = tagService;
         _productService = productService;
+        _offeringManagementService = offeringManagementService;
+        CatalogSetup = catalogService is not null && mockupService is not null ? new CatalogSetupViewModel(catalogService, mockupService, offeringManagementService, providerCatalog) : null;
         ToggleStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = !IsSelectorExpanded);
         ExpandStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = true);
         CollapseStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = false);
@@ -344,8 +358,13 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         ConfirmDeleteProductCommand = new RelayCommand(_ => Run(ConfirmDeleteProductAsync()));
         CancelDeleteProductCommand = new RelayCommand(_ => ClearProductDeleteWarning());
          StartCreateOfferingCommand = new RelayCommand(_ => StartCreateOffering());
+         CancelNewOfferingCommand = new RelayCommand(_ => CancelNewOffering());
          BackToProductsCommand = new RelayCommand(_ => BackToProducts());
          BackToProductCommand = new RelayCommand(_ => BackToProduct());
+         BackToOfferingOverviewCommand = new RelayCommand(_ => NavigateOfferingCatalog(CatalogEditorLevel.OfferingDetail));
+         OpenVariantManagementCommand = new RelayCommand(_ => OpenOfferingManagement(CatalogEditorLevel.VariantManagement));
+         OpenDesignAreaManagementCommand = new RelayCommand(_ => OpenOfferingManagement(CatalogEditorLevel.DesignAreaManagement));
+         OpenMockupTemplateManagementCommand = new RelayCommand(_ => OpenOfferingManagement(CatalogEditorLevel.MockupTemplateManagement));
          OpenProductDetailCommand = new RelayCommand(parameter =>
          {
              if (parameter is StoreProductSummary product)
@@ -366,7 +385,11 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
          CancelAddDesignAreaCommand = new RelayCommand(_ => IsAddingDesignArea = false);
         SelectOfferingCommand = new RelayCommand(parameter =>
         {
-            if (parameter is FulfillmentOfferingSummary offering)
+            if (parameter is BlueprintOfferingCardViewModel card && SelectedProduct?.Offerings.FirstOrDefault(value => value.Id == card.Id) is { } cardOffering)
+            {
+                SelectOfferingForEditing(cardOffering);
+            }
+            else if (parameter is FulfillmentOfferingSummary offering)
             {
                 SelectOfferingForEditing(offering);
             }
@@ -402,6 +425,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public event EventHandler? StoreNameFocusRequested;
 
     public event EventHandler? ProductNameFocusRequested;
+    public event EventHandler? OfferingNameFocusRequested;
 
     public IReadOnlyList<StoreSummary> ActiveStores { get; private set; } = [];
 
@@ -454,6 +478,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public StoreSummary? SelectedStore { get; private set; }
 
+    public CatalogSetupViewModel? CatalogSetup { get; }
+
     public NicheSummary? SelectedNiche { get; private set; }
 
     public bool NeedsFirstStore { get; private set; }
@@ -483,6 +509,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public bool HasAnyUnsavedChanges => HasUnsavedChanges || HasUnsavedNicheChanges || HasUnsavedTagChanges || HasAnyCatalogUnsavedChanges;
 
     public bool CanSaveSelectedStore => _isCreatingNewStore || (SelectedStore is not null && HasUnsavedChanges);
+
+    public bool CanEditStoreConfiguration => _isCreatingNewStore || SelectedStore is { IsArchived: false };
 
     public bool CanArchiveSelectedStore => SelectedStore is { IsArchived: false } && !_isCreatingNewStore;
 
@@ -516,6 +544,10 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(IsCatalogOverview));
                 OnPropertyChanged(nameof(IsProductDetail));
                 OnPropertyChanged(nameof(IsOfferingDetail));
+                OnPropertyChanged(nameof(IsOfferingContext));
+                OnPropertyChanged(nameof(IsVariantManagement));
+                OnPropertyChanged(nameof(IsDesignAreaManagement));
+                OnPropertyChanged(nameof(IsMockupTemplateManagement));
                 OnPropertyChanged(nameof(CatalogBreadcrumb));
             }
         }
@@ -527,10 +559,24 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public bool IsOfferingDetail => CatalogEditorLevel == CatalogEditorLevel.OfferingDetail;
 
+    public bool IsOfferingContext => CatalogEditorLevel is CatalogEditorLevel.OfferingDetail
+        or CatalogEditorLevel.VariantManagement
+        or CatalogEditorLevel.DesignAreaManagement
+        or CatalogEditorLevel.MockupTemplateManagement;
+
+    public bool IsVariantManagement => CatalogEditorLevel == CatalogEditorLevel.VariantManagement;
+
+    public bool IsDesignAreaManagement => CatalogEditorLevel == CatalogEditorLevel.DesignAreaManagement;
+
+    public bool IsMockupTemplateManagement => CatalogEditorLevel == CatalogEditorLevel.MockupTemplateManagement;
+
     public string CatalogBreadcrumb => CatalogEditorLevel switch
     {
         CatalogEditorLevel.ProductDetail => $"Products  /  {SelectedProduct?.Name ?? "Product"}",
         CatalogEditorLevel.OfferingDetail => $"Products  /  {SelectedProduct?.Name ?? "Product"}  /  {SelectedOffering?.Name ?? "Offering"}",
+        CatalogEditorLevel.VariantManagement => $"Products  /  {SelectedProduct?.Name ?? "Product"}  /  {SelectedOffering?.Name ?? "Offering"}  /  Variants",
+        CatalogEditorLevel.DesignAreaManagement => $"Products  /  {SelectedProduct?.Name ?? "Product"}  /  {SelectedOffering?.Name ?? "Offering"}  /  Design Areas",
+        CatalogEditorLevel.MockupTemplateManagement => $"Products  /  {SelectedProduct?.Name ?? "Product"}  /  {SelectedOffering?.Name ?? "Offering"}  /  Mockup Templates",
         _ => "Products"
     };
 
@@ -538,6 +584,12 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     {
         get => _isBasicsSectionExpanded;
         set => SetField(ref _isBasicsSectionExpanded, value);
+    }
+
+    public bool IsBlueprintBasicsExpanded
+    {
+        get => _isBlueprintBasicsExpanded;
+        set => SetField(ref _isBlueprintBasicsExpanded, value);
     }
 
     public bool IsVariantsSectionExpanded
@@ -673,6 +725,22 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             {
                 RaiseEditorStateProperties();
                 OnPropertyChanged(nameof(EditorActiveStores));
+            }
+        }
+    }
+
+    public IReadOnlyList<FulfillmentStrategy> AvailableFulfillmentStrategies => FulfillmentStrategyPolicy.AvailableStrategies;
+
+    public IReadOnlyList<FulfillmentStrategy> FulfillmentStrategies => Enum.GetValues<FulfillmentStrategy>();
+
+    public FulfillmentStrategy SelectedFulfillmentStrategy
+    {
+        get => _fulfillmentStrategy;
+        set
+        {
+            if (SetField(ref _fulfillmentStrategy, value))
+            {
+                RaiseEditorStateProperties();
             }
         }
     }
@@ -896,6 +964,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     }
 
     public IReadOnlyList<StoreProductSummary> Products { get; private set; } = [];
+    public ObservableCollection<BlueprintOfferingCardViewModel> BlueprintOfferingCards { get; } = [];
+    public bool HasBlueprintOfferingCards => BlueprintOfferingCards.Count > 0;
 
     public bool HasProducts => Products.Count > 0;
 
@@ -970,6 +1040,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public bool HasSelectedOffering => SelectedOffering is not null;
 
+    public bool IsCreatingNewOffering => _isCreatingNewOffering;
+
     public bool HasSelectedVariant => SelectedOffering?.Variants.Any() == true;
 
     public bool HasSelectedDesignArea => SelectedOffering?.DesignAreas.Any() == true;
@@ -984,11 +1056,11 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public bool CanSaveSelectedOffering => _productService is not null && SelectedProduct is not null && SelectedStore is { IsArchived: false } && HasUnsavedOfferingChanges;
 
-    public bool CanDeleteSelectedProduct => _productService is not null && SelectedProduct is not null && !_isCreatingNewProduct;
+    public bool CanDeleteSelectedProduct => _productService is not null && SelectedProduct is not null && !_isCreatingNewProduct && SelectedStore is { IsArchived: false };
 
     public bool CanArchiveSelectedProduct => false;
 
-    public bool CanDeleteSelectedOffering => _productService is not null && SelectedOffering is not null && !_isCreatingNewOffering;
+    public bool CanDeleteSelectedOffering => _productService is not null && SelectedOffering is not null && !_isCreatingNewOffering && SelectedStore is { IsArchived: false };
 
     public bool CanCreateCatalogItem => _productService is not null && SelectedStore is { IsArchived: false } && !_isCreatingNewStore;
 
@@ -1006,7 +1078,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public string ProductDeleteWarningMessage => _pendingDeleteProduct is null
         ? "Permanent deletion cannot be undone."
-        : $"Delete product '{_pendingDeleteProduct.Name}' permanently? This cannot be undone.";
+        : $"Delete Blueprint '{_pendingDeleteProduct.Name}' permanently? This cannot be undone.";
 
     public string OfferingDeleteWarningMessage => _pendingDeleteOffering is null
         ? "Permanent deletion cannot be undone."
@@ -1307,8 +1379,13 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public ICommand CancelDeleteProductCommand { get; }
 
     public ICommand StartCreateOfferingCommand { get; }
+    public ICommand CancelNewOfferingCommand { get; }
     public ICommand BackToProductsCommand { get; }
     public ICommand BackToProductCommand { get; }
+    public ICommand BackToOfferingOverviewCommand { get; }
+    public ICommand OpenVariantManagementCommand { get; }
+    public ICommand OpenDesignAreaManagementCommand { get; }
+    public ICommand OpenMockupTemplateManagementCommand { get; }
     public ICommand OpenProductDetailCommand { get; }
     public ICommand OpenOfferingDetailCommand { get; }
     public ICommand StartAddVariantCommand { get; }
@@ -1340,6 +1417,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         ApplyState(state);
         await LoadNichesForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
         await LoadTagsForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
+        if (CatalogSetup is not null && SelectedStore is not null)
+            await CatalogSetup.LoadForStoreAsync(SelectedStore.Id, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task SetActiveWorkspaceAsync(Guid? workspaceId, CancellationToken cancellationToken = default)
@@ -1411,10 +1490,13 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(SelectedStore));
         OnPropertyChanged(nameof(EditorActiveStores));
         OnPropertyChanged(nameof(HasSelectedStore));
+        OnPropertyChanged(nameof(CanEditStoreConfiguration));
         OnPropertyChanged(nameof(CanRestoreSelectedStore));
         RaiseEditorActionProperties();
         Run(LoadNichesForSelectedStoreAsync());
         Run(LoadTagsForSelectedStoreAsync());
+        if (CatalogSetup is not null)
+            Run(CatalogSetup.LoadForStoreAsync(store.Id));
     }
 
     public void StartCreateStore()
@@ -1521,7 +1603,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         if (_isCreatingNewStore)
         {
             var createResult = await _service.CreateStoreAsync(
-                new StoreManagementCreateRequest(NewStoreName, CurrentContext()),
+                new StoreManagementCreateRequest(NewStoreName, CurrentContext(), SelectedFulfillmentStrategy),
                 cancellationToken).ConfigureAwait(false);
 
             if (createResult.Succeeded)
@@ -1549,7 +1631,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         }
 
         var result = await _service.UpdateStoreAsync(
-            new StoreManagementUpdateRequest(SelectedStore.Id, NewStoreName, CurrentContext()),
+            new StoreManagementUpdateRequest(SelectedStore.Id, NewStoreName, CurrentContext(), SelectedFulfillmentStrategy),
             cancellationToken).ConfigureAwait(false);
         ApplyResult(result);
     }
@@ -2376,6 +2458,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     {
         var offerings = SelectedProduct?.Offerings ?? [];
         SelectedOffering = offerings.FirstOrDefault(offering => offering.Id == SelectedOffering?.Id) ?? offerings.FirstOrDefault();
+        CatalogSetup?.SelectOffering(SelectedOffering?.Id);
         if (SelectedOffering is not null)
         {
             ApplySelectedOfferingFields(SelectedOffering);
@@ -2384,6 +2467,52 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         {
             ClearOfferingEditingFields();
         }
+        Run(RefreshBlueprintOfferingCardsAsync());
+    }
+
+    private async Task RefreshBlueprintOfferingCardsAsync()
+    {
+        var store = SelectedStore;
+        var blueprint = SelectedProduct;
+        IReadOnlyList<BlueprintOfferingCardViewModel> cards;
+        if (store is null || blueprint is null || _isCreatingNewProduct)
+        {
+            cards = [];
+        }
+        else if (_offeringManagementService is not null)
+        {
+            try
+            {
+                cards = (await _offeringManagementService.LoadForBlueprintAsync(store.Id, blueprint.Id).ConfigureAwait(true))
+                    .Select(BlueprintOfferingCardViewModel.From)
+                    .ToArray();
+                if (SelectedStore?.Id != store.Id || SelectedProduct?.Id != blueprint.Id)
+                    return;
+            }
+            catch (Exception exception)
+            {
+                if (SelectedStore?.Id != store.Id || SelectedProduct?.Id != blueprint.Id)
+                    return;
+                ErrorMessage = exception.Message;
+                return;
+            }
+        }
+        else
+        {
+            cards = blueprint.Offerings.Select(offering => new BlueprintOfferingCardViewModel(
+                offering.Id,
+                offering.Name,
+                offering.ProviderName ?? "Provider not configured",
+                offering.Kind != FulfillmentKind.FixedProvider,
+                "Setup incomplete",
+                offering.Variants.Count,
+                offering.DesignAreas.Count,
+                0)).ToArray();
+        }
+
+        BlueprintOfferingCards.Clear();
+        foreach (var card in cards) BlueprintOfferingCards.Add(card);
+        OnPropertyChanged(nameof(HasBlueprintOfferingCards));
     }
 
     private void ApplySelectedOfferingFields(FulfillmentOfferingSummary offering)
@@ -2420,6 +2549,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         _isCreatingNewOffering = false;
         _draftOfferingId = null;
         SelectedOffering = offering;
+        CatalogSetup?.SelectOffering(offering.Id);
         ApplySelectedOfferingFields(offering);
         ClearOfferingDeleteWarning();
         ClearDiscardChangesPrompt();
@@ -2455,6 +2585,38 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         }
 
         CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
+        Run(RefreshBlueprintOfferingCardsAsync());
+    }
+
+    private void OpenOfferingManagement(CatalogEditorLevel level)
+    {
+        if (SelectedOffering is null || _isCreatingNewOffering)
+        {
+            ErrorMessage = "Save the Blueprint Offering before managing its catalog setup.";
+            return;
+        }
+
+        if (HasUnsavedOfferingChanges || CatalogSetup?.HasActiveDraft == true)
+        {
+            _pendingCatalogLevel = level;
+            RequestDiscardBefore(PendingEditorAction.NavigateCatalog);
+            return;
+        }
+
+        CatalogEditorLevel = level;
+    }
+
+    private void NavigateOfferingCatalog(CatalogEditorLevel level)
+    {
+        if (HasUnsavedOfferingChanges || CatalogSetup?.HasActiveDraft == true)
+        {
+            _pendingCatalogLevel = level;
+            RequestDiscardBefore(PendingEditorAction.NavigateCatalog);
+            return;
+        }
+        CatalogEditorLevel = level;
+        if (level == CatalogEditorLevel.OfferingDetail)
+            Run(RefreshBlueprintOfferingCardsAsync());
     }
 
     private void StartAddVariant()
@@ -2658,6 +2820,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private void BeginCreateOfferingDraft()
     {
         _isCreatingNewOffering = true;
+        OnPropertyChanged(nameof(IsCreatingNewOffering));
         _draftOfferingId = Guid.NewGuid();
         ClearOfferingEditingFields();
         SelectedOffering = DraftOffering();
@@ -2670,6 +2833,32 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(OfferingVariants));
         OnPropertyChanged(nameof(OfferingDesignAreas));
         CatalogEditorLevel = CatalogEditorLevel.OfferingDetail;
+        RaiseOfferingEditorStateProperties();
+        OfferingNameFocusRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void CancelNewOffering()
+    {
+        if (!_isCreatingNewOffering)
+        {
+            return;
+        }
+
+        _isCreatingNewOffering = false;
+        _draftOfferingId = null;
+        SelectedOffering = SelectedProduct?.Offerings.FirstOrDefault();
+        CatalogSetup?.SelectOffering(SelectedOffering?.Id);
+        if (SelectedOffering is not null)
+        {
+            ApplySelectedOfferingFields(SelectedOffering);
+        }
+        else
+        {
+            ClearOfferingEditingFields();
+        }
+
+        CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
+        OnPropertyChanged(nameof(IsCreatingNewOffering));
         RaiseOfferingEditorStateProperties();
     }
 
@@ -2691,7 +2880,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         if (_isCreatingNewOffering)
         {
             var result = await _productService.CreateOfferingAsync(
-                new CreateOfferingRequest(
+                new FusionCanvas.Application.Products.CreateOfferingRequest(
                     SelectedProduct.Id,
                     OfferingName,
                     kind,
@@ -2703,9 +2892,15 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             {
                 _isCreatingNewOffering = false;
                 _draftOfferingId = null;
+                OnPropertyChanged(nameof(IsCreatingNewOffering));
             }
 
             ApplyOfferingResult(result);
+            if (result.Succeeded && CatalogSetup is not null && SelectedStore is not null)
+            {
+                await CatalogSetup.LoadForStoreAsync(SelectedStore.Id, cancellationToken).ConfigureAwait(false);
+                CatalogSetup.SelectOffering(result.Offering?.Id);
+            }
             return;
         }
 
@@ -2901,8 +3096,10 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private void ClearOfferingSelection()
     {
         _isCreatingNewOffering = false;
+        OnPropertyChanged(nameof(IsCreatingNewOffering));
         _draftOfferingId = null;
         SelectedOffering = null;
+        CatalogSetup?.SelectOffering(null);
         ClearOfferingEditingFields();
         OnPropertyChanged(nameof(SelectedOffering));
         OnPropertyChanged(nameof(HasSelectedOffering));
@@ -3137,6 +3334,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         BrandDirection = store.Context.BrandDirection ?? string.Empty;
         PlanningContext = store.Context.PlanningContext ?? string.Empty;
         Url = store.Context.Url ?? string.Empty;
+        SelectedFulfillmentStrategy = store.FulfillmentStrategy;
     }
 
     private void ApplySelectedNicheFields(NicheSummary? niche)
@@ -3167,6 +3365,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         BrandDirection = string.Empty;
         PlanningContext = string.Empty;
         Url = string.Empty;
+        SelectedFulfillmentStrategy = FulfillmentStrategy.Manual;
     }
 
     private void ClearNicheEditorFields()
@@ -3191,7 +3390,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
         var now = DateTimeOffset.Now;
         var name = string.IsNullOrWhiteSpace(NewStoreName) ? "New store" : NewStoreName.Trim();
-        return new StoreSummary(id, SelectedStore?.WorkspaceId ?? WorkspaceDefaults.DefaultWorkspaceId, name, CurrentContext(), false, now, now);
+        return new StoreSummary(id, SelectedStore?.WorkspaceId ?? WorkspaceDefaults.DefaultWorkspaceId, name, CurrentContext(), false, now, now, SelectedFulfillmentStrategy);
     }
 
     private NicheSummary? DraftNiche()
@@ -3289,6 +3488,10 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 break;
             case PendingEditorAction.BackToProduct:
                 CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
+                break;
+            case PendingEditorAction.NavigateCatalog:
+                CatalogSetup?.CancelActiveDrafts();
+                CatalogEditorLevel = _pendingCatalogLevel;
                 break;
         }
     }
@@ -3421,7 +3624,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             EmptyToNull(NicheNotes));
 
     private EditorState CurrentEditorState() =>
-        new(NewStoreName, Description, Notes, TargetMarket, BrandDirection, PlanningContext, Url);
+        new(NewStoreName, Description, Notes, TargetMarket, BrandDirection, PlanningContext, Url, SelectedFulfillmentStrategy);
 
     private NicheEditorState CurrentNicheEditorState() =>
         new(NicheName, NicheDescription, NicheAudience, NicheHumorStyle, NicheVisualStyleGuidance, NicheConstraints, NicheRisks, NicheResearchNotes, NicheNotes);
@@ -3462,7 +3665,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanDeleteSelectedNiche));
     }
 
-    private static EditorState EmptyEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
+    private static EditorState EmptyEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, FulfillmentStrategy.Manual);
 
     private static NicheEditorState EmptyNicheEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
 

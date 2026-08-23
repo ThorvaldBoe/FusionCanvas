@@ -55,6 +55,36 @@ public static class WorkspaceSnapshotFilter
                 (rejection.GroupId is null || groupIds.Contains(rejection.GroupId.Value)))
             .ToArray();
 
+        var storeProducts = source.StoreProducts.Where(value => storeIds.Contains(value.StoreId)).ToArray();
+        var storeProductIds = storeProducts.Select(value => value.Id).ToHashSet();
+        var fulfillmentOfferings = source.FulfillmentOfferings.Where(value => storeProductIds.Contains(value.StoreProductId)).ToArray();
+        var fulfillmentOfferingIds = fulfillmentOfferings.Select(value => value.Id).ToHashSet();
+        var productVariants = source.ProductVariants.Where(value => fulfillmentOfferingIds.Contains(value.FulfillmentOfferingId)).ToArray();
+        var designAreas = source.DesignAreas.Where(value => fulfillmentOfferingIds.Contains(value.FulfillmentOfferingId)).ToArray();
+        var designAreaIds = designAreas.Select(value => value.Id).ToHashSet();
+        var itemListingConfigurations = source.ItemListingConfigurations.Where(value => itemIds.Contains(value.ItemId) && fulfillmentOfferingIds.Contains(value.OfferingId)).ToArray();
+        var designSelectedColors = source.DesignSelectedColors.Where(value => itemIds.Contains(value.ItemId)).ToArray();
+        var designVariantRows = source.DesignVariantRows.Where(value => itemIds.Contains(value.ItemId)).ToArray();
+        var designVariantRowIds = designVariantRows.Select(value => value.Id).ToHashSet();
+        var designVariantRowColors = source.DesignVariantRowColors.Where(value => designVariantRowIds.Contains(value.RowId)).ToArray();
+        var designSlotAssignments = source.DesignSlotAssignments.Where(value => designVariantRowIds.Contains(value.RowId) && designAreaIds.Contains(value.DesignAreaId)).ToArray();
+
+        var blueprints = source.Blueprints.Where(value => storeIds.Contains(value.StoreId)).ToArray();
+        var blueprintIds = blueprints.Select(value => value.Id).ToHashSet();
+        var printProviders = source.PrintProviders.Where(value => storeIds.Contains(value.StoreId)).ToArray();
+        var blueprintOfferings = source.BlueprintOfferings.Where(value => storeIds.Contains(value.StoreId) && blueprintIds.Contains(value.BlueprintId)).ToArray();
+        var blueprintOfferingIds = blueprintOfferings.Select(value => value.Id).ToHashSet();
+        var offeringOptions = source.OfferingOptions.Where(value => blueprintOfferingIds.Contains(value.OfferingId)).ToArray();
+        var offeringOptionValues = source.OfferingOptionValues.Where(value => blueprintOfferingIds.Contains(value.OfferingId)).ToArray();
+        var offeringVariants = source.OfferingVariants.Where(value => blueprintOfferingIds.Contains(value.OfferingId)).ToArray();
+        var offeringPlaceholders = source.OfferingPlaceholders.Where(value => blueprintOfferingIds.Contains(value.OfferingId)).ToArray();
+        var mockupTemplates = source.MockupTemplates.Where(value => blueprintOfferingIds.Contains(value.BlueprintOfferingId)).ToArray();
+        var mockupTemplateIds = mockupTemplates.Select(value => value.Id).ToHashSet();
+        var mockupTemplateColors = source.MockupTemplateColorVariants.Where(value => mockupTemplateIds.Contains(value.MockupTemplateId)).ToArray();
+        var mockupTemplateRevisions = source.MockupTemplateRevisions.Where(value => mockupTemplateIds.Contains(value.MockupTemplateId)).ToArray();
+        var mockupTemplateRevisionIds = mockupTemplateRevisions.Select(value => value.Id).ToHashSet();
+        var mockupTemplateRevisionColors = source.MockupTemplateRevisionColors.Where(value => mockupTemplateRevisionIds.Contains(value.RevisionId)).ToArray();
+
         return new WorkspaceSnapshotFilterResult(
             new WorkspaceSnapshot(
                 workspaces,
@@ -68,7 +98,27 @@ public static class WorkspaceSnapshotFilter
                 itemTags,
                 includedLinks)
             {
-                IdeationRejections = ideationRejections
+                IdeationRejections = ideationRejections,
+                StoreProducts = storeProducts,
+                FulfillmentOfferings = fulfillmentOfferings,
+                ProductVariants = productVariants,
+                DesignAreas = designAreas,
+                ItemListingConfigurations = itemListingConfigurations,
+                DesignSelectedColors = designSelectedColors,
+                DesignVariantRows = designVariantRows,
+                DesignVariantRowColors = designVariantRowColors,
+                DesignSlotAssignments = designSlotAssignments,
+                Blueprints = blueprints,
+                PrintProviders = printProviders,
+                BlueprintOfferings = blueprintOfferings,
+                OfferingOptions = offeringOptions,
+                OfferingOptionValues = offeringOptionValues,
+                OfferingVariants = offeringVariants,
+                OfferingPlaceholders = offeringPlaceholders,
+                MockupTemplates = mockupTemplates,
+                MockupTemplateColorVariants = mockupTemplateColors,
+                MockupTemplateRevisions = mockupTemplateRevisions,
+                MockupTemplateRevisionColors = mockupTemplateRevisionColors
             },
             droppedLinks);
     }

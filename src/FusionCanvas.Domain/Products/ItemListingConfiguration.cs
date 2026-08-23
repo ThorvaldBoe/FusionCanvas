@@ -17,4 +17,7 @@ public sealed record ItemListingConfiguration
     public Guid ItemId { get; init; }
 
     public Guid OfferingId { get; init; }
+
+    /// <summary>Normalized catalog terminology for the same stable relationship.</summary>
+    public Guid BlueprintOfferingId => OfferingId;
 }
