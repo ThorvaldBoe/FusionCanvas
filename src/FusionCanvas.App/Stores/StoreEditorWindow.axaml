@@ -562,7 +562,7 @@
                       Command="{Binding BackToProductCommand}"
                       IsVisible="{Binding IsOfferingDetail}"
                       Classes="secondary" />
-              <Button Content="Back to Offering overview"
+              <Button Content="‹  Back to Offering overview"
                       Command="{Binding BackToOfferingOverviewCommand}"
                       IsVisible="{Binding !IsOfferingDetail}"
                       Classes="secondary" />
