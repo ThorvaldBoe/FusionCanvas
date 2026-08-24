@@ -695,6 +695,120 @@ public class StoreEditorHeadlessTests
         window.Close();
     }
 
+    [AvaloniaFact]
+    public void AdvancedProviderDataExpander_ShowsPopulatedState()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.BackToOfferingOverviewCommand.Execute(null);
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        var templateCard = Assert.Single(viewModel.CatalogSetup!.MockupTemplateCards);
+        viewModel.CatalogSetup.EditTemplateCommand.Execute(templateCard);
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        var reference = "front-black";
+        var candidate = new ProviderMockupCandidateDescriptor(reference, "Front preview", 1200, 1200, new HashSet<Guid>());
+        viewModel.CatalogSetup.ProviderMockupCandidates.Add(candidate);
+        viewModel.CatalogSetup.SelectedProviderMockup = candidate;
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        var expander = window.GetVisualDescendants().OfType<Expander>()
+            .Single(e => string.Equals(e.Header as string, "Advanced provider data", StringComparison.Ordinal) && IsEffectivelyVisible(e));
+        expander.IsExpanded = true;
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        var label = window.GetVisualDescendants().OfType<TextBlock>()
+            .FirstOrDefault(t => IsEffectivelyVisible(t) && string.Equals(t.Text, "Provider mockup reference", StringComparison.Ordinal));
+        Assert.NotNull(label);
+        Assert.True(label!.IsVisible);
+
+        var valueBox = window.GetVisualDescendants().OfType<TextBox>()
+            .FirstOrDefault(t => IsEffectivelyVisible(t) && t.IsReadOnly && string.Equals(t.Text, reference, StringComparison.Ordinal));
+        Assert.NotNull(valueBox);
+        Assert.True(valueBox!.IsReadOnly);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void AdvancedProviderDataExpander_ShowsUnavailableState()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.BackToOfferingOverviewCommand.Execute(null);
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        var expander = window.GetVisualDescendants().OfType<Expander>()
+            .Single(e => string.Equals(e.Header as string, "Advanced provider data", StringComparison.Ordinal) && IsEffectivelyVisible(e));
+        expander.IsExpanded = true;
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        var unavailableText = window.GetVisualDescendants().OfType<TextBlock>()
+            .FirstOrDefault(t => IsEffectivelyVisible(t) && string.Equals(t.Text, "No provider reference available.", StringComparison.Ordinal));
+        Assert.NotNull(unavailableText);
+
+        var anyValueControl = window.GetVisualDescendants().OfType<TextBox>()
+            .FirstOrDefault(t => IsEffectivelyVisible(t) && t.IsReadOnly && !string.IsNullOrEmpty(t.Text));
+        Assert.Null(anyValueControl);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void AdvancedProviderDataExpander_ExposesExpandedState()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.BackToOfferingOverviewCommand.Execute(null);
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        var expander = window.GetVisualDescendants().OfType<Expander>()
+            .Single(e => string.Equals(e.Header as string, "Advanced provider data", StringComparison.Ordinal) && IsEffectivelyVisible(e));
+
+        Assert.NotNull(expander);
+        Assert.False(expander.IsExpanded);
+
+        expander.IsExpanded = true;
+        window.UpdateLayout();
+        window.UpdateLayout();
+        Assert.True(expander.IsExpanded);
+
+        expander.IsExpanded = false;
+        window.UpdateLayout();
+        window.UpdateLayout();
+        Assert.False(expander.IsExpanded);
+
+        window.Close();
+    }
+
     private static StoreEditorWindow CreateEditorWindow(
         bool includeNormalizedCatalog = true,
         bool useFixedProviderOffering = false,

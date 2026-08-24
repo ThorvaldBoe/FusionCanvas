@@ -284,6 +284,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             }
             OnPropertyChanged(nameof(MappingImageWidth));
             OnPropertyChanged(nameof(MappingImageHeight));
+            OnPropertyChanged(nameof(HasSelectedProviderMockup));
             RebuildChoices();
             NotifyCommands();
         }
@@ -291,6 +292,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public string ProviderCatalogMessage { get => _providerCatalogMessage; private set { if (SetField(ref _providerCatalogMessage, value)) OnPropertyChanged(nameof(HasProviderCatalogMessage)); } }
     public bool HasProviderCatalogMessage => !string.IsNullOrWhiteSpace(ProviderCatalogMessage);
     public bool HasProviderMockupCandidates => ProviderMockupCandidates.Count > 0;
+    public bool HasSelectedProviderMockup => SelectedProviderMockup is not null;
     public double MappingX { get => _mappingX; set { if (SetField(ref _mappingX, value)) NotifyCommands(); } }
     public double MappingY { get => _mappingY; set { if (SetField(ref _mappingY, value)) NotifyCommands(); } }
     public double MappingWidth { get => _mappingWidth; set { if (SetField(ref _mappingWidth, value)) NotifyCommands(); } }
