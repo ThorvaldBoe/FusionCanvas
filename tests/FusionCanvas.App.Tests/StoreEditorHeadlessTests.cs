@@ -376,6 +376,33 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void VariantsBackControl_ShowsChevronAndBindsOfferingOverviewCommand()
+    {
+        var window = CreateEditorWindow();
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        var backButton = window.GetVisualDescendants()
+            .OfType<Button>()
+            .Where(IsEffectivelyVisible)
+            .Single(value => value.Content is string label &&
+                label.Contains("Back to Offering overview", StringComparison.Ordinal));
+
+        Assert.Equal("‹  Back to Offering overview", backButton.Content);
+        Assert.Same(viewModel.BackToOfferingOverviewCommand, backButton.Command);
+
+        backButton.Command!.Execute(null);
+        window.UpdateLayout();
+        Assert.True(viewModel.IsOfferingDetail);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void OfferingDetailWithoutNormalizedRecordRepairsAndShowsNormalizedEditor()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: false);
