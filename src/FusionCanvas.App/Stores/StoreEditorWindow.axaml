@@ -1128,9 +1128,22 @@
                         <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding CatalogSetup.MappingHeight}" PlaceholderText="Height (px)" Classes="field" AutomationProperties.Name="Height" />
                       </Grid>
                       <Expander Header="Advanced provider data">
-                        <TextBlock Text="{Binding CatalogSetup.SelectedProviderMockup.ProviderReference}"
-                                   ToolTip.Tip="Stable provider mockup reference from the Printify catalog." />
-                      </Expander>
+                          <StackPanel Spacing="4">
+                            <TextBlock IsVisible="{Binding CatalogSetup.HasSelectedProviderMockup}"
+                                       Text="Provider mockup reference"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource SecondaryTextBrush}" />
+                            <TextBox IsVisible="{Binding CatalogSetup.HasSelectedProviderMockup}"
+                                     Text="{Binding CatalogSetup.SelectedProviderMockup.ProviderReference}"
+                                     IsReadOnly="True"
+                                     Classes="field"
+                                     ToolTip.Tip="Stable provider mockup reference from the Printify catalog." />
+                            <TextBlock IsVisible="{Binding !CatalogSetup.HasSelectedProviderMockup}"
+                                       Text="No provider reference available."
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource SecondaryTextBrush}" />
+                          </StackPanel>
+                        </Expander>
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Content="Save Mockup Template" Command="{Binding CatalogSetup.CreateTemplateCommand}" Classes="primary" HorizontalAlignment="Left" />
                         <Button Content="Cancel" Command="{Binding CatalogSetup.CancelAddTemplateCommand}" Classes="secondary" HorizontalAlignment="Left" />
