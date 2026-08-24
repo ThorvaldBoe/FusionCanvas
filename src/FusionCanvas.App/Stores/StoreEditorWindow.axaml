@@ -754,10 +754,11 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="stores:OfferingChoiceGroupViewModel">
-                        <Border Classes="listItem" Padding="10" Width="300" Margin="0,0,10,10">
+                        <Border Classes="choiceCard" Padding="10" Width="235" Margin="0,0,10,10"
+                                AutomationProperties.AutomationId="Catalog.OptionCard">
                           <StackPanel Spacing="6">
-                            <Grid ColumnDefinitions="*,Auto,Auto">
-                              <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" />
+                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                              <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
                               <TextBlock Grid.Column="1" Text="{Binding KindLabel}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}"
                                          VerticalAlignment="Center" />
                               <Button Grid.Column="2"
@@ -1323,6 +1324,12 @@
       <Setter Property="Foreground" Value="{DynamicResource StrongTextBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Border.choiceCard">
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
     </Style>
     <Style Selector="Button.tabButton">
       <Setter Property="MinWidth" Value="116" />

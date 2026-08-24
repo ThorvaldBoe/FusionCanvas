@@ -193,6 +193,63 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void AvailableOptionChoiceCards_UseBorderedCardTreatmentAndStackOnNarrowWidth()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        var cards = window.GetVisualDescendants().OfType<Border>()
+            .Where(border => AutomationProperties.GetAutomationId(border) == "Catalog.OptionCard")
+            .ToArray();
+        Assert.Equal(2, cards.Length);
+
+        var kinds = cards.Select(card => ((OfferingChoiceGroupViewModel)card.DataContext!).Option.OptionKind).ToHashSet();
+        Assert.Contains(OptionKind.Color, kinds);
+        Assert.Contains(OptionKind.Size, kinds);
+
+        foreach (var card in cards)
+        {
+            Assert.Equal(1, card.BorderThickness.Left);
+            Assert.Equal(1, card.BorderThickness.Top);
+            Assert.NotNull(card.BorderBrush);
+            Assert.NotNull(card.Background);
+            Assert.Equal(6, card.CornerRadius.TopLeft);
+        }
+
+        var color = cards.Single(card => ((OfferingChoiceGroupViewModel)card.DataContext!).Option.OptionKind == OptionKind.Color);
+        var size = cards.Single(card => ((OfferingChoiceGroupViewModel)card.DataContext!).Option.OptionKind == OptionKind.Size);
+        var colorTopLeft = color.TranslatePoint(new Avalonia.Point(0, 0), window);
+        var sizeTopLeft = size.TranslatePoint(new Avalonia.Point(0, 0), window);
+        Assert.NotNull(colorTopLeft);
+        Assert.NotNull(sizeTopLeft);
+        Assert.True(colorTopLeft.Value.Y == sizeTopLeft.Value.Y,
+            "Cards should sit on one row at the default width.");
+        Assert.True(colorTopLeft.Value.X + color.Bounds.Width <= sizeTopLeft.Value.X,
+            $"Multiple cards should align on one row when the available width allows it. Color={colorTopLeft} Size={sizeTopLeft}");
+
+        window.Width = window.MinWidth;
+        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        var narrowColor = color.TranslatePoint(new Avalonia.Point(0, 0), window);
+        var narrowSize = size.TranslatePoint(new Avalonia.Point(0, 0), window);
+        Assert.True(narrowColor!.Value.Y < narrowSize!.Value.Y,
+            "Cards should wrap onto a new row when the window narrows.");
+        Assert.Equal(narrowColor.Value.X, narrowSize.Value.X);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void BlueprintOfferingCard_ClickOpensOfferingOverview()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true);
