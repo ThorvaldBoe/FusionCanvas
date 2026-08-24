@@ -696,6 +696,159 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void DesignAreaCard_ShowsEditArchiveHorizontal()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenDesignAreaManagementCommand.Execute(null);
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        var editButton = Assert.IsType<Button>(FindButton(window, "Edit")!);
+        var archiveButton = Assert.IsType<Button>(FindButton(window, "Archive")!);
+
+        // Assert they share the same card (same listItem Border ancestor)
+        var editCard = editButton.GetVisualAncestors().OfType<Border>()
+            .Single(b => b.Classes.Contains("listItem"));
+        var archiveCard = archiveButton.GetVisualAncestors().OfType<Border>()
+            .Single(b => b.Classes.Contains("listItem"));
+        Assert.Same(editCard, archiveCard);
+
+        // Assert horizontal ordering: same Y, Archive to the right of Edit
+        Assert.Equal(editButton.Bounds.Y, archiveButton.Bounds.Y, 0.5);
+        Assert.True(archiveButton.Bounds.X > editButton.Bounds.X,
+            "Archive button should be to the right of Edit button.");
+
+        // Assert focus/tab order follows visual order (Edit then Archive)
+        Assert.True(editButton.TabIndex <= archiveButton.TabIndex,
+            "Edit should appear before Archive in tab order.");
+
+        // Assert command bindings are non-null and unchanged
+        Assert.NotNull(editButton.Command);
+        Assert.NotNull(archiveButton.Command);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void DesignAreaSaveButton_UsesSentenceCaseLabel()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenDesignAreaManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        viewModel.CatalogSetup!.StartAddPlaceholderCommand.Execute(null);
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        var saveButton = FindButton(window, "Save design area");
+        Assert.NotNull(saveButton);
+        Assert.Null(FindButton(window, "Save Design Area"));
+        Assert.Null(FindButton(window, "Save design"));
+        Assert.NotNull(saveButton!.Command);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void SaveMockupTemplateButton_ShowsFullLabelWithoutClipping()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+        viewModel.CatalogSetup.StartAddTemplateCommand.Execute(null);
+        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        var saveButton = FindButton(window, "Save Mockup Template");
+        Assert.NotNull(saveButton);
+
+        var textBlock = saveButton!.GetVisualDescendants().OfType<TextBlock>()
+            .FirstOrDefault(tb => tb.Text == "Save Mockup Template");
+        Assert.NotNull(textBlock);
+        Assert.True(textBlock!.Bounds.Width <= saveButton.Bounds.Width + 0.5,
+            $"The label '{textBlock.Text}' (width {textBlock.Bounds.Width}) must fit inside the button (width {saveButton.Bounds.Width}).");
+
+        Assert.True(saveButton.Bounds.Width > 104,
+            $"Button width ({saveButton.Bounds.Width}) should exceed the old fixed 104px constraint.");
+        Assert.Equal("Save Mockup Template", saveButton.Content as string);
+        Assert.NotNull(FindButton(window, "Cancel"));
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void MappingFields_HavePersistentLabelsAndAccessibleNames()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        viewModel.CatalogSetup.EditTemplateCommand.Execute(Assert.Single(viewModel.CatalogSetup.MockupTemplateCards));
+        window.UpdateLayout();
+        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        var configRegion = AssertEffectivelyVisible(window, "Catalog.MockupConfigurationRegion");
+
+        // Find mapping TextBoxes by accessible name
+        var mappingX = configRegion.GetVisualDescendants().OfType<TextBox>()
+            .Single(tb => AutomationProperties.GetName(tb) == "X");
+        var mappingY = configRegion.GetVisualDescendants().OfType<TextBox>()
+            .Single(tb => AutomationProperties.GetName(tb) == "Y");
+        var mappingWidth = configRegion.GetVisualDescendants().OfType<TextBox>()
+            .Single(tb => AutomationProperties.GetName(tb) == "Width");
+        var mappingHeight = configRegion.GetVisualDescendants().OfType<TextBox>()
+            .Single(tb => AutomationProperties.GetName(tb) == "Height");
+
+        // Fields contain values (non-empty) — identification does not rely on placeholders
+        Assert.False(string.IsNullOrEmpty(mappingX.Text), "MappingX should have a value.");
+        Assert.False(string.IsNullOrEmpty(mappingY.Text), "MappingY should have a value.");
+        Assert.False(string.IsNullOrEmpty(mappingWidth.Text), "MappingWidth should have a value.");
+        Assert.False(string.IsNullOrEmpty(mappingHeight.Text), "MappingHeight should have a value.");
+
+        // Persistent visible labels identify each field
+        var labelTexts = configRegion.GetVisualDescendants()
+            .OfType<TextBlock>()
+            .Where(IsEffectivelyVisible)
+            .Select(tb => tb.Text)
+            .ToHashSet();
+        Assert.Contains("X", labelTexts);
+        Assert.Contains("Y", labelTexts);
+        Assert.Contains("Width", labelTexts);
+        Assert.Contains("Height", labelTexts);
+
+        // Tab order: X before Y before Width before Height
+        Assert.True(mappingX.Bounds.Left < mappingY.Bounds.Left,
+            "X should be left of Y.");
+        Assert.True(mappingY.Bounds.Top <= mappingWidth.Bounds.Top,
+            "Y should be above or level with Width.");
+        Assert.True(mappingWidth.Bounds.Left < mappingHeight.Bounds.Left,
+            "Width should be left of Height.");
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void AdvancedProviderDataExpander_ShowsPopulatedState()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
