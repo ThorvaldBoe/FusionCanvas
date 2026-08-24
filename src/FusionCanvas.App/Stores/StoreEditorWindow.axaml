@@ -756,18 +756,31 @@
                       <DataTemplate x:DataType="stores:OfferingChoiceGroupViewModel">
                         <Border Classes="listItem" Padding="10" Width="300" Margin="0,0,10,10">
                           <StackPanel Spacing="6">
-                            <Grid ColumnDefinitions="*,Auto">
+                            <Grid ColumnDefinitions="*,Auto,Auto">
                               <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" />
-                              <TextBlock Grid.Column="1" Text="{Binding KindLabel}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                              <TextBlock Grid.Column="1" Text="{Binding KindLabel}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}"
+                                         VerticalAlignment="Center" />
+                              <Button Grid.Column="2"
+                                      Content="..."
+                                      Classes="iconButton"
+                                      AutomationProperties.Name="{Binding AccessibleOverflowName}"
+                                      AutomationProperties.AutomationId="{Binding OverflowAutomationId}"
+                                      VerticalAlignment="Top">
+<Button.Flyout>
+                                  <MenuFlyout>
+                                    <MenuItem Header="Archive option"
+                                              Classes="danger"
+                                              Command="{Binding ArchiveOptionCommand}"
+                                              CommandParameter="{Binding Option}" />
+                                  </MenuFlyout>
+                                </Button.Flyout>
+                              </Button>
                             </Grid>
                             <TextBlock Text="{Binding ValuesSummary}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
                             <StackPanel Orientation="Horizontal" Spacing="8">
                               <Button Content="Manage values"
                                       Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ManageOptionCommand}"
                                       CommandParameter="{Binding Option}" Classes="secondary" />
-                              <Button Content="Archive Option"
-                                      Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ArchiveOptionCommand}"
-                                      CommandParameter="{Binding Option}" Classes="danger" />
                             </StackPanel>
                           </StackPanel>
                         </Border>
@@ -1268,6 +1281,20 @@
       <Setter Property="Foreground" Value="{DynamicResource SecondaryButtonForegroundBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.iconButton">
+      <Setter Property="Width" Value="28" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SecondaryButtonForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="MenuItem.danger">
+      <Setter Property="Foreground" Value="{DynamicResource DangerStrongBrush}" />
     </Style>
     <Style Selector="Button.danger">
       <Setter Property="Padding" Value="10,8" />

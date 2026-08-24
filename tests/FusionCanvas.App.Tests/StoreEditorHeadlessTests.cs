@@ -1,8 +1,10 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Automation;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Stores;
 using FusionCanvas.Domain.Workspace;
@@ -480,6 +482,158 @@ public class StoreEditorHeadlessTests
             Assert.True(parent.Bounds.Width - textBox.Bounds.Right >= 16,
                 $"The {textBox.PlaceholderText} field should have a trailing margin.");
         });
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void OptionCardsMoveArchiveIntoOverflowMenu()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        Assert.Null(FindButton(window, "Archive Option"));
+        Assert.Null(FindButton(window, "Archive option"));
+        Assert.NotNull(FindButton(window, "Manage values"));
+
+        var overflowButtons = window.GetVisualDescendants()
+            .OfType<Button>()
+            .Where(button => (AutomationProperties.GetAutomationId(button) ?? string.Empty).StartsWith("Catalog.OptionOverflow.", StringComparison.Ordinal))
+            .ToArray();
+        Assert.Equal(2, overflowButtons.Length);
+
+        var accessibleNames = overflowButtons
+            .Select(button => AutomationProperties.GetName(button))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(new[] { "More actions for Color", "More actions for Size" }, accessibleNames);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void OptionOverflowMenu_OpensByPointerAndKeyboard()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        var overflowButton = window.GetVisualDescendants()
+            .OfType<Button>()
+            .Single(button => AutomationProperties.GetName(button) == "More actions for Color");
+        var flyout = Assert.IsAssignableFrom<MenuFlyout>(overflowButton.Flyout);
+
+        var center = overflowButton.TranslatePoint(new Point(overflowButton.Bounds.Width / 2, overflowButton.Bounds.Height / 2), window) ?? default;
+        HeadlessWindowExtensions.MouseDown(window, center, MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseUp(window, center, MouseButton.Left, RawInputModifiers.None);
+        window.UpdateLayout();
+        Assert.True(flyout.IsOpen);
+        flyout.Hide();
+
+        overflowButton.Focus();
+        HeadlessWindowExtensions.KeyPress(window, Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, string.Empty);
+        window.UpdateLayout();
+        Assert.True(flyout.IsOpen, "Enter on the focused overflow button should open the menu.");
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void OptionOverflowMenu_ContainsDestructiveArchiveEntryForTheOption()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        var overflowButton = window.GetVisualDescendants()
+            .OfType<Button>()
+            .Single(button => AutomationProperties.GetName(button) == "More actions for Color");
+        var flyout = Assert.IsAssignableFrom<MenuFlyout>(overflowButton.Flyout);
+
+        flyout.ShowAt(overflowButton);
+        window.UpdateLayout();
+        var archiveItem = flyout.Items.OfType<MenuItem>()
+            .Single(item => Equals(item.Header, "Archive option"));
+        Assert.Contains("danger", archiveItem.Classes);
+        Assert.NotNull(archiveItem.Command);
+        Assert.IsAssignableFrom<OfferingOption>(archiveItem.CommandParameter);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void OptionOverflowMenu_InvokesArchiveAndSurfacesBlockedReason()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        var overflowButton = window.GetVisualDescendants()
+            .OfType<Button>()
+            .Single(button => AutomationProperties.GetName(button) == "More actions for Color");
+        var flyout = Assert.IsAssignableFrom<MenuFlyout>(overflowButton.Flyout);
+        flyout.ShowAt(overflowButton);
+        window.UpdateLayout();
+        var archiveItem = flyout.Items.OfType<MenuItem>()
+            .Single(item => Equals(item.Header, "Archive option"));
+
+        archiveItem.Command!.Execute(archiveItem.CommandParameter);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        Assert.True(viewModel.CatalogSetup!.HasError);
+        Assert.Contains("referenced", viewModel.CatalogSetup.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void OptionOverflowMenu_DismissalReturnsFocusAndMakesNoChange()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        var overflowButton = window.GetVisualDescendants()
+            .OfType<Button>()
+            .Single(button => AutomationProperties.GetName(button) == "More actions for Color");
+        overflowButton.Focus();
+        window.UpdateLayout();
+        Assert.True(overflowButton.IsFocused);
+
+        var flyout = Assert.IsAssignableFrom<MenuFlyout>(overflowButton.Flyout);
+        flyout.ShowAt(overflowButton);
+        window.UpdateLayout();
+        Assert.True(flyout.IsOpen);
+
+        flyout.Hide();
+        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        Assert.False(flyout.IsOpen);
+        Assert.True(overflowButton.IsFocused);
+        Assert.NotNull(viewModel.CatalogSetup!.AvailableChoiceGroups);
+        Assert.Equal(2, viewModel.CatalogSetup.AvailableChoiceGroups.Count);
 
         window.Close();
     }

@@ -86,4 +86,27 @@ public sealed class CatalogPresentationModelsTests
         Assert.Equal("2 compatible Variants", card.VariantSummary);
         Assert.Equal("Revision 3 · Active", card.RevisionSummary);
     }
+
+    [Theory]
+    [InlineData(OptionKind.Color)]
+    [InlineData(OptionKind.Size)]
+    [InlineData(OptionKind.Other)]
+    public void ChoiceGroupOverflowNameIdentifiesTheOptionKind(OptionKind kind)
+    {
+        var group = new OfferingChoiceGroupViewModel(
+            new OfferingOption(Guid.NewGuid(), Guid.NewGuid(), kind, "Shade", 0),
+            [],
+            new StubCommand());
+
+        Assert.Equal($"More actions for Shade", group.AccessibleOverflowName);
+        Assert.StartsWith("Catalog.OptionOverflow.", group.OverflowAutomationId);
+        Assert.Equal("Shade", group.Name);
+    }
+
+    private sealed class StubCommand : System.Windows.Input.ICommand
+    {
+        public event EventHandler? CanExecuteChanged { add { } remove { } }
+        public bool CanExecute(object? parameter) => true;
+        public void Execute(object? parameter) { }
+    }
 }
