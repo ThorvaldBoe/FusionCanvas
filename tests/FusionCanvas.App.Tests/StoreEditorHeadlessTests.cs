@@ -696,6 +696,44 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void DesignAreaCard_ShowsEditArchiveHorizontal()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenDesignAreaManagementCommand.Execute(null);
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        var editButton = Assert.IsType<Button>(FindButton(window, "Edit")!);
+        var archiveButton = Assert.IsType<Button>(FindButton(window, "Archive")!);
+
+        // Assert they share the same card (same listItem Border ancestor)
+        var editCard = editButton.GetVisualAncestors().OfType<Border>()
+            .Single(b => b.Classes.Contains("listItem"));
+        var archiveCard = archiveButton.GetVisualAncestors().OfType<Border>()
+            .Single(b => b.Classes.Contains("listItem"));
+        Assert.Same(editCard, archiveCard);
+
+        // Assert horizontal ordering: same Y, Archive to the right of Edit
+        Assert.Equal(editButton.Bounds.Y, archiveButton.Bounds.Y, 0.5);
+        Assert.True(archiveButton.Bounds.X > editButton.Bounds.X,
+            "Archive button should be to the right of Edit button.");
+
+        // Assert focus/tab order follows visual order (Edit then Archive)
+        Assert.True(editButton.TabIndex <= archiveButton.TabIndex,
+            "Edit should appear before Archive in tab order.");
+
+        // Assert command bindings are non-null and unchanged
+        Assert.NotNull(editButton.Command);
+        Assert.NotNull(archiveButton.Command);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void DesignAreaSaveButton_UsesSentenceCaseLabel()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);

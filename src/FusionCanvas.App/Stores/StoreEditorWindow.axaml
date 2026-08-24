@@ -1011,7 +1011,7 @@
                                 <TextBlock Text="{Binding MaximumSizeSummary}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                                 <TextBlock Text="{Binding CompatibilitySummary}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                               </StackPanel>
-                              <StackPanel Grid.Column="1" Spacing="6">
+                              <StackPanel Grid.Column="1" Spacing="8" Orientation="Horizontal">
                                 <Button Content="Edit" Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.EditPlaceholderCommand}" CommandParameter="{Binding}" Classes="secondary" />
                                 <Button Content="Archive" Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ArchivePlaceholderCommand}" CommandParameter="{Binding}" Classes="danger" />
                               </StackPanel>
