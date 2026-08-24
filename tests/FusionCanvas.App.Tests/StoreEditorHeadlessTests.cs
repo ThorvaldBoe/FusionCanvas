@@ -695,6 +695,38 @@ public class StoreEditorHeadlessTests
         window.Close();
     }
 
+    [AvaloniaFact]
+    public void SaveMockupTemplateButton_ShowsFullLabelWithoutClipping()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+        viewModel.CatalogSetup.StartAddTemplateCommand.Execute(null);
+        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        var saveButton = FindButton(window, "Save Mockup Template");
+        Assert.NotNull(saveButton);
+
+        var textBlock = saveButton!.GetVisualDescendants().OfType<TextBlock>()
+            .FirstOrDefault(tb => tb.Text == "Save Mockup Template");
+        Assert.NotNull(textBlock);
+        Assert.True(textBlock!.Bounds.Width <= saveButton.Bounds.Width + 0.5,
+            $"The label '{textBlock.Text}' (width {textBlock.Bounds.Width}) must fit inside the button (width {saveButton.Bounds.Width}).");
+
+        Assert.True(saveButton.Bounds.Width > 104,
+            $"Button width ({saveButton.Bounds.Width}) should exceed the old fixed 104px constraint.");
+        Assert.Equal("Save Mockup Template", saveButton.Content as string);
+        Assert.NotNull(FindButton(window, "Cancel"));
+
+        window.Close();
+    }
+
     private static StoreEditorWindow CreateEditorWindow(
         bool includeNormalizedCatalog = true,
         bool useFixedProviderOffering = false,
