@@ -695,6 +695,30 @@ public class StoreEditorHeadlessTests
         window.Close();
     }
 
+    [AvaloniaFact]
+    public void DesignAreaSaveButton_UsesSentenceCaseLabel()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenDesignAreaManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        viewModel.CatalogSetup!.StartAddPlaceholderCommand.Execute(null);
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        var saveButton = FindButton(window, "Save design area");
+        Assert.NotNull(saveButton);
+        Assert.Null(FindButton(window, "Save Design Area"));
+        Assert.Null(FindButton(window, "Save design"));
+        Assert.NotNull(saveButton!.Command);
+
+        window.Close();
+    }
+
     private static StoreEditorWindow CreateEditorWindow(
         bool includeNormalizedCatalog = true,
         bool useFixedProviderOffering = false,
