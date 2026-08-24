@@ -184,6 +184,34 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void BlueprintOfferingCard_ClickOpensOfferingAfterWorkspaceSwitch()
+    {
+        var window = CreateEditorWindowAfterWorkspaceSwitch();
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        window.UpdateLayout();
+
+        var card = Assert.Single(viewModel.BlueprintOfferingCards);
+        var offeringButton = window.GetVisualDescendants()
+            .OfType<Button>()
+            .Single(button => ReferenceEquals(button.DataContext, card));
+
+        Assert.NotNull(offeringButton.Command);
+        Assert.Same(card, offeringButton.CommandParameter);
+        offeringButton.Command.Execute(offeringButton.CommandParameter);
+        window.UpdateLayout();
+
+        Assert.True(viewModel.IsOfferingDetail);
+        Assert.Equal(card.Id, viewModel.SelectedOffering?.Id);
+        Assert.Equal(card.Id, viewModel.CatalogSetup!.SelectedOfferingId);
+        Assert.False(viewModel.CatalogSetup.IsOfferingContextUnavailable);
+        AssertEffectivelyVisible(window, "Catalog.OfferingStatus");
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void CatalogEditorsUseCompactBasicsOnDemandDraftsAndSummaryFirstRegions()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
@@ -412,6 +440,48 @@ public class StoreEditorHeadlessTests
             new MockupTemplateSetupService(repository),
             new OfferingManagementService(repository));
         viewModel.LoadAsync(default).GetAwaiter().GetResult();
+        var window = new StoreEditorWindow { DataContext = viewModel };
+        window.Show();
+        window.UpdateLayout();
+        window.UpdateLayout();
+        return window;
+    }
+
+    private static StoreEditorWindow CreateEditorWindowAfterWorkspaceSwitch()
+    {
+        // The second workspace's catalog is normalized-only: the Blueprint Offering
+        // has no legacy FulfillmentOffering mirror until catalog synchronization repairs it.
+        var workspaceA = WorkspaceSnapshot.DefaultWorkspace(Now);
+        var workspaceB = new FusionCanvas.Domain.Workspace.Workspace(Guid.NewGuid(), "Seasonal", null, false, Now, Now, "{}");
+        var storeA = new Store(Guid.NewGuid(), workspaceA.Id, "Alpha Tees", null, false, Now, Now, "{}");
+        var storeB = new Store(Guid.NewGuid(), workspaceB.Id, "SwiftPod Store", null, false, Now, Now, "{}");
+        var product = new StoreProduct(Guid.NewGuid(), storeB.Id, "Gildan 64000 t-shirt", null, null, Now, Now, "{}");
+        var blueprint = new Blueprint(product.Id, storeB.Id, product.Name, product.Description, false, Now, Now);
+        var provider = new PrintProvider(Guid.NewGuid(), storeB.Id, "SwiftPOD", null, false, Now, Now);
+        var normalizedOffering = new BlueprintOffering(
+            Guid.NewGuid(), blueprint.Id, storeB.Id, "Gildan 64000", null,
+            BlueprintOfferingKind.FixedPrintProvider, provider.Id, null, null, null, false, Now, Now);
+        var snapshot = new WorkspaceSnapshot(
+            [workspaceA, workspaceB],
+            [storeA, storeB],
+            [], [], [], [], [], [], [], [])
+        {
+            StoreProducts = [product],
+            Blueprints = [blueprint],
+            PrintProviders = [provider],
+            BlueprintOfferings = [normalizedOffering]
+        };
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+        var viewModel = new StoreManagementViewModel(
+            new StoreManagementService(repository),
+            new NicheManagementService(repository),
+            new TagManagementService(repository),
+            new ProductSupplierSetupService(repository),
+            new CatalogSetupService(repository),
+            new MockupTemplateSetupService(repository),
+            new OfferingManagementService(repository));
+        viewModel.LoadAsync(default).GetAwaiter().GetResult();
+        viewModel.SetActiveWorkspaceAsync(workspaceB.Id).GetAwaiter().GetResult();
         var window = new StoreEditorWindow { DataContext = viewModel };
         window.Show();
         window.UpdateLayout();
