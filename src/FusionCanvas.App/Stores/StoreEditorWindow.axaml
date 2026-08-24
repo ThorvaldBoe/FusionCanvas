@@ -698,41 +698,43 @@
                            TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
                 <Border Classes="listItem" Padding="10">
                   <Grid ColumnDefinitions="2*,Auto,Auto" ColumnSpacing="12">
-                    <StackPanel Grid.Column="0" Spacing="3">
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="30" />
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="30" />
+                      <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Grid.Column="0" Spacing="3">
                       <TextBlock Text="Variants" FontWeight="SemiBold" />
                       <TextBlock Text="Possible choices and explicit sellable combinations."
                                  TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     </StackPanel>
-                    <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                    <TextBlock Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" TextAlignment="Right"
                                Text="{Binding CatalogSetup.AvailableVariantCount, StringFormat='{}{0} configured'}"
                                Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <Button Grid.Column="2" Content="Manage Variants" Command="{Binding OpenVariantManagementCommand}" Classes="secondary" />
-                  </Grid>
-                </Border>
-                <Border Classes="listItem" Padding="10">
-                  <Grid ColumnDefinitions="2*,Auto,Auto" ColumnSpacing="12">
-                    <StackPanel Grid.Column="0" Spacing="3">
+                    <Button Grid.Row="0" Grid.Column="2" Content="Manage Variants" Command="{Binding OpenVariantManagementCommand}" Classes="secondary" HorizontalAlignment="Stretch" />
+
+                    <StackPanel Grid.Row="2" Grid.Column="0" Spacing="3">
                       <TextBlock Text="Design Areas" FontWeight="SemiBold" />
                       <TextBlock Text="Printable regions and compatible Variants."
                                  TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     </StackPanel>
-                    <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                    <TextBlock Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" TextAlignment="Right"
                                Text="{Binding CatalogSetup.AvailableDesignAreaCount, StringFormat='{}{0} configured'}"
                                Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <Button Grid.Column="2" Content="Manage Design Areas" Command="{Binding OpenDesignAreaManagementCommand}" Classes="secondary" />
-                  </Grid>
-                </Border>
-                <Border Classes="listItem" Padding="10">
-                  <Grid ColumnDefinitions="2*,Auto,Auto" ColumnSpacing="12">
-                    <StackPanel Grid.Column="0" Spacing="3">
+                    <Button Grid.Row="2" Grid.Column="2" Content="Manage Design Areas" Command="{Binding OpenDesignAreaManagementCommand}" Classes="secondary" HorizontalAlignment="Stretch" />
+
+                    <StackPanel Grid.Row="4" Grid.Column="0" Spacing="3">
                       <TextBlock Text="Mockup Templates" FontWeight="SemiBold" />
                       <TextBlock Text="Provider images linked to Design Areas and Colors."
                                  TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     </StackPanel>
-                    <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                    <TextBlock Grid.Row="4" Grid.Column="1" VerticalAlignment="Center" TextAlignment="Right"
                                Text="{Binding CatalogSetup.AvailableTemplateCount, StringFormat='{}{0} configured'}"
                                Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <Button Grid.Column="2" Content="Manage Mockup Templates" Command="{Binding OpenMockupTemplateManagementCommand}" Classes="secondary" />
+                    <Button Grid.Row="4" Grid.Column="2" Content="Manage Mockup Templates" Command="{Binding OpenMockupTemplateManagementCommand}" Classes="secondary" HorizontalAlignment="Stretch" />
                   </Grid>
                 </Border>
               </StackPanel>

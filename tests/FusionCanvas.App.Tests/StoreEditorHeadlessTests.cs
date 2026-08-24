@@ -158,6 +158,39 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void OfferingSetupRows_ShareAlignedCountAndActionColumns()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        window.UpdateLayout();
+
+        var manageVariants = Assert.IsType<Button>(FindButton(window, "Manage Variants")!);
+        var manageAreas = Assert.IsType<Button>(FindButton(window, "Manage Design Areas")!);
+        var manageTemplates = Assert.IsType<Button>(FindButton(window, "Manage Mockup Templates")!);
+
+        Assert.True(manageVariants.Bounds.Width > 0, "Manage buttons should be laid out.");
+        Assert.Equal(manageVariants.Bounds.X, manageAreas.Bounds.X, 0.5);
+        Assert.Equal(manageAreas.Bounds.X, manageTemplates.Bounds.X, 0.5);
+        Assert.Equal(manageVariants.Bounds.Width, manageAreas.Bounds.Width, 0.5);
+        Assert.Equal(manageAreas.Bounds.Width, manageTemplates.Bounds.Width, 0.5);
+
+        var setup = AssertEffectivelyVisible(window, "Catalog.OfferingSetup");
+        var countLabels = setup.GetVisualDescendants()
+            .OfType<TextBlock>()
+            .Where(IsEffectivelyVisible)
+            .Where(block => block.Text?.EndsWith(" configured", StringComparison.Ordinal) == true)
+            .ToArray();
+        Assert.Equal(3, countLabels.Length);
+        Assert.Equal(countLabels[0].Bounds.Right, countLabels[1].Bounds.Right, 0.5);
+        Assert.Equal(countLabels[1].Bounds.Right, countLabels[2].Bounds.Right, 0.5);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void BlueprintOfferingCard_ClickOpensOfferingOverview()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true);
