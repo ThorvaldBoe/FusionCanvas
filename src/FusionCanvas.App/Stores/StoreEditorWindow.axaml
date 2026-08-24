@@ -983,7 +983,7 @@
                                  ToolTip.Tip="Normally populated from the Printify catalog integration." />
                       </Expander>
                       <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="Save Design Area" Command="{Binding CatalogSetup.CreatePlaceholderCommand}" Classes="primary fixedAction" />
+                        <Button Content="Save design area" Command="{Binding CatalogSetup.CreatePlaceholderCommand}" Classes="primary fixedAction" />
                         <Button Content="Cancel" Command="{Binding CatalogSetup.CancelAddPlaceholderCommand}" Classes="secondary fixedAction" />
                       </StackPanel>
                     </StackPanel>
@@ -1011,7 +1011,7 @@
                                 <TextBlock Text="{Binding MaximumSizeSummary}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                                 <TextBlock Text="{Binding CompatibilitySummary}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                               </StackPanel>
-                              <StackPanel Grid.Column="1" Spacing="6">
+                              <StackPanel Grid.Column="1" Spacing="8" Orientation="Horizontal">
                                 <Button Content="Edit" Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.EditPlaceholderCommand}" CommandParameter="{Binding}" Classes="secondary" />
                                 <Button Content="Archive" Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ArchivePlaceholderCommand}" CommandParameter="{Binding}" Classes="danger" />
                               </StackPanel>
@@ -1132,8 +1132,8 @@
                                    ToolTip.Tip="Stable provider mockup reference from the Printify catalog." />
                       </Expander>
                       <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="Save Mockup Template" Command="{Binding CatalogSetup.CreateTemplateCommand}" Classes="primary fixedAction" />
-                        <Button Content="Cancel" Command="{Binding CatalogSetup.CancelAddTemplateCommand}" Classes="secondary fixedAction" />
+                        <Button Content="Save Mockup Template" Command="{Binding CatalogSetup.CreateTemplateCommand}" Classes="primary" HorizontalAlignment="Left" />
+                        <Button Content="Cancel" Command="{Binding CatalogSetup.CancelAddTemplateCommand}" Classes="secondary" HorizontalAlignment="Left" />
                       </StackPanel>
                     </StackPanel>
                   </Grid>
