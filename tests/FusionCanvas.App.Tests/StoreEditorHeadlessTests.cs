@@ -789,6 +789,65 @@ public class StoreEditorHeadlessTests
         window.Close();
     }
 
+    [AvaloniaFact]
+    public void MappingFields_HavePersistentLabelsAndAccessibleNames()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        viewModel.CatalogSetup.EditTemplateCommand.Execute(Assert.Single(viewModel.CatalogSetup.MockupTemplateCards));
+        window.UpdateLayout();
+        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        var configRegion = AssertEffectivelyVisible(window, "Catalog.MockupConfigurationRegion");
+
+        // Find mapping TextBoxes by accessible name
+        var mappingX = configRegion.GetVisualDescendants().OfType<TextBox>()
+            .Single(tb => AutomationProperties.GetName(tb) == "X");
+        var mappingY = configRegion.GetVisualDescendants().OfType<TextBox>()
+            .Single(tb => AutomationProperties.GetName(tb) == "Y");
+        var mappingWidth = configRegion.GetVisualDescendants().OfType<TextBox>()
+            .Single(tb => AutomationProperties.GetName(tb) == "Width");
+        var mappingHeight = configRegion.GetVisualDescendants().OfType<TextBox>()
+            .Single(tb => AutomationProperties.GetName(tb) == "Height");
+
+        // Fields contain values (non-empty) — identification does not rely on placeholders
+        Assert.False(string.IsNullOrEmpty(mappingX.Text), "MappingX should have a value.");
+        Assert.False(string.IsNullOrEmpty(mappingY.Text), "MappingY should have a value.");
+        Assert.False(string.IsNullOrEmpty(mappingWidth.Text), "MappingWidth should have a value.");
+        Assert.False(string.IsNullOrEmpty(mappingHeight.Text), "MappingHeight should have a value.");
+
+        // Persistent visible labels identify each field
+        var labelTexts = configRegion.GetVisualDescendants()
+            .OfType<TextBlock>()
+            .Where(IsEffectivelyVisible)
+            .Select(tb => tb.Text)
+            .ToHashSet();
+        Assert.Contains("X", labelTexts);
+        Assert.Contains("Y", labelTexts);
+        Assert.Contains("Width", labelTexts);
+        Assert.Contains("Height", labelTexts);
+
+        // Tab order: X before Y before Width before Height
+        Assert.True(mappingX.Bounds.Left < mappingY.Bounds.Left,
+            "X should be left of Y.");
+        Assert.True(mappingY.Bounds.Top <= mappingWidth.Bounds.Top,
+            "Y should be above or level with Width.");
+        Assert.True(mappingWidth.Bounds.Left < mappingHeight.Bounds.Left,
+            "Width should be left of Height.");
+
+        window.Close();
+    }
+
     private static StoreEditorWindow CreateEditorWindow(
         bool includeNormalizedCatalog = true,
         bool useFixedProviderOffering = false,

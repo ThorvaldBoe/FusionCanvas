@@ -1117,11 +1117,15 @@
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>
                       <TextBlock Text="Image-space mapping (pixels)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8">
-                        <TextBox Grid.Row="0" Grid.Column="0" Text="{Binding CatalogSetup.MappingX}" PlaceholderText="X (px)" Classes="field" />
-                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding CatalogSetup.MappingY}" PlaceholderText="Y (px)" Classes="field" />
-                        <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding CatalogSetup.MappingWidth}" PlaceholderText="Width (px)" Classes="field" />
-                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CatalogSetup.MappingHeight}" PlaceholderText="Height (px)" Classes="field" />
+                      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="8">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="X" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="Y" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding CatalogSetup.MappingX}" PlaceholderText="X (px)" Classes="field" AutomationProperties.Name="X" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CatalogSetup.MappingY}" PlaceholderText="Y (px)" Classes="field" AutomationProperties.Name="Y" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Width" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="Height" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <TextBox Grid.Row="3" Grid.Column="0" Text="{Binding CatalogSetup.MappingWidth}" PlaceholderText="Width (px)" Classes="field" AutomationProperties.Name="Width" />
+                        <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding CatalogSetup.MappingHeight}" PlaceholderText="Height (px)" Classes="field" AutomationProperties.Name="Height" />
                       </Grid>
                       <Expander Header="Advanced provider data">
                         <TextBlock Text="{Binding CatalogSetup.SelectedProviderMockup.ProviderReference}"
