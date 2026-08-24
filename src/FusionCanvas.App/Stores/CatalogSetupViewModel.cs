@@ -95,6 +95,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private double _mappingY;
     private double _mappingWidth = 100;
     private double _mappingHeight = 100;
+    private Guid? _pendingDesignAreaArchiveId;
+    private string _pendingDesignAreaArchiveName = string.Empty;
+    private bool _isDesignAreaArchiveConfirmationVisible;
 
     public CatalogSetupViewModel(ICatalogSetupService catalog, IMockupTemplateSetupService mockups, IOfferingManagementService? offeringManagement = null, IProviderCatalogCandidateSource? providerCatalog = null)
     {
@@ -142,7 +145,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         ArchiveOptionCommand = new RelayCommand(parameter => RunArchive(parameter, CatalogRecordKind.Option));
         ArchiveOptionValueCommand = new RelayCommand(parameter => RunArchive(parameter, CatalogRecordKind.OptionValue));
         ArchiveVariantCommand = new RelayCommand(parameter => RunArchive(parameter, CatalogRecordKind.Variant));
-        ArchivePlaceholderCommand = new RelayCommand(parameter => RunArchive(parameter, CatalogRecordKind.Placeholder));
+        ArchivePlaceholderCommand = new RelayCommand(parameter => RequestDesignAreaArchive(parameter));
+        ConfirmDesignAreaArchiveCommand = new AsyncRelayCommand(ConfirmDesignAreaArchiveAsync, () => CanEdit && _isDesignAreaArchiveConfirmationVisible);
+        CancelDesignAreaArchiveCommand = new RelayCommand(_ => CancelDesignAreaArchive(), () => _isDesignAreaArchiveConfirmationVisible);
         ArchiveTemplateCommand = new RelayCommand(parameter => _ = ArchiveTemplateAsync(parameter switch
         {
             MockupTemplateCardViewModel card => Templates.FirstOrDefault(value => value.Id == card.Id),
@@ -161,6 +166,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public event EventHandler? VariantActionsFocusRequested;
     public event EventHandler? BulkVariantEditorFocusRequested;
     public event EventHandler? BulkVariantActionFocusRequested;
+    public event EventHandler? DesignAreaArchiveConfirmationRequested;
+    public event EventHandler? DesignAreaArchiveFocusRequested;
 
     public ObservableCollection<Blueprint> Blueprints { get; } = [];
     public ObservableCollection<PrintProvider> PrintProviders { get; } = [];
@@ -350,6 +357,19 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
     public bool HasActiveDraft => IsAddingPrintProvider || IsAddingOption || IsAddingOptionValue || IsAddingVariant || IsAddingBulkVariants || IsAddingPlaceholder || IsAddingTemplate;
 
+    public bool IsDesignAreaArchiveConfirmationVisible
+    {
+        get => _isDesignAreaArchiveConfirmationVisible;
+        private set { if (SetField(ref _isDesignAreaArchiveConfirmationVisible, value)) NotifyCommands(); }
+    }
+
+    public Guid? PendingDesignAreaArchiveId => _pendingDesignAreaArchiveId;
+
+    public string PendingDesignAreaArchiveName => _pendingDesignAreaArchiveName;
+
+    public string DesignAreaArchiveConfirmationMessage =>
+        $"Archive the '{_pendingDesignAreaArchiveName}' design area? It will leave the active Design Area list and can be restored later.";
+
     public void CancelActiveDrafts()
     {
         IsAddingPrintProvider = false;
@@ -414,6 +434,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ICommand ArchiveOptionValueCommand { get; }
     public ICommand ArchiveVariantCommand { get; }
     public ICommand ArchivePlaceholderCommand { get; }
+    public ICommand ConfirmDesignAreaArchiveCommand { get; }
+    public ICommand CancelDesignAreaArchiveCommand { get; }
     public ICommand ArchiveTemplateCommand { get; }
     public ICommand PreviewBulkVariantsCommand { get; }
     public ICommand ConfirmBulkVariantsCommand { get; }
@@ -676,6 +698,48 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         TemplateName = string.Empty;
         foreach (var color in TemplateColorChoices) color.IsSelected = false;
         IsAddingTemplate = true;
+    }
+
+    private void RequestDesignAreaArchive(object? parameter)
+    {
+        if (_isDesignAreaArchiveConfirmationVisible || SelectedOffering is null) return;
+        var (id, name) = parameter switch
+        {
+            OfferingPlaceholder area => (area.Id, area.Name),
+            DesignAreaCardViewModel card => (card.Id, card.Name),
+            _ => (Guid.Empty, string.Empty)
+        };
+        if (id == Guid.Empty) return;
+        _pendingDesignAreaArchiveId = id;
+        _pendingDesignAreaArchiveName = name;
+        OnPropertyChanged(nameof(PendingDesignAreaArchiveId));
+        OnPropertyChanged(nameof(PendingDesignAreaArchiveName));
+        OnPropertyChanged(nameof(DesignAreaArchiveConfirmationMessage));
+        IsDesignAreaArchiveConfirmationVisible = true;
+        DesignAreaArchiveConfirmationRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private async Task ConfirmDesignAreaArchiveAsync()
+    {
+        if (_pendingDesignAreaArchiveId is not Guid id || SelectedOffering is null) return;
+        ClearDesignAreaArchiveConfirmation();
+        await RunMutationAsync(() => _catalog.ArchiveAsync(new ArchiveCatalogRecordRequest(SelectedOffering.StoreId, CatalogRecordKind.Placeholder, id))).ConfigureAwait(true);
+    }
+
+    private void CancelDesignAreaArchive()
+    {
+        DesignAreaArchiveFocusRequested?.Invoke(this, EventArgs.Empty);
+        ClearDesignAreaArchiveConfirmation();
+    }
+
+    private void ClearDesignAreaArchiveConfirmation()
+    {
+        _pendingDesignAreaArchiveId = null;
+        _pendingDesignAreaArchiveName = string.Empty;
+        OnPropertyChanged(nameof(PendingDesignAreaArchiveId));
+        OnPropertyChanged(nameof(PendingDesignAreaArchiveName));
+        OnPropertyChanged(nameof(DesignAreaArchiveConfirmationMessage));
+        IsDesignAreaArchiveConfirmationVisible = false;
     }
 
     private void RunArchive(object? parameter, CatalogRecordKind kind)
@@ -1075,7 +1139,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             SaveOfferingCommand, StartAddPrintProviderCommand, CreatePrintProviderCommand, StartAddOptionCommand, ManageOptionCommand, CreateOptionCommand, StartAddOptionValueCommand,
             CreateOptionValueCommand, StartAddVariantCommand, StartBulkVariantsCommand, CreateVariantCommand, StartAddPlaceholderCommand,
             CreatePlaceholderCommand, SetDefaultPlaceholderCommand, StartAddTemplateCommand, CreateTemplateCommand,
-            AddTemplateColorCommand, PreviewBulkVariantsCommand, ConfirmBulkVariantsCommand
+            AddTemplateColorCommand, PreviewBulkVariantsCommand, ConfirmBulkVariantsCommand,
+            ConfirmDesignAreaArchiveCommand, CancelDesignAreaArchiveCommand
         })
         {
             switch (command)

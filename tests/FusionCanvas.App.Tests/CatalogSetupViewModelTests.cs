@@ -2,6 +2,7 @@ using FusionCanvas.App.Stores;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Domain.Catalog;
+using FusionCanvas.Domain.Mockups;
 using FusionCanvas.App.Tests.TestSupport;
 
 namespace FusionCanvas.App.Tests;
@@ -188,6 +189,122 @@ public sealed class CatalogSetupViewModelTests
         viewModel.CancelBulkVariantsCommand.Execute(null);
         Assert.False(viewModel.IsAddingBulkVariants);
         Assert.False(viewModel.HasActiveDraft);
+    }
+
+    [Fact]
+    public async Task RequestDesignAreaArchive_OpensConfirmationWithoutMutatingData()
+    {
+        var (viewModel, area, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: false);
+        var card = Assert.Single(viewModel.DesignAreaCards);
+
+        viewModel.ArchivePlaceholderCommand.Execute(card);
+
+        Assert.True(viewModel.IsDesignAreaArchiveConfirmationVisible);
+        Assert.Equal(area.Id, viewModel.PendingDesignAreaArchiveId);
+        Assert.Equal("Front", viewModel.PendingDesignAreaArchiveName);
+        Assert.Contains("Front", viewModel.DesignAreaArchiveConfirmationMessage, StringComparison.Ordinal);
+        Assert.Single(viewModel.DesignAreaCards);
+        Assert.False(viewModel.HasError);
+        Assert.True(viewModel.ConfirmDesignAreaArchiveCommand.CanExecute(null));
+        Assert.True(viewModel.CancelDesignAreaArchiveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task CancelDesignAreaArchive_HidesConfirmationAndPreservesData()
+    {
+        var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: false);
+        viewModel.ArchivePlaceholderCommand.Execute(Assert.Single(viewModel.DesignAreaCards));
+
+        viewModel.CancelDesignAreaArchiveCommand.Execute(null);
+
+        Assert.False(viewModel.IsDesignAreaArchiveConfirmationVisible);
+        Assert.Null(viewModel.PendingDesignAreaArchiveId);
+        Assert.Single(viewModel.DesignAreaCards);
+        Assert.False(viewModel.HasError);
+        Assert.False(viewModel.ConfirmDesignAreaArchiveCommand.CanExecute(null));
+        Assert.False(viewModel.CancelDesignAreaArchiveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task ConfirmDesignAreaArchive_ArchivesUnreferencedAreaOnceAndCloses()
+    {
+        var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: false);
+        viewModel.ArchivePlaceholderCommand.Execute(Assert.Single(viewModel.DesignAreaCards));
+
+        viewModel.ConfirmDesignAreaArchiveCommand.Execute(null);
+
+        Assert.False(viewModel.IsDesignAreaArchiveConfirmationVisible);
+        Assert.Empty(viewModel.DesignAreaCards);
+        Assert.False(viewModel.HasError);
+        Assert.False(viewModel.ConfirmDesignAreaArchiveCommand.CanExecute(null));
+
+        viewModel.ConfirmDesignAreaArchiveCommand.Execute(null);
+        Assert.Empty(viewModel.DesignAreaCards);
+        Assert.False(viewModel.HasError);
+    }
+
+    [Fact]
+    public async Task ConfirmDesignAreaArchive_BlockedReferencedAreaDisplaysRecoverableGuidance()
+    {
+        var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: true);
+        viewModel.ArchivePlaceholderCommand.Execute(Assert.Single(viewModel.DesignAreaCards));
+
+        viewModel.ConfirmDesignAreaArchiveCommand.Execute(null);
+
+        Assert.False(viewModel.IsDesignAreaArchiveConfirmationVisible);
+        Assert.True(viewModel.HasError);
+        Assert.Contains("referenced", viewModel.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(viewModel.DesignAreaCards);
+    }
+
+    [Fact]
+    public async Task RepeatedArchiveRequestKeepsOriginalTargetAndSingleConfirmation()
+    {
+        var (viewModel, area, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: false);
+        var card = Assert.Single(viewModel.DesignAreaCards);
+        viewModel.ArchivePlaceholderCommand.Execute(card);
+
+        viewModel.ArchivePlaceholderCommand.Execute(card);
+
+        Assert.True(viewModel.IsDesignAreaArchiveConfirmationVisible);
+        Assert.Equal(area.Id, viewModel.PendingDesignAreaArchiveId);
+        Assert.Equal("Front", viewModel.PendingDesignAreaArchiveName);
+        Assert.Single(viewModel.DesignAreaCards);
+        Assert.False(viewModel.HasError);
+    }
+
+    private static async Task<(CatalogSetupViewModel ViewModel, OfferingPlaceholder Area, BlueprintOffering Offering)> CreateCatalogWithDesignAreaAsync(bool referencedByTemplate)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Printful tee", null, BlueprintOfferingKind.ProviderNetwork, null, "printful", null, null, false, now, now);
+        var colorOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
+        var sizeOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Size, "Size", 1);
+        var black = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "Black", 0);
+        var small = new OfferingOptionValue(Guid.NewGuid(), sizeOption.Id, offering.Id, "S", 0);
+        var variant = new OfferingVariant(Guid.NewGuid(), offering.Id, "Black / S", [black.Id, small.Id], false, now, now);
+        var area = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 4500, 5400, [variant.Id], false, now, now);
+        var populated = snapshot with
+        {
+            Blueprints = [blueprint],
+            BlueprintOfferings = [offering],
+            OfferingOptions = [colorOption, sizeOption],
+            OfferingOptionValues = [black, small],
+            OfferingVariants = [variant],
+            OfferingPlaceholders = [area]
+        };
+        if (referencedByTemplate)
+        {
+            var template = new MockupTemplate(Guid.NewGuid(), offering.Id, area.Id, "Front black", null, 1, false, now, now);
+            populated = populated with { MockupTemplates = [template] };
+        }
+        var repository = new InMemoryWorkspaceRepository(populated);
+        var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository));
+        await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+        viewModel.SelectOffering(offering.Id);
+        return (viewModel, area, offering);
     }
 
     private sealed class StubProviderCatalog(ProviderCatalogCandidateDescriptor descriptor) : IProviderCatalogCandidateSource
