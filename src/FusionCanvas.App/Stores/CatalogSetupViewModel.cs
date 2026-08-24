@@ -864,7 +864,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(OfferingReadinessStatus));
         var groups = AvailableOptions.Select(option => new OfferingChoiceGroupViewModel(
             option,
-            OptionValues.Where(value => value.OptionId == option.Id && !value.IsArchived).OrderBy(value => value.SortOrder).ToArray()));
+            OptionValues.Where(value => value.OptionId == option.Id && !value.IsArchived).OrderBy(value => value.SortOrder).ToArray(),
+            ArchiveOptionCommand));
         Replace(AvailableChoiceGroups, groups);
         Replace(SellableVariantRows, AvailableVariants.Select(value => SellableVariantRowViewModel.From(value, Options, OptionValues)));
 
