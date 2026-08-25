@@ -4,6 +4,8 @@ using Avalonia.Threading;
 using System.ComponentModel;
 using FusionCanvas.App.RejectedPhrases;
 using FusionCanvas.App.Snowclones;
+using FusionCanvas.App.Views;
+using FusionCanvas.Application.Settings;
 
 namespace FusionCanvas.App.Ideation;
 
@@ -14,6 +16,8 @@ public partial class IdeationWindow : Window
     private RejectIdeaWindow? _rejectWindow;
     private SnowcloneLibraryWindow? _snowcloneLibraryWindow;
     private RejectedPhrasesWindow? _rejectedPhrasesWindow;
+
+    public IWindowGeometryStore? GeometryStore { get; set; }
 
     public IdeationWindow()
     {
@@ -44,6 +48,10 @@ public partial class IdeationWindow : Window
 
         viewModel.RejectCandidateCommand.Execute(candidate);
         _rejectWindow = new RejectIdeaWindow { DataContext = viewModel };
+        if (GeometryStore is { } rejectStore)
+        {
+            WindowGeometryPersistence.Attach(_rejectWindow, rejectStore, WindowLayoutKeys.RejectIdea, _rejectWindow.MinWidth, _rejectWindow.MinHeight);
+        }
         await _rejectWindow.ShowDialog(this);
         _rejectWindow = null;
         FocusNextCandidate();
@@ -66,6 +74,10 @@ public partial class IdeationWindow : Window
         }
 
         _snowcloneLibraryWindow = new SnowcloneLibraryWindow { DataContext = library };
+        if (GeometryStore is { } snowcloneStore)
+        {
+            WindowGeometryPersistence.Attach(_snowcloneLibraryWindow, snowcloneStore, WindowLayoutKeys.SnowcloneLibrary, _snowcloneLibraryWindow.MinWidth, _snowcloneLibraryWindow.MinHeight);
+        }
         await _snowcloneLibraryWindow.ShowDialog(this);
         _snowcloneLibraryWindow = null;
         await viewModel.CompleteSnowcloneLibraryAsync();
@@ -86,6 +98,10 @@ public partial class IdeationWindow : Window
         }
 
         _rejectedPhrasesWindow = new RejectedPhrasesWindow { DataContext = manager };
+        if (GeometryStore is { } rejectedPhrasesStore)
+        {
+            WindowGeometryPersistence.Attach(_rejectedPhrasesWindow, rejectedPhrasesStore, WindowLayoutKeys.RejectedPhrases, _rejectedPhrasesWindow.MinWidth, _rejectedPhrasesWindow.MinHeight);
+        }
         await _rejectedPhrasesWindow.ShowDialog(this);
         _rejectedPhrasesWindow = null;
         await viewModel.CompleteRejectedPhrasesAsync();
