@@ -10,6 +10,7 @@ public partial class StoreEditorWindow : Window
     private CatalogSetupViewModel? _subscribedCatalog;
     private bool _designAreaArchiveConfirmationOpen;
     private bool _optionValueManagementOpen;
+    private bool _variantCreationDialogOpen;
 
     public StoreEditorWindow()
     {
@@ -39,9 +40,9 @@ public partial class StoreEditorWindow : Window
         {
             _subscribedCatalog.OptionValueManagementRequested -= OnOptionValueManagementRequested;
             _subscribedCatalog.OptionChoiceFocusRequested -= OnOptionChoiceFocusRequested;
-            _subscribedCatalog.VariantEditorFocusRequested -= OnVariantEditorFocusRequested;
+            _subscribedCatalog.AddVariantRequested -= OnAddVariantRequested;
             _subscribedCatalog.VariantActionsFocusRequested -= OnVariantActionsFocusRequested;
-            _subscribedCatalog.BulkVariantEditorFocusRequested -= OnBulkVariantEditorFocusRequested;
+            _subscribedCatalog.BulkVariantsRequested -= OnBulkVariantsRequested;
             _subscribedCatalog.BulkVariantActionFocusRequested -= OnBulkVariantActionFocusRequested;
             _subscribedCatalog.DesignAreaArchiveConfirmationRequested -= OnDesignAreaArchiveConfirmationRequested;
             _subscribedCatalog.DesignAreaArchiveFocusRequested -= OnDesignAreaArchiveFocusRequested;
@@ -62,9 +63,9 @@ public partial class StoreEditorWindow : Window
             _subscribedCatalog = catalog;
             catalog.OptionValueManagementRequested += OnOptionValueManagementRequested;
             catalog.OptionChoiceFocusRequested += OnOptionChoiceFocusRequested;
-            catalog.VariantEditorFocusRequested += OnVariantEditorFocusRequested;
+            catalog.AddVariantRequested += OnAddVariantRequested;
             catalog.VariantActionsFocusRequested += OnVariantActionsFocusRequested;
-            catalog.BulkVariantEditorFocusRequested += OnBulkVariantEditorFocusRequested;
+            catalog.BulkVariantsRequested += OnBulkVariantsRequested;
             catalog.BulkVariantActionFocusRequested += OnBulkVariantActionFocusRequested;
             catalog.DesignAreaArchiveConfirmationRequested += OnDesignAreaArchiveConfirmationRequested;
             catalog.DesignAreaArchiveFocusRequested += OnDesignAreaArchiveFocusRequested;
@@ -127,15 +128,39 @@ public partial class StoreEditorWindow : Window
         (button ?? AddOptionButton).Focus();
     });
 
-    private void OnVariantEditorFocusRequested(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
-    {
-        VariantNameTextBox.Focus();
-        VariantNameTextBox.SelectAll();
-    });
-
     private void OnVariantActionsFocusRequested(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() => AddVariantButton.Focus());
 
-    private void OnBulkVariantEditorFocusRequested(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() => BulkColorComboBox.Focus());
+    private async void OnAddVariantRequested(object? sender, EventArgs e)
+    {
+        if (_variantCreationDialogOpen || _subscribedCatalog is not { } catalog) return;
+        _variantCreationDialogOpen = true;
+        try
+        {
+            var dialog = new AddVariantWindow { DataContext = catalog };
+            await dialog.ShowDialog(this);
+            catalog.CancelAddVariantCommand.Execute(null);
+        }
+        finally
+        {
+            _variantCreationDialogOpen = false;
+        }
+    }
+
+    private async void OnBulkVariantsRequested(object? sender, EventArgs e)
+    {
+        if (_variantCreationDialogOpen || _subscribedCatalog is not { } catalog) return;
+        _variantCreationDialogOpen = true;
+        try
+        {
+            var dialog = new BulkAddVariantsWindow { DataContext = catalog };
+            await dialog.ShowDialog(this);
+            catalog.CancelBulkVariantsCommand.Execute(null);
+        }
+        finally
+        {
+            _variantCreationDialogOpen = false;
+        }
+    }
 
     private void OnBulkVariantActionFocusRequested(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() => BulkAddVariantButton.Focus());
 

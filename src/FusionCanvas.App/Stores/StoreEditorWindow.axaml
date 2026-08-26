@@ -5,7 +5,6 @@
         xmlns:appNiches="clr-namespace:FusionCanvas.Application.Niches;assembly=FusionCanvas.Application"
         xmlns:appTags="clr-namespace:FusionCanvas.Application.Tags;assembly=FusionCanvas.Application"
         xmlns:appProducts="clr-namespace:FusionCanvas.Application.Products;assembly=FusionCanvas.Application"
-        xmlns:catalogApplication="clr-namespace:FusionCanvas.Application.Catalog;assembly=FusionCanvas.Application"
         xmlns:catalog="clr-namespace:FusionCanvas.Domain.Catalog;assembly=FusionCanvas.Domain"
         xmlns:mockups="clr-namespace:FusionCanvas.Domain.Mockups;assembly=FusionCanvas.Domain"
         x:Class="FusionCanvas.App.Stores.StoreEditorWindow"
@@ -830,61 +829,6 @@
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <StackPanel IsVisible="{Binding CatalogSetup.IsAddingVariant}" Spacing="6">
-                      <TextBox x:Name="VariantNameTextBox" Text="{Binding CatalogSetup.VariantName}" PlaceholderText="Variant name (optional)" Classes="field" />
-                      <TextBlock Text="Option Values" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                      <ItemsControl ItemsSource="{Binding CatalogSetup.VariantValueChoices}">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="stores:OptionValueChoiceViewModel">
-                            <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" />
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="Save Variant" Command="{Binding CatalogSetup.CreateVariantCommand}" Classes="primary fixedAction" />
-                        <Button Content="Cancel" Command="{Binding CatalogSetup.CancelAddVariantCommand}" Classes="secondary fixedAction" />
-                      </StackPanel>
-                    </StackPanel>
-                    <Border Classes="panel" Padding="10" IsVisible="{Binding CatalogSetup.IsAddingBulkVariants}"
-                            AutomationProperties.AutomationId="Catalog.BulkVariantEditor">
-                      <StackPanel Spacing="8">
-                        <TextBlock Text="Add all valid sizes for a Color" FontWeight="SemiBold" />
-                        <TextBlock Text="Select an enabled Color and the Sizes you want to sell. Fusion Canvas previews only combinations confirmed by the provider catalog before creating anything."
-                                   TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <ComboBox x:Name="BulkColorComboBox" ItemsSource="{Binding CatalogSetup.AvailableColors}"
-                                  SelectedItem="{Binding CatalogSetup.BulkColor}"
-                                  DisplayMemberBinding="{Binding Value}"
-                                  PlaceholderText="Select Color" />
-                        <ItemsControl ItemsSource="{Binding CatalogSetup.BulkSizeChoices}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="stores:BulkSizeChoiceViewModel">
-                              <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" />
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                          <Button Content="Preview valid Variants" Command="{Binding CatalogSetup.PreviewBulkVariantsCommand}" Classes="secondary" />
-                          <Button Content="Cancel" Command="{Binding CatalogSetup.CancelBulkVariantsCommand}" Classes="secondary fixedAction" />
-                        </StackPanel>
-                        <TextBlock Text="{Binding CatalogSetup.BulkResultMessage}"
-                                   IsVisible="{Binding CatalogSetup.HasBulkResultMessage}"
-                                   TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <ItemsControl ItemsSource="{Binding CatalogSetup.BulkPreviewCandidates}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="catalogApplication:BulkVariantCandidate">
-                              <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Text="{Binding SizeName}" />
-                                <TextBlock Text="{Binding ExclusionReason}" Foreground="{DynamicResource SecondaryTextBrush}" />
-                              </StackPanel>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <Button Content="Create previewed Variants"
-                                IsVisible="{Binding CatalogSetup.HasBulkPreview}"
-                                Command="{Binding CatalogSetup.ConfirmBulkVariantsCommand}"
-                                Classes="primary" />
-                      </StackPanel>
-                    </Border>
                 </StackPanel>
               </Border>
 

@@ -163,9 +163,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public event EventHandler? OptionValueEditorFocusRequested;
     public event EventHandler? OptionValueManagementRequested;
     public event EventHandler? OptionChoiceFocusRequested;
-    public event EventHandler? VariantEditorFocusRequested;
+    public event EventHandler? AddVariantRequested;
     public event EventHandler? VariantActionsFocusRequested;
-    public event EventHandler? BulkVariantEditorFocusRequested;
+    public event EventHandler? BulkVariantsRequested;
     public event EventHandler? BulkVariantActionFocusRequested;
     public event EventHandler? DesignAreaArchiveConfirmationRequested;
     public event EventHandler? DesignAreaArchiveFocusRequested;
@@ -197,14 +197,20 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         get => _selectedOffering;
         private set
         {
-            if (!SetField(ref _selectedOffering, value)) return;
-            if (IsManagingOptionValues)
-            {
-                IsAddingOptionValue = false;
-                OptionValue = string.Empty;
-                IsManagingOptionValues = false;
-            }
-            LoadOfferingFields();
+        if (!SetField(ref _selectedOffering, value)) return;
+        if (IsManagingOptionValues)
+        {
+            IsAddingOptionValue = false;
+            OptionValue = string.Empty;
+            IsManagingOptionValues = false;
+        }
+        if (IsAddingVariant || IsAddingBulkVariants)
+        {
+            ResetVariantDraft();
+            ResetBulkDraft();
+            IsAddingBulkVariants = false;
+        }
+        LoadOfferingFields();
             RefreshOfferingCollections();
             OnPropertyChanged(nameof(SelectedOfferingId));
             OnPropertyChanged(nameof(HasSelectedOffering));
@@ -1004,8 +1010,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         ResetBulkDraft();
         IsAddingVariant = !bulk;
         IsAddingBulkVariants = bulk;
-        if (bulk) BulkVariantEditorFocusRequested?.Invoke(this, EventArgs.Empty);
-        else VariantEditorFocusRequested?.Invoke(this, EventArgs.Empty);
+        if (bulk) BulkVariantsRequested?.Invoke(this, EventArgs.Empty);
+        else AddVariantRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void RebuildChoices()

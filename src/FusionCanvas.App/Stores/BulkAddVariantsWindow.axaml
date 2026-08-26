@@ -1,0 +1,80 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:stores="clr-namespace:FusionCanvas.App.Stores"
+        xmlns:catalogApplication="clr-namespace:FusionCanvas.Application.Catalog;assembly=FusionCanvas.Application"
+        x:Class="FusionCanvas.App.Stores.BulkAddVariantsWindow"
+        x:DataType="stores:CatalogSetupViewModel"
+        Title="Bulk add"
+        Width="460"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowActivated="True"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ApplicationBackgroundBrush}"
+        AutomationProperties.AutomationId="Catalog.BulkAddVariantsDialog">
+  <Grid RowDefinitions="*,Auto" Margin="20" RowSpacing="16">
+    <StackPanel Grid.Row="0" Spacing="8" AutomationProperties.AutomationId="Catalog.BulkVariantEditor">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="Add all valid sizes for a Color" FontWeight="SemiBold" />
+        <Button x:Name="BulkAddCancelButton" Grid.Column="1" Content="Cancel" Click="OnCancelClick" Classes="secondary" />
+      </Grid>
+      <TextBlock Text="Select an enabled Color and the Sizes you want to sell. Fusion Canvas previews only combinations confirmed by the provider catalog before creating anything."
+                 TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+      <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" FontSize="12" Foreground="{DynamicResource DangerTextBrush}" />
+      <ComboBox x:Name="BulkColorComboBox" ItemsSource="{Binding AvailableColors}"
+                SelectedItem="{Binding BulkColor}"
+                DisplayMemberBinding="{Binding Value}"
+                PlaceholderText="Select Color" />
+      <TextBlock IsVisible="{Binding !HasAvailableOptions}" Text="Add Options and Values before creating Variants." Foreground="{DynamicResource SecondaryTextBrush}" />
+      <ItemsControl ItemsSource="{Binding BulkSizeChoices}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="stores:BulkSizeChoiceViewModel">
+            <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Button Content="Preview valid Variants" Command="{Binding PreviewBulkVariantsCommand}" Classes="secondary" />
+      <TextBlock Text="{Binding BulkResultMessage}"
+                 IsVisible="{Binding HasBulkResultMessage}"
+                 TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+      <ItemsControl ItemsSource="{Binding BulkPreviewCandidates}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="catalogApplication:BulkVariantCandidate">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="{Binding SizeName}" />
+              <TextBlock Text="{Binding ExclusionReason}" Foreground="{DynamicResource SecondaryTextBrush}" />
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Button Content="Create previewed Variants"
+              IsVisible="{Binding HasBulkPreview}"
+              Command="{Binding ConfirmBulkVariantsCommand}"
+              Classes="primary" />
+    </StackPanel>
+  </Grid>
+  <Window.Styles>
+    <Style Selector="Button.primary">
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource CommandForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.secondary">
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SecondaryButtonForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="TextBox.field">
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Padding" Value="8,6" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource StrongTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+  </Window.Styles>
+</Window>

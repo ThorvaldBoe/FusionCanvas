@@ -1,0 +1,62 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:stores="clr-namespace:FusionCanvas.App.Stores"
+        x:Class="FusionCanvas.App.Stores.AddVariantWindow"
+        x:DataType="stores:CatalogSetupViewModel"
+        Title="Add Variant"
+        Width="420"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowActivated="True"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ApplicationBackgroundBrush}"
+        AutomationProperties.AutomationId="Catalog.AddVariantDialog">
+  <Grid RowDefinitions="*,Auto" Margin="20" RowSpacing="16">
+    <StackPanel Grid.Row="0" Spacing="8" AutomationProperties.AutomationId="Catalog.AddVariantEditor">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="Add Variant" FontWeight="SemiBold" />
+        <Button x:Name="AddVariantCancelButton" Grid.Column="1" Content="Cancel" Click="OnCancelClick" Classes="secondary" />
+      </Grid>
+      <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" FontSize="12" Foreground="{DynamicResource DangerTextBrush}" />
+      <TextBox x:Name="VariantNameTextBox" Text="{Binding VariantName}" PlaceholderText="Variant name (optional)" Classes="field" />
+      <TextBlock Text="Option Values" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+      <TextBlock IsVisible="{Binding !HasAvailableOptions}" Text="Add Options and Values before creating Variants." Foreground="{DynamicResource SecondaryTextBrush}" />
+      <ItemsControl ItemsSource="{Binding VariantValueChoices}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="stores:OptionValueChoiceViewModel">
+            <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Button x:Name="SaveVariantButton" Content="Save Variant" Command="{Binding CreateVariantCommand}" Classes="primary fixedAction" />
+    </StackPanel>
+  </Grid>
+  <Window.Styles>
+    <Style Selector="Button.primary">
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource CommandForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.secondary">
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SecondaryButtonForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.fixedAction">
+      <Setter Property="Width" Value="104" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <Style Selector="TextBox.field">
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Padding" Value="8,6" />
+      <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource StrongTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+  </Window.Styles>
+</Window>

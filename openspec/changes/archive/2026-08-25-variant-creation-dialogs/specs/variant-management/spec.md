@@ -1,10 +1,4 @@
-# Variant Management
-
-## Purpose
-
-Defines how the Manage Variants surface presents an Offering's provider-catalog Options, Option Values, and concrete sellable Variants, including on-demand editing, draft exclusivity, lifecycle safeguard behavior, and the compact card presentation that keeps the routine **Manage values** action primary and the infrequent destructive **Archive option** action inside a three-dot overflow menu.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Variant management separates possible choices from sellable Variants
 FusionCanvas SHALL present provider-catalog Options and Option Values that may participate in combinations in a distinct Available choices region before a Sellable Variants region for one Blueprint Offering. It SHALL preserve stable Option kinds and explicit Variant identities from the authoritative catalog model, disclose choice editing and Variant creation only when invoked, and summarize each confirmed Variant through its stable Option-kind values rather than a name-only row. Each compact Option summary SHALL expose **Manage values** as its routine, directly available action and SHALL keep the infrequent destructive **Archive option** action inside a compact three-dot overflow menu so it does not dominate the card. Option Value editing SHALL be presented in a focused modal dialog scoped to one Option, not as an inline region of the Variants page. Individual and bulk Variant creation SHALL be presented in focused modal dialogs, not as inline editors below the Sellable Variants list.
@@ -113,86 +107,7 @@ FusionCanvas SHALL keep Option Value, individual Variant, and bulk Variant creat
 - **THEN** FusionCanvas shows a recoverable unavailable state in the Available choices region
 - **AND** leaves confirmed Variants visible and unchanged
 
-### Requirement: Available options render as bordered choice cards
-FusionCanvas SHALL present each available Option in the Available choices region as a distinct compact bordered card, SHALL show the Option name, semantic kind label, current value summary, and the Option's manage and archive actions inside the same boundary, and SHALL use shared semantic theme resources so the boundary remains visible in both Light and Dark appearance.
-
-#### Scenario: User scans available choices as cards
-- **WHEN** Variant management has multiple available Options
-- **THEN** FusionCanvas encloses each Option in its own bordered card
-- **AND** places the Option name, kind label, value summary, and its actions inside the same boundary
-- **AND** applies consistent padding, corner radius, and spacing across the cards
-
-#### Scenario: Empty Option uses the same card treatment
-- **WHEN** an available Option has no configured values
-- **THEN** FusionCanvas renders the empty Option as a choice card with the same boundary
-- **AND** shows a truthful summary that no values are configured
-
-#### Scenario: Custom Option kind uses the same card treatment
-- **WHEN** an available Option is neither Color nor Size
-- **THEN** FusionCanvas renders it as a choice card with the same boundary
-- **AND** labels the card by its custom Option kind
-
-### Requirement: Choice cards align and respond to available width without clipping
-FusionCanvas SHALL align available-option cards cleanly in the available width, SHALL wrap or stack them gracefully at narrower supported widths, and SHALL wrap long Option names and value summaries so card layout does not clip content.
-
-#### Scenario: Cards align cleanly in the available width
-- **WHEN** multiple available Option cards fit within the available width
-- **THEN** they sit side by side aligned on the same row with consistent spacing
-
-#### Scenario: Cards stack at narrower supported widths
-- **WHEN** the window narrows toward its minimum supported width
-- **THEN** the cards wrap onto new rows instead of overflowing or being clipped
-
-#### Scenario: Long content does not clip
-- **WHEN** an available Option name or value summary is longer than the card width
-- **THEN** the text wraps within the card and remains readable
-
-### Requirement: Option value management dialog is scoped, single, and context-safe
-FusionCanvas SHALL present Option value management in a focused modal dialog owned by the Store Editor window, SHALL scope the dialog to exactly one Option identified by its stable identity, SHALL allow only one value-management dialog at a time, SHALL title the dialog "Manage &lt;Option name&gt; values", and SHALL close the dialog when the Blueprint Offering or workspace context changes so the dialog cannot edit stale data. The dialog SHALL reuse the existing add-value and archive-value capabilities, validation, dependency safeguards, error messages, and persistence semantics without duplicating domain or application logic.
-
-#### Scenario: Manage values opens a focused dialog for the selected Option
-- **WHEN** the user selects **Manage values** on an Option card
-- **THEN** FusionCanvas opens one focused modal dialog owned by the Store Editor window
-- **AND** scopes the dialog to the Option's stable identity
-- **AND** the dialog title is "Manage &lt;Option name&gt; values", such as "Manage Color values" or "Manage Size values"
-- **AND** the dialog shows only that Option's current values
-
-#### Scenario: Only one value-management dialog may be open at a time
-- **WHEN** a value-management dialog is already open and the user invokes another value management action
-- **THEN** FusionCanvas does not open a second value-management dialog
-- **AND** keeps the existing dialog scoped to its original Option
-
-#### Scenario: Switching the Blueprint Offering closes the dialog
-- **WHEN** the Blueprint Offering context changes while a value-management dialog is open
-- **THEN** FusionCanvas closes the dialog
-- **AND** discards any unfinished add-value draft without persisting
-- **AND** does not allow the dialog to edit values for a different Offering than the one that opened it
-
-#### Scenario: Switching the workspace closes the dialog
-- **WHEN** the active workspace changes while a value-management dialog is open
-- **THEN** FusionCanvas closes the dialog
-- **AND** discards any unfinished add-value draft without persisting
-
-#### Scenario: Explicit finish closes the dialog
-- **WHEN** the user selects the explicit finish action, such as **Done**
-- **THEN** FusionCanvas closes the value-management dialog
-- **AND** returns keyboard focus to the originating **Manage values** control
-
-#### Scenario: Cancel or close discards an unfinished add-value draft
-- **WHEN** the user cancels, closes, or presses Escape while an add-value draft is in progress
-- **THEN** FusionCanvas closes the dialog
-- **AND** does not persist the unfinished add-value draft
-- **AND** returns keyboard focus to the originating **Manage values** control
-
-#### Scenario: Value management reuses existing validation, dependencies, and persistence
-- **WHEN** the user adds or archives a value inside the dialog
-- **THEN** FusionCanvas applies the same validation, dependency safeguards, error messages, and persistence semantics as the previous inline editor
-- **AND** a successful change updates the underlying Option and refreshes the parent Option card value summary and affected Variant state
-
-#### Scenario: Value management dialog supports custom Option kinds
-- **WHEN** the user selects **Manage values** for an Option whose kind is neither Color nor Size
-- **THEN** FusionCanvas opens the same value-management dialog titled "Manage &lt;Option name&gt; values"
-- **AND** does not require a hard-coded screen for the custom kind
+## ADDED Requirements
 
 ### Requirement: Variant creation dialogs are scoped, single, and context-safe
 FusionCanvas SHALL present individual and bulk Variant creation in two independently titled focused modal dialogs owned by the Store Editor window: one titled "Add Variant" for creating a single sellable combination and one titled "Bulk add" for selecting and generating multiple valid combinations. Each dialog SHALL be scoped to the active Blueprint Offering by stable identity and SHALL use only that Offering's current Option Values. Only one creation dialog may be open at a time. Both dialogs SHALL close when the Blueprint Offering or workspace context changes so a dialog cannot edit stale data. The dialogs SHALL reuse the existing single-Variant and bulk creation capabilities, validation, duplicate, cross-Offering, incomplete-combination, dependency, error, and persistence semantics without duplicating domain or application logic. Successful completion SHALL close the dialog and refresh the Variant count and list while preserving the active Offering. Cancel, close, and Escape SHALL discard the in-progress dialog draft and create no Variant, and focus SHALL return to the action that opened the dialog.
