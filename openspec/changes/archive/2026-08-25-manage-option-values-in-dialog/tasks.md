@@ -1,0 +1,14 @@
+# Tasks: Manage Option values in a focused dialog
+
+- [x] 1. View model: add `OptionValueManagementRequested` event and raise it from `BeginManageOptionValues`; stop raising `OptionValueEditorFocusRequested` there (keep it in `BeginAddOptionValue`).
+- [x] 2. View model: add `ManageOptionValuesDialogTitle` computed property; raise change notifications from the `SelectedOption` setter.
+- [x] 3. View model: in the `SelectedOffering` setter, when the Offering changes and `IsManagingOptionValues` is true, reset the management session (clear `IsManagingOptionValues`, `IsAddingOptionValue`, `OptionValue`) without raising `OptionChoiceFocusRequested`.
+- [x] 4. Create `OptionValueManagementWindow.axaml` + `.axaml.cs`: title bound to `ManageOptionValuesDialogTitle`; reuse existing value-editor markup and command bindings; Done click closes the window; Escape closes; `Opened` focuses Done; subscribe to `OptionValueEditorFocusRequested` to focus the value text box when an add-value draft starts; closes itself when `IsManagingOptionValues` becomes false.
+- [x] 5. Host wiring in `StoreEditorWindow.axaml.cs`: subscribe/unsubscribe `OptionValueManagementRequested`; open the dialog via `ShowDialog`; after close, run `CloseOptionValueManagementCommand` only if still managing; single-dialog guard flag; removed the inline `OnOptionValueEditorFocusRequested` handler (named controls now live in the dialog).
+- [x] 6. Remove the inline value-editor `Border` (AutomationId `Catalog.OptionValueEditor`) and its named controls from `StoreEditorWindow.axaml`; keep the **Manage values** button and `ManageOptionCommand` binding on the card.
+- [x] 7. UI description reconciliation: `manage-variants.ui.yaml` describes no inline value editor (only the manage buttons), so no content removal was needed; the wireframe is already consistent with the focused-dialog approach and was left unchanged to avoid breaking the rendered SVG fixtures.
+- [x] 8. Framework-free tests in `CatalogSetupViewModelTests.cs`: title derives from selected Option; `ManageOptionCommand` raises `OptionValueManagementRequested`; Offering switch closes the session and discards the draft; `CloseOptionValueManagementCommand` discards the draft.
+- [x] 9. Headless tests in `StoreEditorHeadlessTests.cs`: rewrote inline-editor assertions in `CatalogEditorsUseCompactBasicsOnDemandDraftsAndSummaryFirstRegions`; added dialog tests (open via **Manage values**, title, Done closes + focus returns, Escape discards draft, only one dialog, custom Option kind, Offering switch closes).
+- [x] 10. Build and run `dotnet test .\FusionCanvas.sln`; 0 failures (1385 passed).
+- [x] 11. Run `openspec validate manage-option-values-in-dialog --strict`; valid.
+- [x] 12. Fill `verification.md` with criterion-level evidence; run full `openspec validate --specs --strict` and `openspec validate --changes --strict` after spec sync.

@@ -161,6 +161,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler? OptionValueEditorFocusRequested;
+    public event EventHandler? OptionValueManagementRequested;
     public event EventHandler? OptionChoiceFocusRequested;
     public event EventHandler? VariantEditorFocusRequested;
     public event EventHandler? VariantActionsFocusRequested;
@@ -197,6 +198,12 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         private set
         {
             if (!SetField(ref _selectedOffering, value)) return;
+            if (IsManagingOptionValues)
+            {
+                IsAddingOptionValue = false;
+                OptionValue = string.Empty;
+                IsManagingOptionValues = false;
+            }
             LoadOfferingFields();
             RefreshOfferingCollections();
             OnPropertyChanged(nameof(SelectedOfferingId));
@@ -240,11 +247,13 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(SelectedOptionId));
             OnPropertyChanged(nameof(AvailableValues));
             OnPropertyChanged(nameof(HasAvailableValues));
+            OnPropertyChanged(nameof(ManageOptionValuesDialogTitle));
             NotifyCommands();
         }
     }
 
     public Guid? SelectedOptionId => SelectedOption?.Id;
+    public string ManageOptionValuesDialogTitle => SelectedOption is { } option ? $"Manage {option.Name} values" : "Manage values";
 
     public OfferingPlaceholder? SelectedPlaceholder
     {
@@ -971,7 +980,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         if (option is null) return;
         SelectedOption = option;
         IsManagingOptionValues = true;
-        OptionValueEditorFocusRequested?.Invoke(this, EventArgs.Empty);
+        OptionValueManagementRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void BeginAddOptionValue()

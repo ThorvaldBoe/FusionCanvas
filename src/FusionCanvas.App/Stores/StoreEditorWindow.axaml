@@ -797,39 +797,6 @@
                       <Button Content="Cancel" Command="{Binding CatalogSetup.CancelAddOptionCommand}" Classes="secondary fixedAction" />
                     </StackPanel>
                   </StackPanel>
-                  <Border IsVisible="{Binding CatalogSetup.IsManagingOptionValues}" Classes="panel" Padding="10"
-                          AutomationProperties.AutomationId="Catalog.OptionValueEditor">
-                  <StackPanel Spacing="6">
-                    <Grid ColumnDefinitions="*,Auto">
-                      <StackPanel Grid.Column="0" Spacing="2">
-                        <TextBlock Text="Manage values" FontWeight="SemiBold" />
-                        <TextBlock Text="{Binding CatalogSetup.SelectedOption.Name}" Foreground="{DynamicResource SecondaryTextBrush}" />
-                      </StackPanel>
-                      <Button x:Name="OptionValueDoneButton" Grid.Column="1" Content="Done" Command="{Binding CatalogSetup.CloseOptionValueManagementCommand}" Classes="secondary" />
-                    </Grid>
-                    <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailableValues}" Text="No Values configured for this Option." Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <ItemsControl ItemsSource="{Binding CatalogSetup.AvailableValues}">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="catalog:OfferingOptionValue">
-                          <Border Classes="listItem" Padding="8">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                              <TextBlock Text="{Binding Value}" />
-                              <Button Content="Archive Option Value" Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ArchiveOptionValueCommand}" CommandParameter="{Binding}" Classes="danger" />
-                            </StackPanel>
-                          </Border>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <Button x:Name="AddOptionValueButton" Content="Add Option Value" Command="{Binding CatalogSetup.StartAddOptionValueCommand}" Classes="secondary" />
-                    <StackPanel IsVisible="{Binding CatalogSetup.IsAddingOptionValue}" Spacing="6">
-                      <TextBox x:Name="OptionValueTextBox" Text="{Binding CatalogSetup.OptionValue}" PlaceholderText="Option Value" Classes="field" />
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="Save Option Value" Command="{Binding CatalogSetup.CreateOptionValueCommand}" Classes="primary fixedAction" />
-                        <Button Content="Cancel" Command="{Binding CatalogSetup.CancelAddOptionValueCommand}" Classes="secondary fixedAction" />
-                      </StackPanel>
-                    </StackPanel>
-                  </StackPanel>
-                  </Border>
                 </StackPanel>
               </Border>
 
