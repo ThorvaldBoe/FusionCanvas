@@ -1,10 +1,4 @@
-# Variant Management
-
-## Purpose
-
-Defines how the Manage Variants surface presents an Offering's provider-catalog Options, Option Values, and concrete sellable Variants, including on-demand editing, draft exclusivity, lifecycle safeguard behavior, and the compact card presentation that keeps the routine **Manage values** action primary and the infrequent destructive **Archive option** action inside a three-dot overflow menu.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Variant management separates possible choices from sellable Variants
 FusionCanvas SHALL present provider-catalog Options and Option Values that may participate in combinations in a distinct Available choices region before a Sellable Variants region for one Blueprint Offering. It SHALL preserve stable Option kinds and explicit Variant identities from the authoritative catalog model, disclose choice editing and Variant drafts only when invoked, and summarize each confirmed Variant through its stable Option-kind values rather than a name-only row. Each compact Option summary SHALL expose **Manage values** as its routine, directly available action and SHALL keep the infrequent destructive **Archive option** action inside a compact three-dot overflow menu so it does not dominate the card. Option Value editing SHALL be presented in a focused modal dialog scoped to one Option, not as an inline region of the Variants page.
@@ -113,39 +107,7 @@ FusionCanvas SHALL keep Option Value, individual Variant, and bulk Variant edito
 - **THEN** FusionCanvas shows a recoverable unavailable state in the Available choices region
 - **AND** leaves confirmed Variants visible and unchanged
 
-### Requirement: Available options render as bordered choice cards
-FusionCanvas SHALL present each available Option in the Available choices region as a distinct compact bordered card, SHALL show the Option name, semantic kind label, current value summary, and the Option's manage and archive actions inside the same boundary, and SHALL use shared semantic theme resources so the boundary remains visible in both Light and Dark appearance.
-
-#### Scenario: User scans available choices as cards
-- **WHEN** Variant management has multiple available Options
-- **THEN** FusionCanvas encloses each Option in its own bordered card
-- **AND** places the Option name, kind label, value summary, and its actions inside the same boundary
-- **AND** applies consistent padding, corner radius, and spacing across the cards
-
-#### Scenario: Empty Option uses the same card treatment
-- **WHEN** an available Option has no configured values
-- **THEN** FusionCanvas renders the empty Option as a choice card with the same boundary
-- **AND** shows a truthful summary that no values are configured
-
-#### Scenario: Custom Option kind uses the same card treatment
-- **WHEN** an available Option is neither Color nor Size
-- **THEN** FusionCanvas renders it as a choice card with the same boundary
-- **AND** labels the card by its custom Option kind
-
-### Requirement: Choice cards align and respond to available width without clipping
-FusionCanvas SHALL align available-option cards cleanly in the available width, SHALL wrap or stack them gracefully at narrower supported widths, and SHALL wrap long Option names and value summaries so card layout does not clip content.
-
-#### Scenario: Cards align cleanly in the available width
-- **WHEN** multiple available Option cards fit within the available width
-- **THEN** they sit side by side aligned on the same row with consistent spacing
-
-#### Scenario: Cards stack at narrower supported widths
-- **WHEN** the window narrows toward its minimum supported width
-- **THEN** the cards wrap onto new rows instead of overflowing or being clipped
-
-#### Scenario: Long content does not clip
-- **WHEN** an available Option name or value summary is longer than the card width
-- **THEN** the text wraps within the card and remains readable
+## ADDED Requirements
 
 ### Requirement: Option value management dialog is scoped, single, and context-safe
 FusionCanvas SHALL present Option value management in a focused modal dialog owned by the Store Editor window, SHALL scope the dialog to exactly one Option identified by its stable identity, SHALL allow only one value-management dialog at a time, SHALL title the dialog "Manage &lt;Option name&gt; values", and SHALL close the dialog when the Blueprint Offering or workspace context changes so the dialog cannot edit stale data. The dialog SHALL reuse the existing add-value and archive-value capabilities, validation, dependency safeguards, error messages, and persistence semantics without duplicating domain or application logic.

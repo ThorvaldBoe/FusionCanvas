@@ -192,6 +192,142 @@ public sealed class CatalogSetupViewModelTests
     }
 
     [Fact]
+    public async Task ManageOptionValuesDialogTitleReflectsSelectedOptionName()
+    {
+        var (viewModel, colorOption, sizeOption, _) = await CreateCatalogWithOptionsAsync();
+        Assert.Equal(colorOption.Id, viewModel.SelectedOption?.Id);
+        Assert.Equal("Manage Color values", viewModel.ManageOptionValuesDialogTitle);
+
+        viewModel.ManageOptionCommand.Execute(sizeOption);
+
+        Assert.True(viewModel.IsManagingOptionValues);
+        Assert.Equal("Manage Size values", viewModel.ManageOptionValuesDialogTitle);
+    }
+
+    [Fact]
+    public async Task ManageOptionCommandRequestsDialogAndCloseDiscardsDraft()
+    {
+        var (viewModel, colorOption, _, _) = await CreateCatalogWithOptionsAsync();
+        var requested = 0;
+        viewModel.OptionValueManagementRequested += (_, _) => requested++;
+
+        viewModel.ManageOptionCommand.Execute(colorOption);
+        Assert.Equal(1, requested);
+        Assert.True(viewModel.IsManagingOptionValues);
+
+        viewModel.StartAddOptionValueCommand.Execute(null);
+        viewModel.OptionValue = "Navy";
+        Assert.True(viewModel.IsAddingOptionValue);
+
+        viewModel.CloseOptionValueManagementCommand.Execute(null);
+
+        Assert.False(viewModel.IsManagingOptionValues);
+        Assert.False(viewModel.IsAddingOptionValue);
+        Assert.Equal(string.Empty, viewModel.OptionValue);
+    }
+
+    [Fact]
+    public async Task SecondManageRequestKeepsOriginalStableOptionScope()
+    {
+        var (viewModel, colorOption, sizeOption, _) = await CreateCatalogWithOptionsAsync();
+        var requested = 0;
+        viewModel.OptionValueManagementRequested += (_, _) => requested++;
+
+        viewModel.ManageOptionCommand.Execute(colorOption);
+        viewModel.ManageOptionCommand.Execute(sizeOption);
+
+        Assert.Equal(1, requested);
+        Assert.Equal(colorOption.Id, viewModel.SelectedOptionId);
+        Assert.Equal("Manage Color values", viewModel.ManageOptionValuesDialogTitle);
+    }
+
+    [Fact]
+    public async Task ManageRequestRejectsOptionOutsideCurrentOffering()
+    {
+        var (viewModel, colorOption, _, offering) = await CreateCatalogWithOptionsAsync();
+        var staleOption = colorOption with { Id = Guid.NewGuid(), OfferingId = Guid.NewGuid() };
+        var requested = 0;
+        viewModel.OptionValueManagementRequested += (_, _) => requested++;
+
+        viewModel.ManageOptionCommand.Execute(staleOption);
+
+        Assert.Equal(0, requested);
+        Assert.False(viewModel.IsManagingOptionValues);
+        Assert.Equal(offering.Id, viewModel.SelectedOfferingId);
+        Assert.Equal(colorOption.Id, viewModel.SelectedOptionId);
+    }
+
+    [Fact]
+    public async Task WorkspaceLoadClosesOptionValueManagementAndDiscardsDraft()
+    {
+        var (viewModel, colorOption, _, _) = await CreateCatalogWithOptionsAsync();
+        viewModel.ManageOptionCommand.Execute(colorOption);
+        viewModel.StartAddOptionValueCommand.Execute(null);
+        viewModel.OptionValue = "Navy";
+
+        await viewModel.LoadForStoreAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
+
+        Assert.False(viewModel.IsManagingOptionValues);
+        Assert.False(viewModel.IsAddingOptionValue);
+        Assert.Equal(string.Empty, viewModel.OptionValue);
+    }
+
+    [Fact]
+    public async Task OfferingSwitchClosesOptionValueManagementAndDiscardsDraft()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
+        var first = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "First", null, BlueprintOfferingKind.ProviderNetwork, null, "first", null, null, false, now, now);
+        var second = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Second", null, BlueprintOfferingKind.ProviderNetwork, null, "second", null, null, false, now, now);
+        var colorOption = new OfferingOption(Guid.NewGuid(), first.Id, OptionKind.Color, "Color", 0);
+        var repository = new InMemoryWorkspaceRepository(snapshot with
+        {
+            Blueprints = [blueprint],
+            BlueprintOfferings = [first, second],
+            OfferingOptions = [colorOption]
+        });
+        var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository));
+        await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+        viewModel.SelectOffering(first.Id);
+        viewModel.ManageOptionCommand.Execute(colorOption);
+        Assert.True(viewModel.IsManagingOptionValues);
+        viewModel.StartAddOptionValueCommand.Execute(null);
+        viewModel.OptionValue = "Navy";
+        Assert.True(viewModel.IsAddingOptionValue);
+
+        viewModel.SelectOffering(second.Id);
+
+        Assert.False(viewModel.IsManagingOptionValues);
+        Assert.False(viewModel.IsAddingOptionValue);
+        Assert.Equal(string.Empty, viewModel.OptionValue);
+    }
+
+    private static async Task<(CatalogSetupViewModel ViewModel, OfferingOption ColorOption, OfferingOption SizeOption, BlueprintOffering Offering)> CreateCatalogWithOptionsAsync()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Printful tee", null, BlueprintOfferingKind.ProviderNetwork, null, "printful", null, null, false, now, now);
+        var colorOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
+        var sizeOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Size, "Size", 1);
+        var black = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "Black", 0);
+        var repository = new InMemoryWorkspaceRepository(snapshot with
+        {
+            Blueprints = [blueprint],
+            BlueprintOfferings = [offering],
+            OfferingOptions = [colorOption, sizeOption],
+            OfferingOptionValues = [black]
+        });
+        var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository), new OfferingManagementService(repository));
+        await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+        viewModel.SelectOffering(offering.Id);
+        return (viewModel, colorOption, sizeOption, offering);
+    }
+
+    [Fact]
     public async Task RequestDesignAreaArchive_OpensConfirmationWithoutMutatingData()
     {
         var (viewModel, area, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: false);

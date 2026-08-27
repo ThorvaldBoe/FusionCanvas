@@ -9,6 +9,7 @@ public partial class StoreEditorWindow : Window
     private StoreManagementViewModel? _subscribedViewModel;
     private CatalogSetupViewModel? _subscribedCatalog;
     private bool _designAreaArchiveConfirmationOpen;
+    private bool _optionValueManagementOpen;
 
     public StoreEditorWindow()
     {
@@ -36,7 +37,7 @@ public partial class StoreEditorWindow : Window
         }
         if (_subscribedCatalog is not null)
         {
-            _subscribedCatalog.OptionValueEditorFocusRequested -= OnOptionValueEditorFocusRequested;
+            _subscribedCatalog.OptionValueManagementRequested -= OnOptionValueManagementRequested;
             _subscribedCatalog.OptionChoiceFocusRequested -= OnOptionChoiceFocusRequested;
             _subscribedCatalog.VariantEditorFocusRequested -= OnVariantEditorFocusRequested;
             _subscribedCatalog.VariantActionsFocusRequested -= OnVariantActionsFocusRequested;
@@ -59,7 +60,7 @@ public partial class StoreEditorWindow : Window
         if (viewModel.CatalogSetup is { } catalog)
         {
             _subscribedCatalog = catalog;
-            catalog.OptionValueEditorFocusRequested += OnOptionValueEditorFocusRequested;
+            catalog.OptionValueManagementRequested += OnOptionValueManagementRequested;
             catalog.OptionChoiceFocusRequested += OnOptionChoiceFocusRequested;
             catalog.VariantEditorFocusRequested += OnVariantEditorFocusRequested;
             catalog.VariantActionsFocusRequested += OnVariantActionsFocusRequested;
@@ -100,15 +101,21 @@ public partial class StoreEditorWindow : Window
         });
     }
 
-    private void OnOptionValueEditorFocusRequested(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
+    private async void OnOptionValueManagementRequested(object? sender, EventArgs e)
     {
-        if (_subscribedCatalog?.IsAddingOptionValue == true)
+        if (_optionValueManagementOpen || _subscribedCatalog is not { } catalog) return;
+        _optionValueManagementOpen = true;
+        try
         {
-            OptionValueTextBox.Focus();
-            OptionValueTextBox.SelectAll();
+            var dialog = new OptionValueManagementWindow { DataContext = catalog };
+            await dialog.ShowDialog(this);
+            if (catalog.IsManagingOptionValues) catalog.CloseOptionValueManagementCommand.Execute(null);
         }
-        else OptionValueDoneButton.Focus();
-    });
+        finally
+        {
+            _optionValueManagementOpen = false;
+        }
+    }
 
     private void OnOptionChoiceFocusRequested(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
     {

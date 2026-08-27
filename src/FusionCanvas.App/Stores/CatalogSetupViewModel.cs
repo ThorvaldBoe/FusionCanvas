@@ -161,6 +161,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler? OptionValueEditorFocusRequested;
+    public event EventHandler? OptionValueManagementRequested;
     public event EventHandler? OptionChoiceFocusRequested;
     public event EventHandler? VariantEditorFocusRequested;
     public event EventHandler? VariantActionsFocusRequested;
@@ -197,6 +198,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         private set
         {
             if (!SetField(ref _selectedOffering, value)) return;
+            if (IsManagingOptionValues)
+            {
+                ResetOptionValueManagement();
+            }
             LoadOfferingFields();
             RefreshOfferingCollections();
             OnPropertyChanged(nameof(SelectedOfferingId));
@@ -240,11 +245,13 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(SelectedOptionId));
             OnPropertyChanged(nameof(AvailableValues));
             OnPropertyChanged(nameof(HasAvailableValues));
+            OnPropertyChanged(nameof(ManageOptionValuesDialogTitle));
             NotifyCommands();
         }
     }
 
     public Guid? SelectedOptionId => SelectedOption?.Id;
+    public string ManageOptionValuesDialogTitle => SelectedOption is { } option ? $"Manage {option.Name} values" : "Manage values";
 
     public OfferingPlaceholder? SelectedPlaceholder
     {
@@ -380,8 +387,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         IsAddingPrintProvider = false;
         NewPrintProviderName = string.Empty;
         IsAddingOption = false;
-        IsManagingOptionValues = false;
-        IsAddingOptionValue = false;
+        ResetOptionValueManagement();
         ResetVariantDraft();
         ResetPlaceholderDraft();
         IsAddingTemplate = false;
@@ -449,6 +455,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public async Task LoadForStoreAsync(Guid storeId, CancellationToken cancellationToken = default)
     {
         ClearDesignAreaArchiveConfirmation();
+        ResetOptionValueManagement();
         IsBusy = true;
         ErrorMessage = string.Empty;
         try
@@ -975,10 +982,12 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void BeginManageOptionValues(OfferingOption? option)
     {
-        if (option is null) return;
-        SelectedOption = option;
+        if (IsManagingOptionValues || option is null) return;
+        var currentOption = AvailableOptions.FirstOrDefault(value => value.Id == option.Id);
+        if (currentOption is null) return;
+        SelectedOption = currentOption;
         IsManagingOptionValues = true;
-        OptionValueEditorFocusRequested?.Invoke(this, EventArgs.Empty);
+        OptionValueManagementRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void BeginAddOptionValue()
@@ -989,10 +998,15 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void CloseOptionValueManagement()
     {
+        ResetOptionValueManagement();
+        OptionChoiceFocusRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ResetOptionValueManagement()
+    {
         IsAddingOptionValue = false;
         OptionValue = string.Empty;
         IsManagingOptionValues = false;
-        OptionChoiceFocusRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void BeginVariantDraft(bool bulk)
