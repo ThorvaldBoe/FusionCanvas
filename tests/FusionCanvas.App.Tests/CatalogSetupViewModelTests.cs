@@ -183,12 +183,149 @@ public sealed class CatalogSetupViewModelTests
         Assert.False(viewModel.IsAddingBulkVariants);
 
         viewModel.StartBulkVariantsCommand.Execute(null);
+        Assert.True(viewModel.IsAddingVariant);
+        Assert.False(viewModel.IsAddingBulkVariants);
+
+        viewModel.CancelAddVariantCommand.Execute(null);
+        viewModel.StartBulkVariantsCommand.Execute(null);
         Assert.False(viewModel.IsAddingVariant);
         Assert.True(viewModel.IsAddingBulkVariants);
 
         viewModel.CancelBulkVariantsCommand.Execute(null);
         Assert.False(viewModel.IsAddingBulkVariants);
         Assert.False(viewModel.HasActiveDraft);
+    }
+
+    [Fact]
+    public async Task StartAddVariantRaisesRequestEvent()
+    {
+        var (viewModel, _, _, _) = await CreateCatalogWithOptionsAsync();
+        var requested = 0;
+        viewModel.AddVariantRequested += (_, _) => requested++;
+
+        viewModel.StartAddVariantCommand.Execute(null);
+
+        Assert.Equal(1, requested);
+        Assert.True(viewModel.IsAddingVariant);
+        Assert.False(viewModel.IsAddingBulkVariants);
+    }
+
+    [Fact]
+    public async Task StartBulkVariantsRaisesRequestEvent()
+    {
+        var (viewModel, _, _, _) = await CreateCatalogWithOptionsAsync();
+        var requested = 0;
+        viewModel.BulkVariantsRequested += (_, _) => requested++;
+
+        viewModel.StartBulkVariantsCommand.Execute(null);
+
+        Assert.Equal(1, requested);
+        Assert.True(viewModel.IsAddingBulkVariants);
+        Assert.False(viewModel.IsAddingVariant);
+    }
+
+    [Fact]
+    public async Task SecondVariantCreationRequestKeepsOriginalDialogMode()
+    {
+        var (viewModel, _, _, _) = await CreateCatalogWithOptionsAsync();
+        var addRequested = 0;
+        var bulkRequested = 0;
+        viewModel.AddVariantRequested += (_, _) => addRequested++;
+        viewModel.BulkVariantsRequested += (_, _) => bulkRequested++;
+
+        viewModel.StartAddVariantCommand.Execute(null);
+        viewModel.StartBulkVariantsCommand.Execute(null);
+
+        Assert.Equal(1, addRequested);
+        Assert.Equal(0, bulkRequested);
+        Assert.True(viewModel.IsAddingVariant);
+        Assert.False(viewModel.IsAddingBulkVariants);
+    }
+
+    [Fact]
+    public async Task WorkspaceLoadClosesVariantCreationAndDiscardsDraft()
+    {
+        var (viewModel, _, _, _) = await CreateCatalogWithOptionsAsync();
+        viewModel.StartAddVariantCommand.Execute(null);
+        viewModel.VariantName = "Draft";
+
+        await viewModel.LoadForStoreAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
+
+        Assert.False(viewModel.IsAddingVariant);
+        Assert.False(viewModel.IsAddingBulkVariants);
+        Assert.Equal(string.Empty, viewModel.VariantName);
+    }
+
+    [Fact]
+    public async Task CancelActiveDraftsClosesBulkCreationSession()
+    {
+        var (viewModel, _, _, _) = await CreateCatalogWithOptionsAsync();
+        viewModel.StartBulkVariantsCommand.Execute(null);
+        viewModel.BulkColor = viewModel.AvailableColors.First();
+
+        viewModel.CancelActiveDrafts();
+
+        Assert.False(viewModel.IsAddingBulkVariants);
+        Assert.Null(viewModel.BulkColor);
+    }
+
+    [Fact]
+    public async Task SuccessfulVariantCreationClosesSessionAndRefreshesList()
+    {
+        var (viewModel, _, _, _) = await CreateCatalogWithOptionsAsync();
+        viewModel.StartAddVariantCommand.Execute(null);
+        Assert.True(viewModel.IsAddingVariant);
+        viewModel.VariantValueChoices.Single(v => v.Value.Value == "Black").IsSelected = true;
+
+        viewModel.CreateVariantCommand.Execute(null);
+
+        Assert.False(viewModel.HasError);
+        Assert.False(viewModel.IsAddingVariant);
+        Assert.Equal(1, viewModel.AvailableVariantCount);
+    }
+
+    [Fact]
+    public async Task OfferingSwitchClosesVariantCreationAndDiscardsDrafts()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
+        var first = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "First", null, BlueprintOfferingKind.ProviderNetwork, null, "first", null, null, false, now, now);
+        var second = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Second", null, BlueprintOfferingKind.ProviderNetwork, null, "second", null, null, false, now, now);
+        var colorOption = new OfferingOption(Guid.NewGuid(), first.Id, OptionKind.Color, "Color", 0);
+        var sizeOption = new OfferingOption(Guid.NewGuid(), first.Id, OptionKind.Size, "Size", 1);
+        var black = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, first.Id, "Black", 0);
+        var medium = new OfferingOptionValue(Guid.NewGuid(), sizeOption.Id, first.Id, "M", 0);
+        var repository = new InMemoryWorkspaceRepository(snapshot with
+        {
+            Blueprints = [blueprint],
+            BlueprintOfferings = [first, second],
+            OfferingOptions = [colorOption, sizeOption],
+            OfferingOptionValues = [black, medium]
+        });
+        var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository), new OfferingManagementService(repository));
+        await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+        viewModel.SelectOffering(first.Id);
+
+        viewModel.StartAddVariantCommand.Execute(null);
+        viewModel.VariantName = "Draft";
+        Assert.True(viewModel.IsAddingVariant);
+
+        viewModel.SelectOffering(second.Id);
+
+        Assert.False(viewModel.IsAddingVariant);
+        Assert.False(viewModel.IsAddingBulkVariants);
+        Assert.Equal(string.Empty, viewModel.VariantName);
+
+        viewModel.StartBulkVariantsCommand.Execute(null);
+        viewModel.BulkColor = viewModel.AvailableColors.FirstOrDefault();
+        Assert.True(viewModel.IsAddingBulkVariants);
+
+        viewModel.SelectOffering(first.Id);
+
+        Assert.False(viewModel.IsAddingBulkVariants);
+        Assert.False(viewModel.IsAddingVariant);
     }
 
     [Fact]

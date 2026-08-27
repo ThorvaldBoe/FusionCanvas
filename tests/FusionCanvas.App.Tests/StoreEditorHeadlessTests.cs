@@ -343,14 +343,22 @@ public class StoreEditorHeadlessTests
         Assert.Empty(window.OwnedWindows.OfType<OptionValueManagementWindow>());
         Assert.True(manageValues.IsFocused);
         Assert.Null(FindButton(window, "Preview valid Variants"));
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<Control>(),
+            control => AutomationProperties.GetAutomationId(control) == "Catalog.BulkVariantEditor");
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<Control>(),
+            control => AutomationProperties.GetAutomationId(control) == "Catalog.AddVariantEditor");
         FindButton(window, "Bulk add")!.Command!.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         window.UpdateLayout();
-        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
-        AssertEffectivelyVisible(window, "Catalog.BulkVariantEditor");
-        Assert.True(window.FindControl<ComboBox>("BulkColorComboBox")!.IsFocused);
+        var bulkDialog = Assert.Single(window.OwnedWindows.OfType<BulkAddVariantsWindow>());
+        Assert.Equal("Bulk add", bulkDialog.Title);
+        Assert.True(bulkDialog.FindControl<ComboBox>("BulkColorComboBox")!.IsFocused);
         Assert.Null(FindButton(window, "Save Variant"));
-        viewModel.CatalogSetup.CancelBulkVariantsCommand.Execute(null);
+        bulkDialog.Close();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        Assert.False(viewModel.CatalogSetup!.IsAddingBulkVariants);
+        Assert.Empty(window.OwnedWindows.OfType<BulkAddVariantsWindow>());
         Assert.True(window.FindControl<Button>("BulkAddVariantButton")!.IsFocused);
 
         viewModel.BackToOfferingOverviewCommand.Execute(null);
@@ -904,6 +912,230 @@ public class StoreEditorHeadlessTests
 
         Assert.Empty(window.OwnedWindows.OfType<OptionValueManagementWindow>());
         Assert.False(viewModel.CatalogSetup.IsManagingOptionValues);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void AddVariant_OpensFocusedDialogScopedToOffering()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        FindButton(window, "Add Variant")!.Command!.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        var dialog = Assert.Single(window.OwnedWindows.OfType<AddVariantWindow>());
+        Assert.Equal("Add Variant", dialog.Title);
+        Assert.Equal(viewModel.CatalogSetup!.SelectedOfferingId, viewModel.SelectedOffering!.Id);
+        Assert.True(dialog.FindControl<TextBox>("VariantNameTextBox")!.IsFocused);
+        Assert.NotNull(dialog.FindControl<Button>("SaveVariantButton"));
+
+        dialog.FindControl<Button>("AddVariantCancelButton")!.RaiseEvent(
+            new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        Assert.Empty(window.OwnedWindows.OfType<AddVariantWindow>());
+        Assert.False(viewModel.CatalogSetup.IsAddingVariant);
+        Assert.True(window.FindControl<Button>("AddVariantButton")!.IsFocused);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void BulkAdd_OpensFocusedDialogScopedToOffering()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        FindButton(window, "Bulk add")!.Command!.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        var dialog = Assert.Single(window.OwnedWindows.OfType<BulkAddVariantsWindow>());
+        Assert.Equal("Bulk add", dialog.Title);
+        Assert.Equal(viewModel.CatalogSetup!.SelectedOfferingId, viewModel.SelectedOffering!.Id);
+        Assert.True(dialog.FindControl<ComboBox>("BulkColorComboBox")!.IsFocused);
+        Assert.NotNull(dialog.GetVisualDescendants().OfType<Button>().Single(b => (b.Content as string) == "Preview valid Variants"));
+
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        Assert.Empty(window.OwnedWindows.OfType<BulkAddVariantsWindow>());
+        Assert.False(viewModel.CatalogSetup.IsAddingBulkVariants);
+        Assert.True(window.FindControl<Button>("BulkAddVariantButton")!.IsFocused);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void VariantCreation_AllowsOnlyOneDialogAtATime()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        FindButton(window, "Add Variant")!.Command!.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        Assert.Single(window.OwnedWindows.OfType<AddVariantWindow>());
+        Assert.Empty(window.OwnedWindows.OfType<BulkAddVariantsWindow>());
+
+        viewModel.CatalogSetup!.StartBulkVariantsCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        Assert.True(viewModel.CatalogSetup.IsAddingVariant);
+        Assert.False(viewModel.CatalogSetup.IsAddingBulkVariants);
+        Assert.Single(window.OwnedWindows.OfType<AddVariantWindow>());
+        Assert.Empty(window.OwnedWindows.OfType<BulkAddVariantsWindow>());
+
+        Assert.Single(window.OwnedWindows.OfType<Window>());
+        foreach (var dialog in window.OwnedWindows.OfType<Window>().ToArray()) dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        Assert.Empty(window.OwnedWindows.OfType<Window>());
+
+        FindButton(window, "Bulk add")!.Command!.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        Assert.Single(window.OwnedWindows.OfType<BulkAddVariantsWindow>());
+        Assert.Empty(window.OwnedWindows.OfType<AddVariantWindow>());
+        Assert.Single(window.OwnedWindows.OfType<Window>());
+
+        foreach (var dialog in window.OwnedWindows.OfType<Window>().ToArray()) dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void VariantCreation_EscapeClosesAndDiscardsDraft()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        FindButton(window, "Add Variant")!.Command!.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<AddVariantWindow>());
+
+        viewModel.CatalogSetup!.VariantName = "Draft";
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.True(viewModel.CatalogSetup.IsAddingVariant);
+
+        HeadlessWindowExtensions.KeyPress(dialog, Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, string.Empty);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        Assert.Empty(window.OwnedWindows.OfType<AddVariantWindow>());
+        Assert.False(viewModel.CatalogSetup.IsAddingVariant);
+        Assert.Equal(string.Empty, viewModel.CatalogSetup.VariantName);
+        Assert.Single(viewModel.CatalogSetup.SellableVariantRows);
+        Assert.True(window.FindControl<Button>("AddVariantButton")!.IsFocused);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void VariantCreation_OfferingSwitchClosesDialog()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        FindButton(window, "Add Variant")!.Command!.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        Assert.Single(window.OwnedWindows.OfType<AddVariantWindow>());
+
+        viewModel.CatalogSetup!.SelectOffering(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        Assert.Empty(window.OwnedWindows.OfType<AddVariantWindow>());
+        Assert.False(viewModel.CatalogSetup.IsAddingVariant);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void VariantCreation_SuccessClosesDialogAndRefreshesList()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+        Assert.Single(viewModel.CatalogSetup!.SellableVariantRows);
+
+        FindButton(window, "Add Variant")!.Command!.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<AddVariantWindow>());
+
+        var medium = viewModel.CatalogSetup.VariantValueChoices.Single(v => v.Value.Value == "M");
+        medium.IsSelected = true;
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.True(viewModel.CatalogSetup.CreateVariantCommand.CanExecute(null));
+        Assert.True(dialog.IsVisible);
+
+        viewModel.CatalogSetup.CreateVariantCommand.Execute(null);
+        Assert.False(viewModel.CatalogSetup.HasError, $"Error: {viewModel.CatalogSetup.ErrorMessage}");
+        Assert.False(viewModel.CatalogSetup.IsAddingVariant);
+        Assert.Equal(2, viewModel.CatalogSetup.SellableVariantRows.Count);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        Assert.Equal(viewModel.SelectedOffering!.Id, viewModel.CatalogSetup.SelectedOfferingId);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void ParentScreen_RendersNoInlineCreationEditor()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<Control>(),
+            control => AutomationProperties.GetAutomationId(control) == "Catalog.BulkVariantEditor");
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<Control>(),
+            control => AutomationProperties.GetAutomationId(control) == "Catalog.AddVariantEditor");
+        Assert.NotNull(FindButton(window, "Add Variant"));
+        Assert.NotNull(FindButton(window, "Bulk add"));
 
         window.Close();
     }
