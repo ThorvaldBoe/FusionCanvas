@@ -962,6 +962,104 @@ public class StoreEditorHeadlessTests
         window.Close();
     }
 
+    [AvaloniaFact]
+    public void DesignAreaArchiveCommand_OpensConfirmationWithoutMutationAndCancelRestoresFocus()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenDesignAreaManagementCommand.Execute(null);
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        var archiveButton = FindButton(window, "Archive");
+        Assert.NotNull(archiveButton);
+        archiveButton!.Focus();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.True(archiveButton.IsFocused);
+
+        archiveButton.Command!.Execute(archiveButton.CommandParameter);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        Assert.True(viewModel.CatalogSetup!.IsDesignAreaArchiveConfirmationVisible);
+        Assert.Equal("Front", viewModel.CatalogSetup.PendingDesignAreaArchiveName);
+        Assert.Single(viewModel.CatalogSetup.DesignAreaCards);
+        Assert.False(viewModel.CatalogSetup.HasError);
+
+        var dialog = Assert.Single(window.OwnedWindows.OfType<DesignAreaArchiveConfirmationWindow>());
+        var message = dialog.GetVisualDescendants().OfType<TextBlock>()
+            .Single(t => t.Text?.Contains("Front", StringComparison.Ordinal) == true);
+        Assert.Contains("Front", message.Text, StringComparison.Ordinal);
+        Assert.NotNull(dialog.FindControl<Button>("CancelButton"));
+        Assert.NotNull(dialog.GetVisualDescendants().OfType<Button>().Single(b => (b.Content as string) == "Archive design area"));
+
+        dialog.Close(false);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        Assert.False(viewModel.CatalogSetup.IsDesignAreaArchiveConfirmationVisible);
+        Assert.Single(viewModel.CatalogSetup.DesignAreaCards);
+        Assert.False(viewModel.CatalogSetup.HasError);
+        Assert.True(archiveButton.IsFocused);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void DesignAreaArchiveConfirmationDialog_ShowsTargetNameFocusesCancelAndDismissesOnEscape()
+    {
+        var catalog = CreateStandaloneCatalogWithPendingDesignAreaArchive();
+        Assert.True(catalog.IsDesignAreaArchiveConfirmationVisible);
+        Assert.Equal("Front", catalog.PendingDesignAreaArchiveName);
+
+        var dialog = new DesignAreaArchiveConfirmationWindow { DataContext = catalog };
+        try
+        {
+            dialog.Show();
+            dialog.UpdateLayout();
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            dialog.UpdateLayout();
+
+            var message = dialog.GetVisualDescendants().OfType<TextBlock>()
+                .Single(t => t.Text?.Contains("Front", StringComparison.Ordinal) == true);
+            Assert.Contains("Front", message.Text, StringComparison.Ordinal);
+            Assert.Contains("leave the active Design Area list", message.Text, StringComparison.Ordinal);
+
+            var cancelButton = dialog.FindControl<Button>("CancelButton")!;
+            var confirmButton = dialog.GetVisualDescendants().OfType<Button>()
+                .Single(b => (b.Content as string) == "Archive design area");
+            Assert.Equal("Cancel archive", AutomationProperties.GetName(cancelButton));
+            Assert.Equal("Confirm archive design area", AutomationProperties.GetName(confirmButton));
+            Assert.True(cancelButton.IsFocused);
+
+            HeadlessWindowExtensions.KeyPress(dialog, Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, string.Empty);
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Assert.False(dialog.IsVisible);
+        }
+        finally
+        {
+            if (dialog.IsVisible) dialog.Close();
+        }
+    }
+
+    private static CatalogSetupViewModel CreateStandaloneCatalogWithPendingDesignAreaArchive()
+    {
+        var store = new Store(Guid.NewGuid(), "North Star", null, false, Now, Now, "{}");
+        var repository = new InMemoryWorkspaceRepository(Snapshot(store, true, true, true));
+        var catalog = new CatalogSetupViewModel(
+            new CatalogSetupService(repository),
+            new MockupTemplateSetupService(repository));
+        catalog.LoadForStoreAsync(store.Id, default).GetAwaiter().GetResult();
+        var offering = Assert.Single(catalog.Offerings);
+        catalog.SelectOffering(offering.Id);
+        catalog.ArchivePlaceholderCommand.Execute(Assert.Single(catalog.DesignAreaCards));
+        return catalog;
+    }
+
     private static StoreEditorWindow CreateEditorWindow(
         bool includeNormalizedCatalog = true,
         bool useFixedProviderOffering = false,

@@ -1,0 +1,39 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:stores="using:FusionCanvas.App.Stores"
+        x:Class="FusionCanvas.App.Stores.DesignAreaArchiveConfirmationWindow"
+        x:DataType="stores:CatalogSetupViewModel"
+        Title="Archive design area?"
+        Width="460"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner">
+  <Grid RowDefinitions="Auto,Auto" Margin="24" RowSpacing="22">
+    <StackPanel Spacing="10">
+      <TextBlock Text="Archive design area?"
+                 FontSize="20"
+                 FontWeight="SemiBold"
+                 Foreground="{DynamicResource DangerStrongBrush}" />
+      <TextBlock Text="{Binding DesignAreaArchiveConfirmationMessage}"
+                 TextWrapping="Wrap"
+                 FontSize="14" />
+    </StackPanel>
+
+    <StackPanel Grid.Row="1"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8">
+      <Button x:Name="CancelButton"
+              Content="Cancel"
+              MinWidth="90"
+              Click="OnCancelClick"
+              AutomationProperties.Name="Cancel archive" />
+      <Button Content="Archive design area"
+              MinWidth="170"
+              Background="{DynamicResource DangerStrongBrush}"
+              Foreground="{DynamicResource CommandForegroundBrush}"
+              Click="OnConfirmClick"
+              AutomationProperties.Name="Confirm archive design area" />
+    </StackPanel>
+  </Grid>
+</Window>

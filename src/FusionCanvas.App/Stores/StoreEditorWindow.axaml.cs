@@ -8,6 +8,7 @@ public partial class StoreEditorWindow : Window
 {
     private StoreManagementViewModel? _subscribedViewModel;
     private CatalogSetupViewModel? _subscribedCatalog;
+    private bool _designAreaArchiveConfirmationOpen;
 
     public StoreEditorWindow()
     {
@@ -41,6 +42,8 @@ public partial class StoreEditorWindow : Window
             _subscribedCatalog.VariantActionsFocusRequested -= OnVariantActionsFocusRequested;
             _subscribedCatalog.BulkVariantEditorFocusRequested -= OnBulkVariantEditorFocusRequested;
             _subscribedCatalog.BulkVariantActionFocusRequested -= OnBulkVariantActionFocusRequested;
+            _subscribedCatalog.DesignAreaArchiveConfirmationRequested -= OnDesignAreaArchiveConfirmationRequested;
+            _subscribedCatalog.DesignAreaArchiveFocusRequested -= OnDesignAreaArchiveFocusRequested;
             _subscribedCatalog = null;
         }
 
@@ -62,6 +65,8 @@ public partial class StoreEditorWindow : Window
             catalog.VariantActionsFocusRequested += OnVariantActionsFocusRequested;
             catalog.BulkVariantEditorFocusRequested += OnBulkVariantEditorFocusRequested;
             catalog.BulkVariantActionFocusRequested += OnBulkVariantActionFocusRequested;
+            catalog.DesignAreaArchiveConfirmationRequested += OnDesignAreaArchiveConfirmationRequested;
+            catalog.DesignAreaArchiveFocusRequested += OnDesignAreaArchiveFocusRequested;
         }
     }
 
@@ -126,4 +131,36 @@ public partial class StoreEditorWindow : Window
     private void OnBulkVariantEditorFocusRequested(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() => BulkColorComboBox.Focus());
 
     private void OnBulkVariantActionFocusRequested(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() => BulkAddVariantButton.Focus());
+
+    private async void OnDesignAreaArchiveConfirmationRequested(object? sender, EventArgs e)
+    {
+        if (_designAreaArchiveConfirmationOpen || _subscribedCatalog is not { } catalog) return;
+        _designAreaArchiveConfirmationOpen = true;
+        try
+        {
+            var confirmation = new DesignAreaArchiveConfirmationWindow { DataContext = catalog };
+            var confirmed = await confirmation.ShowDialog<bool>(this);
+            if (confirmed) catalog.ConfirmDesignAreaArchiveCommand.Execute(null);
+            else catalog.CancelDesignAreaArchiveCommand.Execute(null);
+        }
+        finally
+        {
+            _designAreaArchiveConfirmationOpen = false;
+        }
+    }
+
+    private void OnDesignAreaArchiveFocusRequested(object? sender, EventArgs e)
+    {
+        if (_subscribedCatalog is not { } catalog) return;
+        var pendingId = catalog.PendingDesignAreaArchiveId;
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (pendingId is not Guid id) return;
+            var archiveButton = this.GetVisualDescendants().OfType<Button>().FirstOrDefault(button =>
+                string.Equals(button.Content as string, "Archive", StringComparison.Ordinal)
+                && button.DataContext is DesignAreaCardViewModel card
+                && card.Id == id);
+            archiveButton?.Focus();
+        });
+    }
 }
