@@ -60,6 +60,26 @@ public class WindowGeometryPersistenceTests
         Assert.Equal(defaultHeight, window.Height);
     }
 
+    [AvaloniaFact]
+    public void Attach_ClosingWhileMaximizedPersistsLatestNormalGeometry()
+    {
+        var store = new RecordingGeometryStore();
+        var window = new Window();
+        WindowGeometryPersistence.Attach(window, store, WindowLayoutKeys.Settings, 200, 150);
+        window.Show();
+        window.Width = 720;
+        window.Height = 540;
+        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        window.WindowState = WindowState.Maximized;
+        window.Close();
+
+        var captured = Assert.Single(store.Updates, u => u.Key == WindowLayoutKeys.Settings);
+        Assert.Equal(720, captured.Geometry!.Width);
+        Assert.Equal(540, captured.Geometry.Height);
+    }
+
     private sealed class RecordingGeometryStore : IWindowGeometryStore
     {
         public Dictionary<string, WindowGeometrySettings> Stored { get; } = new();

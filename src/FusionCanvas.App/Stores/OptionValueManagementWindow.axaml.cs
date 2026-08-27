@@ -49,6 +49,8 @@ public partial class OptionValueManagementWindow : Window
 
     private void OnDoneClick(object? sender, RoutedEventArgs e) => Close();
 
+    private void OnCancelClick(object? sender, RoutedEventArgs e) => Close();
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
         if (e.Key == Key.Escape)

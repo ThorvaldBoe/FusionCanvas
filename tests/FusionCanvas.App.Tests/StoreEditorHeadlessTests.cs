@@ -766,13 +766,16 @@ public class StoreEditorHeadlessTests
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         window.UpdateLayout();
         Assert.Single(window.OwnedWindows.OfType<OptionValueManagementWindow>());
+        var originalOptionId = viewModel.CatalogSetup!.SelectedOptionId;
 
-        viewModel.CatalogSetup!.ManageOptionCommand.Execute(
+        viewModel.CatalogSetup.ManageOptionCommand.Execute(
             viewModel.CatalogSetup.AvailableChoiceGroups.First(option => option.Option.OptionKind == OptionKind.Size).Option);
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         window.UpdateLayout();
 
         Assert.Single(window.OwnedWindows.OfType<OptionValueManagementWindow>());
+        Assert.Equal(originalOptionId, viewModel.CatalogSetup.SelectedOptionId);
+        Assert.Equal("Manage Color values", Assert.Single(window.OwnedWindows.OfType<OptionValueManagementWindow>()).Title);
         foreach (var dialog in window.OwnedWindows.OfType<OptionValueManagementWindow>().ToArray()) dialog.Close();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
 
@@ -805,6 +808,39 @@ public class StoreEditorHeadlessTests
         HeadlessWindowExtensions.KeyPress(dialog, Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, string.Empty);
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         window.UpdateLayout();
+
+        Assert.Empty(window.OwnedWindows.OfType<OptionValueManagementWindow>());
+        Assert.False(viewModel.CatalogSetup.IsManagingOptionValues);
+        Assert.False(viewModel.CatalogSetup.IsAddingOptionValue);
+        Assert.Equal(string.Empty, viewModel.CatalogSetup.OptionValue);
+        Assert.True(manageValues.IsFocused);
+        Assert.Single(viewModel.CatalogSetup.AvailableChoiceGroups.Single(group => group.Option.OptionKind == OptionKind.Color).Values);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void ManageValues_CancelClosesDialogAndDiscardsAddValueDraft()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        var manageValues = FindButton(window, "Manage values")!;
+        manageValues.Command!.Execute(manageValues.CommandParameter);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<OptionValueManagementWindow>());
+
+        viewModel.CatalogSetup!.StartAddOptionValueCommand.Execute(null);
+        viewModel.CatalogSetup.OptionValue = "Navy";
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        dialog.FindControl<Button>("OptionValueCancelButton")!.RaiseEvent(
+            new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
 
         Assert.Empty(window.OwnedWindows.OfType<OptionValueManagementWindow>());
         Assert.False(viewModel.CatalogSetup.IsManagingOptionValues);

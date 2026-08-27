@@ -197,20 +197,18 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         get => _selectedOffering;
         private set
         {
-        if (!SetField(ref _selectedOffering, value)) return;
-        if (IsManagingOptionValues)
-        {
-            IsAddingOptionValue = false;
-            OptionValue = string.Empty;
-            IsManagingOptionValues = false;
-        }
-        if (IsAddingVariant || IsAddingBulkVariants)
-        {
-            ResetVariantDraft();
-            ResetBulkDraft();
-            IsAddingBulkVariants = false;
-        }
-        LoadOfferingFields();
+            if (!SetField(ref _selectedOffering, value)) return;
+            if (IsManagingOptionValues)
+            {
+                ResetOptionValueManagement();
+            }
+            if (IsAddingVariant || IsAddingBulkVariants)
+            {
+                ResetVariantDraft();
+                ResetBulkDraft();
+                IsAddingBulkVariants = false;
+            }
+            LoadOfferingFields();
             RefreshOfferingCollections();
             OnPropertyChanged(nameof(SelectedOfferingId));
             OnPropertyChanged(nameof(HasSelectedOffering));
@@ -395,8 +393,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         IsAddingPrintProvider = false;
         NewPrintProviderName = string.Empty;
         IsAddingOption = false;
-        IsManagingOptionValues = false;
-        IsAddingOptionValue = false;
+        ResetOptionValueManagement();
         ResetVariantDraft();
         ResetPlaceholderDraft();
         IsAddingTemplate = false;
@@ -463,6 +460,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     public async Task LoadForStoreAsync(Guid storeId, CancellationToken cancellationToken = default)
     {
+        ClearDesignAreaArchiveConfirmation();
+        ResetOptionValueManagement();
         IsBusy = true;
         ErrorMessage = string.Empty;
         try
@@ -495,6 +494,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     public void SelectOffering(Guid? offeringId)
     {
+        if (offeringId != SelectedOffering?.Id)
+        {
+            ClearDesignAreaArchiveConfirmation();
+        }
         _requestedOfferingId = offeringId;
         SelectedOffering = offeringId is null ? null : Offerings.FirstOrDefault(value => value.Id == offeringId.Value);
         OnPropertyChanged(nameof(IsOfferingContextUnavailable));
@@ -723,15 +726,17 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private void RequestDesignAreaArchive(object? parameter)
     {
         if (_isDesignAreaArchiveConfirmationVisible || SelectedOffering is null) return;
-        var (id, name) = parameter switch
+        var id = parameter switch
         {
-            OfferingPlaceholder area => (area.Id, area.Name),
-            DesignAreaCardViewModel card => (card.Id, card.Name),
-            _ => (Guid.Empty, string.Empty)
+            OfferingPlaceholder area => area.Id,
+            DesignAreaCardViewModel card => card.Id,
+            _ => Guid.Empty
         };
         if (id == Guid.Empty) return;
-        _pendingDesignAreaArchiveId = id;
-        _pendingDesignAreaArchiveName = name;
+        var currentArea = AvailablePlaceholders.FirstOrDefault(candidate => candidate.Id == id);
+        if (currentArea is null) return;
+        _pendingDesignAreaArchiveId = currentArea.Id;
+        _pendingDesignAreaArchiveName = currentArea.Name;
         OnPropertyChanged(nameof(PendingDesignAreaArchiveId));
         OnPropertyChanged(nameof(PendingDesignAreaArchiveName));
         OnPropertyChanged(nameof(DesignAreaArchiveConfirmationMessage));
@@ -983,8 +988,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void BeginManageOptionValues(OfferingOption? option)
     {
-        if (option is null) return;
-        SelectedOption = option;
+        if (IsManagingOptionValues || option is null) return;
+        var currentOption = AvailableOptions.FirstOrDefault(value => value.Id == option.Id);
+        if (currentOption is null) return;
+        SelectedOption = currentOption;
         IsManagingOptionValues = true;
         OptionValueManagementRequested?.Invoke(this, EventArgs.Empty);
     }
@@ -997,10 +1004,15 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void CloseOptionValueManagement()
     {
+        ResetOptionValueManagement();
+        OptionChoiceFocusRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ResetOptionValueManagement()
+    {
         IsAddingOptionValue = false;
         OptionValue = string.Empty;
         IsManagingOptionValues = false;
-        OptionChoiceFocusRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void BeginVariantDraft(bool bulk)

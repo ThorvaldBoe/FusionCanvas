@@ -17,8 +17,38 @@ internal static class WindowGeometryPersistence
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(windowKey);
 
-        window.Opened += (_, _) => Restore(window, store, windowKey, minimumWindowWidth, minimumWindowHeight);
-        window.Closing += (_, _) => Capture(window, store, windowKey, minimumWindowWidth, minimumWindowHeight);
+        WindowGeometrySettings? lastNormalGeometry = null;
+
+        void CaptureNormalGeometry()
+        {
+            if (MainWindowLayoutNormalizer.TryCaptureGeometry(
+                    window.WindowState,
+                    window.Position,
+                    window.Width,
+                    window.Height,
+                    minimumWindowWidth,
+                    minimumWindowHeight,
+                    out var geometry))
+            {
+                lastNormalGeometry = geometry;
+            }
+        }
+
+        window.Opened += (_, _) =>
+        {
+            Restore(window, store, windowKey, minimumWindowWidth, minimumWindowHeight);
+            CaptureNormalGeometry();
+        };
+        window.SizeChanged += (_, _) => CaptureNormalGeometry();
+        window.PositionChanged += (_, _) => CaptureNormalGeometry();
+        window.Closing += (_, _) =>
+        {
+            CaptureNormalGeometry();
+            if (lastNormalGeometry is not null)
+            {
+                store.UpdateWindowGeometry(windowKey, lastNormalGeometry);
+            }
+        };
     }
 
     private static void Restore(
@@ -43,28 +73,6 @@ internal static class WindowGeometryPersistence
         window.Width = normalized.Width;
         window.Height = normalized.Height;
         window.Position = new PixelPoint(normalized.PositionX, normalized.PositionY);
-    }
-
-    private static void Capture(
-        Window window,
-        IWindowGeometryStore store,
-        string windowKey,
-        double minimumWindowWidth,
-        double minimumWindowHeight)
-    {
-        if (!MainWindowLayoutNormalizer.TryCaptureGeometry(
-                window.WindowState,
-                window.Position,
-                window.Width,
-                window.Height,
-                minimumWindowWidth,
-                minimumWindowHeight,
-                out var geometry))
-        {
-            return;
-        }
-
-        store.UpdateWindowGeometry(windowKey, geometry);
     }
 
     private static ScreenLayoutInfo[] GetScreens(Window window) =>

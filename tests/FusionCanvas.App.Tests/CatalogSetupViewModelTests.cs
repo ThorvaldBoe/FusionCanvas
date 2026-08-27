@@ -314,6 +314,52 @@ public sealed class CatalogSetupViewModelTests
     }
 
     [Fact]
+    public async Task SecondManageRequestKeepsOriginalStableOptionScope()
+    {
+        var (viewModel, colorOption, sizeOption, _) = await CreateCatalogWithOptionsAsync();
+        var requested = 0;
+        viewModel.OptionValueManagementRequested += (_, _) => requested++;
+
+        viewModel.ManageOptionCommand.Execute(colorOption);
+        viewModel.ManageOptionCommand.Execute(sizeOption);
+
+        Assert.Equal(1, requested);
+        Assert.Equal(colorOption.Id, viewModel.SelectedOptionId);
+        Assert.Equal("Manage Color values", viewModel.ManageOptionValuesDialogTitle);
+    }
+
+    [Fact]
+    public async Task ManageRequestRejectsOptionOutsideCurrentOffering()
+    {
+        var (viewModel, colorOption, _, offering) = await CreateCatalogWithOptionsAsync();
+        var staleOption = colorOption with { Id = Guid.NewGuid(), OfferingId = Guid.NewGuid() };
+        var requested = 0;
+        viewModel.OptionValueManagementRequested += (_, _) => requested++;
+
+        viewModel.ManageOptionCommand.Execute(staleOption);
+
+        Assert.Equal(0, requested);
+        Assert.False(viewModel.IsManagingOptionValues);
+        Assert.Equal(offering.Id, viewModel.SelectedOfferingId);
+        Assert.Equal(colorOption.Id, viewModel.SelectedOptionId);
+    }
+
+    [Fact]
+    public async Task WorkspaceLoadClosesOptionValueManagementAndDiscardsDraft()
+    {
+        var (viewModel, colorOption, _, _) = await CreateCatalogWithOptionsAsync();
+        viewModel.ManageOptionCommand.Execute(colorOption);
+        viewModel.StartAddOptionValueCommand.Execute(null);
+        viewModel.OptionValue = "Navy";
+
+        await viewModel.LoadForStoreAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
+
+        Assert.False(viewModel.IsManagingOptionValues);
+        Assert.False(viewModel.IsAddingOptionValue);
+        Assert.Equal(string.Empty, viewModel.OptionValue);
+    }
+
+    [Fact]
     public async Task OfferingSwitchClosesOptionValueManagementAndDiscardsDraft()
     {
         var now = DateTimeOffset.UtcNow;
@@ -450,6 +496,25 @@ public sealed class CatalogSetupViewModelTests
         Assert.False(viewModel.HasError);
     }
 
+    [Fact]
+    public async Task OfferingSwitch_CancelsPendingDesignAreaArchiveAndRejectsStaleCard()
+    {
+        var (viewModel, _, offering) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: false);
+        var staleCard = Assert.Single(viewModel.DesignAreaCards);
+        viewModel.ArchivePlaceholderCommand.Execute(staleCard);
+
+        var otherOffering = viewModel.Offerings.First(candidate => candidate.Id != offering.Id);
+        viewModel.SelectOffering(otherOffering.Id);
+
+        Assert.False(viewModel.IsDesignAreaArchiveConfirmationVisible);
+        Assert.Null(viewModel.PendingDesignAreaArchiveId);
+
+        viewModel.ArchivePlaceholderCommand.Execute(staleCard);
+
+        Assert.False(viewModel.IsDesignAreaArchiveConfirmationVisible);
+        Assert.Null(viewModel.PendingDesignAreaArchiveId);
+    }
+
     private static async Task<(CatalogSetupViewModel ViewModel, OfferingPlaceholder Area, BlueprintOffering Offering)> CreateCatalogWithDesignAreaAsync(bool referencedByTemplate)
     {
         var now = DateTimeOffset.UtcNow;
@@ -457,6 +522,7 @@ public sealed class CatalogSetupViewModelTests
         var store = snapshot.Stores.Single();
         var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
         var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Printful tee", null, BlueprintOfferingKind.ProviderNetwork, null, "printful", null, null, false, now, now);
+        var otherOffering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Other tee", null, BlueprintOfferingKind.ProviderNetwork, null, "other", null, null, false, now, now);
         var colorOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
         var sizeOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Size, "Size", 1);
         var black = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "Black", 0);
@@ -466,7 +532,7 @@ public sealed class CatalogSetupViewModelTests
         var populated = snapshot with
         {
             Blueprints = [blueprint],
-            BlueprintOfferings = [offering],
+            BlueprintOfferings = [offering, otherOffering],
             OfferingOptions = [colorOption, sizeOption],
             OfferingOptionValues = [black, small],
             OfferingVariants = [variant],

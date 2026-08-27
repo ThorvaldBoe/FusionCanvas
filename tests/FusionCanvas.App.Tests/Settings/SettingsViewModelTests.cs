@@ -166,6 +166,19 @@ public class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task UpdateWindowGeometry_QueuesLatestGeometryForSave()
+    {
+        var store = new RecordingStore();
+        var vm = new SettingsViewModel(store, new FakeThemeController(), ApplicationSettings.Default, loadWarning: null);
+        var geometry = new WindowGeometrySettings(120, 80, 700, 520);
+
+        vm.UpdateWindowGeometry("settings", geometry);
+        await vm.FlushAsync();
+
+        Assert.Equal(geometry, store.LastSaved.WindowGeometry!["settings"]);
+    }
+
+    [Fact]
     public async Task WorkspaceProjection_ShowsNoWorkspaceWhenNoneAttached()
     {
         var vm = NewViewModel();
