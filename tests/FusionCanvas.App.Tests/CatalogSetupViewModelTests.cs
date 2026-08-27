@@ -183,6 +183,11 @@ public sealed class CatalogSetupViewModelTests
         Assert.False(viewModel.IsAddingBulkVariants);
 
         viewModel.StartBulkVariantsCommand.Execute(null);
+        Assert.True(viewModel.IsAddingVariant);
+        Assert.False(viewModel.IsAddingBulkVariants);
+
+        viewModel.CancelAddVariantCommand.Execute(null);
+        viewModel.StartBulkVariantsCommand.Execute(null);
         Assert.False(viewModel.IsAddingVariant);
         Assert.True(viewModel.IsAddingBulkVariants);
 
@@ -217,6 +222,51 @@ public sealed class CatalogSetupViewModelTests
         Assert.Equal(1, requested);
         Assert.True(viewModel.IsAddingBulkVariants);
         Assert.False(viewModel.IsAddingVariant);
+    }
+
+    [Fact]
+    public async Task SecondVariantCreationRequestKeepsOriginalDialogMode()
+    {
+        var (viewModel, _, _, _) = await CreateCatalogWithOptionsAsync();
+        var addRequested = 0;
+        var bulkRequested = 0;
+        viewModel.AddVariantRequested += (_, _) => addRequested++;
+        viewModel.BulkVariantsRequested += (_, _) => bulkRequested++;
+
+        viewModel.StartAddVariantCommand.Execute(null);
+        viewModel.StartBulkVariantsCommand.Execute(null);
+
+        Assert.Equal(1, addRequested);
+        Assert.Equal(0, bulkRequested);
+        Assert.True(viewModel.IsAddingVariant);
+        Assert.False(viewModel.IsAddingBulkVariants);
+    }
+
+    [Fact]
+    public async Task WorkspaceLoadClosesVariantCreationAndDiscardsDraft()
+    {
+        var (viewModel, _, _, _) = await CreateCatalogWithOptionsAsync();
+        viewModel.StartAddVariantCommand.Execute(null);
+        viewModel.VariantName = "Draft";
+
+        await viewModel.LoadForStoreAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
+
+        Assert.False(viewModel.IsAddingVariant);
+        Assert.False(viewModel.IsAddingBulkVariants);
+        Assert.Equal(string.Empty, viewModel.VariantName);
+    }
+
+    [Fact]
+    public async Task CancelActiveDraftsClosesBulkCreationSession()
+    {
+        var (viewModel, _, _, _) = await CreateCatalogWithOptionsAsync();
+        viewModel.StartBulkVariantsCommand.Execute(null);
+        viewModel.BulkColor = viewModel.AvailableColors.First();
+
+        viewModel.CancelActiveDrafts();
+
+        Assert.False(viewModel.IsAddingBulkVariants);
+        Assert.Null(viewModel.BulkColor);
     }
 
     [Fact]

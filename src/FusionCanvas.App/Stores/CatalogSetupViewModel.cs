@@ -204,9 +204,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             }
             if (IsAddingVariant || IsAddingBulkVariants)
             {
-                ResetVariantDraft();
-                ResetBulkDraft();
-                IsAddingBulkVariants = false;
+                ResetVariantCreation();
             }
             LoadOfferingFields();
             RefreshOfferingCollections();
@@ -394,11 +392,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         NewPrintProviderName = string.Empty;
         IsAddingOption = false;
         ResetOptionValueManagement();
-        ResetVariantDraft();
+        ResetVariantCreation();
         ResetPlaceholderDraft();
         IsAddingTemplate = false;
         TemplateName = string.Empty;
-        ResetBulkDraft();
     }
 
     public IEnumerable<OfferingOption> AvailableOptions => Options.Where(value => value.OfferingId == SelectedOffering?.Id && !value.IsArchived).OrderBy(value => value.SortOrder);
@@ -462,6 +459,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     {
         ClearDesignAreaArchiveConfirmation();
         ResetOptionValueManagement();
+        ResetVariantCreation();
         IsBusy = true;
         ErrorMessage = string.Empty;
         try
@@ -1017,9 +1015,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void BeginVariantDraft(bool bulk)
     {
+        if (IsAddingVariant || IsAddingBulkVariants) return;
         CloseOptionValueManagement();
-        ResetVariantDraft();
-        ResetBulkDraft();
+        ResetVariantCreation();
         IsAddingVariant = !bulk;
         IsAddingBulkVariants = bulk;
         if (bulk) BulkVariantsRequested?.Invoke(this, EventArgs.Empty);
@@ -1113,6 +1111,13 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         VariantName = string.Empty;
         foreach (var value in VariantValueChoices) value.IsSelected = false;
         NotifyCommands();
+    }
+
+    private void ResetVariantCreation()
+    {
+        ResetVariantDraft();
+        ResetBulkDraft();
+        IsAddingBulkVariants = false;
     }
 
     private void ResetPlaceholderDraft()

@@ -937,7 +937,8 @@ public class StoreEditorHeadlessTests
         Assert.True(dialog.FindControl<TextBox>("VariantNameTextBox")!.IsFocused);
         Assert.NotNull(dialog.FindControl<Button>("SaveVariantButton"));
 
-        dialog.Close();
+        dialog.FindControl<Button>("AddVariantCancelButton")!.RaiseEvent(
+            new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         window.UpdateLayout();
         Assert.Empty(window.OwnedWindows.OfType<AddVariantWindow>());
@@ -995,6 +996,15 @@ public class StoreEditorHeadlessTests
         Assert.Single(window.OwnedWindows.OfType<AddVariantWindow>());
         Assert.Empty(window.OwnedWindows.OfType<BulkAddVariantsWindow>());
 
+        viewModel.CatalogSetup!.StartBulkVariantsCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        Assert.True(viewModel.CatalogSetup.IsAddingVariant);
+        Assert.False(viewModel.CatalogSetup.IsAddingBulkVariants);
+        Assert.Single(window.OwnedWindows.OfType<AddVariantWindow>());
+        Assert.Empty(window.OwnedWindows.OfType<BulkAddVariantsWindow>());
+
         Assert.Single(window.OwnedWindows.OfType<Window>());
         foreach (var dialog in window.OwnedWindows.OfType<Window>().ToArray()) dialog.Close();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
@@ -1041,7 +1051,7 @@ public class StoreEditorHeadlessTests
         Assert.Empty(window.OwnedWindows.OfType<AddVariantWindow>());
         Assert.False(viewModel.CatalogSetup.IsAddingVariant);
         Assert.Equal(string.Empty, viewModel.CatalogSetup.VariantName);
-        Assert.Equal(1, viewModel.CatalogSetup.SellableVariantRows.Count);
+        Assert.Single(viewModel.CatalogSetup.SellableVariantRows);
         Assert.True(window.FindControl<Button>("AddVariantButton")!.IsFocused);
 
         window.Close();
@@ -1083,7 +1093,7 @@ public class StoreEditorHeadlessTests
         viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
         viewModel.OpenVariantManagementCommand.Execute(null);
         window.UpdateLayout();
-        Assert.Equal(1, viewModel.CatalogSetup!.SellableVariantRows.Count);
+        Assert.Single(viewModel.CatalogSetup!.SellableVariantRows);
 
         FindButton(window, "Add Variant")!.Command!.Execute(null);
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
