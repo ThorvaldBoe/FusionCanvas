@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Settings;
 using FusionCanvas.Integration.Settings;
@@ -101,7 +102,7 @@ public class JsonApplicationSettingsStoreTests
     {
         using var tempDirectory = new TemporaryDirectory();
         var path = tempDirectory.GetPath("settings.json");
-        await File.WriteAllTextAsync(path, "{\"version\":4,\"darkMode\":true}", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(path, "{\"version\":5,\"darkMode\":true}", TestContext.Current.CancellationToken);
         var store = new JsonApplicationSettingsStore(path);
 
         var result = await store.LoadAsync(TestContext.Current.CancellationToken);
@@ -243,7 +244,7 @@ public class JsonApplicationSettingsStoreTests
         Assert.Equal("idea/model", loaded.Value.Ai.Ideation.CustomProfile.ModelId);
         Assert.Equal("retained/model", loaded.Value.Ai.Concept.CustomProfile.ModelId);
         Assert.Equal("sll/model", loaded.Value.Ai.Sll.CustomProfile.ModelId);
-        Assert.Contains("\"version\": 3", json);
+        Assert.Contains("\"version\": 4", json);
         Assert.DoesNotContain("apiKey", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("secret", json, StringComparison.OrdinalIgnoreCase);
     }
@@ -340,6 +341,116 @@ public class JsonApplicationSettingsStoreTests
         Assert.True(result.Value.DarkMode);
         Assert.Equal(AiConfigurationSettings.Default, result.Value.Ai);
         Assert.Contains("AI settings", result.Warning);
+    }
+
+    [Fact]
+    public async Task Version4_RoundTripsWindowGeometry()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var store = new JsonApplicationSettingsStore(tempDirectory.GetPath("settings.json"));
+        var geometry = new Dictionary<string, WindowGeometrySettings>
+        {
+            ["settings"] = new(120, 80, 700, 520),
+            ["storeEditor"] = new(-200, 40, 1000, 800)
+        };
+
+        Assert.True((await store.SaveAsync(
+            new ApplicationSettings(
+                true,
+                AiConfigurationSettings.Default,
+                WindowGeometry: geometry.ToImmutableDictionary()),
+            TestContext.Current.CancellationToken)).Saved);
+
+        var loaded = await store.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(loaded.UsedDefault);
+        Assert.Equal(geometry["settings"], loaded.Value.WindowGeometry!["settings"]);
+        Assert.Equal(geometry["storeEditor"], loaded.Value.WindowGeometry!["storeEditor"]);
+    }
+
+    [Fact]
+    public async Task LoadAsync_LegacyVersionDefaultsWindowGeometry()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var path = tempDirectory.GetPath("settings.json");
+        await File.WriteAllTextAsync(
+            path,
+            "{\"version\":3,\"darkMode\":true,\"windowLayout\":{\"positionX\":10,\"positionY\":20,\"width\":1400,\"height\":900,\"navigationWidth\":320}}",
+            TestContext.Current.CancellationToken);
+
+        var loaded = await new JsonApplicationSettingsStore(path)
+            .LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(loaded.Value.DarkMode);
+        Assert.NotNull(loaded.Value.WindowLayout);
+        Assert.Empty(loaded.Value.WindowGeometry!);
+        Assert.False(loaded.UsedDefault);
+        Assert.Null(loaded.Warning);
+    }
+
+    [Fact]
+    public async Task LoadAsync_LegacyVersionIgnoresFutureWindowGeometrySection()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var path = tempDirectory.GetPath("settings.json");
+        await File.WriteAllTextAsync(
+            path,
+            "{\"version\":3,\"darkMode\":true,\"windowGeometry\":{\"settings\":{\"positionX\":10,\"positionY\":20,\"width\":700,\"height\":520}}}",
+            TestContext.Current.CancellationToken);
+
+        var loaded = await new JsonApplicationSettingsStore(path)
+            .LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Empty(loaded.Value.WindowGeometry!);
+        Assert.False(loaded.UsedDefault);
+        Assert.Null(loaded.Warning);
+    }
+
+    [Fact]
+    public async Task LoadAsync_InvalidGeometryEntryDiscardsEntryPreservesOthers()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var path = tempDirectory.GetPath("settings.json");
+        await File.WriteAllTextAsync(
+            path,
+            "{\"version\":4,\"darkMode\":true,\"windowGeometry\":{\"settings\":{\"positionX\":10,\"positionY\":20,\"width\":700,\"height\":520},\"bad\":{\"positionX\":1,\"positionY\":2,\"width\":\"NaN\",\"height\":400}}}",
+            TestContext.Current.CancellationToken);
+
+        var loaded = await new JsonApplicationSettingsStore(path)
+            .LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(loaded.Value.DarkMode);
+        Assert.Single(loaded.Value.WindowGeometry!);
+        Assert.Equal(new WindowGeometrySettings(10, 20, 700, 520), loaded.Value.WindowGeometry!["settings"]);
+        Assert.False(loaded.Value.WindowGeometry!.ContainsKey("bad"));
+        Assert.False(loaded.UsedDefault);
+        Assert.Contains("window geometry", loaded.Warning, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Version4_RoundTripsWindowLayoutAlongsideWindowGeometry()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var store = new JsonApplicationSettingsStore(tempDirectory.GetPath("settings.json"));
+        var layout = new WindowLayoutSettings(120, -40, 1400, 900, 380);
+        var geometry = ImmutableDictionary.CreateRange(new[]
+        {
+            KeyValuePair.Create("ideation", new WindowGeometrySettings(60, 90, 800, 600))
+        });
+        var settings = new ApplicationSettings(
+            true,
+            AiConfigurationSettings.Default,
+            WindowLayout: layout,
+            WindowGeometry: geometry);
+
+        Assert.True((await store.SaveAsync(settings, TestContext.Current.CancellationToken)).Saved);
+
+        var loaded = await store.LoadAsync(TestContext.Current.CancellationToken);
+        var json = await File.ReadAllTextAsync(store.SettingsPath, TestContext.Current.CancellationToken);
+
+        Assert.Equal(layout, loaded.Value.WindowLayout);
+        Assert.Equal(new WindowGeometrySettings(60, 90, 800, 600), loaded.Value.WindowGeometry!["ideation"]);
+        Assert.Contains("\"version\": 4", json);
     }
 
     private sealed class TemporaryDirectory : IDisposable

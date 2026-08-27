@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Settings;
@@ -6,7 +7,7 @@ namespace FusionCanvas.Integration.Settings;
 
 public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
 {
-    private const int SupportedVersion = 3;
+    private const int SupportedVersion = 4;
 
     private static readonly JsonSerializerOptions WriteOptions = new()
     {
@@ -92,10 +93,11 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
             if (!TryGetProperty(root, "ai", out var aiElement))
             {
                 var noAiLayout = TryReadWindowLayout(root, out var noAiLayoutWarning);
+                var noAiGeometry = TryReadWindowGeometry(version, root, out var noAiGeometryWarning);
                 return new ApplicationSettingsLoadResult(
-                    new ApplicationSettings(darkMode, AiConfigurationSettings.Default, noAiLayout, activeWorkspaceId),
+                    new ApplicationSettings(darkMode, AiConfigurationSettings.Default, noAiLayout, activeWorkspaceId, noAiGeometry),
                     UsedDefault: false,
-                    noAiLayoutWarning);
+                    CombineWarnings(noAiLayoutWarning, noAiGeometryWarning));
             }
 
             AiConfigurationSettings aiSettings;
@@ -113,9 +115,11 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
             }
 
             var layout = TryReadWindowLayout(root, out var layoutWarning);
+            var geometry = TryReadWindowGeometry(version, root, out var geometryWarning);
             warning = CombineWarnings(warning, layoutWarning);
+            warning = CombineWarnings(warning, geometryWarning);
             return new ApplicationSettingsLoadResult(
-                new ApplicationSettings(darkMode, aiSettings, layout, activeWorkspaceId),
+                new ApplicationSettings(darkMode, aiSettings, layout, activeWorkspaceId, geometry),
                 UsedDefault: false,
                 warning);
         }
@@ -145,7 +149,10 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
                         DarkMode = settings.DarkMode,
                         Ai = settings.Ai,
                         WindowLayout = settings.WindowLayout,
-                        ActiveWorkspaceId = settings.ActiveWorkspaceId
+                        ActiveWorkspaceId = settings.ActiveWorkspaceId,
+                        WindowGeometry = settings.WindowGeometry is { Count: > 0 } geo
+                            ? geo.ToDictionary(p => p.Key, p => p.Value)
+                            : null
                     },
                     WriteOptions,
                     cancellationToken);
@@ -226,6 +233,50 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
         return new WindowLayoutSettings(positionX, positionY, width, height, navigationWidth);
     }
 
+    private static ImmutableDictionary<string, WindowGeometrySettings> TryReadWindowGeometry(
+        int version, JsonElement root, out string? warning)
+    {
+        warning = null;
+        if (version < 4)
+        {
+            return ImmutableDictionary<string, WindowGeometrySettings>.Empty;
+        }
+
+        if (!TryGetProperty(root, "windowGeometry", out var element) ||
+            element.ValueKind != JsonValueKind.Object)
+        {
+            return ImmutableDictionary<string, WindowGeometrySettings>.Empty;
+        }
+
+        var builder = ImmutableDictionary.CreateBuilder<string, WindowGeometrySettings>();
+        var hadInvalid = false;
+        foreach (var property in element.EnumerateObject())
+        {
+            if (TryReadGeometryEntry(property.Value, out var geometry))
+            {
+                builder[property.Name] = geometry;
+            }
+            else
+            {
+                hadInvalid = true;
+            }
+        }
+
+        warning = hadInvalid ? "One or more saved window geometry entries were invalid and were reset." : null;
+        return builder.ToImmutable();
+    }
+
+    private static bool TryReadGeometryEntry(JsonElement element, out WindowGeometrySettings geometry)
+    {
+        geometry = default!;
+        return element.ValueKind == JsonValueKind.Object &&
+            TryGetInt32(element, "positionX", out var positionX) &&
+            TryGetInt32(element, "positionY", out var positionY) &&
+            TryGetFinitePositiveDouble(element, "width", out var width) &&
+            TryGetFinitePositiveDouble(element, "height", out var height) &&
+            (geometry = new WindowGeometrySettings(positionX, positionY, width, height)) is not null;
+    }
+
     private static bool TryGetFinitePositiveDouble(JsonElement element, string name, out double value)
     {
         value = default;
@@ -295,5 +346,6 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
         public AiConfigurationSettings Ai { get; set; } = AiConfigurationSettings.Default;
         public WindowLayoutSettings? WindowLayout { get; set; }
         public Guid? ActiveWorkspaceId { get; set; }
+        public Dictionary<string, WindowGeometrySettings>? WindowGeometry { get; set; }
     }
 }

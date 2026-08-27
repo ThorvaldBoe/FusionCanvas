@@ -64,7 +64,89 @@ internal static class MainWindowLayoutNormalizer
             return false;
         }
 
-        var screen = SelectScreen(saved, screens);
+        if (!TryNormalizeBounds(
+            saved.PositionX, saved.PositionY, saved.Width, saved.Height,
+            screens, minimumWindowWidth, minimumWindowHeight,
+            out var positionX, out var positionY, out var width, out var height))
+        {
+            return false;
+        }
+
+        normalized = new WindowLayoutSettings(positionX, positionY, width, height, saved.NavigationWidth);
+        return true;
+    }
+
+    public static bool TryCaptureGeometry(
+        WindowState state,
+        PixelPoint position,
+        double width,
+        double height,
+        double minimumWindowWidth,
+        double minimumWindowHeight,
+        out WindowGeometrySettings geometry)
+    {
+        geometry = default!;
+        if (state != WindowState.Normal ||
+            !IsFinitePositive(width) ||
+            !IsFinitePositive(height) ||
+            width < minimumWindowWidth ||
+            height < minimumWindowHeight)
+        {
+            return false;
+        }
+
+        geometry = new WindowGeometrySettings(position.X, position.Y, width, height);
+        return true;
+    }
+
+    public static bool TryNormalizeGeometry(
+        WindowGeometrySettings saved,
+        IReadOnlyList<ScreenLayoutInfo> screens,
+        double minimumWindowWidth,
+        double minimumWindowHeight,
+        out WindowGeometrySettings normalized)
+    {
+        normalized = default!;
+        if (screens.Count == 0 ||
+            !IsFinitePositive(saved.Width) ||
+            !IsFinitePositive(saved.Height) ||
+            saved.Width < minimumWindowWidth ||
+            saved.Height < minimumWindowHeight)
+        {
+            return false;
+        }
+
+        if (!TryNormalizeBounds(
+            saved.PositionX, saved.PositionY, saved.Width, saved.Height,
+            screens, minimumWindowWidth, minimumWindowHeight,
+            out var positionX, out var positionY, out var width, out var height))
+        {
+            return false;
+        }
+
+        normalized = new WindowGeometrySettings(positionX, positionY, width, height);
+        return true;
+    }
+
+    private static bool TryNormalizeBounds(
+        int savedX,
+        int savedY,
+        double savedWidth,
+        double savedHeight,
+        IReadOnlyList<ScreenLayoutInfo> screens,
+        double minimumWindowWidth,
+        double minimumWindowHeight,
+        out int positionX,
+        out int positionY,
+        out double width,
+        out double height)
+    {
+        positionX = 0;
+        positionY = 0;
+        width = 0;
+        height = 0;
+
+        var screen = SelectScreen(savedX, savedY, screens);
         if (!double.IsFinite(screen.Scaling) || screen.Scaling <= 0 ||
             screen.WorkingArea.Width <= 0 || screen.WorkingArea.Height <= 0)
         {
@@ -78,8 +160,8 @@ internal static class MainWindowLayoutNormalizer
             return false;
         }
 
-        var width = Math.Min(saved.Width, maximumWidth);
-        var height = Math.Min(saved.Height, maximumHeight);
+        width = Math.Min(savedWidth, maximumWidth);
+        height = Math.Min(savedHeight, maximumHeight);
         var pixelWidth = Math.Max(1, (int)Math.Ceiling(width * screen.Scaling));
         var pixelHeight = Math.Max(1, (int)Math.Ceiling(height * screen.Scaling));
         var visiblePixels = Math.Min(MinimumVisiblePixels, Math.Min(pixelWidth, pixelHeight));
@@ -89,29 +171,26 @@ internal static class MainWindowLayoutNormalizer
         var minimumY = screen.WorkingArea.Y - pixelHeight + visiblePixels;
         var maximumY = screen.WorkingArea.Y + screen.WorkingArea.Height - visiblePixels;
 
-        normalized = new WindowLayoutSettings(
-            Clamp(saved.PositionX, minimumX, maximumX),
-            Clamp(saved.PositionY, minimumY, maximumY),
-            width,
-            height,
-            saved.NavigationWidth);
+        positionX = Clamp(savedX, minimumX, maximumX);
+        positionY = Clamp(savedY, minimumY, maximumY);
         return true;
     }
 
     private static ScreenLayoutInfo SelectScreen(
-        WindowLayoutSettings saved,
+        int x,
+        int y,
         IReadOnlyList<ScreenLayoutInfo> screens)
     {
         foreach (var screen in screens)
         {
-            if (Contains(screen.WorkingArea, saved.PositionX, saved.PositionY))
+            if (Contains(screen.WorkingArea, x, y))
             {
                 return screen;
             }
         }
 
         return screens
-            .OrderBy(screen => DistanceSquared(screen.WorkingArea, saved.PositionX, saved.PositionY))
+            .OrderBy(screen => DistanceSquared(screen.WorkingArea, x, y))
             .ThenByDescending(screen => screen.IsPrimary)
             .First();
     }

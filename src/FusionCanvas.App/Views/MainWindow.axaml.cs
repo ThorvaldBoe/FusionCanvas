@@ -212,6 +212,10 @@ public partial class MainWindow : Window
         if (settings.IsOpen && _settingsWindow is null)
         {
             _settingsWindow = new SettingsWindow { DataContext = settings };
+            if (_settings is not null)
+            {
+                WindowGeometryPersistence.Attach(_settingsWindow, _settings, WindowLayoutKeys.Settings, _settingsWindow.MinWidth, _settingsWindow.MinHeight);
+            }
             _settingsWindow.Closed += (_, _) =>
             {
                 _settingsWindow = null;
@@ -240,6 +244,10 @@ public partial class MainWindow : Window
         if (workspaceManagement.IsWorkspaceManagementOpen && _workspaceManagementWindow is null)
         {
             _workspaceManagementWindow = new WorkspaceManagementWindow { DataContext = workspaceManagement };
+            if (_settings is not null)
+            {
+                WindowGeometryPersistence.Attach(_workspaceManagementWindow, _settings, WindowLayoutKeys.WorkspaceManagement, _workspaceManagementWindow.MinWidth, _workspaceManagementWindow.MinHeight);
+            }
             _workspaceManagementWindow.Closed += (_, _) =>
             {
                 _workspaceManagementWindow = null;
@@ -274,6 +282,10 @@ public partial class MainWindow : Window
         if (storeManagement.IsStoreEditorOpen && _storeEditorWindow is null)
         {
             _storeEditorWindow = new StoreEditorWindow { DataContext = storeManagement };
+            if (_settings is not null)
+            {
+                WindowGeometryPersistence.Attach(_storeEditorWindow, _settings, WindowLayoutKeys.StoreEditor, _storeEditorWindow.MinWidth, _storeEditorWindow.MinHeight);
+            }
             _storeEditorWindow.Closed += (_, _) =>
             {
                 _storeEditorWindow = null;
@@ -298,6 +310,10 @@ public partial class MainWindow : Window
         {
             _assetsWindow = new AssetsWindow { DataContext = assets };
             assets.FilePicker = new AvaloniaAssetFilePicker(_assetsWindow.StorageProvider);
+            if (_settings is not null)
+            {
+                WindowGeometryPersistence.Attach(_assetsWindow, _settings, WindowLayoutKeys.Assets, _assetsWindow.MinWidth, _assetsWindow.MinHeight);
+            }
             _assetsWindow.Closed += (_, _) =>
             {
                 _assetsWindow = null;
@@ -323,6 +339,11 @@ public partial class MainWindow : Window
         if (ideation.IsOpen && _ideationWindow is null)
         {
             _ideationWindow = new IdeationWindow { DataContext = ideation };
+            if (_settings is not null)
+            {
+                _ideationWindow.GeometryStore = _settings;
+                WindowGeometryPersistence.Attach(_ideationWindow, _settings, WindowLayoutKeys.Ideation, _ideationWindow.MinWidth, _ideationWindow.MinHeight);
+            }
             _ideationWindow.Closed += (_, _) =>
             {
                 _ideationWindow = null;
@@ -350,6 +371,10 @@ public partial class MainWindow : Window
         if (designTool.ShowPreviewDialog && _designPreviewWindow is null)
         {
             _designPreviewWindow = new DesignPreviewWindow { DataContext = designTool };
+            if (_settings is not null)
+            {
+                WindowGeometryPersistence.Attach(_designPreviewWindow, _settings, WindowLayoutKeys.DesignPreview, _designPreviewWindow.MinWidth, _designPreviewWindow.MinHeight);
+            }
             _designPreviewWindow.Closed += (_, _) =>
             {
                 _designPreviewWindow = null;
@@ -1154,6 +1179,10 @@ public partial class MainWindow : Window
             viewModel.ItemCsvImport,
             new FusionCanvas.Integration.Items.Import.ItemCsvCodec());
         var window = new ItemImportWindow { DataContext = import };
+        if (_settings is not null)
+        {
+            WindowGeometryPersistence.Attach(window, _settings, WindowLayoutKeys.ItemImport, window.MinWidth, window.MinHeight);
+        }
         await window.ShowDialog(this);
         if (import.HasImportCompleted)
         {

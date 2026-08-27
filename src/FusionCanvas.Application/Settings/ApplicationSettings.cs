@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using FusionCanvas.Application.AI;
 
 namespace FusionCanvas.Application.Settings;
@@ -6,10 +7,11 @@ public sealed record ApplicationSettings(
     bool DarkMode,
     AiConfigurationSettings Ai,
     WindowLayoutSettings? WindowLayout = null,
-    Guid? ActiveWorkspaceId = null)
+    Guid? ActiveWorkspaceId = null,
+    ImmutableDictionary<string, WindowGeometrySettings>? WindowGeometry = null)
 {
     public ApplicationSettings(bool DarkMode)
-        : this(DarkMode, AiConfigurationSettings.Default, null, null)
+        : this(DarkMode, AiConfigurationSettings.Default, null, null, null)
     {
     }
 

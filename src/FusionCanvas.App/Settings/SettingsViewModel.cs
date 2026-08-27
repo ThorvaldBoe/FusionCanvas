@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
@@ -11,7 +12,7 @@ using FusionCanvas.Application.Workspaces;
 
 namespace FusionCanvas.App.Settings;
 
-public sealed class SettingsViewModel : INotifyPropertyChanged
+public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryStore
 {
     private readonly IApplicationSettingsStore _store;
     private readonly IApplicationThemeController _themeController;
@@ -115,6 +116,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
 
     public WindowLayoutSettings? WindowLayout => _currentSettings.WindowLayout;
 
+    public IReadOnlyDictionary<string, WindowGeometrySettings> WindowGeometry =>
+        _currentSettings.WindowGeometry ?? ImmutableDictionary<string, WindowGeometrySettings>.Empty;
+
     public Guid? ActiveWorkspaceId => _currentSettings.ActiveWorkspaceId;
 
     public bool ConfirmDiscardCredentialDraft
@@ -202,6 +206,23 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         }
 
         _currentSettings = _currentSettings with { WindowLayout = layout };
+        QueueSave(_currentSettings);
+    }
+
+    public void UpdateWindowGeometry(string windowKey, WindowGeometrySettings? geometry)
+    {
+        ArgumentNullException.ThrowIfNull(windowKey);
+        var current = _currentSettings.WindowGeometry ?? ImmutableDictionary<string, WindowGeometrySettings>.Empty;
+        var updated = geometry is null
+            ? (current.ContainsKey(windowKey) ? current.Remove(windowKey) : current)
+            : current.SetItem(windowKey, geometry);
+
+        if (ReferenceEquals(updated, current))
+        {
+            return;
+        }
+
+        _currentSettings = _currentSettings with { WindowGeometry = updated };
         QueueSave(_currentSettings);
     }
 
