@@ -389,6 +389,24 @@ public class JsonApplicationSettingsStoreTests
     }
 
     [Fact]
+    public async Task LoadAsync_LegacyVersionIgnoresFutureWindowGeometrySection()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var path = tempDirectory.GetPath("settings.json");
+        await File.WriteAllTextAsync(
+            path,
+            "{\"version\":3,\"darkMode\":true,\"windowGeometry\":{\"settings\":{\"positionX\":10,\"positionY\":20,\"width\":700,\"height\":520}}}",
+            TestContext.Current.CancellationToken);
+
+        var loaded = await new JsonApplicationSettingsStore(path)
+            .LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Empty(loaded.Value.WindowGeometry!);
+        Assert.False(loaded.UsedDefault);
+        Assert.Null(loaded.Warning);
+    }
+
+    [Fact]
     public async Task LoadAsync_InvalidGeometryEntryDiscardsEntryPreservesOthers()
     {
         using var tempDirectory = new TemporaryDirectory();
