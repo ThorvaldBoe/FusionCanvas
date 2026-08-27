@@ -19,7 +19,10 @@
           <TextBlock Text="Manage values" FontWeight="SemiBold" />
           <TextBlock Text="{Binding SelectedOption.Name}" Foreground="{DynamicResource SecondaryTextBrush}" />
         </StackPanel>
-        <Button x:Name="OptionValueDoneButton" Grid.Column="1" Content="Done" Click="OnDoneClick" Classes="secondary" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+          <Button x:Name="OptionValueCancelButton" Content="Cancel" Click="OnCancelClick" Classes="secondary" />
+          <Button x:Name="OptionValueDoneButton" Content="Done" Click="OnDoneClick" Classes="secondary" />
+        </StackPanel>
       </Grid>
       <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" FontSize="12" Foreground="{DynamicResource DangerTextBrush}" />
       <TextBlock IsVisible="{Binding !HasAvailableValues}" Text="No Values configured for this Option." Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -40,7 +43,7 @@
         <TextBox x:Name="OptionValueTextBox" Text="{Binding OptionValue}" PlaceholderText="Option Value" Classes="field" />
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Button Content="Save Option Value" Command="{Binding CreateOptionValueCommand}" Classes="primary fixedAction" />
-          <Button Content="Cancel" Command="{Binding CancelAddOptionValueCommand}" Classes="secondary fixedAction" />
+          <Button Content="Cancel add" Command="{Binding CancelAddOptionValueCommand}" Classes="secondary fixedAction" />
         </StackPanel>
       </StackPanel>
     </StackPanel>

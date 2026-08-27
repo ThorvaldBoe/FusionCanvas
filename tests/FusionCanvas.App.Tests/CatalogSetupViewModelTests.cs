@@ -227,6 +227,52 @@ public sealed class CatalogSetupViewModelTests
     }
 
     [Fact]
+    public async Task SecondManageRequestKeepsOriginalStableOptionScope()
+    {
+        var (viewModel, colorOption, sizeOption, _) = await CreateCatalogWithOptionsAsync();
+        var requested = 0;
+        viewModel.OptionValueManagementRequested += (_, _) => requested++;
+
+        viewModel.ManageOptionCommand.Execute(colorOption);
+        viewModel.ManageOptionCommand.Execute(sizeOption);
+
+        Assert.Equal(1, requested);
+        Assert.Equal(colorOption.Id, viewModel.SelectedOptionId);
+        Assert.Equal("Manage Color values", viewModel.ManageOptionValuesDialogTitle);
+    }
+
+    [Fact]
+    public async Task ManageRequestRejectsOptionOutsideCurrentOffering()
+    {
+        var (viewModel, colorOption, _, offering) = await CreateCatalogWithOptionsAsync();
+        var staleOption = colorOption with { Id = Guid.NewGuid(), OfferingId = Guid.NewGuid() };
+        var requested = 0;
+        viewModel.OptionValueManagementRequested += (_, _) => requested++;
+
+        viewModel.ManageOptionCommand.Execute(staleOption);
+
+        Assert.Equal(0, requested);
+        Assert.False(viewModel.IsManagingOptionValues);
+        Assert.Equal(offering.Id, viewModel.SelectedOfferingId);
+        Assert.Equal(colorOption.Id, viewModel.SelectedOptionId);
+    }
+
+    [Fact]
+    public async Task WorkspaceLoadClosesOptionValueManagementAndDiscardsDraft()
+    {
+        var (viewModel, colorOption, _, _) = await CreateCatalogWithOptionsAsync();
+        viewModel.ManageOptionCommand.Execute(colorOption);
+        viewModel.StartAddOptionValueCommand.Execute(null);
+        viewModel.OptionValue = "Navy";
+
+        await viewModel.LoadForStoreAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
+
+        Assert.False(viewModel.IsManagingOptionValues);
+        Assert.False(viewModel.IsAddingOptionValue);
+        Assert.Equal(string.Empty, viewModel.OptionValue);
+    }
+
+    [Fact]
     public async Task OfferingSwitchClosesOptionValueManagementAndDiscardsDraft()
     {
         var now = DateTimeOffset.UtcNow;

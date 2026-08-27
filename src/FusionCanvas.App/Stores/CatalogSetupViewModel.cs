@@ -200,9 +200,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             if (!SetField(ref _selectedOffering, value)) return;
             if (IsManagingOptionValues)
             {
-                IsAddingOptionValue = false;
-                OptionValue = string.Empty;
-                IsManagingOptionValues = false;
+                ResetOptionValueManagement();
             }
             LoadOfferingFields();
             RefreshOfferingCollections();
@@ -389,8 +387,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         IsAddingPrintProvider = false;
         NewPrintProviderName = string.Empty;
         IsAddingOption = false;
-        IsManagingOptionValues = false;
-        IsAddingOptionValue = false;
+        ResetOptionValueManagement();
         ResetVariantDraft();
         ResetPlaceholderDraft();
         IsAddingTemplate = false;
@@ -458,6 +455,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public async Task LoadForStoreAsync(Guid storeId, CancellationToken cancellationToken = default)
     {
         ClearDesignAreaArchiveConfirmation();
+        ResetOptionValueManagement();
         IsBusy = true;
         ErrorMessage = string.Empty;
         try
@@ -984,8 +982,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void BeginManageOptionValues(OfferingOption? option)
     {
-        if (option is null) return;
-        SelectedOption = option;
+        if (IsManagingOptionValues || option is null) return;
+        var currentOption = AvailableOptions.FirstOrDefault(value => value.Id == option.Id);
+        if (currentOption is null) return;
+        SelectedOption = currentOption;
         IsManagingOptionValues = true;
         OptionValueManagementRequested?.Invoke(this, EventArgs.Empty);
     }
@@ -998,10 +998,15 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void CloseOptionValueManagement()
     {
+        ResetOptionValueManagement();
+        OptionChoiceFocusRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ResetOptionValueManagement()
+    {
         IsAddingOptionValue = false;
         OptionValue = string.Empty;
         IsManagingOptionValues = false;
-        OptionChoiceFocusRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void BeginVariantDraft(bool bulk)
