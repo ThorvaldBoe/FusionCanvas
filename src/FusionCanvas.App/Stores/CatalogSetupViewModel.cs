@@ -292,20 +292,25 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(MappingImageWidth));
             OnPropertyChanged(nameof(MappingImageHeight));
             OnPropertyChanged(nameof(HasSelectedProviderMockup));
+            OnPropertyChanged(nameof(MockupPreviewUnavailableMessage));
             RebuildChoices();
             NotifyCommands();
         }
     }
-    public string ProviderCatalogMessage { get => _providerCatalogMessage; private set { if (SetField(ref _providerCatalogMessage, value)) OnPropertyChanged(nameof(HasProviderCatalogMessage)); } }
+    public string ProviderCatalogMessage { get => _providerCatalogMessage; private set { if (SetField(ref _providerCatalogMessage, value)) { OnPropertyChanged(nameof(HasProviderCatalogMessage)); OnPropertyChanged(nameof(MockupPreviewUnavailableMessage)); } } }
     public bool HasProviderCatalogMessage => !string.IsNullOrWhiteSpace(ProviderCatalogMessage);
     public bool HasProviderMockupCandidates => ProviderMockupCandidates.Count > 0;
     public bool HasSelectedProviderMockup => SelectedProviderMockup is not null;
+    public string MockupPreviewUnavailableMessage =>
+        !string.IsNullOrWhiteSpace(ProviderCatalogMessage)
+            ? ProviderCatalogMessage
+            : "Select a provider mockup image to preview and edit placement.";
     public double MappingX { get => _mappingX; set { if (SetField(ref _mappingX, value)) NotifyCommands(); } }
     public double MappingY { get => _mappingY; set { if (SetField(ref _mappingY, value)) NotifyCommands(); } }
     public double MappingWidth { get => _mappingWidth; set { if (SetField(ref _mappingWidth, value)) NotifyCommands(); } }
     public double MappingHeight { get => _mappingHeight; set { if (SetField(ref _mappingHeight, value)) NotifyCommands(); } }
-    public double MappingImageWidth => SelectedProviderMockup?.ImageWidth ?? 1;
-    public double MappingImageHeight => SelectedProviderMockup?.ImageHeight ?? 1;
+    public double MappingImageWidth => SelectedProviderMockup?.ImageWidth ?? 0;
+    public double MappingImageHeight => SelectedProviderMockup?.ImageHeight ?? 0;
 
     public string OfferingName { get => _offeringName; set { if (SetField(ref _offeringName, value)) NotifyCommands(); } }
     public string OfferingDescription { get => _offeringDescription; set => SetField(ref _offeringDescription, value); }

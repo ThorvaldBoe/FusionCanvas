@@ -849,6 +849,79 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void MockupPreview_WithoutImageShowsCompactUnavailableStateAndNoRectangle()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+        viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
+        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        Assert.False(viewModel.CatalogSetup.HasSelectedProviderMockup);
+        Assert.False(viewModel.CatalogSetup.HasProviderMockupCandidates);
+
+        var editor = window.GetVisualDescendants().OfType<MockupPlacementEditor>().Single();
+        Assert.False(IsEffectivelyVisible(editor));
+
+        var previewRegion = AssertEffectivelyVisible(window, "Catalog.MockupPreviewRegion");
+        var unavailable = previewRegion.GetVisualDescendants().OfType<TextBlock>()
+            .Where(IsEffectivelyVisible)
+            .FirstOrDefault(block => !string.IsNullOrEmpty(block.Text)
+                && block.Text.Contains("available", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(unavailable);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void MockupPreview_WithImageSynchronizesPlacementRectangleAndMappingFields()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+        viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
+        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        var candidate = new ProviderMockupCandidateDescriptor("front-black", "Front preview", 1000, 1000, new HashSet<Guid>());
+        viewModel.CatalogSetup.ProviderMockupCandidates.Add(candidate);
+        viewModel.CatalogSetup.SelectedProviderMockup = candidate;
+        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        var editor = window.GetVisualDescendants().OfType<MockupPlacementEditor>().Single();
+        Assert.True(IsEffectivelyVisible(editor));
+        Assert.Equal(viewModel.CatalogSetup.MappingX, editor.PlacementX, 1);
+        Assert.Equal(viewModel.CatalogSetup.MappingY, editor.PlacementY, 1);
+        Assert.Equal(viewModel.CatalogSetup.MappingWidth, editor.PlacementWidth, 1);
+        Assert.Equal(viewModel.CatalogSetup.MappingHeight, editor.PlacementHeight, 1);
+
+        editor.PlacementX = 333;
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.Equal(333, viewModel.CatalogSetup.MappingX, 1);
+        Assert.True(viewModel.CatalogSetup.MappingX + viewModel.CatalogSetup.MappingWidth <= viewModel.CatalogSetup.MappingImageWidth);
+
+        viewModel.CatalogSetup.MappingY = 412;
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        Assert.Equal(412, editor.PlacementY, 1);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void AdvancedProviderDataExpander_ShowsPopulatedState()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);

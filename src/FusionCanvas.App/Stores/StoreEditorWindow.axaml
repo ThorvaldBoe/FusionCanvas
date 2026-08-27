@@ -1081,12 +1081,14 @@
                             AutomationProperties.AutomationId="Catalog.MockupPreviewRegion">
                       <StackPanel Spacing="6">
                         <TextBlock Text="Provider image and placement" FontWeight="SemiBold" />
-                        <TextBlock IsVisible="{Binding !CatalogSetup.HasProviderMockupCandidates}"
-                                   Text="{Binding CatalogSetup.ProviderCatalogMessage}"
+                        <TextBlock IsVisible="{Binding !CatalogSetup.HasSelectedProviderMockup}"
+                                   Text="{Binding CatalogSetup.MockupPreviewUnavailableMessage}"
                                    TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <TextBlock Text="Drag the rectangle to move it, drag its lower-right handle to resize, or use arrow keys. Hold Shift with arrow keys to resize."
+                        <TextBlock IsVisible="{Binding CatalogSetup.HasSelectedProviderMockup}"
+                                   Text="Drag the rectangle to move it, drag its lower-right handle to resize, or use arrow keys. Hold Shift with arrow keys to resize."
                                    TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <stores:MockupPlacementEditor Height="320"
+                        <stores:MockupPlacementEditor IsVisible="{Binding CatalogSetup.HasSelectedProviderMockup}"
+                                                       Height="320"
                                                        IsEnabled="{Binding CatalogSetup.CanEdit}"
                                                        PlacementX="{Binding CatalogSetup.MappingX, Mode=TwoWay}"
                                                        PlacementY="{Binding CatalogSetup.MappingY, Mode=TwoWay}"
