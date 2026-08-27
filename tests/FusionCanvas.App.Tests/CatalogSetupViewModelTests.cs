@@ -273,6 +273,25 @@ public sealed class CatalogSetupViewModelTests
         Assert.False(viewModel.HasError);
     }
 
+    [Fact]
+    public async Task OfferingSwitch_CancelsPendingDesignAreaArchiveAndRejectsStaleCard()
+    {
+        var (viewModel, _, offering) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: false);
+        var staleCard = Assert.Single(viewModel.DesignAreaCards);
+        viewModel.ArchivePlaceholderCommand.Execute(staleCard);
+
+        var otherOffering = viewModel.Offerings.First(candidate => candidate.Id != offering.Id);
+        viewModel.SelectOffering(otherOffering.Id);
+
+        Assert.False(viewModel.IsDesignAreaArchiveConfirmationVisible);
+        Assert.Null(viewModel.PendingDesignAreaArchiveId);
+
+        viewModel.ArchivePlaceholderCommand.Execute(staleCard);
+
+        Assert.False(viewModel.IsDesignAreaArchiveConfirmationVisible);
+        Assert.Null(viewModel.PendingDesignAreaArchiveId);
+    }
+
     private static async Task<(CatalogSetupViewModel ViewModel, OfferingPlaceholder Area, BlueprintOffering Offering)> CreateCatalogWithDesignAreaAsync(bool referencedByTemplate)
     {
         var now = DateTimeOffset.UtcNow;
@@ -280,6 +299,7 @@ public sealed class CatalogSetupViewModelTests
         var store = snapshot.Stores.Single();
         var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
         var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Printful tee", null, BlueprintOfferingKind.ProviderNetwork, null, "printful", null, null, false, now, now);
+        var otherOffering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Other tee", null, BlueprintOfferingKind.ProviderNetwork, null, "other", null, null, false, now, now);
         var colorOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
         var sizeOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Size, "Size", 1);
         var black = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "Black", 0);
@@ -289,7 +309,7 @@ public sealed class CatalogSetupViewModelTests
         var populated = snapshot with
         {
             Blueprints = [blueprint],
-            BlueprintOfferings = [offering],
+            BlueprintOfferings = [offering, otherOffering],
             OfferingOptions = [colorOption, sizeOption],
             OfferingOptionValues = [black, small],
             OfferingVariants = [variant],

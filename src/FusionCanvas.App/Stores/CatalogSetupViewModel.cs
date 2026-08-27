@@ -448,6 +448,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     public async Task LoadForStoreAsync(Guid storeId, CancellationToken cancellationToken = default)
     {
+        ClearDesignAreaArchiveConfirmation();
         IsBusy = true;
         ErrorMessage = string.Empty;
         try
@@ -480,6 +481,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     public void SelectOffering(Guid? offeringId)
     {
+        if (offeringId != SelectedOffering?.Id)
+        {
+            ClearDesignAreaArchiveConfirmation();
+        }
         _requestedOfferingId = offeringId;
         SelectedOffering = offeringId is null ? null : Offerings.FirstOrDefault(value => value.Id == offeringId.Value);
         OnPropertyChanged(nameof(IsOfferingContextUnavailable));
@@ -708,15 +713,17 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private void RequestDesignAreaArchive(object? parameter)
     {
         if (_isDesignAreaArchiveConfirmationVisible || SelectedOffering is null) return;
-        var (id, name) = parameter switch
+        var id = parameter switch
         {
-            OfferingPlaceholder area => (area.Id, area.Name),
-            DesignAreaCardViewModel card => (card.Id, card.Name),
-            _ => (Guid.Empty, string.Empty)
+            OfferingPlaceholder area => area.Id,
+            DesignAreaCardViewModel card => card.Id,
+            _ => Guid.Empty
         };
         if (id == Guid.Empty) return;
-        _pendingDesignAreaArchiveId = id;
-        _pendingDesignAreaArchiveName = name;
+        var currentArea = AvailablePlaceholders.FirstOrDefault(candidate => candidate.Id == id);
+        if (currentArea is null) return;
+        _pendingDesignAreaArchiveId = currentArea.Id;
+        _pendingDesignAreaArchiveName = currentArea.Name;
         OnPropertyChanged(nameof(PendingDesignAreaArchiveId));
         OnPropertyChanged(nameof(PendingDesignAreaArchiveName));
         OnPropertyChanged(nameof(DesignAreaArchiveConfirmationMessage));
