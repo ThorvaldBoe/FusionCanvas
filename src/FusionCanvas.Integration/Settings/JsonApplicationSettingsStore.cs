@@ -93,7 +93,7 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
             if (!TryGetProperty(root, "ai", out var aiElement))
             {
                 var noAiLayout = TryReadWindowLayout(root, out var noAiLayoutWarning);
-                var noAiGeometry = TryReadWindowGeometry(root, out var noAiGeometryWarning);
+                var noAiGeometry = TryReadWindowGeometry(version, root, out var noAiGeometryWarning);
                 return new ApplicationSettingsLoadResult(
                     new ApplicationSettings(darkMode, AiConfigurationSettings.Default, noAiLayout, activeWorkspaceId, noAiGeometry),
                     UsedDefault: false,
@@ -115,7 +115,7 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
             }
 
             var layout = TryReadWindowLayout(root, out var layoutWarning);
-            var geometry = TryReadWindowGeometry(root, out var geometryWarning);
+            var geometry = TryReadWindowGeometry(version, root, out var geometryWarning);
             warning = CombineWarnings(warning, layoutWarning);
             warning = CombineWarnings(warning, geometryWarning);
             return new ApplicationSettingsLoadResult(
@@ -234,9 +234,14 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
     }
 
     private static ImmutableDictionary<string, WindowGeometrySettings> TryReadWindowGeometry(
-        JsonElement root, out string? warning)
+        int version, JsonElement root, out string? warning)
     {
         warning = null;
+        if (version < 4)
+        {
+            return ImmutableDictionary<string, WindowGeometrySettings>.Empty;
+        }
+
         if (!TryGetProperty(root, "windowGeometry", out var element) ||
             element.ValueKind != JsonValueKind.Object)
         {

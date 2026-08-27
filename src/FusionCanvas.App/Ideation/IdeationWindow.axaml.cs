@@ -17,7 +17,7 @@ public partial class IdeationWindow : Window
     private SnowcloneLibraryWindow? _snowcloneLibraryWindow;
     private RejectedPhrasesWindow? _rejectedPhrasesWindow;
 
-    public IWindowGeometryStore? GeometryStore { get; set; }
+    internal IWindowGeometryStore? GeometryStore { get; set; }
 
     public IdeationWindow()
     {
