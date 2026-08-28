@@ -24,9 +24,9 @@ screen:
             kind: text
             variant: supporting
             text: Version 2 - pixels first, with physical print size and artwork guidance
-      - id: master-detail
+      - id: collection-surface
         kind: grid
-        columns: [690, fill]
+        columns: [fill]
         rowTracks: [fill]
         gap: region
         height: fill
@@ -67,7 +67,7 @@ screen:
                   - id: add-area
                     kind: button
                     variant: primary
-                    text: + Add area
+                    text: Add Design Area
                     width: content
                     column: 1
                     row: 0
@@ -154,13 +154,14 @@ screen:
                 variant: empty
                 text: No design areas configured.
                 visible: false
-          - id: area-editor
+          - id: area-editor-dialog
             kind: panel
             variant: canvas
+            visible: false
             height: fill
             gap: compact
             padding: window
-            column: 1
+            column: 0
             row: 0
             children:
               - { id: editor-title, kind: text, variant: section-heading, text: Edit design area }
@@ -206,11 +207,21 @@ screen:
                     row: 0
 states:
   default:
-    overrides: []
+    overrides:
+      - { target: area-editor-dialog, visible: false }
+  add-dialog:
+    overrides:
+      - { target: area-editor-dialog, visible: true }
+      - { target: editor-title, text: Add Design Area }
+      - { target: editor-area-name, text: New Design Area }
+  edit-dialog:
+    overrides:
+      - { target: area-editor-dialog, visible: true }
+      - { target: editor-title, text: Edit Design Area }
   empty-collection:
     overrides:
       - { target: front-area-card, visible: false }
       - { target: back-area-card, visible: false }
       - { target: chest-area-card, visible: false }
       - { target: empty-collection-message, visible: true }
-      - { target: area-editor, visible: false }
+      - { target: area-editor-dialog, visible: false }

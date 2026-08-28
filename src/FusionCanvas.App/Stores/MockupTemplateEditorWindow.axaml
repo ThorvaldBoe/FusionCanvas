@@ -1,0 +1,133 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:stores="using:FusionCanvas.App.Stores"
+        x:Class="FusionCanvas.App.Stores.MockupTemplateEditorWindow"
+        x:DataType="stores:CatalogSetupViewModel"
+        Title="{Binding MockupTemplateEditorDialogTitle}"
+        Width="980" Height="760"
+        MinWidth="640" MinHeight="540"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner">
+  <Grid Margin="16" RowDefinitions="*,Auto,Auto" RowSpacing="12">
+    <ScrollViewer Grid.Row="0"
+                  HorizontalScrollBarVisibility="Auto"
+                  VerticalScrollBarVisibility="Auto">
+      <Grid MinWidth="760" ColumnDefinitions="3*,2*" ColumnSpacing="16">
+        <Border Grid.Column="0" Classes="listItem" Padding="12"
+                AutomationProperties.AutomationId="Catalog.MockupPreviewRegion">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Provider image and placement" FontSize="18" FontWeight="SemiBold" />
+            <TextBlock IsVisible="{Binding !HasSelectedProviderMockup}"
+                       Text="{Binding MockupPreviewUnavailableMessage}"
+                       TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+            <TextBlock IsVisible="{Binding HasSelectedProviderMockup}"
+                       Text="Drag the rectangle to move it, drag its lower-right handle to resize, or use arrow keys. Hold Shift with arrow keys to resize."
+                       TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+            <stores:MockupPlacementEditor x:Name="PlacementEditor"
+                                           IsVisible="{Binding HasSelectedProviderMockup}"
+                                           Height="420"
+                                           IsEnabled="{Binding CanEdit}"
+                                           PlacementX="{Binding MappingX, Mode=TwoWay}"
+                                           PlacementY="{Binding MappingY, Mode=TwoWay}"
+                                           PlacementWidth="{Binding MappingWidth, Mode=TwoWay}"
+                                           PlacementHeight="{Binding MappingHeight, Mode=TwoWay}"
+                                           ImageWidth="{Binding MappingImageWidth}"
+                                           ImageHeight="{Binding MappingImageHeight}"
+                                           AutomationProperties.Name="Provider image placement" />
+          </StackPanel>
+        </Border>
+
+        <StackPanel Grid.Column="1" Spacing="8"
+                    AutomationProperties.AutomationId="Catalog.MockupConfigurationRegion">
+          <TextBlock Text="Configuration" FontSize="18" FontWeight="SemiBold" />
+          <TextBlock Text="Template name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBox x:Name="TemplateNameTextBox"
+                   Text="{Binding TemplateName}"
+                   PlaceholderText="Mockup Template name"
+                   Classes="field"
+                   IsReadOnly="{Binding !CanEdit}"
+                   AutomationProperties.Name="Template name" />
+          <TextBlock Text="Provider mockup image" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBlock Text="{Binding ProviderImageSelectionInstructions}"
+                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <ComboBox ItemsSource="{Binding ProviderMockupCandidates}"
+                    SelectedItem="{Binding SelectedProviderMockup}"
+                    DisplayMemberBinding="{Binding DisplayName}"
+                    PlaceholderText="Provider mockup image"
+                    IsEnabled="{Binding CanEdit}"
+                    AutomationProperties.Name="Provider mockup image" />
+          <TextBlock Text="{Binding ProviderImageSelectionStateMessage}"
+                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}"
+                     AutomationProperties.AutomationId="Catalog.ProviderImageState" />
+          <TextBlock Text="{Binding ProviderImageSelectionRecoveryMessage}"
+                     IsVisible="{Binding HasProviderImageSelectionRecovery}"
+                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource WarningTextBrush}"
+                     AutomationProperties.AutomationId="Catalog.ProviderImageRecovery" />
+          <TextBlock Text="Linked Design Area" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <ComboBox ItemsSource="{Binding AvailablePlaceholders}"
+                    SelectedItem="{Binding SelectedPlaceholder}"
+                    DisplayMemberBinding="{Binding Name}"
+                    PlaceholderText="Linked Design Area"
+                    IsEnabled="{Binding CanEdit}"
+                    AutomationProperties.Name="Linked Design Area" />
+          <TextBlock Text="Applicable Colors" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <ItemsControl ItemsSource="{Binding TemplateColorChoices}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="stores:OptionValueChoiceViewModel">
+                <CheckBox Content="{Binding Label}"
+                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                          IsEnabled="{Binding $parent[Window].DataContext.CanEdit}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="Image-space mapping (pixels)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="8">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="X" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+            <TextBlock Grid.Row="0" Grid.Column="1" Text="Y" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+            <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding MappingX}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="X" />
+            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding MappingY}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Y" />
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Width" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Text="Height" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+            <TextBox Grid.Row="3" Grid.Column="0" Text="{Binding MappingWidth}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Width" />
+            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding MappingHeight}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Height" />
+          </Grid>
+          <Expander Header="Advanced provider data">
+            <StackPanel Spacing="4">
+              <TextBlock IsVisible="{Binding HasSelectedProviderMockup}"
+                         Text="Provider mockup reference"
+                         FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+              <TextBox IsVisible="{Binding HasSelectedProviderMockup}"
+                       Text="{Binding SelectedProviderMockup.ProviderReference}"
+                       IsReadOnly="True" Classes="field"
+                       ToolTip.Tip="Stable provider mockup reference from the Printify catalog."
+                       AutomationProperties.Name="Provider mockup reference" />
+              <TextBlock IsVisible="{Binding !HasSelectedProviderMockup}"
+                         Text="No provider reference available."
+                         TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+            </StackPanel>
+          </Expander>
+        </StackPanel>
+      </Grid>
+    </ScrollViewer>
+
+    <Border Grid.Row="1"
+            IsVisible="{Binding IsMockupTemplateDiscardConfirmationVisible}"
+            Background="{DynamicResource WarningBackgroundBrush}"
+            BorderBrush="{DynamicResource WarningBorderBrush}"
+            BorderThickness="1" Padding="10">
+      <StackPanel Spacing="8">
+        <TextBlock Text="Discard unsaved Mockup Template changes?" FontWeight="SemiBold" />
+        <TextBlock Text="Your current template values and placement will be lost." TextWrapping="Wrap" />
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <Button Content="Discard changes" Command="{Binding ConfirmDiscardMockupTemplateCommand}" Classes="danger" />
+          <Button x:Name="KeepEditingButton" Content="Keep editing" Command="{Binding KeepEditingMockupTemplateCommand}" Classes="secondary" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+      <Button Content="Save Mockup Template" Command="{Binding CreateTemplateCommand}" Classes="primary" />
+      <Button Content="Cancel" Command="{Binding RequestCancelMockupTemplateCommand}" Classes="secondary" />
+    </StackPanel>
+  </Grid>
+</Window>

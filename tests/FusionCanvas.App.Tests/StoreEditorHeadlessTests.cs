@@ -148,13 +148,16 @@ public class StoreEditorHeadlessTests
         viewModel.OpenDesignAreaManagementCommand.Execute(null);
         window.UpdateLayout();
         AssertEffectivelyVisible(window, "Catalog.DesignAreaList");
-        AssertEffectivelyVisible(window, "Catalog.DesignAreaEditor");
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<Control>(), control =>
+            AutomationProperties.GetAutomationId(control) == "Catalog.DesignAreaEditor");
 
         viewModel.BackToOfferingOverviewCommand.Execute(null);
         viewModel.OpenMockupTemplateManagementCommand.Execute(null);
         window.UpdateLayout();
         AssertEffectivelyVisible(window, "Catalog.MockupTemplateList");
-        AssertEffectivelyVisible(window, "Catalog.MockupTemplateEditor");
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<Control>(),
+            control => AutomationProperties.GetAutomationId(control) == "Catalog.MockupTemplateEditor");
+        Assert.Empty(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
 
         window.Close();
     }
@@ -375,9 +378,13 @@ public class StoreEditorHeadlessTests
         Assert.Equal("Front", templateCard.TargetDesignArea);
         Assert.Equal(1, templateCard.CurrentRevision);
         viewModel.CatalogSetup.StartAddTemplateCommand.Execute(null);
-        window.UpdateLayout();
-        AssertEffectivelyVisible(window, "Catalog.MockupPreviewRegion");
-        AssertEffectivelyVisible(window, "Catalog.MockupConfigurationRegion");
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        var templateDialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        templateDialog.UpdateLayout();
+        AssertEffectivelyVisible(templateDialog, "Catalog.MockupPreviewRegion");
+        AssertEffectivelyVisible(templateDialog, "Catalog.MockupConfigurationRegion");
+        templateDialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
 
         window.Close();
     }
@@ -747,6 +754,91 @@ public class StoreEditorHeadlessTests
         Assert.False(viewModel.CatalogSetup.IsManagingOptionValues);
         Assert.True(manageValues.IsFocused);
 
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void ManageValues_ArchiveActionsAreCompactTargetSpecificAndKeepLongValuesReadable()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        foreach (var kind in new[] { OptionKind.Color, OptionKind.Size })
+        {
+            var group = viewModel.CatalogSetup!.AvailableChoiceGroups.Single(candidate => candidate.Option.OptionKind == kind);
+            viewModel.CatalogSetup.ManageOptionCommand.Execute(group.Option);
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+
+            var standardDialog = Assert.Single(window.OwnedWindows.OfType<OptionValueManagementWindow>());
+            var standardActions = standardDialog.GetVisualDescendants()
+                .OfType<Button>()
+                .Where(button => string.Equals(button.Content as string, "Archive", StringComparison.Ordinal))
+                .ToArray();
+            Assert.Equal(group.Values.Count, standardActions.Length);
+            Assert.All(standardActions, button =>
+            {
+                var optionValue = Assert.IsType<OfferingOptionValue>(button.DataContext);
+                Assert.Equal($"Archive {optionValue.Value}", AutomationProperties.GetName(button));
+                Assert.Contains("compactDanger", button.Classes);
+            });
+
+            standardDialog.Close();
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        }
+
+        viewModel.CatalogSetup!.SelectedOptionKind = OptionKind.Other;
+        viewModel.CatalogSetup.OptionName = "Material";
+        viewModel.CatalogSetup.StartAddOptionCommand.Execute(null);
+        viewModel.CatalogSetup.CreateOptionCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        var customOption = viewModel.CatalogSetup.AvailableChoiceGroups
+            .Single(group => group.Option.OptionKind == OptionKind.Other);
+        viewModel.CatalogSetup.ManageOptionCommand.Execute(customOption.Option);
+        viewModel.CatalogSetup.StartAddOptionValueCommand.Execute(null);
+        const string longValue = "Extraordinarily long recycled cotton blend material value";
+        viewModel.CatalogSetup.OptionValue = longValue;
+        viewModel.CatalogSetup.CreateOptionValueCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        var dialog = Assert.Single(window.OwnedWindows.OfType<OptionValueManagementWindow>());
+        dialog.UpdateLayout();
+        var archive = dialog.GetVisualDescendants()
+            .OfType<Button>()
+            .Single(button => string.Equals(button.Content as string, "Archive", StringComparison.Ordinal));
+        var value = Assert.IsType<OfferingOptionValue>(archive.DataContext);
+        var valueText = dialog.GetVisualDescendants()
+            .OfType<TextBlock>()
+            .Single(text => string.Equals(text.Text, longValue, StringComparison.Ordinal));
+
+        Assert.Equal(longValue, value.Value);
+        Assert.Contains("compactDanger", archive.Classes);
+        Assert.DoesNotContain("danger", archive.Classes);
+        Assert.Equal(new Thickness(7, 4), archive.Padding);
+        Assert.Equal($"Archive {longValue}", AutomationProperties.GetName(archive));
+        Assert.Same(viewModel.CatalogSetup.ArchiveOptionValueCommand, archive.Command);
+        Assert.Same(value, archive.CommandParameter);
+        Assert.Equal(Avalonia.Media.TextWrapping.Wrap, valueText.TextWrapping);
+        Assert.True(valueText.Bounds.Right <= archive.Bounds.Left,
+            $"Value text ending at {valueText.Bounds.Right} must not overlap Archive starting at {archive.Bounds.Left}.");
+
+        archive.Command!.Execute(archive.CommandParameter);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        dialog.UpdateLayout();
+
+        Assert.DoesNotContain(viewModel.CatalogSetup.AvailableValues, candidate => candidate.Id == value.Id);
+        Assert.DoesNotContain(dialog.GetVisualDescendants().OfType<Button>(),
+            button => string.Equals(AutomationProperties.GetName(button), $"Archive {longValue}", StringComparison.Ordinal));
+
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         window.Close();
     }
 
@@ -1190,14 +1282,132 @@ public class StoreEditorHeadlessTests
         window.UpdateLayout();
 
         viewModel.CatalogSetup!.StartAddPlaceholderCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         window.UpdateLayout();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<DesignAreaEditorWindow>());
+        dialog.UpdateLayout();
+
+        var saveButton = FindButton(dialog, "Save design area");
+        Assert.NotNull(saveButton);
+        Assert.Null(FindButton(dialog, "Save Design Area"));
+        Assert.Null(FindButton(dialog, "Save design"));
+        Assert.NotNull(saveButton!.Command);
+
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void DesignAreaManagement_UsesListOnlySurfaceAndGuardedAddDialog()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenDesignAreaManagementCommand.Execute(null);
         window.UpdateLayout();
 
-        var saveButton = FindButton(window, "Save design area");
-        Assert.NotNull(saveButton);
-        Assert.Null(FindButton(window, "Save Design Area"));
-        Assert.Null(FindButton(window, "Save design"));
-        Assert.NotNull(saveButton!.Command);
+        var list = AssertEffectivelyVisible(window, "Catalog.DesignAreaList");
+        Assert.True(list.Bounds.Width > 500, "The Design Area collection should use the full management width.");
+        Assert.Empty(window.OwnedWindows.OfType<DesignAreaEditorWindow>());
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<Control>(), control =>
+            AutomationProperties.GetAutomationId(control) == "Catalog.DesignAreaEditorDialog");
+
+        var add = FindButton(window, "Add Design Area")!;
+        add.Command!.Execute(add.CommandParameter);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        var dialog = Assert.Single(window.OwnedWindows.OfType<DesignAreaEditorWindow>());
+        dialog.UpdateLayout();
+        Assert.Equal("Add Design Area", dialog.Title);
+        Assert.Equal(window, dialog.Owner);
+        Assert.True(viewModel.CatalogSetup!.IsAddingPlaceholder);
+        Assert.False(viewModel.CatalogSetup.IsEditingDesignArea);
+        Assert.False(viewModel.CatalogSetup.HasMeaningfulDesignAreaDraft);
+        Assert.True(dialog.FindControl<TextBox>("DesignAreaNameTextBox")!.IsFocused);
+        Assert.NotEmpty(dialog.GetVisualDescendants().OfType<ScrollViewer>());
+        Assert.Equal(520, dialog.MinWidth);
+        Assert.Equal(520, dialog.MinHeight);
+
+        viewModel.CatalogSetup.PlaceholderName = "Sleeve";
+        Assert.True(viewModel.CatalogSetup.HasMeaningfulDesignAreaDraft);
+        HeadlessWindowExtensions.KeyPress(dialog, Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, string.Empty);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        dialog.UpdateLayout();
+
+        Assert.True(dialog.IsVisible);
+        Assert.True(viewModel.CatalogSetup.IsDesignAreaDiscardConfirmationVisible);
+        Assert.True(dialog.FindControl<Button>("KeepEditingButton")!.IsFocused);
+
+        viewModel.CatalogSetup.KeepEditingDesignAreaCommand.Execute(null);
+        Assert.True(dialog.IsVisible);
+        Assert.Equal("Sleeve", viewModel.CatalogSetup.PlaceholderName);
+
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.True(viewModel.CatalogSetup.IsDesignAreaDiscardConfirmationVisible);
+        viewModel.CatalogSetup.ConfirmDiscardDesignAreaCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        Assert.Empty(window.OwnedWindows.OfType<DesignAreaEditorWindow>());
+        Assert.False(viewModel.CatalogSetup.IsAddingPlaceholder);
+        Assert.True(add.IsFocused);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void DesignAreaManagement_EditDialogPopulatesSavesAndReturnsFocus()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenDesignAreaManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        var card = Assert.Single(viewModel.CatalogSetup!.DesignAreaCards);
+        var edit = window.GetVisualDescendants().OfType<Button>()
+            .Single(button => IsEffectivelyVisible(button)
+                && string.Equals(button.Content as string, "Edit", StringComparison.Ordinal)
+                && button.DataContext is DesignAreaCardViewModel value
+                && value.Id == card.Id);
+        edit.Command!.Execute(edit.CommandParameter);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        var dialog = Assert.Single(window.OwnedWindows.OfType<DesignAreaEditorWindow>());
+        dialog.UpdateLayout();
+        Assert.Equal("Edit Design Area", dialog.Title);
+        Assert.True(viewModel.CatalogSetup.IsEditingDesignArea);
+        Assert.Equal(card.Id, viewModel.CatalogSetup.SelectedPlaceholderId);
+        Assert.Equal("Front", viewModel.CatalogSetup.PlaceholderName);
+        Assert.Equal("front", viewModel.CatalogSetup.PlaceholderPosition);
+        Assert.Equal("DTG", viewModel.CatalogSetup.PlaceholderDecorationMethod);
+        Assert.Equal("4500", viewModel.CatalogSetup.PlaceholderWidth);
+        Assert.Equal("5400", viewModel.CatalogSetup.PlaceholderHeight);
+        Assert.False(viewModel.CatalogSetup.HasMeaningfulDesignAreaDraft);
+
+        viewModel.CatalogSetup.PlaceholderName = "Front updated";
+        Assert.True(viewModel.CatalogSetup.HasMeaningfulDesignAreaDraft);
+        var save = FindButton(dialog, "Save design area")!;
+        Assert.True(save.Command!.CanExecute(save.CommandParameter));
+        save.Command.Execute(save.CommandParameter);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        Assert.Empty(window.OwnedWindows.OfType<DesignAreaEditorWindow>());
+        Assert.Equal("Front updated", Assert.Single(viewModel.CatalogSetup.DesignAreaCards).Name);
+        var restoredEdit = window.GetVisualDescendants().OfType<Button>()
+            .Single(button => string.Equals(button.Content as string, "Edit", StringComparison.Ordinal)
+                && button.DataContext is DesignAreaCardViewModel value
+                && value.Id == card.Id);
+        Assert.True(restoredEdit.IsFocused);
 
         window.Close();
     }
@@ -1213,11 +1423,11 @@ public class StoreEditorHeadlessTests
         viewModel.OpenMockupTemplateManagementCommand.Execute(null);
         window.UpdateLayout();
         viewModel.CatalogSetup.StartAddTemplateCommand.Execute(null);
-        window.UpdateLayout();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
-        window.UpdateLayout();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        dialog.UpdateLayout();
 
-        var saveButton = FindButton(window, "Save Mockup Template");
+        var saveButton = FindButton(dialog, "Save Mockup Template");
         Assert.NotNull(saveButton);
 
         var textBlock = saveButton!.GetVisualDescendants().OfType<TextBlock>()
@@ -1229,8 +1439,110 @@ public class StoreEditorHeadlessTests
         Assert.True(saveButton.Bounds.Width > 104,
             $"Button width ({saveButton.Bounds.Width}) should exceed the old fixed 104px constraint.");
         Assert.Equal("Save Mockup Template", saveButton.Content as string);
-        Assert.NotNull(FindButton(window, "Cancel"));
+        Assert.NotNull(FindButton(dialog, "Cancel"));
 
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void MockupTemplateManagement_UsesListOnlySurfaceAndGuardedAddDialog()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        var list = AssertEffectivelyVisible(window, "Catalog.MockupTemplateList");
+        Assert.True(list.Bounds.Width > 500, "The Mockup Template collection should use the full management width.");
+        Assert.Empty(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<Control>(), control =>
+            AutomationProperties.GetAutomationId(control) is "Catalog.MockupPreviewRegion" or "Catalog.MockupConfigurationRegion");
+
+        var add = window.FindControl<Button>("AddMockupTemplateButton")!;
+        add.Command!.Execute(add.CommandParameter);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        dialog.UpdateLayout();
+        Assert.Equal("Add Mockup Template", dialog.Title);
+        Assert.Equal(window, dialog.Owner);
+        Assert.True(viewModel.CatalogSetup!.IsAddingTemplate);
+        Assert.False(viewModel.CatalogSetup.IsEditingMockupTemplate);
+        Assert.False(viewModel.CatalogSetup.HasMeaningfulMockupTemplateDraft);
+        Assert.True(dialog.FindControl<TextBox>("TemplateNameTextBox")!.IsFocused);
+        Assert.NotEmpty(dialog.GetVisualDescendants().OfType<ScrollViewer>());
+        Assert.Equal(640, dialog.MinWidth);
+        Assert.Equal(540, dialog.MinHeight);
+        Assert.NotNull(AssertEffectivelyVisible(dialog, "Catalog.MockupPreviewRegion"));
+        Assert.NotNull(AssertEffectivelyVisible(dialog, "Catalog.MockupConfigurationRegion"));
+
+        viewModel.CatalogSetup.TemplateName = "Front navy";
+        HeadlessWindowExtensions.KeyPress(dialog, Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, string.Empty);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        dialog.UpdateLayout();
+
+        Assert.True(dialog.IsVisible);
+        Assert.True(viewModel.CatalogSetup.IsMockupTemplateDiscardConfirmationVisible);
+        Assert.True(dialog.FindControl<Button>("KeepEditingButton")!.IsFocused);
+
+        viewModel.CatalogSetup.KeepEditingMockupTemplateCommand.Execute(null);
+        Assert.Equal("Front navy", viewModel.CatalogSetup.TemplateName);
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.True(viewModel.CatalogSetup.IsMockupTemplateDiscardConfirmationVisible);
+        viewModel.CatalogSetup.ConfirmDiscardMockupTemplateCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        Assert.Empty(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        Assert.False(viewModel.CatalogSetup.IsAddingTemplate);
+        Assert.True(add.IsFocused);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void MockupTemplateManagement_EditDialogPopulatesAndReturnsFocusOnCancel()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        var card = Assert.Single(viewModel.CatalogSetup!.MockupTemplateCards);
+        var edit = window.GetVisualDescendants().OfType<Button>()
+            .Single(button => button.DataContext is MockupTemplateCardViewModel value
+                && value.Id == card.Id
+                && ReferenceEquals(button.Command, viewModel.CatalogSetup.EditTemplateCommand));
+        edit.Command!.Execute(edit.CommandParameter);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        dialog.UpdateLayout();
+        Assert.Equal("Edit Mockup Template", dialog.Title);
+        Assert.Equal(card.Id, viewModel.CatalogSetup.SelectedTemplateId);
+        Assert.Equal("Front black", viewModel.CatalogSetup.TemplateName);
+        Assert.Equal("Front", viewModel.CatalogSetup.SelectedPlaceholder!.Name);
+        Assert.Equal(250, viewModel.CatalogSetup.MappingX, 1);
+        Assert.Equal(200, viewModel.CatalogSetup.MappingY, 1);
+        Assert.False(viewModel.CatalogSetup.HasMeaningfulMockupTemplateDraft);
+
+        FindButton(dialog, "Cancel")!.Command!.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        Assert.Empty(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        Assert.False(viewModel.CatalogSetup.IsAddingTemplate);
+        Assert.True(edit.IsFocused);
         window.Close();
     }
 
@@ -1249,11 +1561,11 @@ public class StoreEditorHeadlessTests
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
 
         viewModel.CatalogSetup.EditTemplateCommand.Execute(Assert.Single(viewModel.CatalogSetup.MockupTemplateCards));
-        window.UpdateLayout();
-        window.UpdateLayout();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        dialog.UpdateLayout();
 
-        var configRegion = AssertEffectivelyVisible(window, "Catalog.MockupConfigurationRegion");
+        var configRegion = AssertEffectivelyVisible(dialog, "Catalog.MockupConfigurationRegion");
 
         // Find mapping TextBoxes by accessible name
         var mappingX = configRegion.GetVisualDescendants().OfType<TextBox>()
@@ -1290,6 +1602,8 @@ public class StoreEditorHeadlessTests
         Assert.True(mappingWidth.Bounds.Left < mappingHeight.Bounds.Left,
             "Width should be left of Height.");
 
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         window.Close();
     }
 
@@ -1304,31 +1618,33 @@ public class StoreEditorHeadlessTests
         viewModel.OpenMockupTemplateManagementCommand.Execute(null);
         window.UpdateLayout();
         viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
-        window.UpdateLayout();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
-        window.UpdateLayout();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        dialog.UpdateLayout();
 
         Assert.False(viewModel.CatalogSetup.HasSelectedProviderMockup);
         Assert.False(viewModel.CatalogSetup.HasProviderMockupCandidates);
 
-        var editor = window.GetVisualDescendants().OfType<MockupPlacementEditor>().Single();
+        var editor = dialog.GetVisualDescendants().OfType<MockupPlacementEditor>().Single();
         Assert.False(IsEffectivelyVisible(editor));
 
-        var previewRegion = AssertEffectivelyVisible(window, "Catalog.MockupPreviewRegion");
+        var previewRegion = AssertEffectivelyVisible(dialog, "Catalog.MockupPreviewRegion");
         var unavailable = previewRegion.GetVisualDescendants().OfType<TextBlock>()
             .Where(IsEffectivelyVisible)
             .FirstOrDefault(block => !string.IsNullOrEmpty(block.Text)
                 && block.Text.Contains("available", StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(unavailable);
 
-        var selector = window.GetVisualDescendants().OfType<ComboBox>()
+        var selector = dialog.GetVisualDescendants().OfType<ComboBox>()
             .Single(combo => IsEffectivelyVisible(combo) && AutomationProperties.GetName(combo) == "Provider mockup image");
         Assert.NotNull(selector);
-        var guidance = string.Join(" ", window.GetVisualDescendants().OfType<TextBlock>().Where(IsEffectivelyVisible).Select(block => block.Text));
+        var guidance = string.Join(" ", dialog.GetVisualDescendants().OfType<TextBlock>().Where(IsEffectivelyVisible).Select(block => block.Text));
         Assert.Contains("Offering's provider catalog", guidance, StringComparison.Ordinal);
         Assert.Contains("Local upload and drag/drop are not available", guidance, StringComparison.Ordinal);
         Assert.Contains("Configure or sync provider catalog data", guidance, StringComparison.Ordinal);
 
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         window.Close();
     }
 
@@ -1354,19 +1670,23 @@ public class StoreEditorHeadlessTests
             viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
             viewModel.OpenMockupTemplateManagementCommand.Execute(null);
             viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
-            window.UpdateLayout();
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+            dialog.UpdateLayout();
 
             Assert.Equal(testCase.State, viewModel.CatalogSetup.ProviderCatalogState);
-            var selector = window.GetVisualDescendants().OfType<ComboBox>()
+            var selector = dialog.GetVisualDescendants().OfType<ComboBox>()
                 .Single(combo => IsEffectivelyVisible(combo) && AutomationProperties.GetName(combo) == "Provider mockup image");
             Assert.NotNull(selector);
-            var state = window.GetVisualDescendants().OfType<TextBlock>()
+            var state = dialog.GetVisualDescendants().OfType<TextBlock>()
                 .Single(block => AutomationProperties.GetAutomationId(block) == "Catalog.ProviderImageState");
             Assert.Contains(testCase.Expected, state.Text, StringComparison.OrdinalIgnoreCase);
-            var recovery = window.GetVisualDescendants().OfType<TextBlock>()
+            var recovery = dialog.GetVisualDescendants().OfType<TextBlock>()
                 .Single(block => AutomationProperties.GetAutomationId(block) == "Catalog.ProviderImageRecovery");
             Assert.Equal(testCase.Recovery, IsEffectivelyVisible(recovery));
 
+            dialog.Close();
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
             window.Close();
         }
     }
@@ -1382,18 +1702,17 @@ public class StoreEditorHeadlessTests
         viewModel.OpenMockupTemplateManagementCommand.Execute(null);
         window.UpdateLayout();
         viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
-        window.UpdateLayout();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
-        window.UpdateLayout();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        dialog.UpdateLayout();
 
         var candidate = new ProviderMockupCandidateDescriptor("front-black", "Front preview", 1000, 1000, new HashSet<Guid>());
         viewModel.CatalogSetup.ProviderMockupCandidates.Add(candidate);
         viewModel.CatalogSetup.SelectedProviderMockup = candidate;
-        window.UpdateLayout();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
-        window.UpdateLayout();
+        dialog.UpdateLayout();
 
-        var editor = window.GetVisualDescendants().OfType<MockupPlacementEditor>().Single();
+        var editor = dialog.GetVisualDescendants().OfType<MockupPlacementEditor>().Single();
         Assert.True(IsEffectivelyVisible(editor));
         Assert.Equal(viewModel.CatalogSetup.MappingX, editor.PlacementX, 1);
         Assert.Equal(viewModel.CatalogSetup.MappingY, editor.PlacementY, 1);
@@ -1407,9 +1726,11 @@ public class StoreEditorHeadlessTests
 
         viewModel.CatalogSetup.MappingY = 412;
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
-        window.UpdateLayout();
+        dialog.UpdateLayout();
         Assert.Equal(412, editor.PlacementY, 1);
 
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         window.Close();
     }
 
@@ -1428,32 +1749,33 @@ public class StoreEditorHeadlessTests
 
         var templateCard = Assert.Single(viewModel.CatalogSetup!.MockupTemplateCards);
         viewModel.CatalogSetup.EditTemplateCommand.Execute(templateCard);
-        window.UpdateLayout();
-        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        dialog.UpdateLayout();
 
         var reference = "front-black";
         var candidate = new ProviderMockupCandidateDescriptor(reference, "Front preview", 1200, 1200, new HashSet<Guid>());
         viewModel.CatalogSetup.ProviderMockupCandidates.Add(candidate);
         viewModel.CatalogSetup.SelectedProviderMockup = candidate;
-        window.UpdateLayout();
-        window.UpdateLayout();
+        dialog.UpdateLayout();
 
-        var expander = window.GetVisualDescendants().OfType<Expander>()
+        var expander = dialog.GetVisualDescendants().OfType<Expander>()
             .Single(e => string.Equals(e.Header as string, "Advanced provider data", StringComparison.Ordinal) && IsEffectivelyVisible(e));
         expander.IsExpanded = true;
-        window.UpdateLayout();
-        window.UpdateLayout();
+        dialog.UpdateLayout();
 
-        var label = window.GetVisualDescendants().OfType<TextBlock>()
+        var label = dialog.GetVisualDescendants().OfType<TextBlock>()
             .FirstOrDefault(t => IsEffectivelyVisible(t) && string.Equals(t.Text, "Provider mockup reference", StringComparison.Ordinal));
         Assert.NotNull(label);
         Assert.True(label!.IsVisible);
 
-        var valueBox = window.GetVisualDescendants().OfType<TextBox>()
+        var valueBox = dialog.GetVisualDescendants().OfType<TextBox>()
             .FirstOrDefault(t => IsEffectivelyVisible(t) && t.IsReadOnly && string.Equals(t.Text, reference, StringComparison.Ordinal));
         Assert.NotNull(valueBox);
         Assert.True(valueBox!.IsReadOnly);
 
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         window.Close();
     }
 
@@ -1471,23 +1793,25 @@ public class StoreEditorHeadlessTests
         window.UpdateLayout();
 
         viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
-        window.UpdateLayout();
-        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        dialog.UpdateLayout();
 
-        var expander = window.GetVisualDescendants().OfType<Expander>()
+        var expander = dialog.GetVisualDescendants().OfType<Expander>()
             .Single(e => string.Equals(e.Header as string, "Advanced provider data", StringComparison.Ordinal) && IsEffectivelyVisible(e));
         expander.IsExpanded = true;
-        window.UpdateLayout();
-        window.UpdateLayout();
+        dialog.UpdateLayout();
 
-        var unavailableText = window.GetVisualDescendants().OfType<TextBlock>()
+        var unavailableText = dialog.GetVisualDescendants().OfType<TextBlock>()
             .FirstOrDefault(t => IsEffectivelyVisible(t) && string.Equals(t.Text, "No provider reference available.", StringComparison.Ordinal));
         Assert.NotNull(unavailableText);
 
-        var anyValueControl = window.GetVisualDescendants().OfType<TextBox>()
+        var anyValueControl = dialog.GetVisualDescendants().OfType<TextBox>()
             .FirstOrDefault(t => IsEffectivelyVisible(t) && t.IsReadOnly && !string.IsNullOrEmpty(t.Text));
         Assert.Null(anyValueControl);
 
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         window.Close();
     }
 
@@ -1505,25 +1829,26 @@ public class StoreEditorHeadlessTests
         window.UpdateLayout();
 
         viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
-        window.UpdateLayout();
-        window.UpdateLayout();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        dialog.UpdateLayout();
 
-        var expander = window.GetVisualDescendants().OfType<Expander>()
+        var expander = dialog.GetVisualDescendants().OfType<Expander>()
             .Single(e => string.Equals(e.Header as string, "Advanced provider data", StringComparison.Ordinal) && IsEffectivelyVisible(e));
 
         Assert.NotNull(expander);
         Assert.False(expander.IsExpanded);
 
         expander.IsExpanded = true;
-        window.UpdateLayout();
-        window.UpdateLayout();
+        dialog.UpdateLayout();
         Assert.True(expander.IsExpanded);
 
         expander.IsExpanded = false;
-        window.UpdateLayout();
-        window.UpdateLayout();
+        dialog.UpdateLayout();
         Assert.False(expander.IsExpanded);
 
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         window.Close();
     }
 
