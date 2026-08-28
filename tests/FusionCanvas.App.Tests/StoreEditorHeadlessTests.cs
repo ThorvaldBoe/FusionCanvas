@@ -148,7 +148,8 @@ public class StoreEditorHeadlessTests
         viewModel.OpenDesignAreaManagementCommand.Execute(null);
         window.UpdateLayout();
         AssertEffectivelyVisible(window, "Catalog.DesignAreaList");
-        AssertEffectivelyVisible(window, "Catalog.DesignAreaEditor");
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<Control>(), control =>
+            AutomationProperties.GetAutomationId(control) == "Catalog.DesignAreaEditor");
 
         viewModel.BackToOfferingOverviewCommand.Execute(null);
         viewModel.OpenMockupTemplateManagementCommand.Execute(null);
@@ -757,6 +758,91 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void ManageValues_ArchiveActionsAreCompactTargetSpecificAndKeepLongValuesReadable()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        foreach (var kind in new[] { OptionKind.Color, OptionKind.Size })
+        {
+            var group = viewModel.CatalogSetup!.AvailableChoiceGroups.Single(candidate => candidate.Option.OptionKind == kind);
+            viewModel.CatalogSetup.ManageOptionCommand.Execute(group.Option);
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+
+            var standardDialog = Assert.Single(window.OwnedWindows.OfType<OptionValueManagementWindow>());
+            var standardActions = standardDialog.GetVisualDescendants()
+                .OfType<Button>()
+                .Where(button => string.Equals(button.Content as string, "Archive", StringComparison.Ordinal))
+                .ToArray();
+            Assert.Equal(group.Values.Count, standardActions.Length);
+            Assert.All(standardActions, button =>
+            {
+                var optionValue = Assert.IsType<OfferingOptionValue>(button.DataContext);
+                Assert.Equal($"Archive {optionValue.Value}", AutomationProperties.GetName(button));
+                Assert.Contains("compactDanger", button.Classes);
+            });
+
+            standardDialog.Close();
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        }
+
+        viewModel.CatalogSetup!.SelectedOptionKind = OptionKind.Other;
+        viewModel.CatalogSetup.OptionName = "Material";
+        viewModel.CatalogSetup.StartAddOptionCommand.Execute(null);
+        viewModel.CatalogSetup.CreateOptionCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        var customOption = viewModel.CatalogSetup.AvailableChoiceGroups
+            .Single(group => group.Option.OptionKind == OptionKind.Other);
+        viewModel.CatalogSetup.ManageOptionCommand.Execute(customOption.Option);
+        viewModel.CatalogSetup.StartAddOptionValueCommand.Execute(null);
+        const string longValue = "Extraordinarily long recycled cotton blend material value";
+        viewModel.CatalogSetup.OptionValue = longValue;
+        viewModel.CatalogSetup.CreateOptionValueCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        var dialog = Assert.Single(window.OwnedWindows.OfType<OptionValueManagementWindow>());
+        dialog.UpdateLayout();
+        var archive = dialog.GetVisualDescendants()
+            .OfType<Button>()
+            .Single(button => string.Equals(button.Content as string, "Archive", StringComparison.Ordinal));
+        var value = Assert.IsType<OfferingOptionValue>(archive.DataContext);
+        var valueText = dialog.GetVisualDescendants()
+            .OfType<TextBlock>()
+            .Single(text => string.Equals(text.Text, longValue, StringComparison.Ordinal));
+
+        Assert.Equal(longValue, value.Value);
+        Assert.Contains("compactDanger", archive.Classes);
+        Assert.DoesNotContain("danger", archive.Classes);
+        Assert.Equal(new Thickness(7, 4), archive.Padding);
+        Assert.Equal($"Archive {longValue}", AutomationProperties.GetName(archive));
+        Assert.Same(viewModel.CatalogSetup.ArchiveOptionValueCommand, archive.Command);
+        Assert.Same(value, archive.CommandParameter);
+        Assert.Equal(Avalonia.Media.TextWrapping.Wrap, valueText.TextWrapping);
+        Assert.True(valueText.Bounds.Right <= archive.Bounds.Left,
+            $"Value text ending at {valueText.Bounds.Right} must not overlap Archive starting at {archive.Bounds.Left}.");
+
+        archive.Command!.Execute(archive.CommandParameter);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        dialog.UpdateLayout();
+
+        Assert.DoesNotContain(viewModel.CatalogSetup.AvailableValues, candidate => candidate.Id == value.Id);
+        Assert.DoesNotContain(dialog.GetVisualDescendants().OfType<Button>(),
+            button => string.Equals(AutomationProperties.GetName(button), $"Archive {longValue}", StringComparison.Ordinal));
+
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void ManageValues_AllowsOnlyOneDialogAtATime()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
@@ -1196,14 +1282,132 @@ public class StoreEditorHeadlessTests
         window.UpdateLayout();
 
         viewModel.CatalogSetup!.StartAddPlaceholderCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         window.UpdateLayout();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<DesignAreaEditorWindow>());
+        dialog.UpdateLayout();
+
+        var saveButton = FindButton(dialog, "Save design area");
+        Assert.NotNull(saveButton);
+        Assert.Null(FindButton(dialog, "Save Design Area"));
+        Assert.Null(FindButton(dialog, "Save design"));
+        Assert.NotNull(saveButton!.Command);
+
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void DesignAreaManagement_UsesListOnlySurfaceAndGuardedAddDialog()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenDesignAreaManagementCommand.Execute(null);
         window.UpdateLayout();
 
-        var saveButton = FindButton(window, "Save design area");
-        Assert.NotNull(saveButton);
-        Assert.Null(FindButton(window, "Save Design Area"));
-        Assert.Null(FindButton(window, "Save design"));
-        Assert.NotNull(saveButton!.Command);
+        var list = AssertEffectivelyVisible(window, "Catalog.DesignAreaList");
+        Assert.True(list.Bounds.Width > 500, "The Design Area collection should use the full management width.");
+        Assert.Empty(window.OwnedWindows.OfType<DesignAreaEditorWindow>());
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<Control>(), control =>
+            AutomationProperties.GetAutomationId(control) == "Catalog.DesignAreaEditorDialog");
+
+        var add = FindButton(window, "Add Design Area")!;
+        add.Command!.Execute(add.CommandParameter);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        var dialog = Assert.Single(window.OwnedWindows.OfType<DesignAreaEditorWindow>());
+        dialog.UpdateLayout();
+        Assert.Equal("Add Design Area", dialog.Title);
+        Assert.Equal(window, dialog.Owner);
+        Assert.True(viewModel.CatalogSetup!.IsAddingPlaceholder);
+        Assert.False(viewModel.CatalogSetup.IsEditingDesignArea);
+        Assert.False(viewModel.CatalogSetup.HasMeaningfulDesignAreaDraft);
+        Assert.True(dialog.FindControl<TextBox>("DesignAreaNameTextBox")!.IsFocused);
+        Assert.NotEmpty(dialog.GetVisualDescendants().OfType<ScrollViewer>());
+        Assert.Equal(520, dialog.MinWidth);
+        Assert.Equal(520, dialog.MinHeight);
+
+        viewModel.CatalogSetup.PlaceholderName = "Sleeve";
+        Assert.True(viewModel.CatalogSetup.HasMeaningfulDesignAreaDraft);
+        HeadlessWindowExtensions.KeyPress(dialog, Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, string.Empty);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        dialog.UpdateLayout();
+
+        Assert.True(dialog.IsVisible);
+        Assert.True(viewModel.CatalogSetup.IsDesignAreaDiscardConfirmationVisible);
+        Assert.True(dialog.FindControl<Button>("KeepEditingButton")!.IsFocused);
+
+        viewModel.CatalogSetup.KeepEditingDesignAreaCommand.Execute(null);
+        Assert.True(dialog.IsVisible);
+        Assert.Equal("Sleeve", viewModel.CatalogSetup.PlaceholderName);
+
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.True(viewModel.CatalogSetup.IsDesignAreaDiscardConfirmationVisible);
+        viewModel.CatalogSetup.ConfirmDiscardDesignAreaCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        Assert.Empty(window.OwnedWindows.OfType<DesignAreaEditorWindow>());
+        Assert.False(viewModel.CatalogSetup.IsAddingPlaceholder);
+        Assert.True(add.IsFocused);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void DesignAreaManagement_EditDialogPopulatesSavesAndReturnsFocus()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenDesignAreaManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        var card = Assert.Single(viewModel.CatalogSetup!.DesignAreaCards);
+        var edit = window.GetVisualDescendants().OfType<Button>()
+            .Single(button => IsEffectivelyVisible(button)
+                && string.Equals(button.Content as string, "Edit", StringComparison.Ordinal)
+                && button.DataContext is DesignAreaCardViewModel value
+                && value.Id == card.Id);
+        edit.Command!.Execute(edit.CommandParameter);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        var dialog = Assert.Single(window.OwnedWindows.OfType<DesignAreaEditorWindow>());
+        dialog.UpdateLayout();
+        Assert.Equal("Edit Design Area", dialog.Title);
+        Assert.True(viewModel.CatalogSetup.IsEditingDesignArea);
+        Assert.Equal(card.Id, viewModel.CatalogSetup.SelectedPlaceholderId);
+        Assert.Equal("Front", viewModel.CatalogSetup.PlaceholderName);
+        Assert.Equal("front", viewModel.CatalogSetup.PlaceholderPosition);
+        Assert.Equal("DTG", viewModel.CatalogSetup.PlaceholderDecorationMethod);
+        Assert.Equal("4500", viewModel.CatalogSetup.PlaceholderWidth);
+        Assert.Equal("5400", viewModel.CatalogSetup.PlaceholderHeight);
+        Assert.False(viewModel.CatalogSetup.HasMeaningfulDesignAreaDraft);
+
+        viewModel.CatalogSetup.PlaceholderName = "Front updated";
+        Assert.True(viewModel.CatalogSetup.HasMeaningfulDesignAreaDraft);
+        var save = FindButton(dialog, "Save design area")!;
+        Assert.True(save.Command!.CanExecute(save.CommandParameter));
+        save.Command.Execute(save.CommandParameter);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        Assert.Empty(window.OwnedWindows.OfType<DesignAreaEditorWindow>());
+        Assert.Equal("Front updated", Assert.Single(viewModel.CatalogSetup.DesignAreaCards).Name);
+        var restoredEdit = window.GetVisualDescendants().OfType<Button>()
+            .Single(button => string.Equals(button.Content as string, "Edit", StringComparison.Ordinal)
+                && button.DataContext is DesignAreaCardViewModel value
+                && value.Id == card.Id);
+        Assert.True(restoredEdit.IsFocused);
 
         window.Close();
     }

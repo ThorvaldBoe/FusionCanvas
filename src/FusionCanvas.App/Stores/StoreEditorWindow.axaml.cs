@@ -12,6 +12,7 @@ public partial class StoreEditorWindow : Window
     private bool _optionValueManagementOpen;
     private bool _variantCreationDialogOpen;
     private bool _mockupTemplateEditorOpen;
+    private bool _designAreaEditorOpen;
 
     public StoreEditorWindow()
     {
@@ -48,6 +49,7 @@ public partial class StoreEditorWindow : Window
             _subscribedCatalog.DesignAreaArchiveConfirmationRequested -= OnDesignAreaArchiveConfirmationRequested;
             _subscribedCatalog.DesignAreaArchiveFocusRequested -= OnDesignAreaArchiveFocusRequested;
             _subscribedCatalog.MockupTemplateEditorRequested -= OnMockupTemplateEditorRequested;
+            _subscribedCatalog.DesignAreaEditorRequested -= OnDesignAreaEditorRequested;
             _subscribedCatalog = null;
         }
 
@@ -72,6 +74,7 @@ public partial class StoreEditorWindow : Window
             catalog.DesignAreaArchiveConfirmationRequested += OnDesignAreaArchiveConfirmationRequested;
             catalog.DesignAreaArchiveFocusRequested += OnDesignAreaArchiveFocusRequested;
             catalog.MockupTemplateEditorRequested += OnMockupTemplateEditorRequested;
+            catalog.DesignAreaEditorRequested += OnDesignAreaEditorRequested;
         }
     }
 
@@ -166,6 +169,39 @@ public partial class StoreEditorWindow : Window
     }
 
     private void OnBulkVariantActionFocusRequested(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() => BulkAddVariantButton.Focus());
+
+    private async void OnDesignAreaEditorRequested(object? sender, EventArgs e)
+    {
+        if (_designAreaEditorOpen || _subscribedCatalog is not { } catalog) return;
+        _designAreaEditorOpen = true;
+        var originId = catalog.SelectedPlaceholderId;
+        try
+        {
+            var dialog = new DesignAreaEditorWindow { DataContext = catalog };
+            await dialog.ShowDialog(this);
+            if (catalog.IsAddingPlaceholder) catalog.CancelAddPlaceholderCommand.Execute(null);
+        }
+        finally
+        {
+            _designAreaEditorOpen = false;
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (originId is Guid id)
+                {
+                    var editButton = this.GetVisualDescendants().OfType<Button>().FirstOrDefault(button =>
+                        string.Equals(button.Content as string, "Edit", StringComparison.Ordinal)
+                        && button.DataContext is DesignAreaCardViewModel card
+                        && card.Id == id);
+                    if (editButton is not null)
+                    {
+                        editButton.Focus();
+                        return;
+                    }
+                }
+                AddDesignAreaButton.Focus();
+            });
+        }
+    }
 
     private async void OnDesignAreaArchiveConfirmationRequested(object? sender, EventArgs e)
     {
