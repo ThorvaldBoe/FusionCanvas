@@ -116,12 +116,60 @@ public sealed class CatalogSetupViewModelTests
         Assert.Single(viewModel.TemplateColorChoices).IsSelected = true;
 
         Assert.True(viewModel.HasProviderMockupCandidates);
+        Assert.Equal(ProviderCatalogLoadState.Available, viewModel.ProviderCatalogState);
+        Assert.Contains("matches the target Design Area", viewModel.ProviderImageSelectionStateMessage, StringComparison.Ordinal);
+        Assert.Contains("Local upload", viewModel.ProviderImageSelectionInstructions, StringComparison.Ordinal);
+        Assert.Contains("drag/drop", viewModel.ProviderImageSelectionInstructions, StringComparison.Ordinal);
         Assert.Equal(1000, viewModel.MappingImageWidth);
         Assert.Equal(1200, viewModel.MappingImageHeight);
         Assert.True(viewModel.CreateTemplateCommand.CanExecute(null));
 
         viewModel.MappingWidth = 2000;
         Assert.False(viewModel.CreateTemplateCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task ProviderImageSelection_ClassifiesEmptyUnavailableAndErrorWithRecovery()
+    {
+        var empty = CreateProviderCatalogStateViewModel(new StubProviderCatalog(new ProviderCatalogCandidateDescriptor(
+            new OfferingContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), true, null, new HashSet<ProviderCatalogCombination>(), [])));
+        await empty.ViewModel.LoadForStoreAsync(empty.StoreId, TestContext.Current.CancellationToken);
+        Assert.Equal(ProviderCatalogLoadState.Empty, empty.ViewModel.ProviderCatalogState);
+        Assert.Contains("no mockup images", empty.ViewModel.ProviderImageSelectionStateMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Sync", empty.ViewModel.ProviderImageSelectionRecoveryMessage, StringComparison.Ordinal);
+
+        var unavailable = CreateProviderCatalogStateViewModel(new StubProviderCatalog(new ProviderCatalogCandidateDescriptor(
+            new OfferingContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), false, "Provider connection is not configured.", new HashSet<ProviderCatalogCombination>(), [])));
+        await unavailable.ViewModel.LoadForStoreAsync(unavailable.StoreId, TestContext.Current.CancellationToken);
+        Assert.Equal(ProviderCatalogLoadState.Unavailable, unavailable.ViewModel.ProviderCatalogState);
+        Assert.Contains("not configured", unavailable.ViewModel.ProviderImageSelectionStateMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Configure or sync", unavailable.ViewModel.ProviderImageSelectionRecoveryMessage, StringComparison.Ordinal);
+
+        var failed = CreateProviderCatalogStateViewModel(new ThrowingProviderCatalog());
+        await failed.ViewModel.LoadForStoreAsync(failed.StoreId, TestContext.Current.CancellationToken);
+        Assert.Equal(ProviderCatalogLoadState.Error, failed.ViewModel.ProviderCatalogState);
+        Assert.Contains("could not be loaded", failed.ViewModel.ProviderImageSelectionStateMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("retry", failed.ViewModel.ProviderImageSelectionRecoveryMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(failed.ViewModel.ProviderMockupCandidates);
+    }
+
+    [Fact]
+    public async Task ProviderImageSelection_ExposesLoadingBeforePendingSourceCompletes()
+    {
+        var source = new PendingProviderCatalog();
+        var setup = CreateProviderCatalogStateViewModel(source);
+
+        var load = setup.ViewModel.LoadForStoreAsync(setup.StoreId, TestContext.Current.CancellationToken);
+        await source.Started.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(ProviderCatalogLoadState.Loading, setup.ViewModel.ProviderCatalogState);
+        Assert.Contains("Loading", setup.ViewModel.ProviderImageSelectionStateMessage, StringComparison.Ordinal);
+        Assert.Contains("provider catalog", setup.ViewModel.ProviderImageSelectionInstructions, StringComparison.OrdinalIgnoreCase);
+
+        source.Complete(new ProviderCatalogCandidateDescriptor(
+            new OfferingContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), true, null, new HashSet<ProviderCatalogCombination>(), []));
+        await load;
+        Assert.Equal(ProviderCatalogLoadState.Empty, setup.ViewModel.ProviderCatalogState);
     }
 
     [Fact]
@@ -757,5 +805,44 @@ public sealed class CatalogSetupViewModelTests
     {
         public Task<ProviderCatalogCandidateDescriptor> LoadAsync(OfferingContext context, CancellationToken cancellationToken = default) =>
             Task.FromResult(descriptor);
+    }
+
+    private static (CatalogSetupViewModel ViewModel, Guid StoreId) CreateProviderCatalogStateViewModel(IProviderCatalogCandidateSource? source)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Provider tee", null, BlueprintOfferingKind.ProviderNetwork, null, "provider", null, null, false, now, now);
+        var repository = new InMemoryWorkspaceRepository(snapshot with
+        {
+            Blueprints = [blueprint],
+            BlueprintOfferings = [offering]
+        });
+        return (new CatalogSetupViewModel(
+            new CatalogSetupService(repository),
+            new MockupTemplateSetupService(repository),
+            new OfferingManagementService(repository, source),
+            source), store.Id);
+    }
+
+    private sealed class ThrowingProviderCatalog : IProviderCatalogCandidateSource
+    {
+        public Task<ProviderCatalogCandidateDescriptor> LoadAsync(OfferingContext context, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Provider service timed out.");
+    }
+
+    private sealed class PendingProviderCatalog : IProviderCatalogCandidateSource
+    {
+        private readonly TaskCompletionSource<ProviderCatalogCandidateDescriptor> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<ProviderCatalogCandidateDescriptor> LoadAsync(OfferingContext context, CancellationToken cancellationToken = default)
+        {
+            Started.TrySetResult();
+            return _completion.Task;
+        }
+
+        public void Complete(ProviderCatalogCandidateDescriptor descriptor) => _completion.TrySetResult(descriptor);
     }
 }

@@ -48,12 +48,21 @@
                    IsReadOnly="{Binding !CanEdit}"
                    AutomationProperties.Name="Template name" />
           <TextBlock Text="Provider mockup image" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBlock Text="{Binding ProviderImageSelectionInstructions}"
+                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
           <ComboBox ItemsSource="{Binding ProviderMockupCandidates}"
                     SelectedItem="{Binding SelectedProviderMockup}"
                     DisplayMemberBinding="{Binding DisplayName}"
                     PlaceholderText="Provider mockup image"
                     IsEnabled="{Binding CanEdit}"
                     AutomationProperties.Name="Provider mockup image" />
+          <TextBlock Text="{Binding ProviderImageSelectionStateMessage}"
+                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}"
+                     AutomationProperties.AutomationId="Catalog.ProviderImageState" />
+          <TextBlock Text="{Binding ProviderImageSelectionRecoveryMessage}"
+                     IsVisible="{Binding HasProviderImageSelectionRecovery}"
+                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource WarningTextBrush}"
+                     AutomationProperties.AutomationId="Catalog.ProviderImageRecovery" />
           <TextBlock Text="Linked Design Area" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
           <ComboBox ItemsSource="{Binding AvailablePlaceholders}"
                     SelectedItem="{Binding SelectedPlaceholder}"

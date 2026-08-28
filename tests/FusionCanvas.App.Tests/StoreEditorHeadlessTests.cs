@@ -1635,9 +1635,60 @@ public class StoreEditorHeadlessTests
                 && block.Text.Contains("available", StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(unavailable);
 
+        var selector = dialog.GetVisualDescendants().OfType<ComboBox>()
+            .Single(combo => IsEffectivelyVisible(combo) && AutomationProperties.GetName(combo) == "Provider mockup image");
+        Assert.NotNull(selector);
+        var guidance = string.Join(" ", dialog.GetVisualDescendants().OfType<TextBlock>().Where(IsEffectivelyVisible).Select(block => block.Text));
+        Assert.Contains("Offering's provider catalog", guidance, StringComparison.Ordinal);
+        Assert.Contains("Local upload and drag/drop are not available", guidance, StringComparison.Ordinal);
+        Assert.Contains("Configure or sync provider catalog data", guidance, StringComparison.Ordinal);
+
         dialog.Close();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         window.Close();
+    }
+
+    [AvaloniaFact]
+    public void ProviderImageSelection_RendersAvailableEmptyUnavailableAndErrorGuidance()
+    {
+        var context = new OfferingContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var candidate = new ProviderMockupCandidateDescriptor("front", "Front view", 1000, 1200, new HashSet<Guid>());
+        var cases = new (IProviderCatalogCandidateSource? Source, ProviderCatalogLoadState State, string Expected, bool Recovery)[]
+        {
+            (new FixedProviderCatalog(new ProviderCatalogCandidateDescriptor(context, true, null, new HashSet<ProviderCatalogCombination>(), [candidate])), ProviderCatalogLoadState.Available, "matches the target Design Area", false),
+            (new FixedProviderCatalog(new ProviderCatalogCandidateDescriptor(context, true, null, new HashSet<ProviderCatalogCombination>(), [])), ProviderCatalogLoadState.Empty, "no mockup images", true),
+            (new FixedProviderCatalog(new ProviderCatalogCandidateDescriptor(context, false, "Provider setup is incomplete.", new HashSet<ProviderCatalogCombination>(), [])), ProviderCatalogLoadState.Unavailable, "setup is incomplete", true),
+            (new FailingProviderCatalog(), ProviderCatalogLoadState.Error, "could not be loaded", true)
+        };
+
+        foreach (var testCase in cases)
+        {
+            var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true, providerCatalog: testCase.Source);
+            var viewModel = (StoreManagementViewModel)window.DataContext!;
+            viewModel.SelectProductsTabCommand.Execute(null);
+            viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+            viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+            viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+            viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+            dialog.UpdateLayout();
+
+            Assert.Equal(testCase.State, viewModel.CatalogSetup.ProviderCatalogState);
+            var selector = dialog.GetVisualDescendants().OfType<ComboBox>()
+                .Single(combo => IsEffectivelyVisible(combo) && AutomationProperties.GetName(combo) == "Provider mockup image");
+            Assert.NotNull(selector);
+            var state = dialog.GetVisualDescendants().OfType<TextBlock>()
+                .Single(block => AutomationProperties.GetAutomationId(block) == "Catalog.ProviderImageState");
+            Assert.Contains(testCase.Expected, state.Text, StringComparison.OrdinalIgnoreCase);
+            var recovery = dialog.GetVisualDescendants().OfType<TextBlock>()
+                .Single(block => AutomationProperties.GetAutomationId(block) == "Catalog.ProviderImageRecovery");
+            Assert.Equal(testCase.Recovery, IsEffectivelyVisible(recovery));
+
+            dialog.Close();
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            window.Close();
+        }
     }
 
     [AvaloniaFact]
@@ -1902,7 +1953,8 @@ public class StoreEditorHeadlessTests
     private static StoreEditorWindow CreateEditorWindow(
         bool includeNormalizedCatalog = true,
         bool useFixedProviderOffering = false,
-        bool includeOfferingOptions = false)
+        bool includeOfferingOptions = false,
+        IProviderCatalogCandidateSource? providerCatalog = null)
     {
         var store = new Store(Guid.NewGuid(), "North Star", null, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog, useFixedProviderOffering, includeOfferingOptions));
@@ -1913,7 +1965,8 @@ public class StoreEditorHeadlessTests
             new ProductSupplierSetupService(repository),
             new CatalogSetupService(repository),
             new MockupTemplateSetupService(repository),
-            new OfferingManagementService(repository));
+            new OfferingManagementService(repository, providerCatalog),
+            providerCatalog);
         viewModel.LoadAsync(default).GetAwaiter().GetResult();
         var window = new StoreEditorWindow { DataContext = viewModel };
         window.Show();
@@ -2068,5 +2121,17 @@ public class StoreEditorHeadlessTests
 
         public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(_snapshot);
+    }
+
+    private sealed class FixedProviderCatalog(ProviderCatalogCandidateDescriptor descriptor) : IProviderCatalogCandidateSource
+    {
+        public Task<ProviderCatalogCandidateDescriptor> LoadAsync(OfferingContext context, CancellationToken cancellationToken = default) =>
+            Task.FromResult(descriptor);
+    }
+
+    private sealed class FailingProviderCatalog : IProviderCatalogCandidateSource
+    {
+        public Task<ProviderCatalogCandidateDescriptor> LoadAsync(OfferingContext context, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Provider request failed.");
     }
 }

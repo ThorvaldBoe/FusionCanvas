@@ -91,6 +91,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private BulkVariantPreview? _bulkPreview;
     private ProviderMockupCandidateDescriptor? _selectedProviderMockup;
     private string _providerCatalogMessage = string.Empty;
+    private ProviderCatalogLoadState _providerCatalogState = ProviderCatalogLoadState.Unavailable;
     private double _mappingX;
     private double _mappingY;
     private double _mappingWidth = 100;
@@ -339,7 +340,36 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             NotifyCommands();
         }
     }
-    public string ProviderCatalogMessage { get => _providerCatalogMessage; private set { if (SetField(ref _providerCatalogMessage, value)) { OnPropertyChanged(nameof(HasProviderCatalogMessage)); OnPropertyChanged(nameof(MockupPreviewUnavailableMessage)); } } }
+    public string ProviderCatalogMessage { get => _providerCatalogMessage; private set { if (SetField(ref _providerCatalogMessage, value)) { OnPropertyChanged(nameof(HasProviderCatalogMessage)); OnPropertyChanged(nameof(MockupPreviewUnavailableMessage)); OnPropertyChanged(nameof(ProviderImageSelectionStateMessage)); } } }
+    public ProviderCatalogLoadState ProviderCatalogState
+    {
+        get => _providerCatalogState;
+        private set
+        {
+            if (!SetField(ref _providerCatalogState, value)) return;
+            OnPropertyChanged(nameof(ProviderImageSelectionStateMessage));
+            OnPropertyChanged(nameof(HasProviderImageSelectionRecovery));
+            OnPropertyChanged(nameof(ProviderImageSelectionRecoveryMessage));
+        }
+    }
+    public string ProviderImageSelectionInstructions =>
+        "Choose a mockup image supplied by this Offering's provider catalog. Local upload and drag/drop are not available in this editor.";
+    public string ProviderImageSelectionStateMessage => ProviderCatalogState switch
+    {
+        ProviderCatalogLoadState.Loading => "Loading provider-catalog mockup images…",
+        ProviderCatalogLoadState.Available => "Choose the provider view that matches the target Design Area.",
+        ProviderCatalogLoadState.Empty => "The configured provider catalog has no mockup images for this Offering.",
+        ProviderCatalogLoadState.Error => $"Provider-catalog mockup images could not be loaded{MessageSuffix(ProviderCatalogMessage)}",
+        _ => $"Provider-catalog mockup images are unavailable{MessageSuffix(ProviderCatalogMessage)}"
+    };
+    public bool HasProviderImageSelectionRecovery => ProviderCatalogState is ProviderCatalogLoadState.Empty or ProviderCatalogLoadState.Unavailable or ProviderCatalogLoadState.Error;
+    public string ProviderImageSelectionRecoveryMessage => ProviderCatalogState switch
+    {
+        ProviderCatalogLoadState.Empty => "Sync or review this Offering's provider catalog setup, then return to choose an image.",
+        ProviderCatalogLoadState.Error => "Review provider setup or retry provider catalog synchronization, then return to this editor.",
+        ProviderCatalogLoadState.Unavailable => "Configure or sync provider catalog data for this Offering, then return to this editor.",
+        _ => string.Empty
+    };
     public bool HasProviderCatalogMessage => !string.IsNullOrWhiteSpace(ProviderCatalogMessage);
     public bool HasProviderMockupCandidates => ProviderMockupCandidates.Count > 0;
     public bool HasSelectedProviderMockup => SelectedProviderMockup is not null;
@@ -560,9 +590,11 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         Replace(ProviderMockupCandidates, []);
         SelectedProviderMockup = null;
         ProviderCatalogMessage = string.Empty;
+        ProviderCatalogState = ProviderCatalogLoadState.Loading;
         if (_providerCatalog is null || SelectedOffering is null)
         {
             ProviderCatalogMessage = "Provider mockup catalog data is not available.";
+            ProviderCatalogState = ProviderCatalogLoadState.Unavailable;
         }
         else
         {
@@ -570,15 +602,27 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             {
                 var descriptor = await _providerCatalog.LoadAsync(CurrentContext(), cancellationToken).ConfigureAwait(true);
                 if (!descriptor.IsAvailable)
+                {
                     ProviderCatalogMessage = descriptor.UnavailableReason ?? "Provider mockup catalog data is not available.";
+                    ProviderCatalogState = ProviderCatalogLoadState.Unavailable;
+                }
                 else
                 {
                     Replace(ProviderMockupCandidates, descriptor.AvailableMockupImages);
                     SelectedProviderMockup = ProviderMockupCandidates.FirstOrDefault();
-                    if (SelectedProviderMockup is null) ProviderCatalogMessage = "This Offering has no provider mockup images.";
+                    if (SelectedProviderMockup is null)
+                    {
+                        ProviderCatalogMessage = "This Offering has no provider mockup images.";
+                        ProviderCatalogState = ProviderCatalogLoadState.Empty;
+                    }
+                    else ProviderCatalogState = ProviderCatalogLoadState.Available;
                 }
             }
-            catch (Exception exception) { ProviderCatalogMessage = exception.Message; }
+            catch (Exception exception)
+            {
+                ProviderCatalogMessage = exception.Message;
+                ProviderCatalogState = ProviderCatalogLoadState.Error;
+            }
         }
         OnPropertyChanged(nameof(HasProviderMockupCandidates));
         NotifyCommands();
@@ -1345,6 +1389,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     }
 
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string MessageSuffix(string message) => string.IsNullOrWhiteSpace(message) ? "." : $": {message}";
     private static void Replace<T>(ObservableCollection<T> target, IEnumerable<T> values) { target.Clear(); foreach (var value in values) target.Add(value); }
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? name = null) { if (EqualityComparer<T>.Default.Equals(field, value)) return false; field = value; OnPropertyChanged(name); return true; }
     private void OnPropertyChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

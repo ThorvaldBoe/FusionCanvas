@@ -88,6 +88,8 @@ For each relevant workflow, decide:
 
 Not every feature needs every state, but omitted states should be intentional rather than left to implementation guesswork.
 
+For selectors backed by asynchronous external data, model loading, available, empty, unavailable, and error as explicit presentation states. Keep the data source and actionable recovery guidance visible rather than inferring state only from a message or item count.
+
 ## UX Preflight for User-Facing Changes
 
 Before implementation, answer these questions in the OpenSpec proposal, design, or scenarios:
