@@ -832,75 +832,7 @@
                 </StackPanel>
               </Border>
 
-              <Grid IsVisible="{Binding IsDesignAreaManagement}" ColumnDefinitions="3*,2*" ColumnSpacing="12">
-                <Border Grid.Column="1" Classes="panel" Padding="12"
-                        AutomationProperties.AutomationId="Catalog.DesignAreaEditor">
-                  <StackPanel Spacing="8">
-                    <TextBlock Text="Design Area editor" FontSize="18" FontWeight="SemiBold" />
-                    <TextBlock IsVisible="{Binding !CatalogSetup.IsAddingPlaceholder}"
-                               Text="Select Edit on a Design Area, or add a new one."
-                               TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <StackPanel IsVisible="{Binding CatalogSetup.IsAddingPlaceholder}" Spacing="6">
-                      <TextBlock Text="Identity" FontWeight="SemiBold" />
-                      <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                      <TextBox Text="{Binding CatalogSetup.PlaceholderName}" PlaceholderText="Front" Classes="field" />
-                      <TextBlock Text="Position" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                      <TextBox Text="{Binding CatalogSetup.PlaceholderPosition}" PlaceholderText="front" Classes="field" />
-                      <TextBlock Text="Decoration method" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                      <TextBox Text="{Binding CatalogSetup.PlaceholderDecorationMethod}" PlaceholderText="DTG" Classes="field" />
-                      <TextBlock Text="Description (optional)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                      <TextBox Text="{Binding CatalogSetup.PlaceholderDescription}" AcceptsReturn="True" MinHeight="44" Classes="field" />
-                      <TextBlock Text="Maximum design size" FontWeight="SemiBold" Margin="0,6,0,0" />
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <StackPanel Width="120" Spacing="4">
-                          <TextBlock Text="Width (px)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                          <TextBox Text="{Binding CatalogSetup.PlaceholderWidth}" Classes="field" />
-                        </StackPanel>
-                        <StackPanel Width="120" Spacing="4">
-                          <TextBlock Text="Height (px)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                          <TextBox Text="{Binding CatalogSetup.PlaceholderHeight}" Classes="field" />
-                        </StackPanel>
-                      </StackPanel>
-                      <TextBlock Text="{Binding CatalogSetup.PhysicalSizeSummary}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                      <TextBlock Text="Recommended artwork" FontWeight="SemiBold" Margin="0,6,0,0" />
-                      <TextBlock Text="Maximum printable dimensions are shown in pixels first. Inches and millimetres are derived only when reliable DPI metadata is available."
-                                 TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBox Width="130" Text="{Binding CatalogSetup.ArtworkWidth}" PlaceholderText="Width (px)" Classes="field" />
-                        <TextBox Width="130" Text="{Binding CatalogSetup.ArtworkHeight}" PlaceholderText="Height (px)" Classes="field" />
-                        <TextBox Width="100" Text="{Binding CatalogSetup.ArtworkDpi}" PlaceholderText="DPI" Classes="field" />
-                      </StackPanel>
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBox Width="130" Text="{Binding CatalogSetup.ArtworkFormat}" PlaceholderText="Format (PNG)" Classes="field" />
-                        <TextBox Width="210" Text="{Binding CatalogSetup.ArtworkBackground}" PlaceholderText="Background (transparent)" Classes="field" />
-                      </StackPanel>
-                      <TextBlock Text="Compatibility" FontWeight="SemiBold" Margin="0,6,0,0" />
-                      <CheckBox Content="Compatible with all current Variants"
-                                IsChecked="{Binding CatalogSetup.PlaceholderUsesAllVariants, Mode=TwoWay}" />
-                      <StackPanel IsVisible="{Binding !CatalogSetup.PlaceholderUsesAllVariants}" Spacing="4">
-                        <TextBlock Text="Compatible Variants" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <ItemsControl ItemsSource="{Binding CatalogSetup.PlaceholderVariantChoices}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="stores:VariantChoiceViewModel">
-                              <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" />
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                      </StackPanel>
-                      <Expander Header="Advanced provider data">
-                        <TextBox Text="{Binding CatalogSetup.PlaceholderProviderReference}"
-                                 PlaceholderText="Provider Design Area reference"
-                                 Classes="field"
-                                 ToolTip.Tip="Normally populated from the Printify catalog integration." />
-                      </Expander>
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="Save design area" Command="{Binding CatalogSetup.CreatePlaceholderCommand}" Classes="primary fixedAction" />
-                        <Button Content="Cancel" Command="{Binding CatalogSetup.CancelAddPlaceholderCommand}" Classes="secondary fixedAction" />
-                      </StackPanel>
-                    </StackPanel>
-                  </StackPanel>
-                </Border>
-                <Border Grid.Column="0" Classes="panel" Padding="12"
+              <Border IsVisible="{Binding IsDesignAreaManagement}" Classes="panel" Padding="12"
                         AutomationProperties.AutomationId="Catalog.DesignAreaList">
                   <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="*,Auto">
@@ -908,7 +840,7 @@
                         <TextBlock Text="Design Areas" FontSize="18" FontWeight="SemiBold" />
                         <TextBlock Text="Printable regions for this Offering." Foreground="{DynamicResource SecondaryTextBrush}" />
                       </StackPanel>
-                      <Button Grid.Column="1" Content="Add Design Area" Command="{Binding CatalogSetup.StartAddPlaceholderCommand}" Classes="primary" />
+                      <Button x:Name="AddDesignAreaButton" Grid.Column="1" Content="Add Design Area" Command="{Binding CatalogSetup.StartAddPlaceholderCommand}" Classes="primary" />
                     </Grid>
                     <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailablePlaceholders}" Text="No Design Areas configured." Foreground="{DynamicResource SecondaryTextBrush}" />
                     <ItemsControl ItemsSource="{Binding CatalogSetup.DesignAreaCards}">
@@ -932,8 +864,7 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                   </StackPanel>
-                </Border>
-              </Grid>
+              </Border>
 
               <Grid IsVisible="{Binding IsMockupTemplateManagement}" ColumnDefinitions="2*,3*" ColumnSpacing="12">
                 <Border Grid.Column="0" Classes="panel" Padding="12"

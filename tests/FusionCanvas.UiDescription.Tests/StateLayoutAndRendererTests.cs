@@ -91,7 +91,7 @@ public sealed class StateLayoutAndRendererTests
     }
 
     [Fact]
-    public void Design_areas_grid_allocates_fixed_and_remaining_regions()
+    public void Design_areas_collection_uses_the_full_management_surface()
     {
         var source = Path.Combine(TestSupport.RepositoryRoot, "docs", "Visuals", "ui-descriptions", "manage-design-areas.ui.yaml");
         var parsed = new UiDescriptionParser().ParseFile(source);
@@ -99,9 +99,8 @@ public sealed class StateLayoutAndRendererTests
         var layout = new UiLayoutEngine().Layout(validated.Document!);
         var nodes = Flatten(layout.Root!).ToDictionary(node => node.Component.Id);
 
-        Assert.Equal(690, nodes["area-collection"].Bounds.Width);
-        Assert.Equal(390, nodes["area-editor"].Bounds.Width);
-        Assert.Equal(24, nodes["area-editor"].Bounds.X - nodes["area-collection"].Bounds.Right);
+        Assert.Equal(1104, nodes["area-collection"].Bounds.Width);
+        Assert.DoesNotContain("area-editor-dialog", nodes.Keys);
         Assert.All(nodes.Values, node => Assert.True(node.Bounds.Right <= validated.Document!.Screen.ViewportWidth));
     }
 

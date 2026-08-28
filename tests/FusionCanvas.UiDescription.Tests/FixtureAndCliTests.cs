@@ -19,7 +19,7 @@ public sealed class FixtureAndCliTests
         {
             "manage-design-areas.ui.yaml",
             "manage-design-areas.default.svg",
-            ["page-header", "area-collection", "front-area-card", "area-editor", "save-area"]
+            ["page-header", "area-collection", "front-area-card", "area-editor-dialog", "save-area"]
         }
     };
 

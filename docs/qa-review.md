@@ -290,6 +290,7 @@ For each relevant view or surface, check:
 4. **Focus and selection:** framework-owned focus, selection, and synchronization behavior is covered where it affects accepted outcomes.
 5. **Visual tree and templates:** important named controls, presenters, or generated items exist and carry the expected state when that structure is part of behavior rather than mere layout.
 6. **Test quality:** assertions describe product behavior, fixtures isolate dispatcher/application lifetime correctly, and tests avoid sleeps, pixels, incidental tree shape, or duplicated view-model assertions.
+7. **UI-description fixture reconciliation:** when a described inline fixture moves into a modal or another focused surface, reconcile its semantic fixture IDs, deterministic layout and state assertions, and checked-in golden renderings together.
 
 ### Optional Live Desktop Evidence
 
