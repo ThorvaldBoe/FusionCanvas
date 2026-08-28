@@ -630,11 +630,98 @@ public sealed class CatalogSetupViewModelTests
         Assert.Null(viewModel.PendingDesignAreaArchiveId);
     }
 
-    private static async Task<(CatalogSetupViewModel ViewModel, OfferingPlaceholder Area, BlueprintOffering Offering)> CreateCatalogWithDesignAreaAsync(bool referencedByTemplate)
+    [Fact]
+    public async Task MockupTemplateDraft_AddModeTracksMeaningfulChangesAndDiscardChoices()
+    {
+        var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: false);
+        var requests = 0;
+        viewModel.MockupTemplateEditorRequested += (_, _) => requests++;
+
+        viewModel.StartAddTemplateCommand.Execute(null);
+
+        Assert.Equal(1, requests);
+        Assert.True(viewModel.IsAddingTemplate);
+        Assert.False(viewModel.IsEditingMockupTemplate);
+        Assert.Equal("Add Mockup Template", viewModel.MockupTemplateEditorDialogTitle);
+        Assert.False(viewModel.HasMeaningfulMockupTemplateDraft);
+
+        viewModel.TemplateName = "Front navy";
+        Assert.True(viewModel.HasMeaningfulMockupTemplateDraft);
+        viewModel.RequestCancelMockupTemplateCommand.Execute(null);
+        Assert.True(viewModel.IsMockupTemplateDiscardConfirmationVisible);
+        Assert.True(viewModel.IsAddingTemplate);
+
+        viewModel.KeepEditingMockupTemplateCommand.Execute(null);
+        Assert.False(viewModel.IsMockupTemplateDiscardConfirmationVisible);
+        Assert.Equal("Front navy", viewModel.TemplateName);
+
+        viewModel.RequestCancelMockupTemplateCommand.Execute(null);
+        viewModel.ConfirmDiscardMockupTemplateCommand.Execute(null);
+        Assert.False(viewModel.IsAddingTemplate);
+        Assert.False(viewModel.HasMeaningfulMockupTemplateDraft);
+        Assert.Equal(string.Empty, viewModel.TemplateName);
+    }
+
+    [Fact]
+    public async Task MockupTemplateDraft_EditModePreservesInvalidDraftAndOfferingSwitchEndsIt()
+    {
+        var (viewModel, area, offering) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: true);
+        var template = Assert.Single(viewModel.MockupTemplateCards);
+        var requests = 0;
+        viewModel.MockupTemplateEditorRequested += (_, _) => requests++;
+
+        viewModel.EditTemplateCommand.Execute(template);
+
+        Assert.Equal(1, requests);
+        Assert.True(viewModel.IsEditingMockupTemplate);
+        Assert.Equal("Edit Mockup Template", viewModel.MockupTemplateEditorDialogTitle);
+        Assert.Equal(template.Id, viewModel.SelectedTemplateId);
+        Assert.Equal(area.Id, viewModel.SelectedPlaceholderId);
+        Assert.Equal("Front black", viewModel.TemplateName);
+        Assert.False(viewModel.HasMeaningfulMockupTemplateDraft);
+
+        viewModel.TemplateName = string.Empty;
+        Assert.True(viewModel.HasMeaningfulMockupTemplateDraft);
+        Assert.False(viewModel.CreateTemplateCommand.CanExecute(null));
+        Assert.True(viewModel.IsAddingTemplate);
+        Assert.Single(viewModel.MockupTemplateCards);
+
+        var otherOffering = viewModel.Offerings.First(candidate => candidate.Id != offering.Id);
+        viewModel.SelectOffering(otherOffering.Id);
+
+        Assert.False(viewModel.IsAddingTemplate);
+        Assert.False(viewModel.IsMockupTemplateDiscardConfirmationVisible);
+        Assert.False(viewModel.HasMeaningfulMockupTemplateDraft);
+        Assert.Equal(string.Empty, viewModel.TemplateName);
+    }
+
+    [Fact]
+    public async Task MockupTemplateDraft_ArchivedStoreCannotOpenAddOrEdit()
+    {
+        var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: true, storeArchived: true);
+        var card = Assert.Single(viewModel.MockupTemplateCards);
+        var requests = 0;
+        viewModel.MockupTemplateEditorRequested += (_, _) => requests++;
+
+        Assert.True(viewModel.IsReadOnly);
+        Assert.False(viewModel.CanEdit);
+        Assert.False(viewModel.StartAddTemplateCommand.CanExecute(null));
+        Assert.False(viewModel.EditTemplateCommand.CanExecute(card));
+
+        viewModel.StartAddTemplateCommand.Execute(null);
+        viewModel.EditTemplateCommand.Execute(card);
+
+        Assert.Equal(0, requests);
+        Assert.False(viewModel.IsAddingTemplate);
+    }
+
+    private static async Task<(CatalogSetupViewModel ViewModel, OfferingPlaceholder Area, BlueprintOffering Offering)> CreateCatalogWithDesignAreaAsync(
+        bool referencedByTemplate,
+        bool storeArchived = false)
     {
         var now = DateTimeOffset.UtcNow;
         var snapshot = SampleWorkspace.Create();
-        var store = snapshot.Stores.Single();
+        var store = snapshot.Stores.Single() with { IsArchived = storeArchived };
         var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
         var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Printful tee", null, BlueprintOfferingKind.ProviderNetwork, null, "printful", null, null, false, now, now);
         var otherOffering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Other tee", null, BlueprintOfferingKind.ProviderNetwork, null, "other", null, null, false, now, now);
@@ -646,6 +733,7 @@ public sealed class CatalogSetupViewModelTests
         var area = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 4500, 5400, [variant.Id], false, now, now);
         var populated = snapshot with
         {
+            Stores = [store],
             Blueprints = [blueprint],
             BlueprintOfferings = [offering, otherOffering],
             OfferingOptions = [colorOption, sizeOption],

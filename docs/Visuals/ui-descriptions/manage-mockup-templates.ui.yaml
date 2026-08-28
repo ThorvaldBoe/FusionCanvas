@@ -18,9 +18,9 @@ screen:
         children:
           - { id: page-title, kind: text, variant: screen-heading, text: Catalog & Mockups - Manage Mockup Templates }
           - { id: page-subtitle, kind: text, variant: supporting, text: Link one provider mockup image to a Design Area and map its image-space placement. }
-      - id: master-detail
+      - id: collection-surface
         kind: grid
-        columns: [400, fill]
+        columns: [fill]
         rowTracks: [fill]
         gap: region
         height: fill
@@ -49,7 +49,7 @@ screen:
                     children:
                       - { id: collection-title, kind: text, variant: screen-heading, text: Mockup Templates }
                       - { id: collection-count, kind: text, variant: supporting, text: 3 configured }
-                  - { id: add-template, kind: button, variant: primary, text: + Add Template, width: content, column: 1, row: 0 }
+                  - { id: add-template, kind: button, variant: primary, text: Add Mockup Template, width: content, column: 1, row: 0 }
               - { id: collection-divider, kind: divider, variant: standard }
               - id: black-front-card
                 kind: panel
@@ -82,13 +82,14 @@ screen:
                   - { id: black-back-summary, kind: text, variant: supporting, text: Back print area - Black - all enabled sizes }
                   - { id: black-back-status, kind: text, variant: supporting, text: Draft }
               - { id: collection-empty, kind: message, variant: empty, text: No Mockup Templates configured., visible: false }
-          - id: template-editor
+          - id: template-editor-dialog
             kind: panel
             variant: canvas
+            visible: false
             height: fill
             gap: section
             padding: window
-            column: 1
+            column: 0
             row: 0
             children:
               - id: editor-header
@@ -187,11 +188,21 @@ screen:
                       - { id: remove-template, kind: button, variant: danger, text: Remove Mockup Template, width: content }
 states:
   default:
-    overrides: []
+    overrides:
+      - { target: template-editor-dialog, visible: false }
+  add-dialog:
+    overrides:
+      - { target: template-editor-dialog, visible: true }
+      - { target: editor-title, text: Add Mockup Template }
+      - { target: editor-template-name, text: New template }
+  edit-dialog:
+    overrides:
+      - { target: template-editor-dialog, visible: true }
+      - { target: editor-title, text: Edit Mockup Template }
   empty-collection:
     overrides:
       - { target: black-front-card, visible: false }
       - { target: white-front-card, visible: false }
       - { target: black-back-card, visible: false }
       - { target: collection-empty, visible: true }
-      - { target: template-editor, visible: false }
+      - { target: template-editor-dialog, visible: false }

@@ -11,6 +11,7 @@ public partial class StoreEditorWindow : Window
     private bool _designAreaArchiveConfirmationOpen;
     private bool _optionValueManagementOpen;
     private bool _variantCreationDialogOpen;
+    private bool _mockupTemplateEditorOpen;
     private bool _designAreaEditorOpen;
 
     public StoreEditorWindow()
@@ -47,6 +48,7 @@ public partial class StoreEditorWindow : Window
             _subscribedCatalog.BulkVariantActionFocusRequested -= OnBulkVariantActionFocusRequested;
             _subscribedCatalog.DesignAreaArchiveConfirmationRequested -= OnDesignAreaArchiveConfirmationRequested;
             _subscribedCatalog.DesignAreaArchiveFocusRequested -= OnDesignAreaArchiveFocusRequested;
+            _subscribedCatalog.MockupTemplateEditorRequested -= OnMockupTemplateEditorRequested;
             _subscribedCatalog.DesignAreaEditorRequested -= OnDesignAreaEditorRequested;
             _subscribedCatalog = null;
         }
@@ -71,6 +73,7 @@ public partial class StoreEditorWindow : Window
             catalog.BulkVariantActionFocusRequested += OnBulkVariantActionFocusRequested;
             catalog.DesignAreaArchiveConfirmationRequested += OnDesignAreaArchiveConfirmationRequested;
             catalog.DesignAreaArchiveFocusRequested += OnDesignAreaArchiveFocusRequested;
+            catalog.MockupTemplateEditorRequested += OnMockupTemplateEditorRequested;
             catalog.DesignAreaEditorRequested += OnDesignAreaEditorRequested;
         }
     }
@@ -230,5 +233,30 @@ public partial class StoreEditorWindow : Window
                 && card.Id == id);
             archiveButton?.Focus();
         });
+    }
+
+    private async void OnMockupTemplateEditorRequested(object? sender, EventArgs e)
+    {
+        if (_mockupTemplateEditorOpen || _subscribedCatalog is not { } catalog) return;
+        _mockupTemplateEditorOpen = true;
+        var editedTemplateId = catalog.SelectedTemplateId;
+        try
+        {
+            var dialog = new MockupTemplateEditorWindow { DataContext = catalog };
+            await dialog.ShowDialog(this);
+            if (catalog.IsAddingTemplate) catalog.CancelAddTemplateCommand.Execute(null);
+        }
+        finally
+        {
+            _mockupTemplateEditorOpen = false;
+            Dispatcher.UIThread.Post(() =>
+            {
+                var editButton = editedTemplateId is Guid id
+                    ? this.GetVisualDescendants().OfType<Button>().FirstOrDefault(button =>
+                        button.DataContext is MockupTemplateCardViewModel card && card.Id == id)
+                    : null;
+                (editButton ?? AddMockupTemplateButton).Focus();
+            });
+        }
     }
 }
