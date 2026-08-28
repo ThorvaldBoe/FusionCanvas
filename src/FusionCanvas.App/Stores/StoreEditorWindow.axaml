@@ -935,8 +935,8 @@
                 </Border>
               </Grid>
 
-              <Grid IsVisible="{Binding IsMockupTemplateManagement}" ColumnDefinitions="2*,3*" ColumnSpacing="12">
-                <Border Grid.Column="0" Classes="panel" Padding="12"
+              <Grid IsVisible="{Binding IsMockupTemplateManagement}">
+                <Border Classes="panel" Padding="12"
                         AutomationProperties.AutomationId="Catalog.MockupTemplateList">
                   <StackPanel Spacing="8">
                   <TextBlock Text="Mockup Templates" FontSize="18" FontWeight="SemiBold" />
@@ -953,7 +953,8 @@
                       <DataTemplate x:DataType="stores:MockupTemplateCardViewModel">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <Button Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.EditTemplateCommand}"
-                                  CommandParameter="{Binding}" Classes="listItem" HorizontalContentAlignment="Left">
+                                  CommandParameter="{Binding}" Classes="listItem" HorizontalContentAlignment="Left"
+                                  AutomationProperties.Name="{Binding Name, StringFormat='Edit {0}'}">
                             <StackPanel Spacing="3">
                               <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
                               <TextBlock Text="{Binding TargetDesignArea, StringFormat='Design Area: {0}'}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -977,92 +978,7 @@
                       <Button Content="Manage Design Areas" Command="{Binding OpenDesignAreaManagementCommand}" Classes="secondary" />
                     </StackPanel>
                   </Border>
-                  <Button Content="Add Mockup Template" Command="{Binding CatalogSetup.StartAddTemplateCommand}" Classes="secondary" />
-                  </StackPanel>
-                </Border>
-                <Border Grid.Column="1" Classes="panel" Padding="12"
-                        AutomationProperties.AutomationId="Catalog.MockupTemplateEditor">
-                  <StackPanel Spacing="8">
-                  <TextBlock Text="Mockup Template editor" FontSize="18" FontWeight="SemiBold" />
-                  <TextBlock IsVisible="{Binding !CatalogSetup.IsAddingTemplate}"
-                             Text="Select Edit on a template, or add a new one."
-                             TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
-                  <Grid IsVisible="{Binding CatalogSetup.IsAddingTemplate}" ColumnDefinitions="3*,2*" ColumnSpacing="12">
-                    <Border Grid.Column="0" Classes="listItem" Padding="10"
-                            AutomationProperties.AutomationId="Catalog.MockupPreviewRegion">
-                      <StackPanel Spacing="6">
-                        <TextBlock Text="Provider image and placement" FontWeight="SemiBold" />
-                        <TextBlock IsVisible="{Binding !CatalogSetup.HasSelectedProviderMockup}"
-                                   Text="{Binding CatalogSetup.MockupPreviewUnavailableMessage}"
-                                   TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <TextBlock IsVisible="{Binding CatalogSetup.HasSelectedProviderMockup}"
-                                   Text="Drag the rectangle to move it, drag its lower-right handle to resize, or use arrow keys. Hold Shift with arrow keys to resize."
-                                   TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <stores:MockupPlacementEditor IsVisible="{Binding CatalogSetup.HasSelectedProviderMockup}"
-                                                       Height="320"
-                                                       IsEnabled="{Binding CatalogSetup.CanEdit}"
-                                                       PlacementX="{Binding CatalogSetup.MappingX, Mode=TwoWay}"
-                                                       PlacementY="{Binding CatalogSetup.MappingY, Mode=TwoWay}"
-                                                       PlacementWidth="{Binding CatalogSetup.MappingWidth, Mode=TwoWay}"
-                                                       PlacementHeight="{Binding CatalogSetup.MappingHeight, Mode=TwoWay}"
-                                                       ImageWidth="{Binding CatalogSetup.MappingImageWidth}"
-                                                       ImageHeight="{Binding CatalogSetup.MappingImageHeight}" />
-                      </StackPanel>
-                    </Border>
-                    <StackPanel Grid.Column="1" Spacing="6"
-                                AutomationProperties.AutomationId="Catalog.MockupConfigurationRegion">
-                      <TextBlock Text="Configuration" FontWeight="SemiBold" />
-                      <TextBox Text="{Binding CatalogSetup.TemplateName}" PlaceholderText="Mockup Template name" Classes="field" />
-                      <ComboBox ItemsSource="{Binding CatalogSetup.ProviderMockupCandidates}"
-                                SelectedItem="{Binding CatalogSetup.SelectedProviderMockup}"
-                                DisplayMemberBinding="{Binding DisplayName}"
-                                PlaceholderText="Provider mockup image" />
-                      <ComboBox ItemsSource="{Binding CatalogSetup.AvailablePlaceholders}"
-                                SelectedItem="{Binding CatalogSetup.SelectedPlaceholder}"
-                                DisplayMemberBinding="{Binding Name}"
-                                PlaceholderText="Linked Design Area" />
-                      <TextBlock Text="Applicable Colors" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                      <ItemsControl ItemsSource="{Binding CatalogSetup.TemplateColorChoices}">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="stores:OptionValueChoiceViewModel">
-                            <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" />
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-                      <TextBlock Text="Image-space mapping (pixels)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="8">
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="X" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <TextBlock Grid.Row="0" Grid.Column="1" Text="Y" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding CatalogSetup.MappingX}" PlaceholderText="X (px)" Classes="field" AutomationProperties.Name="X" />
-                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CatalogSetup.MappingY}" PlaceholderText="Y (px)" Classes="field" AutomationProperties.Name="Y" />
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Width" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <TextBlock Grid.Row="2" Grid.Column="1" Text="Height" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <TextBox Grid.Row="3" Grid.Column="0" Text="{Binding CatalogSetup.MappingWidth}" PlaceholderText="Width (px)" Classes="field" AutomationProperties.Name="Width" />
-                        <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding CatalogSetup.MappingHeight}" PlaceholderText="Height (px)" Classes="field" AutomationProperties.Name="Height" />
-                      </Grid>
-                      <Expander Header="Advanced provider data">
-                          <StackPanel Spacing="4">
-                            <TextBlock IsVisible="{Binding CatalogSetup.HasSelectedProviderMockup}"
-                                       Text="Provider mockup reference"
-                                       FontSize="12"
-                                       Foreground="{DynamicResource SecondaryTextBrush}" />
-                            <TextBox IsVisible="{Binding CatalogSetup.HasSelectedProviderMockup}"
-                                     Text="{Binding CatalogSetup.SelectedProviderMockup.ProviderReference}"
-                                     IsReadOnly="True"
-                                     Classes="field"
-                                     ToolTip.Tip="Stable provider mockup reference from the Printify catalog." />
-                            <TextBlock IsVisible="{Binding !CatalogSetup.HasSelectedProviderMockup}"
-                                       Text="No provider reference available."
-                                       TextWrapping="Wrap"
-                                       Foreground="{DynamicResource SecondaryTextBrush}" />
-                          </StackPanel>
-                        </Expander>
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="Save Mockup Template" Command="{Binding CatalogSetup.CreateTemplateCommand}" Classes="primary" HorizontalAlignment="Left" />
-                        <Button Content="Cancel" Command="{Binding CatalogSetup.CancelAddTemplateCommand}" Classes="secondary" HorizontalAlignment="Left" />
-                      </StackPanel>
-                    </StackPanel>
-                  </Grid>
+                  <Button x:Name="AddMockupTemplateButton" Content="Add Mockup Template" Command="{Binding CatalogSetup.StartAddTemplateCommand}" Classes="secondary" />
                   </StackPanel>
                 </Border>
               </Grid>

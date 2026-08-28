@@ -98,6 +98,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private Guid? _pendingDesignAreaArchiveId;
     private string _pendingDesignAreaArchiveName = string.Empty;
     private bool _isDesignAreaArchiveConfirmationVisible;
+    private bool _isMockupTemplateDiscardConfirmationVisible;
+    private MockupTemplateDraftState? _mockupTemplateDraftBaseline;
 
     public CatalogSetupViewModel(ICatalogSetupService catalog, IMockupTemplateSetupService mockups, IOfferingManagementService? offeringManagement = null, IProviderCatalogCandidateSource? providerCatalog = null)
     {
@@ -139,7 +141,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             MockupTemplate template => template,
             _ => null
         }), () => CanEdit);
-        CancelAddTemplateCommand = new RelayCommand(_ => { IsAddingTemplate = false; TemplateName = string.Empty; SelectedTemplate = AvailableTemplates.FirstOrDefault(); });
+        CancelAddTemplateCommand = new RelayCommand(_ => ResetTemplateDraft());
+        RequestCancelMockupTemplateCommand = new RelayCommand(_ => RequestCancelMockupTemplate(), () => IsAddingTemplate);
+        ConfirmDiscardMockupTemplateCommand = new RelayCommand(_ => ConfirmDiscardMockupTemplate(), () => IsMockupTemplateDiscardConfirmationVisible);
+        KeepEditingMockupTemplateCommand = new RelayCommand(_ => IsMockupTemplateDiscardConfirmationVisible = false, () => IsMockupTemplateDiscardConfirmationVisible);
         CreateTemplateCommand = new AsyncRelayCommand(CreateTemplateAsync, CanCreateTemplate);
         AddTemplateColorCommand = new AsyncRelayCommand(AddTemplateColorAsync, () => CanEdit && SelectedTemplate is not null && SelectedColor is not null);
         ArchiveOptionCommand = new RelayCommand(parameter => RunArchive(parameter, CatalogRecordKind.Option));
@@ -169,6 +174,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public event EventHandler? BulkVariantActionFocusRequested;
     public event EventHandler? DesignAreaArchiveConfirmationRequested;
     public event EventHandler? DesignAreaArchiveFocusRequested;
+    public event EventHandler? MockupTemplateEditorRequested;
 
     public ObservableCollection<Blueprint> Blueprints { get; } = [];
     public ObservableCollection<PrintProvider> PrintProviders { get; } = [];
@@ -205,6 +211,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             if (IsAddingVariant || IsAddingBulkVariants)
             {
                 ResetVariantCreation();
+            }
+            if (IsAddingTemplate)
+            {
+                ResetTemplateDraft();
             }
             LoadOfferingFields();
             RefreshOfferingCollections();
@@ -264,6 +274,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         {
             if (!SetField(ref _selectedPlaceholder, value)) return;
             OnPropertyChanged(nameof(SelectedPlaceholderId));
+            NotifyMockupTemplateDraftChanged();
             NotifyCommands();
         }
     }
@@ -277,11 +288,16 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         {
             if (!SetField(ref _selectedTemplate, value)) return;
             OnPropertyChanged(nameof(SelectedTemplateId));
+            OnPropertyChanged(nameof(IsEditingMockupTemplate));
+            OnPropertyChanged(nameof(MockupTemplateEditorDialogTitle));
+            NotifyMockupTemplateDraftChanged();
             NotifyCommands();
         }
     }
 
     public Guid? SelectedTemplateId => SelectedTemplate?.Id;
+    public bool IsEditingMockupTemplate => IsAddingTemplate && SelectedTemplate is not null;
+    public string MockupTemplateEditorDialogTitle => IsEditingMockupTemplate ? "Edit Mockup Template" : "Add Mockup Template";
     public OfferingOptionValue? SelectedColor { get => _selectedColor; set { if (SetField(ref _selectedColor, value)) NotifyCommands(); } }
     public OfferingOptionValue? BulkColor { get => _bulkColor; set { if (SetField(ref _bulkColor, value)) { ResetBulkPreview(); NotifyCommands(); } } }
     public string BulkResultMessage { get => _bulkResultMessage; private set { if (SetField(ref _bulkResultMessage, value)) OnPropertyChanged(nameof(HasBulkResultMessage)); } }
@@ -305,6 +321,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(HasSelectedProviderMockup));
             OnPropertyChanged(nameof(MockupPreviewUnavailableMessage));
             RebuildChoices();
+            NotifyMockupTemplateDraftChanged();
             NotifyCommands();
         }
     }
@@ -316,10 +333,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         !string.IsNullOrWhiteSpace(ProviderCatalogMessage)
             ? ProviderCatalogMessage
             : "Select a provider mockup image to preview and edit placement.";
-    public double MappingX { get => _mappingX; set { if (SetField(ref _mappingX, value)) NotifyCommands(); } }
-    public double MappingY { get => _mappingY; set { if (SetField(ref _mappingY, value)) NotifyCommands(); } }
-    public double MappingWidth { get => _mappingWidth; set { if (SetField(ref _mappingWidth, value)) NotifyCommands(); } }
-    public double MappingHeight { get => _mappingHeight; set { if (SetField(ref _mappingHeight, value)) NotifyCommands(); } }
+    public double MappingX { get => _mappingX; set { if (SetField(ref _mappingX, value)) { NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
+    public double MappingY { get => _mappingY; set { if (SetField(ref _mappingY, value)) { NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
+    public double MappingWidth { get => _mappingWidth; set { if (SetField(ref _mappingWidth, value)) { NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
+    public double MappingHeight { get => _mappingHeight; set { if (SetField(ref _mappingHeight, value)) { NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
     public double MappingImageWidth => SelectedProviderMockup?.ImageWidth ?? 0;
     public double MappingImageHeight => SelectedProviderMockup?.ImageHeight ?? 0;
 
@@ -354,7 +371,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             return $"{size.WidthInches:0.##} × {size.HeightInches:0.##} in · {size.WidthMillimetres:0.#} × {size.HeightMillimetres:0.#} mm";
         }
     }
-    public string TemplateName { get => _templateName; set { if (SetField(ref _templateName, value)) NotifyCommands(); } }
+    public string TemplateName { get => _templateName; set { if (SetField(ref _templateName, value)) { NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
     public OptionKind SelectedOptionKind { get => _selectedOptionKind; set => SetField(ref _selectedOptionKind, value); }
 
     public bool IsAddingOption { get => _isAddingOption; private set { if (SetField(ref _isAddingOption, value)) NotifyCommands(); } }
@@ -364,7 +381,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public bool IsAddingVariant { get => _isAddingVariant; private set { if (SetField(ref _isAddingVariant, value)) NotifyCommands(); } }
     public bool IsAddingBulkVariants { get => _isAddingBulkVariants; private set { if (SetField(ref _isAddingBulkVariants, value)) NotifyCommands(); } }
     public bool IsAddingPlaceholder { get => _isAddingPlaceholder; private set { if (SetField(ref _isAddingPlaceholder, value)) NotifyCommands(); } }
-    public bool IsAddingTemplate { get => _isAddingTemplate; private set { if (SetField(ref _isAddingTemplate, value)) NotifyCommands(); } }
+    public bool IsAddingTemplate { get => _isAddingTemplate; private set { if (SetField(ref _isAddingTemplate, value)) { OnPropertyChanged(nameof(IsEditingMockupTemplate)); OnPropertyChanged(nameof(MockupTemplateEditorDialogTitle)); NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
     public bool IsAvailable { get; private set; }
     public bool IsReadOnly { get; private set; }
     public bool CanEdit => IsAvailable && !IsReadOnly && !IsBusy;
@@ -372,6 +389,13 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public string ErrorMessage { get => _error; private set { if (SetField(ref _error, value)) OnPropertyChanged(nameof(HasError)); } }
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
     public bool HasActiveDraft => IsAddingPrintProvider || IsAddingOption || IsAddingOptionValue || IsAddingVariant || IsAddingBulkVariants || IsAddingPlaceholder || IsAddingTemplate;
+    public bool HasMeaningfulMockupTemplateDraft => IsAddingTemplate && _mockupTemplateDraftBaseline is not null && CurrentMockupTemplateDraftState() != _mockupTemplateDraftBaseline;
+
+    public bool IsMockupTemplateDiscardConfirmationVisible
+    {
+        get => _isMockupTemplateDiscardConfirmationVisible;
+        private set { if (SetField(ref _isMockupTemplateDiscardConfirmationVisible, value)) NotifyCommands(); }
+    }
 
     public bool IsDesignAreaArchiveConfirmationVisible
     {
@@ -442,6 +466,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ICommand StartAddTemplateCommand { get; }
     public ICommand EditTemplateCommand { get; }
     public ICommand CancelAddTemplateCommand { get; }
+    public ICommand RequestCancelMockupTemplateCommand { get; }
+    public ICommand ConfirmDiscardMockupTemplateCommand { get; }
+    public ICommand KeepEditingMockupTemplateCommand { get; }
     public ICommand CreateTemplateCommand { get; }
     public ICommand AddTemplateColorCommand { get; }
     public ICommand ArchiveOptionCommand { get; }
@@ -460,6 +487,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         ClearDesignAreaArchiveConfirmation();
         ResetOptionValueManagement();
         ResetVariantCreation();
+        ResetTemplateDraft();
         IsBusy = true;
         ErrorMessage = string.Empty;
         try
@@ -641,7 +669,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
                 ReplaceProviderImage: true, ProviderMockupReference: SelectedProviderMockup.ProviderReference,
                 ImageMapping: mapping,
                 ReplaceColorOptionValueIds: TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).ToArray()))).ConfigureAwait(true);
-            if (!HasError) IsAddingTemplate = false;
+            if (!HasError) EndTemplateDraft();
             return;
         }
         if (_offeringManagement is not null && SelectedProviderMockup is not null)
@@ -658,9 +686,12 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
                     TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).ToArray(), mapping)).ConfigureAwait(true);
                 if (result.Succeeded)
                 {
+                    var savedName = TemplateName.Trim();
                     ApplyOfferingState(result.State);
                     ApplyMockups(await _mockups.LoadForStoreAsync(SelectedOffering.StoreId).ConfigureAwait(true));
-                    IsAddingTemplate = false;
+                    SelectedTemplate = AvailableTemplates.LastOrDefault(value => string.Equals(value.Name, savedName, StringComparison.Ordinal))
+                        ?? SelectedTemplate;
+                    EndTemplateDraft();
                     TemplateName = string.Empty;
                     foreach (var color in TemplateColorChoices) color.IsSelected = false;
                 }
@@ -676,7 +707,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             return;
         }
         await RunMockupMutationAsync(() => _mockups.CreateTemplateAsync(new CreateMockupTemplateRequest(SelectedOffering.StoreId, SelectedOffering.Id, TemplateName, SelectedPlaceholder.Id))).ConfigureAwait(true);
-        if (!HasError) { IsAddingTemplate = false; TemplateName = string.Empty; }
+        if (!HasError) { EndTemplateDraft(); TemplateName = string.Empty; }
     }
 
     private async Task AddTemplateColorAsync()
@@ -693,7 +724,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void BeginEditTemplate(MockupTemplate? template)
     {
-        if (template is null) return;
+        if (!CanEdit || template is null) return;
         SelectedTemplate = template;
         SelectedPlaceholder = AvailablePlaceholders.FirstOrDefault(value => value.Id == template.TargetPlaceholderId);
         TemplateName = template.Name;
@@ -709,16 +740,21 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         RebuildChoices();
         var activeColorIds = TemplateColors.Where(value => value.MockupTemplateId == template.Id && !value.IsArchived).Select(value => value.ColorOptionValueId).ToHashSet();
         foreach (var color in TemplateColorChoices) color.IsSelected = activeColorIds.Contains(color.Value.Id);
+        _mockupTemplateDraftBaseline = CurrentMockupTemplateDraftState();
         IsAddingTemplate = true;
+        MockupTemplateEditorRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void BeginNewTemplate()
     {
+        if (!CanEdit || !AvailablePlaceholders.Any()) return;
         SelectedTemplate = null;
         SelectedPlaceholder = AvailablePlaceholders.FirstOrDefault(value => value.Id == SelectedOffering?.DefaultPlaceholderId) ?? AvailablePlaceholders.FirstOrDefault();
         TemplateName = string.Empty;
         foreach (var color in TemplateColorChoices) color.IsSelected = false;
+        _mockupTemplateDraftBaseline = CurrentMockupTemplateDraftState();
         IsAddingTemplate = true;
+        MockupTemplateEditorRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void RequestDesignAreaArchive(object? parameter)
@@ -1066,6 +1102,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         if (e.PropertyName == nameof(SelectableCatalogRecord.IsSelected))
         {
             ResetBulkPreview();
+            NotifyMockupTemplateDraftChanged();
             NotifyCommands();
         }
     }
@@ -1169,6 +1206,53 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         IsAddingPlaceholder = true;
     }
 
+    private void RequestCancelMockupTemplate()
+    {
+        if (!IsAddingTemplate) return;
+        if (HasMeaningfulMockupTemplateDraft)
+        {
+            IsMockupTemplateDiscardConfirmationVisible = true;
+            return;
+        }
+
+        ResetTemplateDraft();
+    }
+
+    private void ConfirmDiscardMockupTemplate()
+    {
+        if (!IsMockupTemplateDiscardConfirmationVisible) return;
+        ResetTemplateDraft();
+    }
+
+    private void ResetTemplateDraft()
+    {
+        EndTemplateDraft();
+        TemplateName = string.Empty;
+        foreach (var color in TemplateColorChoices) color.IsSelected = false;
+        SelectedTemplate = AvailableTemplates.FirstOrDefault();
+    }
+
+    private void EndTemplateDraft()
+    {
+        IsMockupTemplateDiscardConfirmationVisible = false;
+        IsAddingTemplate = false;
+        _mockupTemplateDraftBaseline = null;
+        OnPropertyChanged(nameof(HasMeaningfulMockupTemplateDraft));
+    }
+
+    private void NotifyMockupTemplateDraftChanged() => OnPropertyChanged(nameof(HasMeaningfulMockupTemplateDraft));
+
+    private MockupTemplateDraftState CurrentMockupTemplateDraftState() => new(
+        SelectedTemplate?.Id,
+        TemplateName,
+        SelectedProviderMockup?.ProviderReference,
+        SelectedPlaceholder?.Id,
+        MappingX,
+        MappingY,
+        MappingWidth,
+        MappingHeight,
+        string.Join("|", TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).OrderBy(value => value)));
+
     private void NotifyCommands()
     {
         foreach (var command in new ICommand[]
@@ -1177,7 +1261,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             CreateOptionValueCommand, StartAddVariantCommand, StartBulkVariantsCommand, CreateVariantCommand, StartAddPlaceholderCommand,
             CreatePlaceholderCommand, SetDefaultPlaceholderCommand, StartAddTemplateCommand, CreateTemplateCommand,
             AddTemplateColorCommand, PreviewBulkVariantsCommand, ConfirmBulkVariantsCommand,
-            ConfirmDesignAreaArchiveCommand, CancelDesignAreaArchiveCommand
+            ConfirmDesignAreaArchiveCommand, CancelDesignAreaArchiveCommand,
+            RequestCancelMockupTemplateCommand, ConfirmDiscardMockupTemplateCommand, KeepEditingMockupTemplateCommand
         })
         {
             switch (command)
@@ -1192,4 +1277,15 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private static void Replace<T>(ObservableCollection<T> target, IEnumerable<T> values) { target.Clear(); foreach (var value in values) target.Add(value); }
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? name = null) { if (EqualityComparer<T>.Default.Equals(field, value)) return false; field = value; OnPropertyChanged(name); return true; }
     private void OnPropertyChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+    private sealed record MockupTemplateDraftState(
+        Guid? TemplateId,
+        string Name,
+        string? ProviderReference,
+        Guid? PlaceholderId,
+        double X,
+        double Y,
+        double Width,
+        double Height,
+        string SelectedColorIds);
 }

@@ -92,9 +92,9 @@ Priority: high. The data and behavior exist; the remaining issue is information 
 
 ### Mockup Template Management
 
-The current screen correctly uses a collection/editor master-detail split and already has the hardest behavior: an accessible visual placement editor synchronized with X, Y, width, and height fields. Provider image selection, Design Area selection, Color-level applicability, Advanced provider reference, revision creation, and blocked-no-Design-Area behavior are also present.
+The current screen uses a collection-focused parent with Add/Edit opening the same focused dialog. The dialog preserves the hardest behavior: an accessible visual placement editor synchronized with X, Y, width, and height fields. Provider image selection, Design Area selection, Color-level applicability, Advanced provider reference, revision creation, meaningful-draft protection, and blocked-no-Design-Area behavior are also present.
 
-The current collection shows only template name and revision, so it omits target Design Area, Color applicability, derived Variant summary, and lifecycle state required by the accepted screen summary. Inside the editor, controls are one long vertical stack. The approved design instead gives the provider image and placement rectangle a prominent left region and groups identity, Design Area, Color applicability, numeric mapping, and provider reference beside it.
+The collection cards expose template name, target Design Area, Color applicability, derived Variant summary, revision, and lifecycle state. The focused dialog gives the provider image and placement rectangle a prominent left region and groups identity, Design Area, Color applicability, numeric mapping, and provider reference beside it without constraining the default collection surface.
 
 Recommended adjustment:
 
