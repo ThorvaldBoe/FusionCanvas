@@ -30,10 +30,15 @@
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="catalog:OfferingOptionValue">
             <Border Classes="listItem" Padding="8">
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <TextBlock Text="{Binding Value}" />
-                <Button Content="Archive Option Value" Command="{Binding $parent[ItemsControl].DataContext.ArchiveOptionValueCommand}" CommandParameter="{Binding}" Classes="danger" />
-              </StackPanel>
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <TextBlock Grid.Column="0" Text="{Binding Value}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Content="Archive"
+                        Command="{Binding $parent[ItemsControl].DataContext.ArchiveOptionValueCommand}"
+                        CommandParameter="{Binding}"
+                        Classes="compactDanger"
+                        AutomationProperties.Name="{Binding Value, StringFormat='Archive {0}'}" />
+              </Grid>
             </Border>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
@@ -69,6 +74,16 @@
       <Setter Property="Foreground" Value="{DynamicResource CommandForegroundBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource DangerStrongBrush}" />
       <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.compactDanger">
+      <Setter Property="Padding" Value="7,4" />
+      <Setter Property="MinHeight" Value="28" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource DangerTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DangerStrongBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style Selector="Button.fixedAction">
       <Setter Property="Width" Value="104" />
