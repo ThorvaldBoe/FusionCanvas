@@ -98,6 +98,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private Guid? _pendingDesignAreaArchiveId;
     private string _pendingDesignAreaArchiveName = string.Empty;
     private bool _isDesignAreaArchiveConfirmationVisible;
+    private bool _isDesignAreaDiscardConfirmationVisible;
+    private DesignAreaDraftState? _designAreaDraftBaseline;
 
     public CatalogSetupViewModel(ICatalogSetupService catalog, IMockupTemplateSetupService mockups, IOfferingManagementService? offeringManagement = null, IProviderCatalogCandidateSource? providerCatalog = null)
     {
@@ -130,6 +132,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             _ => null
         }), () => CanEdit);
         CancelAddPlaceholderCommand = new RelayCommand(_ => { ResetPlaceholderDraft(); SelectedPlaceholder = AvailablePlaceholders.FirstOrDefault(); });
+        RequestCancelDesignAreaCommand = new RelayCommand(_ => RequestCancelDesignArea(), () => IsAddingPlaceholder);
+        ConfirmDiscardDesignAreaCommand = new RelayCommand(_ => ConfirmDiscardDesignArea(), () => IsDesignAreaDiscardConfirmationVisible);
+        KeepEditingDesignAreaCommand = new RelayCommand(_ => IsDesignAreaDiscardConfirmationVisible = false, () => IsDesignAreaDiscardConfirmationVisible);
         CreatePlaceholderCommand = new AsyncRelayCommand(CreatePlaceholderAsync, CanCreatePlaceholder);
         SetDefaultPlaceholderCommand = new AsyncRelayCommand(SetDefaultPlaceholderAsync, () => CanEdit && SelectedOffering is not null && SelectedPlaceholder is not null);
         StartAddTemplateCommand = new RelayCommand(_ => BeginNewTemplate(), () => CanEdit && AvailablePlaceholders.Any());
@@ -169,6 +174,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public event EventHandler? BulkVariantActionFocusRequested;
     public event EventHandler? DesignAreaArchiveConfirmationRequested;
     public event EventHandler? DesignAreaArchiveFocusRequested;
+    public event EventHandler? DesignAreaEditorRequested;
 
     public ObservableCollection<Blueprint> Blueprints { get; } = [];
     public ObservableCollection<PrintProvider> PrintProviders { get; } = [];
@@ -205,6 +211,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             if (IsAddingVariant || IsAddingBulkVariants)
             {
                 ResetVariantCreation();
+            }
+            if (IsAddingPlaceholder)
+            {
+                ResetPlaceholderDraft();
             }
             LoadOfferingFields();
             RefreshOfferingCollections();
@@ -264,11 +274,15 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         {
             if (!SetField(ref _selectedPlaceholder, value)) return;
             OnPropertyChanged(nameof(SelectedPlaceholderId));
+            OnPropertyChanged(nameof(IsEditingDesignArea));
+            OnPropertyChanged(nameof(DesignAreaEditorDialogTitle));
             NotifyCommands();
         }
     }
 
     public Guid? SelectedPlaceholderId => SelectedPlaceholder?.Id;
+    public bool IsEditingDesignArea => IsAddingPlaceholder && SelectedPlaceholder is not null;
+    public string DesignAreaEditorDialogTitle => IsEditingDesignArea ? "Edit Design Area" : "Add Design Area";
 
     public MockupTemplate? SelectedTemplate
     {
@@ -331,19 +345,19 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public string OptionName { get => _optionName; set { if (SetField(ref _optionName, value)) NotifyCommands(); } }
     public string OptionValue { get => _optionValue; set { if (SetField(ref _optionValue, value)) NotifyCommands(); } }
     public string VariantName { get => _variantName; set => SetField(ref _variantName, value); }
-    public string PlaceholderName { get => _placeholderName; set { if (SetField(ref _placeholderName, value)) NotifyCommands(); } }
-    public string PlaceholderDescription { get => _placeholderDescription; set => SetField(ref _placeholderDescription, value); }
-    public string PlaceholderPosition { get => _placeholderPosition; set { if (SetField(ref _placeholderPosition, value)) NotifyCommands(); } }
-    public string PlaceholderDecorationMethod { get => _placeholderDecorationMethod; set { if (SetField(ref _placeholderDecorationMethod, value)) NotifyCommands(); } }
-    public string PlaceholderWidth { get => _placeholderWidth; set { if (SetField(ref _placeholderWidth, value)) { OnPropertyChanged(nameof(PhysicalSizeSummary)); NotifyCommands(); } } }
-    public string PlaceholderHeight { get => _placeholderHeight; set { if (SetField(ref _placeholderHeight, value)) { OnPropertyChanged(nameof(PhysicalSizeSummary)); NotifyCommands(); } } }
-    public bool PlaceholderUsesAllVariants { get => _placeholderUsesAllVariants; set { if (SetField(ref _placeholderUsesAllVariants, value)) NotifyCommands(); } }
-    public string PlaceholderProviderReference { get => _placeholderProviderReference; set => SetField(ref _placeholderProviderReference, value); }
-    public string ArtworkWidth { get => _artworkWidth; set { if (SetField(ref _artworkWidth, value)) NotifyCommands(); } }
-    public string ArtworkHeight { get => _artworkHeight; set { if (SetField(ref _artworkHeight, value)) NotifyCommands(); } }
-    public string ArtworkDpi { get => _artworkDpi; set { if (SetField(ref _artworkDpi, value)) { OnPropertyChanged(nameof(PhysicalSizeSummary)); NotifyCommands(); } } }
-    public string ArtworkFormat { get => _artworkFormat; set => SetField(ref _artworkFormat, value); }
-    public string ArtworkBackground { get => _artworkBackground; set => SetField(ref _artworkBackground, value); }
+    public string PlaceholderName { get => _placeholderName; set { if (SetField(ref _placeholderName, value)) { NotifyDesignAreaDraftChanged(); NotifyCommands(); } } }
+    public string PlaceholderDescription { get => _placeholderDescription; set { if (SetField(ref _placeholderDescription, value)) NotifyDesignAreaDraftChanged(); } }
+    public string PlaceholderPosition { get => _placeholderPosition; set { if (SetField(ref _placeholderPosition, value)) { NotifyDesignAreaDraftChanged(); NotifyCommands(); } } }
+    public string PlaceholderDecorationMethod { get => _placeholderDecorationMethod; set { if (SetField(ref _placeholderDecorationMethod, value)) { NotifyDesignAreaDraftChanged(); NotifyCommands(); } } }
+    public string PlaceholderWidth { get => _placeholderWidth; set { if (SetField(ref _placeholderWidth, value)) { OnPropertyChanged(nameof(PhysicalSizeSummary)); NotifyDesignAreaDraftChanged(); NotifyCommands(); } } }
+    public string PlaceholderHeight { get => _placeholderHeight; set { if (SetField(ref _placeholderHeight, value)) { OnPropertyChanged(nameof(PhysicalSizeSummary)); NotifyDesignAreaDraftChanged(); NotifyCommands(); } } }
+    public bool PlaceholderUsesAllVariants { get => _placeholderUsesAllVariants; set { if (SetField(ref _placeholderUsesAllVariants, value)) { NotifyDesignAreaDraftChanged(); NotifyCommands(); } } }
+    public string PlaceholderProviderReference { get => _placeholderProviderReference; set { if (SetField(ref _placeholderProviderReference, value)) NotifyDesignAreaDraftChanged(); } }
+    public string ArtworkWidth { get => _artworkWidth; set { if (SetField(ref _artworkWidth, value)) { NotifyDesignAreaDraftChanged(); NotifyCommands(); } } }
+    public string ArtworkHeight { get => _artworkHeight; set { if (SetField(ref _artworkHeight, value)) { NotifyDesignAreaDraftChanged(); NotifyCommands(); } } }
+    public string ArtworkDpi { get => _artworkDpi; set { if (SetField(ref _artworkDpi, value)) { OnPropertyChanged(nameof(PhysicalSizeSummary)); NotifyDesignAreaDraftChanged(); NotifyCommands(); } } }
+    public string ArtworkFormat { get => _artworkFormat; set { if (SetField(ref _artworkFormat, value)) NotifyDesignAreaDraftChanged(); } }
+    public string ArtworkBackground { get => _artworkBackground; set { if (SetField(ref _artworkBackground, value)) NotifyDesignAreaDraftChanged(); } }
     public string PhysicalSizeSummary
     {
         get
@@ -363,7 +377,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public bool IsManagingOptionValues { get => _isManagingOptionValues; private set => SetField(ref _isManagingOptionValues, value); }
     public bool IsAddingVariant { get => _isAddingVariant; private set { if (SetField(ref _isAddingVariant, value)) NotifyCommands(); } }
     public bool IsAddingBulkVariants { get => _isAddingBulkVariants; private set { if (SetField(ref _isAddingBulkVariants, value)) NotifyCommands(); } }
-    public bool IsAddingPlaceholder { get => _isAddingPlaceholder; private set { if (SetField(ref _isAddingPlaceholder, value)) NotifyCommands(); } }
+    public bool IsAddingPlaceholder { get => _isAddingPlaceholder; private set { if (SetField(ref _isAddingPlaceholder, value)) { OnPropertyChanged(nameof(IsEditingDesignArea)); OnPropertyChanged(nameof(DesignAreaEditorDialogTitle)); NotifyDesignAreaDraftChanged(); NotifyCommands(); } } }
     public bool IsAddingTemplate { get => _isAddingTemplate; private set { if (SetField(ref _isAddingTemplate, value)) NotifyCommands(); } }
     public bool IsAvailable { get; private set; }
     public bool IsReadOnly { get; private set; }
@@ -372,6 +386,13 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public string ErrorMessage { get => _error; private set { if (SetField(ref _error, value)) OnPropertyChanged(nameof(HasError)); } }
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
     public bool HasActiveDraft => IsAddingPrintProvider || IsAddingOption || IsAddingOptionValue || IsAddingVariant || IsAddingBulkVariants || IsAddingPlaceholder || IsAddingTemplate;
+    public bool HasMeaningfulDesignAreaDraft => IsAddingPlaceholder && _designAreaDraftBaseline is not null && CurrentDesignAreaDraftState() != _designAreaDraftBaseline;
+
+    public bool IsDesignAreaDiscardConfirmationVisible
+    {
+        get => _isDesignAreaDiscardConfirmationVisible;
+        private set { if (SetField(ref _isDesignAreaDiscardConfirmationVisible, value)) NotifyCommands(); }
+    }
 
     public bool IsDesignAreaArchiveConfirmationVisible
     {
@@ -437,6 +458,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ICommand StartAddPlaceholderCommand { get; }
     public ICommand EditPlaceholderCommand { get; }
     public ICommand CancelAddPlaceholderCommand { get; }
+    public ICommand RequestCancelDesignAreaCommand { get; }
+    public ICommand ConfirmDiscardDesignAreaCommand { get; }
+    public ICommand KeepEditingDesignAreaCommand { get; }
     public ICommand CreatePlaceholderCommand { get; }
     public ICommand SetDefaultPlaceholderCommand { get; }
     public ICommand StartAddTemplateCommand { get; }
@@ -1066,6 +1090,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         if (e.PropertyName == nameof(SelectableCatalogRecord.IsSelected))
         {
             ResetBulkPreview();
+            NotifyDesignAreaDraftChanged();
             NotifyCommands();
         }
     }
@@ -1122,6 +1147,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void ResetPlaceholderDraft()
     {
+        IsDesignAreaDiscardConfirmationVisible = false;
         IsAddingPlaceholder = false;
         PlaceholderName = string.Empty;
         PlaceholderDescription = string.Empty;
@@ -1137,6 +1163,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         ArtworkFormat = string.Empty;
         ArtworkBackground = string.Empty;
         foreach (var value in PlaceholderVariantChoices) value.IsSelected = false;
+        _designAreaDraftBaseline = null;
+        OnPropertyChanged(nameof(HasMeaningfulDesignAreaDraft));
         NotifyCommands();
     }
 
@@ -1144,7 +1172,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     {
         ResetPlaceholderDraft();
         SelectedPlaceholder = null;
+        _designAreaDraftBaseline = CurrentDesignAreaDraftState();
         IsAddingPlaceholder = true;
+        DesignAreaEditorRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void BeginEditDesignArea(OfferingPlaceholder? area)
@@ -1166,8 +1196,47 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         var activeIds = AvailableVariants.Select(value => value.Id).ToHashSet();
         PlaceholderUsesAllVariants = activeIds.SetEquals(area.VariantIds);
         foreach (var choice in PlaceholderVariantChoices) choice.IsSelected = area.VariantIds.Contains(choice.Variant.Id);
+        _designAreaDraftBaseline = CurrentDesignAreaDraftState();
         IsAddingPlaceholder = true;
+        DesignAreaEditorRequested?.Invoke(this, EventArgs.Empty);
     }
+
+    private void RequestCancelDesignArea()
+    {
+        if (!IsAddingPlaceholder) return;
+        if (HasMeaningfulDesignAreaDraft)
+        {
+            IsDesignAreaDiscardConfirmationVisible = true;
+            return;
+        }
+        ResetPlaceholderDraft();
+        SelectedPlaceholder = AvailablePlaceholders.FirstOrDefault();
+    }
+
+    private void ConfirmDiscardDesignArea()
+    {
+        if (!IsDesignAreaDiscardConfirmationVisible) return;
+        ResetPlaceholderDraft();
+        SelectedPlaceholder = AvailablePlaceholders.FirstOrDefault();
+    }
+
+    private void NotifyDesignAreaDraftChanged() => OnPropertyChanged(nameof(HasMeaningfulDesignAreaDraft));
+
+    private DesignAreaDraftState CurrentDesignAreaDraftState() => new(
+        PlaceholderName,
+        PlaceholderDescription,
+        PlaceholderPosition,
+        PlaceholderDecorationMethod,
+        PlaceholderWidth,
+        PlaceholderHeight,
+        PlaceholderUsesAllVariants,
+        PlaceholderProviderReference,
+        ArtworkWidth,
+        ArtworkHeight,
+        ArtworkDpi,
+        ArtworkFormat,
+        ArtworkBackground,
+        string.Join("|", PlaceholderVariantChoices.Where(value => value.IsSelected).Select(value => value.Variant.Id).OrderBy(value => value)));
 
     private void NotifyCommands()
     {
@@ -1177,7 +1246,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             CreateOptionValueCommand, StartAddVariantCommand, StartBulkVariantsCommand, CreateVariantCommand, StartAddPlaceholderCommand,
             CreatePlaceholderCommand, SetDefaultPlaceholderCommand, StartAddTemplateCommand, CreateTemplateCommand,
             AddTemplateColorCommand, PreviewBulkVariantsCommand, ConfirmBulkVariantsCommand,
-            ConfirmDesignAreaArchiveCommand, CancelDesignAreaArchiveCommand
+            ConfirmDesignAreaArchiveCommand, CancelDesignAreaArchiveCommand,
+            RequestCancelDesignAreaCommand, ConfirmDiscardDesignAreaCommand, KeepEditingDesignAreaCommand
         })
         {
             switch (command)
@@ -1192,4 +1262,20 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private static void Replace<T>(ObservableCollection<T> target, IEnumerable<T> values) { target.Clear(); foreach (var value in values) target.Add(value); }
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? name = null) { if (EqualityComparer<T>.Default.Equals(field, value)) return false; field = value; OnPropertyChanged(name); return true; }
     private void OnPropertyChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+    private sealed record DesignAreaDraftState(
+        string Name,
+        string Description,
+        string Position,
+        string DecorationMethod,
+        string Width,
+        string Height,
+        bool UsesAllVariants,
+        string ProviderReference,
+        string ArtworkWidth,
+        string ArtworkHeight,
+        string ArtworkDpi,
+        string ArtworkFormat,
+        string ArtworkBackground,
+        string SelectedVariantIds);
 }
