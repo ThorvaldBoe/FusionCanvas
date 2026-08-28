@@ -751,6 +751,91 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void ManageValues_ArchiveActionsAreCompactTargetSpecificAndKeepLongValuesReadable()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        foreach (var kind in new[] { OptionKind.Color, OptionKind.Size })
+        {
+            var group = viewModel.CatalogSetup!.AvailableChoiceGroups.Single(candidate => candidate.Option.OptionKind == kind);
+            viewModel.CatalogSetup.ManageOptionCommand.Execute(group.Option);
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+
+            var standardDialog = Assert.Single(window.OwnedWindows.OfType<OptionValueManagementWindow>());
+            var standardActions = standardDialog.GetVisualDescendants()
+                .OfType<Button>()
+                .Where(button => string.Equals(button.Content as string, "Archive", StringComparison.Ordinal))
+                .ToArray();
+            Assert.Equal(group.Values.Count, standardActions.Length);
+            Assert.All(standardActions, button =>
+            {
+                var optionValue = Assert.IsType<OfferingOptionValue>(button.DataContext);
+                Assert.Equal($"Archive {optionValue.Value}", AutomationProperties.GetName(button));
+                Assert.Contains("compactDanger", button.Classes);
+            });
+
+            standardDialog.Close();
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        }
+
+        viewModel.CatalogSetup!.SelectedOptionKind = OptionKind.Other;
+        viewModel.CatalogSetup.OptionName = "Material";
+        viewModel.CatalogSetup.StartAddOptionCommand.Execute(null);
+        viewModel.CatalogSetup.CreateOptionCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        var customOption = viewModel.CatalogSetup.AvailableChoiceGroups
+            .Single(group => group.Option.OptionKind == OptionKind.Other);
+        viewModel.CatalogSetup.ManageOptionCommand.Execute(customOption.Option);
+        viewModel.CatalogSetup.StartAddOptionValueCommand.Execute(null);
+        const string longValue = "Extraordinarily long recycled cotton blend material value";
+        viewModel.CatalogSetup.OptionValue = longValue;
+        viewModel.CatalogSetup.CreateOptionValueCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        var dialog = Assert.Single(window.OwnedWindows.OfType<OptionValueManagementWindow>());
+        dialog.UpdateLayout();
+        var archive = dialog.GetVisualDescendants()
+            .OfType<Button>()
+            .Single(button => string.Equals(button.Content as string, "Archive", StringComparison.Ordinal));
+        var value = Assert.IsType<OfferingOptionValue>(archive.DataContext);
+        var valueText = dialog.GetVisualDescendants()
+            .OfType<TextBlock>()
+            .Single(text => string.Equals(text.Text, longValue, StringComparison.Ordinal));
+
+        Assert.Equal(longValue, value.Value);
+        Assert.Contains("compactDanger", archive.Classes);
+        Assert.DoesNotContain("danger", archive.Classes);
+        Assert.Equal(new Thickness(7, 4), archive.Padding);
+        Assert.Equal($"Archive {longValue}", AutomationProperties.GetName(archive));
+        Assert.Same(viewModel.CatalogSetup.ArchiveOptionValueCommand, archive.Command);
+        Assert.Same(value, archive.CommandParameter);
+        Assert.Equal(Avalonia.Media.TextWrapping.Wrap, valueText.TextWrapping);
+        Assert.True(valueText.Bounds.Right <= archive.Bounds.Left,
+            $"Value text ending at {valueText.Bounds.Right} must not overlap Archive starting at {archive.Bounds.Left}.");
+
+        archive.Command!.Execute(archive.CommandParameter);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        dialog.UpdateLayout();
+
+        Assert.DoesNotContain(viewModel.CatalogSetup.AvailableValues, candidate => candidate.Id == value.Id);
+        Assert.DoesNotContain(dialog.GetVisualDescendants().OfType<Button>(),
+            button => string.Equals(AutomationProperties.GetName(button), $"Archive {longValue}", StringComparison.Ordinal));
+
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void ManageValues_AllowsOnlyOneDialogAtATime()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
