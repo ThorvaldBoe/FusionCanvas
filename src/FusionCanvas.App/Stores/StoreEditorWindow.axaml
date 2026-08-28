@@ -1013,10 +1013,21 @@
                                 AutomationProperties.AutomationId="Catalog.MockupConfigurationRegion">
                       <TextBlock Text="Configuration" FontWeight="SemiBold" />
                       <TextBox Text="{Binding CatalogSetup.TemplateName}" PlaceholderText="Mockup Template name" Classes="field" />
+                      <TextBlock Text="Provider mockup image" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <TextBlock Text="{Binding CatalogSetup.ProviderImageSelectionInstructions}"
+                                 TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                       <ComboBox ItemsSource="{Binding CatalogSetup.ProviderMockupCandidates}"
                                 SelectedItem="{Binding CatalogSetup.SelectedProviderMockup}"
                                 DisplayMemberBinding="{Binding DisplayName}"
-                                PlaceholderText="Provider mockup image" />
+                                PlaceholderText="Provider mockup image"
+                                AutomationProperties.Name="Provider mockup image" />
+                      <TextBlock Text="{Binding CatalogSetup.ProviderImageSelectionStateMessage}"
+                                 TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}"
+                                 AutomationProperties.AutomationId="Catalog.ProviderImageState" />
+                      <TextBlock Text="{Binding CatalogSetup.ProviderImageSelectionRecoveryMessage}"
+                                 IsVisible="{Binding CatalogSetup.HasProviderImageSelectionRecovery}"
+                                 TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource WarningTextBrush}"
+                                 AutomationProperties.AutomationId="Catalog.ProviderImageRecovery" />
                       <ComboBox ItemsSource="{Binding CatalogSetup.AvailablePlaceholders}"
                                 SelectedItem="{Binding CatalogSetup.SelectedPlaceholder}"
                                 DisplayMemberBinding="{Binding Name}"
