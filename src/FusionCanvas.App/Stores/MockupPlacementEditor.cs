@@ -18,6 +18,8 @@ public sealed class MockupPlacementEditor : Control
     public static readonly StyledProperty<double> ImageWidthProperty = AvaloniaProperty.Register<MockupPlacementEditor, double>(nameof(ImageWidth), defaultBindingMode: BindingMode.TwoWay);
     public static readonly StyledProperty<double> ImageHeightProperty = AvaloniaProperty.Register<MockupPlacementEditor, double>(nameof(ImageHeight), defaultBindingMode: BindingMode.TwoWay);
     public static readonly StyledProperty<string?> ImagePathProperty = AvaloniaProperty.Register<MockupPlacementEditor, string?>(nameof(ImagePath));
+    public static readonly StyledProperty<double> AspectRatioProperty = AvaloniaProperty.Register<MockupPlacementEditor, double>(nameof(AspectRatio));
+    public static readonly StyledProperty<bool> KeepAspectRatioProperty = AvaloniaProperty.Register<MockupPlacementEditor, bool>(nameof(KeepAspectRatio));
 
     private const double HandleSize = 8;
     private const double HitPadding = 8;
@@ -39,11 +41,14 @@ public sealed class MockupPlacementEditor : Control
     public double ImageWidth { get => GetValue(ImageWidthProperty); set => SetValue(ImageWidthProperty, value); }
     public double ImageHeight { get => GetValue(ImageHeightProperty); set => SetValue(ImageHeightProperty, value); }
     public string? ImagePath { get => GetValue(ImagePathProperty); set => SetValue(ImagePathProperty, value); }
+    public double AspectRatio { get => GetValue(AspectRatioProperty); set => SetValue(AspectRatioProperty, value); }
+    public bool KeepAspectRatio { get => GetValue(KeepAspectRatioProperty); set => SetValue(KeepAspectRatioProperty, value); }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        if (change.Property == ImageWidthProperty || change.Property == ImageHeightProperty || change.Property == ImagePathProperty)
+        if (change.Property == ImageWidthProperty || change.Property == ImageHeightProperty || change.Property == ImagePathProperty ||
+            change.Property == AspectRatioProperty || change.Property == KeepAspectRatioProperty)
         {
             ClampPlacement();
             InvalidateVisual();
@@ -97,8 +102,9 @@ public sealed class MockupPlacementEditor : Control
         var dy = (point.Y - previous.Y) / scale;
         if (_resizing)
         {
-            PlacementWidth = Math.Clamp(PlacementWidth + dx, 1, Math.Max(1, ImageWidth - PlacementX));
-            PlacementHeight = Math.Clamp(PlacementHeight + dy, 1, Math.Max(1, ImageHeight - PlacementY));
+            var (width, height) = ResizeDimensions(PlacementWidth + dx, PlacementHeight + dy, Math.Abs(dx) >= Math.Abs(dy));
+            PlacementWidth = width;
+            PlacementHeight = height;
         }
         else
         {
@@ -131,8 +137,9 @@ public sealed class MockupPlacementEditor : Control
         if (dx == 0 && dy == 0) return;
         if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
         {
-            PlacementWidth = Math.Clamp(PlacementWidth + dx, 1, Math.Max(1, ImageWidth - PlacementX));
-            PlacementHeight = Math.Clamp(PlacementHeight + dy, 1, Math.Max(1, ImageHeight - PlacementY));
+            var (width, height) = ResizeDimensions(PlacementWidth + dx, PlacementHeight + dy, dx != 0);
+            PlacementWidth = width;
+            PlacementHeight = height;
         }
         else
         {
@@ -143,6 +150,28 @@ public sealed class MockupPlacementEditor : Control
     }
 
     private bool HasImage() => ImageWidth > 0 && ImageHeight > 0;
+
+    private bool HasAspectRatio => KeepAspectRatio && double.IsFinite(AspectRatio) && AspectRatio > 0;
+
+    private (double Width, double Height) ResizeDimensions(double proposedWidth, double proposedHeight, bool preferWidth)
+    {
+        var maxWidth = Math.Max(1, ImageWidth - PlacementX);
+        var maxHeight = Math.Max(1, ImageHeight - PlacementY);
+        if (!HasAspectRatio)
+            return (Math.Clamp(proposedWidth, 1, maxWidth), Math.Clamp(proposedHeight, 1, maxHeight));
+
+        var width = Math.Max(1, proposedWidth);
+        var height = Math.Max(1, proposedHeight);
+        if (preferWidth)
+            height = width / AspectRatio;
+        else
+            width = height * AspectRatio;
+
+        var scale = Math.Min(1, Math.Min(maxWidth / width, maxHeight / height));
+        width *= scale;
+        height *= scale;
+        return (Math.Clamp(width, 1, maxWidth), Math.Clamp(height, 1, maxHeight));
+    }
 
     private double Scale()
     {
@@ -179,6 +208,10 @@ public sealed class MockupPlacementEditor : Control
         var imageHeight = Math.Max(1, ImageHeight);
         var width = Math.Min(Math.Max(1, PlacementWidth), imageWidth);
         var height = Math.Min(Math.Max(1, PlacementHeight), imageHeight);
+        if (HasAspectRatio)
+        {
+            (width, height) = ResizeDimensions(width, height, width / Math.Max(1, height) >= AspectRatio);
+        }
         var x = Math.Clamp(PlacementX, 0, Math.Max(0, imageWidth - width));
         var y = Math.Clamp(PlacementY, 0, Math.Max(0, imageHeight - height));
         if (x != PlacementX) PlacementX = x;

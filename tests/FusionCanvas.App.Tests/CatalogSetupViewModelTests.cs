@@ -51,6 +51,32 @@ public sealed class CatalogSetupViewModelTests
     }
 
     [Fact]
+    public async Task SelectedDesignAreaDefaultsAspectRatioLockAndSynchronizesNumericDimensions()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Choice", null, BlueprintOfferingKind.ProviderNetwork, null, "choice", null, null, false, now, now);
+        var area = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 1200, 600, [], false, now, now);
+        var repository = new InMemoryWorkspaceRepository(snapshot with { Blueprints = [blueprint], BlueprintOfferings = [offering], OfferingPlaceholders = [area] });
+        var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository));
+
+        await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+        viewModel.SelectOffering(offering.Id);
+        viewModel.SelectedPlaceholder = area;
+
+        Assert.Equal(2, viewModel.PlacementAspectRatio, 3);
+        Assert.True(viewModel.KeepAspectRatio);
+        viewModel.MappingWidthText = "401";
+        Assert.Equal("200", viewModel.MappingHeightText);
+
+        viewModel.KeepAspectRatio = false;
+        viewModel.MappingHeightText = "333";
+        Assert.Equal("401", viewModel.MappingWidthText);
+    }
+
+    [Fact]
     public async Task RequestedOfferingIdentityIsAuthoritativeAndNeverFallsBack()
     {
         var now = DateTimeOffset.UtcNow;

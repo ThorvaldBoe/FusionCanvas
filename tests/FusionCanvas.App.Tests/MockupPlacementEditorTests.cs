@@ -47,6 +47,42 @@ public sealed class MockupPlacementEditorTests
     }
 
     [AvaloniaFact]
+    public void RatioLockedResizePreservesConfiguredAspectRatio()
+    {
+        var editor = NewEditor();
+        editor.AspectRatio = 2;
+        editor.KeepAspectRatio = true;
+        editor.PlacementWidth = 400;
+        editor.PlacementHeight = 200;
+        var window = Show(editor);
+
+        HeadlessWindowExtensions.MouseDown(window, new Point(280, 280), MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseMove(window, new Point(360, 340), RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseUp(window, new Point(360, 340), MouseButton.Left, RawInputModifiers.None);
+
+        Assert.Equal(2, editor.PlacementWidth / editor.PlacementHeight, 3);
+        Assert.True(editor.PlacementX + editor.PlacementWidth <= editor.ImageWidth);
+        Assert.True(editor.PlacementY + editor.PlacementHeight <= editor.ImageHeight);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void UncheckingRatioAllowsIndependentResize()
+    {
+        var editor = NewEditor();
+        editor.AspectRatio = 2;
+        editor.KeepAspectRatio = false;
+        var window = Show(editor);
+
+        HeadlessWindowExtensions.MouseDown(window, new Point(300, 300), MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseMove(window, new Point(340, 380), RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseUp(window, new Point(340, 380), MouseButton.Left, RawInputModifiers.None);
+
+        Assert.NotEqual(2, editor.PlacementWidth / editor.PlacementHeight, 3);
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void ArrowKeysMoveAndShiftArrowResizesInImagePixels()
     {
         var editor = NewEditor();
@@ -146,11 +182,14 @@ public sealed class MockupPlacementEditorTests
         var editor = window.GetVisualDescendants().OfType<MockupPlacementEditor>().Single();
         var close = window.GetVisualDescendants().OfType<Button>().Single(button =>
             AutomationProperties.GetName(button) == "Close enlarged image placement");
+        var ratio = window.GetVisualDescendants().OfType<CheckBox>().Single(checkBox =>
+            AutomationProperties.GetName(checkBox) == "Keep aspect ratio");
 
         Assert.True(editor.Bounds.Width > 0);
         Assert.True(editor.Bounds.Height > 0);
         Assert.Equal("Close", close.Content);
         Assert.True(close.IsEffectivelyVisible);
+        Assert.Equal("Keep aspect ratio", ratio.Content);
 
         close.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
         Assert.False(window.IsVisible);
