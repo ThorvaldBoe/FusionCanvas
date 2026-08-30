@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using Avalonia.Media.Imaging;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Settings;
 using FusionCanvas.Application.Catalog;
@@ -42,6 +43,21 @@ public sealed class VariantChoiceViewModel(OfferingVariant variant) : Selectable
 
 public sealed class LocalMockupSourceDraftViewModel(string path, IReadOnlyList<Guid> optionValueIds, bool isManaged = false, MockupImageSpaceMapping? mapping = null, int imageWidth = 0, int imageHeight = 0, Guid? sourceImageId = null, string? previewPath = null) : INotifyPropertyChanged
 {
+    private static (int Width, int Height) ReadPreviewDimensions(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                using var bitmap = new Bitmap(path);
+                return (bitmap.PixelSize.Width, bitmap.PixelSize.Height);
+            }
+        }
+        catch { }
+        return (0, 0);
+    }
+
+    private readonly (int Width, int Height) _previewDimensions = imageWidth > 0 && imageHeight > 0 ? (imageWidth, imageHeight) : mapping is not null ? (mapping.ImageWidth, mapping.ImageHeight) : ReadPreviewDimensions(previewPath ?? path);
     public event PropertyChangedEventHandler? PropertyChanged;
     public string Path { get; } = path;
     public string DisplayName => System.IO.Path.GetFileName(Path);
@@ -50,8 +66,8 @@ public sealed class LocalMockupSourceDraftViewModel(string path, IReadOnlyList<G
     public Guid? SourceImageId { get; } = sourceImageId;
     public string PreviewPath { get; } = previewPath ?? path;
     public MockupImageSpaceMapping? Mapping { get; private set; } = mapping;
-    public int ImageWidth { get; } = imageWidth > 0 ? imageWidth : mapping?.ImageWidth ?? 0;
-    public int ImageHeight { get; } = imageHeight > 0 ? imageHeight : mapping?.ImageHeight ?? 0;
+    public int ImageWidth => _previewDimensions.Width;
+    public int ImageHeight => _previewDimensions.Height;
     public string ApplicabilitySummary { get; set; } = string.Empty;
     public bool IsComplete => OptionValueIds.Count > 0 && Mapping is not null;
     public string StatusLabel => IsComplete ? "Complete" : "Needs setup";
@@ -256,7 +272,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public IAssetFilePicker FilePicker { get => _filePicker; set => _filePicker = value ?? new NullAssetFilePicker(); }
     public string LocalSourcePath { get => _localSourcePath; private set { if (SetField(ref _localSourcePath, value)) { NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
     public LocalMockupSourceDraftViewModel? SelectedLocalSource { get => _selectedLocalSource; private set { if (SetField(ref _selectedLocalSource, value)) { OnPropertyChanged(nameof(HasSelectedLocalSource)); OnPropertyChanged(nameof(MappingImageWidth)); OnPropertyChanged(nameof(MappingImageHeight)); OnPropertyChanged(nameof(SelectedImagePreviewPath)); RebuildMappedSourceChoices(); NotifyCommands(); } } }
-    public LocalMockupSourceDraftViewModel? SelectedMappingSource { get => _selectedMappingSource; private set => SetField(ref _selectedMappingSource, value); }
+    public LocalMockupSourceDraftViewModel? SelectedMappingSource { get => _selectedMappingSource; set => SetField(ref _selectedMappingSource, value); }
     public string? SelectedImagePreviewPath => SelectedLocalSource?.PreviewPath;
     public bool HasSelectedLocalSource => SelectedLocalSource is not null;
     public bool HasLocalSource => LocalSourceDrafts.Count > 0 || !string.IsNullOrWhiteSpace(LocalSourcePath);
@@ -886,7 +902,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         {
             var draft = new LocalMockupSourceDraftViewModel(path, []);
             LocalSourceDrafts.Add(draft);
-            SelectedLocalSource = draft;
+            SelectLocalSource(draft);
             foreach (var color in TemplateColorChoices) color.IsSelected = false;
             MappingXText = MappingYText = MappingWidthText = MappingHeightText = string.Empty;
             LocalSourcePath = path;
@@ -899,7 +915,6 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private void SelectLocalSource(LocalMockupSourceDraftViewModel? draft)
     {
         if (draft is null) return;
-        if (draft.IsManaged && draft.SourceImageId is not null && !_archivedLocalSourceDrafts.Contains(draft)) _archivedLocalSourceDrafts.Add(draft);
         CaptureSelectedLocalSource();
         SelectedLocalSource = draft;
         foreach (var row in LocalSourceDrafts) row.IsSelected = ReferenceEquals(row, draft);
@@ -945,6 +960,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public void RemoveLocalSource(LocalMockupSourceDraftViewModel? draft)
     {
         if (draft is null) return;
+        if (draft.IsManaged && draft.SourceImageId is not null && !_archivedLocalSourceDrafts.Contains(draft)) _archivedLocalSourceDrafts.Add(draft);
         if (ReferenceEquals(SelectedLocalSource, draft)) SelectedLocalSource = null;
         LocalSourceDrafts.Remove(draft);
         RebuildMappedSourceChoices();
