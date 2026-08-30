@@ -1,9 +1,11 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Layout;
+using Avalonia.VisualTree;
 using FusionCanvas.App.Stores;
 
 namespace FusionCanvas.App.Tests;
@@ -130,6 +132,28 @@ public sealed class MockupPlacementEditorTests
         Assert.Equal(500, editor.PlacementWidth, 1);
         Assert.Equal(500, editor.PlacementHeight, 1);
         window.Close();
+    }
+
+    [AvaloniaFact]
+    public void EnlargedEditorProvidesAccessibleClosePathAtResponsiveMinimum()
+    {
+        var window = new EnlargedMockupPlacementEditorWindow();
+        window.Show();
+        window.Width = window.MinWidth;
+        window.Height = window.MinHeight;
+        window.UpdateLayout();
+
+        var editor = window.GetVisualDescendants().OfType<MockupPlacementEditor>().Single();
+        var close = window.GetVisualDescendants().OfType<Button>().Single(button =>
+            AutomationProperties.GetName(button) == "Close enlarged image placement");
+
+        Assert.True(editor.Bounds.Width > 0);
+        Assert.True(editor.Bounds.Height > 0);
+        Assert.Equal("Close", close.Content);
+        Assert.True(close.IsEffectivelyVisible);
+
+        close.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        Assert.False(window.IsVisible);
     }
 
     private static MockupPlacementEditor NewEditor() => new()
