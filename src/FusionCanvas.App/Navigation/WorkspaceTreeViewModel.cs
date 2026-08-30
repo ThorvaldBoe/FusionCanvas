@@ -232,6 +232,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     private bool _includeArchived;
     private int _stageFilterIndex;
     private int _statusFilterIndex;
+    private int _ideaRatingFilterIndex;
     private bool _nextToggleExpands = true;
     private string? _errorMessage;
     private bool _isBusy;
@@ -532,13 +533,15 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         _scopeToCurrentTopic ||
         _includeArchived ||
         _stageFilterIndex > 0 ||
-        _statusFilterIndex > 0;
+        _statusFilterIndex > 0 ||
+        _ideaRatingFilterIndex > 0;
     public int ActiveFilterCount =>
         (_selectedTagIds.Count > 0 ? 1 : 0) +
         (_scopeToCurrentTopic ? 1 : 0) +
         (_includeArchived ? 1 : 0) +
         (_stageFilterIndex > 0 ? 1 : 0) +
-        (_statusFilterIndex > 0 ? 1 : 0);
+        (_statusFilterIndex > 0 ? 1 : 0) +
+        (_ideaRatingFilterIndex > 0 ? 1 : 0);
     public bool HasVisibleResults => Roots.Count > 0;
     public bool HasEmptyFilterResults => HasActiveFilters && !HasVisibleResults;
     public bool IsFiltering => BuildQuery().IsActive;
@@ -620,6 +623,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         _includeArchived = false;
         _stageFilterIndex = 0;
         _statusFilterIndex = 0;
+        _ideaRatingFilterIndex = 0;
         OnPropertyChanged(nameof(QueryText));
         OnPropertyChanged(nameof(IncludeArchived));
         OnPropertyChanged(nameof(ScopeToCurrentTopic));
@@ -627,6 +631,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(SelectedTagIds));
         OnPropertyChanged(nameof(StageFilterIndex));
         OnPropertyChanged(nameof(StatusFilterIndex));
+        OnPropertyChanged(nameof(IdeaRatingFilterIndex));
         if (tagIdsCleared)
         {
             RaiseAllTagSelectionsChanged();
@@ -765,13 +770,28 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
     }
 
+    public int IdeaRatingFilterIndex
+    {
+        get => _ideaRatingFilterIndex;
+        set
+        {
+            if (_ideaRatingFilterIndex == value) return;
+            if (value is < 0 or > 6) return;
+            SetField(ref _ideaRatingFilterIndex, value);
+            ApplyFilterTransition();
+        }
+    }
+
     private WorkspaceTreeQuery BuildQuery() => new(
         Text: _queryText,
         WorkflowStages: _stageFilterIndex > 0 ? new HashSet<WorkflowStage> { WorkflowStages.Ordered[_stageFilterIndex - 1] } : null,
         ItemStatuses: _statusFilterIndex > 0 ? new HashSet<ItemStatus> { ItemStatuses.Ordered[_statusFilterIndex - 1] } : null,
         TagIds: _selectedTagIds.Count > 0 ? _selectedTagIds : null,
         ScopeTopic: _scopeToCurrentTopic ? _scopedTopic : null,
-        IncludeArchived: _includeArchived);
+        IncludeArchived: _includeArchived)
+    {
+        IdeaRating = _ideaRatingFilterIndex > 0 ? _ideaRatingFilterIndex - 1 : null
+    };
 
     public void SetStore(Guid? storeId, WorkspaceSnapshot snapshot)
     {

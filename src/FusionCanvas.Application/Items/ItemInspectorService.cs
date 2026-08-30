@@ -128,7 +128,8 @@ public sealed class ItemInspectorService : IItemInspectorService
                 "The item's current stage has changed. Reload the latest item state before saving.");
         }
 
-        var editDecision = ItemWorkflowPolicy.CanPerformOperation(existing, ItemOperationKind.StageContent);
+        var editDecision = ItemWorkflowPolicy.CanPerformOperation(existing,
+            request.IdeaRating.HasValue ? ItemOperationKind.IdeaRating : ItemOperationKind.StageContent);
         if (!editDecision.IsAllowed)
         {
             return ItemInspectorSaveResult.Failure(editDecision.Reason);
@@ -149,6 +150,12 @@ public sealed class ItemInspectorService : IItemInspectorService
         }
 
         var metadata = ItemMetadataCodec.ParseMetadata(existing.MetadataJson);
+        if (request.IdeaRating is int rating)
+        {
+            var ratingError = ItemMetadataCodec.ValidateIdeaRating(rating);
+            if (ratingError is not null) return ItemInspectorSaveResult.Failure(ratingError);
+            ItemMetadataCodec.SetIdeaRating(metadata, rating);
+        }
         ApplyInspectorField(metadata, ItemMetadataCodec.NotesKey, request.Notes);
         ApplyStagePayload(metadata, request.StagePayload, existing.Stage);
 
@@ -296,6 +303,7 @@ public sealed class ItemInspectorService : IItemInspectorService
         var phrase = metadata.GetValueOrDefault(ItemMetadataCodec.PhraseKey);
         var graphicDirection = metadata.GetValueOrDefault(ItemMetadataCodec.GraphicDirectionKey);
         var sll = metadata.GetValueOrDefault(ItemMetadataCodec.SllKey);
+        var ideaRating = ItemMetadataCodec.GetIdeaRating(metadata);
         var creative = new ItemInspectorCreativeFields(
             string.IsNullOrWhiteSpace(idea) ? null : idea,
             string.IsNullOrWhiteSpace(audience) ? null : audience,
@@ -342,7 +350,10 @@ public sealed class ItemInspectorService : IItemInspectorService
             assetEntries,
             availableTagNames,
             listing.UpdatedAt,
-            string.IsNullOrWhiteSpace(sll) ? null : sll);
+            string.IsNullOrWhiteSpace(sll) ? null : sll)
+        {
+            IdeaRating = ideaRating
+        };
     }
 
     private static string BuildDisplayPath(WorkspaceSnapshot snapshot, Item listing)

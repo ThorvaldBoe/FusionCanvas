@@ -109,6 +109,14 @@ public static class WorkspaceTreeProjector
             }
         }
 
+        if (query.IdeaRating is int rating &&
+            (node.EntityKind != WorkspaceEntityKind.Item ||
+             context.Snapshot.Items.SingleOrDefault(item => item.Id == node.EntityId) is not { } ratedItem ||
+             ItemMetadataCodec.GetIdeaRating(ItemMetadataCodec.ParseMetadata(ratedItem.MetadataJson)) != rating))
+        {
+            return false;
+        }
+
         return true;
     }
 
