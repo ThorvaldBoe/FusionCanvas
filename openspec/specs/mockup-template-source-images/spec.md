@@ -67,6 +67,10 @@ FusionCanvas SHALL determine a local source image's width and height from its ma
 ### Requirement: Source configuration is revisioned and protected
 FusionCanvas SHALL create an immutable Template revision whenever a source image, its applicability conditions, its archive state, or its image-space mapping changes. Each revision SHALL snapshot every active source Asset identity, mapping, and applicability condition used by that configuration. FusionCanvas SHALL block permanent deletion of an Asset referenced by current source configuration or a historical Template revision.
 
+#### Scenario: Creator changes source metadata
+- **WHEN** the creator saves changed applicability, mapping, or archive state for a source image
+- **THEN** FusionCanvas creates a new immutable revision while preserving the prior source configuration and Asset identity
+
 ### Requirement: Local source-image setup has a focused, accessible master-detail editor workflow
 FusionCanvas SHALL provide local source-image setup inside the focused Mockup Template dialog. An upper image table SHALL expose upload, selection, archive, applicability and mapping summaries, and complete/incomplete indicators. A lower selected-image editor SHALL expose applicability controls, preview, and that entry's mapping independently of upload. The dialog SHALL preserve meaningful unsaved work on cancellation or close requests and SHALL keep Archived Stores read-only.
 
