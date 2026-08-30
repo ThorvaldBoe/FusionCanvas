@@ -715,6 +715,11 @@
                         <TextBlock Text="Idea potential"
                                    FontSize="11"
                                    Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <TextBlock Text="{Binding ItemInspector.IdeaRatingStars}"
+                                   FontSize="20"
+                                   LetterSpacing="1"
+                                   Foreground="#F6C445"
+                                   AutomationProperties.Name="{Binding ItemInspector.IdeaRatingLabel}" />
                         <StackPanel Orientation="Horizontal" Spacing="2">
                           <Button Content="★" Command="{Binding ItemInspector.SetIdeaRatingCommand}" CommandParameter="1" IsEnabled="{Binding ItemInspector.CanEditShared}" ToolTip.Tip="Rate 1 star" AutomationProperties.Name="Rate 1 star" />
                           <Button Content="★" Command="{Binding ItemInspector.SetIdeaRatingCommand}" CommandParameter="2" IsEnabled="{Binding ItemInspector.CanEditShared}" ToolTip.Tip="Rate 2 stars" AutomationProperties.Name="Rate 2 stars" />

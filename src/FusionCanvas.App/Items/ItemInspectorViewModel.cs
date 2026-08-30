@@ -307,6 +307,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
             if (SetField(ref _ideaRating, value))
             {
                 OnPropertyChanged(nameof(IdeaRatingLabel));
+                OnPropertyChanged(nameof(IdeaRatingStars));
                 OnPropertyChanged(nameof(IsRated));
             }
         }
@@ -314,6 +315,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
 
     public bool IsRated => IdeaRating > 0;
     public string IdeaRatingLabel => IdeaRating == 0 ? "Unrated" : $"Rated {IdeaRating} of 5 stars";
+    public string IdeaRatingStars => new string('★', IdeaRating) + new string('☆', 5 - IdeaRating);
 
     public string Notes
     {
