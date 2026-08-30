@@ -276,7 +276,7 @@ public partial class StoreEditorWindow : Window
     {
         if (GeometryStore is not null)
         {
-            WindowGeometryPersistence.Attach(window, GeometryStore, key, window.MinWidth, window.MinHeight);
+            WindowGeometryRegistrar.Register(window, GeometryStore, key, window.MinWidth, window.MinHeight);
         }
     }
 }
