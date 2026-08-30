@@ -12,4 +12,9 @@ internal static class WindowLayoutKeys
     public const string RejectedPhrases = "rejectedPhrases";
     public const string DesignPreview = "designPreview";
     public const string ItemImport = "itemImport";
+    public const string OptionValueManagement = "optionValueManagement";
+    public const string AddVariant = "addVariant";
+    public const string BulkAddVariants = "bulkAddVariants";
+    public const string DesignAreaEditor = "designAreaEditor";
+    public const string MockupTemplateEditor = "mockupTemplateEditor";
 }

@@ -284,6 +284,7 @@ public partial class MainWindow : Window
             _storeEditorWindow = new StoreEditorWindow { DataContext = storeManagement };
             if (_settings is not null)
             {
+                _storeEditorWindow.GeometryStore = _settings;
                 WindowGeometryPersistence.Attach(_storeEditorWindow, _settings, WindowLayoutKeys.StoreEditor, _storeEditorWindow.MinWidth, _storeEditorWindow.MinHeight);
             }
             _storeEditorWindow.Closed += (_, _) =>

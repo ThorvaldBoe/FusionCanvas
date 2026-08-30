@@ -1,6 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using FusionCanvas.Application.Settings;
+using FusionCanvas.App.Views;
 
 namespace FusionCanvas.App.Stores;
 
@@ -13,6 +15,8 @@ public partial class StoreEditorWindow : Window
     private bool _variantCreationDialogOpen;
     private bool _mockupTemplateEditorOpen;
     private bool _designAreaEditorOpen;
+
+    internal IWindowGeometryStore? GeometryStore { get; set; }
 
     public StoreEditorWindow()
     {
@@ -115,6 +119,7 @@ public partial class StoreEditorWindow : Window
         try
         {
             var dialog = new OptionValueManagementWindow { DataContext = catalog };
+            AttachGeometry(dialog, WindowLayoutKeys.OptionValueManagement);
             await dialog.ShowDialog(this);
             if (catalog.IsManagingOptionValues) catalog.CloseOptionValueManagementCommand.Execute(null);
         }
@@ -143,6 +148,7 @@ public partial class StoreEditorWindow : Window
         try
         {
             var dialog = new AddVariantWindow { DataContext = catalog };
+            AttachGeometry(dialog, WindowLayoutKeys.AddVariant);
             await dialog.ShowDialog(this);
             catalog.CancelAddVariantCommand.Execute(null);
         }
@@ -159,6 +165,7 @@ public partial class StoreEditorWindow : Window
         try
         {
             var dialog = new BulkAddVariantsWindow { DataContext = catalog };
+            AttachGeometry(dialog, WindowLayoutKeys.BulkAddVariants);
             await dialog.ShowDialog(this);
             catalog.CancelBulkVariantsCommand.Execute(null);
         }
@@ -178,6 +185,7 @@ public partial class StoreEditorWindow : Window
         try
         {
             var dialog = new DesignAreaEditorWindow { DataContext = catalog };
+            AttachGeometry(dialog, WindowLayoutKeys.DesignAreaEditor);
             await dialog.ShowDialog(this);
             if (catalog.IsAddingPlaceholder) catalog.CancelAddPlaceholderCommand.Execute(null);
         }
@@ -243,6 +251,7 @@ public partial class StoreEditorWindow : Window
         try
         {
             var dialog = new MockupTemplateEditorWindow { DataContext = catalog };
+            AttachGeometry(dialog, WindowLayoutKeys.MockupTemplateEditor);
             await dialog.ShowDialog(this);
             if (catalog.IsAddingTemplate) catalog.CancelAddTemplateCommand.Execute(null);
         }
@@ -257,6 +266,14 @@ public partial class StoreEditorWindow : Window
                     : null;
                 (editButton ?? AddMockupTemplateButton).Focus();
             });
+        }
+    }
+
+    private void AttachGeometry(Window window, string key) 
+    {
+        if (GeometryStore is not null)
+        {
+            WindowGeometryPersistence.Attach(window, GeometryStore, key, window.MinWidth, window.MinHeight);
         }
     }
 }
