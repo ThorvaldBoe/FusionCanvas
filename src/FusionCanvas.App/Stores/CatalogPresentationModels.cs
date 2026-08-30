@@ -1,5 +1,6 @@
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Domain.Catalog;
+using FusionCanvas.Domain.Mockups;
 
 namespace FusionCanvas.App.Stores;
 
@@ -140,10 +141,10 @@ public sealed record MockupTemplateCardViewModel(
         return new(
             summary.Id,
             summary.Name,
-            summary.TargetDesignAreaName,
+            summary.TargetDesignAreaName ?? "No Design Area",
             colors.Length == 0 ? "No Colors" : string.Join(", ", colors),
             $"{summary.CompatibleVariantIds.Count} compatible Variants",
             summary.CurrentRevision,
-            summary.IsArchived ? "Archived" : "Active");
+            summary.IsArchived ? "Archived" : summary.Lifecycle == MockupTemplateLifecycle.ReadyForUse ? "Ready for use" : "Draft");
     }
 }

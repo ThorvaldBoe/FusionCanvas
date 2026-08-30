@@ -47,7 +47,7 @@
                    Classes="field"
                    IsReadOnly="{Binding !CanEdit}"
                    AutomationProperties.Name="Template name" />
-          <TextBlock Text="Provider mockup image" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBlock Text="Provider mockup image (optional)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
           <TextBlock Text="{Binding ProviderImageSelectionInstructions}"
                      TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
           <ComboBox ItemsSource="{Binding ProviderMockupCandidates}"
@@ -84,13 +84,30 @@
           <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="8">
             <TextBlock Grid.Row="0" Grid.Column="0" Text="X" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
             <TextBlock Grid.Row="0" Grid.Column="1" Text="Y" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-            <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding MappingX}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="X" />
-            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding MappingY}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Y" />
+            <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding MappingXText}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="X" />
+            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding MappingYText}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Y" />
             <TextBlock Grid.Row="2" Grid.Column="0" Text="Width" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
             <TextBlock Grid.Row="2" Grid.Column="1" Text="Height" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-            <TextBox Grid.Row="3" Grid.Column="0" Text="{Binding MappingWidth}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Width" />
-            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding MappingHeight}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Height" />
+            <TextBox Grid.Row="3" Grid.Column="0" Text="{Binding MappingWidthText}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Width" />
+            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding MappingHeightText}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Height" />
           </Grid>
+          <Border Classes="listItem" Padding="8" AutomationProperties.AutomationId="Catalog.MockupReadiness">
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding MockupTemplateLifecycleLabel}" FontWeight="SemiBold" />
+              <ItemsControl ItemsSource="{Binding MockupTemplateReadinessMessages}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate><TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" /></DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Text="{Binding MockupTemplateSaveValidationMessage}"
+                         IsVisible="{Binding HasMockupTemplateSaveValidationMessage}"
+                         TextWrapping="Wrap" Foreground="{DynamicResource WarningTextBrush}"
+                         AutomationProperties.AutomationId="Catalog.MockupSaveValidation" />
+              <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}"
+                         TextWrapping="Wrap" Foreground="{DynamicResource WarningTextBrush}"
+                         AutomationProperties.AutomationId="Catalog.MockupSaveError" />
+            </StackPanel>
+          </Border>
           <Expander Header="Advanced provider data">
             <StackPanel Spacing="4">
               <TextBlock IsVisible="{Binding HasSelectedProviderMockup}"
@@ -126,7 +143,7 @@
     </Border>
 
     <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-      <Button Content="Save Mockup Template" Command="{Binding CreateTemplateCommand}" Classes="primary" />
+      <Button x:Name="SaveMockupTemplateButton" Content="Save Mockup Template" Command="{Binding CreateTemplateCommand}" Classes="primary" />
       <Button Content="Cancel" Command="{Binding RequestCancelMockupTemplateCommand}" Classes="secondary" />
     </StackPanel>
   </Grid>

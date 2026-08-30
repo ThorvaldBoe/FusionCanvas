@@ -82,7 +82,7 @@ public sealed class CatalogSetupViewModelTests
     }
 
     [Fact]
-    public async Task FocusedTemplateDraftRequiresProviderImageDesignAreaColorAndBoundedMapping()
+    public async Task FocusedTemplateDraftCanSaveWithoutProviderAndValidatesSelectedMapping()
     {
         var now = DateTimeOffset.UtcNow;
         var snapshot = SampleWorkspace.Create();
@@ -117,9 +117,8 @@ public sealed class CatalogSetupViewModelTests
 
         Assert.True(viewModel.HasProviderMockupCandidates);
         Assert.Equal(ProviderCatalogLoadState.Available, viewModel.ProviderCatalogState);
-        Assert.Contains("matches the target Design Area", viewModel.ProviderImageSelectionStateMessage, StringComparison.Ordinal);
-        Assert.Contains("Local upload", viewModel.ProviderImageSelectionInstructions, StringComparison.Ordinal);
-        Assert.Contains("drag/drop", viewModel.ProviderImageSelectionInstructions, StringComparison.Ordinal);
+        Assert.Contains("optional", viewModel.ProviderImageSelectionStateMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("save a Draft", viewModel.ProviderImageSelectionInstructions, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1000, viewModel.MappingImageWidth);
         Assert.Equal(1200, viewModel.MappingImageHeight);
         Assert.True(viewModel.CreateTemplateCommand.CanExecute(null));
@@ -136,14 +135,14 @@ public sealed class CatalogSetupViewModelTests
         await empty.ViewModel.LoadForStoreAsync(empty.StoreId, TestContext.Current.CancellationToken);
         Assert.Equal(ProviderCatalogLoadState.Empty, empty.ViewModel.ProviderCatalogState);
         Assert.Contains("no mockup images", empty.ViewModel.ProviderImageSelectionStateMessage, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Sync", empty.ViewModel.ProviderImageSelectionRecoveryMessage, StringComparison.Ordinal);
+        Assert.Contains("save", empty.ViewModel.ProviderImageSelectionRecoveryMessage, StringComparison.OrdinalIgnoreCase);
 
         var unavailable = CreateProviderCatalogStateViewModel(new StubProviderCatalog(new ProviderCatalogCandidateDescriptor(
             new OfferingContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), false, "Provider connection is not configured.", new HashSet<ProviderCatalogCombination>(), [])));
         await unavailable.ViewModel.LoadForStoreAsync(unavailable.StoreId, TestContext.Current.CancellationToken);
         Assert.Equal(ProviderCatalogLoadState.Unavailable, unavailable.ViewModel.ProviderCatalogState);
-        Assert.Contains("not configured", unavailable.ViewModel.ProviderImageSelectionStateMessage, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Configure or sync", unavailable.ViewModel.ProviderImageSelectionRecoveryMessage, StringComparison.Ordinal);
+        Assert.Contains("Draft saving remains available", unavailable.ViewModel.ProviderImageSelectionStateMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("optional", unavailable.ViewModel.ProviderImageSelectionRecoveryMessage, StringComparison.OrdinalIgnoreCase);
 
         var failed = CreateProviderCatalogStateViewModel(new ThrowingProviderCatalog());
         await failed.ViewModel.LoadForStoreAsync(failed.StoreId, TestContext.Current.CancellationToken);
@@ -170,6 +169,58 @@ public sealed class CatalogSetupViewModelTests
             new OfferingContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), true, null, new HashSet<ProviderCatalogCombination>(), []));
         await load;
         Assert.Equal(ProviderCatalogLoadState.Empty, setup.ViewModel.ProviderCatalogState);
+    }
+
+    [Fact]
+    public async Task NameOnlyTemplateSavesAsDraftWithoutDesignAreaOrProvider()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Manual tee", null, BlueprintOfferingKind.ProviderNetwork, null, "manual", null, null, false, now, now);
+        var repository = new InMemoryWorkspaceRepository(snapshot with { Blueprints = [blueprint], BlueprintOfferings = [offering] });
+        var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository));
+        await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+        viewModel.SelectOffering(offering.Id);
+
+        Assert.True(viewModel.StartAddTemplateCommand.CanExecute(null));
+        viewModel.StartAddTemplateCommand.Execute(null);
+        viewModel.TemplateName = "Manual front";
+
+        Assert.Equal("Draft", viewModel.MockupTemplateLifecycleLabel);
+        Assert.True(viewModel.CreateTemplateCommand.CanExecute(null));
+        viewModel.CreateTemplateCommand.Execute(null);
+        for (var attempt = 0; attempt < 10 && viewModel.IsAddingTemplate; attempt++) await Task.Yield();
+
+        var saved = Assert.Single((await repository.LoadAsync(TestContext.Current.CancellationToken)).MockupTemplates);
+        Assert.Equal("Manual front", saved.Name);
+        Assert.Null(saved.TargetPlaceholderId);
+        Assert.False(viewModel.IsAddingTemplate);
+    }
+
+    [Fact]
+    public async Task SelectedProviderMappingRejectsPartialAndFractionalText()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Provider tee", null, BlueprintOfferingKind.ProviderNetwork, null, "provider", null, null, false, now, now);
+        var repository = new InMemoryWorkspaceRepository(snapshot with { Blueprints = [blueprint], BlueprintOfferings = [offering] });
+        var context = new OfferingContext(store.Id, blueprint.Id, offering.Id);
+        var source = new StubProviderCatalog(new ProviderCatalogCandidateDescriptor(context, true, null, new HashSet<ProviderCatalogCombination>(),
+            [new ProviderMockupCandidateDescriptor("front", "Front", 1000, 1000, new HashSet<Guid>())]));
+        var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository), new OfferingManagementService(repository, source), source);
+        await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+        viewModel.StartAddTemplateCommand.Execute(null);
+        viewModel.TemplateName = "Front";
+
+        viewModel.MappingWidthText = "";
+        Assert.False(viewModel.CreateTemplateCommand.CanExecute(null));
+        viewModel.MappingWidthText = "400.5";
+        Assert.False(viewModel.CreateTemplateCommand.CanExecute(null));
+        Assert.Contains("whole-number", viewModel.MockupTemplateSaveValidationMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
