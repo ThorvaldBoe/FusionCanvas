@@ -7,7 +7,8 @@
         Width="980" Height="760"
         MinWidth="640" MinHeight="540"
         CanResize="True"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ApplicationBackgroundBrush}">
   <Grid Margin="16" RowDefinitions="*,Auto,Auto" RowSpacing="12">
     <ScrollViewer Grid.Row="0"
                   HorizontalScrollBarVisibility="Auto"

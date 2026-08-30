@@ -7,7 +7,8 @@
          Width="440"
          Height="300"
          CanResize="False"
-         WindowStartupLocation="CenterOwner">
+         WindowStartupLocation="CenterOwner"
+         Background="{DynamicResource ElevatedSurfaceBrush}">
   <Grid Margin="20" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="10">
     <TextBlock Text="Reject idea candidate?"
                FontSize="18"
