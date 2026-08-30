@@ -93,7 +93,10 @@ public sealed class CatalogSetupService : ICatalogSetupService
             var storeCheck = EnsureWritableStore(snapshot, offering.StoreId);
             if (storeCheck is not null) return Failure(snapshot, offering.StoreId, storeCheck);
             if (offering.IsArchived || option.IsArchived) return Failure(snapshot, offering.StoreId, "Archived catalog records are read-only.");
-            var value = new OfferingOptionValue(_newId(), option.Id, offering.Id, request.Value, request.SortOrder);
+            var normalizedValue = request.Value.Trim();
+            if (string.IsNullOrWhiteSpace(normalizedValue)) return Failure(snapshot, offering.StoreId, "A value is required.");
+            if (HasActiveOptionValue(snapshot, option.Id, normalizedValue)) return Failure(snapshot, offering.StoreId, "An active Option Value already uses this name.");
+            var value = new OfferingOptionValue(_newId(), option.Id, offering.Id, normalizedValue, request.SortOrder);
             return Success(snapshot with { OfferingOptionValues = [.. snapshot.OfferingOptionValues, value] }, offering.StoreId);
         }, cancellationToken);
 
@@ -240,13 +243,21 @@ public sealed class CatalogSetupService : ICatalogSetupService
                 if (!snapshot.PrintProviders.Any(value => value.Id == printProviderId && value.StoreId == request.StoreId && !value.IsArchived))
                     return Failure(snapshot, request.StoreId, "The selected Print Provider must be active and belong to this Store.");
             }
+            if (request.Kind == CatalogRecordKind.OptionValue)
+            {
+                var optionValue = snapshot.OfferingOptionValues.Single(value => value.Id == request.RecordId);
+                var normalizedValue = request.Name?.Trim();
+                if (string.IsNullOrWhiteSpace(normalizedValue)) return Failure(snapshot, request.StoreId, "A value is required.");
+                if (HasActiveOptionValue(snapshot, optionValue.OptionId, normalizedValue, optionValue.Id))
+                    return Failure(snapshot, request.StoreId, "An active Option Value already uses this name.");
+            }
             var updated = request.Kind switch
             {
                 CatalogRecordKind.Blueprint => snapshot with { Blueprints = snapshot.Blueprints.Select(value => value.Id == request.RecordId && value.StoreId == request.StoreId ? value with { Name = Required(request.Name, value.Name), Description = request.Description ?? value.Description, UpdatedAt = now } : value).ToArray() },
                 CatalogRecordKind.PrintProvider => snapshot with { PrintProviders = snapshot.PrintProviders.Select(value => value.Id == request.RecordId && value.StoreId == request.StoreId ? value with { Name = Required(request.Name, value.Name), UpdatedAt = now } : value).ToArray() },
                 CatalogRecordKind.Offering => snapshot with { BlueprintOfferings = snapshot.BlueprintOfferings.Select(value => value.Id == request.RecordId && value.StoreId == request.StoreId ? value with { Name = Required(request.Name, value.Name), Description = request.Description ?? value.Description, PrintProviderId = request.PrintProviderId ?? value.PrintProviderId, ProviderNetworkCode = request.ProviderNetworkCode?.Trim().ToLowerInvariant() ?? value.ProviderNetworkCode, DefaultPlaceholderId = request.DefaultPlaceholderId ?? value.DefaultPlaceholderId, ExternalOfferingId = request.ExternalOfferingId ?? value.ExternalOfferingId, UpdatedAt = now } : value).ToArray() },
                 CatalogRecordKind.Option => snapshot with { OfferingOptions = snapshot.OfferingOptions.Select(value => value.Id == request.RecordId ? value with { Name = Required(request.Name, value.Name) } : value).ToArray() },
-                CatalogRecordKind.OptionValue => snapshot with { OfferingOptionValues = snapshot.OfferingOptionValues.Select(value => value.Id == request.RecordId ? value with { Value = Required(request.Name, value.Value) } : value).ToArray() },
+                CatalogRecordKind.OptionValue => snapshot with { OfferingOptionValues = snapshot.OfferingOptionValues.Select(value => value.Id == request.RecordId ? value with { Value = request.Name!.Trim() } : value).ToArray() },
                 CatalogRecordKind.Variant => snapshot with { OfferingVariants = snapshot.OfferingVariants.Select(value => value.Id == request.RecordId ? value with { Name = Required(request.Name, value.Name), UpdatedAt = now } : value).ToArray() },
                 CatalogRecordKind.Placeholder => snapshot with { OfferingPlaceholders = snapshot.OfferingPlaceholders.Select(value => value.Id == request.RecordId ? value with { Name = Required(request.Name, value.Name), Description = request.Description ?? value.Description, Position = request.Position ?? value.Position, DecorationMethod = request.DecorationMethod ?? value.DecorationMethod, Width = request.Width ?? value.Width, Height = request.Height ?? value.Height, UpdatedAt = now } : value).ToArray() },
                 _ => snapshot
@@ -274,6 +285,12 @@ public sealed class CatalogSetupService : ICatalogSetupService
     }
 
     private static string Required(string? requested, string current) => string.IsNullOrWhiteSpace(requested) ? current : requested.Trim();
+
+    private static bool HasActiveOptionValue(WorkspaceSnapshot snapshot, Guid optionId, string value, Guid? excludingId = null) =>
+        snapshot.OfferingOptionValues.Any(candidate => candidate.OptionId == optionId
+            && !candidate.IsArchived
+            && candidate.Id != excludingId
+            && string.Equals(candidate.Value.Trim(), value, StringComparison.OrdinalIgnoreCase));
 
     private static string? GetDependencyError(WorkspaceSnapshot snapshot, ArchiveCatalogRecordRequest request)
     {
