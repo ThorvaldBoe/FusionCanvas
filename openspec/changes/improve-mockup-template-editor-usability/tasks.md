@@ -1,0 +1,6 @@
+- [x] 1. Add visual preview and mapping-reuse state/commands.
+- [x] 2. Rebuild placement and source list UI as preview plus styled selectable table.
+- [x] 3. Correct Color versus Size/Other option filtering.
+- [x] 4. Harden StoreEditor dialog ownership lifecycle.
+- [x] 5. Add focused ViewModel/headless tests and update UI evidence.
+- [x] 6. Run full tests, strict OpenSpec validation, and changed-scope review.

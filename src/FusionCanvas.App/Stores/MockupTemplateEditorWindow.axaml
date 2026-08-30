@@ -7,6 +7,10 @@
         Width="980" Height="820" MinWidth="700" MinHeight="620"
         CanResize="True" WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ApplicationBackgroundBrush}">
+  <Window.Styles>
+    <Style Selector="Border.listItem.selected"><Setter Property="Background" Value="{DynamicResource SelectionBackgroundBrush}" /></Style>
+    <Style Selector="Border.listItem:nth-child(even)"><Setter Property="Background" Value="{DynamicResource SelectionSubtleBackgroundBrush}" /></Style>
+  </Window.Styles>
   <Grid Margin="16" RowDefinitions="Auto,Auto,*,Auto,Auto,Auto" RowSpacing="12">
     <StackPanel Grid.Row="0" Spacing="4">
       <TextBlock Text="Mockup Template" FontSize="18" FontWeight="SemiBold" />
@@ -33,12 +37,17 @@
         <Button Grid.Column="1" Content="Archive selected" Command="{Binding RemoveLocalSourceCommand}" CommandParameter="{Binding SelectedLocalSource}" Classes="secondary" />
         <Button Grid.Column="2" Content="Upload image..." Command="{Binding BrowseLocalSourceCommand}" Classes="primary" />
       </Grid>
+      <Grid Grid.Row="1" RowDefinitions="Auto,*">
+        <Border Grid.Row="0" Background="{DynamicResource TabBarBackgroundBrush}" Padding="8">
+          <Grid ColumnDefinitions="2*,2*,Auto,Auto"><TextBlock Text="File" FontWeight="Bold"/><TextBlock Grid.Column="1" Text="Applicability" FontWeight="Bold"/><TextBlock Grid.Column="2" Text="Status" FontWeight="Bold"/><TextBlock Grid.Column="3" Text="Action" FontWeight="Bold"/></Grid>
+        </Border>
       <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
         <ItemsControl ItemsSource="{Binding LocalSourceDrafts}" AutomationProperties.Name="Mockup source image table">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="stores:LocalMockupSourceDraftViewModel">
-              <Border Classes="listItem" Padding="8" Margin="0,2">
-                <Grid ColumnDefinitions="*,*,Auto,Auto" ColumnSpacing="10">
+              <Border Classes="listItem" Classes.selected="{Binding IsSelected}" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                <Grid ColumnDefinitions="2*,2*,Auto,Auto" ColumnSpacing="10">
                   <Button Grid.Column="0" Content="{Binding DisplayName}" Command="{Binding $parent[Window].DataContext.SelectLocalSourceCommand}" CommandParameter="{Binding}" HorizontalContentAlignment="Left" Classes="link" />
                   <TextBlock Grid.Column="1" Text="{Binding ApplicabilitySummary}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" />
                   <TextBlock Grid.Column="2" Text="{Binding StatusLabel}" VerticalAlignment="Center" FontWeight="SemiBold" />
@@ -49,6 +58,7 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
       </ScrollViewer>
+      </Grid>
       <TextBlock Grid.Row="2" IsVisible="{Binding !HasLocalSource}" Text="No source images uploaded yet. Upload an image to begin." Foreground="{DynamicResource SecondaryTextBrush}" />
       <ItemsControl Grid.Row="3" ItemsSource="{Binding MockupTemplateReadinessMessages}">
         <ItemsControl.ItemTemplate>
@@ -68,7 +78,13 @@
                                          PlacementX="{Binding MappingX, Mode=TwoWay}" PlacementY="{Binding MappingY, Mode=TwoWay}"
                                          PlacementWidth="{Binding MappingWidth, Mode=TwoWay}" PlacementHeight="{Binding MappingHeight, Mode=TwoWay}"
                                          ImageWidth="{Binding MappingImageWidth}" ImageHeight="{Binding MappingImageHeight}"
+                                         ImagePath="{Binding SelectedImagePreviewPath}"
                                          AutomationProperties.Name="Selected image placement" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="Re-use mapping from" VerticalAlignment="Center" />
+            <ComboBox Width="220" ItemsSource="{Binding MappedSourceChoices}" SelectedItem="{Binding SelectedMappingSource}" DisplayMemberBinding="{Binding DisplayName}" IsEnabled="{Binding CanEdit}" />
+            <Button Content="Apply" Command="{Binding ReuseMappingCommand}" CommandParameter="{Binding SelectedMappingSource}" Classes="secondary" />
+          </StackPanel>
           <TextBlock Text="Mapping is optional while this image is being configured. Set positive in-bounds values before using it." TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
         </StackPanel>
         <StackPanel Grid.Column="1" Spacing="8">
