@@ -145,6 +145,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private double _mappingY;
     private double _mappingWidth = 100;
     private double _mappingHeight = 100;
+    private bool _keepAspectRatio;
     private string _mappingXText = string.Empty;
     private string _mappingYText = string.Empty;
     private string _mappingWidthText = string.Empty;
@@ -373,6 +374,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         {
             if (!SetField(ref _selectedPlaceholder, value)) return;
             OnPropertyChanged(nameof(SelectedPlaceholderId));
+            OnPropertyChanged(nameof(PlacementAspectRatio));
+            OnPropertyChanged(nameof(IsKeepAspectRatioAvailable));
+            OnPropertyChanged(nameof(CanKeepAspectRatio));
+            KeepAspectRatio = PlacementAspectRatio > 0;
             NotifyMockupTemplateDraftChanged();
             OnPropertyChanged(nameof(IsEditingDesignArea));
             OnPropertyChanged(nameof(DesignAreaEditorDialogTitle));
@@ -478,10 +483,29 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public double MappingHeight { get => _mappingHeight; set { if (SetField(ref _mappingHeight, value)) { _mappingHeightText = FormatMapping(value); OnPropertyChanged(nameof(MappingHeightText)); NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
     public string MappingXText { get => _mappingXText; set => SetMappingText(ref _mappingXText, value, ref _mappingX, nameof(MappingXText), nameof(MappingX)); }
     public string MappingYText { get => _mappingYText; set => SetMappingText(ref _mappingYText, value, ref _mappingY, nameof(MappingYText), nameof(MappingY)); }
-    public string MappingWidthText { get => _mappingWidthText; set => SetMappingText(ref _mappingWidthText, value, ref _mappingWidth, nameof(MappingWidthText), nameof(MappingWidth)); }
-    public string MappingHeightText { get => _mappingHeightText; set => SetMappingText(ref _mappingHeightText, value, ref _mappingHeight, nameof(MappingHeightText), nameof(MappingHeight)); }
+    public string MappingWidthText { get => _mappingWidthText; set => SetMappingText(ref _mappingWidthText, value, ref _mappingWidth, nameof(MappingWidthText), nameof(MappingWidth), true); }
+    public string MappingHeightText { get => _mappingHeightText; set => SetMappingText(ref _mappingHeightText, value, ref _mappingHeight, nameof(MappingHeightText), nameof(MappingHeight), false); }
     public double MappingImageWidth => SelectedProviderMockup?.ImageWidth ?? SelectedLocalSource?.ImageWidth ?? 0;
     public double MappingImageHeight => SelectedProviderMockup?.ImageHeight ?? SelectedLocalSource?.ImageHeight ?? 0;
+    public double PlacementAspectRatio => SelectedPlaceholder is { Width: > 0, Height: > 0 }
+        ? SelectedPlaceholder.Width / (double)SelectedPlaceholder.Height
+        : 0;
+    public bool IsKeepAspectRatioAvailable => double.IsFinite(PlacementAspectRatio) && PlacementAspectRatio > 0;
+    public bool CanKeepAspectRatio => CanEdit && IsKeepAspectRatioAvailable;
+    public bool KeepAspectRatio
+    {
+        get => _keepAspectRatio;
+        set
+        {
+            var enabled = value && IsKeepAspectRatioAvailable;
+            if (SetField(ref _keepAspectRatio, enabled))
+            {
+                OnPropertyChanged(nameof(CanKeepAspectRatio));
+                NotifyMockupTemplateDraftChanged();
+                NotifyCommands();
+            }
+        }
+    }
 
     public string OfferingName { get => _offeringName; set { if (SetField(ref _offeringName, value)) NotifyCommands(); } }
     public string OfferingDescription { get => _offeringDescription; set => SetField(ref _offeringDescription, value); }
@@ -529,7 +553,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public bool IsAvailable { get; private set; }
     public bool IsReadOnly { get; private set; }
     public bool CanEdit => IsAvailable && !IsReadOnly && !IsBusy;
-    public bool IsBusy { get => _isBusy; private set { if (SetField(ref _isBusy, value)) { OnPropertyChanged(nameof(CanEdit)); NotifyCommands(); } } }
+    public bool IsBusy { get => _isBusy; private set { if (SetField(ref _isBusy, value)) { OnPropertyChanged(nameof(CanEdit)); OnPropertyChanged(nameof(CanKeepAspectRatio)); NotifyCommands(); } } }
     public string ErrorMessage { get => _error; private set { if (SetField(ref _error, value)) OnPropertyChanged(nameof(HasError)); } }
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
     public bool HasActiveDraft => IsAddingPrintProvider || IsAddingOption || IsAddingOptionValue || IsEditingOptionValue || IsAddingVariant || IsAddingBulkVariants || IsAddingPlaceholder || IsAddingTemplate;
@@ -1691,12 +1715,33 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         }
     }
 
-    private void SetMappingText(ref string field, string value, ref double numericField, string textProperty, string numericProperty)
+    private void SetMappingText(ref string field, string value, ref double numericField, string textProperty, string numericProperty, bool? widthDimension = null)
     {
         value ??= string.Empty;
         if (field == value) return;
         field = value;
-        if (int.TryParse(value, out var parsed)) numericField = parsed;
+        if (int.TryParse(value, out var parsed))
+        {
+            numericField = parsed;
+            if (widthDimension is not null && KeepAspectRatio && IsKeepAspectRatioAvailable)
+            {
+                var paired = widthDimension.Value ? parsed / PlacementAspectRatio : parsed * PlacementAspectRatio;
+                if (widthDimension.Value)
+                {
+                    _mappingHeight = paired;
+                    _mappingHeightText = FormatMapping(paired);
+                    OnPropertyChanged(nameof(MappingHeight));
+                    OnPropertyChanged(nameof(MappingHeightText));
+                }
+                else
+                {
+                    _mappingWidth = paired;
+                    _mappingWidthText = FormatMapping(paired);
+                    OnPropertyChanged(nameof(MappingWidth));
+                    OnPropertyChanged(nameof(MappingWidthText));
+                }
+            }
+        }
         OnPropertyChanged(textProperty);
         OnPropertyChanged(numericProperty);
         NotifyMockupTemplateDraftChanged();
