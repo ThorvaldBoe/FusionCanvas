@@ -255,7 +255,16 @@ public partial class StoreEditorWindow : Window
         {
             var dialog = new MockupTemplateEditorWindow { DataContext = catalog };
             AttachGeometry(dialog, WindowLayoutKeys.MockupTemplateEditor);
-            await dialog.ShowDialog(this);
+            if (VisualRoot is null || !IsVisible)
+            {
+                // A catalog request can arrive during StoreEditor construction/teardown;
+                // modal dialogs require an attached visible owner, so fall back safely.
+                dialog.Show();
+            }
+            else
+            {
+                await dialog.ShowDialog(this);
+            }
             if (catalog.IsAddingTemplate) catalog.CancelAddTemplateCommand.Execute(null);
         }
         finally

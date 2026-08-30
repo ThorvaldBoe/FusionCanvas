@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 
 namespace FusionCanvas.App.Stores;
 
@@ -16,6 +17,7 @@ public sealed class MockupPlacementEditor : Control
     public static readonly StyledProperty<double> PlacementHeightProperty = AvaloniaProperty.Register<MockupPlacementEditor, double>(nameof(PlacementHeight), 100, defaultBindingMode: BindingMode.TwoWay);
     public static readonly StyledProperty<double> ImageWidthProperty = AvaloniaProperty.Register<MockupPlacementEditor, double>(nameof(ImageWidth), defaultBindingMode: BindingMode.TwoWay);
     public static readonly StyledProperty<double> ImageHeightProperty = AvaloniaProperty.Register<MockupPlacementEditor, double>(nameof(ImageHeight), defaultBindingMode: BindingMode.TwoWay);
+    public static readonly StyledProperty<string?> ImagePathProperty = AvaloniaProperty.Register<MockupPlacementEditor, string?>(nameof(ImagePath));
 
     private const double HandleSize = 8;
     private const double HitPadding = 8;
@@ -36,11 +38,12 @@ public sealed class MockupPlacementEditor : Control
     public double PlacementHeight { get => GetValue(PlacementHeightProperty); set => SetValue(PlacementHeightProperty, value); }
     public double ImageWidth { get => GetValue(ImageWidthProperty); set => SetValue(ImageWidthProperty, value); }
     public double ImageHeight { get => GetValue(ImageHeightProperty); set => SetValue(ImageHeightProperty, value); }
+    public string? ImagePath { get => GetValue(ImagePathProperty); set => SetValue(ImagePathProperty, value); }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        if (change.Property == ImageWidthProperty || change.Property == ImageHeightProperty)
+        if (change.Property == ImageWidthProperty || change.Property == ImageHeightProperty || change.Property == ImagePathProperty)
         {
             ClampPlacement();
             InvalidateVisual();
@@ -58,6 +61,12 @@ public sealed class MockupPlacementEditor : Control
         var imageRect = ImageRect();
         context.DrawRectangle(new SolidColorBrush(Color.FromRgb(35, 43, 55)), new Pen(Brushes.SlateGray, 1), imageRect);
         if (!HasImage()) return;
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(ImagePath) && File.Exists(ImagePath))
+                using (var bitmap = new Bitmap(ImagePath)) context.DrawImage(bitmap, new Rect(0, 0, bitmap.PixelSize.Width, bitmap.PixelSize.Height), imageRect);
+        }
+        catch { }
         var rectangle = DisplayRectangle(imageRect);
         context.DrawRectangle(new SolidColorBrush(Color.FromArgb(45, 70, 150, 230)), new Pen(Brushes.DodgerBlue, 2), rectangle);
         context.DrawRectangle(Brushes.DodgerBlue, null, new Rect(rectangle.Right - HandleSize, rectangle.Bottom - HandleSize, HandleSize, HandleSize));
