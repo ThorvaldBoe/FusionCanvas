@@ -795,6 +795,28 @@ public sealed class CatalogSetupViewModelTests
     }
 
     [Fact]
+    public async Task MockupTemplateDraft_LoadedSourceImagesBecomeBaselineAndRevertingMappingIsClean()
+    {
+        var sourceImage = new MockupTemplateSourceImageSummary(
+            Guid.NewGuid(), Guid.NewGuid(), "Front", "assets/front.png", new RasterImageInfo(1200, 1200),
+            new MockupImageSpaceMapping(1200, 1200, 250, 200, 600, 700), []);
+        var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(
+            referencedByTemplate: true,
+            sourceImages: new FixedMockupTemplateSourceImageService(new([sourceImage], [], false)));
+
+        viewModel.EditTemplateCommand.Execute(Assert.Single(viewModel.MockupTemplateCards));
+        await Task.Yield();
+
+        Assert.False(viewModel.HasMeaningfulMockupTemplateDraft);
+        viewModel.MappingXText = "251";
+        Assert.True(viewModel.HasMeaningfulMockupTemplateDraft);
+        viewModel.MappingXText = "250";
+        Assert.False(viewModel.HasMeaningfulMockupTemplateDraft);
+        viewModel.RequestCancelMockupTemplateCommand.Execute(null);
+        Assert.False(viewModel.IsMockupTemplateDiscardConfirmationVisible);
+    }
+
+    [Fact]
     public async Task MockupTemplateDraft_ArchivedStoreCannotOpenAddOrEdit()
     {
         var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: true, storeArchived: true);
@@ -816,7 +838,8 @@ public sealed class CatalogSetupViewModelTests
 
     private static async Task<(CatalogSetupViewModel ViewModel, OfferingPlaceholder Area, BlueprintOffering Offering)> CreateCatalogWithDesignAreaAsync(
         bool referencedByTemplate,
-        bool storeArchived = false)
+        bool storeArchived = false,
+        IMockupTemplateSourceImageService? sourceImages = null)
     {
         var now = DateTimeOffset.UtcNow;
         var snapshot = SampleWorkspace.Create();
@@ -846,7 +869,7 @@ public sealed class CatalogSetupViewModelTests
             populated = populated with { MockupTemplates = [template] };
         }
         var repository = new InMemoryWorkspaceRepository(populated);
-        var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository));
+        var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository), sourceImages: sourceImages);
         await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
         viewModel.SelectOffering(offering.Id);
         return (viewModel, area, offering);
@@ -856,6 +879,17 @@ public sealed class CatalogSetupViewModelTests
     {
         public Task<ProviderCatalogCandidateDescriptor> LoadAsync(OfferingContext context, CancellationToken cancellationToken = default) =>
             Task.FromResult(descriptor);
+    }
+
+    private sealed class FixedMockupTemplateSourceImageService(MockupTemplateSourceState state) : IMockupTemplateSourceImageService
+    {
+        public Task<MockupTemplateSourceState> LoadAsync(Guid storeId, Guid templateId, CancellationToken cancellationToken = default) => Task.FromResult(state);
+
+        public Task<MockupTemplateSetupResult> AddAsync(AddLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<MockupTemplateSetupResult> UpdateAsync(UpdateLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private static (CatalogSetupViewModel ViewModel, Guid StoreId) CreateProviderCatalogStateViewModel(IProviderCatalogCandidateSource? source)

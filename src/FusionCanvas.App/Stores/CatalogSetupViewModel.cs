@@ -1031,9 +1031,16 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         RebuildChoices();
         var activeColorIds = TemplateColors.Where(value => value.MockupTemplateId == template.Id && !value.IsArchived).Select(value => value.ColorOptionValueId).ToHashSet();
         foreach (var color in TemplateColorChoices) color.IsSelected = activeColorIds.Contains(color.Value.Id);
-        _mockupTemplateDraftBaseline = CurrentMockupTemplateDraftState();
+        _mockupTemplateDraftBaseline = null;
         IsAddingTemplate = true;
-        _ = LoadLocalSourceDraftsAsync(template.Id);
+        if (_sourceImages is null)
+        {
+            _mockupTemplateDraftBaseline = CurrentMockupTemplateDraftState();
+        }
+        else
+        {
+            _ = LoadLocalSourceDraftsAsync(template.Id);
+        }
         MockupTemplateEditorRequested?.Invoke(this, EventArgs.Empty);
     }
 
@@ -1564,6 +1571,11 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         if (LocalSourceDrafts.Count > 0) SelectLocalSource(LocalSourceDrafts[0]);
         RebuildMappedSourceChoices();
         OnPropertyChanged(nameof(HasLocalSource));
+        if (IsAddingTemplate && SelectedTemplate?.Id == templateId)
+        {
+            _mockupTemplateDraftBaseline = CurrentMockupTemplateDraftState();
+            OnPropertyChanged(nameof(HasMeaningfulMockupTemplateDraft));
+        }
     }
 
     private void EndTemplateDraft()
@@ -1657,7 +1669,30 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         MappingYText,
         MappingWidthText,
         MappingHeightText,
-        string.Join("|", TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).OrderBy(value => value)));
+        string.Join("|", TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).OrderBy(value => value)),
+        LocalSourcePath,
+        string.Join("|", LocalSourceDrafts.Concat(_archivedLocalSourceDrafts).Select(CurrentLocalSourceDraftState).OrderBy(value => value)));
+
+    private string CurrentLocalSourceDraftState(LocalMockupSourceDraftViewModel draft)
+    {
+        var optionValueIds = draft.OptionValueIds;
+        MockupImageSpaceMapping? mapping = draft.Mapping;
+        var isArchived = _archivedLocalSourceDrafts.Contains(draft);
+        if (ReferenceEquals(SelectedLocalSource, draft))
+        {
+            optionValueIds = TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id)
+                .Concat(TemplateAdditionalOptionChoices.Where(value => value.IsSelected).Select(value => value.Value.Id))
+                .Distinct()
+                .ToArray();
+            TryCreateMapping(out mapping);
+        }
+
+        var optionIds = string.Join(",", optionValueIds.OrderBy(value => value));
+        var mappingValue = mapping is null
+            ? string.Empty
+            : string.Join(",", mapping.ImageWidth, mapping.ImageHeight, mapping.X, mapping.Y, mapping.Width, mapping.Height);
+        return string.Join(";", isArchived, draft.SourceImageId, draft.Path, optionIds, mappingValue);
+    }
 
     private void RequestCancelDesignArea()
     {
@@ -1732,7 +1767,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         string Y,
         string Width,
         string Height,
-        string SelectedColorIds);
+        string SelectedColorIds,
+        string LocalSourcePath,
+        string LocalSourceDrafts);
 
     private sealed record DesignAreaDraftState(
         string Name,
