@@ -8,6 +8,21 @@ namespace FusionCanvas.App.Tests;
 public class WindowGeometryPersistenceTests
 {
     [AvaloniaFact]
+    public void Registrar_RejectsDuplicateActiveWindowKeys()
+    {
+        var store = new RecordingGeometryStore();
+        var first = new Window();
+        var second = new Window();
+        WindowGeometryRegistrar.Register(first, store, WindowLayoutKeys.Settings, 200, 150);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            WindowGeometryRegistrar.Register(second, store, WindowLayoutKeys.Settings, 200, 150));
+
+        first.Show();
+        first.Close();
+    }
+
+    [AvaloniaFact]
     public void Attach_ClosedCapturesNormalStateGeometry()
     {
         var store = new RecordingGeometryStore();
