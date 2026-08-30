@@ -8,4 +8,5 @@ public sealed record ItemStageAwareSaveRequest(
     string Title,
     string? Notes,
     ItemStageSavePayload StagePayload,
-    IReadOnlyList<string> TagNames);
+    IReadOnlyList<string> TagNames,
+    int? IdeaRating = null);

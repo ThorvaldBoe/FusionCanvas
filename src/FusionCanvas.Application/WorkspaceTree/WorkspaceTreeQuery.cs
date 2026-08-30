@@ -14,12 +14,14 @@ public sealed record WorkspaceTreeQuery(
     NavigationTopicReference? ScopeTopic = null,
     bool IncludeArchived = false)
 {
+    public int? IdeaRating { get; init; }
     public bool IsActive =>
         !string.IsNullOrWhiteSpace(Text) ||
         EntityKinds is { Count: > 0 } ||
         ItemStatuses is { Count: > 0 } ||
         WorkflowStages is { Count: > 0 } ||
         TagIds is { Count: > 0 } ||
+        IdeaRating is not null ||
         ScopeTopic is not null ||
         IncludeArchived;
 }

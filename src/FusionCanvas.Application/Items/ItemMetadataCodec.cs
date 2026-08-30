@@ -10,6 +10,7 @@ internal static class ItemMetadataCodec
     public const string IdeaAudienceKey = "idea.audience";
     public const string PhraseKey = "phrase";
     public const string GraphicDirectionKey = "graphicDirection";
+    public const string IdeaRatingKey = "idea.rating";
     public const string SllKey = "sll";
     public const string InheritedFromPrefix = "inheritedFrom:";
 
@@ -84,6 +85,22 @@ internal static class ItemMetadataCodec
         {
             metadata[key] = normalized;
         }
+    }
+
+    public static int GetIdeaRating(IReadOnlyDictionary<string, string> metadata) =>
+        metadata.TryGetValue(IdeaRatingKey, out var value) && int.TryParse(value, out var rating) && rating is >= 1 and <= 5
+            ? rating
+            : 0;
+
+    public static string? ValidateIdeaRating(int rating) =>
+        rating is >= 0 and <= 5 ? null : "Idea rating must be between 0 and 5 stars.";
+
+    public static void SetIdeaRating(Dictionary<string, string> metadata, int rating)
+    {
+        var error = ValidateIdeaRating(rating);
+        if (error is not null) throw new ArgumentOutOfRangeException(nameof(rating), error);
+        if (rating == 0) metadata.Remove(IdeaRatingKey);
+        else metadata[IdeaRatingKey] = rating.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     public static void ApplyContextMetadata(Dictionary<string, string> metadata, ItemContext context, bool replaceExplicitMetadata)

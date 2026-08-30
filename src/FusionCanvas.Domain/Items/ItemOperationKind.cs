@@ -12,5 +12,6 @@ public enum ItemOperationKind
     DesignFile = 7,
     RelatedAssetLink = 8,
     StageMovement = 9,
-    DesignStage = 10
+    DesignStage = 10,
+    IdeaRating = 11
 }
