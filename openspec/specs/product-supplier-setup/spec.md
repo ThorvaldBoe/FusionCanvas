@@ -132,38 +132,34 @@ The progressive-disclosure editor SHALL treat back navigation, breadcrumbs, leve
 - **AND** after success the editor selects a valid remaining record or shows the relevant empty state
 
 ### Requirement: Provider mockup image selection communicates source and recovery
-FusionCanvas SHALL identify the Mockup Template image selector with a persistent visible label and accessible name and SHALL explain that candidates come from the active Offering's provider catalog. The guidance SHALL remain available while candidates load and when the result is available, empty, unavailable, or failed. It SHALL NOT imply that local upload or drag/drop is supported, and unavailable or failed states SHALL identify a supported provider setup or synchronization next action without fabricating candidates.
+FusionCanvas SHALL identify Mockup Template local source-image configuration with persistent visible labels and accessible names. The focused Template editor SHALL explain that the current module uses managed local source images which are uploaded independently and may then be associated with the active Offering's option values. It SHALL expose a keyboard-accessible local upload route and SHALL distinguish per-image metadata completeness, Template-level Variant coverage, file-import failures, and ready configuration without fabricating external candidates or implying current Printify synchronization.
 
-#### Scenario: User opens provider image selection
+#### Scenario: User opens local source-image configuration
 - **WHEN** the Mockup Template editor is shown
-- **THEN** the selector has the visible label and accessible name **Provider mockup image**
-- **AND** nearby instructions explain how to choose an Offering provider-catalog image
-- **AND** state that local upload and drag/drop are not available
+- **THEN** it identifies the configuration as **Mockup source images**
+- **AND** nearby instructions explain that the creator uploads local images and configures each selected row independently
+- **AND** it provides a clear accessible action to upload a source image whenever the Store is editable
 
-#### Scenario: Provider catalog is loading
-- **WHEN** provider mockup candidates are being requested
-- **THEN** the persistent guidance remains visible
-- **AND** state text explains that provider-catalog images are loading
+#### Scenario: Template has no source images
+- **WHEN** the configured Template has no active local source-image entries
+- **THEN** state text explains that the Template needs source imagery before it is ready
+- **AND** the upload action remains available when the Store is editable
 
-#### Scenario: Provider catalog provides candidates
-- **WHEN** one or more provider mockup candidates are available
-- **THEN** the selector exposes those candidates
-- **AND** state text prompts the user to choose the provider view that matches the target Design Area
+#### Scenario: Template source configuration is incomplete
+- **WHEN** one or more compatible concrete Variants have no exact source-image match or have multiple matches
+- **THEN** the editor distinguishes the affected Variant and the missing or ambiguous source condition
+- **AND** it directs the creator to add or adjust local source images and applicability values
+- **AND** it permits the incomplete Template to be saved while preserving successfully resolved Variants
 
-#### Scenario: Provider catalog is empty
-- **WHEN** the configured provider catalog is available but contains no mockup images for the Offering
-- **THEN** state text distinguishes the empty result from loading and failure
-- **AND** directs the user to sync or review the Offering's provider catalog setup
+#### Scenario: Template source configuration is ready
+- **WHEN** every compatible concrete Variant resolves to exactly one active local source-image entry
+- **THEN** the editor reports that the Template source configuration is ready
+- **AND** it presents the selected managed image and its placement configuration without requiring a provider-catalog request
 
-#### Scenario: Provider catalog is unavailable
-- **WHEN** no provider catalog source exists or the source reports that it is unavailable
-- **THEN** state text explains the supplied reason when available
-- **AND** directs the user to configure or sync provider catalog data before returning
-
-#### Scenario: Provider catalog request fails
-- **WHEN** loading provider mockup candidates raises an error
-- **THEN** state text identifies the recoverable load failure without exposing a fabricated candidate
-- **AND** directs the user to review provider setup or retry synchronization
+#### Scenario: Local source import fails
+- **WHEN** the creator's local source-image import or managed-image preview cannot be completed
+- **THEN** the editor identifies the recoverable local failure without creating a fabricated candidate
+- **AND** preserves confirmed Template configuration and the editable draft where one exists
 
 ### Requirement: Design Area management uses a focused guarded editor dialog
 FusionCanvas SHALL keep the default Manage Design Areas surface focused on the Offering-scoped collection without reserving an inline editor column. The **Add Design Area** action and each row's **Edit** action SHALL open the same modal dialog, owned by the Store Editor, with mode-specific title and draft values. The dialog SHALL reuse existing Design Area validation, compatibility, persistence, and referenced-record behavior; SHALL close only after successful save or confirmed cancellation; and SHALL not permit a workspace or Offering context change to leave a stale editable dialog open.
@@ -213,8 +209,8 @@ FusionCanvas SHALL keep the default Manage Design Areas surface focused on the O
 - **WHEN** the Design Area dialog is opened or resized within supported normal and narrow dimensions
 - **THEN** its descriptive title, accessible form controls, predictable keyboard traversal, scrollable content, Save/Cancel actions, and close behavior remain usable without clipping required fields
 
-### Requirement: Mockup Template management uses a focused guarded editor dialog
-FusionCanvas SHALL keep the default Offering-scoped Mockup Template management surface focused on its template collection without reserving an inline editor region. The **Add Mockup Template** action and each template's Edit action SHALL open the same Store Editor-owned modal dialog with a mode-specific title and draft values. The dialog SHALL preserve the existing preview-first provider-image placement workflow, catalog validation, Color/Design Area relationships, revision and persistence behavior, and archived-store read-only policy; SHALL close only after successful save or confirmed cancellation; and SHALL not permit workspace or Offering context changes to leave a stale editable dialog open.
+### Requirement: Mockup Template management uses a focused guarded master-detail editor
+FusionCanvas SHALL keep the default Offering-scoped Mockup Template management surface focused on its template collection without reserving an inline editor region. The **Add Mockup Template** action and each template's Edit action SHALL open the same Store Editor-owned modal dialog with a mode-specific title and draft values. The dialog SHALL retain Template identity and one shared target Design Area at Template level, SHALL expose an upper source-image collection with upload, selection, archive, summaries, and complete/incomplete status, and SHALL expose a lower selected-image editor with grouped applicability and per-image mapping. It SHALL preserve catalog validation, revision and persistence behavior, archived-store read-only policy, guarded dismissal, and focus behavior.
 
 #### Scenario: User reviews the Mockup Template collection
 - **WHEN** Mockup Template management is open without an Add/Edit dialog
@@ -231,12 +227,26 @@ FusionCanvas SHALL keep the default Offering-scoped Mockup Template management s
 #### Scenario: User edits a Mockup Template
 - **WHEN** the user selects an existing template's Edit action
 - **THEN** FusionCanvas opens the same modal titled **Edit Mockup Template**
-- **AND** populates its stable identity, provider image, target Design Area, Color applicability, image-space mapping, advanced provider data, and revision context
+- **AND** populates its stable identity, shared target Design Area, source-image rows, grouped applicability, per-image mappings, and revision context
 
-#### Scenario: Preview-first mapping remains available
-- **WHEN** a template draft has a selectable provider image
-- **THEN** the dialog gives the provider image and visual placement editor prominent space
-- **AND** keeps synchronized numeric mapping and supporting configuration reachable at supported normal and narrow sizes
+#### Scenario: User uploads a source image independently of metadata
+- **WHEN** the user uploads a valid local raster file from the source-image collection
+- **THEN** one new incomplete row is added without inheriting applicability or mapping from another row
+- **AND** the new row is selected for metadata editing
+
+#### Scenario: User configures one selected source image
+- **WHEN** the user selects Color values and optionally Size or another Offering Option for the selected row and enters a valid mapping
+- **THEN** those metadata values remain attached only to that row
+- **AND** values are OR alternatives within an Option and AND conditions across Options
+
+#### Scenario: User saves an incomplete Template
+- **WHEN** one or more source-image rows have missing applicability or mapping
+- **THEN** FusionCanvas saves the Template draft and visibly reports the incomplete rows
+- **AND** the Template is not reported ready while independently resolved Variants remain individually identifiable
+
+#### Scenario: User archives a source-image row
+- **WHEN** the user confirms archiving a selected active source-image row
+- **THEN** the row leaves current resolution and readiness evaluation while historical revisions retain its identity
 
 #### Scenario: Save fails validation or persistence
 - **WHEN** the user attempts to save an invalid draft or persistence reports a recoverable failure
@@ -265,7 +275,7 @@ FusionCanvas SHALL keep the default Offering-scoped Mockup Template management s
 
 #### Scenario: Archived store is reviewed
 - **WHEN** Mockup Template management belongs to an archived Store
-- **THEN** Add, Edit, placement, and Save remain unavailable
+- **THEN** Add, Edit, upload, archive, placement, and Save remain unavailable
 - **AND** no editable template dialog can be opened
 
 #### Scenario: Dialog is used with keyboard and supported sizes

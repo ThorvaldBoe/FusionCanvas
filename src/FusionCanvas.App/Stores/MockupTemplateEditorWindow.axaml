@@ -4,102 +4,88 @@
         x:Class="FusionCanvas.App.Stores.MockupTemplateEditorWindow"
         x:DataType="stores:CatalogSetupViewModel"
         Title="{Binding MockupTemplateEditorDialogTitle}"
-        Width="980" Height="760"
-        MinWidth="640" MinHeight="540"
-        CanResize="True"
-        WindowStartupLocation="CenterOwner"
+        Width="980" Height="820" MinWidth="700" MinHeight="620"
+        CanResize="True" WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ApplicationBackgroundBrush}">
-  <Grid Margin="16" RowDefinitions="*,Auto,Auto" RowSpacing="12">
-    <ScrollViewer Grid.Row="0"
-                  HorizontalScrollBarVisibility="Auto"
-                  VerticalScrollBarVisibility="Auto">
-      <Grid MinWidth="760" ColumnDefinitions="3*,2*" ColumnSpacing="16">
-        <Border Grid.Column="0" Classes="listItem" Padding="12"
-                AutomationProperties.AutomationId="Catalog.MockupPreviewRegion">
-          <StackPanel Spacing="8">
-            <TextBlock Text="Provider image and placement" FontSize="18" FontWeight="SemiBold" />
-            <TextBlock IsVisible="{Binding !HasSelectedProviderMockup}"
-                       Text="{Binding MockupPreviewUnavailableMessage}"
-                       TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
-            <TextBlock IsVisible="{Binding HasSelectedProviderMockup}"
-                       Text="Drag the rectangle to move it, drag its lower-right handle to resize, or use arrow keys. Hold Shift with arrow keys to resize."
-                       TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-            <stores:MockupPlacementEditor x:Name="PlacementEditor"
-                                           IsVisible="{Binding HasSelectedProviderMockup}"
-                                           Height="420"
-                                           IsEnabled="{Binding CanEdit}"
-                                           PlacementX="{Binding MappingX, Mode=TwoWay}"
-                                           PlacementY="{Binding MappingY, Mode=TwoWay}"
-                                           PlacementWidth="{Binding MappingWidth, Mode=TwoWay}"
-                                           PlacementHeight="{Binding MappingHeight, Mode=TwoWay}"
-                                           ImageWidth="{Binding MappingImageWidth}"
-                                           ImageHeight="{Binding MappingImageHeight}"
-                                           AutomationProperties.Name="Provider image placement" />
-          </StackPanel>
-        </Border>
+  <Grid Margin="16" RowDefinitions="Auto,Auto,*,Auto,Auto,Auto" RowSpacing="12">
+    <StackPanel Grid.Row="0" Spacing="4">
+      <TextBlock Text="Mockup Template" FontSize="18" FontWeight="SemiBold" />
+      <TextBlock Text="Upload source images first, then configure each selected image independently." TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+    </StackPanel>
 
-        <StackPanel Grid.Column="1" Spacing="8"
-                    AutomationProperties.AutomationId="Catalog.MockupConfigurationRegion">
-          <TextBlock Text="Configuration" FontSize="18" FontWeight="SemiBold" />
-          <TextBlock Text="Template name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-          <TextBox x:Name="TemplateNameTextBox"
-                   Text="{Binding TemplateName}"
-                   PlaceholderText="Mockup Template name"
-                   Classes="field"
-                   IsReadOnly="{Binding !CanEdit}"
-                   AutomationProperties.Name="Template name" />
-          <TextBlock Text="Provider mockup image (optional)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-          <TextBlock Text="Local source image (one image can cover one or more option values)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBox Text="{Binding LocalSourcePath}" IsReadOnly="True" Classes="field" HorizontalAlignment="Stretch" AutomationProperties.Name="Local source image" />
-            <Button Content="Browse…" Command="{Binding BrowseLocalSourceCommand}" Classes="secondary" />
-          </StackPanel>
-          <ItemsControl ItemsSource="{Binding LocalSourceDrafts}" AutomationProperties.Name="Mockup source image collection">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="stores:LocalMockupSourceDraftViewModel">
-                <Border Classes="listItem" Padding="6" Margin="0,2">
-                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                    <StackPanel>
-                      <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
-                      <TextBlock Text="{Binding ApplicabilitySummary}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
-                    </StackPanel>
-                    <Button Grid.Column="1" Content="Remove" Classes="secondary"
-                            Command="{Binding $parent[Window].DataContext.RemoveLocalSourceCommand}"
-                            CommandParameter="{Binding}" />
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          <TextBlock Text="{Binding ProviderImageSelectionInstructions}"
-                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-          <ComboBox ItemsSource="{Binding ProviderMockupCandidates}"
-                    SelectedItem="{Binding SelectedProviderMockup}"
-                    DisplayMemberBinding="{Binding DisplayName}"
-                    PlaceholderText="Provider mockup image"
-                    IsEnabled="{Binding CanEdit}"
-                    AutomationProperties.Name="Provider mockup image" />
-          <TextBlock Text="{Binding ProviderImageSelectionStateMessage}"
-                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}"
-                     AutomationProperties.AutomationId="Catalog.ProviderImageState" />
-          <TextBlock Text="{Binding ProviderImageSelectionRecoveryMessage}"
-                     IsVisible="{Binding HasProviderImageSelectionRecovery}"
-                     TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource WarningTextBrush}"
-                     AutomationProperties.AutomationId="Catalog.ProviderImageRecovery" />
-          <TextBlock Text="Linked Design Area" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-          <ComboBox ItemsSource="{Binding AvailablePlaceholders}"
-                    SelectedItem="{Binding SelectedPlaceholder}"
-                    DisplayMemberBinding="{Binding Name}"
-                    PlaceholderText="Linked Design Area"
-                    IsEnabled="{Binding CanEdit}"
-                    AutomationProperties.Name="Linked Design Area" />
-          <TextBlock Text="Applicable option values" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+    <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="16">
+      <StackPanel Grid.Column="0" Spacing="4">
+        <TextBlock Text="Template name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <TextBox x:Name="TemplateNameTextBox" Text="{Binding TemplateName}" PlaceholderText="Mockup Template name" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Template name" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Spacing="4">
+        <TextBlock Text="Shared Design Area" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <ComboBox ItemsSource="{Binding AvailablePlaceholders}" SelectedItem="{Binding SelectedPlaceholder}" DisplayMemberBinding="{Binding Name}" PlaceholderText="Linked Design Area" IsEnabled="{Binding CanEdit}" AutomationProperties.Name="Shared Design Area" />
+      </StackPanel>
+    </Grid>
+
+    <Grid Grid.Row="2" RowDefinitions="Auto,*,Auto,Auto" RowSpacing="8">
+      <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+        <StackPanel Spacing="2">
+          <TextBlock Text="Mockup source images" FontSize="16" FontWeight="SemiBold" />
+          <TextBlock Text="Select a row to edit its metadata below." FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        </StackPanel>
+        <Button Grid.Column="1" Content="Archive selected" Command="{Binding RemoveLocalSourceCommand}" CommandParameter="{Binding SelectedLocalSource}" Classes="secondary" />
+        <Button Grid.Column="2" Content="Upload image..." Command="{Binding BrowseLocalSourceCommand}" Classes="primary" />
+      </Grid>
+      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+        <ItemsControl ItemsSource="{Binding LocalSourceDrafts}" AutomationProperties.Name="Mockup source image table">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="stores:LocalMockupSourceDraftViewModel">
+              <Border Classes="listItem" Padding="8" Margin="0,2">
+                <Grid ColumnDefinitions="*,*,Auto,Auto" ColumnSpacing="10">
+                  <Button Grid.Column="0" Content="{Binding DisplayName}" Command="{Binding $parent[Window].DataContext.SelectLocalSourceCommand}" CommandParameter="{Binding}" HorizontalContentAlignment="Left" Classes="link" />
+                  <TextBlock Grid.Column="1" Text="{Binding ApplicabilitySummary}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" />
+                  <TextBlock Grid.Column="2" Text="{Binding StatusLabel}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                  <Button Grid.Column="3" Content="Archive" Command="{Binding $parent[Window].DataContext.RemoveLocalSourceCommand}" CommandParameter="{Binding}" Classes="secondary" />
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+      <TextBlock Grid.Row="2" IsVisible="{Binding !HasLocalSource}" Text="No source images uploaded yet. Upload an image to begin." Foreground="{DynamicResource SecondaryTextBrush}" />
+      <ItemsControl Grid.Row="3" ItemsSource="{Binding MockupTemplateReadinessMessages}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Grid>
+
+    <Border Grid.Row="3" Classes="listItem" Padding="12" IsVisible="{Binding HasSelectedLocalSource}" AutomationProperties.AutomationId="Catalog.MockupSelectedImageEditor">
+      <Grid ColumnDefinitions="3*,2*" ColumnSpacing="16">
+        <StackPanel Grid.Column="0" Spacing="8">
+          <TextBlock Text="Image and design placement" FontSize="16" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding SelectedLocalSource.DisplayName}" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <stores:MockupPlacementEditor x:Name="PlacementEditor" Height="240" IsEnabled="{Binding CanEdit}"
+                                         PlacementX="{Binding MappingX, Mode=TwoWay}" PlacementY="{Binding MappingY, Mode=TwoWay}"
+                                         PlacementWidth="{Binding MappingWidth, Mode=TwoWay}" PlacementHeight="{Binding MappingHeight, Mode=TwoWay}"
+                                         ImageWidth="{Binding MappingImageWidth}" ImageHeight="{Binding MappingImageHeight}"
+                                         AutomationProperties.Name="Selected image placement" />
+          <TextBlock Text="Mapping is optional while this image is being configured. Set positive in-bounds values before using it." TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Spacing="8">
+          <TextBlock Text="Image metadata" FontSize="16" FontWeight="SemiBold" />
+          <TextBlock Text="Color (choose one or more)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
           <ItemsControl ItemsSource="{Binding TemplateColorChoices}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="stores:OptionValueChoiceViewModel">
-                <CheckBox Content="{Binding Label}"
-                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                          IsEnabled="{Binding $parent[Window].DataContext.CanEdit}" />
+                <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" IsEnabled="{Binding $parent[Window].DataContext.CanEdit}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="Size and other options" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <ItemsControl ItemsSource="{Binding TemplateAdditionalOptionChoices}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="stores:OptionValueChoiceViewModel">
+                <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" IsEnabled="{Binding $parent[Window].DataContext.CanEdit}" />
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -114,47 +100,11 @@
             <TextBox Grid.Row="3" Grid.Column="0" Text="{Binding MappingWidthText}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Width" />
             <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding MappingHeightText}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Height" />
           </Grid>
-          <Border Classes="listItem" Padding="8" AutomationProperties.AutomationId="Catalog.MockupReadiness">
-            <StackPanel Spacing="4">
-              <TextBlock Text="{Binding MockupTemplateLifecycleLabel}" FontWeight="SemiBold" />
-              <ItemsControl ItemsSource="{Binding MockupTemplateReadinessMessages}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate><TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" /></DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <TextBlock Text="{Binding MockupTemplateSaveValidationMessage}"
-                         IsVisible="{Binding HasMockupTemplateSaveValidationMessage}"
-                         TextWrapping="Wrap" Foreground="{DynamicResource WarningTextBrush}"
-                         AutomationProperties.AutomationId="Catalog.MockupSaveValidation" />
-              <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}"
-                         TextWrapping="Wrap" Foreground="{DynamicResource WarningTextBrush}"
-                         AutomationProperties.AutomationId="Catalog.MockupSaveError" />
-            </StackPanel>
-          </Border>
-          <Expander Header="Advanced provider data">
-            <StackPanel Spacing="4">
-              <TextBlock IsVisible="{Binding HasSelectedProviderMockup}"
-                         Text="Provider mockup reference"
-                         FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-              <TextBox IsVisible="{Binding HasSelectedProviderMockup}"
-                       Text="{Binding SelectedProviderMockup.ProviderReference}"
-                       IsReadOnly="True" Classes="field"
-                       ToolTip.Tip="Stable provider mockup reference from the Printify catalog."
-                       AutomationProperties.Name="Provider mockup reference" />
-              <TextBlock IsVisible="{Binding !HasSelectedProviderMockup}"
-                         Text="No provider reference available."
-                         TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
-            </StackPanel>
-          </Expander>
         </StackPanel>
       </Grid>
-    </ScrollViewer>
+    </Border>
 
-    <Border Grid.Row="1"
-            IsVisible="{Binding IsMockupTemplateDiscardConfirmationVisible}"
-            Background="{DynamicResource WarningBackgroundBrush}"
-            BorderBrush="{DynamicResource WarningBorderBrush}"
-            BorderThickness="1" Padding="10">
+    <Border Grid.Row="4" IsVisible="{Binding IsMockupTemplateDiscardConfirmationVisible}" Background="{DynamicResource WarningBackgroundBrush}" BorderBrush="{DynamicResource WarningBorderBrush}" BorderThickness="1" Padding="10">
       <StackPanel Spacing="8">
         <TextBlock Text="Discard unsaved Mockup Template changes?" FontWeight="SemiBold" />
         <TextBlock Text="Your current template values and placement will be lost." TextWrapping="Wrap" />
@@ -165,7 +115,7 @@
       </StackPanel>
     </Border>
 
-    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+    <StackPanel Grid.Row="5" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
       <Button x:Name="SaveMockupTemplateButton" Content="Save Mockup Template" Command="{Binding CreateTemplateCommand}" Classes="primary" />
       <Button Content="Cancel" Command="{Binding RequestCancelMockupTemplateCommand}" Classes="secondary" />
     </StackPanel>

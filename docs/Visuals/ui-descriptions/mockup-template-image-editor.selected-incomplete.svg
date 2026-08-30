@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1400" viewBox="0 0 1280 1400" role="img" aria-label="Edit Mockup Template - Flatlay no. 1">
+  <rect width="100%" height="100%" fill="#f4f6f8" />
+  <g data-ui-id="page" data-ui-kind="stack" data-enabled="true">
+    <g data-ui-id="page-header" data-ui-kind="stack" data-enabled="true">
+      <g data-ui-id="page-title" data-ui-kind="text" data-enabled="true">
+        <text x="48" y="74" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="600">Edit Mockup Template</text>
+      </g>
+      <g data-ui-id="page-help" data-ui-kind="text" data-enabled="true">
+        <text x="48" y="98" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Upload source images first, then configure each selected image independently.</text>
+      </g>
+    </g>
+    <g data-ui-id="template-name-group" data-ui-kind="grid" data-enabled="true">
+      <g data-ui-id="template-name-fields" data-ui-kind="stack" data-enabled="true">
+        <g data-ui-id="template-name-label" data-ui-kind="text" data-enabled="true">
+          <text x="48" y="133" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Template name</text>
+        </g>
+        <g data-ui-id="template-name" data-ui-kind="field" data-enabled="true">
+          <rect x="48" y="142" width="580" height="38" rx="5" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+          <text x="60" y="166" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Flatlay no. 1</text>
+        </g>
+      </g>
+      <g data-ui-id="shared-design-area-fields" data-ui-kind="stack" data-enabled="true">
+        <g data-ui-id="shared-design-area-label" data-ui-kind="text" data-enabled="true">
+          <text x="652" y="133" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Shared Design Area</text>
+        </g>
+        <g data-ui-id="shared-design-area" data-ui-kind="select" data-enabled="true">
+          <rect x="652" y="142" width="580" height="38" rx="5" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+          <text x="664" y="166" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Front</text>
+          <text x="1210" y="166" fill="#415870" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">▾</text>
+        </g>
+      </g>
+    </g>
+    <g data-ui-id="image-collection" data-ui-kind="panel" data-enabled="true">
+      <rect x="48" y="196" width="1184" height="358" rx="10" fill="#ffffff" stroke="#b8c4d2" stroke-width="1" />
+      <g data-ui-id="image-collection-header" data-ui-kind="grid" data-enabled="true">
+        <g data-ui-id="image-collection-title-group" data-ui-kind="stack" data-enabled="true">
+          <g data-ui-id="image-collection-title" data-ui-kind="text" data-enabled="true">
+            <text x="64" y="232" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">Mockup source images</text>
+          </g>
+          <g data-ui-id="image-collection-summary" data-ui-kind="text" data-enabled="true">
+            <text x="64" y="256" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">5 images - 3 complete - 2 need setup</text>
+          </g>
+        </g>
+        <g data-ui-id="archive-image" data-ui-kind="button" data-enabled="true">
+          <rect x="912" y="212" width="150" height="38" rx="7" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+          <text x="924" y="236" fill="#214f7d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Archive selected</text>
+        </g>
+        <g data-ui-id="upload-images" data-ui-kind="button" data-enabled="true">
+          <rect x="1074" y="212" width="142" height="38" rx="7" fill="#214f7d" stroke="#214f7d" stroke-width="1" />
+          <text x="1086" y="236" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Upload image...</text>
+        </g>
+      </g>
+      <g data-ui-id="image-table" data-ui-kind="table" data-enabled="true">
+        <rect x="64" y="270" width="1152" height="40" rx="5" fill="#e9eef3" stroke="#c2ccd7" stroke-width="1" />
+          <text x="76" y="297" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">Image file</text>
+          <text x="397" y="297" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">Applies to</text>
+          <text x="718" y="297" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">Design area</text>
+          <text x="908" y="297" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">Mapping</text>
+          <text x="1058" y="297" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">Status</text>
+        <rect x="64" y="310" width="1152" height="40" rx="0" fill="#ffffff" stroke="#d2d9e1" stroke-width="1" />
+          <text x="76" y="337" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">black-flatlay.png</text>
+          <text x="397" y="337" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Color: Black</text>
+          <text x="718" y="337" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Front</text>
+          <text x="908" y="337" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Set</text>
+          <text x="1058" y="337" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Complete</text>
+        <rect x="64" y="350" width="1152" height="40" rx="0" fill="#ffffff" stroke="#d2d9e1" stroke-width="1" />
+          <text x="76" y="377" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">white-flatlay.png</text>
+          <text x="397" y="377" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Color: White</text>
+          <text x="718" y="377" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Front</text>
+          <text x="908" y="377" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Set</text>
+          <text x="1058" y="377" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Complete</text>
+        <rect x="64" y="390" width="1152" height="40" rx="0" fill="#ffffff" stroke="#d2d9e1" stroke-width="1" />
+          <text x="76" y="417" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">navy-flatlay.png</text>
+          <text x="397" y="417" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Color: Navy</text>
+          <text x="718" y="417" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Front</text>
+          <text x="908" y="417" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Set</text>
+          <text x="1058" y="417" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Complete</text>
+        <rect x="64" y="430" width="1152" height="40" rx="0" fill="#ffffff" stroke="#d2d9e1" stroke-width="1" />
+          <text x="76" y="457" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">military-green.png</text>
+          <text x="397" y="457" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Not assigned</text>
+          <text x="718" y="457" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Front</text>
+          <text x="908" y="457" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Not set</text>
+          <text x="1058" y="457" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Needs setup</text>
+        <rect x="64" y="470" width="1152" height="40" rx="0" fill="#ffffff" stroke="#d2d9e1" stroke-width="1" />
+          <text x="76" y="497" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">gray-flatlay.png</text>
+          <text x="397" y="497" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Not assigned</text>
+          <text x="718" y="497" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Front</text>
+          <text x="908" y="497" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Not set</text>
+          <text x="1058" y="497" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Needs setup</text>
+      </g>
+      <g data-ui-id="selection-help" data-ui-kind="text" data-enabled="true">
+        <text x="64" y="532" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Select an image row to edit its applicability and placement below. Uploading does not assign metadata.</text>
+      </g>
+    </g>
+    <g data-ui-id="selected-image-editor" data-ui-kind="panel" data-enabled="true">
+      <rect x="48" y="570" width="1184" height="728" rx="10" fill="#ffffff" stroke="#b8c4d2" stroke-width="1" />
+      <g data-ui-id="selected-image-header" data-ui-kind="stack" data-enabled="true">
+        <g data-ui-id="selected-image-title" data-ui-kind="text" data-enabled="true">
+          <text x="64" y="606" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">Selected image - military-green.png</text>
+        </g>
+        <g data-ui-id="selected-image-status" data-ui-kind="message" data-enabled="true">
+          <rect x="64" y="616" width="1152" height="48" rx="7" fill="#fff4dd" stroke="#d4a649" stroke-width="1" />
+          <text x="76" y="644" fill="#765715" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Needs setup - assign applicability and a valid image-space mapping.</text>
+        </g>
+      </g>
+      <g data-ui-id="metadata-layout" data-ui-kind="grid" data-enabled="true">
+        <g data-ui-id="image-placement" data-ui-kind="stack" data-enabled="true">
+          <g data-ui-id="image-preview-title" data-ui-kind="text" data-enabled="true">
+            <text x="64" y="696" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="600">Image and design placement</text>
+          </g>
+          <g data-ui-id="image-preview" data-ui-kind="panel" data-enabled="true">
+            <rect x="64" y="710" width="564" height="280" rx="9" fill="#ffffff" stroke="#b8c4d2" stroke-width="1" />
+            <g data-ui-id="image-preview-summary" data-ui-kind="text" data-enabled="true">
+              <text x="112" y="772" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">military-green.png - 2000 x 2000 px</text>
+            </g>
+            <g data-ui-id="mapping-preview" data-ui-kind="panel" data-enabled="true">
+              <rect x="112" y="794" width="468" height="120" rx="9" fill="#ffffff" stroke="#bdc8d5" stroke-width="1" />
+              <g data-ui-id="mapping-preview-title" data-ui-kind="text" data-enabled="true">
+                <text x="128" y="824" fill="#153f69" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Design Area placement rectangle</text>
+              </g>
+              <g data-ui-id="mapping-preview-help" data-ui-kind="text" data-enabled="true">
+                <text x="128" y="848" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Drag to move; resize from the lower-right handle.</text>
+              </g>
+            </g>
+          </g>
+          <g data-ui-id="replace-row" data-ui-kind="grid" data-enabled="true">
+            <g data-ui-id="file-identity" data-ui-kind="text" data-enabled="true">
+              <text x="64" y="1012" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Managed local source image</text>
+            </g>
+            <g data-ui-id="replace-file" data-ui-kind="button" data-enabled="true">
+              <rect x="486" y="998" width="142" height="38" rx="7" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+              <text x="498" y="1022" fill="#214f7d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Replace file...</text>
+            </g>
+          </g>
+        </g>
+        <g data-ui-id="image-metadata" data-ui-kind="stack" data-enabled="true">
+          <g data-ui-id="applicability-title" data-ui-kind="text" data-enabled="true">
+            <text x="652" y="696" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="600">Applicability</text>
+          </g>
+          <g data-ui-id="applicability-help" data-ui-kind="text" data-enabled="true">
+            <text x="652" y="724" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Choose the Offering option values whose variants use this image.</text>
+          </g>
+          <g data-ui-id="color-label" data-ui-kind="text" data-enabled="true">
+            <text x="652" y="751" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Color</text>
+          </g>
+          <g data-ui-id="color-values" data-ui-kind="list" data-enabled="true">
+            <rect x="652" y="764" width="564" height="38" rx="0" fill="#ffffff" stroke="#d0d7e0" stroke-width="1" />
+            <text x="664" y="788" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Black - not selected</text>
+            <rect x="652" y="802" width="564" height="38" rx="0" fill="#ffffff" stroke="#d0d7e0" stroke-width="1" />
+            <text x="664" y="826" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">White - not selected</text>
+            <rect x="652" y="840" width="564" height="38" rx="0" fill="#ffffff" stroke="#d0d7e0" stroke-width="1" />
+            <text x="664" y="864" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Navy - not selected</text>
+            <rect x="652" y="878" width="564" height="38" rx="0" fill="#ffffff" stroke="#d0d7e0" stroke-width="1" />
+            <text x="664" y="902" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Military Green - selected</text>
+            <rect x="652" y="916" width="564" height="38" rx="0" fill="#ffffff" stroke="#d0d7e0" stroke-width="1" />
+            <text x="664" y="940" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Gray - not selected</text>
+          </g>
+          <g data-ui-id="add-condition" data-ui-kind="button" data-enabled="true">
+            <rect x="652" y="962" width="166" height="38" rx="7" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+            <text x="664" y="986" fill="#214f7d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Add Size condition</text>
+          </g>
+          <g data-ui-id="mapping-title" data-ui-kind="text" data-enabled="true">
+            <text x="652" y="1024" fill="#182536" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="600">Image-space mapping (pixels)</text>
+          </g>
+          <g data-ui-id="mapping-grid" data-ui-kind="grid" data-enabled="true">
+            <g data-ui-id="x-label" data-ui-kind="text" data-enabled="true">
+              <text x="652" y="1051" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">X</text>
+            </g>
+            <g data-ui-id="y-label" data-ui-kind="text" data-enabled="true">
+              <text x="940" y="1051" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Y</text>
+            </g>
+            <g data-ui-id="x-field" data-ui-kind="field" data-enabled="true">
+              <rect x="652" y="1068" width="276" height="38" rx="5" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+              <text x="664" y="1092" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">620 px</text>
+            </g>
+            <g data-ui-id="y-field" data-ui-kind="field" data-enabled="true">
+              <rect x="940" y="1068" width="276" height="38" rx="5" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+              <text x="952" y="1092" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">480 px</text>
+            </g>
+            <g data-ui-id="width-label" data-ui-kind="text" data-enabled="true">
+              <text x="652" y="1131" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Width</text>
+            </g>
+            <g data-ui-id="height-label" data-ui-kind="text" data-enabled="true">
+              <text x="940" y="1131" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="400">Height</text>
+            </g>
+            <g data-ui-id="width-field" data-ui-kind="field" data-enabled="true">
+              <rect x="652" y="1148" width="276" height="38" rx="5" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+              <text x="664" y="1172" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">710 px</text>
+            </g>
+            <g data-ui-id="height-field" data-ui-kind="field" data-enabled="true">
+              <rect x="940" y="1148" width="276" height="38" rx="5" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+              <text x="952" y="1172" fill="#26384c" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">910 px</text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g data-ui-id="dialog-actions" data-ui-kind="grid" data-enabled="true">
+      <g data-ui-id="template-readiness" data-ui-kind="text" data-enabled="true">
+        <text x="48" y="1328" fill="#617087" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400">Template draft may be saved before every image is completely configured.</text>
+      </g>
+      <g data-ui-id="cancel" data-ui-kind="button" data-enabled="true">
+        <rect x="967" y="1314" width="72" height="38" rx="7" fill="#edf2f7" stroke="#9fb0c3" stroke-width="1" />
+        <text x="979" y="1338" fill="#214f7d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Cancel</text>
+      </g>
+      <g data-ui-id="save-template" data-ui-kind="button" data-enabled="true">
+        <rect x="1051" y="1314" width="181" height="38" rx="7" fill="#214f7d" stroke="#214f7d" stroke-width="1" />
+        <text x="1063" y="1338" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">Save Mockup Template</text>
+      </g>
+    </g>
+  </g>
+</svg>

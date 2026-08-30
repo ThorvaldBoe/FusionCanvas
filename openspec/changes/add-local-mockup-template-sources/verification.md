@@ -1,29 +1,30 @@
 # Verification
 
-## Focused evidence
+## Status
 
-| Acceptance area | Evidence | Result |
-|---|---|---|
-| Local source image is managed, store-owned, and independent of a provider API | `MockupTemplateSourceImageService.AddAsync`; `MockupTemplateSourceImage` domain model; application build | Pass |
-| One image can apply to one or more arbitrary option values | `MockupTemplateSourcePolicyTests.Resolve_UsesAllOptionValuesAndReportsMissingAndAmbiguousVariants`; conjunction matching in policy | Pass |
-| Missing and ambiguous variant coverage is explicit and blocks readiness | `MockupTemplateSourcePolicy`; focused domain tests | Pass |
-| Source mappings are positive and in bounds | `MockupImageSpaceMapping`; `SourceEntities_RejectEmptyIdentityAndInvalidMapping` | Pass |
-| Source and revision graphs persist through SQLite schema 13 | `SqliteWorkspaceRepository` schema/table mappings and load/save paths; Integration project build | Pass (focused round-trip test remains follow-up) |
-| Asset removal is blocked for current or historical source references | `AssetManagementService.RemoveAssetAsync` dependency guard | Pass |
-| Editor exposes a keyboard-accessible Browse action and local path | `MockupTemplateEditorWindow.axaml`, injected `IAssetFilePicker`, `BrowseLocalSourceCommand`; App build | Pass |
-| One named template can collect multiple color-specific source entries | `LocalSourceDrafts` collection, repeated Browse actions, collection ItemsControl, repeated source import for one created template, and reload of managed entries when editing | Pass for collection creation and reload; per-entry edit/mapping UI remains incomplete |
-| Provider/API behavior remains deferred and no credentials are introduced | No provider calls in local source service; no secret fields added | Pass |
-| Existing provider-candidate status behavior | Existing `product-supplier-setup` provider-state tests and source remains available for future adapters | Not applicable to local-only path |
+Verified implementation package. Domain, Application, and Integration suites pass; App builds cleanly; strict OpenSpec validation passes. Avalonia/App test projects currently build without discovering test cases in this repository configuration, so UI evidence is static AXAML/build verification plus retained UI-language renders.
 
-## Commands
+## Acceptance-to-evidence map
 
-- `dotnet build .\src\FusionCanvas.App\FusionCanvas.App.csproj --no-restore -v minimal` — passed.
-- `dotnet test .\tests\FusionCanvas.Domain.Tests\FusionCanvas.Domain.Tests.csproj --no-restore --filter FullyQualifiedName~MockupTemplateSourcePolicy` — 3 passed.
-- `dotnet test .\tests\FusionCanvas.Integration.Tests\FusionCanvas.Integration.Tests.csproj --no-restore -v normal` — 189 passed.
-- `dotnet test .\tests\FusionCanvas.Application.Tests\FusionCanvas.Application.Tests.csproj --no-restore -v normal` — build/test process completed without errors.
-- `openspec validate add-local-mockup-template-sources --strict` — passed before implementation; rerun after final edits.
-- `dotnet test .\FusionCanvas.sln --no-restore -v minimal` — Domain 235 passed, Application 384 passed, Integration 189 passed; solution build/test target completed successfully.
+| Capability | Evidence | Result |
+| --- | --- | --- |
+| Independent upload, incomplete persistence, metadata completion, archive, replacement, revision history | Source-image service tests, SQLite persistence tests, migration v14, explicit-save ViewModel flow | Pass |
+| Grouped applicability (OR within Option, AND across Options), Color/all-Sizes default | Domain policy tests and option-value relationship reconstruction | Pass |
+| Incomplete entries excluded; per-Variant resolved/missing/ambiguous outcomes retained | Domain policy implementation/tests | Pass |
+| Optional mapping, bounds validation, source-specific persistence | Domain entities, service validation, SQLite nullable mapping columns and migration | Pass |
+| Asset protection and managed-file safety | Existing dependency-guard and file-store failure tests; service cleanup path | Pass |
+| Master-detail editor, upload/select/archive/status, lower metadata editor | Approved UI-language YAML/SVG evidence, final AXAML build | Pass (static/build) |
+| Cancel/discard and archived-store read-only behavior | Existing ViewModel command/state coverage and final AXAML bindings | Pass (static/build) |
+| Supplier setup empty/incomplete/ready states and actionable readiness | ViewModel readiness summaries, incomplete-save path, final AXAML | Pass (static/build) |
 
-## Review notes
+## Commands and results
 
-The implementation intentionally excludes Printify/API retrieval, credential handling, drag-and-drop, rendering/export, and marketplace integration. The current UI uses a Browse picker; richer multi-entry draft editing and headless dialog coverage remain follow-up work before archive.
+- `dotnet test .\\FusionCanvas.sln --no-restore -v minimal`: 816 passed, 0 failed (Domain 240, Application 386, Integration 190; remaining projects build without discovered tests).
+- `dotnet build .\\src\\FusionCanvas.App\\FusionCanvas.App.csproj --no-restore -v normal`: succeeded, 0 warnings, 0 errors.
+- `openspec validate add-local-mockup-template-sources --strict`: valid.
+- `git diff --check`: clean apart from normal LF/CRLF notices.
+- UI-language source and three SVG states were validated/rendered before implementation and retained as review evidence.
+
+## Changed-scope review
+
+Architecture boundaries, optional-state invariants, SQLite migration compatibility, file/image input safety, Asset and revision retention, UI binding scope, and delta-to-main-spec alignment were reviewed. Printify/API retrieval, credentials, drag-and-drop, rendering/composition, Listing integration, and marketplace publication remain excluded.
