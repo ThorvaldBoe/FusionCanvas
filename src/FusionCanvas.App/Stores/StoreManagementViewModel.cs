@@ -225,14 +225,14 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private string _variantColor = string.Empty;
     private string _variantSize = string.Empty;
 
-    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null, ITagManagementService? tagService = null, IProductSupplierSetupService? productService = null, ICatalogSetupService? catalogService = null, IMockupTemplateSetupService? mockupService = null, IOfferingManagementService? offeringManagementService = null, IProviderCatalogCandidateSource? providerCatalog = null)
+    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null, ITagManagementService? tagService = null, IProductSupplierSetupService? productService = null, ICatalogSetupService? catalogService = null, IMockupTemplateSetupService? mockupService = null, IOfferingManagementService? offeringManagementService = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, FusionCanvas.App.Assets.IAssetFilePicker? filePicker = null)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _nicheService = nicheService;
         _tagService = tagService;
         _productService = productService;
         _offeringManagementService = offeringManagementService;
-        CatalogSetup = catalogService is not null && mockupService is not null ? new CatalogSetupViewModel(catalogService, mockupService, offeringManagementService, providerCatalog) : null;
+        CatalogSetup = catalogService is not null && mockupService is not null ? new CatalogSetupViewModel(catalogService, mockupService, offeringManagementService, providerCatalog, sourceImages, filePicker) : null;
         ToggleStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = !IsSelectorExpanded);
         ExpandStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = true);
         CollapseStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = false);

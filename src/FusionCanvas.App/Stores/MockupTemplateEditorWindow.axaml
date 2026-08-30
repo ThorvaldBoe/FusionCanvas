@@ -49,6 +49,11 @@
                    IsReadOnly="{Binding !CanEdit}"
                    AutomationProperties.Name="Template name" />
           <TextBlock Text="Provider mockup image (optional)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBlock Text="Local source image (one image can cover one or more option values)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBox Text="{Binding LocalSourcePath}" IsReadOnly="True" Classes="field" HorizontalAlignment="Stretch" AutomationProperties.Name="Local source image" />
+            <Button Content="Browse…" Command="{Binding BrowseLocalSourceCommand}" Classes="secondary" />
+          </StackPanel>
           <TextBlock Text="{Binding ProviderImageSelectionInstructions}"
                      TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
           <ComboBox ItemsSource="{Binding ProviderMockupCandidates}"
@@ -71,7 +76,7 @@
                     PlaceholderText="Linked Design Area"
                     IsEnabled="{Binding CanEdit}"
                     AutomationProperties.Name="Linked Design Area" />
-          <TextBlock Text="Applicable Colors" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBlock Text="Applicable option values" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
           <ItemsControl ItemsSource="{Binding TemplateColorChoices}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="stores:OptionValueChoiceViewModel">

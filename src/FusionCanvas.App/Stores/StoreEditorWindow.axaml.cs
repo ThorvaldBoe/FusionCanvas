@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using FusionCanvas.App.Assets;
 using FusionCanvas.Application.Settings;
 using FusionCanvas.App.Views;
 
@@ -69,6 +70,8 @@ public partial class StoreEditorWindow : Window
         if (viewModel.CatalogSetup is { } catalog)
         {
             _subscribedCatalog = catalog;
+            if (TopLevel.GetTopLevel(this)?.StorageProvider is { } storageProvider)
+                catalog.FilePicker = new AvaloniaAssetFilePicker(storageProvider);
             catalog.OptionValueManagementRequested += OnOptionValueManagementRequested;
             catalog.OptionChoiceFocusRequested += OnOptionChoiceFocusRequested;
             catalog.AddVariantRequested += OnAddVariantRequested;

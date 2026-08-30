@@ -33,7 +33,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
 
-        foreach (var table in new[] { "mockup_template_revision_colors", "mockup_template_revisions", "mockup_template_colors", "mockup_templates", "placeholder_variants", "offering_placeholders", "offering_variant_values", "offering_variants", "offering_option_values", "offering_options", "blueprint_offerings", "print_providers", "catalog_blueprints", "design_slot_assignments", "design_variant_row_colors", "design_variant_rows", "design_selected_colors", "item_listing_configuration", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
+        foreach (var table in new[] { "mockup_template_revision_source_image_values", "mockup_template_revision_source_images", "mockup_template_source_image_values", "mockup_template_source_images", "mockup_template_revision_colors", "mockup_template_revisions", "mockup_template_colors", "mockup_templates", "placeholder_variants", "offering_placeholders", "offering_variant_values", "offering_variants", "offering_option_values", "offering_options", "blueprint_offerings", "print_providers", "catalog_blueprints", "design_slot_assignments", "design_variant_row_colors", "design_variant_rows", "design_selected_colors", "item_listing_configuration", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
         {
             await ExecuteAsync(connection, transaction, $"DELETE FROM {table};", cancellationToken);
         }
@@ -121,6 +121,15 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await InsertAssetAsync(connection, transaction, asset, cancellationToken);
         }
 
+        foreach (var image in snapshot.MockupTemplateSourceImages)
+            await InsertMockupTemplateSourceImageAsync(connection, transaction, image, cancellationToken);
+        foreach (var condition in snapshot.MockupTemplateSourceImageOptionValues)
+            await InsertMockupTemplateSourceImageOptionValueAsync(connection, transaction, condition, cancellationToken);
+        foreach (var image in snapshot.MockupTemplateRevisionSourceImages)
+            await InsertMockupTemplateRevisionSourceImageAsync(connection, transaction, image, cancellationToken);
+        foreach (var condition in snapshot.MockupTemplateRevisionSourceImageOptionValues)
+            await InsertMockupTemplateRevisionSourceImageOptionValueAsync(connection, transaction, condition, cancellationToken);
+
         foreach (var prompt in snapshot.Prompts)
         {
             await InsertPromptAsync(connection, transaction, prompt, cancellationToken);
@@ -207,6 +216,10 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             ,MockupTemplateColorVariants = await LoadMockupTemplateColorsAsync(connection, cancellationToken)
             ,MockupTemplateRevisions = await LoadMockupTemplateRevisionsAsync(connection, cancellationToken)
             ,MockupTemplateRevisionColors = await LoadMockupTemplateRevisionColorsAsync(connection, cancellationToken)
+            ,MockupTemplateSourceImages = await LoadMockupTemplateSourceImagesAsync(connection, cancellationToken)
+            ,MockupTemplateSourceImageOptionValues = await LoadMockupTemplateSourceImageOptionValuesAsync(connection, cancellationToken)
+            ,MockupTemplateRevisionSourceImages = await LoadMockupTemplateRevisionSourceImagesAsync(connection, cancellationToken)
+            ,MockupTemplateRevisionSourceImageOptionValues = await LoadMockupTemplateRevisionSourceImageOptionValuesAsync(connection, cancellationToken)
         };
     }
 
@@ -500,6 +513,29 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             CREATE TABLE IF NOT EXISTS mockup_template_revision_colors (
                 id TEXT PRIMARY KEY, revision_id TEXT NOT NULL REFERENCES mockup_template_revisions(id) ON DELETE RESTRICT,
                 color_option_value_id TEXT NOT NULL REFERENCES offering_option_values(id) ON DELETE RESTRICT, source_asset_id TEXT NULL
+            );
+            CREATE TABLE IF NOT EXISTS mockup_template_source_images (
+                id TEXT PRIMARY KEY, template_id TEXT NOT NULL REFERENCES mockup_templates(id) ON DELETE CASCADE,
+                source_asset_id TEXT NOT NULL REFERENCES assets(id) ON DELETE RESTRICT,
+                image_width INTEGER NOT NULL, image_height INTEGER NOT NULL,
+                mapping_x INTEGER NOT NULL, mapping_y INTEGER NOT NULL, mapping_width INTEGER NOT NULL, mapping_height INTEGER NOT NULL,
+                is_archived INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS mockup_template_source_image_values (
+                source_image_id TEXT NOT NULL REFERENCES mockup_template_source_images(id) ON DELETE CASCADE,
+                option_value_id TEXT NOT NULL REFERENCES offering_option_values(id) ON DELETE RESTRICT,
+                PRIMARY KEY (source_image_id, option_value_id)
+            );
+            CREATE TABLE IF NOT EXISTS mockup_template_revision_source_images (
+                id TEXT PRIMARY KEY, revision_id TEXT NOT NULL REFERENCES mockup_template_revisions(id) ON DELETE RESTRICT,
+                source_asset_id TEXT NOT NULL REFERENCES assets(id) ON DELETE RESTRICT,
+                image_width INTEGER NOT NULL, image_height INTEGER NOT NULL,
+                mapping_x INTEGER NOT NULL, mapping_y INTEGER NOT NULL, mapping_width INTEGER NOT NULL, mapping_height INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS mockup_template_revision_source_image_values (
+                revision_source_image_id TEXT NOT NULL REFERENCES mockup_template_revision_source_images(id) ON DELETE CASCADE,
+                option_value_id TEXT NOT NULL REFERENCES offering_option_values(id) ON DELETE RESTRICT,
+                PRIMARY KEY (revision_source_image_id, option_value_id)
             );
 
             CREATE TABLE IF NOT EXISTS snowclones (
@@ -1461,6 +1497,10 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     private static Task InsertMockupTemplateColorAsync(SqliteConnection c, System.Data.Common.DbTransaction t, MockupTemplateColorVariant value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO mockup_template_colors (id, template_id, color_option_value_id, is_archived, created_at, updated_at, source_asset_id) VALUES ($id,$template_id,$color_option_value_id,$is_archived,$created_at,$updated_at,$source_asset_id);", ct, ("$id", value.Id.ToString()), ("$template_id", value.MockupTemplateId.ToString()), ("$color_option_value_id", value.ColorOptionValueId.ToString()), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$source_asset_id", value.SourceAssetId?.ToString()));
     private static Task InsertMockupTemplateRevisionAsync(SqliteConnection c, System.Data.Common.DbTransaction t, MockupTemplateRevision value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO mockup_template_revisions (id, template_id, revision_number, target_placeholder_id, created_at, note, provider_mockup_reference, image_width, image_height, mapping_x, mapping_y, mapping_width, mapping_height) VALUES ($id,$template_id,$revision_number,$target_placeholder_id,$created_at,$note,$provider_mockup_reference,$image_width,$image_height,$mapping_x,$mapping_y,$mapping_width,$mapping_height);", ct, ("$id", value.Id.ToString()), ("$template_id", value.MockupTemplateId.ToString()), ("$revision_number", value.RevisionNumber), ("$target_placeholder_id", value.TargetPlaceholderId?.ToString()), ("$created_at", value.CreatedAt.ToString("O")), ("$note", value.Note), ("$provider_mockup_reference", value.ProviderMockupReference), ("$image_width", value.ImageMapping?.ImageWidth), ("$image_height", value.ImageMapping?.ImageHeight), ("$mapping_x", value.ImageMapping?.X), ("$mapping_y", value.ImageMapping?.Y), ("$mapping_width", value.ImageMapping?.Width), ("$mapping_height", value.ImageMapping?.Height));
     private static Task InsertMockupTemplateRevisionColorAsync(SqliteConnection c, System.Data.Common.DbTransaction t, MockupTemplateRevisionColor value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO mockup_template_revision_colors (id, revision_id, color_option_value_id, source_asset_id) VALUES ($id,$revision_id,$color_option_value_id,$source_asset_id);", ct, ("$id", value.Id.ToString()), ("$revision_id", value.RevisionId.ToString()), ("$color_option_value_id", value.ColorOptionValueId.ToString()), ("$source_asset_id", value.SourceAssetId?.ToString()));
+    private static Task InsertMockupTemplateSourceImageAsync(SqliteConnection c, System.Data.Common.DbTransaction t, MockupTemplateSourceImage value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO mockup_template_source_images (id, template_id, source_asset_id, image_width, image_height, mapping_x, mapping_y, mapping_width, mapping_height, is_archived, created_at, updated_at) VALUES ($id,$template_id,$source_asset_id,$image_width,$image_height,$mapping_x,$mapping_y,$mapping_width,$mapping_height,$is_archived,$created_at,$updated_at);", ct, ("$id", value.Id.ToString()), ("$template_id", value.MockupTemplateId.ToString()), ("$source_asset_id", value.SourceAssetId.ToString()), ("$image_width", value.ImageMapping.ImageWidth), ("$image_height", value.ImageMapping.ImageHeight), ("$mapping_x", value.ImageMapping.X), ("$mapping_y", value.ImageMapping.Y), ("$mapping_width", value.ImageMapping.Width), ("$mapping_height", value.ImageMapping.Height), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")));
+    private static Task InsertMockupTemplateSourceImageOptionValueAsync(SqliteConnection c, System.Data.Common.DbTransaction t, MockupTemplateSourceImageOptionValue value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO mockup_template_source_image_values (source_image_id, option_value_id) VALUES ($source_image_id,$option_value_id);", ct, ("$source_image_id", value.SourceImageId.ToString()), ("$option_value_id", value.OptionValueId.ToString()));
+    private static Task InsertMockupTemplateRevisionSourceImageAsync(SqliteConnection c, System.Data.Common.DbTransaction t, MockupTemplateRevisionSourceImage value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO mockup_template_revision_source_images (id, revision_id, source_asset_id, image_width, image_height, mapping_x, mapping_y, mapping_width, mapping_height) VALUES ($id,$revision_id,$source_asset_id,$image_width,$image_height,$mapping_x,$mapping_y,$mapping_width,$mapping_height);", ct, ("$id", value.Id.ToString()), ("$revision_id", value.RevisionId.ToString()), ("$source_asset_id", value.SourceAssetId.ToString()), ("$image_width", value.ImageMapping.ImageWidth), ("$image_height", value.ImageMapping.ImageHeight), ("$mapping_x", value.ImageMapping.X), ("$mapping_y", value.ImageMapping.Y), ("$mapping_width", value.ImageMapping.Width), ("$mapping_height", value.ImageMapping.Height));
+    private static Task InsertMockupTemplateRevisionSourceImageOptionValueAsync(SqliteConnection c, System.Data.Common.DbTransaction t, MockupTemplateRevisionSourceImageOptionValue value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO mockup_template_revision_source_image_values (revision_source_image_id, option_value_id) VALUES ($revision_source_image_id,$option_value_id);", ct, ("$revision_source_image_id", value.RevisionSourceImageId.ToString()), ("$option_value_id", value.OptionValueId.ToString()));
 
     private static Task InsertItemListingConfigurationAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, ItemListingConfiguration config, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, "INSERT INTO item_listing_configuration (item_id, offering_id) VALUES ($item_id, $offering_id);", cancellationToken, ("$item_id", config.ItemId.ToString()), ("$offering_id", config.OfferingId.ToString()));
@@ -1628,6 +1668,44 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         var result = new List<MockupTemplateRevisionColor>();
         await foreach (var r in ReadAsync(c, "SELECT * FROM mockup_template_revision_colors ORDER BY id;", ct))
             result.Add(new MockupTemplateRevisionColor(ReadGuid(r, "id"), ReadGuid(r, "revision_id"), ReadGuid(r, "color_option_value_id"), ReadNullableGuid(r, "source_asset_id")));
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<MockupTemplateSourceImage>> LoadMockupTemplateSourceImagesAsync(SqliteConnection c, CancellationToken ct)
+    {
+        var result = new List<MockupTemplateSourceImage>();
+        await foreach (var r in ReadAsync(c, "SELECT * FROM mockup_template_source_images ORDER BY created_at;", ct))
+        {
+            var mapping = new MockupImageSpaceMapping(ReadInt(r, "image_width"), ReadInt(r, "image_height"), ReadInt(r, "mapping_x"), ReadInt(r, "mapping_y"), ReadInt(r, "mapping_width"), ReadInt(r, "mapping_height"));
+            result.Add(new MockupTemplateSourceImage(ReadGuid(r, "id"), ReadGuid(r, "template_id"), ReadGuid(r, "source_asset_id"), mapping, ReadBool(r, "is_archived"), ReadDate(r, "created_at"), ReadDate(r, "updated_at")));
+        }
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<MockupTemplateSourceImageOptionValue>> LoadMockupTemplateSourceImageOptionValuesAsync(SqliteConnection c, CancellationToken ct)
+    {
+        var result = new List<MockupTemplateSourceImageOptionValue>();
+        await foreach (var r in ReadAsync(c, "SELECT * FROM mockup_template_source_image_values;", ct))
+            result.Add(new MockupTemplateSourceImageOptionValue(ReadGuid(r, "source_image_id"), ReadGuid(r, "option_value_id")));
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<MockupTemplateRevisionSourceImage>> LoadMockupTemplateRevisionSourceImagesAsync(SqliteConnection c, CancellationToken ct)
+    {
+        var result = new List<MockupTemplateRevisionSourceImage>();
+        await foreach (var r in ReadAsync(c, "SELECT * FROM mockup_template_revision_source_images;", ct))
+        {
+            var mapping = new MockupImageSpaceMapping(ReadInt(r, "image_width"), ReadInt(r, "image_height"), ReadInt(r, "mapping_x"), ReadInt(r, "mapping_y"), ReadInt(r, "mapping_width"), ReadInt(r, "mapping_height"));
+            result.Add(new MockupTemplateRevisionSourceImage(ReadGuid(r, "id"), ReadGuid(r, "revision_id"), ReadGuid(r, "source_asset_id"), mapping));
+        }
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<MockupTemplateRevisionSourceImageOptionValue>> LoadMockupTemplateRevisionSourceImageOptionValuesAsync(SqliteConnection c, CancellationToken ct)
+    {
+        var result = new List<MockupTemplateRevisionSourceImageOptionValue>();
+        await foreach (var r in ReadAsync(c, "SELECT * FROM mockup_template_revision_source_image_values;", ct))
+            result.Add(new MockupTemplateRevisionSourceImageOptionValue(ReadGuid(r, "revision_source_image_id"), ReadGuid(r, "option_value_id")));
         return result;
     }
 

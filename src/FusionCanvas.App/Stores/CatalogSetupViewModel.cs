@@ -6,6 +6,7 @@ using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Settings;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
+using FusionCanvas.App.Assets;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
 
@@ -46,6 +47,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private readonly IMockupTemplateSetupService _mockups;
     private readonly IOfferingManagementService? _offeringManagement;
     private readonly IProviderCatalogCandidateSource? _providerCatalog;
+    private readonly IMockupTemplateSourceImageService? _sourceImages;
+    private IAssetFilePicker _filePicker;
     private BlueprintOffering? _selectedOffering;
     private OfferingOption? _selectedOption;
     private PrintProvider? _selectedPrintProvider;
@@ -75,6 +78,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private string _artworkFormat = string.Empty;
     private string _artworkBackground = string.Empty;
     private string _templateName = string.Empty;
+    private string _localSourcePath = string.Empty;
     private string _error = string.Empty;
     private bool _isBusy;
     private bool _isAddingOption;
@@ -108,12 +112,14 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private bool _isDesignAreaDiscardConfirmationVisible;
     private DesignAreaDraftState? _designAreaDraftBaseline;
 
-    public CatalogSetupViewModel(ICatalogSetupService catalog, IMockupTemplateSetupService mockups, IOfferingManagementService? offeringManagement = null, IProviderCatalogCandidateSource? providerCatalog = null)
+    public CatalogSetupViewModel(ICatalogSetupService catalog, IMockupTemplateSetupService mockups, IOfferingManagementService? offeringManagement = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, IAssetFilePicker? filePicker = null)
     {
         _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         _mockups = mockups ?? throw new ArgumentNullException(nameof(mockups));
         _offeringManagement = offeringManagement;
         _providerCatalog = providerCatalog;
+        _sourceImages = sourceImages;
+        _filePicker = filePicker ?? new NullAssetFilePicker();
 
         SaveOfferingCommand = new AsyncRelayCommand(SaveOfferingAsync, CanSaveOffering);
         StartAddPrintProviderCommand = new RelayCommand(_ => IsAddingPrintProvider = true, () => CanEdit && SelectedOffering is not null && !IsProviderNetworkOffering);
@@ -156,6 +162,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         ConfirmDiscardMockupTemplateCommand = new RelayCommand(_ => ConfirmDiscardMockupTemplate(), () => IsMockupTemplateDiscardConfirmationVisible);
         KeepEditingMockupTemplateCommand = new RelayCommand(_ => IsMockupTemplateDiscardConfirmationVisible = false, () => IsMockupTemplateDiscardConfirmationVisible);
         CreateTemplateCommand = new AsyncRelayCommand(CreateTemplateAsync, CanCreateTemplate);
+        BrowseLocalSourceCommand = new AsyncRelayCommand(BrowseLocalSourceAsync, () => CanEdit && IsAddingTemplate && _sourceImages is not null);
         AddTemplateColorCommand = new AsyncRelayCommand(AddTemplateColorAsync, () => CanEdit && SelectedTemplate is not null && SelectedColor is not null);
         ArchiveOptionCommand = new RelayCommand(parameter => RunArchive(parameter, CatalogRecordKind.Option));
         ArchiveOptionValueCommand = new RelayCommand(parameter => RunArchive(parameter, CatalogRecordKind.OptionValue));
@@ -208,6 +215,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ObservableCollection<BulkVariantCandidate> BulkPreviewCandidates { get; } = [];
     public ObservableCollection<ProviderMockupCandidateDescriptor> ProviderMockupCandidates { get; } = [];
     public ObservableCollection<OptionValueChoiceViewModel> TemplateColorChoices { get; } = [];
+    public ICommand BrowseLocalSourceCommand { get; }
+    public IAssetFilePicker FilePicker { get => _filePicker; set => _filePicker = value ?? new NullAssetFilePicker(); }
+    public string LocalSourcePath { get => _localSourcePath; private set { if (SetField(ref _localSourcePath, value)) { NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
+    public bool HasLocalSource => !string.IsNullOrWhiteSpace(LocalSourcePath);
 
     public BlueprintOffering? SelectedOffering
     {
@@ -757,6 +768,21 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         try
         {
             var colors = TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).ToArray();
+            if (_sourceImages is not null && HasLocalSource && SelectedProviderMockup is null)
+            {
+                var created = await _mockups.CreateTemplateAsync(new CreateMockupTemplateRequest(SelectedOffering.StoreId, SelectedOffering.Id, TemplateName, SelectedPlaceholder?.Id)).ConfigureAwait(true);
+                if (!created.Succeeded) { ErrorMessage = created.Error ?? "Mockup Template could not be created."; return; }
+                ApplyMockups(created.State);
+                var template = created.State.Templates.LastOrDefault(value => value.Name == TemplateName.Trim());
+                if (template is null) { ErrorMessage = "The new Mockup Template could not be selected."; return; }
+                var sourceResult = await _sourceImages.AddAsync(new AddLocalMockupTemplateSourceRequest(SelectedOffering.StoreId, template.Id, LocalSourcePath, colors)).ConfigureAwait(true);
+                if (!sourceResult.Succeeded) { ErrorMessage = sourceResult.Error ?? "The local source image could not be added."; return; }
+                ApplyMockups(sourceResult.State);
+                EndTemplateDraft();
+                TemplateName = string.Empty;
+                LocalSourcePath = string.Empty;
+                return;
+            }
             _ = TryCreateMapping(out var mapping);
             var result = SelectedTemplate is not null && AvailableTemplates.Any(value => value.Id == SelectedTemplate.Id)
                 ? await _mockups.UpdateTemplateAsync(new UpdateMockupTemplateRequest(
@@ -786,6 +812,12 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         }
         catch (Exception exception) { ErrorMessage = exception.Message; }
         finally { IsBusy = false; }
+    }
+
+    private async Task BrowseLocalSourceAsync()
+    {
+        var path = await _filePicker.PickImportFileAsync().ConfigureAwait(true);
+        if (!string.IsNullOrWhiteSpace(path)) LocalSourcePath = path;
     }
 
     private async Task AddTemplateColorAsync()
@@ -1169,9 +1201,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
         var selectedTemplateColorIds = TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).ToHashSet();
         var supportedColors = SelectedProviderMockup?.SupportedColorOptionValueIds;
-        var templateColors = AvailableColors
+        var templateColors = OptionValues
+            .Where(value => value.OfferingId == SelectedOffering?.Id && !value.IsArchived)
             .Where(value => supportedColors is null || supportedColors.Contains(value.Id))
-            .Select(value => new OptionValueChoiceViewModel(value, value.Value) { IsSelected = selectedTemplateColorIds.Contains(value.Id) })
+            .Select(value => new OptionValueChoiceViewModel(value, ValueLabel(value)) { IsSelected = selectedTemplateColorIds.Contains(value.Id) })
             .ToArray();
         foreach (var choice in templateColors) choice.PropertyChanged += ChoiceSelectionChanged;
         Replace(TemplateColorChoices, templateColors);
@@ -1210,6 +1243,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private bool CanCreateTemplate()
     {
         if (!CanEdit || !IsAddingTemplate || SelectedOffering is null || string.IsNullOrWhiteSpace(TemplateName)) return false;
+        if (_sourceImages is not null && HasLocalSource && SelectedProviderMockup is null)
+            return TemplateColorChoices.Any(value => value.IsSelected);
         return SelectedProviderMockup is null || TryCreateMapping(out _);
     }
 
