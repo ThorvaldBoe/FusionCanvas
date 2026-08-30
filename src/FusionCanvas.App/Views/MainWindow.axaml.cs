@@ -67,7 +67,12 @@ public partial class MainWindow : Window
         {
             if (args.PropertyName == nameof(StoreManagementViewModel.IsStoreEditorOpen))
             {
-                SyncStoreEditorWindow(viewModel.StoreManagement);
+                // StoreEditorWindow updates this property from its Closing handler.
+                // Defer synchronization until that close has completed so we do not
+                // re-enter Window.Close while Avalonia is still processing Closing.
+                Dispatcher.UIThread.Post(
+                    () => SyncStoreEditorWindow(viewModel.StoreManagement),
+                    DispatcherPriority.Background);
             }
         };
         viewModel.WorkspaceManagement.PropertyChanged += (_, args) =>
