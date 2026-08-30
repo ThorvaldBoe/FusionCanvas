@@ -209,6 +209,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         RemoveLocalSourceCommand = new RelayCommand(parameter => RemoveLocalSource(parameter as LocalMockupSourceDraftViewModel), () => CanEdit && IsAddingTemplate);
         SelectLocalSourceCommand = new RelayCommand(parameter => SelectLocalSource(parameter as LocalMockupSourceDraftViewModel), () => CanEdit && IsAddingTemplate);
         ReuseMappingCommand = new RelayCommand(parameter => ReuseMapping(parameter as LocalMockupSourceDraftViewModel), () => CanEdit && HasSelectedLocalSource);
+        SelectAllTemplateSizesCommand = new RelayCommand(_ => SelectAllTemplateSizes(), () => CanEdit && IsAddingTemplate && TemplateAdditionalOptionChoices.Any(value => IsSizeValue(value.Value)));
         AddTemplateColorCommand = new AsyncRelayCommand(AddTemplateColorAsync, () => CanEdit && SelectedTemplate is not null && SelectedColor is not null);
         ArchiveOptionCommand = new RelayCommand(parameter => RunArchive(parameter, CatalogRecordKind.Option));
         ArchiveOptionValueCommand = new RelayCommand(parameter => RunArchive(parameter, CatalogRecordKind.OptionValue));
@@ -269,6 +270,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ICommand RemoveLocalSourceCommand { get; }
     public ICommand SelectLocalSourceCommand { get; }
     public ICommand ReuseMappingCommand { get; }
+    public ICommand SelectAllTemplateSizesCommand { get; }
     public IAssetFilePicker FilePicker { get => _filePicker; set => _filePicker = value ?? new NullAssetFilePicker(); }
     public string LocalSourcePath { get => _localSourcePath; private set { if (SetField(ref _localSourcePath, value)) { NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
     public LocalMockupSourceDraftViewModel? SelectedLocalSource { get => _selectedLocalSource; private set { if (SetField(ref _selectedLocalSource, value)) { OnPropertyChanged(nameof(HasSelectedLocalSource)); OnPropertyChanged(nameof(MappingImageWidth)); OnPropertyChanged(nameof(MappingImageHeight)); OnPropertyChanged(nameof(SelectedImagePreviewPath)); RebuildMappedSourceChoices(); NotifyCommands(); } } }
@@ -950,6 +952,16 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         MappingWidthText = FormatMapping(mapping.Width); MappingHeightText = FormatMapping(mapping.Height);
         NotifyMockupTemplateDraftChanged();
     }
+
+    private void SelectAllTemplateSizes()
+    {
+        foreach (var choice in TemplateAdditionalOptionChoices.Where(value => IsSizeValue(value.Value)))
+            choice.IsSelected = true;
+        NotifyMockupTemplateDraftChanged();
+        NotifyCommands();
+    }
+
+    private bool IsSizeValue(OfferingOptionValue value) => Options.FirstOrDefault(option => option.Id == value.OptionId)?.OptionKind == OptionKind.Size;
 
     private void RebuildMappedSourceChoices()
     {
