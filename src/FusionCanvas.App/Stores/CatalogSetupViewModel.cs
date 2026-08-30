@@ -831,6 +831,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
                 var template = SelectedTemplate is not null && AvailableTemplates.Any(value => value.Id == SelectedTemplate.Id)
                     ? SelectedTemplate
                     : null;
+                var templateWasExisting = template is not null;
                 var sourceState = (MockupTemplateSetupState?)null;
                 if (template is null)
                 {
@@ -841,6 +842,19 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
                     sourceState = created.State;
                 }
                 if (template is null) { ErrorMessage = "The Mockup Template could not be selected."; return; }
+                if (templateWasExisting)
+                {
+                    var templateResult = await _mockups.UpdateTemplateAsync(new UpdateMockupTemplateRequest(
+                        SelectedOffering.StoreId,
+                        template.Id,
+                        TemplateName,
+                        TargetPlaceholderId: SelectedPlaceholder?.Id,
+                        ReplaceTargetPlaceholder: true)).ConfigureAwait(true);
+                    if (!templateResult.Succeeded) { ErrorMessage = templateResult.Error ?? "Mockup Template could not be updated."; return; }
+                    ApplyMockups(templateResult.State);
+                    template = templateResult.State.Templates.Single(value => value.Id == template.Id);
+                    sourceState = templateResult.State;
+                }
                 foreach (var draft in LocalSourceDrafts)
                 {
                     var sourceResult = draft.IsManaged
