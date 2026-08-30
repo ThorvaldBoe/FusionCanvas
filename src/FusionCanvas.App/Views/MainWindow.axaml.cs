@@ -115,7 +115,12 @@ public partial class MainWindow : Window
         {
             if (args.PropertyName == nameof(SettingsViewModel.IsOpen))
             {
-                SyncSettingsWindow(viewModel.Settings);
+                // SettingsWindow updates this property from its Closing handler.
+                // Defer synchronization until that close has completed so native
+                // geometry can be captured without re-entering Window.Close.
+                Dispatcher.UIThread.Post(
+                    () => SyncSettingsWindow(viewModel.Settings),
+                    DispatcherPriority.Background);
             }
         };
         DataContext = viewModel;
