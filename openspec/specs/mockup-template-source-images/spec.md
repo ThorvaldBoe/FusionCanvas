@@ -84,6 +84,11 @@ FusionCanvas SHALL provide local source-image setup inside the focused Mockup Te
 - **THEN** the lower editor displays that image's own applicability and mapping draft
 - **AND** preserves unsaved edits made to previously selected image rows
 
+#### Scenario: Creator expands the selected image placement preview
+- **WHEN** the creator activates the lower-right magnifying-glass-with-plus control in the selected image editor
+- **THEN** FusionCanvas opens an enlarged placement editor with the selected image and current mapping draft
+- **AND** placement edits remain part of the same Mockup Template draft
+
 #### Scenario: Archived Store is reviewed
 - **WHEN** the Mockup Template belongs to an archived Store
-- **THEN** upload, archive, applicability editing, placement editing, and Save are unavailable
+- **THEN** upload, archive, applicability editing, placement editing, zoom activation, and Save are unavailable

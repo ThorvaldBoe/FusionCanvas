@@ -208,6 +208,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         BrowseLocalSourceCommand = new AsyncRelayCommand(BrowseLocalSourceAsync, () => CanEdit && IsAddingTemplate && _sourceImages is not null);
         RemoveLocalSourceCommand = new RelayCommand(parameter => RemoveLocalSource(parameter as LocalMockupSourceDraftViewModel), () => CanEdit && IsAddingTemplate);
         SelectLocalSourceCommand = new RelayCommand(parameter => SelectLocalSource(parameter as LocalMockupSourceDraftViewModel), () => CanEdit && IsAddingTemplate);
+        OpenEnlargedPlacementEditorCommand = new RelayCommand(_ => RequestEnlargedPlacementEditor(), () => CanEdit && IsAddingTemplate && HasSelectedLocalSource);
         ReuseMappingCommand = new RelayCommand(parameter => ReuseMapping(parameter as LocalMockupSourceDraftViewModel), () => CanEdit && HasSelectedLocalSource);
         SelectAllTemplateSizesCommand = new RelayCommand(_ => SelectAllTemplateSizes(), () => CanEdit && IsAddingTemplate && TemplateAdditionalOptionChoices.Any(value => IsSizeValue(value.Value)));
         AddTemplateColorCommand = new AsyncRelayCommand(AddTemplateColorAsync, () => CanEdit && SelectedTemplate is not null && SelectedColor is not null);
@@ -239,6 +240,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public event EventHandler? DesignAreaArchiveConfirmationRequested;
     public event EventHandler? DesignAreaArchiveFocusRequested;
     public event EventHandler? MockupTemplateEditorRequested;
+    public event EventHandler? EnlargedPlacementEditorRequested;
     public event EventHandler? DesignAreaEditorRequested;
 
     public ObservableCollection<Blueprint> Blueprints { get; } = [];
@@ -269,6 +271,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ICommand BrowseLocalSourceCommand { get; }
     public ICommand RemoveLocalSourceCommand { get; }
     public ICommand SelectLocalSourceCommand { get; }
+    public ICommand OpenEnlargedPlacementEditorCommand { get; }
     public ICommand ReuseMappingCommand { get; }
     public ICommand SelectAllTemplateSizesCommand { get; }
     public IAssetFilePicker FilePicker { get => _filePicker; set => _filePicker = value ?? new NullAssetFilePicker(); }
@@ -278,6 +281,12 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public string? SelectedImagePreviewPath => SelectedLocalSource?.PreviewPath;
     public bool HasSelectedLocalSource => SelectedLocalSource is not null;
     public bool HasLocalSource => LocalSourceDrafts.Count > 0 || !string.IsNullOrWhiteSpace(LocalSourcePath);
+
+    private void RequestEnlargedPlacementEditor()
+    {
+        if (!CanEdit || !IsAddingTemplate || !HasSelectedLocalSource) return;
+        EnlargedPlacementEditorRequested?.Invoke(this, EventArgs.Empty);
+    }
 
     public BlueprintOffering? SelectedOffering
     {
@@ -1704,6 +1713,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             CreateOptionValueCommand, StartAddVariantCommand, StartBulkVariantsCommand, CreateVariantCommand, StartAddPlaceholderCommand,
             CreatePlaceholderCommand, SetDefaultPlaceholderCommand, StartAddTemplateCommand, CreateTemplateCommand,
             AddTemplateColorCommand, PreviewBulkVariantsCommand, ConfirmBulkVariantsCommand,
+            OpenEnlargedPlacementEditorCommand,
             ConfirmDesignAreaArchiveCommand, CancelDesignAreaArchiveCommand,
             RequestCancelMockupTemplateCommand, ConfirmDiscardMockupTemplateCommand, KeepEditingMockupTemplateCommand,
             RequestCancelDesignAreaCommand, ConfirmDiscardDesignAreaCommand, KeepEditingDesignAreaCommand
