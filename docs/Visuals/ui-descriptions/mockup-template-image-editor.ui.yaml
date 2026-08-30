@@ -1,0 +1,186 @@
+schemaVersion: 1
+tokenProfile: fusioncanvas-wireframe-v1
+screen:
+  id: mockup-template-image-editor
+  title: Edit Mockup Template - Flatlay no. 1
+  viewport:
+    width: 1280
+    height: 1400
+  root:
+    id: page
+    kind: stack
+    gap: section
+    padding: window
+    children:
+      - id: page-header
+        kind: stack
+        gap: tight
+        children:
+          - { id: page-title, kind: text, variant: screen-heading, text: Edit Mockup Template }
+          - { id: page-help, kind: text, variant: supporting, text: 'Upload source images first, then configure each selected image independently.' }
+      - id: template-name-group
+        kind: grid
+        columns: [fill, fill]
+        rowTracks: [content]
+        gap: region
+        children:
+          - id: template-name-fields
+            kind: stack
+            gap: tight
+            column: 0
+            row: 0
+            children:
+              - { id: template-name-label, kind: text, variant: label, text: Template name }
+              - { id: template-name, kind: field, variant: single-line, text: Flatlay no. 1 }
+          - id: shared-design-area-fields
+            kind: stack
+            gap: tight
+            column: 1
+            row: 0
+            children:
+              - { id: shared-design-area-label, kind: text, variant: label, text: Shared Design Area }
+              - { id: shared-design-area, kind: select, variant: standard, text: Front, items: [Front, Back, Left chest] }
+      - id: image-collection
+        kind: panel
+        variant: canvas
+        gap: compact
+        padding: section
+        children:
+          - id: image-collection-header
+            kind: grid
+            columns: [fill, content, content]
+            rowTracks: [content]
+            gap: control
+            children:
+              - id: image-collection-title-group
+                kind: stack
+                gap: tight
+                column: 0
+                row: 0
+                children:
+                  - { id: image-collection-title, kind: text, variant: section-heading, text: Mockup source images }
+                  - { id: image-collection-summary, kind: text, variant: supporting, text: 5 images - 3 complete - 2 need setup }
+              - { id: archive-image, kind: button, variant: secondary, text: Archive selected, width: content, column: 1, row: 0 }
+              - { id: upload-images, kind: button, variant: primary, text: Upload image..., width: content, column: 2, row: 0 }
+          - id: image-table
+            kind: table
+            variant: data-table
+            height: 240
+            tableColumns:
+              - { header: Image file, width: fill }
+              - { header: Applies to, width: fill }
+              - { header: Design area, width: 190 }
+              - { header: Mapping, width: 150 }
+              - { header: Status, width: 170 }
+            tableRows:
+              - [black-flatlay.png, 'Color: Black', Front, Set, Complete]
+              - [white-flatlay.png, 'Color: White', Front, Set, Complete]
+              - [navy-flatlay.png, 'Color: Navy', Front, Set, Complete]
+              - [military-green.png, Not assigned, Front, Not set, Needs setup]
+              - [gray-flatlay.png, Not assigned, Front, Not set, Needs setup]
+          - { id: selection-help, kind: text, variant: supporting, text: Select an image row to edit its applicability and placement below. Uploading does not assign metadata. }
+      - id: selected-image-editor
+        kind: panel
+        variant: canvas
+        height: fill
+        gap: section
+        padding: section
+        children:
+          - id: selected-image-header
+            kind: stack
+            gap: tight
+            children:
+              - { id: selected-image-title, kind: text, variant: section-heading, text: Selected image - military-green.png }
+              - { id: selected-image-status, kind: message, variant: warning, text: 'Needs setup - assign applicability and a valid image-space mapping.' }
+          - id: metadata-layout
+            kind: grid
+            columns: [fill, fill]
+            rowTracks: [fill]
+            gap: region
+            height: fill
+            children:
+              - id: image-placement
+                kind: stack
+                gap: compact
+                height: fill
+                column: 0
+                row: 0
+                children:
+                  - { id: image-preview-title, kind: text, variant: subheading, text: Image and design placement }
+                  - id: image-preview
+                    kind: panel
+                    variant: choice-card
+                    height: 280
+                    gap: section
+                    padding: window
+                    children:
+                      - { id: image-preview-summary, kind: text, variant: supporting, text: 'military-green.png - 2000 x 2000 px' }
+                      - id: mapping-preview
+                        kind: panel
+                        variant: summary-card
+                        height: 120
+                        gap: tight
+                        padding: section
+                        children:
+                          - { id: mapping-preview-title, kind: text, variant: emphasis, text: Design Area placement rectangle }
+                          - { id: mapping-preview-help, kind: text, variant: supporting, text: Drag to move; resize from the lower-right handle. }
+                  - id: replace-row
+                    kind: grid
+                    columns: [fill, content]
+                    rowTracks: [content]
+                    gap: control
+                    children:
+                      - { id: file-identity, kind: text, variant: supporting, text: Managed local source image, column: 0, row: 0 }
+                      - { id: replace-file, kind: button, variant: secondary, text: Replace file..., width: content, column: 1, row: 0 }
+              - id: image-metadata
+                kind: stack
+                gap: compact
+                height: fill
+                column: 1
+                row: 0
+                children:
+                  - { id: applicability-title, kind: text, variant: subheading, text: Applicability }
+                  - { id: applicability-help, kind: text, variant: supporting, text: Choose the Offering option values whose variants use this image. }
+                  - { id: color-label, kind: text, variant: label, text: Color }
+                  - { id: color-values, kind: list, variant: standard, items: ['Black - not selected', 'White - not selected', 'Navy - not selected', 'Military Green - selected', 'Gray - not selected'] }
+                  - { id: add-condition, kind: button, variant: secondary, text: Add Size condition, width: content }
+                  - { id: mapping-title, kind: text, variant: subheading, text: Image-space mapping (pixels) }
+                  - id: mapping-grid
+                    kind: grid
+                    columns: [fill, fill]
+                    rowTracks: [content, content, content, content]
+                    gap: control
+                    children:
+                      - { id: x-label, kind: text, variant: label, text: X, column: 0, row: 0 }
+                      - { id: y-label, kind: text, variant: label, text: Y, column: 1, row: 0 }
+                      - { id: x-field, kind: field, variant: single-line, text: 620 px, column: 0, row: 1 }
+                      - { id: y-field, kind: field, variant: single-line, text: 480 px, column: 1, row: 1 }
+                      - { id: width-label, kind: text, variant: label, text: Width, column: 0, row: 2 }
+                      - { id: height-label, kind: text, variant: label, text: Height, column: 1, row: 2 }
+                      - { id: width-field, kind: field, variant: single-line, text: 710 px, column: 0, row: 3 }
+                      - { id: height-field, kind: field, variant: single-line, text: 910 px, column: 1, row: 3 }
+      - id: dialog-actions
+        kind: grid
+        columns: [fill, content, content]
+        rowTracks: [content]
+        gap: control
+        children:
+          - { id: template-readiness, kind: text, variant: supporting, text: Template draft may be saved before every image is completely configured., column: 0, row: 0 }
+          - { id: cancel, kind: button, variant: secondary, text: Cancel, width: content, column: 1, row: 0 }
+          - { id: save-template, kind: button, variant: primary, text: Save Mockup Template, width: content, column: 2, row: 0 }
+states:
+  selected-incomplete:
+    overrides: []
+  selected-complete:
+    overrides:
+      - { target: selected-image-title, text: Selected image - black-flatlay.png }
+      - { target: selected-image-status, text: 'Complete - Color: Black, Design Area: Front, mapping set.' }
+      - { target: image-preview-summary, text: 'black-flatlay.png - 2000 x 2000 px' }
+      - { target: file-identity, text: Managed local source image }
+      - { target: color-values, items: ['Black - selected', 'White - not selected', 'Navy - not selected', 'Military Green - not selected', 'Gray - not selected'] }
+  no-selection:
+    overrides:
+      - { target: selected-image-title, text: No image selected }
+      - { target: selected-image-status, text: Select an image in the table to configure its metadata and placement. }
+      - { target: image-placement, visible: false }
+      - { target: image-metadata, visible: false }

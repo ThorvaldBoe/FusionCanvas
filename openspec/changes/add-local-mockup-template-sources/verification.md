@@ -1,29 +1,61 @@
 # Verification
 
-## Focused evidence
+## Status
 
-| Acceptance area | Evidence | Result |
-|---|---|---|
-| Local source image is managed, store-owned, and independent of a provider API | `MockupTemplateSourceImageService.AddAsync`; `MockupTemplateSourceImage` domain model; application build | Pass |
-| One image can apply to one or more arbitrary option values | `MockupTemplateSourcePolicyTests.Resolve_UsesAllOptionValuesAndReportsMissingAndAmbiguousVariants`; conjunction matching in policy | Pass |
-| Missing and ambiguous variant coverage is explicit and blocks readiness | `MockupTemplateSourcePolicy`; focused domain tests | Pass |
-| Source mappings are positive and in bounds | `MockupImageSpaceMapping`; `SourceEntities_RejectEmptyIdentityAndInvalidMapping` | Pass |
-| Source and revision graphs persist through SQLite schema 13 | `SqliteWorkspaceRepository` schema/table mappings and load/save paths; Integration project build | Pass (focused round-trip test remains follow-up) |
-| Asset removal is blocked for current or historical source references | `AssetManagementService.RemoveAssetAsync` dependency guard | Pass |
-| Editor exposes a keyboard-accessible Browse action and local path | `MockupTemplateEditorWindow.axaml`, injected `IAssetFilePicker`, `BrowseLocalSourceCommand`; App build | Pass |
-| One named template can collect multiple color-specific source entries | `LocalSourceDrafts` collection, repeated Browse actions, collection ItemsControl, repeated source import for one created template, and reload of managed entries when editing | Pass for collection creation and reload; per-entry edit/mapping UI remains incomplete |
-| Provider/API behavior remains deferred and no credentials are introduced | No provider calls in local source service; no secret fields added | Pass |
-| Existing provider-candidate status behavior | Existing `product-supplier-setup` provider-state tests and source remains available for future adapters | Not applicable to local-only path |
+The package was revised after manual UX feedback. Earlier focused passes remain useful implementation history, but they do not satisfy the revised acceptance criteria. Every result below is pending until the master-detail workflow and incomplete-entry model are implemented and reverified.
 
-## Commands
+## Acceptance-to-evidence map
 
-- `dotnet build .\src\FusionCanvas.App\FusionCanvas.App.csproj --no-restore -v minimal` — passed.
-- `dotnet test .\tests\FusionCanvas.Domain.Tests\FusionCanvas.Domain.Tests.csproj --no-restore --filter FullyQualifiedName~MockupTemplateSourcePolicy` — 3 passed.
-- `dotnet test .\tests\FusionCanvas.Integration.Tests\FusionCanvas.Integration.Tests.csproj --no-restore -v normal` — 189 passed.
-- `dotnet test .\tests\FusionCanvas.Application.Tests\FusionCanvas.Application.Tests.csproj --no-restore -v normal` — build/test process completed without errors.
-- `openspec validate add-local-mockup-template-sources --strict` — passed before implementation; rerun after final edits.
-- `dotnet test .\FusionCanvas.sln --no-restore -v minimal` — Domain 235 passed, Application 384 passed, Integration 189 passed; solution build/test target completed successfully.
+| Capability and scenario | Planned deterministic evidence | Result |
+| --- | --- | --- |
+| Source images — Creator adds a local source image | Application service tests for managed import and stable Asset identity; SQLite round trip | Pending |
+| Source images — Creator saves uploaded images before configuring them | Domain optional-state tests; Application save/reload test; SQLite incomplete-row round trip; headless row-status test | Pending |
+| Source images — Import cannot complete | Application fake file-store/inspector failure tests and cleanup assertions | Pending |
+| Source images — Creator replaces a source image | Application revision-provenance test and SQLite current/history reconstruction | Pending |
+| Source images — Creator archives a source image | Domain/Application archive and readiness tests; ViewModel selection-aftermath test; headless confirmation/action-state test | Pending |
+| Applicability — Creator configures common color-specific source images | Domain one-Color/all-Sizes resolution test; ViewModel default-control test | Pending |
+| Applicability — Creator selects alternatives within and conditions across Options | Domain parameterized OR-within/AND-between tests using stable Option/Value identities | Pending |
+| Applicability — Creator attempts an invalid applicability assignment | Domain/Application ownership, archived-record, empty-group, and duplicate validation tests | Pending |
+| Applicability — Creator leaves applicability unconfigured | Domain no-match test; Application completeness summary test; SQLite zero-condition round trip | Pending |
+| Resolution — Color-only images cover every compatible variant | Domain exact-one policy test and Application ready summary | Pending |
+| Resolution — A variant has no matching image | Domain missing-result test asserting other exact-one results remain intact | Pending |
+| Resolution — A variant matches more than one image | Domain ambiguity test asserting no implicit choice and unaffected results remain intact | Pending |
+| Resolution — A future consumer requests an unresolved variant | Domain/Application result-contract test asserting recoverable per-Variant outcome without aggregate exception | Pending |
+| Mapping — Creator adds a source image | Application/ViewModel test asserting inspected dimensions and absent initial mapping | Pending |
+| Mapping — Creator configures placement for one image | Domain bounds test; ViewModel selection/draft-retention test; SQLite source-specific mapping round trip | Pending |
+| Mapping — Creator enters an invalid mapping | Domain/Application validation test and headless inline-error/save-state test | Pending |
+| Revision — Creator changes source applicability | Domain revision-copy test and SQLite immutable-history round trip | Pending |
+| Asset protection — Creator attempts to delete a referenced asset | Application dependency-guard tests for current and historical source references | Pending |
+| Editor — Creator opens a new Template dialog | Headless construction, accessible-name, focus, and provider-state-absence test | Pending |
+| Editor — Creator uploads images independently of metadata | ViewModel picker/draft test and headless table/lower-editor binding test | Pending |
+| Editor — Creator selects an image row | ViewModel per-row draft-retention test and headless selection test | Pending |
+| Editor — Editor reports image completeness | Framework-free completeness tests and headless complete/incomplete/status presentation test | Pending |
+| Editor — Creator cancels while configuring sources | ViewModel discard-state test and headless Escape/close/focus test | Pending |
+| Editor — Archived Store is reviewed | ViewModel command-state test and headless read-only presentation test | Pending |
+| Supplier setup — User opens local source-image configuration | Headless persistent-label, instruction, and upload-action accessibility test | Pending |
+| Supplier setup — Template has no source images | ViewModel empty-state test and headless upload-enabled test | Pending |
+| Supplier setup — Template source configuration is incomplete | Application per-Variant summary test; headless actionable state; save-remains-enabled test | Pending |
+| Supplier setup — Template source configuration is ready | Application readiness test and headless selected-image placement presentation | Pending |
+| Supplier setup — Local source import fails | Application failure-preservation test and headless recoverable-error presentation | Pending |
 
-## Review notes
+## Design evidence
 
-The implementation intentionally excludes Printify/API retrieval, credential handling, drag-and-drop, rendering/export, and marketplace integration. The current UI uses a Browse picker; richer multi-entry draft editing and headless dialog coverage remain follow-up work before archive.
+- Validate `docs/Visuals/ui-descriptions/mockup-template-image-editor.ui.yaml`.
+- Render and retain `selected-incomplete`, `selected-complete`, and `no-selection` states.
+- Compare the implemented AXAML hierarchy and interaction states with the approved semantic source; document intentional differences.
+
+## Required commands
+
+- `dotnet run --project .\tools\FusionCanvas.UiDescription -- validate .\docs\Visuals\ui-descriptions\mockup-template-image-editor.ui.yaml`
+- Render all three declared UI-description states with the documented renderer.
+- `dotnet test .\tests\FusionCanvas.Domain.Tests\FusionCanvas.Domain.Tests.csproj`
+- `dotnet test .\tests\FusionCanvas.Application.Tests\FusionCanvas.Application.Tests.csproj`
+- `dotnet test .\tests\FusionCanvas.Integration.Tests\FusionCanvas.Integration.Tests.csproj`
+- `dotnet test .\tests\FusionCanvas.App.Tests\FusionCanvas.App.Tests.csproj`
+- `dotnet test .\tests\FusionCanvas.UiDescription.Tests\FusionCanvas.UiDescription.Tests.csproj`
+- `openspec validate add-local-mockup-template-sources --strict`
+- `dotnet test .\FusionCanvas.sln`
+
+## Changed-scope review
+
+Before completion, review architecture placement, optional-state invariants, SQLite migration compatibility, file and image-input safety, Asset/revision retention, keyboard/focus behavior, UI-description drift, and delta-to-implementation drift. Printify/API retrieval, credentials, drag-and-drop, rendering/composition, Listing integration, and marketplace publication remain excluded.
