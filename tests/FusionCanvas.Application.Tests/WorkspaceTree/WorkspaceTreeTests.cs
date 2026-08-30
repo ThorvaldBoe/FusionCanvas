@@ -254,4 +254,23 @@ public class WorkspaceTreeTests
         Assert.True(projection.CanReorderBetweenSiblings);
         Assert.Single(projection.Roots);
     }
+
+    [Fact]
+    public void Project_RatingFilterMatchesExactAndUnratedItems()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
+        var niche = new Niche(Guid.NewGuid(), store.Id, "Niche", null, false, now, now, "{}");
+        var rated = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Rated", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{\"idea.rating\":\"3\"}");
+        var unrated = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Unrated", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var snapshot = new WorkspaceSnapshot([store], [niche], [], [rated, unrated], [], [], [], [], []);
+
+        var exact = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery { IdeaRating = 3 });
+        Assert.Contains(exact.Roots.Single().Children, node => node.EntityId == rated.Id);
+        Assert.DoesNotContain(exact.Roots.Single().Children, node => node.EntityId == unrated.Id);
+
+        var clear = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery { IdeaRating = 0 });
+        Assert.Contains(clear.Roots.Single().Children, node => node.EntityId == unrated.Id);
+        Assert.DoesNotContain(clear.Roots.Single().Children, node => node.EntityId == rated.Id);
+    }
 }

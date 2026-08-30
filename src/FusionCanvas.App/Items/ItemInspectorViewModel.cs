@@ -39,6 +39,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
     private string _phrase = string.Empty;
     private string _graphicDirection = string.Empty;
     private string _sll = string.Empty;
+    private int _ideaRating;
     private string _notes = string.Empty;
     private string _tagInput = string.Empty;
     private string? _errorMessage;
@@ -77,6 +78,16 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
             }
         });
         OptimizeCommand = new RelayCommand(_ => Run(OptimizeTitleAsync()), () => CanOptimize);
+        SetIdeaRatingCommand = new RelayCommand(parameter =>
+        {
+            var rating = parameter switch
+            {
+                int value => value,
+                string text when int.TryParse(text, out var value) => value,
+                _ => -1
+            };
+            if (rating >= 0) Run(SetIdeaRatingAsync(rating));
+        });
         RequestArchiveCommand = new RelayCommand(_ => ArchiveConfirmationVisible = true, () => CanArchive);
         ConfirmArchiveCommand = new RelayCommand(_ => Run(ConfirmArchiveAsync()));
         CancelArchiveCommand = new RelayCommand(_ => ArchiveConfirmationVisible = false);
@@ -288,6 +299,32 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         }
     }
 
+    public int IdeaRating
+    {
+        get => _ideaRating;
+        private set
+        {
+            if (SetField(ref _ideaRating, value))
+            {
+                OnPropertyChanged(nameof(IdeaRatingLabel));
+                OnPropertyChanged(nameof(IsIdeaRatingStar1Selected));
+                OnPropertyChanged(nameof(IsIdeaRatingStar2Selected));
+                OnPropertyChanged(nameof(IsIdeaRatingStar3Selected));
+                OnPropertyChanged(nameof(IsIdeaRatingStar4Selected));
+                OnPropertyChanged(nameof(IsIdeaRatingStar5Selected));
+                OnPropertyChanged(nameof(IsRated));
+            }
+        }
+    }
+
+    public bool IsRated => IdeaRating > 0;
+    public string IdeaRatingLabel => IdeaRating == 0 ? "Unrated" : $"Rated {IdeaRating} of 5 stars";
+    public bool IsIdeaRatingStar1Selected => IdeaRating >= 1;
+    public bool IsIdeaRatingStar2Selected => IdeaRating >= 2;
+    public bool IsIdeaRatingStar3Selected => IdeaRating >= 3;
+    public bool IsIdeaRatingStar4Selected => IdeaRating >= 4;
+    public bool IsIdeaRatingStar5Selected => IdeaRating >= 5;
+
     public string Notes
     {
         get => _notes;
@@ -447,6 +484,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
     public ICommand ConfirmDeleteCommand { get; }
     public ICommand CancelDeleteCommand { get; }
     public ICommand OptimizeCommand { get; }
+    public ICommand SetIdeaRatingCommand { get; }
 
     public async Task LoadAsync(Guid itemId, CancellationToken cancellationToken = default)
     {
@@ -488,6 +526,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         Phrase = string.Empty;
         GraphicDirection = string.Empty;
         Sll = string.Empty;
+        IdeaRating = 0;
         Notes = string.Empty;
         TagDraft.Clear();
         TagInput = string.Empty;
@@ -702,6 +741,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
             ? (state.Creative.GraphicDirection ?? string.Empty)
             : GraphicDirection;
         Sll = Sll == snapshot.Sll ? (state.Sll ?? string.Empty) : Sll;
+        IdeaRating = state.IdeaRating;
         Notes = Notes == snapshot.Notes ? (state.Notes ?? string.Empty) : Notes;
         if (TagDraft.SequenceEqual(snapshot.TagDraft))
         {
@@ -750,6 +790,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         Phrase = state.Creative.Phrase ?? string.Empty;
         GraphicDirection = state.Creative.GraphicDirection ?? string.Empty;
         Sll = state.Sll ?? string.Empty;
+        IdeaRating = state.IdeaRating;
         Notes = state.Notes ?? string.Empty;
         TagDraft.Clear();
         foreach (var tag in state.Tags)
@@ -776,6 +817,30 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         _originalNotes = Notes;
         _originalTagNames = [.. TagDraft];
         RaiseDirty();
+    }
+
+    private async Task SetIdeaRatingAsync(int rating)
+    {
+        if (_state is not { } state || !CanEditShared || rating is < 0 or > 5)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        ErrorMessage = null;
+        var result = await _service.SaveStageAsync(new ItemStageAwareSaveRequest(
+            state.Id, state.Stage, _originalTitle, _originalNotes,
+            CreateStagePayload(state.Stage), _originalTagNames, rating)).ConfigureAwait(true);
+        IsBusy = false;
+        if (!result.Succeeded)
+        {
+            ErrorMessage = result.Error;
+            return;
+        }
+
+        State = result.State;
+        IdeaRating = result.State!.IdeaRating;
+        Saved?.Invoke(this, EventArgs.Empty);
     }
 
     private async Task AddTagAsync()

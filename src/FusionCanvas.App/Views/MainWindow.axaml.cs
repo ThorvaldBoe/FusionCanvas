@@ -79,14 +79,14 @@ public partial class MainWindow : Window
         {
             if (args.PropertyName == nameof(WorkspaceManagementViewModel.IsWorkspaceManagementOpen))
             {
-                SyncWorkspaceManagementWindow(viewModel.WorkspaceManagement);
+                Dispatcher.UIThread.Post(() => SyncWorkspaceManagementWindow(viewModel.WorkspaceManagement), DispatcherPriority.Background);
             }
         };
         viewModel.AssetsManagement.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(AssetsViewModel.IsOpen))
             {
-                SyncAssetsWindow(viewModel.AssetsManagement);
+                Dispatcher.UIThread.Post(() => SyncAssetsWindow(viewModel.AssetsManagement), DispatcherPriority.Background);
             }
         };
         viewModel.PropertyChanged += (_, args) =>
@@ -101,21 +101,26 @@ public partial class MainWindow : Window
         {
             if (args.PropertyName == nameof(IdeationViewModel.IsOpen))
             {
-                SyncIdeationWindow(viewModel.Ideation);
+                Dispatcher.UIThread.Post(() => SyncIdeationWindow(viewModel.Ideation), DispatcherPriority.Background);
             }
         };
         viewModel.DesignTool.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(DesignStageToolViewModel.ShowPreviewDialog))
             {
-                SyncDesignPreviewWindow(viewModel.DesignTool);
+                Dispatcher.UIThread.Post(() => SyncDesignPreviewWindow(viewModel.DesignTool), DispatcherPriority.Background);
             }
         };
         viewModel.Settings.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(SettingsViewModel.IsOpen))
             {
-                SyncSettingsWindow(viewModel.Settings);
+                // SettingsWindow updates this property from its Closing handler.
+                // Defer synchronization until that close has completed so native
+                // geometry can be captured without re-entering Window.Close.
+                Dispatcher.UIThread.Post(
+                    () => SyncSettingsWindow(viewModel.Settings),
+                    DispatcherPriority.Background);
             }
         };
         DataContext = viewModel;
@@ -219,7 +224,7 @@ public partial class MainWindow : Window
             _settingsWindow = new SettingsWindow { DataContext = settings };
             if (_settings is not null)
             {
-                WindowGeometryPersistence.Attach(_settingsWindow, _settings, WindowLayoutKeys.Settings, _settingsWindow.MinWidth, _settingsWindow.MinHeight);
+                WindowGeometryRegistrar.Register(_settingsWindow, _settings, WindowLayoutKeys.Settings, _settingsWindow.MinWidth, _settingsWindow.MinHeight);
             }
             _settingsWindow.Closed += (_, _) =>
             {
@@ -251,7 +256,7 @@ public partial class MainWindow : Window
             _workspaceManagementWindow = new WorkspaceManagementWindow { DataContext = workspaceManagement };
             if (_settings is not null)
             {
-                WindowGeometryPersistence.Attach(_workspaceManagementWindow, _settings, WindowLayoutKeys.WorkspaceManagement, _workspaceManagementWindow.MinWidth, _workspaceManagementWindow.MinHeight);
+                WindowGeometryRegistrar.Register(_workspaceManagementWindow, _settings, WindowLayoutKeys.WorkspaceManagement, _workspaceManagementWindow.MinWidth, _workspaceManagementWindow.MinHeight);
             }
             _workspaceManagementWindow.Closed += (_, _) =>
             {
@@ -290,7 +295,7 @@ public partial class MainWindow : Window
             if (_settings is not null)
             {
                 _storeEditorWindow.GeometryStore = _settings;
-                WindowGeometryPersistence.Attach(_storeEditorWindow, _settings, WindowLayoutKeys.StoreEditor, _storeEditorWindow.MinWidth, _storeEditorWindow.MinHeight);
+                WindowGeometryRegistrar.Register(_storeEditorWindow, _settings, WindowLayoutKeys.StoreEditor, _storeEditorWindow.MinWidth, _storeEditorWindow.MinHeight);
             }
             _storeEditorWindow.Closed += (_, _) =>
             {
@@ -318,7 +323,7 @@ public partial class MainWindow : Window
             assets.FilePicker = new AvaloniaAssetFilePicker(_assetsWindow.StorageProvider);
             if (_settings is not null)
             {
-                WindowGeometryPersistence.Attach(_assetsWindow, _settings, WindowLayoutKeys.Assets, _assetsWindow.MinWidth, _assetsWindow.MinHeight);
+                WindowGeometryRegistrar.Register(_assetsWindow, _settings, WindowLayoutKeys.Assets, _assetsWindow.MinWidth, _assetsWindow.MinHeight);
             }
             _assetsWindow.Closed += (_, _) =>
             {
@@ -348,7 +353,7 @@ public partial class MainWindow : Window
             if (_settings is not null)
             {
                 _ideationWindow.GeometryStore = _settings;
-                WindowGeometryPersistence.Attach(_ideationWindow, _settings, WindowLayoutKeys.Ideation, _ideationWindow.MinWidth, _ideationWindow.MinHeight);
+                WindowGeometryRegistrar.Register(_ideationWindow, _settings, WindowLayoutKeys.Ideation, _ideationWindow.MinWidth, _ideationWindow.MinHeight);
             }
             _ideationWindow.Closed += (_, _) =>
             {
@@ -379,7 +384,7 @@ public partial class MainWindow : Window
             _designPreviewWindow = new DesignPreviewWindow { DataContext = designTool };
             if (_settings is not null)
             {
-                WindowGeometryPersistence.Attach(_designPreviewWindow, _settings, WindowLayoutKeys.DesignPreview, _designPreviewWindow.MinWidth, _designPreviewWindow.MinHeight);
+                WindowGeometryRegistrar.Register(_designPreviewWindow, _settings, WindowLayoutKeys.DesignPreview, _designPreviewWindow.MinWidth, _designPreviewWindow.MinHeight);
             }
             _designPreviewWindow.Closed += (_, _) =>
             {
@@ -1187,7 +1192,7 @@ public partial class MainWindow : Window
         var window = new ItemImportWindow { DataContext = import };
         if (_settings is not null)
         {
-            WindowGeometryPersistence.Attach(window, _settings, WindowLayoutKeys.ItemImport, window.MinWidth, window.MinHeight);
+            WindowGeometryRegistrar.Register(window, _settings, WindowLayoutKeys.ItemImport, window.MinWidth, window.MinHeight);
         }
         await window.ShowDialog(this);
         if (import.HasImportCompleted)

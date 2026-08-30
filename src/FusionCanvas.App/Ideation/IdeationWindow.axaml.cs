@@ -50,7 +50,7 @@ public partial class IdeationWindow : Window
         _rejectWindow = new RejectIdeaWindow { DataContext = viewModel };
         if (GeometryStore is { } rejectStore)
         {
-            WindowGeometryPersistence.Attach(_rejectWindow, rejectStore, WindowLayoutKeys.RejectIdea, _rejectWindow.MinWidth, _rejectWindow.MinHeight);
+            WindowGeometryRegistrar.Register(_rejectWindow, rejectStore, WindowLayoutKeys.RejectIdea, _rejectWindow.MinWidth, _rejectWindow.MinHeight);
         }
         await _rejectWindow.ShowDialog(this);
         _rejectWindow = null;
@@ -76,7 +76,7 @@ public partial class IdeationWindow : Window
         _snowcloneLibraryWindow = new SnowcloneLibraryWindow { DataContext = library };
         if (GeometryStore is { } snowcloneStore)
         {
-            WindowGeometryPersistence.Attach(_snowcloneLibraryWindow, snowcloneStore, WindowLayoutKeys.SnowcloneLibrary, _snowcloneLibraryWindow.MinWidth, _snowcloneLibraryWindow.MinHeight);
+            WindowGeometryRegistrar.Register(_snowcloneLibraryWindow, snowcloneStore, WindowLayoutKeys.SnowcloneLibrary, _snowcloneLibraryWindow.MinWidth, _snowcloneLibraryWindow.MinHeight);
         }
         await _snowcloneLibraryWindow.ShowDialog(this);
         _snowcloneLibraryWindow = null;
@@ -100,7 +100,7 @@ public partial class IdeationWindow : Window
         _rejectedPhrasesWindow = new RejectedPhrasesWindow { DataContext = manager };
         if (GeometryStore is { } rejectedPhrasesStore)
         {
-            WindowGeometryPersistence.Attach(_rejectedPhrasesWindow, rejectedPhrasesStore, WindowLayoutKeys.RejectedPhrases, _rejectedPhrasesWindow.MinWidth, _rejectedPhrasesWindow.MinHeight);
+            WindowGeometryRegistrar.Register(_rejectedPhrasesWindow, rejectedPhrasesStore, WindowLayoutKeys.RejectedPhrases, _rejectedPhrasesWindow.MinWidth, _rejectedPhrasesWindow.MinHeight);
         }
         await _rejectedPhrasesWindow.ShowDialog(this);
         _rejectedPhrasesWindow = null;

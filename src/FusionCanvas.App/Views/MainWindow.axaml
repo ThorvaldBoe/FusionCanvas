@@ -184,6 +184,22 @@
                 <ComboBoxItem Content="Paused" />
                 <ComboBoxItem Content="Rejected" />
               </ComboBox>
+              <ComboBox x:Name="IdeaRatingFilter"
+                        SelectedIndex="{Binding WorkspaceTree.IdeaRatingFilterIndex}"
+                        MinWidth="110"
+                        MinHeight="34"
+                        ToolTip.Tip="Filter Items by idea rating"
+                        AutomationProperties.Name="Idea rating filter"
+                        Classes="statusSelector"
+                        Margin="0,0,6,6">
+                <ComboBoxItem Content="All ratings" />
+                <ComboBoxItem Content="Unrated" />
+                <ComboBoxItem Content="★ 1" />
+                <ComboBoxItem Content="★ 2" />
+                <ComboBoxItem Content="★ 3" />
+                <ComboBoxItem Content="★ 4" />
+                <ComboBoxItem Content="★ 5" />
+              </ComboBox>
               <Button Content="Filters"
                       ToolTip.Tip="Filter by tag, topic scope, or archived work"
                       Command="{Binding WorkspaceTree.ClearFiltersCommand}"
@@ -694,6 +710,28 @@
                                     AutomationProperties.Name="Optimize title" />
                           </Border>
                         </Grid>
+                      </StackPanel>
+                      <StackPanel Spacing="4">
+                        <TextBlock Text="Idea potential"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <StackPanel Orientation="Horizontal" Spacing="2"
+                                    AutomationProperties.Name="{Binding ItemInspector.IdeaRatingLabel}">
+                          <TextBlock Text="★" Classes="ideaRatingStar" Classes.selected="{Binding ItemInspector.IsIdeaRatingStar1Selected}" />
+                          <TextBlock Text="★" Classes="ideaRatingStar" Classes.selected="{Binding ItemInspector.IsIdeaRatingStar2Selected}" />
+                          <TextBlock Text="★" Classes="ideaRatingStar" Classes.selected="{Binding ItemInspector.IsIdeaRatingStar3Selected}" />
+                          <TextBlock Text="★" Classes="ideaRatingStar" Classes.selected="{Binding ItemInspector.IsIdeaRatingStar4Selected}" />
+                          <TextBlock Text="★" Classes="ideaRatingStar" Classes.selected="{Binding ItemInspector.IsIdeaRatingStar5Selected}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="2">
+                          <Button Content="★" Command="{Binding ItemInspector.SetIdeaRatingCommand}" CommandParameter="1" IsEnabled="{Binding ItemInspector.CanEditShared}" ToolTip.Tip="Rate 1 star" AutomationProperties.Name="Rate 1 star" />
+                          <Button Content="★" Command="{Binding ItemInspector.SetIdeaRatingCommand}" CommandParameter="2" IsEnabled="{Binding ItemInspector.CanEditShared}" ToolTip.Tip="Rate 2 stars" AutomationProperties.Name="Rate 2 stars" />
+                          <Button Content="★" Command="{Binding ItemInspector.SetIdeaRatingCommand}" CommandParameter="3" IsEnabled="{Binding ItemInspector.CanEditShared}" ToolTip.Tip="Rate 3 stars" AutomationProperties.Name="Rate 3 stars" />
+                          <Button Content="★" Command="{Binding ItemInspector.SetIdeaRatingCommand}" CommandParameter="4" IsEnabled="{Binding ItemInspector.CanEditShared}" ToolTip.Tip="Rate 4 stars" AutomationProperties.Name="Rate 4 stars" />
+                          <Button Content="★" Command="{Binding ItemInspector.SetIdeaRatingCommand}" CommandParameter="5" IsEnabled="{Binding ItemInspector.CanEditShared}" ToolTip.Tip="Rate 5 stars" AutomationProperties.Name="Rate 5 stars" />
+                          <Button Content="Clear" Command="{Binding ItemInspector.SetIdeaRatingCommand}" CommandParameter="0" IsEnabled="{Binding ItemInspector.CanEditShared}" ToolTip.Tip="Clear idea rating" AutomationProperties.Name="Clear idea rating" />
+                          <TextBlock Text="{Binding ItemInspector.IdeaRatingLabel}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource SecondaryTextBrush}" />
+                        </StackPanel>
                       </StackPanel>
                     </StackPanel>
                   </Border>
@@ -1899,6 +1937,13 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.ideaRatingStar">
+      <Setter Property="FontSize" Value="20" />
+      <Setter Property="Foreground" Value="#7A8088" />
+    </Style>
+    <Style Selector="TextBlock.ideaRatingStar.selected">
+      <Setter Property="Foreground" Value="#F6C445" />
     </Style>
     <Style Selector="Border.tabFrame">
       <Setter Property="Margin" Value="0,0,4,0" />

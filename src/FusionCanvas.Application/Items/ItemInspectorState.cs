@@ -20,5 +20,6 @@ public sealed record ItemInspectorState(
     DateTimeOffset UpdatedAt,
     string? Sll)
 {
+    public int IdeaRating { get; init; }
     public bool IsReadOnly => !IsEffectivelyActive;
 }
