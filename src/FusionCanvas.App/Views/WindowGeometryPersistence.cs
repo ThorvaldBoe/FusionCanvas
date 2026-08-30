@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Threading;
 using FusionCanvas.Application.Settings;
 
 namespace FusionCanvas.App.Views;
@@ -18,6 +19,10 @@ internal static class WindowGeometryPersistence
         ArgumentNullException.ThrowIfNull(windowKey);
 
         WindowGeometrySettings? lastNormalGeometry = null;
+        var captureTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(250)
+        };
 
         void CaptureNormalGeometry()
         {
@@ -34,15 +39,19 @@ internal static class WindowGeometryPersistence
             }
         }
 
+        captureTimer.Tick += (_, _) => CaptureNormalGeometry();
+
         window.Opened += (_, _) =>
         {
             Restore(window, store, windowKey, minimumWindowWidth, minimumWindowHeight);
             CaptureNormalGeometry();
+            captureTimer.Start();
         };
         window.SizeChanged += (_, _) => CaptureNormalGeometry();
         window.PositionChanged += (_, _) => CaptureNormalGeometry();
         window.Closed += (_, _) =>
         {
+            captureTimer.Stop();
             CaptureNormalGeometry();
             if (lastNormalGeometry is not null)
             {
