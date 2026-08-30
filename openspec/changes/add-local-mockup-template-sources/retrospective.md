@@ -19,3 +19,9 @@ The template is explicitly a reusable collection: one named Mockup Template owns
 - The validated UI-language mockup is the approved semantic design reference for the remaining master-detail implementation.
 - Actual mockup rendering/generation remains deferred; this change supplies recoverable per-Variant resolution outcomes for that later consumer.
 - Printify/API-backed source selection remains explicitly deferred.
+
+## Learning Review
+
+- Reviewed user feedback, revised delta and main specs, implementation diff, test results, and UI-language evidence.
+- Promoted reusable lessons: grouped Option applicability semantics, independent upload/metadata state, and master-detail editor guidance are now reflected in capability specs and product UI guidance.
+- No additional durable lessons or unresolved scope changes were identified; deferred integrations remain explicitly out of scope.

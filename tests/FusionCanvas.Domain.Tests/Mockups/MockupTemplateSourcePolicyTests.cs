@@ -28,9 +28,11 @@ public sealed class MockupTemplateSourcePolicyTests
 
         var results = MockupTemplateSourcePolicy.Resolve([firstVariant, secondVariant], [image, image2, image3], conditions);
 
-        Assert.Equal(MockupTemplateSourceResolutionKind.Resolved, results[0].Kind);
-        Assert.Equal(image.Id, Assert.Single(results[0].SourceImageIds));
-        Assert.Equal(MockupTemplateSourceResolutionKind.Ambiguous, results[1].Kind);
+        var firstResult = Assert.Single(results, value => value.VariantId == firstVariant.Id);
+        var secondResult = Assert.Single(results, value => value.VariantId == secondVariant.Id);
+        Assert.Equal(MockupTemplateSourceResolutionKind.Resolved, firstResult.Kind);
+        Assert.Equal(image.Id, Assert.Single(firstResult.SourceImageIds));
+        Assert.Equal(MockupTemplateSourceResolutionKind.Ambiguous, secondResult.Kind);
         Assert.False(MockupTemplateSourcePolicy.IsReady(results));
     }
 
@@ -52,5 +54,33 @@ public sealed class MockupTemplateSourcePolicyTests
     {
         Assert.Throws<ArgumentException>(() => new MockupTemplateSourceImage(Guid.Empty, Guid.NewGuid(), Guid.NewGuid(), new MockupImageSpaceMapping(100, 100, 0, 0, 100, 100), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow));
         Assert.Throws<ArgumentOutOfRangeException>(() => new MockupImageSpaceMapping(100, 100, 90, 0, 20, 20));
+    }
+
+    [Fact]
+    public void Resolve_UsesOrWithinOptionAndAndAcrossOptions_AndIgnoresIncompleteImages()
+    {
+        var offering = Guid.NewGuid();
+        var colorOption = Guid.NewGuid();
+        var sizeOption = Guid.NewGuid();
+        var black = new OfferingOptionValue(Guid.NewGuid(), colorOption, offering, "Black", 0);
+        var navy = new OfferingOptionValue(Guid.NewGuid(), colorOption, offering, "Navy", 1);
+        var medium = new OfferingOptionValue(Guid.NewGuid(), sizeOption, offering, "M", 0);
+        var large = new OfferingOptionValue(Guid.NewGuid(), sizeOption, offering, "L", 1);
+        var variant = new OfferingVariant(Guid.NewGuid(), offering, "Navy M", [navy.Id, medium.Id], false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        var image = new MockupTemplateSourceImage(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new MockupImageSpaceMapping(100, 100, 0, 0, 100, 100), false, variant.CreatedAt, variant.UpdatedAt);
+        var incomplete = new MockupTemplateSourceImage(Guid.NewGuid(), image.MockupTemplateId, Guid.NewGuid(), null, false, variant.CreatedAt, variant.UpdatedAt, 100, 100);
+        var conditions = new[]
+        {
+            new MockupTemplateSourceImageOptionValue(image.Id, black.Id),
+            new MockupTemplateSourceImageOptionValue(image.Id, navy.Id),
+            new MockupTemplateSourceImageOptionValue(image.Id, medium.Id),
+            new MockupTemplateSourceImageOptionValue(image.Id, large.Id),
+            new MockupTemplateSourceImageOptionValue(incomplete.Id, navy.Id)
+        };
+
+        var result = Assert.Single(MockupTemplateSourcePolicy.Resolve([variant], [image, incomplete], conditions, [black, navy, medium, large]));
+
+        Assert.Equal(MockupTemplateSourceResolutionKind.Resolved, result.Kind);
+        Assert.Equal(image.Id, Assert.Single(result.SourceImageIds));
     }
 }

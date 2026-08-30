@@ -40,13 +40,25 @@ public sealed class VariantChoiceViewModel(OfferingVariant variant) : Selectable
     public OfferingVariant Variant { get; } = variant;
 }
 
-public sealed class LocalMockupSourceDraftViewModel(string path, IReadOnlyList<Guid> optionValueIds, bool isManaged = false)
+public sealed class LocalMockupSourceDraftViewModel(string path, IReadOnlyList<Guid> optionValueIds, bool isManaged = false, MockupImageSpaceMapping? mapping = null, int imageWidth = 0, int imageHeight = 0, Guid? sourceImageId = null)
 {
     public string Path { get; } = path;
     public string DisplayName => System.IO.Path.GetFileName(Path);
-    public IReadOnlyList<Guid> OptionValueIds { get; } = optionValueIds;
+    public IReadOnlyList<Guid> OptionValueIds { get; private set; } = optionValueIds;
     public bool IsManaged { get; } = isManaged;
-    public string ApplicabilitySummary { get; init; } = string.Empty;
+    public Guid? SourceImageId { get; } = sourceImageId;
+    public MockupImageSpaceMapping? Mapping { get; private set; } = mapping;
+    public int ImageWidth { get; } = imageWidth > 0 ? imageWidth : mapping?.ImageWidth ?? 0;
+    public int ImageHeight { get; } = imageHeight > 0 ? imageHeight : mapping?.ImageHeight ?? 0;
+    public string ApplicabilitySummary { get; set; } = string.Empty;
+    public bool IsComplete => OptionValueIds.Count > 0 && Mapping is not null;
+    public string StatusLabel => IsComplete ? "Complete" : "Needs setup";
+    public void UpdateMetadata(IReadOnlyList<Guid> optionValueIds, MockupImageSpaceMapping? mapping, string summary)
+    {
+        OptionValueIds = optionValueIds;
+        Mapping = mapping;
+        ApplicabilitySummary = summary;
+    }
 }
 
 /// <summary>Presentation state for the authoritative normalized Blueprint Offering editor.</summary>
@@ -88,6 +100,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private string _artworkBackground = string.Empty;
     private string _templateName = string.Empty;
     private string _localSourcePath = string.Empty;
+    private LocalMockupSourceDraftViewModel? _selectedLocalSource;
     private string _error = string.Empty;
     private bool _isBusy;
     private bool _isAddingOption;
@@ -173,6 +186,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         CreateTemplateCommand = new AsyncRelayCommand(CreateTemplateAsync, CanCreateTemplate);
         BrowseLocalSourceCommand = new AsyncRelayCommand(BrowseLocalSourceAsync, () => CanEdit && IsAddingTemplate && _sourceImages is not null);
         RemoveLocalSourceCommand = new RelayCommand(parameter => RemoveLocalSource(parameter as LocalMockupSourceDraftViewModel), () => CanEdit && IsAddingTemplate);
+        SelectLocalSourceCommand = new RelayCommand(parameter => SelectLocalSource(parameter as LocalMockupSourceDraftViewModel), () => CanEdit && IsAddingTemplate);
         AddTemplateColorCommand = new AsyncRelayCommand(AddTemplateColorAsync, () => CanEdit && SelectedTemplate is not null && SelectedColor is not null);
         ArchiveOptionCommand = new RelayCommand(parameter => RunArchive(parameter, CatalogRecordKind.Option));
         ArchiveOptionValueCommand = new RelayCommand(parameter => RunArchive(parameter, CatalogRecordKind.OptionValue));
@@ -225,11 +239,16 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ObservableCollection<BulkVariantCandidate> BulkPreviewCandidates { get; } = [];
     public ObservableCollection<ProviderMockupCandidateDescriptor> ProviderMockupCandidates { get; } = [];
     public ObservableCollection<OptionValueChoiceViewModel> TemplateColorChoices { get; } = [];
+    public ObservableCollection<OptionValueChoiceViewModel> TemplateAdditionalOptionChoices { get; } = [];
     public ObservableCollection<LocalMockupSourceDraftViewModel> LocalSourceDrafts { get; } = [];
+    private readonly List<LocalMockupSourceDraftViewModel> _archivedLocalSourceDrafts = [];
     public ICommand BrowseLocalSourceCommand { get; }
     public ICommand RemoveLocalSourceCommand { get; }
+    public ICommand SelectLocalSourceCommand { get; }
     public IAssetFilePicker FilePicker { get => _filePicker; set => _filePicker = value ?? new NullAssetFilePicker(); }
     public string LocalSourcePath { get => _localSourcePath; private set { if (SetField(ref _localSourcePath, value)) { NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
+    public LocalMockupSourceDraftViewModel? SelectedLocalSource { get => _selectedLocalSource; private set { if (SetField(ref _selectedLocalSource, value)) { OnPropertyChanged(nameof(HasSelectedLocalSource)); OnPropertyChanged(nameof(MappingImageWidth)); OnPropertyChanged(nameof(MappingImageHeight)); NotifyCommands(); } } }
+    public bool HasSelectedLocalSource => SelectedLocalSource is not null;
     public bool HasLocalSource => LocalSourceDrafts.Count > 0 || !string.IsNullOrWhiteSpace(LocalSourcePath);
 
     public BlueprintOffering? SelectedOffering
@@ -419,8 +438,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public string MappingYText { get => _mappingYText; set => SetMappingText(ref _mappingYText, value, ref _mappingY, nameof(MappingYText), nameof(MappingY)); }
     public string MappingWidthText { get => _mappingWidthText; set => SetMappingText(ref _mappingWidthText, value, ref _mappingWidth, nameof(MappingWidthText), nameof(MappingWidth)); }
     public string MappingHeightText { get => _mappingHeightText; set => SetMappingText(ref _mappingHeightText, value, ref _mappingHeight, nameof(MappingHeightText), nameof(MappingHeight)); }
-    public double MappingImageWidth => SelectedProviderMockup?.ImageWidth ?? 0;
-    public double MappingImageHeight => SelectedProviderMockup?.ImageHeight ?? 0;
+    public double MappingImageWidth => SelectedProviderMockup?.ImageWidth ?? SelectedLocalSource?.ImageWidth ?? 0;
+    public double MappingImageHeight => SelectedProviderMockup?.ImageHeight ?? SelectedLocalSource?.ImageHeight ?? 0;
 
     public string OfferingName { get => _offeringName; set { if (SetField(ref _offeringName, value)) NotifyCommands(); } }
     public string OfferingDescription { get => _offeringDescription; set => SetField(ref _offeringDescription, value); }
@@ -779,6 +798,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         ErrorMessage = string.Empty;
         try
         {
+            CaptureSelectedLocalSource();
             var colors = TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).ToArray();
             if (_sourceImages is not null && HasLocalSource && SelectedProviderMockup is null)
             {
@@ -795,11 +815,19 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
                     sourceState = created.State;
                 }
                 if (template is null) { ErrorMessage = "The Mockup Template could not be selected."; return; }
-                foreach (var draft in LocalSourceDrafts.Where(value => !value.IsManaged))
+                foreach (var draft in LocalSourceDrafts)
                 {
-                    var sourceResult = await _sourceImages.AddAsync(new AddLocalMockupTemplateSourceRequest(SelectedOffering.StoreId, template.Id, draft.Path, draft.OptionValueIds)).ConfigureAwait(true);
+                    var sourceResult = draft.IsManaged
+                        ? await _sourceImages.UpdateAsync(new UpdateLocalMockupTemplateSourceRequest(SelectedOffering.StoreId, template.Id, draft.SourceImageId ?? Guid.Empty, draft.OptionValueIds, draft.Mapping)).ConfigureAwait(true)
+                        : await _sourceImages.AddAsync(new AddLocalMockupTemplateSourceRequest(SelectedOffering.StoreId, template.Id, draft.Path, draft.OptionValueIds, draft.Mapping)).ConfigureAwait(true);
                     if (!sourceResult.Succeeded) { ErrorMessage = sourceResult.Error ?? $"The local source image '{draft.DisplayName}' could not be added."; return; }
                     sourceState = sourceResult.State;
+                }
+                foreach (var draft in _archivedLocalSourceDrafts.Where(value => value.SourceImageId is not null))
+                {
+                    var archiveResult = await _sourceImages.UpdateAsync(new UpdateLocalMockupTemplateSourceRequest(SelectedOffering.StoreId, template.Id, draft.SourceImageId!.Value, draft.OptionValueIds, draft.Mapping, Archive: true)).ConfigureAwait(true);
+                    if (!archiveResult.Succeeded) { ErrorMessage = archiveResult.Error ?? $"The local source image '{draft.DisplayName}' could not be archived."; return; }
+                    sourceState = archiveResult.State;
                 }
                 if (sourceState is not null) ApplyMockups(sourceState);
                 SelectedTemplate = template;
@@ -807,6 +835,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
                 TemplateName = string.Empty;
                 LocalSourcePath = string.Empty;
                 LocalSourceDrafts.Clear();
+                _archivedLocalSourceDrafts.Clear();
                 return;
             }
             _ = TryCreateMapping(out var mapping);
@@ -845,22 +874,53 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         var path = await _filePicker.PickImportFileAsync().ConfigureAwait(true);
         if (!string.IsNullOrWhiteSpace(path))
         {
-            var ids = TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).Distinct().ToArray();
-            if (ids.Length == 0) { ErrorMessage = "Select at least one applicable option value before adding a source image."; return; }
-            LocalSourceDrafts.Add(new LocalMockupSourceDraftViewModel(path, ids)
-            {
-                ApplicabilitySummary = string.Join(", ", TemplateColorChoices.Where(value => ids.Contains(value.Value.Id)).Select(value => value.Label))
-            });
+            var draft = new LocalMockupSourceDraftViewModel(path, []);
+            LocalSourceDrafts.Add(draft);
+            SelectedLocalSource = draft;
+            foreach (var color in TemplateColorChoices) color.IsSelected = false;
+            MappingXText = MappingYText = MappingWidthText = MappingHeightText = string.Empty;
             LocalSourcePath = path;
             OnPropertyChanged(nameof(HasLocalSource));
             NotifyMockupTemplateDraftChanged();
         }
     }
 
+
+    private void SelectLocalSource(LocalMockupSourceDraftViewModel? draft)
+    {
+        if (draft is null) return;
+        if (draft.IsManaged && draft.SourceImageId is not null && !_archivedLocalSourceDrafts.Contains(draft)) _archivedLocalSourceDrafts.Add(draft);
+        CaptureSelectedLocalSource();
+        SelectedLocalSource = draft;
+        foreach (var color in TemplateColorChoices) color.IsSelected = draft.OptionValueIds.Contains(color.Value.Id);
+        foreach (var option in TemplateAdditionalOptionChoices) option.IsSelected = draft.OptionValueIds.Contains(option.Value.Id);
+        var mapping = draft.Mapping;
+        MappingXText = mapping is null ? string.Empty : FormatMapping(mapping.X);
+        MappingYText = mapping is null ? string.Empty : FormatMapping(mapping.Y);
+        MappingWidthText = mapping is null ? string.Empty : FormatMapping(mapping.Width);
+        MappingHeightText = mapping is null ? string.Empty : FormatMapping(mapping.Height);
+        LocalSourcePath = draft.Path;
+    }
+
+    private void CaptureSelectedLocalSource()
+    {
+        if (SelectedLocalSource is null) return;
+        var ids = TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id)
+            .Concat(TemplateAdditionalOptionChoices.Where(value => value.IsSelected).Select(value => value.Value.Id)).Distinct().ToArray();
+        TryCreateMapping(out var mapping);
+        var labels = TemplateColorChoices.Where(value => ids.Contains(value.Value.Id)).Select(value => value.Label)
+            .Concat(TemplateAdditionalOptionChoices.Where(value => ids.Contains(value.Value.Id)).Select(value => value.Label));
+        SelectedLocalSource.UpdateMetadata(ids, mapping, string.Join(", ", labels));
+        OnPropertyChanged(nameof(HasLocalSource));
+    }
+
     public void RemoveLocalSource(LocalMockupSourceDraftViewModel? draft)
     {
         if (draft is null) return;
+        if (ReferenceEquals(SelectedLocalSource, draft)) SelectedLocalSource = null;
         LocalSourceDrafts.Remove(draft);
+        var next = LocalSourceDrafts.LastOrDefault();
+        if (next is not null) SelectLocalSource(next);
         OnPropertyChanged(nameof(HasLocalSource));
         NotifyMockupTemplateDraftChanged();
     }
@@ -884,6 +944,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         SelectedPlaceholder = AvailablePlaceholders.FirstOrDefault(value => value.Id == template.TargetPlaceholderId);
         TemplateName = template.Name;
         LocalSourceDrafts.Clear();
+        _archivedLocalSourceDrafts.Clear();
+        SelectedLocalSource = null;
         LocalSourcePath = string.Empty;
         var revision = TemplateRevisions.SingleOrDefault(value => value.MockupTemplateId == template.Id && value.RevisionNumber == template.CurrentRevision);
         SelectedProviderMockup = ProviderMockupCandidates.FirstOrDefault(value => value.ProviderReference == revision?.ProviderMockupReference);
@@ -910,8 +972,11 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         SelectedPlaceholder = null;
         TemplateName = string.Empty;
         LocalSourceDrafts.Clear();
+        _archivedLocalSourceDrafts.Clear();
+        SelectedLocalSource = null;
         LocalSourcePath = string.Empty;
         foreach (var color in TemplateColorChoices) color.IsSelected = false;
+        foreach (var option in TemplateAdditionalOptionChoices) option.IsSelected = false;
         _mockupTemplateDraftBaseline = CurrentMockupTemplateDraftState();
         IsAddingTemplate = true;
         MockupTemplateEditorRequested?.Invoke(this, EventArgs.Empty);
@@ -1258,6 +1323,15 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             .ToArray();
         foreach (var choice in templateColors) choice.PropertyChanged += ChoiceSelectionChanged;
         Replace(TemplateColorChoices, templateColors);
+
+        var selectedTemplateOptionIds = TemplateAdditionalOptionChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).ToHashSet();
+        var colorOptionIds = Options.Where(value => value.OfferingId == SelectedOffering?.Id && value.OptionKind == OptionKind.Color).Select(value => value.Id).ToHashSet();
+        var additional = OptionValues
+            .Where(value => value.OfferingId == SelectedOffering?.Id && !value.IsArchived && !colorOptionIds.Contains(value.OptionId))
+            .Select(value => new OptionValueChoiceViewModel(value, ValueLabel(value)) { IsSelected = selectedTemplateOptionIds.Contains(value.Id) })
+            .ToArray();
+        foreach (var choice in additional) choice.PropertyChanged += ChoiceSelectionChanged;
+        Replace(TemplateAdditionalOptionChoices, additional);
     }
 
     private void ChoiceSelectionChanged(object? sender, PropertyChangedEventArgs e)
@@ -1294,7 +1368,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     {
         if (!CanEdit || !IsAddingTemplate || SelectedOffering is null || string.IsNullOrWhiteSpace(TemplateName)) return false;
         if (_sourceImages is not null && HasLocalSource && SelectedProviderMockup is null)
-            return TemplateColorChoices.Any(value => value.IsSelected);
+            return true;
         return SelectedProviderMockup is null || TryCreateMapping(out _);
     }
 
@@ -1396,8 +1470,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         EndTemplateDraft();
         TemplateName = string.Empty;
         foreach (var color in TemplateColorChoices) color.IsSelected = false;
+        foreach (var option in TemplateAdditionalOptionChoices) option.IsSelected = false;
         SelectedTemplate = AvailableTemplates.FirstOrDefault();
         LocalSourceDrafts.Clear();
+        SelectedLocalSource = null;
         LocalSourcePath = string.Empty;
     }
 
@@ -1409,8 +1485,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         foreach (var image in state.Images)
         {
             var labels = image.OptionValueIds.Select(id => OptionValues.FirstOrDefault(value => value.Id == id)).Where(value => value is not null).Select(value => ValueLabel(value!));
-            LocalSourceDrafts.Add(new LocalMockupSourceDraftViewModel(image.WorkspaceRelativePath, image.OptionValueIds, isManaged: true) { ApplicabilitySummary = string.Join(", ", labels) });
+            LocalSourceDrafts.Add(new LocalMockupSourceDraftViewModel(image.WorkspaceRelativePath, image.OptionValueIds, isManaged: true, image.ImageMapping, image.Dimensions.Width, image.Dimensions.Height, image.Id) { ApplicabilitySummary = string.Join(", ", labels) });
         }
+        if (LocalSourceDrafts.Count > 0) SelectLocalSource(LocalSourceDrafts[0]);
         OnPropertyChanged(nameof(HasLocalSource));
     }
 
@@ -1463,7 +1540,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private bool TryCreateMapping(out MockupImageSpaceMapping? mapping)
     {
         mapping = null;
-        if (SelectedProviderMockup is null)
+        var imageWidth = SelectedProviderMockup?.ImageWidth ?? SelectedLocalSource?.ImageWidth ?? 0;
+        var imageHeight = SelectedProviderMockup?.ImageHeight ?? SelectedLocalSource?.ImageHeight ?? 0;
+        if (imageWidth <= 0 || imageHeight <= 0)
             return string.IsNullOrWhiteSpace(MappingXText) && string.IsNullOrWhiteSpace(MappingYText)
                 && string.IsNullOrWhiteSpace(MappingWidthText) && string.IsNullOrWhiteSpace(MappingHeightText);
         if (!int.TryParse(MappingXText, out var x) || !int.TryParse(MappingYText, out var y)
@@ -1471,7 +1550,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             return false;
         try
         {
-            mapping = new MockupImageSpaceMapping(SelectedProviderMockup.ImageWidth, SelectedProviderMockup.ImageHeight, x, y, width, height);
+            mapping = new MockupImageSpaceMapping(imageWidth, imageHeight, x, y, width, height);
             return true;
         }
         catch (ArgumentOutOfRangeException)

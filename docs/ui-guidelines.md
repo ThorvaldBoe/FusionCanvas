@@ -236,12 +236,14 @@ It should support:
 - typed Options and Values, including explicit Color Values
 - concrete Variants and compatible Placeholders
 - Mockup Templates linked to one authoritative target Placeholder
-- color-level template bindings that apply to compatible size Variants
-- template revisions and an explicitly empty future source-image state
+- a master-detail source-image editor: upload/archive/select files in an upper table, then configure applicability and image-space placement for the selected image below
+- grouped option applicability, with Color prominent and no Size restriction as the common default; rows visibly show incomplete metadata
+- template revisions and per-Variant readiness diagnostics
 
-The first version does not include image upload, rendering, artwork composition, placement
-coordinates, slot schemas, or per-Variant mockup overrides. A later visual click-and-point
-template editor will define placement semantics. Use helper text or tooltips for Printify terms
+The local-first version supports managed image upload, per-image placement coordinates, and
+per-Variant readiness diagnostics without rendering artwork. It does not include drag-and-drop,
+image editing, slot schemas, or per-Variant manual overrides. A later visual click-and-point
+template editor may refine placement semantics. Use helper text or tooltips for Printify terms
 such as Blueprint, Provider Network, Offering, Variant, and Placeholder.
 
 ### Store and Niche Setup
