@@ -11,6 +11,7 @@
 | Source and revision graphs persist through SQLite schema 13 | `SqliteWorkspaceRepository` schema/table mappings and load/save paths; Integration project build | Pass (focused round-trip test remains follow-up) |
 | Asset removal is blocked for current or historical source references | `AssetManagementService.RemoveAssetAsync` dependency guard | Pass |
 | Editor exposes a keyboard-accessible Browse action and local path | `MockupTemplateEditorWindow.axaml`, injected `IAssetFilePicker`, `BrowseLocalSourceCommand`; App build | Pass |
+| One named template can collect multiple color-specific source entries | `LocalSourceDrafts` collection, repeated Browse actions, collection ItemsControl, repeated source import for one created template, and reload of managed entries when editing | Pass for collection creation and reload; per-entry edit/mapping UI remains incomplete |
 | Provider/API behavior remains deferred and no credentials are introduced | No provider calls in local source service; no secret fields added | Pass |
 | Existing provider-candidate status behavior | Existing `product-supplier-setup` provider-state tests and source remains available for future adapters | Not applicable to local-only path |
 
