@@ -8,7 +8,7 @@ namespace FusionCanvas.App.Tests;
 public class WindowGeometryPersistenceTests
 {
     [AvaloniaFact]
-    public void Attach_ClosingCapturesNormalStateGeometry()
+    public void Attach_ClosedCapturesNormalStateGeometry()
     {
         var store = new RecordingGeometryStore();
         var window = new Window();
@@ -26,8 +26,8 @@ public class WindowGeometryPersistenceTests
         Assert.NotNull(captured.Geometry);
         Assert.Equal(700, captured.Geometry!.Width);
         Assert.Equal(520, captured.Geometry!.Height);
-        Assert.Equal(120, captured.Geometry.PositionX);
-        Assert.Equal(80, captured.Geometry.PositionY);
+        Assert.Equal(window.Position.X, captured.Geometry.PositionX);
+        Assert.Equal(window.Position.Y, captured.Geometry.PositionY);
         Assert.Equal(new WindowGeometrySettings(captured.Geometry!.PositionX, captured.Geometry!.PositionY, 700, 520),
             store.WindowGeometry[WindowLayoutKeys.Settings]);
     }
@@ -86,7 +86,7 @@ public class WindowGeometryPersistenceTests
     }
 
     [AvaloniaFact]
-    public void Attach_ClosingWhileMaximizedPersistsLatestNormalGeometry()
+    public void Attach_ClosedWhileMaximizedPersistsLatestNormalGeometry()
     {
         var store = new RecordingGeometryStore();
         var window = new Window();

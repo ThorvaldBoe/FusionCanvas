@@ -41,7 +41,7 @@ internal static class WindowGeometryPersistence
         };
         window.SizeChanged += (_, _) => CaptureNormalGeometry();
         window.PositionChanged += (_, _) => CaptureNormalGeometry();
-        window.Closing += (_, _) =>
+        window.Closed += (_, _) =>
         {
             CaptureNormalGeometry();
             if (lastNormalGeometry is not null)
