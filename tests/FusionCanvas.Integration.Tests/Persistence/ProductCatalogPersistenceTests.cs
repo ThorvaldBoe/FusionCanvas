@@ -5,6 +5,7 @@ using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
+using FusionCanvas.Domain.Assets;
 using FusionCanvas.Integration.Persistence;
 using Microsoft.Data.Sqlite;
 
@@ -51,12 +52,19 @@ public class ProductCatalogPersistenceTests
         var templateColor = new MockupTemplateColorVariant(Guid.NewGuid(), template.Id, black.Id, false, Now, Now);
         var revision = new MockupTemplateRevision(Guid.NewGuid(), template.Id, 1, placeholder.Id, Now, providerMockupReference: "provider-image-front-black", imageMapping: new MockupImageSpaceMapping(1200, 1200, 360, 240, 480, 600));
         var revisionColor = new MockupTemplateRevisionColor(Guid.NewGuid(), revision.Id, black.Id);
-        var snapshot = new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [store], [], [], [], [], [], [], [], [])
+        var asset = new Asset(Guid.NewGuid(), store.Id, "front-black.png", null, AssetKind.MockupImage, "assets/front-black.png", "C:\\imports\\front-black.png", false, false, Now, Now, "{}");
+        var sourceImage = new MockupTemplateSourceImage(Guid.NewGuid(), template.Id, asset.Id, new MockupImageSpaceMapping(1200, 1200, 0, 0, 1200, 1200), false, Now, Now);
+        var sourceCondition = new MockupTemplateSourceImageOptionValue(sourceImage.Id, black.Id);
+        var revisionSourceImage = new MockupTemplateRevisionSourceImage(Guid.NewGuid(), revision.Id, asset.Id, sourceImage.ImageMapping);
+        var revisionSourceCondition = new MockupTemplateRevisionSourceImageOptionValue(revisionSourceImage.Id, black.Id);
+        var snapshot = new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [store], [], [], [], [asset], [], [], [], [new AssetLink(asset.Id, WorkspaceEntityKind.Store, store.Id)])
         {
             Blueprints = [blueprint], PrintProviders = [provider], BlueprintOfferings = [offering],
             OfferingOptions = [colorOption, sizeOption], OfferingOptionValues = [black, medium],
             OfferingVariants = [variant], OfferingPlaceholders = [placeholder], MockupTemplates = [template],
-            MockupTemplateColorVariants = [templateColor], MockupTemplateRevisions = [revision], MockupTemplateRevisionColors = [revisionColor]
+            MockupTemplateColorVariants = [templateColor], MockupTemplateRevisions = [revision], MockupTemplateRevisionColors = [revisionColor],
+            MockupTemplateSourceImages = [sourceImage], MockupTemplateSourceImageOptionValues = [sourceCondition],
+            MockupTemplateRevisionSourceImages = [revisionSourceImage], MockupTemplateRevisionSourceImageOptionValues = [revisionSourceCondition]
         };
 
         await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
@@ -79,6 +87,10 @@ public class ProductCatalogPersistenceTests
         Assert.Equal(revision.ProviderMockupReference, loaded.MockupTemplateRevisions[0].ProviderMockupReference);
         Assert.Equal(revision.ImageMapping, loaded.MockupTemplateRevisions[0].ImageMapping);
         Assert.Equal(snapshot.MockupTemplateRevisionColors, loaded.MockupTemplateRevisionColors);
+        Assert.Equal(snapshot.MockupTemplateSourceImages, loaded.MockupTemplateSourceImages);
+        Assert.Equal(snapshot.MockupTemplateSourceImageOptionValues, loaded.MockupTemplateSourceImageOptionValues);
+        Assert.Equal(snapshot.MockupTemplateRevisionSourceImages, loaded.MockupTemplateRevisionSourceImages);
+        Assert.Equal(snapshot.MockupTemplateRevisionSourceImageOptionValues, loaded.MockupTemplateRevisionSourceImageOptionValues);
     }
 
     [Fact]

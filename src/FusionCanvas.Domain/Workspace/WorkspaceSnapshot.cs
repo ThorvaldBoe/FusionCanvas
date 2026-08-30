@@ -66,6 +66,14 @@ public sealed record WorkspaceSnapshot(
 
     public IReadOnlyList<MockupTemplateRevisionColor> MockupTemplateRevisionColors { get; init; } = [];
 
+    public IReadOnlyList<MockupTemplateSourceImage> MockupTemplateSourceImages { get; init; } = [];
+
+    public IReadOnlyList<MockupTemplateSourceImageOptionValue> MockupTemplateSourceImageOptionValues { get; init; } = [];
+
+    public IReadOnlyList<MockupTemplateRevisionSourceImage> MockupTemplateRevisionSourceImages { get; init; } = [];
+
+    public IReadOnlyList<MockupTemplateRevisionSourceImageOptionValue> MockupTemplateRevisionSourceImageOptionValues { get; init; } = [];
+
     public WorkspaceSnapshot(
         IReadOnlyList<Store> Stores,
         IReadOnlyList<Niche> Niches,

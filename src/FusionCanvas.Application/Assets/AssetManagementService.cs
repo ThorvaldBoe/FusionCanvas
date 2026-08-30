@@ -177,6 +177,12 @@ public sealed class AssetManagementService : IAssetManagementService
             return Failure("Permanent removal requires confirmation.", BuildState(snapshot, ResolveSingleContext(snapshot, existing)));
         }
 
+        if (snapshot.MockupTemplateSourceImages.Any(image => image.SourceAssetId == existing.Id)
+            || snapshot.MockupTemplateRevisionSourceImages.Any(image => image.SourceAssetId == existing.Id))
+        {
+            return Failure("This Asset is used by a Mockup Template source image and cannot be removed. Archive or replace the source image first.", BuildState(snapshot, ResolveSingleContext(snapshot, existing)));
+        }
+
         var context = ResolveSingleContext(snapshot, existing);
         var updated = snapshot with
         {
