@@ -97,7 +97,10 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <TextBlock Text="Size and other options" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="Size and other options" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
+            <Button Content="Select all" Command="{Binding SelectAllTemplateSizesCommand}" Classes="link" Padding="0" />
+          </StackPanel>
           <ItemsControl ItemsSource="{Binding TemplateAdditionalOptionChoices}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="stores:OptionValueChoiceViewModel">
