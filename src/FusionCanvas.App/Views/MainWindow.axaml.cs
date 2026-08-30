@@ -67,7 +67,12 @@ public partial class MainWindow : Window
         {
             if (args.PropertyName == nameof(StoreManagementViewModel.IsStoreEditorOpen))
             {
-                SyncStoreEditorWindow(viewModel.StoreManagement);
+                // StoreEditorWindow updates this property from its Closing handler.
+                // Defer synchronization until that close has completed so we do not
+                // re-enter Window.Close while Avalonia is still processing Closing.
+                Dispatcher.UIThread.Post(
+                    () => SyncStoreEditorWindow(viewModel.StoreManagement),
+                    DispatcherPriority.Background);
             }
         };
         viewModel.WorkspaceManagement.PropertyChanged += (_, args) =>
@@ -284,6 +289,7 @@ public partial class MainWindow : Window
             _storeEditorWindow = new StoreEditorWindow { DataContext = storeManagement };
             if (_settings is not null)
             {
+                _storeEditorWindow.GeometryStore = _settings;
                 WindowGeometryPersistence.Attach(_storeEditorWindow, _settings, WindowLayoutKeys.StoreEditor, _storeEditorWindow.MinWidth, _storeEditorWindow.MinHeight);
             }
             _storeEditorWindow.Closed += (_, _) =>

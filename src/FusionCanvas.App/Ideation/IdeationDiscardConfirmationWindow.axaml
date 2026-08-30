@@ -7,7 +7,8 @@
         Width="420"
         Height="180"
         CanResize="False"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ElevatedSurfaceBrush}">
   <Grid Margin="20" RowDefinitions="*,Auto" RowSpacing="16">
     <TextBlock Text="{Binding DiscardConfirmationMessage}"
                TextWrapping="Wrap"

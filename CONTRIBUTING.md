@@ -1,16 +1,16 @@
 # Contributing to FusionCanvas
 
-Thank you for helping improve FusionCanvas. GitHub Issues are the front door for reports, requests, discussion, prioritization, ownership, and delivery tracking. OpenSpec remains the source of truth for accepted product behavior, acceptance criteria, design, implementation tasks, verification, and archived history.
+Thank you for helping improve FusionCanvas. GitHub Issues are the durable records for reports, requests, evidence, discussion, and completion. The GitHub Project named **FusionCanvas Issues** is the operational Kanban view and status source for all work. OpenSpec remains the source of truth for accepted product behavior, acceptance criteria, design, implementation tasks, verification, and archived history.
 
 ## Report a bug or request a feature
 
 Use the Bug Report or Feature Request form. They provide the information maintainers need to investigate the report and apply an initial label automatically.
 
-Public issues must not contain API keys, passwords, tokens, personal information, private workspace contents, or other sensitive material. Do not report a potential security vulnerability publicly; use a private reporting channel instead.
+Repository issues are public, including any raw notes, logs, or screenshots attached to them. Remove API keys, passwords, tokens, personal information, private workspace contents, and other sensitive material before posting. Do not report a potential security vulnerability publicly; use a private reporting channel instead.
 
 ## Triage and labels
 
-Maintainers give each active tracked issue one label from each applicable group:
+Maintainers use labels for issue classification, triage, and supplementary state. The Project's `Status` field, rather than issue labels, is the authoritative operational workflow stage.
 
 | Group | Labels |
 | --- | --- |
@@ -21,6 +21,22 @@ Maintainers give each active tracked issue one label from each applicable group:
 Completed work is represented by a closed issue, not a `done` label. Maintainers close duplicates with a link to the canonical issue and close declined or unreproducible reports with a concise reason.
 
 Repository maintainers must enable Issues, create the labels above with these exact names, and keep blank issues disabled. The Issue Forms assign their type and `status: needs-triage` labels automatically, so both labels must exist before accepting reports.
+
+## Project board workflow
+
+Use the **FusionCanvas Issues** GitHub Project as the single Kanban overview of every issue's current state. Repository issues and OpenSpec artifacts remain the delivery records behind that overview:
+
+| Project status | Meaning and action |
+| --- | --- |
+| **Backlog** | The unstarted queue. Keep work here while it still needs triage, clarification, or prioritization. |
+| **Ready** | The issue is understood, valid, and sufficiently prepared for someone to pick up. |
+| **In progress** | Actual work has begun. For behavior changes, this triggers the existing OpenSpec workflow: explore when appropriate, then propose, review, apply, and verify according to the process below. |
+| **In review** | Implementation is ready for validation, testing, and acceptance review. |
+| **Done** | The work has been accepted. Close the linked repository issue on completion; configured Project workflows may synchronize the Project status from the closed issue. |
+
+The Project automatically adds new or updated open issues from the FusionCanvas repository. Issues created through Codex or directly in the repository therefore appear on the board. Conversely, the Project's **Create new issue** flow immediately creates and links a repository issue.
+
+Do not create a second issue or card for the same work. A Project card represents its linked repository issue; dragging it between columns changes only the Project status and does not create another issue. Keep the description, evidence, discussion, links to any OpenSpec change or pull request, and open/closed state on the repository issue.
 
 ## From issue to delivery
 

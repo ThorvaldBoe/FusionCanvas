@@ -420,6 +420,8 @@ public class WorkspacePackageIntegrationTests
         var binding = new MockupTemplateColorVariant(Guid.NewGuid(), template.Id, black.Id, false, Now, Now);
         var revision = new MockupTemplateRevision(Guid.NewGuid(), template.Id, 1, area.Id, Now, providerMockupReference: "front-black", imageMapping: new MockupImageSpaceMapping(1200, 1200, 300, 200, 500, 650));
         var revisionColor = new MockupTemplateRevisionColor(Guid.NewGuid(), revision.Id, black.Id);
+        var draft = new MockupTemplate(Guid.NewGuid(), offering.Id, null, "Manual draft", null, 1, false, Now, Now);
+        var draftRevision = new MockupTemplateRevision(Guid.NewGuid(), draft.Id, 1, null, Now);
         return snapshot with
         {
             Blueprints = [blueprint],
@@ -429,9 +431,9 @@ public class WorkspacePackageIntegrationTests
             OfferingOptionValues = [black, medium],
             OfferingVariants = [variant],
             OfferingPlaceholders = [area],
-            MockupTemplates = [template],
+            MockupTemplates = [template, draft],
             MockupTemplateColorVariants = [binding],
-            MockupTemplateRevisions = [revision],
+            MockupTemplateRevisions = [revision, draftRevision],
             MockupTemplateRevisionColors = [revisionColor]
         };
     }

@@ -100,6 +100,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private double _mappingY;
     private double _mappingWidth = 100;
     private double _mappingHeight = 100;
+    private string _mappingXText = string.Empty;
+    private string _mappingYText = string.Empty;
+    private string _mappingWidthText = string.Empty;
+    private string _mappingHeightText = string.Empty;
     private Guid? _pendingDesignAreaArchiveId;
     private string _pendingDesignAreaArchiveName = string.Empty;
     private bool _isDesignAreaArchiveConfirmationVisible;
@@ -146,7 +150,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         KeepEditingDesignAreaCommand = new RelayCommand(_ => IsDesignAreaDiscardConfirmationVisible = false, () => IsDesignAreaDiscardConfirmationVisible);
         CreatePlaceholderCommand = new AsyncRelayCommand(CreatePlaceholderAsync, CanCreatePlaceholder);
         SetDefaultPlaceholderCommand = new AsyncRelayCommand(SetDefaultPlaceholderAsync, () => CanEdit && SelectedOffering is not null && SelectedPlaceholder is not null);
-        StartAddTemplateCommand = new RelayCommand(_ => BeginNewTemplate(), () => CanEdit && AvailablePlaceholders.Any());
+        StartAddTemplateCommand = new RelayCommand(_ => BeginNewTemplate(), () => CanEdit && SelectedOffering is not null);
         EditTemplateCommand = new RelayCommand(parameter => BeginEditTemplate(parameter switch
         {
             MockupTemplateCardViewModel card => Templates.FirstOrDefault(value => value.Id == card.Id),
@@ -342,6 +346,13 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
                 MappingWidth = value.ImageWidth * 0.5;
                 MappingHeight = value.ImageHeight * 0.6;
             }
+            else
+            {
+                MappingXText = string.Empty;
+                MappingYText = string.Empty;
+                MappingWidthText = string.Empty;
+                MappingHeightText = string.Empty;
+            }
             OnPropertyChanged(nameof(MappingImageWidth));
             OnPropertyChanged(nameof(MappingImageHeight));
             OnPropertyChanged(nameof(HasSelectedProviderMockup));
@@ -364,21 +375,21 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         }
     }
     public string ProviderImageSelectionInstructions =>
-        "Choose a mockup image supplied by this Offering's provider catalog. Local upload and drag/drop are not available in this editor.";
+        "Optionally choose a mockup image supplied by this Offering's provider catalog. Local upload and drag/drop are not available in this editor. You can save a Draft without provider integration, an image, or placement mapping.";
     public string ProviderImageSelectionStateMessage => ProviderCatalogState switch
     {
         ProviderCatalogLoadState.Loading => "Loading provider-catalog mockup images…",
-        ProviderCatalogLoadState.Available => "Choose the provider view that matches the target Design Area.",
-        ProviderCatalogLoadState.Empty => "The configured provider catalog has no mockup images for this Offering.",
-        ProviderCatalogLoadState.Error => $"Provider-catalog mockup images could not be loaded{MessageSuffix(ProviderCatalogMessage)}",
-        _ => $"Provider-catalog mockup images are unavailable{MessageSuffix(ProviderCatalogMessage)}"
+        ProviderCatalogLoadState.Available => "Choose the optional provider view that matches the target Design Area, or save a Draft without one.",
+        ProviderCatalogLoadState.Empty => "The provider catalog has no mockup images. The template can still be saved as a Draft.",
+        ProviderCatalogLoadState.Error => $"Provider images could not be loaded; Draft saving remains available{MessageSuffix(ProviderCatalogMessage)}",
+        _ => $"Provider images are unavailable; Draft saving remains available{MessageSuffix(ProviderCatalogMessage)}"
     };
     public bool HasProviderImageSelectionRecovery => ProviderCatalogState is ProviderCatalogLoadState.Empty or ProviderCatalogLoadState.Unavailable or ProviderCatalogLoadState.Error;
     public string ProviderImageSelectionRecoveryMessage => ProviderCatalogState switch
     {
-        ProviderCatalogLoadState.Empty => "Sync or review this Offering's provider catalog setup, then return to choose an image.",
-        ProviderCatalogLoadState.Error => "Review provider setup or retry provider catalog synchronization, then return to this editor.",
-        ProviderCatalogLoadState.Unavailable => "Configure or sync provider catalog data for this Offering, then return to this editor.",
+        ProviderCatalogLoadState.Empty => "Save now as a Draft; you may sync provider data later.",
+        ProviderCatalogLoadState.Error => "Save now as a Draft, or retry provider loading later.",
+        ProviderCatalogLoadState.Unavailable => "Save now as a Draft; provider setup is optional.",
         _ => string.Empty
     };
     public bool HasProviderCatalogMessage => !string.IsNullOrWhiteSpace(ProviderCatalogMessage);
@@ -388,10 +399,14 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         !string.IsNullOrWhiteSpace(ProviderCatalogMessage)
             ? ProviderCatalogMessage
             : "Select a provider mockup image to preview and edit placement.";
-    public double MappingX { get => _mappingX; set { if (SetField(ref _mappingX, value)) { NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
-    public double MappingY { get => _mappingY; set { if (SetField(ref _mappingY, value)) { NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
-    public double MappingWidth { get => _mappingWidth; set { if (SetField(ref _mappingWidth, value)) { NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
-    public double MappingHeight { get => _mappingHeight; set { if (SetField(ref _mappingHeight, value)) { NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
+    public double MappingX { get => _mappingX; set { if (SetField(ref _mappingX, value)) { _mappingXText = FormatMapping(value); OnPropertyChanged(nameof(MappingXText)); NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
+    public double MappingY { get => _mappingY; set { if (SetField(ref _mappingY, value)) { _mappingYText = FormatMapping(value); OnPropertyChanged(nameof(MappingYText)); NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
+    public double MappingWidth { get => _mappingWidth; set { if (SetField(ref _mappingWidth, value)) { _mappingWidthText = FormatMapping(value); OnPropertyChanged(nameof(MappingWidthText)); NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
+    public double MappingHeight { get => _mappingHeight; set { if (SetField(ref _mappingHeight, value)) { _mappingHeightText = FormatMapping(value); OnPropertyChanged(nameof(MappingHeightText)); NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
+    public string MappingXText { get => _mappingXText; set => SetMappingText(ref _mappingXText, value, ref _mappingX, nameof(MappingXText), nameof(MappingX)); }
+    public string MappingYText { get => _mappingYText; set => SetMappingText(ref _mappingYText, value, ref _mappingY, nameof(MappingYText), nameof(MappingY)); }
+    public string MappingWidthText { get => _mappingWidthText; set => SetMappingText(ref _mappingWidthText, value, ref _mappingWidth, nameof(MappingWidthText), nameof(MappingWidth)); }
+    public string MappingHeightText { get => _mappingHeightText; set => SetMappingText(ref _mappingHeightText, value, ref _mappingHeight, nameof(MappingHeightText), nameof(MappingHeight)); }
     public double MappingImageWidth => SelectedProviderMockup?.ImageWidth ?? 0;
     public double MappingImageHeight => SelectedProviderMockup?.ImageHeight ?? 0;
 
@@ -445,6 +460,14 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
     public bool HasActiveDraft => IsAddingPrintProvider || IsAddingOption || IsAddingOptionValue || IsAddingVariant || IsAddingBulkVariants || IsAddingPlaceholder || IsAddingTemplate;
     public bool HasMeaningfulMockupTemplateDraft => IsAddingTemplate && _mockupTemplateDraftBaseline is not null && CurrentMockupTemplateDraftState() != _mockupTemplateDraftBaseline;
+    public string MockupTemplateLifecycleLabel => CurrentMockupTemplateReadiness().Lifecycle == MockupTemplateLifecycle.ReadyForUse ? "Ready for use" : "Draft";
+    public IReadOnlyList<string> MockupTemplateReadinessMessages => CurrentMockupTemplateReadiness().Blockers.Select(ReadinessMessage).ToArray();
+    public string MockupTemplateSaveValidationMessage => string.IsNullOrWhiteSpace(TemplateName)
+        ? "Enter a template name to save."
+        : SelectedProviderMockup is not null && !TryCreateMapping(out _)
+            ? "Enter whole-number, positive placement values that stay within the image."
+            : string.Empty;
+    public bool HasMockupTemplateSaveValidationMessage => !string.IsNullOrWhiteSpace(MockupTemplateSaveValidationMessage);
 
     public bool IsMockupTemplateDiscardConfirmationVisible
     {
@@ -739,75 +762,56 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private async Task CreateTemplateAsync()
     {
-        if (SelectedOffering is null || SelectedPlaceholder is null) return;
-        if (_sourceImages is not null && HasLocalSource && SelectedProviderMockup is null)
+        if (SelectedOffering is null) return;
+        IsBusy = true;
+        ErrorMessage = string.Empty;
+        try
         {
-            IsBusy = true;
-            try
+            var colors = TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).ToArray();
+            if (_sourceImages is not null && HasLocalSource && SelectedProviderMockup is null)
             {
-                var created = await _mockups.CreateTemplateAsync(new CreateMockupTemplateRequest(SelectedOffering.StoreId, SelectedOffering.Id, TemplateName, SelectedPlaceholder.Id)).ConfigureAwait(true);
+                var created = await _mockups.CreateTemplateAsync(new CreateMockupTemplateRequest(SelectedOffering.StoreId, SelectedOffering.Id, TemplateName, SelectedPlaceholder?.Id)).ConfigureAwait(true);
                 if (!created.Succeeded) { ErrorMessage = created.Error ?? "Mockup Template could not be created."; return; }
                 ApplyMockups(created.State);
                 var template = created.State.Templates.LastOrDefault(value => value.Name == TemplateName.Trim());
                 if (template is null) { ErrorMessage = "The new Mockup Template could not be selected."; return; }
-                var sourceResult = await _sourceImages.AddAsync(new AddLocalMockupTemplateSourceRequest(
-                    SelectedOffering.StoreId, template.Id, LocalSourcePath,
-                    TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).ToArray())).ConfigureAwait(true);
-                if (sourceResult.Succeeded) { ApplyMockups(sourceResult.State); EndTemplateDraft(); TemplateName = string.Empty; LocalSourcePath = string.Empty; }
-                else ErrorMessage = sourceResult.Error ?? "The local source image could not be added.";
+                var sourceResult = await _sourceImages.AddAsync(new AddLocalMockupTemplateSourceRequest(SelectedOffering.StoreId, template.Id, LocalSourcePath, colors)).ConfigureAwait(true);
+                if (!sourceResult.Succeeded) { ErrorMessage = sourceResult.Error ?? "The local source image could not be added."; return; }
+                ApplyMockups(sourceResult.State);
+                EndTemplateDraft();
+                TemplateName = string.Empty;
+                LocalSourcePath = string.Empty;
+                return;
             }
-            catch (Exception exception) { ErrorMessage = exception.Message; }
-            finally { IsBusy = false; }
-            return;
-        }
-        if (SelectedTemplate is not null && AvailableTemplates.Any(value => value.Id == SelectedTemplate.Id) && _offeringManagement is not null && SelectedProviderMockup is not null)
-        {
-            var mapping = new MockupImageSpaceMapping(SelectedProviderMockup.ImageWidth, SelectedProviderMockup.ImageHeight,
-                (int)Math.Round(MappingX), (int)Math.Round(MappingY), (int)Math.Round(MappingWidth), (int)Math.Round(MappingHeight));
-            await RunMockupMutationAsync(() => _mockups.UpdateTemplateAsync(new UpdateMockupTemplateRequest(
-                SelectedOffering.StoreId, SelectedTemplate.Id, TemplateName, TargetPlaceholderId: SelectedPlaceholder.Id,
-                ReplaceProviderImage: true, ProviderMockupReference: SelectedProviderMockup.ProviderReference,
-                ImageMapping: mapping,
-                ReplaceColorOptionValueIds: TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).ToArray()))).ConfigureAwait(true);
-            if (!HasError) EndTemplateDraft();
-            return;
-        }
-        if (_offeringManagement is not null && SelectedProviderMockup is not null)
-        {
-            IsBusy = true;
-            try
+            _ = TryCreateMapping(out var mapping);
+            var result = SelectedTemplate is not null && AvailableTemplates.Any(value => value.Id == SelectedTemplate.Id)
+                ? await _mockups.UpdateTemplateAsync(new UpdateMockupTemplateRequest(
+                    SelectedOffering.StoreId, SelectedTemplate.Id, TemplateName,
+                    TargetPlaceholderId: SelectedPlaceholder?.Id,
+                    ReplaceProviderImage: true,
+                    ProviderMockupReference: SelectedProviderMockup?.ProviderReference,
+                    ImageMapping: mapping,
+                    ReplaceColorOptionValueIds: colors,
+                    ReplaceTargetPlaceholder: true)).ConfigureAwait(true)
+                : await _mockups.CreateTemplateAsync(new CreateMockupTemplateRequest(
+                    SelectedOffering.StoreId, SelectedOffering.Id, TemplateName, SelectedPlaceholder?.Id,
+                    ProviderMockupReference: SelectedProviderMockup?.ProviderReference,
+                    ImageMapping: mapping,
+                    ColorOptionValueIds: colors)).ConfigureAwait(true);
+            if (!result.Succeeded)
             {
-                var mapping = new MockupImageSpaceMapping(
-                    SelectedProviderMockup.ImageWidth, SelectedProviderMockup.ImageHeight,
-                    (int)Math.Round(MappingX), (int)Math.Round(MappingY),
-                    (int)Math.Round(MappingWidth), (int)Math.Round(MappingHeight));
-                var result = await _offeringManagement.CreateMockupTemplateAsync(new CreateFocusedMockupTemplateRequest(
-                    CurrentContext(), TemplateName, SelectedProviderMockup.ProviderReference, SelectedPlaceholder.Id,
-                    TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).ToArray(), mapping)).ConfigureAwait(true);
-                if (result.Succeeded)
-                {
-                    var savedName = TemplateName.Trim();
-                    ApplyOfferingState(result.State);
-                    ApplyMockups(await _mockups.LoadForStoreAsync(SelectedOffering.StoreId).ConfigureAwait(true));
-                    SelectedTemplate = AvailableTemplates.LastOrDefault(value => string.Equals(value.Name, savedName, StringComparison.Ordinal))
-                        ?? SelectedTemplate;
-                    EndTemplateDraft();
-                    TemplateName = string.Empty;
-                    foreach (var color in TemplateColorChoices) color.IsSelected = false;
-                }
-                else
-                {
-                    ErrorMessage = result.Details is { Count: > 0 }
-                        ? $"{result.Error} {string.Join(", ", result.Details)}"
-                        : result.Error ?? "Mockup Template could not be created.";
-                }
+                ErrorMessage = result.Error ?? "Mockup Template could not be saved.";
+                return;
             }
-            catch (Exception exception) { ErrorMessage = exception.Message; }
-            finally { IsBusy = false; }
-            return;
+            var savedId = result.TemplateId ?? SelectedTemplate?.Id;
+            ApplyMockups(result.State);
+            SelectedTemplate = AvailableTemplates.FirstOrDefault(value => value.Id == savedId) ?? SelectedTemplate;
+            EndTemplateDraft();
+            TemplateName = string.Empty;
+            foreach (var color in TemplateColorChoices) color.IsSelected = false;
         }
-        await RunMockupMutationAsync(() => _mockups.CreateTemplateAsync(new CreateMockupTemplateRequest(SelectedOffering.StoreId, SelectedOffering.Id, TemplateName, SelectedPlaceholder.Id))).ConfigureAwait(true);
-        if (!HasError) { EndTemplateDraft(); TemplateName = string.Empty; }
+        catch (Exception exception) { ErrorMessage = exception.Message; }
+        finally { IsBusy = false; }
     }
 
     private async Task BrowseLocalSourceAsync()
@@ -853,9 +857,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void BeginNewTemplate()
     {
-        if (!CanEdit || !AvailablePlaceholders.Any()) return;
+        if (!CanEdit || SelectedOffering is null) return;
         SelectedTemplate = null;
-        SelectedPlaceholder = AvailablePlaceholders.FirstOrDefault(value => value.Id == SelectedOffering?.DefaultPlaceholderId) ?? AvailablePlaceholders.FirstOrDefault();
+        SelectedPlaceholder = null;
         TemplateName = string.Empty;
         foreach (var color in TemplateColorChoices) color.IsSelected = false;
         _mockupTemplateDraftBaseline = CurrentMockupTemplateDraftState();
@@ -1117,10 +1121,12 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         var templateSummaries = AvailableTemplates.Select(template =>
         {
             var colorIds = TemplateColors.Where(value => value.MockupTemplateId == template.Id && !value.IsArchived).Select(value => value.ColorOptionValueId).ToArray();
-            var targetName = Placeholders.FirstOrDefault(value => value.Id == template.TargetPlaceholderId)?.Name ?? "Unavailable Design Area";
+            var targetName = Placeholders.FirstOrDefault(value => value.Id == template.TargetPlaceholderId)?.Name;
             var revision = TemplateRevisions.FirstOrDefault(value => value.MockupTemplateId == template.Id && value.RevisionNumber == template.CurrentRevision);
             var compatibleVariantIds = AvailableVariants.Where(value => value.OptionValueIds.Any(colorIds.Contains)).Select(value => value.Id).ToArray();
-            return new MockupTemplateSetupSummary(template.Id, template.Name, template.TargetPlaceholderId, targetName, colorIds, compatibleVariantIds, revision?.ProviderMockupReference, template.CurrentRevision, template.IsArchived);
+            var effectiveRevision = revision ?? new MockupTemplateRevision(template.Id, template.Id, template.CurrentRevision, template.TargetPlaceholderId, template.CreatedAt);
+            var readiness = MockupTemplateReadinessPolicy.Evaluate(new(template, effectiveRevision, colorIds, Options, OptionValues, Variants, Placeholders));
+            return new MockupTemplateSetupSummary(template.Id, template.Name, template.TargetPlaceholderId, targetName, colorIds, compatibleVariantIds, revision?.ProviderMockupReference, template.CurrentRevision, template.IsArchived, readiness.Lifecycle, readiness.Blockers);
         });
         Replace(MockupTemplateCards, templateSummaries.Select(value => MockupTemplateCardViewModel.From(value, OptionValues)));
         RebuildChoices();
@@ -1236,15 +1242,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private bool CanCreateTemplate()
     {
-        var common = CanEdit && IsAddingTemplate && SelectedOffering is not null && SelectedPlaceholder is not null && !string.IsNullOrWhiteSpace(TemplateName);
-        if (!common) return false;
-        if (_offeringManagement is null) return true;
-        var hasLocalSource = _sourceImages is not null && HasLocalSource;
-        if (!hasLocalSource && SelectedProviderMockup is null) return false;
-        return TemplateColorChoices.Any(value => value.IsSelected)
-            && (hasLocalSource || SelectedProviderMockup is not null)
-            && MappingX >= 0 && MappingY >= 0 && MappingWidth > 0 && MappingHeight > 0
-            && (hasLocalSource || (MappingX + MappingWidth <= MappingImageWidth && MappingY + MappingHeight <= MappingImageHeight));
+        if (!CanEdit || !IsAddingTemplate || SelectedOffering is null || string.IsNullOrWhiteSpace(TemplateName)) return false;
+        if (_sourceImages is not null && HasLocalSource && SelectedProviderMockup is null)
+            return TemplateColorChoices.Any(value => value.IsSelected);
+        return SelectedProviderMockup is null || TryCreateMapping(out _);
     }
 
     private static bool OptionalPositivePair(string width, string height) =>
@@ -1356,17 +1357,87 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(HasMeaningfulMockupTemplateDraft));
     }
 
-    private void NotifyMockupTemplateDraftChanged() => OnPropertyChanged(nameof(HasMeaningfulMockupTemplateDraft));
+    private void NotifyMockupTemplateDraftChanged()
+    {
+        OnPropertyChanged(nameof(HasMeaningfulMockupTemplateDraft));
+        OnPropertyChanged(nameof(MockupTemplateLifecycleLabel));
+        OnPropertyChanged(nameof(MockupTemplateReadinessMessages));
+        OnPropertyChanged(nameof(MockupTemplateSaveValidationMessage));
+        OnPropertyChanged(nameof(HasMockupTemplateSaveValidationMessage));
+    }
+
+    private MockupTemplateReadinessResult CurrentMockupTemplateReadiness()
+    {
+        if (SelectedOffering is null)
+            return new([MockupTemplateReadinessBlocker.MissingTargetDesignArea, MockupTemplateReadinessBlocker.MissingColors, MockupTemplateReadinessBlocker.MissingImage, MockupTemplateReadinessBlocker.MissingMapping]);
+        var templateId = SelectedTemplate?.Id ?? Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var template = new MockupTemplate(templateId, SelectedOffering.Id, SelectedPlaceholder?.Id, string.IsNullOrWhiteSpace(TemplateName) ? "Draft" : TemplateName, null, 1, false, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch);
+        _ = TryCreateMapping(out var mapping);
+        var revision = new MockupTemplateRevision(templateId, templateId, 1, template.TargetPlaceholderId, DateTimeOffset.UnixEpoch,
+            providerMockupReference: SelectedProviderMockup?.ProviderReference, imageMapping: mapping);
+        return MockupTemplateReadinessPolicy.Evaluate(new(template, revision,
+            TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).ToArray(),
+            Options, OptionValues, Variants, Placeholders, SelectedProviderMockup?.SupportedColorOptionValueIds.ToHashSet()));
+    }
+
+    private static string ReadinessMessage(MockupTemplateReadinessBlocker blocker) => blocker switch
+    {
+        MockupTemplateReadinessBlocker.Archived => "Restore the template before use.",
+        MockupTemplateReadinessBlocker.MissingTargetDesignArea => "Choose a Design Area.",
+        MockupTemplateReadinessBlocker.InvalidTargetDesignArea => "Choose an active Design Area from this Offering.",
+        MockupTemplateReadinessBlocker.MissingColors => "Choose at least one applicable Color.",
+        MockupTemplateReadinessBlocker.InvalidColors => "Remove unavailable Colors.",
+        MockupTemplateReadinessBlocker.MissingCompatibleVariants => "Add an active Variant that uses the selected Colors.",
+        MockupTemplateReadinessBlocker.IncompatibleVariants => "Choose a Design Area compatible with every implied Variant.",
+        MockupTemplateReadinessBlocker.MissingImage => "Choose a mockup image.",
+        MockupTemplateReadinessBlocker.MissingMapping => "Add a valid design-area placement mapping.",
+        MockupTemplateReadinessBlocker.KnownImageColorIncompatibility => "Choose Colors supported by the selected image.",
+        _ => blocker.ToString()
+    };
+
+    private bool TryCreateMapping(out MockupImageSpaceMapping? mapping)
+    {
+        mapping = null;
+        if (SelectedProviderMockup is null)
+            return string.IsNullOrWhiteSpace(MappingXText) && string.IsNullOrWhiteSpace(MappingYText)
+                && string.IsNullOrWhiteSpace(MappingWidthText) && string.IsNullOrWhiteSpace(MappingHeightText);
+        if (!int.TryParse(MappingXText, out var x) || !int.TryParse(MappingYText, out var y)
+            || !int.TryParse(MappingWidthText, out var width) || !int.TryParse(MappingHeightText, out var height))
+            return false;
+        try
+        {
+            mapping = new MockupImageSpaceMapping(SelectedProviderMockup.ImageWidth, SelectedProviderMockup.ImageHeight, x, y, width, height);
+            return true;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return false;
+        }
+    }
+
+    private void SetMappingText(ref string field, string value, ref double numericField, string textProperty, string numericProperty)
+    {
+        value ??= string.Empty;
+        if (field == value) return;
+        field = value;
+        if (int.TryParse(value, out var parsed)) numericField = parsed;
+        OnPropertyChanged(textProperty);
+        OnPropertyChanged(numericProperty);
+        NotifyMockupTemplateDraftChanged();
+        NotifyCommands();
+    }
+
+    private static string FormatMapping(double value) => Math.Round(value).ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private MockupTemplateDraftState CurrentMockupTemplateDraftState() => new(
         SelectedTemplate?.Id,
         TemplateName,
         SelectedProviderMockup?.ProviderReference,
         SelectedPlaceholder?.Id,
-        MappingX,
-        MappingY,
-        MappingWidth,
-        MappingHeight,
+        MappingXText,
+        MappingYText,
+        MappingWidthText,
+        MappingHeightText,
         string.Join("|", TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).OrderBy(value => value)));
 
     private void RequestCancelDesignArea()
@@ -1438,10 +1509,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         string Name,
         string? ProviderReference,
         Guid? PlaceholderId,
-        double X,
-        double Y,
-        double Width,
-        double Height,
+        string X,
+        string Y,
+        string Width,
+        string Height,
         string SelectedColorIds);
 
     private sealed record DesignAreaDraftState(

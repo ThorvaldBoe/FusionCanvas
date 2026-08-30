@@ -106,6 +106,29 @@ public class ProductCatalogPersistenceTests
     }
 
     [Fact]
+    public async Task SaveAndLoadAsync_RoundTripsNameOnlyDraft()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var repository = new SqliteWorkspaceRepository(tempDirectory.GetPath("draft.db"));
+        var store = new Store(Guid.NewGuid(), "Catalog Store", null, false, Now, Now, "{}");
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Manual Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "manual", null, null, false, Now, Now);
+        var template = new MockupTemplate(Guid.NewGuid(), offering.Id, null, "Unfinished front", null, 1, false, Now, Now);
+        var revision = new MockupTemplateRevision(Guid.NewGuid(), template.Id, 1, null, Now);
+        var snapshot = new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [store], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint], BlueprintOfferings = [offering], MockupTemplates = [template], MockupTemplateRevisions = [revision]
+        };
+
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(template, Assert.Single(loaded.MockupTemplates));
+        Assert.Equal(revision, Assert.Single(loaded.MockupTemplateRevisions));
+        Assert.Equal(13, SqliteWorkspaceRepository.CurrentSchemaVersion);
+    }
+
+    [Fact]
     public async Task Migration_DropsItemDesignAreaTargetsTable()
     {
         using var tempDirectory = new TemporaryDirectory();
