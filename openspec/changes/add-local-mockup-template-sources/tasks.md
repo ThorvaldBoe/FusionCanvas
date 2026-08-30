@@ -24,8 +24,8 @@
 ## 4. Focused Mockup Template dialog
 
 - [ ] 4.1 Remove the production unavailable provider-catalog composition and update Template terminology, state messages, and accessible names to local **Mockup source images**.
-- [ ] 4.2 Add an injected raster-file picker and draft source-image collection with a keyboard-accessible Browse action, selected-entry behavior, busy protection, and explicit cancellation handling.
-- [ ] 4.3 Add Color-first applicability selection plus progressively disclosed active non-color Option Value conditions; preserve per-entry draft state while selection changes.
+- [x] 4.2 Add an injected raster-file picker and draft source-image collection with a keyboard-accessible Browse action, selected-entry behavior, busy protection, and explicit cancellation handling.
+- [x] 4.3 Add Color-first applicability selection plus progressively disclosed active non-color Option Value conditions; preserve per-entry draft state while selection changes.
 - [ ] 4.4 Render the selected staged or managed source image safely in the placement editor, initialize and persist a source-specific in-bounds mapping, and expose missing/ambiguous/readiness feedback.
 - [ ] 4.5 Preserve existing meaningful-draft discard confirmation and focus-return behavior for source, condition, and mapping edits; keep archived Store configuration visibly read-only.
 - [ ] 4.6 Add focused framework-free ViewModel tests and meaningful Avalonia headless dialog tests for bindings, command state, selected source/conditions, preview readiness, error/empty/read-only states, focus, and discard behavior.

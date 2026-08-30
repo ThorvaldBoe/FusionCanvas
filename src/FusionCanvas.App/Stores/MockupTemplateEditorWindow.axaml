@@ -54,6 +54,23 @@
             <TextBox Text="{Binding LocalSourcePath}" IsReadOnly="True" Classes="field" HorizontalAlignment="Stretch" AutomationProperties.Name="Local source image" />
             <Button Content="Browse…" Command="{Binding BrowseLocalSourceCommand}" Classes="secondary" />
           </StackPanel>
+          <ItemsControl ItemsSource="{Binding LocalSourceDrafts}" AutomationProperties.Name="Mockup source image collection">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="stores:LocalMockupSourceDraftViewModel">
+                <Border Classes="listItem" Padding="6" Margin="0,2">
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <StackPanel>
+                      <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding ApplicabilitySummary}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="Remove" Classes="secondary"
+                            Command="{Binding $parent[Window].DataContext.RemoveLocalSourceCommand}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
           <TextBlock Text="{Binding ProviderImageSelectionInstructions}"
                      TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
           <ComboBox ItemsSource="{Binding ProviderMockupCandidates}"
