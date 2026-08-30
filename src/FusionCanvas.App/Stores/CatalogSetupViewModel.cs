@@ -104,6 +104,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private string _externalOfferingId = string.Empty;
     private string _optionName = string.Empty;
     private string _optionValue = string.Empty;
+    private OfferingOptionValue? _editingOptionValue;
     private string _variantName = string.Empty;
     private string _placeholderName = string.Empty;
     private string _placeholderDescription = string.Empty;
@@ -127,6 +128,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private bool _isAddingOption;
     private bool _isAddingPrintProvider;
     private bool _isAddingOptionValue;
+    private bool _isEditingOptionValue;
     private bool _isManagingOptionValues;
     private bool _isAddingVariant;
     private bool _isAddingBulkVariants;
@@ -176,6 +178,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         StartAddOptionValueCommand = new RelayCommand(_ => BeginAddOptionValue(), () => CanEdit && SelectedOption is not null);
         CancelAddOptionValueCommand = new RelayCommand(_ => { IsAddingOptionValue = false; OptionValue = string.Empty; });
         CreateOptionValueCommand = new AsyncRelayCommand(CreateOptionValueAsync, () => CanEdit && IsAddingOptionValue && SelectedOffering is not null && SelectedOption is not null && !string.IsNullOrWhiteSpace(OptionValue));
+        EditOptionValueCommand = new RelayCommand(parameter => BeginEditOptionValue(parameter as OfferingOptionValue), () => CanEdit && SelectedOption is not null);
+        SaveOptionValueEditCommand = new AsyncRelayCommand(SaveOptionValueEditAsync, () => CanEdit && IsEditingOptionValue && _editingOptionValue is not null && !string.IsNullOrWhiteSpace(OptionValue));
+        CancelOptionValueEditCommand = new RelayCommand(_ => CancelOptionValueEdit());
         StartAddVariantCommand = new RelayCommand(_ => BeginVariantDraft(false), () => CanEdit && AvailableOptions.Any() && VariantValueChoices.Count > 0);
         StartBulkVariantsCommand = new RelayCommand(_ => BeginVariantDraft(true), () => CanEdit && AvailableColors.Any() && BulkSizeChoices.Count > 0);
         CancelAddVariantCommand = new RelayCommand(_ => { ResetVariantDraft(); VariantActionsFocusRequested?.Invoke(this, EventArgs.Empty); });
@@ -506,6 +511,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public bool IsAddingOption { get => _isAddingOption; private set { if (SetField(ref _isAddingOption, value)) NotifyCommands(); } }
     public bool IsAddingPrintProvider { get => _isAddingPrintProvider; private set { if (SetField(ref _isAddingPrintProvider, value)) NotifyCommands(); } }
     public bool IsAddingOptionValue { get => _isAddingOptionValue; private set { if (SetField(ref _isAddingOptionValue, value)) NotifyCommands(); } }
+    public bool IsEditingOptionValue { get => _isEditingOptionValue; private set { if (SetField(ref _isEditingOptionValue, value)) NotifyCommands(); } }
     public bool IsManagingOptionValues { get => _isManagingOptionValues; private set => SetField(ref _isManagingOptionValues, value); }
     public bool IsAddingVariant { get => _isAddingVariant; private set { if (SetField(ref _isAddingVariant, value)) NotifyCommands(); } }
     public bool IsAddingBulkVariants { get => _isAddingBulkVariants; private set { if (SetField(ref _isAddingBulkVariants, value)) NotifyCommands(); } }
@@ -517,7 +523,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public bool IsBusy { get => _isBusy; private set { if (SetField(ref _isBusy, value)) { OnPropertyChanged(nameof(CanEdit)); NotifyCommands(); } } }
     public string ErrorMessage { get => _error; private set { if (SetField(ref _error, value)) OnPropertyChanged(nameof(HasError)); } }
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
-    public bool HasActiveDraft => IsAddingPrintProvider || IsAddingOption || IsAddingOptionValue || IsAddingVariant || IsAddingBulkVariants || IsAddingPlaceholder || IsAddingTemplate;
+    public bool HasActiveDraft => IsAddingPrintProvider || IsAddingOption || IsAddingOptionValue || IsEditingOptionValue || IsAddingVariant || IsAddingBulkVariants || IsAddingPlaceholder || IsAddingTemplate;
     public bool HasMeaningfulMockupTemplateDraft => IsAddingTemplate && _mockupTemplateDraftBaseline is not null && CurrentMockupTemplateDraftState() != _mockupTemplateDraftBaseline;
     public string MockupTemplateLifecycleLabel => CurrentMockupTemplateReadiness().Lifecycle == MockupTemplateLifecycle.ReadyForUse ? "Ready for use" : "Draft";
     public IReadOnlyList<string> MockupTemplateReadinessMessages => CurrentMockupTemplateReadiness().Blockers.Select(ReadinessMessage).ToArray();
@@ -599,6 +605,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ICommand StartAddOptionValueCommand { get; }
     public ICommand CancelAddOptionValueCommand { get; }
     public ICommand CreateOptionValueCommand { get; }
+    public ICommand EditOptionValueCommand { get; }
+    public ICommand SaveOptionValueEditCommand { get; }
+    public ICommand CancelOptionValueEditCommand { get; }
     public ICommand StartAddVariantCommand { get; }
     public ICommand StartBulkVariantsCommand { get; }
     public ICommand CancelAddVariantCommand { get; }
@@ -758,6 +767,13 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         if (SelectedOffering is null || SelectedOption is null) return;
         await RunMutationAsync(() => _catalog.CreateOptionValueAsync(new CreateOptionValueRequest(SelectedOffering.Id, SelectedOption.Id, OptionValue))).ConfigureAwait(true);
         if (!HasError) { IsAddingOptionValue = false; OptionValue = string.Empty; }
+    }
+
+    private async Task SaveOptionValueEditAsync()
+    {
+        if (SelectedOffering is null || _editingOptionValue is null) return;
+        await RunMutationAsync(() => _catalog.UpdateAsync(new UpdateCatalogRecordRequest(SelectedOffering.StoreId, CatalogRecordKind.OptionValue, _editingOptionValue.Id, Name: OptionValue))).ConfigureAwait(true);
+        if (!HasError) CancelOptionValueEdit();
     }
 
     private async Task CreateVariantAsync()
@@ -1332,8 +1348,27 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void BeginAddOptionValue()
     {
+        CancelOptionValueEdit();
         IsAddingOptionValue = true;
         OptionValueEditorFocusRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void BeginEditOptionValue(OfferingOptionValue? value)
+    {
+        if (value is null || IsAddingOptionValue) return;
+        var current = AvailableValues.FirstOrDefault(candidate => candidate.Id == value.Id);
+        if (current is null) return;
+        _editingOptionValue = current;
+        OptionValue = current.Value;
+        IsEditingOptionValue = true;
+        OptionValueEditorFocusRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void CancelOptionValueEdit()
+    {
+        _editingOptionValue = null;
+        IsEditingOptionValue = false;
+        if (!IsAddingOptionValue) OptionValue = string.Empty;
     }
 
     private void CloseOptionValueManagement()
@@ -1345,6 +1380,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private void ResetOptionValueManagement()
     {
         IsAddingOptionValue = false;
+        CancelOptionValueEdit();
         OptionValue = string.Empty;
         IsManagingOptionValues = false;
     }
