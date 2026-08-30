@@ -119,7 +119,5 @@ public static class CatalogRelationshipPolicy
             throw new InvalidOperationException("Mockup template color bindings must belong to the template offering.");
         if (colorOption.OptionKind != OptionKind.Color || colorValue.OptionId != colorOption.Id)
             throw new InvalidOperationException("A mockup template color must reference a Color Option Value.");
-        if (template.TargetPlaceholderId == Guid.Empty)
-            throw new InvalidOperationException("Mockup templates require an authoritative target Placeholder.");
     }
 }

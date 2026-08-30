@@ -1507,6 +1507,36 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void MockupTemplateDialog_AllowsNamedDraftWithoutDesignAreasOrProvider()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: false, includeOfferingOptions: false);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        var add = window.FindControl<Button>("AddMockupTemplateButton")!;
+        Assert.True(add.Command!.CanExecute(add.CommandParameter));
+        add.Command.Execute(add.CommandParameter);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        viewModel.CatalogSetup!.TemplateName = "Manual draft";
+        dialog.UpdateLayout();
+
+        Assert.Empty(viewModel.CatalogSetup.AvailablePlaceholders);
+        Assert.False(viewModel.CatalogSetup.HasSelectedProviderMockup);
+        Assert.Equal("Draft", viewModel.CatalogSetup.MockupTemplateLifecycleLabel);
+        Assert.True(dialog.FindControl<Button>("SaveMockupTemplateButton")!.IsEnabled);
+        Assert.NotNull(AssertEffectivelyVisible(dialog, "Catalog.MockupReadiness"));
+
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void MockupTemplateManagement_EditDialogPopulatesAndReturnsFocusOnCancel()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
@@ -1641,7 +1671,7 @@ public class StoreEditorHeadlessTests
         var guidance = string.Join(" ", dialog.GetVisualDescendants().OfType<TextBlock>().Where(IsEffectivelyVisible).Select(block => block.Text));
         Assert.Contains("Offering's provider catalog", guidance, StringComparison.Ordinal);
         Assert.Contains("Local upload and drag/drop are not available", guidance, StringComparison.Ordinal);
-        Assert.Contains("Configure or sync provider catalog data", guidance, StringComparison.Ordinal);
+        Assert.Contains("save a Draft without provider integration", guidance, StringComparison.OrdinalIgnoreCase);
 
         dialog.Close();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();

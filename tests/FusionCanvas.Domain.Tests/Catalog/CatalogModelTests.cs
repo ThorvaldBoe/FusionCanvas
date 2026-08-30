@@ -90,7 +90,7 @@ public sealed class CatalogModelTests
     {
         var offeringId = Guid.NewGuid();
         var template = new MockupTemplate(Guid.NewGuid(), offeringId, Guid.NewGuid(), "Front", null, 1, false, Now, Now);
-        var matching = new OfferingPlaceholder(template.TargetPlaceholderId, offeringId, "Front", null, "front", "DTG", 1200, 1400, [], false, Now, Now);
+        var matching = new OfferingPlaceholder(template.TargetPlaceholderId!.Value, offeringId, "Front", null, "front", "DTG", 1200, 1400, [], false, Now, Now);
         var different = matching with { OfferingId = Guid.NewGuid() };
 
         CatalogLifecyclePolicy.EnsureStableTemplateTarget(template, matching);
@@ -154,7 +154,7 @@ public sealed class CatalogModelTests
 
         Assert.Equal("printify-mockup-123", revision.ProviderMockupReference);
         Assert.Equal(mapping, revision.ImageMapping);
-        Assert.Throws<ArgumentException>(() => new MockupTemplateRevision(Guid.NewGuid(), Guid.NewGuid(), 2, Guid.NewGuid(), Now, providerMockupReference: "image-only"));
+        Assert.Null(new MockupTemplateRevision(Guid.NewGuid(), Guid.NewGuid(), 2, null, Now, providerMockupReference: "image-only").ImageMapping);
     }
 
     [Fact]
@@ -168,5 +168,75 @@ public sealed class CatalogModelTests
         Assert.False(MockupTemplatePolicy.IsOutputAffectingChange(placeholder, placeholder, colors, colors, "mockup", "mockup", mapping, mapping));
         Assert.True(MockupTemplatePolicy.IsOutputAffectingChange(placeholder, placeholder, colors, colors, "mockup", "other", mapping, mapping));
         Assert.True(MockupTemplatePolicy.IsOutputAffectingChange(placeholder, placeholder, colors, colors, "mockup", "mockup", mapping, moved));
+    }
+
+    [Fact]
+    public void NameOnlyTemplateAndRevision_AreValidDraftState()
+    {
+        var offeringId = Guid.NewGuid();
+        var template = new MockupTemplate(Guid.NewGuid(), offeringId, null, "  Front draft  ", null, 1, false, Now, Now);
+        var revision = new MockupTemplateRevision(Guid.NewGuid(), template.Id, 1, null, Now);
+
+        Assert.Equal("Front draft", template.Name);
+        Assert.Null(template.TargetPlaceholderId);
+        Assert.Null(revision.TargetPlaceholderId);
+        Assert.Null(revision.ProviderMockupReference);
+        Assert.Null(revision.ImageMapping);
+        Assert.Throws<ArgumentException>(() => new MockupTemplate(Guid.NewGuid(), offeringId, null, " ", null, 1, false, Now, Now));
+    }
+
+    [Fact]
+    public void ReadinessPolicy_AccumulatesOrderedDraftBlockers()
+    {
+        var template = new MockupTemplate(Guid.NewGuid(), Guid.NewGuid(), null, "Draft", null, 1, false, Now, Now);
+        var revision = new MockupTemplateRevision(Guid.NewGuid(), template.Id, 1, null, Now);
+
+        var result = MockupTemplateReadinessPolicy.Evaluate(new(template, revision, [], [], [], [], []));
+
+        Assert.Equal(MockupTemplateLifecycle.Draft, result.Lifecycle);
+        Assert.Equal([
+            MockupTemplateReadinessBlocker.MissingTargetDesignArea,
+            MockupTemplateReadinessBlocker.MissingColors,
+            MockupTemplateReadinessBlocker.MissingImage,
+            MockupTemplateReadinessBlocker.MissingMapping], result.Blockers);
+    }
+
+    [Fact]
+    public void ReadinessPolicy_RecognizesCompleteTemplateAndCatalogRegression()
+    {
+        var offeringId = Guid.NewGuid();
+        var colorOption = new OfferingOption(Guid.NewGuid(), offeringId, OptionKind.Color, "Color", 0);
+        var color = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offeringId, "Black", 0);
+        var variant = new OfferingVariant(Guid.NewGuid(), offeringId, "Black", [color.Id], false, Now, Now);
+        var area = new OfferingPlaceholder(Guid.NewGuid(), offeringId, "Front", null, "front", "DTG", 1200, 1200, [variant.Id], false, Now, Now);
+        var template = new MockupTemplate(Guid.NewGuid(), offeringId, area.Id, "Ready", null, 1, false, Now, Now);
+        var revision = new MockupTemplateRevision(Guid.NewGuid(), template.Id, 1, area.Id, Now,
+            providerMockupReference: "front", imageMapping: new MockupImageSpaceMapping(1200, 1200, 100, 100, 800, 800));
+        var context = new MockupTemplateReadinessContext(template, revision, [color.Id], [colorOption], [color], [variant], [area], new HashSet<Guid> { color.Id });
+
+        Assert.True(MockupTemplateReadinessPolicy.Evaluate(context).IsReadyForUse);
+
+        var regressed = MockupTemplateReadinessPolicy.Evaluate(context with { DesignAreas = [area with { IsArchived = true }] });
+        Assert.Equal([MockupTemplateReadinessBlocker.InvalidTargetDesignArea], regressed.Blockers);
+    }
+
+    [Fact]
+    public void ReadinessPolicy_ReportsCompatibilityArchiveAndKnownImageBlockers()
+    {
+        var offeringId = Guid.NewGuid();
+        var option = new OfferingOption(Guid.NewGuid(), offeringId, OptionKind.Color, "Color", 0);
+        var color = new OfferingOptionValue(Guid.NewGuid(), option.Id, offeringId, "Black", 0);
+        var variant = new OfferingVariant(Guid.NewGuid(), offeringId, "Black", [color.Id], false, Now, Now);
+        var area = new OfferingPlaceholder(Guid.NewGuid(), offeringId, "Front", null, "front", "DTG", 1000, 1000, [], false, Now, Now);
+        var template = new MockupTemplate(Guid.NewGuid(), offeringId, area.Id, "Archived", null, 1, true, Now, Now);
+        var revision = new MockupTemplateRevision(Guid.NewGuid(), template.Id, 1, area.Id, Now,
+            providerMockupReference: "front", imageMapping: new MockupImageSpaceMapping(1000, 1000, 0, 0, 500, 500));
+
+        var result = MockupTemplateReadinessPolicy.Evaluate(new(template, revision, [color.Id], [option], [color], [variant], [area], new HashSet<Guid>()));
+
+        Assert.Equal([
+            MockupTemplateReadinessBlocker.Archived,
+            MockupTemplateReadinessBlocker.IncompatibleVariants,
+            MockupTemplateReadinessBlocker.KnownImageColorIncompatibility], result.Blockers);
     }
 }

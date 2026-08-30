@@ -2,10 +2,10 @@ namespace FusionCanvas.Domain.Mockups;
 
 public static class MockupTemplatePolicy
 {
-    public static bool IsOutputAffectingChange(Guid oldPlaceholderId, Guid newPlaceholderId, IReadOnlySet<Guid> oldColors, IReadOnlySet<Guid> newColors) =>
+    public static bool IsOutputAffectingChange(Guid? oldPlaceholderId, Guid? newPlaceholderId, IReadOnlySet<Guid> oldColors, IReadOnlySet<Guid> newColors) =>
         oldPlaceholderId != newPlaceholderId || !oldColors.SetEquals(newColors);
 
-    public static bool IsOutputAffectingChange(Guid oldPlaceholderId, Guid newPlaceholderId, IReadOnlySet<Guid> oldColors, IReadOnlySet<Guid> newColors, string? oldProviderMockupReference, string? newProviderMockupReference, MockupImageSpaceMapping? oldImageMapping, MockupImageSpaceMapping? newImageMapping) =>
+    public static bool IsOutputAffectingChange(Guid? oldPlaceholderId, Guid? newPlaceholderId, IReadOnlySet<Guid> oldColors, IReadOnlySet<Guid> newColors, string? oldProviderMockupReference, string? newProviderMockupReference, MockupImageSpaceMapping? oldImageMapping, MockupImageSpaceMapping? newImageMapping) =>
         IsOutputAffectingChange(oldPlaceholderId, newPlaceholderId, oldColors, newColors)
         || !string.Equals(oldProviderMockupReference, newProviderMockupReference, StringComparison.Ordinal)
         || oldImageMapping != newImageMapping;

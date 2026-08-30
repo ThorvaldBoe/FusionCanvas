@@ -84,7 +84,7 @@ public sealed class CatalogPresentationModelsTests
 
         Assert.Equal("Black", card.ColorSummary);
         Assert.Equal("2 compatible Variants", card.VariantSummary);
-        Assert.Equal("Revision 3 · Active", card.RevisionSummary);
+        Assert.Equal("Revision 3 · Draft", card.RevisionSummary);
     }
 
     [Theory]

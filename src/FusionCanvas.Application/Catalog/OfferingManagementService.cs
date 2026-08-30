@@ -74,18 +74,23 @@ public sealed class OfferingManagementService : IOfferingManagementService
             templates.Select(template =>
             {
                 var colorIds = snapshot.MockupTemplateColorVariants.Where(value => value.MockupTemplateId == template.Id && !value.IsArchived).Select(value => value.ColorOptionValueId).ToArray();
-                var target = designAreas.Single(value => value.Id == template.TargetPlaceholderId);
+                var target = designAreas.SingleOrDefault(value => value.Id == template.TargetPlaceholderId);
                 var revision = snapshot.MockupTemplateRevisions.SingleOrDefault(value => value.MockupTemplateId == template.Id && value.RevisionNumber == template.CurrentRevision);
+                var effectiveRevision = revision ?? new MockupTemplateRevision(template.Id, template.Id, template.CurrentRevision, template.TargetPlaceholderId, template.CreatedAt);
+                var readiness = MockupTemplateReadinessPolicy.Evaluate(new(template, effectiveRevision, colorIds,
+                    snapshot.OfferingOptions, snapshot.OfferingOptionValues, variants, designAreas));
                 return new MockupTemplateSetupSummary(
                     template.Id,
                     template.Name,
-                    target.Id,
-                    target.Name,
+                    target?.Id,
+                    target?.Name,
                     colorIds,
                     variants.Where(variant => !variant.IsArchived && variant.OptionValueIds.Any(colorIds.Contains)).Select(variant => variant.Id).ToArray(),
                     revision?.ProviderMockupReference,
                     template.CurrentRevision,
-                    template.IsArchived);
+                    template.IsArchived,
+                    readiness.Lifecycle,
+                    readiness.Blockers);
             }).ToArray());
     }
 
@@ -184,33 +189,23 @@ public sealed class OfferingManagementService : IOfferingManagementService
         var (store, blueprint, offering) = RequireContext(snapshot, request.Context);
         if (store.IsArchived || blueprint.IsArchived || offering.IsArchived)
             return Failure(snapshot, request.Context, "Archived catalog records are read-only.");
-        var descriptor = await _providerCatalog.LoadAsync(request.Context, cancellationToken).ConfigureAwait(false);
-        if (!descriptor.IsAvailable || descriptor.Context != request.Context)
-            return Failure(snapshot, request.Context, descriptor.UnavailableReason ?? "Provider mockup images are unavailable.");
-        var providerMockup = descriptor.AvailableMockupImages.SingleOrDefault(value => string.Equals(value.ProviderReference, request.ProviderMockupReference, StringComparison.Ordinal));
-        if (providerMockup is null)
-            return Failure(snapshot, request.Context, "Select a provider mockup image from this Offering's catalog data.");
-        if (providerMockup.ImageWidth != request.ImageMapping.ImageWidth || providerMockup.ImageHeight != request.ImageMapping.ImageHeight)
-            return Failure(snapshot, request.Context, "The mapping image dimensions must match the selected provider mockup image.");
-        var designArea = snapshot.OfferingPlaceholders.SingleOrDefault(value => value.Id == request.TargetDesignAreaId && value.OfferingId == offering.Id && !value.IsArchived);
-        if (designArea is null)
-            return Failure(snapshot, request.Context, "Target Design Area must be active and belong to this Offering.");
+        OfferingPlaceholder? designArea = null;
+        if (request.TargetDesignAreaId is not null)
+        {
+            designArea = snapshot.OfferingPlaceholders.SingleOrDefault(value => value.Id == request.TargetDesignAreaId && value.OfferingId == offering.Id && !value.IsArchived);
+            if (designArea is null)
+                return Failure(snapshot, request.Context, "Target Design Area must be active and belong to this Offering.");
+        }
 
-        var colorIds = request.ColorOptionValueIds.Distinct().ToArray();
-        if (colorIds.Length == 0)
-            return Failure(snapshot, request.Context, "Select at least one applicable Color.");
+        var colorIds = request.ColorOptionValueIds?.Distinct().ToArray() ?? [];
         var colors = colorIds.Select(id => FindTypedValue(snapshot, offering.Id, id, OptionKind.Color)).ToArray();
         if (colors.Any(value => value is null))
             return Failure(snapshot, request.Context, "Template applicability may only use active Color values from this Offering.");
-        if (colorIds.Any(id => !providerMockup.SupportedColorOptionValueIds.Contains(id)))
-            return Failure(snapshot, request.Context, "The selected provider mockup image does not support every selected Color.");
 
         var impliedVariants = snapshot.OfferingVariants.Where(variant =>
             variant.OfferingId == offering.Id && !variant.IsArchived &&
             variant.OptionValueIds.Any(id => colorIds.Contains(id))).ToArray();
-        if (impliedVariants.Length == 0)
-            return Failure(snapshot, request.Context, "No sellable Variants use the selected Colors.");
-        var incompatible = impliedVariants.Where(value => !designArea.VariantIds.Contains(value.Id)).Select(value => value.Name).OrderBy(value => value).ToArray();
+        var incompatible = designArea is null ? [] : impliedVariants.Where(value => !designArea.VariantIds.Contains(value.Id)).Select(value => value.Name).OrderBy(value => value).ToArray();
         if (incompatible.Length > 0)
             return Failure(snapshot, request.Context, "The target Design Area is not compatible with every Variant implied by the selected Colors.", incompatible);
 
@@ -219,8 +214,8 @@ public sealed class OfferingManagementService : IOfferingManagementService
         MockupTemplateRevision revision;
         try
         {
-            template = new MockupTemplate(_newId(), offering.Id, designArea.Id, request.Name, request.Description, 1, false, now, now);
-            revision = new MockupTemplateRevision(_newId(), template.Id, 1, designArea.Id, now, "Initial provider mockup configuration", providerMockup.ProviderReference, request.ImageMapping);
+            template = new MockupTemplate(_newId(), offering.Id, designArea?.Id, request.Name, request.Description, 1, false, now, now);
+            revision = new MockupTemplateRevision(_newId(), template.Id, 1, designArea?.Id, now, "Initial template configuration", request.ProviderMockupReference, request.ImageMapping);
         }
         catch (ArgumentException exception)
         {
@@ -236,7 +231,7 @@ public sealed class OfferingManagementService : IOfferingManagementService
             MockupTemplateRevisionColors = [.. snapshot.MockupTemplateRevisionColors, .. revisionColors]
         };
         await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
-        return Success(updated, request.Context);
+        return Success(updated, request.Context) with { TemplateId = template.Id };
     }
 
     public async Task<BulkVariantPreview> PreviewBulkVariantsAsync(BulkVariantRequest request, CancellationToken cancellationToken = default)

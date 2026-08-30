@@ -121,7 +121,7 @@ public sealed class MockupTemplateSetupServiceTests
     }
 
     [Fact]
-    public async Task IncompleteProviderImageConfigurationIsRejectedWithoutRevision()
+    public async Task PartialProviderImageConfigurationPersistsAsDraft()
     {
         var storeId = Guid.NewGuid();
         var blueprint = new Blueprint(Guid.NewGuid(), storeId, "T-shirt", null, false, Now, Now);
@@ -136,14 +136,41 @@ public sealed class MockupTemplateSetupServiceTests
 
         var result = await service.UpdateTemplateAsync(new UpdateMockupTemplateRequest(storeId, created.State.Templates.Single().Id, ReplaceProviderImage: true, ProviderMockupReference: "front-black"), TestContext.Current.CancellationToken);
 
-        Assert.False(result.Succeeded);
-        Assert.Single(result.State.Revisions);
+        Assert.True(result.Succeeded);
+        Assert.Equal(2, result.State.Revisions.Count);
+        Assert.Equal(MockupTemplateLifecycle.Draft, result.State.Readiness!.Single().Lifecycle);
+        Assert.Contains(MockupTemplateReadinessBlocker.MissingMapping, result.State.Readiness!.Single().Blockers);
+    }
+
+    [Fact]
+    public async Task NameOnlyTemplateSavesOnceWithoutProviderAndReturnsStableId()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprint = new Blueprint(Guid.NewGuid(), storeId, "T-shirt", null, false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, storeId, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "manual", null, null, false, Now, Now);
+        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [new Store(storeId, "Store", null, false, Now, Now, "{}")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint], BlueprintOfferings = [offering]
+        });
+        var service = new MockupTemplateSetupService(repository, () => Now, Guid.NewGuid);
+
+        var result = await service.CreateTemplateAsync(new CreateMockupTemplateRequest(storeId, offering.Id, "Manual draft"), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(result.TemplateId, result.State.Templates.Single().Id);
+        Assert.Null(result.State.Templates.Single().TargetPlaceholderId);
+        Assert.Equal(MockupTemplateLifecycle.Draft, result.State.Readiness!.Single().Lifecycle);
+        Assert.Equal(1, repository.SaveCount);
+        var eligibility = await service.GetEligibleTemplatesAsync(storeId, offering.Id, result.TemplateId, TestContext.Current.CancellationToken);
+        Assert.False(eligibility.Succeeded);
+        Assert.Contains(MockupTemplateReadinessBlocker.MissingImage, eligibility.Blockers);
     }
 
     private sealed class MemoryRepository(WorkspaceSnapshot initial) : IWorkspaceRepository
     {
         private WorkspaceSnapshot _snapshot = initial;
+        public int SaveCount { get; private set; }
         public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(_snapshot);
-        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default) { _snapshot = snapshot; return Task.CompletedTask; }
+        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default) { SaveCount++; _snapshot = snapshot; return Task.CompletedTask; }
     }
 }
