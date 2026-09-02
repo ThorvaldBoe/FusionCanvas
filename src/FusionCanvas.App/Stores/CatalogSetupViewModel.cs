@@ -206,6 +206,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             MockupTemplate template => template,
             _ => null
         }), () => CanEdit);
+        DuplicateTemplateCommand = new RelayCommand(parameter => _ = DuplicateTemplateAsync(parameter), () => CanEdit && SelectedOffering is not null);
         CancelAddTemplateCommand = new RelayCommand(_ => ResetTemplateDraft());
         RequestCancelMockupTemplateCommand = new RelayCommand(_ => RequestCancelMockupTemplate(), () => IsAddingTemplate);
         ConfirmDiscardMockupTemplateCommand = new RelayCommand(_ => ConfirmDiscardMockupTemplate(), () => IsMockupTemplateDiscardConfirmationVisible);
@@ -655,6 +656,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ICommand SetDefaultPlaceholderCommand { get; }
     public ICommand StartAddTemplateCommand { get; }
     public ICommand EditTemplateCommand { get; }
+    public ICommand DuplicateTemplateCommand { get; }
     public ICommand CancelAddTemplateCommand { get; }
     public ICommand RequestCancelMockupTemplateCommand { get; }
     public ICommand ConfirmDiscardMockupTemplateCommand { get; }
@@ -1055,6 +1057,40 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     {
         if (template is null || SelectedOffering is null) return;
         await RunMockupMutationAsync(() => _mockups.ArchiveTemplateAsync(new ArchiveMockupTemplateRequest(SelectedOffering.StoreId, template.Id))).ConfigureAwait(true);
+    }
+
+    private async Task DuplicateTemplateAsync(object? parameter)
+    {
+        if (SelectedOffering is null || !CanEdit) return;
+        var template = parameter switch
+        {
+            MockupTemplateCardViewModel card => Templates.FirstOrDefault(value => value.Id == card.Id),
+            MockupTemplate value => value,
+            _ => null
+        };
+        if (template is null || template.IsArchived) return;
+
+        IsBusy = true;
+        ErrorMessage = string.Empty;
+        try
+        {
+            var result = await _mockups.DuplicateTemplateAsync(new DuplicateMockupTemplateRequest(SelectedOffering.StoreId, template.Id)).ConfigureAwait(true);
+            if (!result.Succeeded)
+            {
+                ErrorMessage = result.Error ?? "Mockup Template could not be duplicated.";
+                return;
+            }
+
+            ApplyMockups(result.State);
+            var duplicate = result.State.Templates.FirstOrDefault(value => value.Id == result.TemplateId);
+            if (duplicate is not null)
+            {
+                IsBusy = false;
+                BeginEditTemplate(duplicate);
+            }
+        }
+        catch (Exception exception) { ErrorMessage = exception.Message; }
+        finally { IsBusy = false; }
     }
 
     private void BeginEditTemplate(MockupTemplate? template)
@@ -1828,6 +1864,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             SaveOfferingCommand, StartAddPrintProviderCommand, CreatePrintProviderCommand, StartAddOptionCommand, ManageOptionCommand, CreateOptionCommand, StartAddOptionValueCommand,
             CreateOptionValueCommand, StartAddVariantCommand, StartBulkVariantsCommand, CreateVariantCommand, StartAddPlaceholderCommand,
             CreatePlaceholderCommand, SetDefaultPlaceholderCommand, StartAddTemplateCommand, CreateTemplateCommand,
+            DuplicateTemplateCommand,
             AddTemplateColorCommand, PreviewBulkVariantsCommand, ConfirmBulkVariantsCommand,
             OpenEnlargedPlacementEditorCommand,
             ConfirmDesignAreaArchiveCommand, CancelDesignAreaArchiveCommand,
