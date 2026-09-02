@@ -13,6 +13,7 @@ public sealed record MockupTemplateSetupResult(bool Succeeded, string? Error, Mo
 }
 
 public sealed record CreateMockupTemplateRequest(Guid StoreId, Guid OfferingId, string Name, Guid? TargetPlaceholderId = null, string? Description = null, string? PositionKey = null, string? ProviderMockupReference = null, MockupImageSpaceMapping? ImageMapping = null, IReadOnlyList<Guid>? ColorOptionValueIds = null);
+public sealed record DuplicateMockupTemplateRequest(Guid StoreId, Guid TemplateId);
 public sealed record AddMockupTemplateColorRequest(Guid StoreId, Guid TemplateId, Guid ColorOptionValueId);
 public sealed record ArchiveMockupTemplateColorRequest(Guid StoreId, Guid TemplateColorId);
 public sealed record ArchiveMockupTemplateRequest(Guid StoreId, Guid TemplateId);
@@ -22,6 +23,7 @@ public interface IMockupTemplateSetupService
 {
     Task<MockupTemplateSetupState> LoadForStoreAsync(Guid storeId, CancellationToken cancellationToken = default);
     Task<MockupTemplateSetupResult> CreateTemplateAsync(CreateMockupTemplateRequest request, CancellationToken cancellationToken = default);
+    Task<MockupTemplateSetupResult> DuplicateTemplateAsync(DuplicateMockupTemplateRequest request, CancellationToken cancellationToken = default);
     Task<MockupTemplateSetupResult> AddColorAsync(AddMockupTemplateColorRequest request, CancellationToken cancellationToken = default);
     Task<MockupTemplateSetupResult> ArchiveColorAsync(ArchiveMockupTemplateColorRequest request, CancellationToken cancellationToken = default);
     Task<MockupTemplateSetupResult> ArchiveTemplateAsync(ArchiveMockupTemplateRequest request, CancellationToken cancellationToken = default);
