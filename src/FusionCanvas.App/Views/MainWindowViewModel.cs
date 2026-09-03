@@ -17,9 +17,6 @@ using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Stores;
-using FusionCanvas.Integration.Files;
-using FusionCanvas.Integration.Packages;
-using FusionCanvas.Integration.SllGeneration;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
@@ -78,13 +75,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public static MainWindowViewModel CreateForDefaultWorkspace(
         SettingsViewModel settings,
-        IAiTextGenerationService ai) =>
+        IAiTextGenerationService ai,
+        AppWorkspaceRuntime? workspace = null) =>
         new(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
             new DocumentWindowViewModel(),
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            AppWorkspaceFactory.CreateDefault(ai),
+            workspace ?? AppWorkspaceFactory.CreateDefault(ai),
             settings);
 
     private MainWindowViewModel(
@@ -105,6 +103,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.ItemManagement,
             runtime.AssetManagement,
             runtime.FileStore,
+            runtime.WorkspaceTransfer,
+            runtime.RasterImageMetadata,
             runtime.ItemInspector,
             runtime.TagManagement,
             settings,
@@ -133,6 +133,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IItemManagementService? itemManagementService = null,
         IAssetManagementService? assetManagementService = null,
         IWorkspaceFileStore? workspaceFileStore = null,
+        IWorkspaceTransferService? workspaceTransferService = null,
+        IRasterImageMetadataReader? rasterImageMetadataReader = null,
         IItemInspectorService? itemInspectorService = null,
         ITagManagementService? tagManagementService = null,
         SettingsViewModel? settings = null,
@@ -153,16 +155,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
-        var fileStore = workspaceFileStore ?? new InMemoryWorkspaceFileStore();
+        var fileStore = workspaceFileStore ?? NullWorkspaceFileStore.Instance;
+        var metadataReader = rasterImageMetadataReader ?? NullRasterImageMetadataReader.Instance;
         WorkspaceManagement = new WorkspaceManagementViewModel(
             new WorkspaceManagementService(
                 workspaceRepository,
                 initialActiveWorkspaceId: settings?.ActiveWorkspaceId),
-            new WorkspaceTransferService(
-                workspaceRepository,
-                fileStore,
-                new ZipWorkspacePackageWriter(),
-                new ZipWorkspacePackageReader()));
+            workspaceTransferService ?? NullWorkspaceTransferService.Instance);
         Settings = CreateSettings(settings);
         var productService = productSupplierSetupService ?? new ProductSupplierSetupService(workspaceRepository);
         var providerCatalog = new UnavailableProviderCatalogCandidateSource();
@@ -175,7 +174,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             mockupTemplateSetupService ?? new MockupTemplateSetupService(workspaceRepository),
             new OfferingManagementService(workspaceRepository, providerCatalog),
             providerCatalog,
-            new MockupTemplateSourceImageService(workspaceRepository, fileStore, new RasterImageMetadataReader()),
+            new MockupTemplateSourceImageService(workspaceRepository, fileStore, metadataReader),
             new NullAssetFilePicker());
         _groupManagementService = groupManagementService ?? new GroupManagementService(workspaceRepository);
         _itemManagementService = itemManagementService ?? new ItemManagementService(workspaceRepository);
@@ -188,7 +187,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _conceptRefinementAccessStatus = conceptRefinementAccessStatus ?? DisabledConceptRefinementAccessStatus.Instance;
         _sllGenerationService = sllGenerationService ?? DisabledSllGenerationService.Instance;
         _sllAccessStatus = sllAccessStatus ?? DisabledSllAccessStatus.Instance;
-        _sllDocumentCodec = sllDocumentCodec ?? new SllDocumentCodec();
+        _sllDocumentCodec = sllDocumentCodec ?? new NullSllDocumentCodec();
         _ideationService = ideationService ?? new IdeationService(
             workspaceRepository,
             _itemManagementService,

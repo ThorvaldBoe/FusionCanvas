@@ -1,5 +1,7 @@
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.Workspaces.Transfer;
+using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.Groups;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Assets;
@@ -18,6 +20,8 @@ namespace FusionCanvas.App.Workspace;
 public sealed record AppWorkspaceRuntime(
     IWorkspaceRepository Repository,
     IWorkspaceFileStore FileStore,
+    IWorkspaceTransferService WorkspaceTransfer,
+    IRasterImageMetadataReader RasterImageMetadata,
     WorkspaceSnapshot Snapshot,
     IGroupManagementService GroupManagement,
     IItemManagementService ItemManagement,

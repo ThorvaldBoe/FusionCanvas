@@ -44,6 +44,12 @@ public static class AppServicesFactory
             new AssemblyApplicationVersionProvider(),
             AvaloniaClipboardService.Instance);
         var textService = new AiTextGenerationService(aiSettings, credentials, catalogCache, openRouter);
-        return new AppServices(httpClient, settingsStore, settings, textService);
+        return new AppServices(
+            httpClient,
+            settingsStore,
+            settings,
+            textService,
+            new FusionCanvas.Integration.Items.ItemCsvCodec(),
+            new FusionCanvas.Integration.Items.Import.ItemCsvCodec());
     }
 }
