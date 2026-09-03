@@ -463,6 +463,18 @@ public sealed class CatalogSetupViewModelTests
     }
 
     [Fact]
+    public async Task EditingOptionValueRefreshesSaveCommandCanExecuteState()
+    {
+        var (viewModel, colorOption, _, _) = await CreateCatalogWithOptionsAsync();
+        viewModel.ManageOptionCommand.Execute(colorOption);
+        var value = Assert.Single(viewModel.AvailableValues);
+        viewModel.EditOptionValueCommand.Execute(value);
+
+        Assert.True(viewModel.IsEditingOptionValue);
+        Assert.True(viewModel.SaveOptionValueEditCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task SecondManageRequestKeepsOriginalStableOptionScope()
     {
         var (viewModel, colorOption, sizeOption, _) = await CreateCatalogWithOptionsAsync();
