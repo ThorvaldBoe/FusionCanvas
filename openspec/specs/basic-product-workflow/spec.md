@@ -3,9 +3,7 @@
 ## Purpose
 
 Defines accepted behavior for basic product workflow.
-
 ## Requirements
-
 ### Requirement: Items expose one basic tool for each workflow stage
 FusionCanvas SHALL provide built-in Idea, Concept, Design, and Listing Stage Tools for an active Item and SHALL show exactly the tool for the active view stage inside the Stage Tool Host.
 
@@ -74,17 +72,17 @@ The Concept Stage Tool SHALL expose optional Concept idea, Phrase, and Graphics 
 - **THEN** the Item can still advance to Design
 
 ### Requirement: Design tool presents selected printable-area guidance
-FusionCanvas SHALL present an Item's selected Store design-area targets in the Design Stage Tool alongside its existing design-file controls.
+FusionCanvas SHALL present an Item's selected Store Offering Placeholder targets in the Design Stage Tool alongside its existing design-file controls and SHALL use Placeholder terminology with explanatory helper text where needed.
 
 #### Scenario: Item opens with selected targets
-- **WHEN** an Item with persisted selected printable areas opens at Design
-- **THEN** the Design Stage Tool displays each target's product, fulfillment offering, position, decoration method, and dimensions
+- **WHEN** an Item with persisted selected Offering Placeholders opens at Design
+- **THEN** the Design Stage Tool displays each target's Blueprint, Blueprint Offering, position, decoration method, and dimensions
 - **AND** existing design-file import, preview, export, and remove behavior remains available according to editability
 
 #### Scenario: Selected Choice target is displayed
-- **WHEN** an Item has a selected target from a Printify Choice network offering
-- **THEN** the Design Stage Tool displays the target and its network consistency warning
-- **AND** it does not display a fabricated fixed provider name
+- **WHEN** an Item has a selected Placeholder from a Printify Choice Provider-Network offering
+- **THEN** the Design Stage Tool displays the target and its network-consistency warning
+- **AND** does not display a fabricated fixed Print Provider name
 
 ### Requirement: Shared Item chrome surrounds the active Stage Tool
 FusionCanvas SHALL present shared Overview, Notes, Tags, Related assets, and lifecycle areas around the Stage Tool Host in one vertically scrollable Item surface.
@@ -147,3 +145,4 @@ FusionCanvas SHALL keep essential workflow actions keyboard reachable with meani
 - **WHEN** an Item save, transition, or Design-file operation is already running and the user invokes the action again
 - **THEN** FusionCanvas performs at most one conflicting mutation
 - **AND** preserves the current draft, selection, and recoverable interaction state
+
