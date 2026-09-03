@@ -18,10 +18,3 @@ public sealed record ApplicationSettings(
     public static ApplicationSettings Default { get; } =
         new(DarkMode: false, AiConfigurationSettings.Default);
 }
-
-public sealed record WindowLayoutSettings(
-    int PositionX,
-    int PositionY,
-    double Width,
-    double Height,
-    double NavigationWidth);

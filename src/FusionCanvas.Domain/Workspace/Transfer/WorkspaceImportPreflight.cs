@@ -1,7 +1,5 @@
 namespace FusionCanvas.Domain.Workspace.Transfer;
 
-public sealed record WorkspaceIdentityCollision(string EntityType, string Identity);
-
 public static class WorkspaceImportPreflight
 {
     public static IReadOnlyList<WorkspaceIdentityCollision> FindIdentityCollisions(

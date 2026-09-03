@@ -1,12 +1,5 @@
 namespace FusionCanvas.Domain.Mockups;
 
-public enum MockupTemplateSourceResolutionKind
-{
-    Missing = 0,
-    Resolved = 1,
-    Ambiguous = 2
-}
-
 public sealed record MockupTemplateSourceResolution(Guid VariantId, MockupTemplateSourceResolutionKind Kind, IReadOnlyList<Guid> SourceImageIds)
 {
     public Guid VariantId { get; } = VariantId == Guid.Empty ? throw new ArgumentException("Identifier must not be empty.", nameof(VariantId)) : VariantId;

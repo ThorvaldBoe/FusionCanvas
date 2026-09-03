@@ -7,12 +7,6 @@ using FusionCanvas.Application.Workspaces.Transfer;
 
 namespace FusionCanvas.App.Workspace;
 
-public sealed record WorkspaceSelectorEntry(WorkspaceSummary Workspace, bool IsSelected)
-{
-    public Guid Id => Workspace.Id;
-
-    public string Name => Workspace.Name;
-}
 
 public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
 {

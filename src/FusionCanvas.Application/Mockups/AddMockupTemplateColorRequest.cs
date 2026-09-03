@@ -1,0 +1,6 @@
+using FusionCanvas.Domain.Mockups;
+using FusionCanvas.Domain.Workspace;
+
+namespace FusionCanvas.Application.Mockups;
+
+public sealed record AddMockupTemplateColorRequest(Guid StoreId, Guid TemplateId, Guid ColorOptionValueId);

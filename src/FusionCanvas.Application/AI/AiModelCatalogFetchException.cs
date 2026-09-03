@@ -1,14 +1,5 @@
 namespace FusionCanvas.Application.AI;
 
-public enum AiModelCatalogFailureKind
-{
-    Authentication,
-    RateLimited,
-    NetworkOrService,
-    InvalidResponse,
-    ZdrDataUnavailable
-}
-
 public sealed class AiModelCatalogFetchException : Exception
 {
     public AiModelCatalogFetchException(AiModelCatalogFailureKind kind, string message, TimeSpan? retryAfter = null)

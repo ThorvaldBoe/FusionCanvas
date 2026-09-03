@@ -121,8 +121,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.ItemCsvImport,
             runtime.SllDocumentCodec)
     {
-    }
-
+}
     public MainWindowViewModel(
         WorkflowStageNavigatorViewModel workflowNavigator,
         DocumentWindowViewModel documentWindow,
@@ -1551,7 +1550,3 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         return true;
     }
 }
-
-public sealed record ItemStatusOptionViewModel(ItemStatus Status, string Label);
-
-public sealed record NavigationDocumentContext(string Label, DocumentContext Context);

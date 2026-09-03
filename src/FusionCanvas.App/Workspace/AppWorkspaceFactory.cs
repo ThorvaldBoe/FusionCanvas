@@ -21,29 +21,6 @@ using FusionCanvas.Integration.SllGeneration;
 
 namespace FusionCanvas.App.Workspace;
 
-public sealed record AppWorkspaceRuntime(
-    IWorkspaceRepository Repository,
-    IWorkspaceFileStore FileStore,
-    WorkspaceSnapshot Snapshot,
-    IGroupManagementService GroupManagement,
-    IItemManagementService ItemManagement,
-    IAssetManagementService AssetManagement,
-    ITagManagementService TagManagement,
-    IItemInspectorService ItemInspector,
-    IIdeationService Ideation,
-    IIdeationAccessStatus IdeationAccess,
-    ISnowcloneLibraryService SnowcloneLibrary,
-    IRejectedPhraseManagementService RejectedPhrases,
-    SnowcloneLibraryResult SnowcloneLibraryInitialization,
-    IConceptRefinementService ConceptRefinement,
-    IConceptRefinementAccessStatus ConceptRefinementAccess,
-    ISllGenerationService SllGeneration,
-    ISllAccessStatus SllGenerationAccess,
-    ITitleOptimizationService TitleOptimization,
-    IProductSupplierSetupService ProductSupplierSetup,
-    IItemCsvImportService ItemCsvImport,
-    ISllDocumentCodec SllDocumentCodec);
-
 public static class AppWorkspaceFactory
 {
     public const string WorkspaceDatabaseEnvironmentVariable = "FUSIONCANVAS_WORKSPACE_DB";
