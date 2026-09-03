@@ -3,15 +3,14 @@
 ## Purpose
 
 Defines how GitHub Issues provide intake and delivery tracking while OpenSpec remains the authoritative workflow for significant product behavior.
-
 ## Requirements
-
 ### Requirement: GitHub Issues provide structured work intake
-FusionCanvas SHALL use GitHub Issues for externally reported bugs and feature requests, separately tracked internal bugs, and high-level planned features. The repository SHALL provide required Bug Report and Feature Request Issue Forms, SHALL disable blank issues, and SHALL warn reporters not to submit credentials, personal information, private workspace data, or other sensitive content.
+FusionCanvas SHALL use GitHub Issues for externally reported bugs and feature requests, separately tracked internal bugs, and high-level planned features. The repository SHALL provide required Bug Report and Feature Request Issue Forms, SHALL disable blank issues, and SHALL warn reporters not to submit credentials, personal information, private workspace data, or other sensitive content. The Bug Report form SHALL request version or commit information when available but SHALL NOT require it.
 
 #### Scenario: External contributor reports a bug
 - **WHEN** an external contributor selects the Bug Report form
-- **THEN** the form requires version or commit, operating system, expected behavior, actual behavior, reproduction steps, and frequency information
+- **THEN** the form requires operating system, expected behavior, actual behavior, reproduction steps, and frequency information
+- **AND** the form accepts a report when version or commit information is omitted
 - **AND** the created issue receives `type: bug` and `status: needs-triage` labels
 
 #### Scenario: External contributor requests a feature
@@ -73,3 +72,4 @@ FusionCanvas work branches SHALL use `codex/<issue-number>-<slug>`. Pull request
 - **WHEN** a pull request implements an OpenSpec change with a primary issue
 - **THEN** the pull request identifies the change and uses `Closes #<issue-number>`
 - **AND** the issue closes only on merge while the change remains subject to its OpenSpec verification and archive gates
+

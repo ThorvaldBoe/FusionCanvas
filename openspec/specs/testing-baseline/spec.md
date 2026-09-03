@@ -3,9 +3,7 @@
 ## Purpose
 
 Defines the automated testing baseline, priority coverage areas, run expectations, and contribution expectations for foundational FusionCanvas behavior.
-
 ## Requirements
-
 ### Requirement: Acceptance criteria are traceable to verification
 FusionCanvas SHALL map every delivery-module acceptance scenario to planned verification and final evidence.
 
@@ -159,3 +157,23 @@ FusionCanvas SHALL construct headless view tests with an in-memory or disposable
 - **WHEN** an application entry point exposes a factory that opens the contributor's real on-disk workspace
 - **THEN** automated tests do not call that factory
 - **AND** any view model that needs a workspace in tests is constructed with isolated data instead
+
+### Requirement: Existing compiler and formatting debt is explicitly baselined
+FusionCanvas SHALL record known compiler, analyzer, and formatting debt with reproducible verification commands and SHALL distinguish environmental verification failures from clean results.
+
+#### Scenario: Contributor reviews the quality baseline
+- **WHEN** a contributor evaluates the repository quality gates
+- **THEN** the checked-in baseline identifies the deterministic build command, observed diagnostics, formatter command, and any runner limitation
+- **AND** the baseline does not suppress diagnostics or claim a clean formatter result when analysis did not run
+
+### Requirement: Dependency updates are batched and verified
+FusionCanvas SHALL plan dependency updates in bounded compatibility batches and SHALL verify each batch with the deterministic build/test baseline and any affected focused tests before treating it as complete.
+
+#### Scenario: A dependency update is proposed
+- **WHEN** a contributor plans package updates with different compatibility or framework risk
+- **THEN** the updates are separated into reviewable batches with explicit affected verification
+
+#### Scenario: A dependency batch is completed
+- **WHEN** a package batch is applied
+- **THEN** the solution build and deterministic tests pass together with the focused tests for the affected framework or integration boundary
+

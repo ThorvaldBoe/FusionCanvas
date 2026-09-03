@@ -1,9 +1,7 @@
 ## Purpose
 
 Store management defines how FusionCanvas creates, selects, edits, archives, restores, and deletes stores as workspace-scoped business contexts.
-
 ## Requirements
-
 ### Requirement: Store management creates stores
 FusionCanvas SHALL allow users to create stores as workspace-scoped business, brand, client, or publishing contexts without requiring advanced setup.
 
@@ -155,27 +153,27 @@ FusionCanvas SHALL keep regular workspace store UI focused on store selection an
 - **THEN** FusionCanvas enables Save
 
 ### Requirement: Store editor owns product and fulfillment setup
-FusionCanvas SHALL provide a Products & fulfillment tab in the dedicated Store Editor for the selected Store and SHALL keep this administration out of the regular workspace rail and application Settings window.
+FusionCanvas SHALL provide a Catalog & mockups tab in the dedicated Store Editor for the selected Store, SHALL place fulfillment strategy, Blueprint catalog, and Mockup Template administration there, and SHALL keep this occasional configuration out of the regular workspace rail and application Settings window.
 
-#### Scenario: User opens product setup for active Store
+#### Scenario: User opens catalog setup for active Store
 - **WHEN** the user opens Manage stores and selects an active Store
-- **THEN** FusionCanvas provides a Products & fulfillment tab for that Store
+- **THEN** FusionCanvas provides a Catalog & mockups tab for that Store
 - **AND** the regular workspace remains focused on Store selection and creative work
 
-#### Scenario: Store has no configured products
-- **WHEN** the user opens Products & fulfillment for a Store with no product blueprints
-- **THEN** FusionCanvas shows a useful empty state and a New product action
-- **AND** it does not fabricate product or provider data
+#### Scenario: Store has no configured Blueprints
+- **WHEN** the user opens Catalog & mockups for a Store with no Blueprints
+- **THEN** FusionCanvas shows the Manual fulfillment strategy, explanatory Blueprint empty guidance, and a New Blueprint action
+- **AND** does not fabricate Blueprint, Print Provider, Provider Network, Variant, Placeholder, or Mockup Template data
 
 #### Scenario: User changes editor context with an unsaved catalog draft
-- **WHEN** the user has meaningful unsaved product, offering, variant, or area changes and changes Store, tab, selection, or closes the Store Editor
-- **THEN** FusionCanvas offers discard and keep-editing actions
-- **AND** keep-editing retains the current draft and focus
+- **WHEN** the user has meaningful unsaved Blueprint, offering, Option, Variant, Placeholder, template, or template-color changes and changes Store, tab, selection, or closes the Store Editor
+- **THEN** FusionCanvas offers the applicable save/discard/cancel or discard/keep-editing safeguard
+- **AND** cancellation or keep-editing retains the current draft, context, selection, and focus
 
 #### Scenario: User reviews archived Store setup
 - **WHEN** the user selects an archived Store in the Store Editor
-- **THEN** FusionCanvas shows its configured product data read-only
-- **AND** it does not enable create, edit, or target-affecting catalog mutations
+- **THEN** FusionCanvas shows its fulfillment strategy, Blueprint catalog, and Mockup Template configuration read-only
+- **AND** does not enable create, edit, archive-conflicting, or relationship-changing catalog mutations
 
 ### Requirement: Store selector supports compact and expanded modes
 FusionCanvas SHALL allow the active store selector to collapse to a compact selected-store view or expand to show active stores in the active workspace.
@@ -272,3 +270,4 @@ FusionCanvas SHALL allow users to provide an optional storefront URL for a store
 - **WHEN** a store has a recorded URL
 - **THEN** the URL belongs to that store in its workspace
 - **AND** other stores do not share or inherit the URL
+

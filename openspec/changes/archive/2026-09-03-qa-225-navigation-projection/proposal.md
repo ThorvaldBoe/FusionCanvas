@@ -14,6 +14,10 @@
 - No user-facing behavior or navigation model changes.
 - No broad rewrite of the remaining view-model responsibilities.
 
+## Modified Capabilities
+
+- `architecture-guidelines`: clarify that cohesive projection responsibilities may be extracted from oversized presentation types without behavior changes.
+
 ## Verification
 
 - Existing main-window and navigation tests pass.

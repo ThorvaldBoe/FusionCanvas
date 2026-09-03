@@ -3,9 +3,7 @@
 ## Purpose
 
 Defines the architectural expectations for FusionCanvas implementation work, including Clean Architecture boundaries, SOLID design, dependency direction, and unit testing expectations.
-
 ## Requirements
-
 ### Requirement: Clean Architecture is the target structure
 FusionCanvas SHALL use Clean Architecture as the default architectural structure for meaningful implementation work.
 
@@ -20,17 +18,9 @@ FusionCanvas SHALL use Clean Architecture as the default architectural structure
 ### Requirement: SOLID principles guide implementation
 FusionCanvas SHALL use SOLID principles to guide maintainable implementation while avoiding unnecessary abstraction and code bloat.
 
-#### Scenario: Contributor designs feature code
-- **WHEN** a contributor designs new domain, application, integration, or UI code
-- **THEN** the design keeps responsibilities focused and dependencies explicit
-
-#### Scenario: Contributor introduces an abstraction
-- **WHEN** a contributor adds an interface, adapter, service, or other abstraction
-- **THEN** the abstraction protects a real boundary, variation point, or testable contract
-
-#### Scenario: Contributor reviews code complexity
-- **WHEN** a contributor reviews implementation code
-- **THEN** the code avoids speculative layers, oversized classes, and broad interfaces that are not justified by current behavior
+#### Scenario: Contributor refactors an oversized presentation type
+- **WHEN** a presentation type contains a cohesive pure projection responsibility that can be independently named and tested
+- **THEN** the responsibility may be extracted into a focused collaborator without changing the observable behavior of the presentation type
 
 ### Requirement: Layer responsibilities are separated
 FusionCanvas SHALL separate domain, application, integration, and UI responsibilities into distinct layer boundaries.
@@ -124,7 +114,7 @@ The FusionCanvas production layers SHALL group production types into cohesive ca
 - **AND** the Integration project does not keep every adapter in a single `Workspace` folder
 
 ### Requirement: Domain layer keeps one primary type per file
-The FusionCanvas production layers SHALL keep one primary top-level type per file, with the file name matching the type name, per the C# coding standard.
+The FusionCanvas production layers SHALL keep one primary top-level type per file, with the file name matching the type name, per the C# coding standard. This requirement applies to Domain, Application, Integration, and App production code, except for private nested implementation types, generated code, Avalonia code-behind partial classes paired with their `.axaml` file, and framework-required partial declarations.
 
 #### Scenario: Contributor opens a domain file
 - **WHEN** a contributor opens any Domain layer file
@@ -142,3 +132,23 @@ The FusionCanvas production layers SHALL keep one primary top-level type per fil
 - **WHEN** a contributor opens any Integration layer file
 - **THEN** it contains at most one top-level public or internal type
 - **AND** the file name matches that type name
+
+#### Scenario: Contributor opens an App file
+- **WHEN** a contributor opens any App production file
+- **THEN** it contains at most one top-level public or internal type unless the file is an allowed framework or generated exception
+- **AND** the file name matches the primary type name
+
+### Requirement: Composition root owns concrete integration construction
+The App composition root SHALL construct concrete Integration adapters and inject them through Application-facing contracts into presentation types.
+
+#### Scenario: Main-window presentation is composed for production
+- **WHEN** the desktop App creates the main window and its view model
+- **THEN** concrete workspace file stores, workspace transfer adapters, CSV codecs, and other Integration adapters are created by an App composition factory
+- **AND** `MainWindow` and `MainWindowViewModel` receive application-facing contracts or already-composed runtime services
+- **AND** those presentation types do not instantiate concrete types from `FusionCanvas.Integration`
+
+#### Scenario: A view model is constructed directly by a test
+- **WHEN** a test constructs a presentation type without the production composition root
+- **THEN** its fallback behavior uses an explicit non-Integration test-safe default or a supplied application contract
+- **AND** the production Integration assembly is not required by that fallback path
+
