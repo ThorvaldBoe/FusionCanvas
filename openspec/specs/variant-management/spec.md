@@ -3,9 +3,7 @@
 ## Purpose
 
 Defines how the Manage Variants surface presents an Offering's provider-catalog Options, Option Values, and concrete sellable Variants, including on-demand editing, draft exclusivity, lifecycle safeguard behavior, and the compact card presentation that keeps the routine **Manage values** action primary and the infrequent destructive **Archive option** action inside a three-dot overflow menu.
-
 ## Requirements
-
 ### Requirement: Variant management separates possible choices from sellable Variants
 FusionCanvas SHALL present provider-catalog Options and Option Values that may participate in combinations in a distinct Available choices region before a Sellable Variants region for one Blueprint Offering. It SHALL preserve stable Option kinds and explicit Variant identities from the authoritative catalog model, disclose choice editing and Variant creation only when invoked, and summarize each confirmed Variant through its stable Option-kind values rather than a name-only row. Each compact Option summary SHALL expose **Manage values** as its routine, directly available action and SHALL keep the infrequent destructive **Archive option** action inside a compact three-dot overflow menu so it does not dominate the card. Option Value editing SHALL be presented in a focused modal dialog scoped to one Option, not as an inline region of the Variants page. Individual and bulk Variant creation SHALL be presented in focused modal dialogs, not as inline editors below the Sellable Variants list.
 
@@ -275,3 +273,28 @@ FusionCanvas SHALL present each active Option Value in the focused value-managem
 - **WHEN** the user invokes a value row's compact **Archive** action
 - **THEN** FusionCanvas passes that row's stable Option Value identity to the existing archive command exactly once
 - **AND** retains all existing archive eligibility, dependency checks, confirmation, persistence, and recoverable guidance
+
+### Requirement: Active Option Values can be renamed in place
+FusionCanvas SHALL expose an accessible **Edit** action for every active Option Value in the focused value-management dialog. The action SHALL open the current display name in an editable draft and SHALL persist a successful rename against the existing Option Value identity. Color and Size SHALL use identical behavior; no replacement value SHALL be created.
+
+#### Scenario: Edit a Color or Size value
+- **WHEN** the user activates Edit for an active Color or Size value
+- **THEN** the dialog shows that value's current name in an editable form
+- **AND** saving a valid new name updates the same stable Option Value record
+- **AND** the dialog list and parent Option summary show the new name
+
+#### Scenario: Reject invalid or duplicate rename
+- **WHEN** the user saves a blank, invalid, or normalized duplicate name for an active value in the same Option
+- **THEN** the existing validation and recoverable error behavior is shown
+- **AND** the original value and its display name remain unchanged
+
+#### Scenario: Preserve references during rename
+- **WHEN** a value used by Variant memberships, template/value links, or other catalog relationships is renamed successfully
+- **THEN** every relationship still references the same Option Value identity
+- **AND** dependent views refresh to display the new name
+
+#### Scenario: Cancel an Option Value edit
+- **WHEN** the user cancels, closes, or presses Escape while editing a value
+- **THEN** no rename is persisted
+- **AND** the existing value and all references remain unchanged
+

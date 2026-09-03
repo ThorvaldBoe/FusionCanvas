@@ -51,6 +51,32 @@ public sealed class CatalogSetupViewModelTests
     }
 
     [Fact]
+    public async Task SelectedDesignAreaDefaultsAspectRatioLockAndSynchronizesNumericDimensions()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Choice", null, BlueprintOfferingKind.ProviderNetwork, null, "choice", null, null, false, now, now);
+        var area = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 1200, 600, [], false, now, now);
+        var repository = new InMemoryWorkspaceRepository(snapshot with { Blueprints = [blueprint], BlueprintOfferings = [offering], OfferingPlaceholders = [area] });
+        var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository));
+
+        await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+        viewModel.SelectOffering(offering.Id);
+        viewModel.SelectedPlaceholder = area;
+
+        Assert.Equal(2, viewModel.PlacementAspectRatio, 3);
+        Assert.True(viewModel.KeepAspectRatio);
+        viewModel.MappingWidthText = "401";
+        Assert.Equal("200", viewModel.MappingHeightText);
+
+        viewModel.KeepAspectRatio = false;
+        viewModel.MappingHeightText = "333";
+        Assert.Equal("401", viewModel.MappingWidthText);
+    }
+
+    [Fact]
     public async Task RequestedOfferingIdentityIsAuthoritativeAndNeverFallsBack()
     {
         var now = DateTimeOffset.UtcNow;
@@ -463,6 +489,18 @@ public sealed class CatalogSetupViewModelTests
     }
 
     [Fact]
+    public async Task EditingOptionValueRefreshesSaveCommandCanExecuteState()
+    {
+        var (viewModel, colorOption, _, _) = await CreateCatalogWithOptionsAsync();
+        viewModel.ManageOptionCommand.Execute(colorOption);
+        var value = Assert.Single(viewModel.AvailableValues);
+        viewModel.EditOptionValueCommand.Execute(value);
+
+        Assert.True(viewModel.IsEditingOptionValue);
+        Assert.True(viewModel.SaveOptionValueEditCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task SecondManageRequestKeepsOriginalStableOptionScope()
     {
         var (viewModel, colorOption, sizeOption, _) = await CreateCatalogWithOptionsAsync();
@@ -795,6 +833,28 @@ public sealed class CatalogSetupViewModelTests
     }
 
     [Fact]
+    public async Task MockupTemplateDraft_LoadedSourceImagesBecomeBaselineAndRevertingMappingIsClean()
+    {
+        var sourceImage = new MockupTemplateSourceImageSummary(
+            Guid.NewGuid(), Guid.NewGuid(), "Front", "assets/front.png", new RasterImageInfo(1200, 1200),
+            new MockupImageSpaceMapping(1200, 1200, 250, 200, 600, 700), []);
+        var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(
+            referencedByTemplate: true,
+            sourceImages: new FixedMockupTemplateSourceImageService(new([sourceImage], [], false)));
+
+        viewModel.EditTemplateCommand.Execute(Assert.Single(viewModel.MockupTemplateCards));
+        await Task.Yield();
+
+        Assert.False(viewModel.HasMeaningfulMockupTemplateDraft);
+        viewModel.MappingXText = "251";
+        Assert.True(viewModel.HasMeaningfulMockupTemplateDraft);
+        viewModel.MappingXText = "250";
+        Assert.False(viewModel.HasMeaningfulMockupTemplateDraft);
+        viewModel.RequestCancelMockupTemplateCommand.Execute(null);
+        Assert.False(viewModel.IsMockupTemplateDiscardConfirmationVisible);
+    }
+
+    [Fact]
     public async Task MockupTemplateDraft_ArchivedStoreCannotOpenAddOrEdit()
     {
         var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: true, storeArchived: true);
@@ -816,7 +876,8 @@ public sealed class CatalogSetupViewModelTests
 
     private static async Task<(CatalogSetupViewModel ViewModel, OfferingPlaceholder Area, BlueprintOffering Offering)> CreateCatalogWithDesignAreaAsync(
         bool referencedByTemplate,
-        bool storeArchived = false)
+        bool storeArchived = false,
+        IMockupTemplateSourceImageService? sourceImages = null)
     {
         var now = DateTimeOffset.UtcNow;
         var snapshot = SampleWorkspace.Create();
@@ -846,7 +907,7 @@ public sealed class CatalogSetupViewModelTests
             populated = populated with { MockupTemplates = [template] };
         }
         var repository = new InMemoryWorkspaceRepository(populated);
-        var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository));
+        var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository), sourceImages: sourceImages);
         await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
         viewModel.SelectOffering(offering.Id);
         return (viewModel, area, offering);
@@ -856,6 +917,17 @@ public sealed class CatalogSetupViewModelTests
     {
         public Task<ProviderCatalogCandidateDescriptor> LoadAsync(OfferingContext context, CancellationToken cancellationToken = default) =>
             Task.FromResult(descriptor);
+    }
+
+    private sealed class FixedMockupTemplateSourceImageService(MockupTemplateSourceState state) : IMockupTemplateSourceImageService
+    {
+        public Task<MockupTemplateSourceState> LoadAsync(Guid storeId, Guid templateId, CancellationToken cancellationToken = default) => Task.FromResult(state);
+
+        public Task<MockupTemplateSetupResult> AddAsync(AddLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<MockupTemplateSetupResult> UpdateAsync(UpdateLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private static (CatalogSetupViewModel ViewModel, Guid StoreId) CreateProviderCatalogStateViewModel(IProviderCatalogCandidateSource? source)

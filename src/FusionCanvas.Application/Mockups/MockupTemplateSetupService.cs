@@ -67,6 +67,88 @@ public sealed class MockupTemplateSetupService : IMockupTemplateSetupService
             return Success(updated, request.StoreId, template.Id);
         }, cancellationToken);
 
+    public Task<MockupTemplateSetupResult> DuplicateTemplateAsync(DuplicateMockupTemplateRequest request, CancellationToken cancellationToken = default) =>
+        MutateAsync(request.StoreId, snapshot =>
+        {
+            var error = EnsureWritable(snapshot, request.StoreId);
+            if (error is not null) return Failure(snapshot, request.StoreId, error);
+
+            var source = snapshot.MockupTemplates.SingleOrDefault(value => value.Id == request.TemplateId && !value.IsArchived);
+            var offering = source is null
+                ? null
+                : snapshot.BlueprintOfferings.SingleOrDefault(value => value.Id == source.BlueprintOfferingId && value.StoreId == request.StoreId && !value.IsArchived);
+            if (source is null || offering is null)
+                return Failure(snapshot, request.StoreId, "Mockup Template was not found in the selected Store.");
+
+            var currentRevision = CurrentRevision(snapshot, source);
+            var activeColors = snapshot.MockupTemplateColorVariants
+                .Where(value => value.MockupTemplateId == source.Id && !value.IsArchived)
+                .ToArray();
+            var activeImages = snapshot.MockupTemplateSourceImages
+                .Where(value => value.MockupTemplateId == source.Id && !value.IsArchived)
+                .ToArray();
+            var sourceConditions = snapshot.MockupTemplateSourceImageOptionValues
+                .Where(value => activeImages.Any(image => image.Id == value.SourceImageId))
+                .ToArray();
+            var now = _clock();
+            var duplicate = new MockupTemplate(
+                _newId(),
+                source.BlueprintOfferingId,
+                source.TargetPlaceholderId,
+                NextCopyName(snapshot, source),
+                source.Description,
+                1,
+                false,
+                now,
+                now,
+                source.PositionKey,
+                source.FutureAssetState,
+                source.MetadataJson);
+            var revision = new MockupTemplateRevision(
+                _newId(),
+                duplicate.Id,
+                1,
+                source.TargetPlaceholderId,
+                now,
+                "Duplicated template configuration",
+                currentRevision?.ProviderMockupReference,
+                currentRevision?.ImageMapping);
+            var colors = activeColors
+                .Select(value => new MockupTemplateColorVariant(_newId(), duplicate.Id, value.ColorOptionValueId, false, now, now, value.SourceAssetId))
+                .ToArray();
+            var revisionColors = colors
+                .Select(value => new MockupTemplateRevisionColor(_newId(), revision.Id, value.ColorOptionValueId, value.SourceAssetId))
+                .ToArray();
+            var imageIdMap = activeImages.ToDictionary(value => value.Id, _ => _newId());
+            var images = activeImages
+                .Select(value => new MockupTemplateSourceImage(
+                    imageIdMap[value.Id], duplicate.Id, value.SourceAssetId, value.ImageMapping, false, now, now, value.ImageWidth, value.ImageHeight))
+                .ToArray();
+            var imageConditions = sourceConditions
+                .Select(value => new MockupTemplateSourceImageOptionValue(imageIdMap[value.SourceImageId], value.OptionValueId))
+                .ToArray();
+            var revisionImageMap = images.ToDictionary(value => value.Id, _ => _newId());
+            var revisionImages = images
+                .Select(value => new MockupTemplateRevisionSourceImage(
+                    revisionImageMap[value.Id], revision.Id, value.SourceAssetId, value.ImageMapping, value.ImageWidth, value.ImageHeight))
+                .ToArray();
+            var revisionImageConditions = imageConditions
+                .Select(value => new MockupTemplateRevisionSourceImageOptionValue(revisionImageMap[value.SourceImageId], value.OptionValueId))
+                .ToArray();
+            var updated = snapshot with
+            {
+                MockupTemplates = [.. snapshot.MockupTemplates, duplicate],
+                MockupTemplateColorVariants = [.. snapshot.MockupTemplateColorVariants, .. colors],
+                MockupTemplateRevisions = [.. snapshot.MockupTemplateRevisions, revision],
+                MockupTemplateRevisionColors = [.. snapshot.MockupTemplateRevisionColors, .. revisionColors],
+                MockupTemplateSourceImages = [.. snapshot.MockupTemplateSourceImages, .. images],
+                MockupTemplateSourceImageOptionValues = [.. snapshot.MockupTemplateSourceImageOptionValues, .. imageConditions],
+                MockupTemplateRevisionSourceImages = [.. snapshot.MockupTemplateRevisionSourceImages, .. revisionImages],
+                MockupTemplateRevisionSourceImageOptionValues = [.. snapshot.MockupTemplateRevisionSourceImageOptionValues, .. revisionImageConditions]
+            };
+            return Success(updated, request.StoreId, duplicate.Id);
+        }, cancellationToken);
+
     public Task<MockupTemplateSetupResult> AddColorAsync(AddMockupTemplateColorRequest request, CancellationToken cancellationToken = default) =>
         MutateAsync(request.StoreId, snapshot =>
         {
@@ -258,6 +340,21 @@ public sealed class MockupTemplateSetupService : IMockupTemplateSetupService
     private static MockupTemplateSetupResult Success(WorkspaceSnapshot snapshot, Guid storeId, Guid? templateId = null) => new(true, null, BuildState(snapshot, storeId), snapshot, templateId);
     private static MockupTemplateRevision? CurrentRevision(WorkspaceSnapshot snapshot, MockupTemplate template) =>
         snapshot.MockupTemplateRevisions.SingleOrDefault(value => value.MockupTemplateId == template.Id && value.RevisionNumber == template.CurrentRevision);
+
+    private static string NextCopyName(WorkspaceSnapshot snapshot, MockupTemplate source)
+    {
+        var existing = snapshot.MockupTemplates
+            .Where(value => value.BlueprintOfferingId == source.BlueprintOfferingId && !value.IsArchived)
+            .Select(value => value.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var baseName = $"Copy of {source.Name}";
+        if (!existing.Contains(baseName)) return baseName;
+        for (var suffix = 2; ; suffix++)
+        {
+            var candidate = $"{baseName} ({suffix})";
+            if (!existing.Contains(candidate)) return candidate;
+        }
+    }
 
     private static string? ValidateColors(WorkspaceSnapshot snapshot, Guid offeringId, IEnumerable<Guid> colorIds)
     {

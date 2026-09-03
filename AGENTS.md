@@ -114,5 +114,5 @@ FusionCanvas.Integration ─┘
 
 - Windows + PowerShell environment; the `dotnet` CLI is available.
 - Keep changes minimal and scoped; match existing conventions; do not fix unrelated issues unless asked.
-- Do not run `git commit`, `git push`, or other git mutations unless explicitly asked.
+- After a successful OpenSpec apply phase and proportionate verification, the default issue-completion workflow is to commit the intended changes, push the branch, create a pull request against `main`, and merge it when the pull request is mergeable and approved. Skip these release steps when the user explicitly asks to hold, test or taste-test, review, avoid merging, or use another completion workflow; also stop when verification, mergeability, or approval is genuinely blocked.
 - If a task is ambiguous or reveals a design/spec conflict, stop and ask rather than guessing.

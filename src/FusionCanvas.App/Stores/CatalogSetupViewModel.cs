@@ -104,6 +104,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private string _externalOfferingId = string.Empty;
     private string _optionName = string.Empty;
     private string _optionValue = string.Empty;
+    private OfferingOptionValue? _editingOptionValue;
     private string _variantName = string.Empty;
     private string _placeholderName = string.Empty;
     private string _placeholderDescription = string.Empty;
@@ -127,6 +128,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private bool _isAddingOption;
     private bool _isAddingPrintProvider;
     private bool _isAddingOptionValue;
+    private bool _isEditingOptionValue;
     private bool _isManagingOptionValues;
     private bool _isAddingVariant;
     private bool _isAddingBulkVariants;
@@ -143,6 +145,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private double _mappingY;
     private double _mappingWidth = 100;
     private double _mappingHeight = 100;
+    private bool _keepAspectRatio;
     private string _mappingXText = string.Empty;
     private string _mappingYText = string.Empty;
     private string _mappingWidthText = string.Empty;
@@ -176,6 +179,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         StartAddOptionValueCommand = new RelayCommand(_ => BeginAddOptionValue(), () => CanEdit && SelectedOption is not null);
         CancelAddOptionValueCommand = new RelayCommand(_ => { IsAddingOptionValue = false; OptionValue = string.Empty; });
         CreateOptionValueCommand = new AsyncRelayCommand(CreateOptionValueAsync, () => CanEdit && IsAddingOptionValue && SelectedOffering is not null && SelectedOption is not null && !string.IsNullOrWhiteSpace(OptionValue));
+        EditOptionValueCommand = new RelayCommand(parameter => BeginEditOptionValue(parameter as OfferingOptionValue), () => CanEdit && SelectedOption is not null);
+        SaveOptionValueEditCommand = new AsyncRelayCommand(SaveOptionValueEditAsync, () => CanEdit && IsEditingOptionValue && _editingOptionValue is not null && !string.IsNullOrWhiteSpace(OptionValue));
+        CancelOptionValueEditCommand = new RelayCommand(_ => CancelOptionValueEdit());
         StartAddVariantCommand = new RelayCommand(_ => BeginVariantDraft(false), () => CanEdit && AvailableOptions.Any() && VariantValueChoices.Count > 0);
         StartBulkVariantsCommand = new RelayCommand(_ => BeginVariantDraft(true), () => CanEdit && AvailableColors.Any() && BulkSizeChoices.Count > 0);
         CancelAddVariantCommand = new RelayCommand(_ => { ResetVariantDraft(); VariantActionsFocusRequested?.Invoke(this, EventArgs.Empty); });
@@ -200,6 +206,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             MockupTemplate template => template,
             _ => null
         }), () => CanEdit);
+        DuplicateTemplateCommand = new RelayCommand(parameter => _ = DuplicateTemplateAsync(parameter), () => CanEdit && SelectedOffering is not null);
         CancelAddTemplateCommand = new RelayCommand(_ => ResetTemplateDraft());
         RequestCancelMockupTemplateCommand = new RelayCommand(_ => RequestCancelMockupTemplate(), () => IsAddingTemplate);
         ConfirmDiscardMockupTemplateCommand = new RelayCommand(_ => ConfirmDiscardMockupTemplate(), () => IsMockupTemplateDiscardConfirmationVisible);
@@ -368,6 +375,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         {
             if (!SetField(ref _selectedPlaceholder, value)) return;
             OnPropertyChanged(nameof(SelectedPlaceholderId));
+            OnPropertyChanged(nameof(PlacementAspectRatio));
+            OnPropertyChanged(nameof(IsKeepAspectRatioAvailable));
+            OnPropertyChanged(nameof(CanKeepAspectRatio));
+            KeepAspectRatio = PlacementAspectRatio > 0;
             NotifyMockupTemplateDraftChanged();
             OnPropertyChanged(nameof(IsEditingDesignArea));
             OnPropertyChanged(nameof(DesignAreaEditorDialogTitle));
@@ -473,10 +484,29 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public double MappingHeight { get => _mappingHeight; set { if (SetField(ref _mappingHeight, value)) { _mappingHeightText = FormatMapping(value); OnPropertyChanged(nameof(MappingHeightText)); NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
     public string MappingXText { get => _mappingXText; set => SetMappingText(ref _mappingXText, value, ref _mappingX, nameof(MappingXText), nameof(MappingX)); }
     public string MappingYText { get => _mappingYText; set => SetMappingText(ref _mappingYText, value, ref _mappingY, nameof(MappingYText), nameof(MappingY)); }
-    public string MappingWidthText { get => _mappingWidthText; set => SetMappingText(ref _mappingWidthText, value, ref _mappingWidth, nameof(MappingWidthText), nameof(MappingWidth)); }
-    public string MappingHeightText { get => _mappingHeightText; set => SetMappingText(ref _mappingHeightText, value, ref _mappingHeight, nameof(MappingHeightText), nameof(MappingHeight)); }
+    public string MappingWidthText { get => _mappingWidthText; set => SetMappingText(ref _mappingWidthText, value, ref _mappingWidth, nameof(MappingWidthText), nameof(MappingWidth), true); }
+    public string MappingHeightText { get => _mappingHeightText; set => SetMappingText(ref _mappingHeightText, value, ref _mappingHeight, nameof(MappingHeightText), nameof(MappingHeight), false); }
     public double MappingImageWidth => SelectedProviderMockup?.ImageWidth ?? SelectedLocalSource?.ImageWidth ?? 0;
     public double MappingImageHeight => SelectedProviderMockup?.ImageHeight ?? SelectedLocalSource?.ImageHeight ?? 0;
+    public double PlacementAspectRatio => SelectedPlaceholder is { Width: > 0, Height: > 0 }
+        ? SelectedPlaceholder.Width / (double)SelectedPlaceholder.Height
+        : 0;
+    public bool IsKeepAspectRatioAvailable => double.IsFinite(PlacementAspectRatio) && PlacementAspectRatio > 0;
+    public bool CanKeepAspectRatio => CanEdit && IsKeepAspectRatioAvailable;
+    public bool KeepAspectRatio
+    {
+        get => _keepAspectRatio;
+        set
+        {
+            var enabled = value && IsKeepAspectRatioAvailable;
+            if (SetField(ref _keepAspectRatio, enabled))
+            {
+                OnPropertyChanged(nameof(CanKeepAspectRatio));
+                NotifyMockupTemplateDraftChanged();
+                NotifyCommands();
+            }
+        }
+    }
 
     public string OfferingName { get => _offeringName; set { if (SetField(ref _offeringName, value)) NotifyCommands(); } }
     public string OfferingDescription { get => _offeringDescription; set => SetField(ref _offeringDescription, value); }
@@ -515,6 +545,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public bool IsAddingOption { get => _isAddingOption; private set { if (SetField(ref _isAddingOption, value)) NotifyCommands(); } }
     public bool IsAddingPrintProvider { get => _isAddingPrintProvider; private set { if (SetField(ref _isAddingPrintProvider, value)) NotifyCommands(); } }
     public bool IsAddingOptionValue { get => _isAddingOptionValue; private set { if (SetField(ref _isAddingOptionValue, value)) NotifyCommands(); } }
+    public bool IsEditingOptionValue { get => _isEditingOptionValue; private set { if (SetField(ref _isEditingOptionValue, value)) NotifyCommands(); } }
     public bool IsManagingOptionValues { get => _isManagingOptionValues; private set => SetField(ref _isManagingOptionValues, value); }
     public bool IsAddingVariant { get => _isAddingVariant; private set { if (SetField(ref _isAddingVariant, value)) NotifyCommands(); } }
     public bool IsAddingBulkVariants { get => _isAddingBulkVariants; private set { if (SetField(ref _isAddingBulkVariants, value)) NotifyCommands(); } }
@@ -523,10 +554,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public bool IsAvailable { get; private set; }
     public bool IsReadOnly { get; private set; }
     public bool CanEdit => IsAvailable && !IsReadOnly && !IsBusy;
-    public bool IsBusy { get => _isBusy; private set { if (SetField(ref _isBusy, value)) { OnPropertyChanged(nameof(CanEdit)); NotifyCommands(); } } }
+    public bool IsBusy { get => _isBusy; private set { if (SetField(ref _isBusy, value)) { OnPropertyChanged(nameof(CanEdit)); OnPropertyChanged(nameof(CanKeepAspectRatio)); NotifyCommands(); } } }
     public string ErrorMessage { get => _error; private set { if (SetField(ref _error, value)) OnPropertyChanged(nameof(HasError)); } }
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
-    public bool HasActiveDraft => IsAddingPrintProvider || IsAddingOption || IsAddingOptionValue || IsAddingVariant || IsAddingBulkVariants || IsAddingPlaceholder || IsAddingTemplate;
+    public bool HasActiveDraft => IsAddingPrintProvider || IsAddingOption || IsAddingOptionValue || IsEditingOptionValue || IsAddingVariant || IsAddingBulkVariants || IsAddingPlaceholder || IsAddingTemplate;
     public bool HasMeaningfulMockupTemplateDraft => IsAddingTemplate && _mockupTemplateDraftBaseline is not null && CurrentMockupTemplateDraftState() != _mockupTemplateDraftBaseline;
     public string MockupTemplateLifecycleLabel => CurrentMockupTemplateReadiness().Lifecycle == MockupTemplateLifecycle.ReadyForUse ? "Ready for use" : "Draft";
     public IReadOnlyList<string> MockupTemplateReadinessMessages => CurrentMockupTemplateReadiness().Blockers.Select(ReadinessMessage).ToArray();
@@ -608,6 +639,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ICommand StartAddOptionValueCommand { get; }
     public ICommand CancelAddOptionValueCommand { get; }
     public ICommand CreateOptionValueCommand { get; }
+    public ICommand EditOptionValueCommand { get; }
+    public ICommand SaveOptionValueEditCommand { get; }
+    public ICommand CancelOptionValueEditCommand { get; }
     public ICommand StartAddVariantCommand { get; }
     public ICommand StartBulkVariantsCommand { get; }
     public ICommand CancelAddVariantCommand { get; }
@@ -622,6 +656,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ICommand SetDefaultPlaceholderCommand { get; }
     public ICommand StartAddTemplateCommand { get; }
     public ICommand EditTemplateCommand { get; }
+    public ICommand DuplicateTemplateCommand { get; }
     public ICommand CancelAddTemplateCommand { get; }
     public ICommand RequestCancelMockupTemplateCommand { get; }
     public ICommand ConfirmDiscardMockupTemplateCommand { get; }
@@ -767,6 +802,13 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         if (SelectedOffering is null || SelectedOption is null) return;
         await RunMutationAsync(() => _catalog.CreateOptionValueAsync(new CreateOptionValueRequest(SelectedOffering.Id, SelectedOption.Id, OptionValue))).ConfigureAwait(true);
         if (!HasError) { IsAddingOptionValue = false; OptionValue = string.Empty; }
+    }
+
+    private async Task SaveOptionValueEditAsync()
+    {
+        if (SelectedOffering is null || _editingOptionValue is null) return;
+        await RunMutationAsync(() => _catalog.UpdateAsync(new UpdateCatalogRecordRequest(SelectedOffering.StoreId, CatalogRecordKind.OptionValue, _editingOptionValue.Id, Name: OptionValue))).ConfigureAwait(true);
+        if (!HasError) CancelOptionValueEdit();
     }
 
     private async Task CreateVariantAsync()
@@ -1017,6 +1059,40 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         await RunMockupMutationAsync(() => _mockups.ArchiveTemplateAsync(new ArchiveMockupTemplateRequest(SelectedOffering.StoreId, template.Id))).ConfigureAwait(true);
     }
 
+    private async Task DuplicateTemplateAsync(object? parameter)
+    {
+        if (SelectedOffering is null || !CanEdit) return;
+        var template = parameter switch
+        {
+            MockupTemplateCardViewModel card => Templates.FirstOrDefault(value => value.Id == card.Id),
+            MockupTemplate value => value,
+            _ => null
+        };
+        if (template is null || template.IsArchived) return;
+
+        IsBusy = true;
+        ErrorMessage = string.Empty;
+        try
+        {
+            var result = await _mockups.DuplicateTemplateAsync(new DuplicateMockupTemplateRequest(SelectedOffering.StoreId, template.Id)).ConfigureAwait(true);
+            if (!result.Succeeded)
+            {
+                ErrorMessage = result.Error ?? "Mockup Template could not be duplicated.";
+                return;
+            }
+
+            ApplyMockups(result.State);
+            var duplicate = result.State.Templates.FirstOrDefault(value => value.Id == result.TemplateId);
+            if (duplicate is not null)
+            {
+                IsBusy = false;
+                BeginEditTemplate(duplicate);
+            }
+        }
+        catch (Exception exception) { ErrorMessage = exception.Message; }
+        finally { IsBusy = false; }
+    }
+
     private void BeginEditTemplate(MockupTemplate? template)
     {
         if (!CanEdit || template is null) return;
@@ -1040,9 +1116,16 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         RebuildChoices();
         var activeColorIds = TemplateColors.Where(value => value.MockupTemplateId == template.Id && !value.IsArchived).Select(value => value.ColorOptionValueId).ToHashSet();
         foreach (var color in TemplateColorChoices) color.IsSelected = activeColorIds.Contains(color.Value.Id);
-        _mockupTemplateDraftBaseline = CurrentMockupTemplateDraftState();
+        _mockupTemplateDraftBaseline = null;
         IsAddingTemplate = true;
-        _ = LoadLocalSourceDraftsAsync(template.Id);
+        if (_sourceImages is null)
+        {
+            _mockupTemplateDraftBaseline = CurrentMockupTemplateDraftState();
+        }
+        else
+        {
+            _ = LoadLocalSourceDraftsAsync(template.Id);
+        }
         MockupTemplateEditorRequested?.Invoke(this, EventArgs.Empty);
     }
 
@@ -1341,8 +1424,27 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void BeginAddOptionValue()
     {
+        CancelOptionValueEdit();
         IsAddingOptionValue = true;
         OptionValueEditorFocusRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void BeginEditOptionValue(OfferingOptionValue? value)
+    {
+        if (value is null || IsAddingOptionValue) return;
+        var current = AvailableValues.FirstOrDefault(candidate => candidate.Id == value.Id);
+        if (current is null) return;
+        _editingOptionValue = current;
+        OptionValue = current.Value;
+        IsEditingOptionValue = true;
+        OptionValueEditorFocusRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void CancelOptionValueEdit()
+    {
+        _editingOptionValue = null;
+        IsEditingOptionValue = false;
+        if (!IsAddingOptionValue) OptionValue = string.Empty;
     }
 
     private void CloseOptionValueManagement()
@@ -1354,6 +1456,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private void ResetOptionValueManagement()
     {
         IsAddingOptionValue = false;
+        CancelOptionValueEdit();
         OptionValue = string.Empty;
         IsManagingOptionValues = false;
     }
@@ -1573,6 +1676,11 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         if (LocalSourceDrafts.Count > 0) SelectLocalSource(LocalSourceDrafts[0]);
         RebuildMappedSourceChoices();
         OnPropertyChanged(nameof(HasLocalSource));
+        if (IsAddingTemplate && SelectedTemplate?.Id == templateId)
+        {
+            _mockupTemplateDraftBaseline = CurrentMockupTemplateDraftState();
+            OnPropertyChanged(nameof(HasMeaningfulMockupTemplateDraft));
+        }
     }
 
     private void EndTemplateDraft()
@@ -1643,12 +1751,33 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         }
     }
 
-    private void SetMappingText(ref string field, string value, ref double numericField, string textProperty, string numericProperty)
+    private void SetMappingText(ref string field, string value, ref double numericField, string textProperty, string numericProperty, bool? widthDimension = null)
     {
         value ??= string.Empty;
         if (field == value) return;
         field = value;
-        if (int.TryParse(value, out var parsed)) numericField = parsed;
+        if (int.TryParse(value, out var parsed))
+        {
+            numericField = parsed;
+            if (widthDimension is not null && KeepAspectRatio && IsKeepAspectRatioAvailable)
+            {
+                var paired = widthDimension.Value ? parsed / PlacementAspectRatio : parsed * PlacementAspectRatio;
+                if (widthDimension.Value)
+                {
+                    _mappingHeight = paired;
+                    _mappingHeightText = FormatMapping(paired);
+                    OnPropertyChanged(nameof(MappingHeight));
+                    OnPropertyChanged(nameof(MappingHeightText));
+                }
+                else
+                {
+                    _mappingWidth = paired;
+                    _mappingWidthText = FormatMapping(paired);
+                    OnPropertyChanged(nameof(MappingWidth));
+                    OnPropertyChanged(nameof(MappingWidthText));
+                }
+            }
+        }
         OnPropertyChanged(textProperty);
         OnPropertyChanged(numericProperty);
         NotifyMockupTemplateDraftChanged();
@@ -1666,7 +1795,30 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         MappingYText,
         MappingWidthText,
         MappingHeightText,
-        string.Join("|", TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).OrderBy(value => value)));
+        string.Join("|", TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).OrderBy(value => value)),
+        LocalSourcePath,
+        string.Join("|", LocalSourceDrafts.Concat(_archivedLocalSourceDrafts).Select(CurrentLocalSourceDraftState).OrderBy(value => value)));
+
+    private string CurrentLocalSourceDraftState(LocalMockupSourceDraftViewModel draft)
+    {
+        var optionValueIds = draft.OptionValueIds;
+        MockupImageSpaceMapping? mapping = draft.Mapping;
+        var isArchived = _archivedLocalSourceDrafts.Contains(draft);
+        if (ReferenceEquals(SelectedLocalSource, draft))
+        {
+            optionValueIds = TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id)
+                .Concat(TemplateAdditionalOptionChoices.Where(value => value.IsSelected).Select(value => value.Value.Id))
+                .Distinct()
+                .ToArray();
+            TryCreateMapping(out mapping);
+        }
+
+        var optionIds = string.Join(",", optionValueIds.OrderBy(value => value));
+        var mappingValue = mapping is null
+            ? string.Empty
+            : string.Join(",", mapping.ImageWidth, mapping.ImageHeight, mapping.X, mapping.Y, mapping.Width, mapping.Height);
+        return string.Join(";", isArchived, draft.SourceImageId, draft.Path, optionIds, mappingValue);
+    }
 
     private void RequestCancelDesignArea()
     {
@@ -1710,8 +1862,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         foreach (var command in new ICommand[]
         {
             SaveOfferingCommand, StartAddPrintProviderCommand, CreatePrintProviderCommand, StartAddOptionCommand, ManageOptionCommand, CreateOptionCommand, StartAddOptionValueCommand,
-            CreateOptionValueCommand, StartAddVariantCommand, StartBulkVariantsCommand, CreateVariantCommand, StartAddPlaceholderCommand,
+            CreateOptionValueCommand, EditOptionValueCommand, SaveOptionValueEditCommand, CancelOptionValueEditCommand,
+            StartAddVariantCommand, StartBulkVariantsCommand, CreateVariantCommand, StartAddPlaceholderCommand,
             CreatePlaceholderCommand, SetDefaultPlaceholderCommand, StartAddTemplateCommand, CreateTemplateCommand,
+            DuplicateTemplateCommand,
             AddTemplateColorCommand, PreviewBulkVariantsCommand, ConfirmBulkVariantsCommand,
             OpenEnlargedPlacementEditorCommand,
             ConfirmDesignAreaArchiveCommand, CancelDesignAreaArchiveCommand,
@@ -1742,7 +1896,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         string Y,
         string Width,
         string Height,
-        string SelectedColorIds);
+        string SelectedColorIds,
+        string LocalSourcePath,
+        string LocalSourceDrafts);
 
     private sealed record DesignAreaDraftState(
         string Name,

@@ -47,6 +47,66 @@ public sealed class MockupTemplateSetupServiceTests
     }
 
     [Fact]
+    public async Task DuplicateTemplateCopiesCurrentConfigurationWithNewTemplateScopedIdentities()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprint = new Blueprint(Guid.NewGuid(), storeId, "T-shirt", null, false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, storeId, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "printify-choice", null, null, false, Now, Now);
+        var colorOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
+        var black = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "Black", 0);
+        var placeholder = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 3000, 4500, [], false, Now, Now);
+        var sourceTemplate = new MockupTemplate(Guid.NewGuid(), offering.Id, placeholder.Id, "Front", "Notes", 2, false, Now, Now, "A", null, "{\"kind\":\"copy\"}");
+        var sourceRevision = new MockupTemplateRevision(Guid.NewGuid(), sourceTemplate.Id, 2, placeholder.Id, Now, "Current", "provider-front", new MockupImageSpaceMapping(1200, 1200, 100, 100, 700, 800));
+        var sourceAssetId = Guid.NewGuid();
+        var sourceImage = new MockupTemplateSourceImage(Guid.NewGuid(), sourceTemplate.Id, sourceAssetId, new MockupImageSpaceMapping(1200, 1200, 10, 20, 500, 600), false, Now, Now);
+        var sourceCondition = new MockupTemplateSourceImageOptionValue(sourceImage.Id, black.Id);
+        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [new Store(storeId, "Store", null, false, Now, Now, "{}")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint], BlueprintOfferings = [offering], OfferingOptions = [colorOption], OfferingOptionValues = [black], OfferingPlaceholders = [placeholder],
+            MockupTemplates = [sourceTemplate], MockupTemplateColorVariants = [new(Guid.NewGuid(), sourceTemplate.Id, black.Id, false, Now, Now)],
+            MockupTemplateRevisions = [sourceRevision], MockupTemplateSourceImages = [sourceImage], MockupTemplateSourceImageOptionValues = [sourceCondition]
+        });
+        var service = new MockupTemplateSetupService(repository, () => Now, Guid.NewGuid);
+
+        var result = await service.DuplicateTemplateAsync(new DuplicateMockupTemplateRequest(storeId, sourceTemplate.Id), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        var duplicate = result.State.Templates.Single(value => value.Id == result.TemplateId);
+        Assert.Equal("Copy of Front", duplicate.Name);
+        Assert.Equal(sourceTemplate with { Id = duplicate.Id, Name = duplicate.Name, CurrentRevision = 1, CreatedAt = Now, UpdatedAt = Now }, duplicate);
+        var duplicateImage = repository.Snapshot.MockupTemplateSourceImages.Single(value => value.MockupTemplateId == duplicate.Id);
+        Assert.Equal(sourceAssetId, duplicateImage.SourceAssetId);
+        Assert.NotEqual(sourceImage.Id, duplicateImage.Id);
+        Assert.Equal(black.Id, repository.Snapshot.MockupTemplateSourceImageOptionValues.Single(value => value.SourceImageId == duplicateImage.Id).OptionValueId);
+        Assert.Equal("provider-front", repository.Snapshot.MockupTemplateRevisions.Single(value => value.MockupTemplateId == duplicate.Id).ProviderMockupReference);
+        Assert.Equal(sourceTemplate.Id, repository.Snapshot.MockupTemplateSourceImages.Single(value => value.Id == sourceImage.Id).MockupTemplateId);
+    }
+
+    [Fact]
+    public async Task DuplicateTemplateUsesNextAvailableCopyNameAndRejectsArchivedSource()
+    {
+        var storeId = Guid.NewGuid();
+        var offering = new BlueprintOffering(Guid.NewGuid(), Guid.NewGuid(), storeId, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "manual", null, null, false, Now, Now);
+        var source = new MockupTemplate(Guid.NewGuid(), offering.Id, null, "Front", null, 1, false, Now, Now);
+        var firstCopy = new MockupTemplate(Guid.NewGuid(), offering.Id, null, "Copy of Front", null, 1, false, Now, Now);
+        var secondCopy = new MockupTemplate(Guid.NewGuid(), offering.Id, null, "Copy of Front (2)", null, 1, false, Now, Now);
+        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [new Store(storeId, "Store", null, false, Now, Now, "{}")], [], [], [], [], [], [], [], [])
+        {
+            BlueprintOfferings = [offering], MockupTemplates = [source, firstCopy, secondCopy]
+        });
+        var service = new MockupTemplateSetupService(repository, () => Now, Guid.NewGuid);
+
+        var result = await service.DuplicateTemplateAsync(new DuplicateMockupTemplateRequest(storeId, source.Id), TestContext.Current.CancellationToken);
+        Assert.True(result.Succeeded);
+        Assert.Equal("Copy of Front (3)", result.State.Templates.Single(value => value.Id == result.TemplateId).Name);
+
+        repository.SetSnapshot(repository.Snapshot with { MockupTemplates = [source with { IsArchived = true }] });
+        var rejected = await service.DuplicateTemplateAsync(new DuplicateMockupTemplateRequest(storeId, source.Id), TestContext.Current.CancellationToken);
+        Assert.False(rejected.Succeeded);
+        Assert.Contains("not found", rejected.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ArchivingTemplateArchivesBindingsAndRestoreReactivatesTemplate()
     {
         var storeId = Guid.NewGuid();
@@ -169,8 +229,10 @@ public sealed class MockupTemplateSetupServiceTests
     private sealed class MemoryRepository(WorkspaceSnapshot initial) : IWorkspaceRepository
     {
         private WorkspaceSnapshot _snapshot = initial;
+        public WorkspaceSnapshot Snapshot => _snapshot;
         public int SaveCount { get; private set; }
         public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(_snapshot);
         public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default) { SaveCount++; _snapshot = snapshot; return Task.CompletedTask; }
+        public void SetSnapshot(WorkspaceSnapshot snapshot) => _snapshot = snapshot;
     }
 }

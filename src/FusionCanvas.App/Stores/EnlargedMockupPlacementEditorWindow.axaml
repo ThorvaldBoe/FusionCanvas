@@ -16,12 +16,21 @@
     <stores:MockupPlacementEditor x:Name="PlacementEditor" Grid.Row="1"
                                   HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                                   IsEnabled="{Binding CanEdit}"
-                                  PlacementX="{Binding MappingX, Mode=TwoWay}" PlacementY="{Binding MappingY, Mode=TwoWay}"
-                                  PlacementWidth="{Binding MappingWidth, Mode=TwoWay}" PlacementHeight="{Binding MappingHeight, Mode=TwoWay}"
-                                  ImageWidth="{Binding MappingImageWidth}" ImageHeight="{Binding MappingImageHeight}"
+                                  PlacementX="{Binding MappingX, Mode=TwoWay}"
+                                  PlacementY="{Binding MappingY, Mode=TwoWay}"
+                                  PlacementWidth="{Binding MappingWidth, Mode=TwoWay}"
+                                  PlacementHeight="{Binding MappingHeight, Mode=TwoWay}"
+                                  AspectRatio="{Binding PlacementAspectRatio}"
+                                  KeepAspectRatio="{Binding KeepAspectRatio, Mode=TwoWay}"
+                                  ImageWidth="{Binding MappingImageWidth}"
+                                  ImageHeight="{Binding MappingImageHeight}"
                                   ImagePath="{Binding SelectedImagePreviewPath}"
                                   AutomationProperties.Name="Enlarged selected image placement" />
     <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <CheckBox Content="Keep aspect ratio" IsChecked="{Binding KeepAspectRatio, Mode=TwoWay}" IsEnabled="{Binding CanKeepAspectRatio}"
+                VerticalAlignment="Center" ToolTip.Tip="Preserve the selected Design Area width-to-height ratio."
+                AutomationProperties.Name="Keep aspect ratio"
+                AutomationProperties.HelpText="Preserve the selected Design Area width-to-height ratio." />
       <Button x:Name="CloseButton" Content="Close" Classes="secondary" AutomationProperties.Name="Close enlarged image placement" />
     </StackPanel>
   </Grid>

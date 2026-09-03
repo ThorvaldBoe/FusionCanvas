@@ -32,6 +32,39 @@ public sealed class CatalogSetupServiceTests
     }
 
     [Fact]
+    public async Task RenamesColorAndSizeValuesInPlaceAndRejectsNormalizedDuplicates()
+    {
+        var storeId = Guid.NewGuid();
+        var offeringId = Guid.NewGuid();
+        var colorOptionId = Guid.NewGuid();
+        var sizeOptionId = Guid.NewGuid();
+        var colorId = Guid.NewGuid();
+        var sizeId = Guid.NewGuid();
+        var secondColorId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "First")], [], [], [], [], [], [], [], [])
+        {
+            BlueprintOfferings = [new BlueprintOffering(offeringId, Guid.NewGuid(), storeId, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "network", null, null, false, Now, Now)],
+            OfferingOptions = [new OfferingOption(colorOptionId, offeringId, OptionKind.Color, "Color", 0), new OfferingOption(sizeOptionId, offeringId, OptionKind.Size, "Size", 1)],
+            OfferingOptionValues = [new OfferingOptionValue(colorId, colorOptionId, offeringId, "Black", 0), new OfferingOptionValue(secondColorId, colorOptionId, offeringId, "White", 1), new OfferingOptionValue(sizeId, sizeOptionId, offeringId, "M", 0)],
+            OfferingVariants = [new OfferingVariant(variantId, offeringId, "Black M", [colorId, sizeId], false, Now, Now)]
+        });
+        var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
+
+        var colorRename = await service.UpdateAsync(new UpdateCatalogRecordRequest(storeId, CatalogRecordKind.OptionValue, colorId, Name: "  Navy  "));
+        var duplicate = await service.UpdateAsync(new UpdateCatalogRecordRequest(storeId, CatalogRecordKind.OptionValue, secondColorId, Name: " navy "));
+        var blank = await service.UpdateAsync(new UpdateCatalogRecordRequest(storeId, CatalogRecordKind.OptionValue, sizeId, Name: " "));
+
+        Assert.True(colorRename.Succeeded);
+        Assert.False(duplicate.Succeeded);
+        Assert.False(blank.Succeeded);
+        Assert.Equal("Navy", repository.Current.OfferingOptionValues.Single(value => value.Id == colorId).Value);
+        Assert.Equal("M", repository.Current.OfferingOptionValues.Single(value => value.Id == sizeId).Value);
+        Assert.Equal([colorId, sizeId], repository.Current.OfferingVariants.Single(value => value.Id == variantId).OptionValueIds);
+        Assert.Equal(colorId, colorRename.State.OptionValues.Single(value => value.Id == colorId).Id);
+    }
+
+    [Fact]
     public async Task RejectsDuplicateVariantCombinationAndCrossOfferingPlaceholder()
     {
         var storeId = Guid.NewGuid();

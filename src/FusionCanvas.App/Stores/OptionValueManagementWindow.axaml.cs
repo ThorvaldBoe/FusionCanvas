@@ -31,6 +31,11 @@ public partial class OptionValueManagementWindow : Window
             OptionValueTextBox.Focus();
             OptionValueTextBox.SelectAll();
         }
+        else if (DataContext is CatalogSetupViewModel { IsEditingOptionValue: true })
+        {
+            OptionValueEditTextBox.Focus();
+            OptionValueEditTextBox.SelectAll();
+        }
         else
         {
             OptionValueDoneButton.Focus();

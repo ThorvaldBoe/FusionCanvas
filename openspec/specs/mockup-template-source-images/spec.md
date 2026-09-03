@@ -3,9 +3,7 @@
 ## Purpose
 
 Defines local source-image collection, independent metadata configuration, grouped offering applicability, per-image placement, revision provenance, and explainable per-Variant readiness for Mockup Templates.
-
 ## Requirements
-
 ### Requirement: A Mockup Template owns independently configurable local source-image entries
 FusionCanvas SHALL let an editable Mockup Template own zero or more active local source-image entries. Each entry SHALL reference one managed, Store-owned raster Asset and SHALL be independent of external provider, network, credential, or synchronization state. Uploading an image SHALL NOT automatically assign applicability values, a Design Area, or an image-space mapping to that entry. An entry with missing configuration SHALL remain persistable and visibly incomplete.
 
@@ -72,7 +70,7 @@ FusionCanvas SHALL create an immutable Template revision whenever a source image
 - **THEN** FusionCanvas creates a new immutable revision while preserving the prior source configuration and Asset identity
 
 ### Requirement: Local source-image setup has a focused, accessible master-detail editor workflow
-FusionCanvas SHALL provide local source-image setup inside the focused Mockup Template dialog. An upper image table SHALL expose upload, selection, archive, applicability and mapping summaries, and complete/incomplete indicators. A lower selected-image editor SHALL expose applicability controls, preview, and that entry's mapping independently of upload. The dialog SHALL preserve meaningful unsaved work on cancellation or close requests and SHALL keep Archived Stores read-only.
+FusionCanvas SHALL provide local source-image setup inside the focused Mockup Template dialog. An upper image table SHALL expose upload, selection, archive, applicability and mapping summaries, and complete/incomplete indicators. A lower selected-image editor SHALL expose applicability controls, preview, and that entry's mapping independently of upload. The placement editor SHALL also expose the accessible **Keep aspect ratio** option defined by the `mockup-placement-aspect-ratio` capability. The dialog SHALL preserve meaningful unsaved work on cancellation or close requests and SHALL keep Archived Stores read-only.
 
 #### Scenario: Creator uploads images independently of metadata
 - **WHEN** the creator uploads a valid file from the image-table action
@@ -84,6 +82,11 @@ FusionCanvas SHALL provide local source-image setup inside the focused Mockup Te
 - **THEN** the lower editor displays that image's own applicability and mapping draft
 - **AND** preserves unsaved edits made to previously selected image rows
 
+#### Scenario: Creator configures ratio-aware placement
+- **WHEN** the creator edits the selected image placement with a valid Design Area selected
+- **THEN** the editor exposes **Keep aspect ratio** checked by default
+- **AND** the creator can uncheck it to permit intentional independent dimensions
+
 #### Scenario: Archived Store is reviewed
 - **WHEN** the Mockup Template belongs to an archived Store
-- **THEN** upload, archive, applicability editing, placement editing, and Save are unavailable
+- **THEN** upload, archive, applicability editing, placement editing, ratio-option editing, and Save are unavailable

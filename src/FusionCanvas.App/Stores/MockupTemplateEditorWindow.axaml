@@ -78,6 +78,7 @@
             <stores:MockupPlacementEditor x:Name="PlacementEditor" IsEnabled="{Binding CanEdit}"
                                            PlacementX="{Binding MappingX, Mode=TwoWay}" PlacementY="{Binding MappingY, Mode=TwoWay}"
                                            PlacementWidth="{Binding MappingWidth, Mode=TwoWay}" PlacementHeight="{Binding MappingHeight, Mode=TwoWay}"
+                                           AspectRatio="{Binding PlacementAspectRatio}" KeepAspectRatio="{Binding KeepAspectRatio, Mode=TwoWay}"
                                            ImageWidth="{Binding MappingImageWidth}" ImageHeight="{Binding MappingImageHeight}"
                                            ImagePath="{Binding SelectedImagePreviewPath}"
                                            AutomationProperties.Name="Selected image placement" />
@@ -130,6 +131,10 @@
             <TextBox Grid.Row="3" Grid.Column="0" Text="{Binding MappingWidthText}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Width" />
             <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding MappingHeightText}" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Height" />
           </Grid>
+          <CheckBox Content="Keep aspect ratio" IsChecked="{Binding KeepAspectRatio, Mode=TwoWay}" IsEnabled="{Binding CanKeepAspectRatio}"
+                    ToolTip.Tip="Preserve the selected Design Area width-to-height ratio while resizing or editing dimensions."
+                    AutomationProperties.Name="Keep aspect ratio"
+                    AutomationProperties.HelpText="Preserve the selected Design Area width-to-height ratio." />
         </StackPanel>
       </Grid>
     </Border>
