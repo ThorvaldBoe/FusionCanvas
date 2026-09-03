@@ -62,6 +62,8 @@ internal sealed class InMemoryWorkspaceRepository(WorkspaceSnapshot snapshot) : 
 {
     private WorkspaceSnapshot _snapshot = snapshot;
 
+    internal WorkspaceSnapshot Snapshot => _snapshot;
+
     public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
     {
         _snapshot = snapshot;

@@ -172,6 +172,26 @@ public class DesignStageToolHeadlessTests
     }
 
     [AvaloniaFact]
+    public async Task ConfigurationSelector_PersistsSelectionThroughViewModelBinding()
+    {
+        var snapshot = SampleWorkspace.Create();
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+        var vm = MainWindowViewModelFactory.CreateFromSnapshot(snapshot, repository);
+        NavigateToDesign(vm);
+
+        var offering = Assert.Single(vm.DesignTool.AvailableOfferings);
+        vm.DesignTool.SelectedOffering = offering;
+
+        for (var i = 0; i < 200 && !repository.Snapshot.ItemListingConfigurations.Any(c => c.ItemId == SampleWorkspace.DesignNodeId && c.OfferingId == offering.Id); i++)
+        {
+            await Task.Delay(10);
+        }
+
+        Assert.Contains(repository.Snapshot.ItemListingConfigurations,
+            c => c.ItemId == SampleWorkspace.DesignNodeId && c.OfferingId == offering.Id);
+    }
+
+    [AvaloniaFact]
     public void ConfiguredState_ShowsRowsAndAreas()
     {
         var vm = CreateConfiguredDesignViewModel();
