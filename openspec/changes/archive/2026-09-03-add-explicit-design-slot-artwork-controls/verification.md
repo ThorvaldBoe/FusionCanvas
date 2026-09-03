@@ -21,7 +21,7 @@
 
 - PASS: `dotnet test .\\tests\\FusionCanvas.App.Tests\\FusionCanvas.App.Tests.csproj --no-restore --filter "FullyQualifiedName~DesignStageToolHeadlessTests"` — 24 passed.
 - PASS: `dotnet test .\\tests\\FusionCanvas.Application.Tests\\FusionCanvas.Application.Tests.csproj --no-restore --filter "FullyQualifiedName~DesignStageServiceTests"` — 24 passed.
-- PASS: `dotnet test .\\FusionCanvas.sln -m:1 --no-restore -v minimal` with `AVALONIA_TELEMETRY_OPTOUT=1` — 1,050 passed, 11 unrelated pre-existing `StoreEditorHeadlessTests` failures.
+- PARTIAL BASELINE: `dotnet test .\\FusionCanvas.sln -m:1 --no-restore -v minimal` with `AVALONIA_TELEMETRY_OPTOUT=1` — 1,050 passed, 11 unrelated pre-existing `StoreEditorHeadlessTests` failures; all changed Design-stage suites passed.
 - PASS: `openspec validate --changes --strict`.
 
 ## Baseline limitation
