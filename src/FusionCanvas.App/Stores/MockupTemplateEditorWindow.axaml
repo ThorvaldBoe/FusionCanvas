@@ -74,12 +74,23 @@
         <StackPanel Grid.Column="0" Spacing="8">
           <TextBlock Text="Image and design placement" FontSize="16" FontWeight="SemiBold" />
           <TextBlock Text="{Binding SelectedLocalSource.DisplayName}" Foreground="{DynamicResource SecondaryTextBrush}" />
-          <stores:MockupPlacementEditor x:Name="PlacementEditor" Height="240" IsEnabled="{Binding CanEdit}"
-                                         PlacementX="{Binding MappingX, Mode=TwoWay}" PlacementY="{Binding MappingY, Mode=TwoWay}"
-                                         PlacementWidth="{Binding MappingWidth, Mode=TwoWay}" PlacementHeight="{Binding MappingHeight, Mode=TwoWay}"
-                                         ImageWidth="{Binding MappingImageWidth}" ImageHeight="{Binding MappingImageHeight}"
-                                         ImagePath="{Binding SelectedImagePreviewPath}"
-                                         AutomationProperties.Name="Selected image placement" />
+          <Grid Height="240">
+            <stores:MockupPlacementEditor x:Name="PlacementEditor" IsEnabled="{Binding CanEdit}"
+                                           PlacementX="{Binding MappingX, Mode=TwoWay}" PlacementY="{Binding MappingY, Mode=TwoWay}"
+                                           PlacementWidth="{Binding MappingWidth, Mode=TwoWay}" PlacementHeight="{Binding MappingHeight, Mode=TwoWay}"
+                                           ImageWidth="{Binding MappingImageWidth}" ImageHeight="{Binding MappingImageHeight}"
+                                           ImagePath="{Binding SelectedImagePreviewPath}"
+                                           AutomationProperties.Name="Selected image placement" />
+            <Button HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,8,8"
+                    Width="40" Height="40" Padding="0" Background="{DynamicResource IconButtonBackgroundBrush}"
+                    Foreground="{DynamicResource IconButtonForegroundBrush}"
+                    ToolTip.Tip="Open enlarged image placement editor"
+                    Command="{Binding OpenEnlargedPlacementEditorCommand}"
+                    AutomationProperties.Name="Open enlarged image placement editor"
+                    AutomationProperties.HelpText="Open a larger view for precise design-area placement">
+              <PathIcon Data="M9.5,3 A6.5,6.5 0,1 0,13.6,14.55 L19,20 L20.4,18.6 L15,13.2 A6.5,6.5 0,0 0,9.5,3 Z M9.5,5 A4.5,4.5 0,1 1,9.5,14 A4.5,4.5 0,0 1,9.5,5 Z M9,7 L9,9 L7,9 L7,11 L9,11 L9,13 L11,13 L11,11 L13,11 L13,9 L11,9 L11,7 Z" />
+            </Button>
+          </Grid>
           <StackPanel Orientation="Horizontal" Spacing="8">
             <TextBlock Text="Re-use mapping from" VerticalAlignment="Center" />
             <ComboBox Width="220" ItemsSource="{Binding MappedSourceChoices}" SelectedItem="{Binding SelectedMappingSource}" DisplayMemberBinding="{Binding DisplayName}" IsEnabled="{Binding CanEdit}" />

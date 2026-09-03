@@ -1,0 +1,28 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:stores="using:FusionCanvas.App.Stores"
+        x:Class="FusionCanvas.App.Stores.EnlargedMockupPlacementEditorWindow"
+        x:DataType="stores:CatalogSetupViewModel"
+        Title="Enlarged image placement"
+        Width="1100" Height="760" MinWidth="440" MinHeight="360"
+        CanResize="True" WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ApplicationBackgroundBrush}">
+  <Grid Margin="16" RowDefinitions="Auto,*,Auto" RowSpacing="12">
+    <StackPanel Grid.Row="0" Spacing="3">
+      <TextBlock Text="Enlarged image placement" FontSize="18" FontWeight="SemiBold" />
+      <TextBlock Text="Drag the design area to position it. Drag the lower-right handle to resize." TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+      <TextBlock Text="{Binding SelectedLocalSource.DisplayName}" Foreground="{DynamicResource SecondaryTextBrush}" />
+    </StackPanel>
+    <stores:MockupPlacementEditor x:Name="PlacementEditor" Grid.Row="1"
+                                  HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                                  IsEnabled="{Binding CanEdit}"
+                                  PlacementX="{Binding MappingX, Mode=TwoWay}" PlacementY="{Binding MappingY, Mode=TwoWay}"
+                                  PlacementWidth="{Binding MappingWidth, Mode=TwoWay}" PlacementHeight="{Binding MappingHeight, Mode=TwoWay}"
+                                  ImageWidth="{Binding MappingImageWidth}" ImageHeight="{Binding MappingImageHeight}"
+                                  ImagePath="{Binding SelectedImagePreviewPath}"
+                                  AutomationProperties.Name="Enlarged selected image placement" />
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button x:Name="CloseButton" Content="Close" Classes="secondary" AutomationProperties.Name="Close enlarged image placement" />
+    </StackPanel>
+  </Grid>
+</Window>
