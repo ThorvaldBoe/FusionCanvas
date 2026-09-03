@@ -163,6 +163,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
     private PendingRemovalAction? _pendingRemoval;
     private bool _isRemovalConfirmationVisible;
     private string _removalConfirmationMessage = string.Empty;
+    private long _loadGeneration;
+    private bool _isApplyingState;
 
     public DesignStageToolViewModel(IDesignStageService designStageService)
     {
@@ -193,9 +195,10 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
             {
                 _selectedOffering = value;
                 OnPropertyChanged();
-                if (value is not null)
+                if (value is not null && !_isApplyingState)
                 {
-                    _ = SelectConfigurationAsync(value.Id);
+                    Interlocked.Increment(ref _loadGeneration);
+                    _ = PersistSelectedOfferingAsync(value.Id);
                 }
             }
         }
@@ -395,6 +398,18 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    private async Task PersistSelectedOfferingAsync(Guid offeringId)
+    {
+        try
+        {
+            await SelectConfigurationAsync(offeringId).ConfigureAwait(true);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            ErrorMessage = $"The listing configuration could not be persisted. {ex.Message}";
         }
     }
 
@@ -639,18 +654,23 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
     // --- Load ---
     public async Task LoadAsync(Guid itemId, bool canEdit, CancellationToken cancellationToken = default)
     {
+        var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         IsReadOnly = !canEdit;
         ReadOnlyReason = canEdit ? string.Empty : "Design stage content is read-only while the item is protected or an earlier stage is being reviewed.";
         _itemId = itemId;
 
         var state = await _designStageService.LoadDesignStageStateAsync(itemId, cancellationToken).ConfigureAwait(true);
+        if (loadGeneration != Volatile.Read(ref _loadGeneration))
+        {
+            return;
+        }
 
         HasConfiguration = state.SelectedOfferingId is not null;
         SelectedOfferingId = state.SelectedOfferingId;
         SelectedOfferingName = state.SelectedOfferingName;
         SelectedBlueprintName = state.SelectedBlueprintName;
         ProviderNetworkWarning = state.ProviderNetworkWarning;
-        _selectedOffering = state.SelectedOfferingId is not null
+        var selectedOffering = state.SelectedOfferingId is not null
             ? state.AvailableOfferings.SingleOrDefault(o => o.Id == state.SelectedOfferingId.Value)
             : null;
         if (state.IsReadOnly)
@@ -659,54 +679,68 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
             ReadOnlyReason = state.ReadOnlyReason;
         }
 
-        // Available offerings
-        AvailableOfferings.Clear();
-        foreach (var offering in state.AvailableOfferings)
+        _isApplyingState = true;
+        try
         {
-            AvailableOfferings.Add(offering);
-        }
-
-        // Ensure SelectedOfferingStatus is re-evaluated now that offerings are populated
-        OnPropertyChanged(nameof(SelectedOfferingStatus));
-
-        // Available colors
-        AvailableColors.Clear();
-        foreach (var color in state.AvailableColors)
-        {
-            var isSelected = state.SelectedColors.Any(c => string.Equals(c, color, StringComparison.OrdinalIgnoreCase));
-            AvailableColors.Add(new DesignColorViewModel(color, isSelected, IsReadOnly));
-        }
-
-        // Selected colors
-        SelectedColors.Clear();
-        foreach (var color in state.SelectedColors)
-        {
-            SelectedColors.Add(new DesignColorViewModel(color, true, IsReadOnly));
-        }
-
-        // Rows — dispose old slot bitmaps first
-        foreach (var row in Rows)
-        {
-            foreach (var slot in row.Slots)
+            // Available offerings
+            AvailableOfferings.Clear();
+            foreach (var offering in state.AvailableOfferings)
             {
-                slot.Dispose();
+                AvailableOfferings.Add(offering);
+            }
+
+            // Reapply the selected item after rebuilding the source collection. Avalonia
+            // may clear SelectedItem while the old collection is being replaced; that
+            // binding update must not be treated as a user selection to persist.
+            _selectedOffering = selectedOffering;
+            OnPropertyChanged(nameof(SelectedOffering));
+
+            // Ensure SelectedOfferingStatus is re-evaluated now that offerings are populated
+            OnPropertyChanged(nameof(SelectedOfferingStatus));
+
+            // Available colors
+            AvailableColors.Clear();
+            foreach (var color in state.AvailableColors)
+            {
+                var isSelected = state.SelectedColors.Any(c => string.Equals(c, color, StringComparison.OrdinalIgnoreCase));
+                AvailableColors.Add(new DesignColorViewModel(color, isSelected, IsReadOnly));
+            }
+
+            // Selected colors
+            SelectedColors.Clear();
+            foreach (var color in state.SelectedColors)
+            {
+                SelectedColors.Add(new DesignColorViewModel(color, true, IsReadOnly));
+            }
+
+            // Rows — dispose old slot bitmaps first
+            foreach (var row in Rows)
+            {
+                foreach (var slot in row.Slots)
+                {
+                    slot.Dispose();
+                }
+            }
+            Rows.Clear();
+            foreach (var row in state.Rows)
+            {
+                Rows.Add(new DesignRowViewModel(row, IsReadOnly));
+            }
+
+            // Supporting images — dispose old slot bitmaps first
+            foreach (var img in SupportingImages)
+            {
+                img.Dispose();
+            }
+            SupportingImages.Clear();
+            foreach (var img in state.SupportingImages)
+            {
+                SupportingImages.Add(new DesignSlotViewModel(img, IsReadOnly));
             }
         }
-        Rows.Clear();
-        foreach (var row in state.Rows)
+        finally
         {
-            Rows.Add(new DesignRowViewModel(row, IsReadOnly));
-        }
-
-        // Supporting images — dispose old slot bitmaps first
-        foreach (var img in SupportingImages)
-        {
-            img.Dispose();
-        }
-        SupportingImages.Clear();
-        foreach (var img in state.SupportingImages)
-        {
-            SupportingImages.Add(new DesignSlotViewModel(img, IsReadOnly));
+            _isApplyingState = false;
         }
     }
 
