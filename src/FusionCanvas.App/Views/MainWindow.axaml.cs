@@ -708,11 +708,48 @@ public partial class MainWindow : Window
             return;
         }
 
-        var ext = Path.GetExtension(path).ToLowerInvariant();
-        if (ext != ".png")
+        await AssignSlotImageFromPathAsync(vm, slotVm, path);
+        e.Handled = true;
+    }
+
+    private async void OnBrowseSlotImage(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm
+            || sender is not Button
+            || !StorageProvider.CanOpen)
         {
-            vm.DesignTool.ErrorMessage = "Only PNG files can be assigned to slots. The dropped file was not imported.";
-            e.Handled = true;
+            return;
+        }
+
+        var slotVm = FindSlotViewModel(sender);
+        if (slotVm is null)
+            return;
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = slotVm.HasImage ? "Replace final design artwork" : "Browse final design artwork",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("PNG final design artwork") { Patterns = ["*.png"] },
+                FilePickerFileTypes.All
+            ]
+        });
+
+        if (files.Count == 1 && files[0].TryGetLocalPath() is { } path)
+        {
+            await AssignSlotImageFromPathAsync(vm, slotVm, path);
+        }
+    }
+
+    private static async Task AssignSlotImageFromPathAsync(
+        MainWindowViewModel vm,
+        DesignSlotViewModel slotVm,
+        string path)
+    {
+        if (!Path.GetExtension(path).Equals(".png", StringComparison.OrdinalIgnoreCase))
+        {
+            vm.DesignTool.ErrorMessage = "Only PNG files can be assigned to final design artwork slots. The selected file was not imported.";
             return;
         }
 
@@ -722,7 +759,6 @@ public partial class MainWindow : Window
 
         vm.DesignTool.ErrorMessage = null;
         await vm.DesignTool.AssignSlotImageAsync(rowVM.RowId, slotVm.DesignAreaId, path);
-        e.Handled = true;
     }
 
     private static DesignSlotViewModel? FindSlotViewModel(object? sender)

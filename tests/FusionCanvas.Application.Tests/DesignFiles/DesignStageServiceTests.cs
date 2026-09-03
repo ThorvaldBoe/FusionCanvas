@@ -285,6 +285,30 @@ public class DesignStageServiceTests
     }
 
     [Fact]
+    public async Task AssignSlotImageAsync_MultipleSlots_PersistsIndependentArtwork()
+    {
+        var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
+        var fileStore = new DeterministicFileStore();
+        var service = new DesignStageService(repo, fileStore, () => Now, Guid.NewGuid);
+        var (itemId, offeringId) = await AddItemWithConfig(service, repo);
+        var secondArea = new DesignArea(
+            Guid.NewGuid(), offeringId, "Back", null, "back", "DTG", 3000, 4500, null, Now, Now, "{}");
+        repo.Snapshot = repo.Snapshot with { DesignAreas = [.. repo.Snapshot.DesignAreas, secondArea] };
+        await service.AddSelectedColorAsync(itemId, "Black", TestContext.Current.CancellationToken);
+        var state = await service.LoadDesignStageStateAsync(itemId, TestContext.Current.CancellationToken);
+        var row = state.Rows[0];
+        Assert.Equal(2, row.Slots.Count);
+
+        await service.AssignSlotImageAsync(itemId, row.RowId, row.Slots[0].DesignAreaId, fileStore.CreateSourcePng(), TestContext.Current.CancellationToken);
+        await service.AssignSlotImageAsync(itemId, row.RowId, row.Slots[1].DesignAreaId, fileStore.CreateSourcePng(), TestContext.Current.CancellationToken);
+
+        var reloaded = await service.LoadDesignStageStateAsync(itemId, TestContext.Current.CancellationToken);
+        var reloadedSlots = reloaded.Rows[0].Slots;
+        Assert.All(reloadedSlots, slot => Assert.NotNull(slot.AssetId));
+        Assert.NotEqual(reloadedSlots[0].AssetId, reloadedSlots[1].AssetId);
+    }
+
+    [Fact]
     public async Task ReplaceSlotImageAsync_ReplacesImageAndCleansUpOld()
     {
         var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
