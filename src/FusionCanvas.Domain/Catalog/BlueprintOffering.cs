@@ -1,11 +1,5 @@
 namespace FusionCanvas.Domain.Catalog;
 
-public enum BlueprintOfferingKind
-{
-    FixedPrintProvider = 0,
-    ProviderNetwork = 1
-}
-
 public sealed record BlueprintOffering
 {
     public BlueprintOffering(Guid id, Guid blueprintId, Guid storeId, string name, string? description, BlueprintOfferingKind kind, Guid? printProviderId, string? providerNetworkCode, Guid? defaultPlaceholderId, string? externalOfferingId, bool isArchived, DateTimeOffset createdAt, DateTimeOffset updatedAt, string metadataJson = "{}")

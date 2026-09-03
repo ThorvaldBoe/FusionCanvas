@@ -680,5 +680,3 @@ public sealed class RejectedPhrasesViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
-
-public sealed record ScopeOption(string Label, RejectedPhraseScope Scope);

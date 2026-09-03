@@ -371,5 +371,3 @@ public sealed class DocumentWindowViewModel : INotifyPropertyChanged
     private void OnPropertyChanged(string propertyName) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }
-
-public sealed record StageToolOptionViewModel(string Id, string DisplayName);

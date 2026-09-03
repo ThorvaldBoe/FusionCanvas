@@ -22,18 +22,3 @@ public partial class GroupDeleteConfirmationWindow : Window
 
     private void OnConfirmClick(object? sender, RoutedEventArgs e) => Close(true);
 }
-
-public sealed record GroupDeleteConfirmationViewModel
-{
-    public GroupDeleteConfirmationViewModel(GroupDeleteImpact impact)
-    {
-        Title = $"Delete '{impact.GroupName}'?";
-        var subgroupLabel = impact.DescendantGroupCount == 1 ? "subgroup" : "subgroups";
-        var itemLabel = impact.ItemCount == 1 ? "item" : "items";
-        WarningMessage = $"The selected group, {impact.DescendantGroupCount} {subgroupLabel}, and {impact.ItemCount} {itemLabel} will be permanently lost.";
-    }
-
-    public string Title { get; }
-
-    public string WarningMessage { get; }
-}

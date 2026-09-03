@@ -11,11 +11,6 @@ using FusionCanvas.Application.TitleOptimization;
 
 namespace FusionCanvas.App.Items;
 
-public sealed class ItemInspectorLifecycleEventArgs(ItemManagementResult result, bool deleted) : EventArgs
-{
-    public ItemManagementResult Result { get; } = result;
-    public bool Deleted { get; } = deleted;
-}
 
 public sealed class ItemInspectorViewModel : INotifyPropertyChanged
 {
