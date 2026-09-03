@@ -4,6 +4,7 @@ using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Assets;
+using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.DesignFiles;
 
@@ -446,6 +447,46 @@ public class DesignStageServiceTests
         Assert.Null(state.SelectedOfferingId);
         Assert.Empty(state.SelectedColors);
         Assert.Empty(state.Rows);
+    }
+
+    [Fact]
+    public async Task LoadDesignStageStateAsync_UsesCurrentCatalogColors()
+    {
+        var itemId = Guid.NewGuid();
+        var offeringId = Guid.NewGuid();
+        var blueprintId = Guid.NewGuid();
+        var colorOptionId = Guid.NewGuid();
+        var blackId = Guid.NewGuid();
+        var navyId = Guid.NewGuid();
+        var heatherGrayId = Guid.NewGuid();
+        var snapshot = SeedWithProduct();
+        var legacyOffering = snapshot.FulfillmentOfferings[0];
+        var item = new Item(itemId, StoreId, null, null, "Item", null, ItemStatus.Draft, WorkflowStage.Design, false, Now, Now, "{}");
+
+        snapshot = snapshot with
+        {
+            Items = [item],
+            ItemListingConfigurations = [new ItemListingConfiguration(itemId, offeringId)],
+            FulfillmentOfferings = [legacyOffering with { Id = offeringId }],
+            BlueprintOfferings = [new BlueprintOffering(offeringId, blueprintId, StoreId, "Gildan 64000", null, BlueprintOfferingKind.FixedPrintProvider, null, null, null, null, false, Now, Now)],
+            OfferingOptions = [new OfferingOption(colorOptionId, offeringId, OptionKind.Color, "Color", 0)],
+            OfferingOptionValues =
+            [
+                new OfferingOptionValue(blackId, colorOptionId, offeringId, "Black", 0),
+                new OfferingOptionValue(navyId, colorOptionId, offeringId, "Navy", 1),
+                new OfferingOptionValue(heatherGrayId, colorOptionId, offeringId, "Heather Gray", 2)
+            ],
+            OfferingVariants =
+            [
+                new OfferingVariant(Guid.NewGuid(), offeringId, "Black", [blackId], false, Now, Now),
+                new OfferingVariant(Guid.NewGuid(), offeringId, "Navy", [navyId], false, Now, Now),
+                new OfferingVariant(Guid.NewGuid(), offeringId, "Heather Gray", [heatherGrayId], false, Now, Now)
+            ]
+        };
+
+        var state = await New(new InMemoryWorkspaceRepository(snapshot)).LoadDesignStageStateAsync(itemId, TestContext.Current.CancellationToken);
+
+        Assert.Equal(["Black", "Navy", "Heather Gray"], state.AvailableColors);
     }
 
     // --- Helpers ---
