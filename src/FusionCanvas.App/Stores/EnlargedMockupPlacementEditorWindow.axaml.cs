@@ -22,7 +22,6 @@ public partial class EnlargedMockupPlacementEditorWindow : Window
             e.Handled = true;
             return;
         }
-
         base.OnKeyDown(e);
     }
 
