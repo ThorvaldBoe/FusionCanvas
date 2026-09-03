@@ -1,4 +1,5 @@
 using FusionCanvas.Domain.Items;
+using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.Domain.Products;
@@ -139,6 +140,39 @@ public static class DesignStagePolicy
             .SelectMany(v => v.Options)
             .Where(o => string.Equals(o.Name, "Color", StringComparison.OrdinalIgnoreCase))
             .Select(o => o.Value)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    /// <summary>
+    /// Gets available color values from the authoritative catalog offering graph.
+    /// A color value is referenced by a non-archived variant through an option
+    /// whose name is "Color" (case-insensitive).
+    /// </summary>
+    public static IReadOnlyList<string> AvailableColors(
+        IReadOnlyList<OfferingOption> options,
+        IReadOnlyList<OfferingOptionValue> optionValues,
+        IReadOnlyList<OfferingVariant> variants,
+        Guid offeringId)
+    {
+        var colorOptionIds = options
+            .Where(option => option.OfferingId == offeringId
+                && !option.IsArchived
+                && string.Equals(option.Name, "Color", StringComparison.OrdinalIgnoreCase))
+            .Select(option => option.Id)
+            .ToHashSet();
+
+        var colorValues = optionValues
+            .Where(value => value.OfferingId == offeringId
+                && !value.IsArchived
+                && colorOptionIds.Contains(value.OptionId))
+            .ToDictionary(value => value.Id);
+
+        return variants
+            .Where(variant => variant.OfferingId == offeringId && !variant.IsArchived)
+            .SelectMany(variant => variant.OptionValueIds)
+            .Where(colorValues.ContainsKey)
+            .Select(valueId => colorValues[valueId].Value)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }

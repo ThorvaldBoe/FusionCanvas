@@ -736,8 +736,10 @@ public sealed class DesignStageService : IDesignStageService
 
         // Available colors: from the selected offering's variants
         var configOfferingId = config?.OfferingId;
-        var availableColors = configOfferingId is not null
-            ? DesignStagePolicy.AvailableColors(snapshot.ProductVariants, configOfferingId.Value)
+        var availableColors = configOfferingId is not null && snapshot.BlueprintOfferings.Any(o => o.Id == configOfferingId.Value)
+            ? DesignStagePolicy.AvailableColors(snapshot.OfferingOptions, snapshot.OfferingOptionValues, snapshot.OfferingVariants, configOfferingId.Value)
+            : configOfferingId is not null
+                ? DesignStagePolicy.AvailableColors(snapshot.ProductVariants, configOfferingId.Value)
             : [];
 
         // Selected colors
