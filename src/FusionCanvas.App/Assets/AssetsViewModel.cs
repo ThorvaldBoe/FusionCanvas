@@ -139,6 +139,8 @@ public sealed class AssetsViewModel : INotifyPropertyChanged
         }
 
         var previouslySelected = _selectedAsset?.Id;
+        foreach (var existing in Assets)
+            existing.Dispose();
         Assets.Clear();
         foreach (var summary in state.Assets)
         {

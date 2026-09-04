@@ -13,4 +13,5 @@ public sealed record AssetSummary(
     bool IsMissing,
     string? ContextLabel,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? ManagedFilePath = null);

@@ -227,7 +227,7 @@ public sealed class AssetManagementService : IAssetManagementService
         return new AssetManagementState(descriptor, summaries, AssetPurposePolicy.AvailablePurposes, null);
     }
 
-    private static AssetSummary ToSummary(
+    private AssetSummary ToSummary(
         WorkspaceSnapshot snapshot,
         Asset asset,
         AssetContextDescriptor? descriptor,
@@ -246,7 +246,8 @@ public sealed class AssetManagementService : IAssetManagementService
             isMissing,
             contextLabel,
             asset.CreatedAt,
-            asset.UpdatedAt);
+            asset.UpdatedAt,
+            Path.Combine(_fileStore.WorkspaceRoot, asset.WorkspaceRelativePath));
     }
 
     private bool IsMissing(Asset asset)
