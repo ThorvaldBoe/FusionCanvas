@@ -1448,8 +1448,25 @@
                                 SelectedValueBinding="{Binding Id}"
                                 AutomationProperties.Name="Mockup template" />
                       <TextBlock Text="{Binding ListingTool.BlockedReason}"
+                                 IsVisible="{Binding ListingTool.HasBlockedReason}"
                                  TextWrapping="Wrap"
                                  Foreground="{DynamicResource WarningTextBrush}" />
+                      <ItemsControl ItemsSource="{Binding ListingTool.TemplateDiagnostics}"
+                                    AutomationProperties.Name="Mockup template readiness diagnostics">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <StackPanel Spacing="2" Margin="0,2,0,0">
+                              <TextBlock Text="{Binding TemplateName, StringFormat='{}{0}'}" FontWeight="SemiBold" />
+                              <TextBlock Text="{Binding Guidance}" TextWrapping="Wrap" Foreground="{DynamicResource WarningTextBrush}" />
+                            </StackPanel>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <TextBlock Text="Open Store settings → Mockup Templates to correct these items."
+                                 IsVisible="{Binding ListingTool.HasTemplateDiagnostics}"
+                                 TextWrapping="Wrap"
+                                 FontSize="11"
+                                 Foreground="{DynamicResource SecondaryTextBrush}" />
                       <Button Content="Apply mockup template"
                               Command="{Binding ListingTool.ApplyCommand}"
                               IsEnabled="{Binding ListingTool.CanApply}"

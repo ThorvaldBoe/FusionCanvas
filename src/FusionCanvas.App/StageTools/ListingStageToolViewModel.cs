@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Domain.Items;
+using FusionCanvas.Domain.Mockups;
 using FusionCanvas.App.DocumentWindow;
 
 namespace FusionCanvas.App.StageTools;
@@ -23,12 +24,15 @@ public sealed class ListingStageToolViewModel : INotifyPropertyChanged
     public ListingStageToolViewModel(IMockupGenerationService? service = null) { _service = service; ApplyCommand = new RelayCommand(parameter => _ = ApplyAsync(), () => CanApply); }
     public event PropertyChangedEventHandler? PropertyChanged;
     public ObservableCollection<MockupTemplateOptionViewModel> Templates { get; } = [];
+    public ObservableCollection<MockupTemplateDiagnosticViewModel> TemplateDiagnostics { get; } = [];
     public ObservableCollection<MockupGenerationOutput> Outputs { get; } = [];
     public ICommand ApplyCommand { get; }
     public string StatusSummary { get => _statusSummary; private set { _statusSummary = value; OnPropertyChanged(); } }
     public bool IsReadOnly { get => _isReadOnly; private set { _isReadOnly = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanApply)); } }
     public string ReadOnlyReason { get => _readOnlyReason; private set { _readOnlyReason = value; OnPropertyChanged(); } }
-    public string? BlockedReason { get => _blockedReason; private set { _blockedReason = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanApply)); } }
+    public string? BlockedReason { get => _blockedReason; private set { _blockedReason = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasBlockedReason)); OnPropertyChanged(nameof(CanApply)); } }
+    public bool HasBlockedReason => !string.IsNullOrWhiteSpace(BlockedReason);
+    public bool HasTemplateDiagnostics => TemplateDiagnostics.Count > 0;
     public string? ErrorMessage { get => _errorMessage; private set { _errorMessage = value; OnPropertyChanged(); } }
     public bool IsBusy { get => _isBusy; private set { _isBusy = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanApply)); } }
     public bool CanApply => !IsReadOnly && !IsBusy && SelectedTemplateId is not null && string.IsNullOrWhiteSpace(BlockedReason);
@@ -49,12 +53,34 @@ public sealed class ListingStageToolViewModel : INotifyPropertyChanged
         var state = await _service.LoadAsync(itemId, !canEdit, ReadOnlyReason, cancellationToken).ConfigureAwait(true);
         Templates.Clear();
         foreach (var template in state.Templates) Templates.Add(new(template.Id, template.Name));
+        TemplateDiagnostics.Clear();
+        foreach (var diagnostic in state.CandidateDiagnostics)
+        {
+            var guidance = string.Join(" ", diagnostic.Blockers.Select(ReadinessMessage));
+            TemplateDiagnostics.Add(new(diagnostic.TemplateName, guidance));
+        }
+        OnPropertyChanged(nameof(HasTemplateDiagnostics));
         SelectedTemplateId = state.SelectedTemplateId;
         Outputs.Clear();
         foreach (var output in state.Outputs) Outputs.Add(output);
         BlockedReason = state.BlockedReason;
         ErrorMessage = state.Error;
     }
+
+    private static string ReadinessMessage(MockupTemplateReadinessBlocker blocker) => blocker switch
+    {
+        MockupTemplateReadinessBlocker.Archived => "Restore the template before use.",
+        MockupTemplateReadinessBlocker.MissingTargetDesignArea => "Choose a Design Area.",
+        MockupTemplateReadinessBlocker.InvalidTargetDesignArea => "Choose an active Design Area from this Offering.",
+        MockupTemplateReadinessBlocker.MissingColors => "Choose at least one applicable Color.",
+        MockupTemplateReadinessBlocker.InvalidColors => "Remove unavailable Colors.",
+        MockupTemplateReadinessBlocker.MissingCompatibleVariants => "Add an active Variant that uses the selected Colors.",
+        MockupTemplateReadinessBlocker.IncompatibleVariants => "Choose a Design Area compatible with every implied Variant.",
+        MockupTemplateReadinessBlocker.MissingImage => "Choose a mockup image.",
+        MockupTemplateReadinessBlocker.MissingMapping => "Add a valid design-area placement mapping.",
+        MockupTemplateReadinessBlocker.KnownImageColorIncompatibility => "Choose Colors supported by the selected image.",
+        _ => blocker.ToString()
+    };
 
     private async Task ApplyAsync()
     {

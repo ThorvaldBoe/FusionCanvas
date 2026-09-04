@@ -373,12 +373,16 @@ public sealed class MockupTemplateSetupService : IMockupTemplateSetupService
         var state = BuildState(snapshot, storeId);
         var candidates = state.Templates.Where(value => value.BlueprintOfferingId == offeringId && !value.IsArchived).ToArray();
         var eligibleIds = (state.Readiness ?? []).Where(value => value.Lifecycle == MockupTemplateLifecycle.ReadyForUse).Select(value => value.TemplateId).ToHashSet();
+        var diagnostics = candidates
+            .Join(state.Readiness ?? [], template => template.Id, readiness => readiness.TemplateId, (template, readiness) =>
+                new MockupTemplateEligibilityDiagnostic(template.Id, template.Name, readiness.Blockers))
+            .ToArray();
         if (requestedTemplateId is not null && !eligibleIds.Contains(requestedTemplateId.Value))
         {
             var readiness = (state.Readiness ?? []).SingleOrDefault(value => value.TemplateId == requestedTemplateId.Value);
-            return new(false, readiness is null ? "Mockup Template was not found." : "Mockup Template is still a Draft.", [], readiness?.Blockers ?? []);
+            return new(false, readiness is null ? "Mockup Template was not found." : "Mockup Template is still a Draft.", [], readiness?.Blockers ?? [], diagnostics);
         }
-        return new(true, null, candidates.Where(value => eligibleIds.Contains(value.Id) && (requestedTemplateId is null || value.Id == requestedTemplateId)).ToArray(), []);
+        return new(true, null, candidates.Where(value => eligibleIds.Contains(value.Id) && (requestedTemplateId is null || value.Id == requestedTemplateId)).ToArray(), [], diagnostics);
     }
 
     private static string? ValidateCompatibility(WorkspaceSnapshot snapshot, Guid offeringId, OfferingPlaceholder? placeholder, IEnumerable<Guid> colorIds)

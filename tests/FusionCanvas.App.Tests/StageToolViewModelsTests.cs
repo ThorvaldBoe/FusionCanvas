@@ -1,4 +1,6 @@
 using FusionCanvas.App.StageTools;
+using FusionCanvas.Application.Mockups;
+using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Application.Items;
@@ -84,5 +86,47 @@ public class StageToolViewModelsTests
 
         Assert.Contains("Published", vm.StatusSummary);
         Assert.True(vm.IsReadOnly);
+    }
+
+    [Fact]
+    public async Task ListingTool_ShowsTemplateBlockersWhenNoReadyTemplateExists()
+    {
+        var vm = new ListingStageToolViewModel(new StubMockupGenerationService(new MockupGenerationState(
+            Guid.NewGuid(), Guid.NewGuid(), false, string.Empty, [], null, [], ["Black"],
+            "No ready Mockup Templates are available. Complete the requirements shown below in Store settings.",
+            null,
+            [new MockupTemplateEligibilityDiagnostic(Guid.NewGuid(), "Front image", [
+                MockupTemplateReadinessBlocker.MissingImage,
+                MockupTemplateReadinessBlocker.MissingMapping])])));
+
+        await vm.LoadAsync(Guid.NewGuid(), ItemStatus.Draft, canEdit: true, TestContext.Current.CancellationToken);
+
+        var diagnostic = Assert.Single(vm.TemplateDiagnostics);
+        Assert.Equal("Front image", diagnostic.TemplateName);
+        Assert.Contains("Choose a mockup image.", diagnostic.Guidance);
+        Assert.Contains("Add a valid design-area placement mapping.", diagnostic.Guidance);
+        Assert.True(vm.HasBlockedReason);
+        Assert.False(vm.CanApply);
+    }
+
+    [Fact]
+    public async Task ListingTool_DistinguishesOfferingWithNoTemplates()
+    {
+        var vm = new ListingStageToolViewModel(new StubMockupGenerationService(new MockupGenerationState(
+            Guid.NewGuid(), Guid.NewGuid(), false, string.Empty, [], null, [], ["Black"],
+            "No Mockup Templates are configured for this Offering. Add one in Store settings.", null, [])));
+
+        await vm.LoadAsync(Guid.NewGuid(), ItemStatus.Draft, canEdit: true, TestContext.Current.CancellationToken);
+
+        Assert.Contains("No Mockup Templates are configured", vm.BlockedReason);
+        Assert.Empty(vm.TemplateDiagnostics);
+    }
+
+    private sealed class StubMockupGenerationService(MockupGenerationState state) : IMockupGenerationService
+    {
+        public Task<MockupGenerationState> LoadAsync(Guid itemId, bool isReadOnly, string readOnlyReason, CancellationToken cancellationToken = default) => Task.FromResult(state);
+
+        public Task<MockupGenerationResult> ApplyAsync(MockupGenerationRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(MockupGenerationResult.Failure("Not used in this test."));
     }
 }

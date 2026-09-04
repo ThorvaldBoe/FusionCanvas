@@ -224,6 +224,9 @@ public sealed class MockupTemplateSetupServiceTests
         var eligibility = await service.GetEligibleTemplatesAsync(storeId, offering.Id, result.TemplateId, TestContext.Current.CancellationToken);
         Assert.False(eligibility.Succeeded);
         Assert.Contains(MockupTemplateReadinessBlocker.MissingImage, eligibility.Blockers);
+        Assert.Single(eligibility.CandidateDiagnostics);
+        Assert.Equal("Manual draft", eligibility.CandidateDiagnostics[0].TemplateName);
+        Assert.Contains(MockupTemplateReadinessBlocker.MissingMapping, eligibility.CandidateDiagnostics[0].Blockers);
     }
 
     private sealed class MemoryRepository(WorkspaceSnapshot initial) : IWorkspaceRepository
