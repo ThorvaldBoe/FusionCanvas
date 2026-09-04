@@ -1319,13 +1319,14 @@
                                                       FontSize="10" Classes="miniButton"
                                                       ToolTip.Tip="Download a copy of this final design artwork"
                                                       AutomationProperties.Name="Download final design artwork" />
-                                              <Button Content="Remove" IsEnabled="{Binding !IsReadOnly}"
-                                                      Tag="{Binding .}"
-                                                      Click="OnRemoveSlotImage"
-                                                      FontSize="10" Classes="miniButton"
-                                                      ToolTip.Tip="Remove this final design artwork from the slot"
-                                                      AutomationProperties.Name="Remove final design artwork" />
                                             </StackPanel>
+                                            <Button Content="Remove" IsEnabled="{Binding !IsReadOnly}"
+                                                    Tag="{Binding .}"
+                                                    Click="OnRemoveSlotImage"
+                                                    HorizontalAlignment="Stretch"
+                                                    FontSize="10" Classes="miniButton"
+                                                    ToolTip.Tip="Remove this final design artwork from the slot"
+                                                    AutomationProperties.Name="Remove final design artwork" />
                                             <TextBlock IsVisible="{Binding IsMissing}" Text="Missing" FontSize="10"
                                                        Foreground="{DynamicResource DangerTextBrush}" />
                                           </StackPanel>

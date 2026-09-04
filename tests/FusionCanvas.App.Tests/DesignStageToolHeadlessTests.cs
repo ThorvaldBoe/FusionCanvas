@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Automation;
+using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using FusionCanvas.App.StageTools;
 using FusionCanvas.App.Tests.TestSupport;
@@ -568,7 +569,13 @@ public class DesignStageToolHeadlessTests
             Assert.Contains(actionButtons, button => button.Content is "Replace artwork...");
             Assert.Contains(actionButtons, button => AutomationProperties.GetName(button) == slot.ArtworkPreviewAccessibleName);
             Assert.Contains(actionButtons, button => AutomationProperties.GetName(button) == "Download final design artwork");
-            Assert.Contains(actionButtons, button => AutomationProperties.GetName(button) == "Remove final design artwork");
+            var removeButton = Assert.Single(actionButtons.Where(button =>
+                AutomationProperties.GetName(button) == "Remove final design artwork"));
+            Assert.True(removeButton.IsVisible);
+            Assert.True(removeButton.Bounds.Width > 0);
+
+            removeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.True(vm.DesignTool.IsRemovalConfirmationVisible);
         }
         finally
         {
