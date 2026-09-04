@@ -21,6 +21,7 @@ using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.Integration.AI;
 using FusionCanvas.Integration.SllGeneration;
+using FusionCanvas.Integration.Mockups;
 
 namespace FusionCanvas.App.Workspace;
 
@@ -100,7 +101,8 @@ public static class AppWorkspaceFactory
             titleOptimization,
             new ProductSupplierSetupService(repository),
             new ItemCsvImportService(repository),
-            new SllDocumentCodec());
+            new SllDocumentCodec(),
+            new MockupGenerationService(repository, fileStore, new MockupTemplateSetupService(repository), new ImageSharpMockupRasterCompositor()));
     }
 
     private static string DefaultDatabasePath()

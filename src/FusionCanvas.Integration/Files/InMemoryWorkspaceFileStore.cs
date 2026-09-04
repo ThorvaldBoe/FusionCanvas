@@ -21,6 +21,15 @@ public sealed class InMemoryWorkspaceFileStore : IWorkspaceFileStore
             sourcePath));
     }
 
+    public async Task<ManagedWorkspaceFile> SaveAsync(string fileName, AssetKind kind, Stream content, CancellationToken cancellationToken = default)
+    {
+        await using var buffer = new MemoryStream();
+        await content.CopyToAsync(buffer, cancellationToken);
+        var relativePath = $"assets/{Guid.NewGuid():N}-{Path.GetFileName(fileName)}";
+        _files[relativePath] = buffer.ToArray();
+        return new(Path.GetFileName(fileName), kind, relativePath, Path.Combine("workspace", relativePath), string.Empty);
+    }
+
     public bool Exists(string workspaceRelativePath) => _files.ContainsKey(Normalize(workspaceRelativePath));
 
     public bool TryDelete(string workspaceRelativePath) => _files.Remove(Normalize(workspaceRelativePath));

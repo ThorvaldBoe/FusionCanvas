@@ -76,11 +76,11 @@ public class StageToolViewModelsTests
     }
 
     [Fact]
-    public void ListingTool_ReportsStatusSummaryAndIsAlwaysReadOnly()
+    public void ListingTool_ReportsStatusSummaryAndHonorsEditability()
     {
         var vm = new ListingStageToolViewModel();
 
-        vm.Load(ItemStatus.Published, canEdit: true);
+        vm.Load(ItemStatus.Published, canEdit: false);
 
         Assert.Contains("Published", vm.StatusSummary);
         Assert.True(vm.IsReadOnly);

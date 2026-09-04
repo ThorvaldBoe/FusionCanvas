@@ -119,7 +119,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.TitleOptimization,
             runtime.ProductSupplierSetup,
             runtime.ItemCsvImport,
-            runtime.SllDocumentCodec)
+            runtime.SllDocumentCodec,
+            mockupGenerationService: runtime.MockupGeneration)
     {
 }
     public MainWindowViewModel(
@@ -151,7 +152,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IItemCsvImportService? itemCsvImportService = null,
         ISllDocumentCodec? sllDocumentCodec = null,
         ICatalogSetupService? catalogSetupService = null,
-        IMockupTemplateSetupService? mockupTemplateSetupService = null)
+        IMockupTemplateSetupService? mockupTemplateSetupService = null,
+        IMockupGenerationService? mockupGenerationService = null)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
@@ -199,7 +201,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ItemInspector = new ItemInspectorViewModel(_itemInspectorService, _itemManagementService, _tagManagementService, titleOptimizationService);
         DesignTool = new DesignStageToolViewModel(
             new DesignStageService(workspaceRepository, fileStore));
-        ListingTool = new ListingStageToolViewModel();
+        ListingTool = new ListingStageToolViewModel(mockupGenerationService);
         Ideation = new IdeationViewModel(_ideationService, _ideationAccessStatus, snowcloneLibrary, rejectedPhrases);
         ConceptRefinement = new ConceptRefinementSessionViewModel(
             _conceptRefinementService,
@@ -1124,7 +1126,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         var activeStage = DocumentWindow.ActiveContext?.WorkflowStage ?? item.Stage;
         var canEdit = ItemWorkflowPolicy.CanEditStage(item, activeStage).IsAllowed;
-        ListingTool.Load(item.Status, canEdit);
+        Run(ListingTool.LoadAsync(item.Id, item.Status, canEdit));
         if (activeStage == WorkflowStage.Design)
         {
             Run(DesignTool.LoadAsync(item.Id, canEdit));

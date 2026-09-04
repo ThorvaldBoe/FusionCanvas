@@ -1420,6 +1420,29 @@
                                  TextWrapping="Wrap"
                                  FontSize="12"
                                  Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <TextBlock Text="Mockup template" FontWeight="SemiBold" />
+                      <ComboBox ItemsSource="{Binding ListingTool.Templates}"
+                                SelectedValue="{Binding ListingTool.SelectedTemplateId}"
+                                SelectedValueBinding="{Binding Id}"
+                                AutomationProperties.Name="Mockup template" />
+                      <TextBlock Text="{Binding ListingTool.BlockedReason}"
+                                 TextWrapping="Wrap"
+                                 Foreground="{DynamicResource WarningTextBrush}" />
+                      <Button Content="Apply mockup template"
+                              Command="{Binding ListingTool.ApplyCommand}"
+                              IsEnabled="{Binding ListingTool.CanApply}"
+                              AutomationProperties.Name="Apply mockup template" />
+                      <TextBlock IsVisible="{Binding ListingTool.IsBusy}" Text="Generating mockups…" />
+                      <TextBlock Text="{Binding ListingTool.ErrorMessage}"
+                                 TextWrapping="Wrap"
+                                 Foreground="{DynamicResource DangerTextBrush}" />
+                      <ItemsControl ItemsSource="{Binding ListingTool.Outputs}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <TextBlock Text="{Binding Name}" Foreground="{DynamicResource StrongTextBrush}" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
                     </StackPanel>
                   </Border>
 
