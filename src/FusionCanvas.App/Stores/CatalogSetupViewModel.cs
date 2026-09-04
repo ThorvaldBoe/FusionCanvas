@@ -1628,6 +1628,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private async Task LoadLocalSourceDraftsAsync(Guid templateId)
     {
         if (_sourceImages is null || SelectedOffering is null) return;
+        var configuredTemplateColorIds = TemplateColorChoices
+            .Where(value => value.IsSelected)
+            .Select(value => value.Value.Id)
+            .ToHashSet();
         var state = await _sourceImages.LoadAsync(SelectedOffering.StoreId, templateId).ConfigureAwait(true);
         if (!IsAddingTemplate || SelectedTemplate?.Id != templateId) return;
         foreach (var image in state.Images)
@@ -1636,6 +1640,11 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             LocalSourceDrafts.Add(new LocalMockupSourceDraftViewModel(image.WorkspaceRelativePath, image.OptionValueIds, isManaged: true, image.ImageMapping, image.Dimensions.Width, image.Dimensions.Height, image.Id, image.PreviewPath) { ApplicabilitySummary = string.Join(", ", labels) });
         }
         if (LocalSourceDrafts.Count > 0) SelectLocalSource(LocalSourceDrafts[0]);
+        if (configuredTemplateColorIds.Count > 0)
+        {
+            foreach (var color in TemplateColorChoices)
+                color.IsSelected = configuredTemplateColorIds.Contains(color.Value.Id);
+        }
         RebuildMappedSourceChoices();
         OnPropertyChanged(nameof(HasLocalSource));
         if (IsAddingTemplate && SelectedTemplate?.Id == templateId)
