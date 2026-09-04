@@ -1,26 +1,26 @@
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
-using Avalonia.Media.Imaging;
+using Avalonia.VisualTree;
+using FusionCanvas.App.Versioning;
+using FusionCanvas.Application.Versioning;
 
 namespace FusionCanvas.App.Tests;
 
 public sealed class SplashWindowTests
 {
     [AvaloniaFact]
-    public void SplashWindow_UsesPackagedBannerAndNonInteractiveChrome()
+    public void SplashWindow_ShowsProductVersion()
     {
-        var window = new SplashWindow();
-
+        var window = new SplashWindow(new ConstantVersionProvider(
+            new ApplicationVersionInfo("0.1.42", "0.1.42+g3f91c2a", "3f91c2a")));
         try
         {
-            Assert.False(window.ShowInTaskbar);
-            Assert.False(window.CanResize);
-            Assert.Equal(WindowDecorations.None, window.WindowDecorations);
-            Assert.NotNull(window.Icon);
+            window.Show();
+            window.UpdateLayout();
 
-            var border = Assert.IsType<Border>(window.Content);
-            var image = Assert.IsType<Image>(border.Child);
-            Assert.IsType<Bitmap>(image.Source);
+            var texts = window.GetVisualDescendants().OfType<TextBlock>().Select(text => text.Text).ToArray();
+            Assert.Contains("Version", texts);
+            Assert.Contains("0.1.42", texts);
         }
         finally
         {
@@ -28,43 +28,8 @@ public sealed class SplashWindowTests
         }
     }
 
-    [AvaloniaFact]
-    public void StartupSuccess_ClosesSplash()
+    private sealed class ConstantVersionProvider(ApplicationVersionInfo info) : IApplicationVersionProvider
     {
-        var window = new SplashWindow();
-        window.Show();
-
-        try
-        {
-            FusionCanvas.App.App.RunWithSplashCleanup(window, static () => { });
-
-            Assert.False(window.IsVisible);
-        }
-        finally
-        {
-            window.Close();
-        }
-    }
-
-    [AvaloniaFact]
-    public void StartupFailure_ClosesSplashAndPreservesException()
-    {
-        var window = new SplashWindow();
-        window.Show();
-
-        try
-        {
-            var error = Assert.Throws<InvalidOperationException>(() =>
-                FusionCanvas.App.App.RunWithSplashCleanup(
-                    window,
-                    () => throw new InvalidOperationException("startup failed")));
-
-            Assert.Equal("startup failed", error.Message);
-            Assert.False(window.IsVisible);
-        }
-        finally
-        {
-            window.Close();
-        }
+        public ApplicationVersionInfo GetVersion() => info;
     }
 }

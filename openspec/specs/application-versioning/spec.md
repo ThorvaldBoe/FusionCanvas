@@ -55,7 +55,12 @@ FusionCanvas SHALL expose application version information through an application
 - **AND** it does not depend on a hard-coded version string
 
 ### Requirement: Version and diagnostics are visible and copyable
-FusionCanvas SHALL present the product version in a discoverable settings surface and SHALL expose a copyable diagnostic block suitable for bug reports.
+FusionCanvas SHALL present the product version in the splash screen and a discoverable settings surface, and SHALL expose a copyable diagnostic block suitable for bug reports.
+
+#### Scenario: User sees the version while the application starts
+- **WHEN** the splash screen is displayed
+- **THEN** it shows the user-friendly product version in the form `Version Major.Minor.Build`
+- **AND** the value comes from the application version provider
 
 #### Scenario: User opens the About surface
 - **WHEN** the user opens Settings and selects the About section
