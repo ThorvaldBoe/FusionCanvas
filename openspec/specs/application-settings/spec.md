@@ -118,6 +118,22 @@ FusionCanvas SHALL include an About section in the Settings window that displays
 #### Scenario: User selects the About section
 - **WHEN** the user opens Settings and selects `About` in the section rail
 - **THEN** the About pane replaces the previous pane in the content region
+
+### Requirement: Additional AI parameters are understandable
+The AI settings profile editor SHALL present each supported additional parameter with a visible human-readable label and concise explanatory text, while preserving capability-based visibility and the existing bound value.
+
+#### Scenario: Supported parameters are displayed with guidance
+- **GIVEN** the selected model supports one or more additional parameters
+- **WHEN** the user expands Additional parameters
+- **THEN** each supported parameter is shown in a clearly labeled, consistently arranged field
+- **AND** each field includes concise guidance describing its effect or expected input
+- **AND** unsupported parameters remain hidden
+
+#### Scenario: Parameter editing behavior is unchanged
+- **GIVEN** a visible additional parameter field
+- **WHEN** the user edits its value
+- **THEN** the same existing profile property is updated
+- **AND** capability gating, validation, persistence, and provider serialization remain unchanged
 - **AND** the About pane shows the FusionCanvas product name and the user-friendly product version
 - **AND** the About pane exposes a copy action for the diagnostic block
 

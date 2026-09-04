@@ -39,21 +39,52 @@
                      FormatString="0" />
     </StackPanel>
     <Expander Header="Additional parameters" IsVisible="{Binding HasAdditionalParameters}">
-      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8" Margin="0,8,0,0">
-        <TextBox Grid.Row="0" Grid.Column="0" IsVisible="{Binding SupportsTopP}" PlaceholderText="Top P (0–1)" Text="{Binding TopP, Mode=TwoWay}" />
-        <TextBox Grid.Row="0" Grid.Column="1" IsVisible="{Binding SupportsTopK}" PlaceholderText="Top K" Text="{Binding TopK, Mode=TwoWay}" />
-        <TextBox Grid.Row="1" Grid.Column="0" IsVisible="{Binding SupportsMinP}" PlaceholderText="Min P (0–1)" Text="{Binding MinP, Mode=TwoWay}" />
-        <TextBox Grid.Row="1" Grid.Column="1" IsVisible="{Binding SupportsTopA}" PlaceholderText="Top A (0–1)" Text="{Binding TopA, Mode=TwoWay}" />
-        <TextBox Grid.Row="2" Grid.Column="0" IsVisible="{Binding SupportsFrequencyPenalty}" PlaceholderText="Frequency penalty" Text="{Binding FrequencyPenalty, Mode=TwoWay}" />
-        <TextBox Grid.Row="2" Grid.Column="1" IsVisible="{Binding SupportsPresencePenalty}" PlaceholderText="Presence penalty" Text="{Binding PresencePenalty, Mode=TwoWay}" />
-        <TextBox Grid.Row="3" Grid.Column="0" IsVisible="{Binding SupportsRepetitionPenalty}" PlaceholderText="Repetition penalty" Text="{Binding RepetitionPenalty, Mode=TwoWay}" />
-        <TextBox Grid.Row="3" Grid.Column="1" IsVisible="{Binding SupportsSeed}" PlaceholderText="Seed" Text="{Binding Seed, Mode=TwoWay}" />
-        <TextBox Grid.Row="4" Grid.ColumnSpan="2"
-                 AcceptsReturn="True"
-                 IsVisible="{Binding SupportsStop}"
-                 MinHeight="56"
-                 PlaceholderText="Stop sequences, one per line (maximum 4)"
-                 Text="{Binding StopSequences, Mode=TwoWay}" />
+      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12" Margin="0,8,0,0">
+        <StackPanel Grid.Row="0" Grid.Column="0" IsVisible="{Binding SupportsTopP}" Spacing="3">
+          <TextBlock Text="Top P" FontSize="12" FontWeight="SemiBold" />
+          <TextBlock Text="Narrow the pool of likely next tokens (0–1)." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBox Text="{Binding TopP, Mode=TwoWay}" PlaceholderText="0–1" />
+        </StackPanel>
+        <StackPanel Grid.Row="0" Grid.Column="1" IsVisible="{Binding SupportsTopK}" Spacing="3">
+          <TextBlock Text="Top K" FontSize="12" FontWeight="SemiBold" />
+          <TextBlock Text="Limit each choice to the K most likely tokens." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBox Text="{Binding TopK, Mode=TwoWay}" PlaceholderText="Number of tokens" />
+        </StackPanel>
+        <StackPanel Grid.Row="1" Grid.Column="0" IsVisible="{Binding SupportsMinP}" Spacing="3">
+          <TextBlock Text="Min P" FontSize="12" FontWeight="SemiBold" />
+          <TextBlock Text="Keep tokens above this probability threshold (0–1)." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBox Text="{Binding MinP, Mode=TwoWay}" PlaceholderText="0–1" />
+        </StackPanel>
+        <StackPanel Grid.Row="1" Grid.Column="1" IsVisible="{Binding SupportsTopA}" Spacing="3">
+          <TextBlock Text="Top A" FontSize="12" FontWeight="SemiBold" />
+          <TextBlock Text="Adapt the candidate pool to the strongest token." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBox Text="{Binding TopA, Mode=TwoWay}" PlaceholderText="0–1" />
+        </StackPanel>
+        <StackPanel Grid.Row="2" Grid.Column="0" IsVisible="{Binding SupportsFrequencyPenalty}" Spacing="3">
+          <TextBlock Text="Frequency penalty" FontSize="12" FontWeight="SemiBold" />
+          <TextBlock Text="Discourage tokens that have appeared often." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBox Text="{Binding FrequencyPenalty, Mode=TwoWay}" PlaceholderText="Usually −2 to 2" />
+        </StackPanel>
+        <StackPanel Grid.Row="2" Grid.Column="1" IsVisible="{Binding SupportsPresencePenalty}" Spacing="3">
+          <TextBlock Text="Presence penalty" FontSize="12" FontWeight="SemiBold" />
+          <TextBlock Text="Encourage introducing topics not used yet." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBox Text="{Binding PresencePenalty, Mode=TwoWay}" PlaceholderText="Usually −2 to 2" />
+        </StackPanel>
+        <StackPanel Grid.Row="3" Grid.Column="0" IsVisible="{Binding SupportsRepetitionPenalty}" Spacing="3">
+          <TextBlock Text="Repetition penalty" FontSize="12" FontWeight="SemiBold" />
+          <TextBlock Text="Reduce repeated phrases and tokens." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBox Text="{Binding RepetitionPenalty, Mode=TwoWay}" PlaceholderText="Provider-specific range" />
+        </StackPanel>
+        <StackPanel Grid.Row="3" Grid.Column="1" IsVisible="{Binding SupportsSeed}" Spacing="3">
+          <TextBlock Text="Seed" FontSize="12" FontWeight="SemiBold" />
+          <TextBlock Text="Use a repeatable random seed when supported." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBox Text="{Binding Seed, Mode=TwoWay}" PlaceholderText="Optional integer" />
+        </StackPanel>
+        <StackPanel Grid.Row="4" Grid.ColumnSpan="2" IsVisible="{Binding SupportsStop}" Spacing="3">
+          <TextBlock Text="Stop sequences" FontSize="12" FontWeight="SemiBold" />
+          <TextBlock Text="End generation when one of these sequences appears; enter up to four, one per line." FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBox AcceptsReturn="True" MinHeight="56" PlaceholderText="One sequence per line" Text="{Binding StopSequences, Mode=TwoWay}" />
+        </StackPanel>
       </Grid>
     </Expander>
   </StackPanel>
