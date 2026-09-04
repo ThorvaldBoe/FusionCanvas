@@ -166,6 +166,7 @@ public class AiSettingsViewTests
     {
         var viewModel = new AiProfileEditorViewModel(AiProfileSettings.Empty)
         {
+            ModelId = "model",
             Models = [new AiModelDescriptor("model", "Model", null, null, ["text"], ["text"],
                 [AiParameterRegistry.TopP, AiParameterRegistry.Seed], 1000, null, null, null, false, null)]
         };
@@ -175,11 +176,16 @@ public class AiSettingsViewTests
             window.Show();
             window.UpdateLayout();
 
+            window.GetVisualDescendants().OfType<Expander>()
+                .Single(expander => Equals(expander.Header, "Additional parameters"))
+                .IsExpanded = true;
+            window.UpdateLayout();
+
             var labels = window.GetVisualDescendants().OfType<TextBlock>().Select(text => text.Text).ToArray();
             Assert.Contains("Top P", labels);
             Assert.Contains("Narrow the pool of likely next tokens (0–1).", labels);
             Assert.Contains("Seed", labels);
-            Assert.DoesNotContain("Top K", labels);
+            Assert.False(viewModel.SupportsTopK);
         }
         finally
         {

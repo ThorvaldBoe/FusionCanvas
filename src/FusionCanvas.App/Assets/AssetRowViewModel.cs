@@ -2,13 +2,14 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using Avalonia.Media.Imaging;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Application.Assets;
 
 namespace FusionCanvas.App.Assets;
 
-public sealed class AssetRowViewModel : INotifyPropertyChanged
+public sealed class AssetRowViewModel : INotifyPropertyChanged, IDisposable
 {
     private AssetPurposeOption _selectedPurpose;
     private bool _suppressRelabel;
@@ -20,6 +21,7 @@ public sealed class AssetRowViewModel : INotifyPropertyChanged
         ManagedFileName = summary.ManagedFileName;
         IsMissing = summary.IsMissing;
         ContextLabel = summary.ContextLabel;
+        Thumbnail = CreateThumbnail(summary);
         Purpose = summary.Kind;
         _selectedPurpose = purposes.SingleOrDefault(option => option.Kind == summary.Kind) ?? purposes[0];
         Parent = parent;
@@ -35,6 +37,8 @@ public sealed class AssetRowViewModel : INotifyPropertyChanged
     public string? ContextLabel { get; }
     public AssetKind Purpose { get; private set; }
     public AssetsViewModel Parent { get; }
+    public Bitmap? Thumbnail { get; }
+    public bool CanPreview => Thumbnail is not null;
 
     public AssetPurposeOption SelectedPurpose
     {
@@ -81,4 +85,24 @@ public sealed class AssetRowViewModel : INotifyPropertyChanged
 
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+    public void Dispose() => Thumbnail?.Dispose();
+
+    private static Bitmap? CreateThumbnail(AssetSummary summary)
+    {
+        if (summary.IsMissing || summary.ManagedFilePath is null || !IsImage(summary.ManagedFilePath))
+            return null;
+
+        try
+        {
+            return new Bitmap(summary.ManagedFilePath);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private static bool IsImage(string path) =>
+        Path.GetExtension(path).ToLowerInvariant() is ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp";
 }

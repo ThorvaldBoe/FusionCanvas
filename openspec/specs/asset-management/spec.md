@@ -65,7 +65,7 @@ FusionCanvas SHALL label every imported asset with a purpose using the domain as
 - **AND** preserves the asset's file reference, context link, and remaining metadata
 
 ### Requirement: Context assets are visible from the relevant work
-FusionCanvas SHALL provide a focused asset surface for a selected listing, niche, group, or store that lists the assets linked to that context with their names, purposes, and file state, and SHALL list every store-owned asset, including unlinked assets, in the store-level view.
+FusionCanvas SHALL provide a focused asset surface for a selected listing, niche, group, or store that lists the assets linked to that context with their names, purposes, file state, and compact previews when the managed file is a supported image, and SHALL list every store-owned asset, including unlinked assets, in the store-level view.
 
 #### Scenario: User reviews listing assets
 - **WHEN** the user opens the asset surface for a listing
@@ -81,6 +81,21 @@ FusionCanvas SHALL provide a focused asset surface for a selected listing, niche
 - **WHEN** the user opens the asset surface for a context with no linked assets
 - **THEN** FusionCanvas shows an empty state that explains assets can be imported
 - **AND** keeps the import action available
+
+#### Scenario: Existing image assets show thumbnails
+- **WHEN** the asset surface lists an asset whose managed workspace file exists and has a supported image extension
+- **THEN** FusionCanvas shows a compact thumbnail from the managed workspace copy
+- **AND** keeps the asset name, purpose, context, and file state visible
+
+#### Scenario: User opens an enlarged asset preview
+- **WHEN** the user activates an available asset thumbnail
+- **THEN** FusionCanvas opens a larger in-app preview of the managed workspace copy
+- **AND** closing the preview leaves the asset record, selection, and list unchanged
+
+#### Scenario: Preview is unavailable
+- **WHEN** an asset is missing, unreadable, or not an image
+- **THEN** FusionCanvas does not show a broken thumbnail or attempt external repair
+- **AND** keeps the existing metadata and asset actions available
 
 ### Requirement: Missing managed files are detected and presented
 FusionCanvas SHALL detect when a listed asset's managed workspace file no longer exists and SHALL present that asset with a distinct missing state without attempting repair or relinking.

@@ -36,20 +36,30 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="assets:AssetRowViewModel">
               <Border Padding="12" Background="{DynamicResource ElevatedSurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,0,0,8">
-                <Grid ColumnDefinitions="*,180,Auto" ColumnSpacing="10">
-                  <StackPanel Grid.Column="0" Spacing="2">
+                <Grid ColumnDefinitions="72,*,180,Auto" ColumnSpacing="10">
+                  <Button Grid.Column="0"
+                          IsVisible="{Binding CanPreview}"
+                          Click="OnPreviewClick"
+                          Tag="{Binding .}"
+                          Padding="0"
+                          Background="Transparent"
+                          BorderThickness="0"
+                          ToolTip.Tip="Open a larger preview">
+                    <Image Source="{Binding Thumbnail}" Width="64" Height="64" Stretch="UniformToFill" />
+                  </Button>
+                  <StackPanel Grid.Column="1" Spacing="2">
                     <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" />
                     <TextBlock Text="{Binding ManagedFileName}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" />
                     <TextBlock Text="Missing managed file" IsVisible="{Binding IsMissing}" FontSize="11" Foreground="{DynamicResource DangerTextBrush}" />
                     <TextBlock Text="{Binding ContextLabel}" IsVisible="{Binding ContextLabel, Converter={x:Static ObjectConverters.IsNotNull}}" FontSize="11" Foreground="{DynamicResource AccentBrush}" />
                   </StackPanel>
-                  <ComboBox Grid.Column="1"
+                  <ComboBox Grid.Column="2"
                             ItemsSource="{Binding Parent.AvailablePurposes}"
                             SelectedItem="{Binding SelectedPurpose}"
                             IsEnabled="{Binding !Parent.IsBusy}"
                             ToolTip.Tip="Asset purpose"
                             MinHeight="32" />
-                  <Button Grid.Column="2"
+                  <Button Grid.Column="3"
                           Content="Remove…"
                           Command="{Binding $parent[ItemsControl].DataContext.RequestRemoveCommand}"
                           CommandParameter="{Binding}"
