@@ -1,6 +1,8 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:versioning="clr-namespace:FusionCanvas.Application.Versioning;assembly=FusionCanvas.Application"
         x:Class="FusionCanvas.App.SplashWindow"
+        x:DataType="versioning:ApplicationVersionInfo"
         Title="FusionCanvas"
         Icon="avares://FusionCanvas.App/Assets/FusionCanvas.ico"
         Width="760"
@@ -15,9 +17,21 @@
         WindowDecorations="None"
         Background="#071B3A">
   <Border Background="#071B3A" Padding="16">
-    <Image Source="avares://FusionCanvas.App/Assets/FusionCanvasBanner.jpg"
-           Stretch="Uniform"
-           HorizontalAlignment="Stretch"
-           VerticalAlignment="Stretch" />
+    <Grid>
+      <Image Source="avares://FusionCanvas.App/Assets/FusionCanvasBanner.jpg"
+             Stretch="Uniform"
+             HorizontalAlignment="Stretch"
+             VerticalAlignment="Stretch" />
+      <Border Background="#CC071B3A"
+              CornerRadius="4"
+              Padding="8,4"
+              HorizontalAlignment="Right"
+              VerticalAlignment="Bottom">
+        <StackPanel Orientation="Horizontal" Spacing="4">
+          <TextBlock Text="Version" Foreground="White" FontSize="12" />
+          <TextBlock Text="{Binding ProductVersion}" Foreground="White" FontSize="12" />
+        </StackPanel>
+      </Border>
+    </Grid>
   </Border>
 </Window>
