@@ -40,4 +40,5 @@ public sealed record AppWorkspaceRuntime(
     ITitleOptimizationService TitleOptimization,
     IProductSupplierSetupService ProductSupplierSetup,
     IItemCsvImportService ItemCsvImport,
-    ISllDocumentCodec SllDocumentCodec);
+    ISllDocumentCodec SllDocumentCodec,
+    IMockupGenerationService MockupGeneration);

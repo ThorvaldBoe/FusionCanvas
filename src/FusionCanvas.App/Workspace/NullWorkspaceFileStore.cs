@@ -16,6 +16,9 @@ internal sealed class NullWorkspaceFileStore : IWorkspaceFileStore
     public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, AssetKind kind, CancellationToken cancellationToken = default) =>
         throw new InvalidOperationException("The workspace file store is not configured. The composition root must inject it.");
 
+    public Task<ManagedWorkspaceFile> SaveAsync(string fileName, AssetKind kind, Stream content, CancellationToken cancellationToken = default) =>
+        throw new InvalidOperationException("The workspace file store is not configured. The composition root must inject it.");
+
     public bool Exists(string workspaceRelativePath) => false;
 
     public bool TryDelete(string workspaceRelativePath) => false;

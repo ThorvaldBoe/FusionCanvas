@@ -11,6 +11,9 @@ public interface IWorkspaceFileStore
         AssetKind kind,
         CancellationToken cancellationToken = default);
 
+    Task<ManagedWorkspaceFile> SaveAsync(string fileName, AssetKind kind, Stream content, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This workspace file store does not support generated file output.");
+
     bool Exists(string workspaceRelativePath);
 
     bool TryDelete(string workspaceRelativePath);

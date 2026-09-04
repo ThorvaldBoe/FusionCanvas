@@ -81,6 +81,21 @@ public sealed class LocalWorkspaceFileStore : IWorkspaceFileStore
             Path.GetFullPath(sourcePath));
     }
 
+    public async Task<ManagedWorkspaceFile> SaveAsync(string fileName, AssetKind kind, Stream content, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        var importedAt = DateTimeOffset.UtcNow;
+        var directory = Path.Combine(WorkspaceRoot, "assets", importedAt.ToString("yyyy"), importedAt.ToString("MM"));
+        Directory.CreateDirectory(directory);
+        var safeName = Path.GetFileName(fileName);
+        var extension = Path.GetExtension(safeName);
+        if (string.IsNullOrWhiteSpace(extension)) safeName += ".png";
+        var destination = Path.Combine(directory, $"{Path.GetFileNameWithoutExtension(safeName)}-{Guid.NewGuid():N}{Path.GetExtension(safeName)}");
+        await using var target = File.Create(destination);
+        await content.CopyToAsync(target, cancellationToken);
+        return new(Path.GetFileName(safeName), kind, WorkspaceFileReference.Normalize(Path.GetRelativePath(WorkspaceRoot, destination)), destination, string.Empty);
+    }
+
     public bool Exists(string workspaceRelativePath)
     {
         string normalizedReference;
