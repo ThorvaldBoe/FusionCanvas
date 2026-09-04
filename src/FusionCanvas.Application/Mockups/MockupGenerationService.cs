@@ -33,12 +33,21 @@ public sealed class MockupGenerationService : IMockupGenerationService
         var item = snapshot.Items.SingleOrDefault(value => value.Id == itemId);
         if (item is null) return new(itemId, null, true, "Item was not found.", [], null, [], [], "Item was not found.", null);
         var config = snapshot.ItemListingConfigurations.SingleOrDefault(value => value.ItemId == itemId);
-        if (config is null) return new(itemId, null, isReadOnly, readOnlyReason, [], null, Outputs(snapshot, itemId), [], "Select an Offering in Design before generating mockups.", null);
+        if (config is null) return new(itemId, null, isReadOnly, readOnlyReason, [], null, Outputs(snapshot, itemId), [], "Select an Offering in Design before generating mockups.", null, []);
         var eligible = await _templates.GetEligibleTemplatesAsync(item.StoreId, config.OfferingId, cancellationToken: cancellationToken).ConfigureAwait(false);
         var colors = snapshot.DesignSelectedColors.Where(value => value.ItemId == itemId).Select(value => value.ColorValue).OrderBy(value => value).ToArray();
         var outputs = Outputs(snapshot, itemId);
-        var blocked = colors.Length == 0 ? "Select at least one product Color in Design before generating mockups." : eligible.Templates.Count == 0 ? "Configure and complete a Mockup Template for this Offering before generating mockups." : null;
-        return new(itemId, config.OfferingId, isReadOnly, readOnlyReason, eligible.Templates, eligible.Templates.FirstOrDefault()?.Id, outputs, colors, blocked, eligible.Error);
+        var blocked = colors.Length == 0
+            ? "Select at least one product Color in Design before generating mockups."
+            : eligible.Error is not null
+                ? null
+                : eligible.Templates.Count > 0
+                    ? null
+                    : eligible.CandidateDiagnostics.Count == 0
+                        ? "No Mockup Templates are configured for this Offering. Add one in Store settings."
+                        : "No ready Mockup Templates are available. Complete the requirements shown below in Store settings.";
+        var diagnostics = eligible.Templates.Count == 0 ? eligible.CandidateDiagnostics : [];
+        return new(itemId, config.OfferingId, isReadOnly, readOnlyReason, eligible.Templates, eligible.Templates.FirstOrDefault()?.Id, outputs, colors, blocked, eligible.Error, diagnostics);
     }
 
     public async Task<MockupGenerationResult> ApplyAsync(MockupGenerationRequest request, CancellationToken cancellationToken = default)
