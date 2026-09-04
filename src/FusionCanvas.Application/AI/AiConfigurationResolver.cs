@@ -1,23 +1,5 @@
 namespace FusionCanvas.Application.AI;
 
-public enum AiConfigurationAvailability
-{
-    Ready,
-    MissingModel,
-    ModelUnavailable,
-    PrivacyIncompatible,
-    InvalidParameters
-}
-
-public sealed record AiConfigurationResolution(
-    AiConfigurationAvailability Availability,
-    AiProfileSettings? Profile,
-    AiModelDescriptor? Model,
-    IReadOnlyList<string> Errors)
-{
-    public bool IsReady => Availability == AiConfigurationAvailability.Ready;
-}
-
 public static class AiConfigurationResolver
 {
     public static AiProfileSettings ProfileFor(AiConfigurationSettings settings, AiRequestPurpose purpose)

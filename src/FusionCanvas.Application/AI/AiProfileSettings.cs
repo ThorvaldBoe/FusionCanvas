@@ -30,29 +30,3 @@ public sealed record AiProfileSettings(
         StopSequences: [],
         Reasoning: AiReasoningSettings.ProviderDefault);
 }
-
-public sealed record AiPurposeProfileSettings(
-    bool UseGeneral,
-    bool HasCustomProfile,
-    AiProfileSettings CustomProfile)
-{
-    public static AiPurposeProfileSettings InheritGeneral { get; } =
-        new(UseGeneral: true, HasCustomProfile: false, AiProfileSettings.Empty);
-}
-
-public sealed record AiConfigurationSettings(
-    bool RequireZeroDataRetention,
-    bool AdvancedMode,
-    AiProfileSettings General,
-    AiPurposeProfileSettings Ideation,
-    AiPurposeProfileSettings Concept,
-    AiPurposeProfileSettings Sll)
-{
-    public static AiConfigurationSettings Default { get; } = new(
-        RequireZeroDataRetention: true,
-        AdvancedMode: false,
-        General: AiProfileSettings.Empty,
-        Ideation: AiPurposeProfileSettings.InheritGeneral,
-        Concept: AiPurposeProfileSettings.InheritGeneral,
-        Sll: AiPurposeProfileSettings.InheritGeneral);
-}

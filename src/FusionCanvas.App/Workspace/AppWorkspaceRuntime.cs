@@ -1,0 +1,43 @@
+using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.Workspaces.Transfer;
+using FusionCanvas.Application.Mockups;
+using FusionCanvas.Application.Groups;
+using FusionCanvas.Application.Items;
+using FusionCanvas.Application.Assets;
+using FusionCanvas.Application.Tags;
+using FusionCanvas.Application.Ideation;
+using FusionCanvas.Application.Snowclones;
+using FusionCanvas.Application.RejectedPhrases;
+using FusionCanvas.Application.ConceptRefinement;
+using FusionCanvas.Application.SllGeneration;
+using FusionCanvas.Application.Products;
+using FusionCanvas.Application.Items.Import;
+using FusionCanvas.Application.TitleOptimization;
+
+namespace FusionCanvas.App.Workspace;
+
+public sealed record AppWorkspaceRuntime(
+    IWorkspaceRepository Repository,
+    IWorkspaceFileStore FileStore,
+    IWorkspaceTransferService WorkspaceTransfer,
+    IRasterImageMetadataReader RasterImageMetadata,
+    WorkspaceSnapshot Snapshot,
+    IGroupManagementService GroupManagement,
+    IItemManagementService ItemManagement,
+    IAssetManagementService AssetManagement,
+    ITagManagementService TagManagement,
+    IItemInspectorService ItemInspector,
+    IIdeationService Ideation,
+    IIdeationAccessStatus IdeationAccess,
+    ISnowcloneLibraryService SnowcloneLibrary,
+    IRejectedPhraseManagementService RejectedPhrases,
+    SnowcloneLibraryResult SnowcloneLibraryInitialization,
+    IConceptRefinementService ConceptRefinement,
+    IConceptRefinementAccessStatus ConceptRefinementAccess,
+    ISllGenerationService SllGeneration,
+    ISllAccessStatus SllGenerationAccess,
+    ITitleOptimizationService TitleOptimization,
+    IProductSupplierSetupService ProductSupplierSetup,
+    IItemCsvImportService ItemCsvImport,
+    ISllDocumentCodec SllDocumentCodec);

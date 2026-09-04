@@ -35,7 +35,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
 
         foreach (var table in new[] { "mockup_template_revision_source_image_values", "mockup_template_revision_source_images", "mockup_template_source_image_values", "mockup_template_source_images", "mockup_template_revision_colors", "mockup_template_revisions", "mockup_template_colors", "mockup_templates", "placeholder_variants", "offering_placeholders", "offering_variant_values", "offering_variants", "offering_option_values", "offering_options", "blueprint_offerings", "print_providers", "catalog_blueprints", "design_slot_assignments", "design_variant_row_colors", "design_variant_rows", "design_selected_colors", "item_listing_configuration", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
         {
-            await ExecuteAsync(connection, transaction, $"DELETE FROM {table};", cancellationToken);
+            await ExecuteAsync(connection, transaction, $"DELETE FROM {QuoteIdentifier(table)};", cancellationToken);
         }
 
         foreach (var workspace in snapshot.Workspaces)
@@ -731,7 +731,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             foreach (var column in columns)
             {
                 if (!await ColumnExistsAsync(connection, column.Table, column.Name, cancellationToken))
-                    await ExecuteAsync(connection, transaction, $"ALTER TABLE {column.Table} ADD COLUMN {column.Name} {column.Definition};", cancellationToken);
+                    await ExecuteAsync(connection, transaction, $"ALTER TABLE {QuoteIdentifier(column.Table)} ADD COLUMN {QuoteIdentifier(column.Name)} {column.Definition};", cancellationToken);
             }
 
             await VerifyForeignKeyIntegrityAsync(connection, transaction, cancellationToken);
@@ -836,7 +836,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             var legacyVariantIds = JsonSerializer.Deserialize<Guid[]>(ReadString(reader, "variant_ids_json")) ?? [];
             if (legacyVariantIds.Length == 0)
             {
-                await foreach (var variant in ReadAsync(connection, $"SELECT id FROM offering_variants WHERE offering_id = '{offeringId}';", cancellationToken, transaction))
+                await foreach (var variant in ReadAsync(connection, "SELECT id FROM offering_variants WHERE offering_id = $offering_id;", cancellationToken, transaction, ("$offering_id", offeringId.ToString())))
                     legacyVariantIds = [.. legacyVariantIds, ReadGuid(variant, "id")];
             }
             foreach (var variantId in legacyVariantIds)
@@ -1270,8 +1270,8 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
 
     private static async Task VerifyRowCountEqualAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, string sourceTable, string destinationTable, CancellationToken cancellationToken)
     {
-        var sourceCount = await ReadScalarIntAsync(connection, transaction, $"SELECT COUNT(*) FROM {sourceTable};", cancellationToken);
-        var destinationCount = await ReadScalarIntAsync(connection, transaction, $"SELECT COUNT(*) FROM {destinationTable};", cancellationToken);
+        var sourceCount = await ReadScalarIntAsync(connection, transaction, $"SELECT COUNT(*) FROM {QuoteIdentifier(sourceTable)};", cancellationToken);
+        var destinationCount = await ReadScalarIntAsync(connection, transaction, $"SELECT COUNT(*) FROM {QuoteIdentifier(destinationTable)};", cancellationToken);
         if (sourceCount != destinationCount)
         {
             throw new InvalidOperationException($"Migration row-count verification failed: {sourceTable} has {sourceCount} rows but {destinationTable} has {destinationCount} rows.");
@@ -1306,7 +1306,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
-        command.CommandText = $"PRAGMA table_info({tableName});";
+        command.CommandText = $"PRAGMA table_info({QuoteIdentifier(tableName)});";
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
@@ -1328,7 +1328,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     }
 
     private static Task SetPragmaUserVersionAsync(SqliteConnection connection, int schemaVersion, CancellationToken cancellationToken) =>
-        ExecuteAsync(connection, null, $"PRAGMA user_version = {schemaVersion};", cancellationToken);
+        ExecuteAsync(connection, null, $"PRAGMA user_version = {schemaVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)};", cancellationToken);
 
     private static async Task ExecuteAsync(
         SqliteConnection connection,
@@ -1347,6 +1347,17 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         }
 
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static string QuoteIdentifier(string identifier)
+    {
+        if (string.IsNullOrWhiteSpace(identifier)
+            || identifier.Any(character => !(char.IsLetterOrDigit(character) || character == '_')))
+        {
+            throw new ArgumentException("The SQLite identifier contains unsupported characters.", nameof(identifier));
+        }
+
+        return $"\"{identifier}\"";
     }
 
     private static Task InsertWorkspaceAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, FusionCanvas.Domain.Workspace.Workspace workspace, CancellationToken cancellationToken) =>
@@ -1641,14 +1652,14 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         {
             var variantId = ReadGuid(r, "id");
             var ids = new List<Guid>();
-            await foreach (var membership in ReadAsync(c, $"""
+            await foreach (var membership in ReadAsync(c, """
                 SELECT membership.option_value_id
                 FROM offering_variant_values AS membership
                 INNER JOIN offering_option_values AS value ON value.id = membership.option_value_id
                 INNER JOIN offering_options AS option ON option.id = value.option_id
-                WHERE membership.variant_id = '{variantId}'
+                WHERE membership.variant_id = $variant_id
                 ORDER BY option.sort_order, value.sort_order, value.id;
-                """, ct))
+                """, ct, null, ("$variant_id", variantId.ToString())))
                 ids.Add(ReadGuid(membership, "option_value_id"));
             result.Add(new OfferingVariant(variantId, ReadGuid(r, "offering_id"), ReadString(r, "name"), ids, ReadBool(r, "is_archived"), ReadDate(r, "created_at"), ReadDate(r, "updated_at"), ReadString(r, "metadata_json")));
         }
@@ -1662,7 +1673,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         {
             var placeholderId = ReadGuid(r, "id");
             var ids = new List<Guid>();
-            await foreach (var membership in ReadAsync(c, $"SELECT variant_id FROM placeholder_variants WHERE placeholder_id = '{placeholderId}';", ct))
+            await foreach (var membership in ReadAsync(c, "SELECT variant_id FROM placeholder_variants WHERE placeholder_id = $placeholder_id;", ct, null, ("$placeholder_id", placeholderId.ToString())))
                 ids.Add(ReadGuid(membership, "variant_id"));
             var recommendedWidth = ReadNullableInt(r, "recommended_width_px");
             var recommendedHeight = ReadNullableInt(r, "recommended_height_px");
@@ -2005,11 +2016,17 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         SqliteConnection connection,
         string sql,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken,
-        System.Data.Common.DbTransaction? transaction = null)
+        System.Data.Common.DbTransaction? transaction = null,
+        params (string Name, object? Value)[] parameters)
     {
         await using var command = connection.CreateCommand();
         command.Transaction = (SqliteTransaction?)transaction;
         command.CommandText = sql;
+        foreach (var (name, value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value ?? DBNull.Value);
+        }
+
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {

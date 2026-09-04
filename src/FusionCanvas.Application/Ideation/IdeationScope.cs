@@ -8,10 +8,3 @@ public sealed record IdeationScope(
     Guid? GroupId,
     string DisplayPath,
     ItemTopicReference CreationTopic);
-
-public sealed record IdeationScopeResult(bool IsAvailable, IdeationScope? Scope, string? Error)
-{
-    public static IdeationScopeResult Available(IdeationScope scope) => new(true, scope, null);
-
-    public static IdeationScopeResult Unavailable(string error) => new(false, null, error);
-}

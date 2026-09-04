@@ -43,6 +43,7 @@ public partial class MainWindow : Window
     private WindowLayoutSettings? _normalLayout;
     private bool _layoutReady;
     private bool _applyingLayout;
+    private FusionCanvas.Application.Items.Import.IItemCsvCodec? _itemCsvImportCodec;
 
     public MainWindow()
     {
@@ -60,9 +61,10 @@ public partial class MainWindow : Window
         var viewModel = MainWindowViewModel.CreateForDefaultWorkspace(
             services.Settings,
             services.AiTextGeneration);
+        _itemCsvImportCodec = services.ItemCsvImportCodec;
         viewModel.WorkspaceManagement.PackagePicker = new AvaloniaWorkspacePackagePicker(StorageProvider);
         viewModel.WorkspaceTree.FilePicker = new FusionCanvas.App.Items.AvaloniaItemCsvFilePicker(StorageProvider);
-        viewModel.WorkspaceTree.CsvCodec = new FusionCanvas.Integration.Items.ItemCsvCodec();
+        viewModel.WorkspaceTree.CsvCodec = services.ItemCsvExportCodec;
         viewModel.StoreManagement.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(StoreManagementViewModel.IsStoreEditorOpen))
@@ -1220,11 +1222,16 @@ public partial class MainWindow : Window
                 ? WorkspaceEntityKind.Group
                 : WorkspaceEntityKind.Niche,
             node.EntityId);
+        if (_itemCsvImportCodec is null)
+        {
+            return;
+        }
+
         var import = new ItemImportViewModel(
             topic,
             node.Name,
             viewModel.ItemCsvImport,
-            new FusionCanvas.Integration.Items.Import.ItemCsvCodec());
+            _itemCsvImportCodec);
         var window = new ItemImportWindow { DataContext = import };
         if (_settings is not null)
         {

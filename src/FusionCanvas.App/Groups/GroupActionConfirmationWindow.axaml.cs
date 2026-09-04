@@ -20,5 +20,3 @@ public partial class GroupActionConfirmationWindow : Window
 
     private void OnConfirmClick(object? sender, RoutedEventArgs e) => Close(true);
 }
-
-public sealed record GroupActionConfirmationViewModel(string Title, string Message);

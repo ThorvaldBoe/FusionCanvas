@@ -1,7 +1,10 @@
 ﻿using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Integration.Persistence;
 using FusionCanvas.Integration.Files;
+using FusionCanvas.Integration.Packages;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.Workspaces.Transfer;
+using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.Groups;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Assets;
@@ -20,29 +23,6 @@ using FusionCanvas.Integration.AI;
 using FusionCanvas.Integration.SllGeneration;
 
 namespace FusionCanvas.App.Workspace;
-
-public sealed record AppWorkspaceRuntime(
-    IWorkspaceRepository Repository,
-    IWorkspaceFileStore FileStore,
-    WorkspaceSnapshot Snapshot,
-    IGroupManagementService GroupManagement,
-    IItemManagementService ItemManagement,
-    IAssetManagementService AssetManagement,
-    ITagManagementService TagManagement,
-    IItemInspectorService ItemInspector,
-    IIdeationService Ideation,
-    IIdeationAccessStatus IdeationAccess,
-    ISnowcloneLibraryService SnowcloneLibrary,
-    IRejectedPhraseManagementService RejectedPhrases,
-    SnowcloneLibraryResult SnowcloneLibraryInitialization,
-    IConceptRefinementService ConceptRefinement,
-    IConceptRefinementAccessStatus ConceptRefinementAccess,
-    ISllGenerationService SllGeneration,
-    ISllAccessStatus SllGenerationAccess,
-    ITitleOptimizationService TitleOptimization,
-    IProductSupplierSetupService ProductSupplierSetup,
-    IItemCsvImportService ItemCsvImport,
-    ISllDocumentCodec SllDocumentCodec);
 
 public static class AppWorkspaceFactory
 {
@@ -64,6 +44,12 @@ public static class AppWorkspaceFactory
         var repository = new SqliteWorkspaceRepository(databasePath);
         var snowcloneRepository = new SqliteSnowcloneRepository(databasePath);
         var fileStore = new LocalWorkspaceFileStore(workspaceRootPath);
+        var workspaceTransfer = new WorkspaceTransferService(
+            repository,
+            fileStore,
+            new ZipWorkspacePackageWriter(),
+            new ZipWorkspacePackageReader());
+        var rasterImageMetadata = new RasterImageMetadataReader();
         var snapshot = StartupTaskRunner.Run(() => repository.LoadAsync());
         var itemManagement = new ItemManagementService(repository);
         var ideationAccess = new ConfiguredIdeationAccessStatus(ai);
@@ -89,6 +75,8 @@ public static class AppWorkspaceFactory
         return new AppWorkspaceRuntime(
             repository,
             fileStore,
+            workspaceTransfer,
+            rasterImageMetadata,
             snapshot,
             new GroupManagementService(repository),
             itemManagement,

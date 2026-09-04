@@ -4,8 +4,6 @@ using FusionCanvas.Application.Settings;
 
 namespace FusionCanvas.App.Views;
 
-internal sealed record ScreenLayoutInfo(PixelRect WorkingArea, double Scaling, bool IsPrimary);
-
 internal static class MainWindowLayoutNormalizer
 {
     internal const double NavigationMinimumWidth = 240;

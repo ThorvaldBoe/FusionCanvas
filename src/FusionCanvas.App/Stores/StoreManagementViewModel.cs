@@ -15,56 +15,9 @@ using FusionCanvas.Application.Mockups;
 
 namespace FusionCanvas.App.Stores;
 
-public sealed record StoreSelectorEntry(StoreSummary Store, bool IsSelected)
-{
-    public Guid Id => Store.Id;
 
-    public string Name => Store.Name;
-}
 
-public sealed class ApplicableVariantViewModel(ProductVariantSummary variant) : INotifyPropertyChanged
-{
-    private bool _isSelected;
 
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    public Guid Id => variant.Id;
-
-    public string Label => string.Join(", ", variant.Options.Select(option => $"{option.Name}: {option.Value}"));
-
-    public bool IsSelected
-    {
-        get => _isSelected;
-        set
-        {
-            if (_isSelected == value)
-            {
-                return;
-            }
-
-            _isSelected = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
-        }
-    }
-}
-
-public enum StoreManagementEditorTab
-{
-    BasicInfo,
-    Niches,
-    Tags,
-    Products
-}
-
-public enum CatalogEditorLevel
-{
-    Overview,
-    ProductDetail,
-    OfferingDetail,
-    VariantManagement,
-    DesignAreaManagement,
-    MockupTemplateManagement
-}
 
 public sealed class StoreManagementViewModel : INotifyPropertyChanged
 {
