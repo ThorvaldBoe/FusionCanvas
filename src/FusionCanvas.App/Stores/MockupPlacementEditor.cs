@@ -44,6 +44,8 @@ public sealed class MockupPlacementEditor : Control
     public double AspectRatio { get => GetValue(AspectRatioProperty); set => SetValue(AspectRatioProperty, value); }
     public bool KeepAspectRatio { get => GetValue(KeepAspectRatioProperty); set => SetValue(KeepAspectRatioProperty, value); }
 
+    public Rect ImageDisplayBounds => ImageRect();
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);

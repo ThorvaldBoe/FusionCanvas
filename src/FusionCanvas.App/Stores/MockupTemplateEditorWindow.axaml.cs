@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -22,6 +23,7 @@ public partial class MockupTemplateEditorWindow : Window
         Opened += OnOpened;
         Closing += OnClosing;
         KeyDown += OnKeyDown;
+        LayoutUpdated += OnLayoutUpdated;
         AddHandler(Button.ClickEvent, OnButtonClick, RoutingStrategies.Bubble);
     }
 
@@ -99,6 +101,20 @@ public partial class MockupTemplateEditorWindow : Window
     {
         if (e.Source is Button button && AutomationProperties.GetName(button) == "Open enlarged image placement editor")
             _enlargedEditorButton = button;
+    }
+
+    private void OnLayoutUpdated(object? sender, EventArgs e)
+    {
+        var editor = PlacementEditor;
+        if (editor.Bounds.Width <= 0 || editor.Bounds.Height <= 0)
+            return;
+
+        var imageBounds = editor.ImageDisplayBounds;
+        OpenEnlargedPlacementEditorButton.Margin = new Thickness(
+            0,
+            0,
+            Math.Max(0, editor.Bounds.Right - (editor.Bounds.X + imageBounds.Right) + 8),
+            Math.Max(0, editor.Bounds.Bottom - (editor.Bounds.Y + imageBounds.Bottom) + 8));
     }
 
     private void OnKeyDown(object? sender, KeyEventArgs e)

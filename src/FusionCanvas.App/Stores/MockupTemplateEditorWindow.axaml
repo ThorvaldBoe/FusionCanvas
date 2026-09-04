@@ -82,7 +82,7 @@
                                            ImageWidth="{Binding MappingImageWidth}" ImageHeight="{Binding MappingImageHeight}"
                                            ImagePath="{Binding SelectedImagePreviewPath}"
                                            AutomationProperties.Name="Selected image placement" />
-            <Button HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,8,8"
+            <Button x:Name="OpenEnlargedPlacementEditorButton" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,8,8"
                     Width="40" Height="40" Padding="0" Background="{DynamicResource IconButtonBackgroundBrush}"
                     Foreground="{DynamicResource IconButtonForegroundBrush}"
                     ToolTip.Tip="Open enlarged image placement editor"
