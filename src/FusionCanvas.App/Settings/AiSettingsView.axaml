@@ -51,6 +51,10 @@
             BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
       <StackPanel Spacing="10">
         <TextBlock Text="Privacy and models" FontWeight="SemiBold" />
+        <StackPanel Spacing="3">
+          <TextBlock Text="Model availability" FontWeight="SemiBold" />
+          <TextBlock Text="Search the models allowed by the privacy setting below. Requiring Zero Data Retention narrows the list to compatible models." TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        </StackPanel>
         <ToggleSwitch Content="Require Zero Data Retention"
                       IsChecked="{Binding RequireZeroDataRetention, Mode=TwoWay}" />
         <TextBlock Text="When enabled, requests are restricted to endpoints OpenRouter marks as Zero Data Retention compatible."
