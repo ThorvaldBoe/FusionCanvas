@@ -11,6 +11,6 @@
 ## Commands
 
 - Focused test: `dotnet test .\tests\FusionCanvas.App.Tests\FusionCanvas.App.Tests.csproj --no-restore --filter FullyQualifiedName~GroupSelectionHeadlessTests -m:1` — 3 passed
-- Baseline: `dotnet test .\FusionCanvas.sln`
-- Strict specs: `openspec validate --specs --strict`
-- Strict changes: `openspec validate --changes --strict`
+- Baseline: `dotnet test .\FusionCanvas.sln --no-restore -m:1 -p:BuildInParallel=false -v:q` — 1,453 passed, 0 failed
+- Strict specs: `openspec validate --specs --strict` — 54 passed
+- Strict changes: `openspec validate --changes --strict` — 5 passed

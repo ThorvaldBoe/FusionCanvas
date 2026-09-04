@@ -19,19 +19,11 @@ FusionCanvas SHALL map every delivery-module acceptance scenario to planned veri
 ### Requirement: User-facing views receive headless verification where valuable
 FusionCanvas SHALL use Avalonia headless tests as the routine framework-level verification lane for user-facing views when rendering, bindings, control state, routed input, focus, or visual-tree behavior carries meaningful risk.
 
-#### Scenario: A user-facing view changes
-- **WHEN** a delivery module adds or changes a view with meaningful Avalonia framework behavior
-- **THEN** the change includes focused Avalonia headless tests for the applicable behavior
-- **AND** those tests run through the documented solution-level test command on both Codex and OpenCode
-
-#### Scenario: Decision logic can be tested without Avalonia
-- **WHEN** UI-owned behavior is fully expressed by a view model, command, projector, or other framework-independent type
-- **THEN** the change uses focused code-level tests for that behavior
-- **AND** does not add a superficial headless view test that only repeats the same assertion
-
-#### Scenario: Static markup has no meaningful behavior
-- **WHEN** a view change is limited to static markup or framework-owned rendering with no material binding, state, input, focus, or visual-tree risk
-- **THEN** headless view testing may be omitted with a concise rationale
+#### Scenario: Group selection dialog behavior is protected
+- **WHEN** a contributor changes or reviews `GroupSelectionWindow`
+- **THEN** focused Avalonia headless tests cover its destination and name bindings
+- **AND** the tests cover invalid confirmation validation and successful confirmation through the rendered dialog controls
+- **AND** the tests use isolated deterministic destinations without opening workspace persistence
 
 ### Requirement: Live desktop UI verification is optional and ad hoc
 FusionCanvas SHALL treat live testing through the built desktop application as an optional verification activity rather than a routine completion gate.
