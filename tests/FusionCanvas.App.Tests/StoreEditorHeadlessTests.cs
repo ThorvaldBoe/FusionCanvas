@@ -1739,6 +1739,11 @@ public class StoreEditorHeadlessTests
         Assert.Equal(viewModel.CatalogSetup.MappingWidth, editor.PlacementWidth, 1);
         Assert.Equal(viewModel.CatalogSetup.MappingHeight, editor.PlacementHeight, 1);
 
+        var enlargeButton = dialog.GetVisualDescendants().OfType<Button>()
+            .Single(button => AutomationProperties.GetName(button) == "Open enlarged image placement editor");
+        Assert.True(enlargeButton.Bounds.Right <= editor.Bounds.X + editor.ImageDisplayBounds.Right + 1);
+        Assert.True(enlargeButton.Bounds.Bottom <= editor.Bounds.Y + editor.ImageDisplayBounds.Bottom + 1);
+
         editor.PlacementX = 333;
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         Assert.Equal(333, viewModel.CatalogSetup.MappingX, 1);
