@@ -55,6 +55,11 @@ public sealed class DesignSlotViewModel : INotifyPropertyChanged, IDisposable
     public bool CanExport { get; }
     public bool IsReadOnly { get; }
     public bool HasImage => AssetId is not null;
+    public string ArtworkUploadActionText => HasImage ? "Replace artwork..." : "Browse artwork...";
+    public string ArtworkUploadAccessibleName => HasImage
+        ? $"Replace final design artwork in {AreaName}"
+        : $"Browse for final design artwork for {AreaName}";
+    public string ArtworkPreviewAccessibleName => $"Enlarge final design artwork in {AreaName}";
 
     /// <summary>Bitmap for thumbnail display. May be null when the managed file is missing.</summary>
     public Bitmap? Thumbnail => _thumbnail;

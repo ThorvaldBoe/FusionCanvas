@@ -1,9 +1,12 @@
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.Automation;
 using Avalonia.VisualTree;
 using FusionCanvas.App.StageTools;
 using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Views;
+using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Workspace;
@@ -21,7 +24,7 @@ public class DesignStageToolHeadlessTests
     /// Creates a ViewModel with a Design-stage item that has a listing configuration,
     /// selected colors, a default row, and slot areas.
     /// </summary>
-    private static MainWindowViewModel CreateConfiguredDesignViewModel()
+    private static MainWindowViewModel CreateConfiguredDesignViewModel(bool withAssignedArtwork = false)
     {
         var baseSnapshot = SampleWorkspace.Create();
         var designItem = baseSnapshot.Items.First(i => i.Id == SampleWorkspace.DesignNodeId);
@@ -69,8 +72,42 @@ public class DesignStageToolHeadlessTests
             DesignVariantRowColors = rowColors,
             DesignSlotAssignments = []
         };
+
+        if (withAssignedArtwork)
+        {
+            var assetId = Guid.Parse("90000000-0000-0000-0000-000000000001");
+            var artwork = new Asset(
+                assetId,
+                designItem.StoreId,
+                "final-artwork.png",
+                null,
+                AssetKind.ExportedImage,
+                "assets/final-artwork.png",
+                "C:\\imports\\final-artwork.png",
+                isMissing: false,
+                isArchived: false,
+                now,
+                now,
+                "{}");
+            snapshot = snapshot with
+            {
+                Assets = [artwork],
+                AssetLinks = [new AssetLink(assetId, WorkspaceEntityKind.Item, designItem.Id)],
+                DesignSlotAssignments = [new DesignSlotAssignment(rowId, baseSnapshot.DesignAreas[0].Id, assetId)]
+            };
+        }
+
         var repo = new InMemoryWorkspaceRepository(snapshot);
         return MainWindowViewModelFactory.CreateFromSnapshot(snapshot, repo);
+    }
+
+    private static MainWindow ShowDesignWindow(MainWindowViewModel viewModel)
+    {
+        var window = new MainWindow { DataContext = viewModel };
+        window.Show();
+        window.UpdateLayout();
+        window.UpdateLayout();
+        return window;
     }
 
     /// <summary>
@@ -470,6 +507,104 @@ public class DesignStageToolHeadlessTests
                 Assert.Null(slot.ThumbnailPath);
                 Assert.Null(slot.Thumbnail);
             }
+        }
+    }
+
+    [AvaloniaFact]
+    public void ConfiguredState_EmptySlotsClearlyExposeDropAndBrowseArtwork()
+    {
+        var vm = CreateConfiguredDesignViewModel();
+        NavigateToDesign(vm);
+        var window = ShowDesignWindow(vm);
+
+        try
+        {
+            var slotBorders = window.GetVisualDescendants()
+                .OfType<Border>()
+                .Where(border => border.DataContext is DesignSlotViewModel
+                    && border.Width == 120
+                    && DragDrop.GetAllowDrop(border))
+                .ToArray();
+            var slotCount = vm.DesignTool.Rows.Sum(row => row.Slots.Count);
+
+            Assert.Equal(slotCount, slotBorders.Length);
+            Assert.All(slotBorders, border => Assert.True(DragDrop.GetAllowDrop(border)));
+            Assert.Equal(slotCount, window.GetVisualDescendants()
+                .OfType<TextBlock>()
+                .Count(text => text.Text == "Drop artwork here"));
+
+            var browseButtons = window.GetVisualDescendants()
+                .OfType<Button>()
+                .Where(button => button.DataContext is DesignSlotViewModel
+                    && button.Content is string content
+                    && content == "Browse artwork...")
+                .ToArray();
+            Assert.Equal(slotCount, browseButtons.Length);
+            Assert.All(browseButtons, button => Assert.True(button.IsEnabled));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void ConfiguredState_AssignedArtwork_ExposesEnlargeDownloadRemoveAndReplace()
+    {
+        var vm = CreateConfiguredDesignViewModel(withAssignedArtwork: true);
+        NavigateToDesign(vm);
+        var window = ShowDesignWindow(vm);
+
+        try
+        {
+            var slot = Assert.Single(vm.DesignTool.Rows[0].Slots.Where(candidate => candidate.HasImage));
+            Assert.Equal("Replace artwork...", slot.ArtworkUploadActionText);
+            Assert.Contains("Enlarge", slot.ArtworkPreviewAccessibleName);
+
+            var actionButtons = window.GetVisualDescendants()
+                .OfType<Button>()
+                .Where(button => button.DataContext == slot)
+                .ToArray();
+            Assert.Contains(actionButtons, button => button.Content is "Replace artwork...");
+            Assert.Contains(actionButtons, button => AutomationProperties.GetName(button) == slot.ArtworkPreviewAccessibleName);
+            Assert.Contains(actionButtons, button => AutomationProperties.GetName(button) == "Download final design artwork");
+            Assert.Contains(actionButtons, button => AutomationProperties.GetName(button) == "Remove final design artwork");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void ConfiguredState_ReadOnlyDisablesFinalArtworkEditing()
+    {
+        var vm = CreateConfiguredDesignViewModel();
+        NavigateToDesign(vm);
+        vm.DesignTool.LoadAsync(SampleWorkspace.DesignNodeId, canEdit: false).GetAwaiter().GetResult();
+        var window = ShowDesignWindow(vm);
+
+        try
+        {
+            var slotBorders = window.GetVisualDescendants()
+                .OfType<Border>()
+                .Where(border => border.DataContext is DesignSlotViewModel && border.Width == 120)
+                .ToArray();
+            var browseButtons = window.GetVisualDescendants()
+                .OfType<Button>()
+                .Where(button => button.DataContext is DesignSlotViewModel
+                    && button.Content is string content
+                    && content == "Browse artwork...")
+                .ToArray();
+
+            Assert.NotEmpty(slotBorders);
+            Assert.All(slotBorders, border => Assert.False(DragDrop.GetAllowDrop(border)));
+            Assert.NotEmpty(browseButtons);
+            Assert.All(browseButtons, button => Assert.False(button.IsEnabled));
+        }
+        finally
+        {
+            window.Close();
         }
     }
 

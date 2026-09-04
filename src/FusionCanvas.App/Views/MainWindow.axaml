@@ -1268,10 +1268,13 @@
                                                 BorderBrush="{DynamicResource SubtleBorderBrush}"
                                                 BorderThickness="1" CornerRadius="4"
                                                 Width="120" MinHeight="100"
+                                                DragDrop.AllowDrop="{Binding !IsReadOnly}"
                                                 DragDrop.DragOver="OnSlotDragOver"
                                                 DragDrop.Drop="OnSlotDrop"
-                                                AutomationProperties.Name="{Binding AreaName}">
+                                                AutomationProperties.Name="{Binding AreaName, StringFormat='Final design artwork slot: {0}'}">
                                           <StackPanel Spacing="4">
+                                            <TextBlock Text="Final design artwork" FontSize="10" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource AccentBrush}" />
                                             <TextBlock Text="{Binding AreaName}" FontSize="11" FontWeight="SemiBold"
                                                        Foreground="{DynamicResource SecondaryTextBrush}" />
                                             <TextBlock Text="{Binding PlaceholderDetails}" FontSize="9"
@@ -1284,25 +1287,44 @@
                                             <Border IsVisible="{Binding !HasImage}" Width="80" Height="60"
                                                     Background="{DynamicResource SubtleSurfaceBrush}" CornerRadius="4"
                                                     BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1">
-                                              <TextBlock Text="+ Add image" FontSize="11"
-                                                         Foreground="{DynamicResource MutedTextBrush}"
-                                                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                              <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="2">
+                                                <TextBlock Text="Drop artwork here" FontSize="10"
+                                                           Foreground="{DynamicResource MutedTextBrush}"
+                                                           HorizontalAlignment="Center" />
+                                                <TextBlock Text="PNG only · drag and drop" FontSize="8"
+                                                           Foreground="{DynamicResource MutedTextBrush}"
+                                                           HorizontalAlignment="Center" />
+                                              </StackPanel>
                                             </Border>
-<StackPanel IsVisible="{Binding HasImage}"
+                                            <Button Content="{Binding ArtworkUploadActionText}"
+                                                    IsEnabled="{Binding !IsReadOnly}"
+                                                    Click="OnBrowseSlotImage"
+                                                    Tag="{Binding .}"
+                                                    FontSize="10"
+                                                    Classes="miniButton"
+                                                    ToolTip.Tip="Browse for a PNG final design artwork or replace the current artwork"
+                                                    AutomationProperties.Name="{Binding ArtworkUploadAccessibleName}" />
+                                            <StackPanel IsVisible="{Binding HasImage}"
                                                           Orientation="Horizontal" Spacing="2"
                                                           HorizontalAlignment="Center">
-                                              <Button Content="View" Click="OnViewSlotImage"
+                                              <Button Content="Enlarge" Click="OnViewSlotImage"
                                                       Tag="{Binding .}"
                                                       IsEnabled="{Binding CanPreview}"
-                                                      FontSize="10" Classes="miniButton" />
+                                                      FontSize="10" Classes="miniButton"
+                                                      ToolTip.Tip="Open a larger preview of this final design artwork"
+                                                      AutomationProperties.Name="{Binding ArtworkPreviewAccessibleName}" />
                                               <Button Content="Download" Click="OnExportSlotImage"
                                                       Tag="{Binding .}"
                                                       IsEnabled="{Binding CanExport}"
-                                                      FontSize="10" Classes="miniButton" />
+                                                      FontSize="10" Classes="miniButton"
+                                                      ToolTip.Tip="Download a copy of this final design artwork"
+                                                      AutomationProperties.Name="Download final design artwork" />
                                               <Button Content="Remove" IsEnabled="{Binding !IsReadOnly}"
                                                       Tag="{Binding .}"
                                                       Click="OnRemoveSlotImage"
-                                                      FontSize="10" Classes="miniButton" />
+                                                      FontSize="10" Classes="miniButton"
+                                                      ToolTip.Tip="Remove this final design artwork from the slot"
+                                                      AutomationProperties.Name="Remove final design artwork" />
                                             </StackPanel>
                                             <TextBlock IsVisible="{Binding IsMissing}" Text="Missing" FontSize="10"
                                                        Foreground="{DynamicResource DangerTextBrush}" />

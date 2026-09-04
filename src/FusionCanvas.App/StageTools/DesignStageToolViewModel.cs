@@ -620,3 +620,4 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
 }
 
 /// <summary>Kind of removal pending user confirmation.</summary>
+
