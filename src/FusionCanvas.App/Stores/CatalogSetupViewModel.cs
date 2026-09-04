@@ -116,6 +116,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         EditOptionValueCommand = new RelayCommand(parameter => BeginEditOptionValue(parameter as OfferingOptionValue), () => CanEdit && SelectedOption is not null);
         SaveOptionValueEditCommand = new AsyncRelayCommand(SaveOptionValueEditAsync, () => CanEdit && IsEditingOptionValue && _editingOptionValue is not null && !string.IsNullOrWhiteSpace(OptionValue));
         CancelOptionValueEditCommand = new RelayCommand(_ => CancelOptionValueEdit());
+        MoveOptionValueUpCommand = new RelayCommand(parameter => _ = MoveOptionValueAsync(parameter as OfferingOptionValue, -1), () => CanEdit && IsManagingOptionValues);
+        MoveOptionValueDownCommand = new RelayCommand(parameter => _ = MoveOptionValueAsync(parameter as OfferingOptionValue, 1), () => CanEdit && IsManagingOptionValues);
         StartAddVariantCommand = new RelayCommand(_ => BeginVariantDraft(false), () => CanEdit && AvailableOptions.Any() && VariantValueChoices.Count > 0);
         StartBulkVariantsCommand = new RelayCommand(_ => BeginVariantDraft(true), () => CanEdit && AvailableColors.Any() && BulkSizeChoices.Count > 0);
         CancelAddVariantCommand = new RelayCommand(_ => { ResetVariantDraft(); VariantActionsFocusRequested?.Invoke(this, EventArgs.Empty); });
@@ -546,7 +548,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public IEnumerable<OfferingVariant> AvailableVariants => Variants.Where(value => value.OfferingId == SelectedOffering?.Id && !value.IsArchived);
     public IEnumerable<OfferingPlaceholder> AvailablePlaceholders => Placeholders.Where(value => value.OfferingId == SelectedOffering?.Id && !value.IsArchived);
     public IEnumerable<MockupTemplate> AvailableTemplates => Templates.Where(value => value.BlueprintOfferingId == SelectedOffering?.Id && !value.IsArchived);
-    public IEnumerable<OfferingOptionValue> AvailableColors => OptionValues.Where(value => value.OfferingId == SelectedOffering?.Id && !value.IsArchived && Options.Any(option => option.Id == value.OptionId && option.OptionKind == OptionKind.Color));
+    public IEnumerable<OfferingOptionValue> AvailableColors => OptionValues.Where(value => value.OfferingId == SelectedOffering?.Id && !value.IsArchived && Options.Any(option => option.Id == value.OptionId && option.OptionKind == OptionKind.Color)).OrderBy(value => value.SortOrder).ThenBy(value => value.Id);
     public bool HasAvailableOptions => AvailableOptions.Any();
     public bool HasAvailableValues => AvailableValues.Any();
     public bool HasAvailableVariants => AvailableVariants.Any();
@@ -576,6 +578,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ICommand EditOptionValueCommand { get; }
     public ICommand SaveOptionValueEditCommand { get; }
     public ICommand CancelOptionValueEditCommand { get; }
+    public ICommand MoveOptionValueUpCommand { get; }
+    public ICommand MoveOptionValueDownCommand { get; }
     public ICommand StartAddVariantCommand { get; }
     public ICommand StartBulkVariantsCommand { get; }
     public ICommand CancelAddVariantCommand { get; }
@@ -736,6 +740,30 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         if (SelectedOffering is null || SelectedOption is null) return;
         await RunMutationAsync(() => _catalog.CreateOptionValueAsync(new CreateOptionValueRequest(SelectedOffering.Id, SelectedOption.Id, OptionValue))).ConfigureAwait(true);
         if (!HasError) { IsAddingOptionValue = false; OptionValue = string.Empty; }
+    }
+
+    private async Task MoveOptionValueAsync(OfferingOptionValue? value, int offset)
+    {
+        if (value is null || SelectedOffering is null || SelectedOption is null) return;
+        var values = AvailableValues.ToArray();
+        var index = Array.FindIndex(values, candidate => candidate.Id == value.Id);
+        var target = index + offset;
+        if (index < 0 || target < 0 || target >= values.Length) return;
+        (values[index], values[target]) = (values[target], values[index]);
+        await RunMutationAsync(() => _catalog.ReorderOptionValuesAsync(new ReorderOptionValuesRequest(SelectedOffering.StoreId, SelectedOption.Id, values.Select(candidate => candidate.Id).ToArray()))).ConfigureAwait(true);
+    }
+
+    public async Task ReorderOptionValuesAsync(OfferingOptionValue source, OfferingOptionValue target)
+    {
+        if (SelectedOption is null || source.OptionId != SelectedOption.Id || target.OptionId != SelectedOption.Id || source.Id == target.Id) return;
+        var values = AvailableValues.ToList();
+        var sourceIndex = values.FindIndex(value => value.Id == source.Id);
+        var targetIndex = values.FindIndex(value => value.Id == target.Id);
+        if (sourceIndex < 0 || targetIndex < 0) return;
+        var moved = values[sourceIndex];
+        values.RemoveAt(sourceIndex);
+        values.Insert(targetIndex, moved);
+        await RunMutationAsync(() => _catalog.ReorderOptionValuesAsync(new ReorderOptionValuesRequest(SelectedOffering!.StoreId, SelectedOption.Id, values.Select(value => value.Id).ToArray()))).ConfigureAwait(true);
     }
 
     private async Task SaveOptionValueEditAsync()
@@ -1797,6 +1825,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         {
             SaveOfferingCommand, StartAddPrintProviderCommand, CreatePrintProviderCommand, StartAddOptionCommand, ManageOptionCommand, CreateOptionCommand, StartAddOptionValueCommand,
             CreateOptionValueCommand, EditOptionValueCommand, SaveOptionValueEditCommand, CancelOptionValueEditCommand,
+            MoveOptionValueUpCommand, MoveOptionValueDownCommand,
             StartAddVariantCommand, StartBulkVariantsCommand, CreateVariantCommand, StartAddPlaceholderCommand,
             CreatePlaceholderCommand, SetDefaultPlaceholderCommand, StartAddTemplateCommand, CreateTemplateCommand,
             DuplicateTemplateCommand,

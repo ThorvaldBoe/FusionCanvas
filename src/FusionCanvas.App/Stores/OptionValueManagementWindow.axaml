@@ -29,10 +29,13 @@
       <ItemsControl ItemsSource="{Binding AvailableValues}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="catalog:OfferingOptionValue">
-            <Border Classes="listItem" Padding="8">
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                <TextBlock Grid.Column="0" Text="{Binding Value}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+            <Border Classes="listItem" Padding="8" DragDrop.AllowDrop="True" DragDrop.DragOver="OnValueDragOver" DragDrop.Drop="OnValueDrop">
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                <Button Grid.Column="0" Content="☷" Classes="grip" PointerPressed="OnGripPointerPressed" PointerMoved="OnGripPointerMoved" ToolTip.Tip="Drag to reorder" AutomationProperties.Name="{Binding Value, StringFormat='Drag to reorder {0}'}" />
+                <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+                  <Button Content="↑" Command="{Binding $parent[ItemsControl].DataContext.MoveOptionValueUpCommand}" CommandParameter="{Binding}" Classes="secondary compact" ToolTip.Tip="Move up" AutomationProperties.Name="{Binding Value, StringFormat='Move {0} up'}" />
+                  <Button Content="↓" Command="{Binding $parent[ItemsControl].DataContext.MoveOptionValueDownCommand}" CommandParameter="{Binding}" Classes="secondary compact" ToolTip.Tip="Move down" AutomationProperties.Name="{Binding Value, StringFormat='Move {0} down'}" />
                   <Button Content="Edit" Command="{Binding $parent[ItemsControl].DataContext.EditOptionValueCommand}" CommandParameter="{Binding}" Classes="secondary" AutomationProperties.Name="{Binding Value, StringFormat='Edit {0}'}" />
                   <Button Content="Archive" Command="{Binding $parent[ItemsControl].DataContext.ArchiveOptionValueCommand}" CommandParameter="{Binding}" Classes="compactDanger" AutomationProperties.Name="{Binding Value, StringFormat='Archive {0}'}" />
                 </StackPanel>
@@ -89,6 +92,18 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="HorizontalAlignment" Value="Right" />
       <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.grip">
+      <Setter Property="Width" Value="30" />
+      <Setter Property="Height" Value="30" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+    </Style>
+    <Style Selector="Button.compact">
+      <Setter Property="Width" Value="30" />
+      <Setter Property="Padding" Value="4" />
     </Style>
     <Style Selector="Button.fixedAction">
       <Setter Property="Width" Value="104" />

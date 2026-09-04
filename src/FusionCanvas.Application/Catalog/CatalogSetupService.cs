@@ -96,8 +96,27 @@ public sealed class CatalogSetupService : ICatalogSetupService
             var normalizedValue = request.Value.Trim();
             if (string.IsNullOrWhiteSpace(normalizedValue)) return Failure(snapshot, offering.StoreId, "A value is required.");
             if (HasActiveOptionValue(snapshot, option.Id, normalizedValue)) return Failure(snapshot, offering.StoreId, "An active Option Value already uses this name.");
-            var value = new OfferingOptionValue(_newId(), option.Id, offering.Id, normalizedValue, request.SortOrder);
-            return Success(snapshot with { OfferingOptionValues = [.. snapshot.OfferingOptionValues, value] }, offering.StoreId);
+            var activeValues = snapshot.OfferingOptionValues.Where(value => value.OptionId == option.Id && !value.IsArchived).OrderBy(value => value.SortOrder).ThenBy(value => value.Id).ToArray();
+            var value = new OfferingOptionValue(_newId(), option.Id, offering.Id, normalizedValue, activeValues.Length);
+            return Success(snapshot with { OfferingOptionValues = NormalizeOptionValues([.. snapshot.OfferingOptionValues, value], option.Id) }, offering.StoreId);
+        }, cancellationToken);
+
+    public Task<CatalogSetupResult> ReorderOptionValuesAsync(ReorderOptionValuesRequest request, CancellationToken cancellationToken = default) =>
+        MutateAsync(request.StoreId, snapshot =>
+        {
+            var check = EnsureWritableStore(snapshot, request.StoreId);
+            if (check is not null) return Failure(snapshot, request.StoreId, check);
+            var option = snapshot.OfferingOptions.SingleOrDefault(value => value.Id == request.OptionId && value.OfferingId != Guid.Empty);
+            if (option is null) return Failure(snapshot, request.StoreId, "Option was not found.");
+            var offering = snapshot.BlueprintOfferings.SingleOrDefault(value => value.Id == option.OfferingId && value.StoreId == request.StoreId && !value.IsArchived);
+            if (offering is null || option.IsArchived) return Failure(snapshot, request.StoreId, "Archived catalog records are read-only.");
+            var active = snapshot.OfferingOptionValues.Where(value => value.OptionId == option.Id && !value.IsArchived).OrderBy(value => value.SortOrder).ThenBy(value => value.Id).ToArray();
+            var requested = request.OrderedValueIds.ToArray();
+            if (requested.Length != active.Length || requested.Distinct().Count() != requested.Length || !requested.ToHashSet().SetEquals(active.Select(value => value.Id)))
+                return Failure(snapshot, request.StoreId, "The requested value order is invalid or stale.");
+            var position = requested.Select((id, index) => (id, index)).ToDictionary(item => item.id, item => item.index);
+            var updated = snapshot.OfferingOptionValues.Select(value => position.TryGetValue(value.Id, out var index) ? value with { SortOrder = index } : value).ToArray();
+            return Success(snapshot with { OfferingOptionValues = updated }, request.StoreId);
         }, cancellationToken);
 
     public Task<CatalogSetupResult> CreateVariantAsync(CreateOfferingVariantRequest request, CancellationToken cancellationToken = default) =>
@@ -164,7 +183,7 @@ public sealed class CatalogSetupService : ICatalogSetupService
                 CatalogRecordKind.PrintProvider => snapshot with { PrintProviders = snapshot.PrintProviders.Select(value => value.Id == request.RecordId ? value with { IsArchived = true } : value).ToArray() },
                 CatalogRecordKind.Offering => snapshot with { BlueprintOfferings = snapshot.BlueprintOfferings.Select(value => value.Id == request.RecordId ? value with { IsArchived = true } : value).ToArray() },
                 CatalogRecordKind.Option => snapshot with { OfferingOptions = snapshot.OfferingOptions.Select(value => value.Id == request.RecordId ? value with { IsArchived = true } : value).ToArray() },
-                CatalogRecordKind.OptionValue => snapshot with { OfferingOptionValues = snapshot.OfferingOptionValues.Select(value => value.Id == request.RecordId ? value with { IsArchived = true } : value).ToArray() },
+                CatalogRecordKind.OptionValue => NormalizeOptionValueSnapshot(snapshot, request.RecordId, true),
                 CatalogRecordKind.Variant => snapshot with { OfferingVariants = snapshot.OfferingVariants.Select(value => value.Id == request.RecordId ? value with { IsArchived = true } : value).ToArray() },
                 CatalogRecordKind.Placeholder => snapshot with { OfferingPlaceholders = snapshot.OfferingPlaceholders.Select(value => value.Id == request.RecordId ? value with { IsArchived = true } : value).ToArray() },
                 _ => snapshot
@@ -183,7 +202,7 @@ public sealed class CatalogSetupService : ICatalogSetupService
                 CatalogRecordKind.PrintProvider => snapshot with { PrintProviders = snapshot.PrintProviders.Select(value => value.Id == request.RecordId ? value with { IsArchived = false } : value).ToArray() },
                 CatalogRecordKind.Offering => snapshot with { BlueprintOfferings = snapshot.BlueprintOfferings.Select(value => value.Id == request.RecordId ? value with { IsArchived = false } : value).ToArray() },
                 CatalogRecordKind.Option => snapshot with { OfferingOptions = snapshot.OfferingOptions.Select(value => value.Id == request.RecordId ? value with { IsArchived = false } : value).ToArray() },
-                CatalogRecordKind.OptionValue => snapshot with { OfferingOptionValues = snapshot.OfferingOptionValues.Select(value => value.Id == request.RecordId ? value with { IsArchived = false } : value).ToArray() },
+                CatalogRecordKind.OptionValue => NormalizeOptionValueSnapshot(snapshot, request.RecordId, false),
                 CatalogRecordKind.Variant => snapshot with { OfferingVariants = snapshot.OfferingVariants.Select(value => value.Id == request.RecordId ? value with { IsArchived = false } : value).ToArray() },
                 CatalogRecordKind.Placeholder => snapshot with { OfferingPlaceholders = snapshot.OfferingPlaceholders.Select(value => value.Id == request.RecordId ? value with { IsArchived = false } : value).ToArray() },
                 _ => snapshot
@@ -291,6 +310,20 @@ public sealed class CatalogSetupService : ICatalogSetupService
             && !candidate.IsArchived
             && candidate.Id != excludingId
             && string.Equals(candidate.Value.Trim(), value, StringComparison.OrdinalIgnoreCase));
+
+    private static IReadOnlyList<OfferingOptionValue> NormalizeOptionValues(IReadOnlyList<OfferingOptionValue> values, Guid optionId)
+    {
+        var ordered = values.Where(value => value.OptionId == optionId && !value.IsArchived).OrderBy(value => value.SortOrder).ThenBy(value => value.Id).ToArray();
+        var positions = ordered.Select((value, index) => (value.Id, index)).ToDictionary(item => item.Id, item => item.index);
+        return values.Select(value => positions.TryGetValue(value.Id, out var position) ? value with { SortOrder = position } : value).ToArray();
+    }
+
+    private static WorkspaceSnapshot NormalizeOptionValueSnapshot(WorkspaceSnapshot snapshot, Guid valueId, bool archived)
+    {
+        var value = snapshot.OfferingOptionValues.Single(candidate => candidate.Id == valueId);
+        var values = snapshot.OfferingOptionValues.Select(candidate => candidate.Id == valueId ? candidate with { IsArchived = archived } : candidate).ToArray();
+        return snapshot with { OfferingOptionValues = NormalizeOptionValues(values, value.OptionId) };
+    }
 
     private static string? GetDependencyError(WorkspaceSnapshot snapshot, ArchiveCatalogRecordRequest request)
     {
