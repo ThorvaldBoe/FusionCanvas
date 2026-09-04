@@ -550,7 +550,7 @@ public class DesignStageToolHeadlessTests
     }
 
     [AvaloniaFact]
-    public void ConfiguredState_AssignedArtwork_ExposesEnlargeDownloadRemoveAndReplace()
+    public async Task ConfiguredState_AssignedArtwork_ExposesEnlargeDownloadRemoveAndReplace()
     {
         var vm = CreateConfiguredDesignViewModel(withAssignedArtwork: true);
         NavigateToDesign(vm);
@@ -576,6 +576,14 @@ public class DesignStageToolHeadlessTests
 
             removeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert.True(vm.DesignTool.IsRemovalConfirmationVisible);
+
+            await vm.DesignTool.ConfirmPendingRemovalAsync();
+            window.UpdateLayout();
+
+            var reloadedSlot = Assert.Single(vm.DesignTool.Rows[0].Slots
+                .Where(candidate => candidate.DesignAreaId == slot.DesignAreaId));
+            Assert.False(reloadedSlot.HasImage);
+            Assert.False(vm.DesignTool.IsRemovalConfirmationVisible);
         }
         finally
         {
