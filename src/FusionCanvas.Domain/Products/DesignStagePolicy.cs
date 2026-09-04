@@ -166,13 +166,19 @@ public static class DesignStagePolicy
             .Where(value => value.OfferingId == offeringId
                 && !value.IsArchived
                 && colorOptionIds.Contains(value.OptionId))
-            .ToDictionary(value => value.Id);
+            .OrderBy(value => value.SortOrder)
+            .ThenBy(value => value.Id)
+            .ToArray();
+        var colorValuesById = colorValues.ToDictionary(value => value.Id);
 
-        return variants
+        var selectedValueIds = variants
             .Where(variant => variant.OfferingId == offeringId && !variant.IsArchived)
             .SelectMany(variant => variant.OptionValueIds)
-            .Where(colorValues.ContainsKey)
-            .Select(valueId => colorValues[valueId].Value)
+            .Where(colorValuesById.ContainsKey)
+            .ToHashSet();
+        return colorValues
+            .Where(value => selectedValueIds.Contains(value.Id))
+            .Select(value => value.Value)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }

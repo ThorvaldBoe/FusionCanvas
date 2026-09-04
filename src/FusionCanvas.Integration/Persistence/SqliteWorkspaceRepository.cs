@@ -624,6 +624,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await MigrateToVersion14Async(connection, cancellationToken);
         }
 
+        if (!isFreshDatabase && schemaVersion < 15)
+        {
+            await MigrateToVersion15Async(connection, cancellationToken);
+        }
+
         await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
     }
 
@@ -705,6 +710,18 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             throw new InvalidOperationException("The workspace database could not be upgraded to schema version 14.", exception);
         }
     }
+
+    private static Task MigrateToVersion15Async(SqliteConnection connection, CancellationToken cancellationToken) => ExecuteAsync(connection, null, """
+        WITH ranked AS (
+            SELECT id,
+                   ROW_NUMBER() OVER (PARTITION BY option_id ORDER BY sort_order, id) - 1 AS position
+            FROM offering_option_values
+            WHERE is_archived = 0
+        )
+        UPDATE offering_option_values
+        SET sort_order = (SELECT position FROM ranked WHERE ranked.id = offering_option_values.id)
+        WHERE is_archived = 0;
+        """, cancellationToken);
 
     private static async Task MigrateToVersion12Async(SqliteConnection connection, CancellationToken cancellationToken)
     {
@@ -1640,7 +1657,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     private static async Task<IReadOnlyList<OfferingOptionValue>> LoadOfferingOptionValuesAsync(SqliteConnection c, CancellationToken ct)
     {
         var result = new List<OfferingOptionValue>();
-        await foreach (var r in ReadAsync(c, "SELECT * FROM offering_option_values ORDER BY sort_order;", ct))
+        await foreach (var r in ReadAsync(c, "SELECT * FROM offering_option_values ORDER BY sort_order, id;", ct))
             result.Add(new OfferingOptionValue(ReadGuid(r, "id"), ReadGuid(r, "option_id"), ReadGuid(r, "offering_id"), ReadString(r, "value"), ReadInt(r, "sort_order"), ReadBool(r, "is_archived")));
         return result;
     }

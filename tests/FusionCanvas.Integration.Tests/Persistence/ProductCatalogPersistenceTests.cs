@@ -125,7 +125,7 @@ public class ProductCatalogPersistenceTests
 
         Assert.Equal(template, Assert.Single(loaded.MockupTemplates));
         Assert.Equal(revision, Assert.Single(loaded.MockupTemplateRevisions));
-        Assert.Equal(14, SqliteWorkspaceRepository.CurrentSchemaVersion);
+        Assert.Equal(15, SqliteWorkspaceRepository.CurrentSchemaVersion);
     }
 
     [Fact]

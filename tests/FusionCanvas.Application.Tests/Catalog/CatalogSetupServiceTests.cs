@@ -11,6 +11,31 @@ public sealed class CatalogSetupServiceTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 9, 12, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData(OptionKind.Color)]
+    [InlineData(OptionKind.Size)]
+    public async Task ReordersValuesByStableIdentityAndPreservesVariantMembership(OptionKind kind)
+    {
+        var storeId = Guid.NewGuid();
+        var blueprint = new Blueprint(Guid.NewGuid(), storeId, "Blueprint", null, false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, storeId, "Offering", null, BlueprintOfferingKind.ProviderNetwork, null, "network", null, null, false, Now, Now);
+        var option = new OfferingOption(Guid.NewGuid(), offering.Id, kind, kind.ToString(), 0);
+        var first = new OfferingOptionValue(Guid.NewGuid(), option.Id, offering.Id, "First", 0);
+        var second = new OfferingOptionValue(Guid.NewGuid(), option.Id, offering.Id, "Second", 1);
+        var variant = new OfferingVariant(Guid.NewGuid(), offering.Id, "Variant", [first.Id], false, Now, Now);
+        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "Store")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint], BlueprintOfferings = [offering], OfferingOptions = [option], OfferingOptionValues = [first, second], OfferingVariants = [variant]
+        });
+        var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
+
+        var result = await service.ReorderOptionValuesAsync(new ReorderOptionValuesRequest(storeId, option.Id, [second.Id, first.Id]), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal([second.Id, first.Id], repository.Current.OfferingOptionValues.Where(value => !value.IsArchived).OrderBy(value => value.SortOrder).Select(value => value.Id));
+        Assert.Equal([first.Id], repository.Current.OfferingVariants.Single().OptionValueIds);
+    }
+
     [Fact]
     public async Task CreatesTypedOfferingGraphAndKeepsStoreIsolation()
     {
