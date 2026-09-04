@@ -15,6 +15,7 @@ public partial class StoreEditorWindow : Window
     private bool _optionValueManagementOpen;
     private bool _variantCreationDialogOpen;
     private bool _mockupTemplateEditorOpen;
+    private MockupTemplateEditorWindow? _mockupTemplateEditorWindow;
     private bool _designAreaEditorOpen;
 
     internal IWindowGeometryStore? GeometryStore { get; set; }
@@ -249,11 +250,25 @@ public partial class StoreEditorWindow : Window
     private async void OnMockupTemplateEditorRequested(object? sender, EventArgs e)
     {
         if (_mockupTemplateEditorOpen || _subscribedCatalog is not { } catalog) return;
+        if (_mockupTemplateEditorWindow is { IsVisible: true } existingDialog)
+        {
+            existingDialog.Activate();
+            return;
+        }
+
         _mockupTemplateEditorOpen = true;
         var editedTemplateId = catalog.SelectedTemplateId;
         try
         {
             var dialog = new MockupTemplateEditorWindow { DataContext = catalog };
+            _mockupTemplateEditorWindow = dialog;
+            dialog.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(_mockupTemplateEditorWindow, dialog))
+                {
+                    _mockupTemplateEditorWindow = null;
+                }
+            };
             AttachGeometry(dialog, WindowLayoutKeys.MockupTemplateEditor);
             if (VisualRoot is null || !IsVisible)
             {
