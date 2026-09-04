@@ -159,6 +159,32 @@ public class AiSettingsViewTests
         }
     }
 
+    [AvaloniaFact]
+    public void ProfileEditor_ShowsGuidanceForSupportedAdditionalParameters()
+    {
+        var viewModel = new AiProfileEditorViewModel(AiProfileSettings.Empty)
+        {
+            Models = [new AiModelDescriptor("model", "Model", null, null, ["text"], ["text"],
+                [AiParameterRegistry.TopP, AiParameterRegistry.Seed], 1000, null, null, null, false, null)]
+        };
+        var window = new Window { Content = new AiProfileEditorView { DataContext = viewModel } };
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+
+            var labels = window.GetVisualDescendants().OfType<TextBlock>().Select(text => text.Text).ToArray();
+            Assert.Contains("Top P", labels);
+            Assert.Contains("Narrow the pool of likely next tokens (0–1).", labels);
+            Assert.Contains("Seed", labels);
+            Assert.DoesNotContain("Top K", labels);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
     private static AiModelDescriptor Descriptor(string id, bool zdr) =>
         new(id, id, null, null, ["text"], ["text"], [], 1000, null, null, null, zdr, null);
 
