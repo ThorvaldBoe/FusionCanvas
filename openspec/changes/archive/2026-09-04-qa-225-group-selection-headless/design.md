@@ -2,7 +2,7 @@
 
 ## Approach
 
-Keep the production dialog unchanged and exercise its compiled XAML bindings and code-behind click handlers from `FusionCanvas.App.Tests`. Construct the dialog with deterministic `GroupDestination` values, show it in the Avalonia headless environment, pump layout, and interact with the actual `TextBox`, `ComboBox`, and `Button` controls.
+Keep the dialog behavior unchanged and exercise its compiled XAML bindings and code-behind click handlers from `FusionCanvas.App.Tests`. Add stable names to the name and destination controls solely to make the meaningful controls directly addressable in headless tests. Construct the dialog with deterministic `GroupDestination` values, show it in the Avalonia headless environment, pump layout, and interact with the actual `TextBox`, `ComboBox`, and `Button` controls.
 
 The tests will verify:
 
