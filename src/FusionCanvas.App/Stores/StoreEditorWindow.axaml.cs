@@ -27,6 +27,16 @@ public partial class StoreEditorWindow : Window
         DataContextChanged += OnDataContextChanged;
     }
 
+    protected override void OnClosed(EventArgs e)
+    {
+        if (_mockupTemplateEditorWindow is { IsVisible: true } dialog)
+        {
+            dialog.Close();
+        }
+
+        base.OnClosed(e);
+    }
+
     private void OnClosing(object? sender, WindowClosingEventArgs e)
     {
         if (DataContext is StoreManagementViewModel viewModel && !viewModel.TryCloseStoreEditor())
@@ -260,6 +270,14 @@ public partial class StoreEditorWindow : Window
         var editedTemplateId = catalog.SelectedTemplateId;
         try
         {
+            if (VisualRoot is null || !IsVisible)
+            {
+                // Do not create an ownerless editor during StoreEditor construction/teardown.
+                // It would outlive this window and retain the application-wide geometry key.
+                catalog.CancelAddTemplateCommand.Execute(null);
+                return;
+            }
+
             var dialog = new MockupTemplateEditorWindow { DataContext = catalog };
             _mockupTemplateEditorWindow = dialog;
             dialog.Closed += (_, _) =>
@@ -270,16 +288,7 @@ public partial class StoreEditorWindow : Window
                 }
             };
             AttachGeometry(dialog, WindowLayoutKeys.MockupTemplateEditor);
-            if (VisualRoot is null || !IsVisible)
-            {
-                // A catalog request can arrive during StoreEditor construction/teardown;
-                // modal dialogs require an attached visible owner, so fall back safely.
-                dialog.Show();
-            }
-            else
-            {
-                await dialog.ShowDialog(this);
-            }
+            await dialog.ShowDialog(this);
             if (catalog.IsAddingTemplate) catalog.CancelAddTemplateCommand.Execute(null);
         }
         finally
