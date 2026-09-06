@@ -100,6 +100,40 @@ public sealed class LocalMockupTemplateReadinessTests
         Assert.Equal(2, files.SaveCount);
     }
 
+    [Fact]
+    public async Task Apply_SanitizesWindowsInvalidCharactersFromGeneratedFileNames()
+    {
+        var snapshot = CreateSnapshot();
+        var offering = snapshot.BlueprintOfferings.Single();
+        var template = snapshot.MockupTemplates.Single();
+        var revision = snapshot.MockupTemplateRevisions.Single();
+        var item = new Item(Guid.NewGuid(), offering.StoreId, null, null, "A \"Dad Joke\" listing", null, ItemStatus.Draft, WorkflowStage.Listing, false, Now, Now, "{}");
+        var design = new Asset(Guid.NewGuid(), offering.StoreId, "design.png", null, AssetKind.ExportedImage, "assets/design.png", null, false, false, Now, Now, "{}");
+        var row = new DesignVariantRow(Guid.NewGuid(), item.Id, true, 0);
+        snapshot = snapshot with
+        {
+            Items = [item], ItemListingConfigurations = [new(item.Id, offering.Id)],
+            OfferingOptionValues = snapshot.OfferingOptionValues.Select(value => value.Value == "Black" ? value with { Value = "Black/White" } : value).ToArray(),
+            DesignSelectedColors = [new(item.Id, "Black/White")],
+            DesignVariantRows = [row], DesignVariantRowColors = [new(row.Id, "Black/White")],
+            DesignSlotAssignments = [new(row.Id, template.TargetPlaceholderId!.Value, design.Id)],
+            Assets = [design, .. snapshot.MockupTemplateSourceImages.Select(image => new Asset(image.SourceAssetId, offering.StoreId,
+                "source.png", null, AssetKind.MockupImage, $"assets/{image.Id}.png", null, false, false, Now, Now, "{}"))],
+            MockupTemplateRevisionSourceImages = snapshot.MockupTemplateSourceImages.Select(image =>
+                new MockupTemplateRevisionSourceImage(image.Id, revision.Id, image.SourceAssetId, image.ImageMapping)).ToArray(),
+            MockupTemplateRevisionSourceImageOptionValues = snapshot.MockupTemplateSourceImageOptionValues.Select(value =>
+                new MockupTemplateRevisionSourceImageOptionValue(value.SourceImageId, value.OptionValueId)).ToArray()
+        };
+        var repository = new MemoryRepository(snapshot);
+        var files = new MemoryFileStore();
+        var service = new MockupGenerationService(repository, files, new MockupTemplateSetupService(repository), new StubCompositor());
+
+        var result = await service.ApplyAsync(new(item.Id, template.Id), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("A -Dad Joke- listing-Black-White-mockup.png", Assert.Single(files.SavedFileNames));
+    }
+
     [Theory]
     [InlineData("missing-image", MockupTemplateReadinessBlocker.MissingVariantSourceImage)]
     [InlineData("ambiguous", MockupTemplateReadinessBlocker.AmbiguousVariantSourceImages)]
@@ -183,12 +217,14 @@ public sealed class LocalMockupTemplateReadinessTests
     {
         public string WorkspaceRoot => "unused";
         public int SaveCount { get; private set; }
+        public List<string> SavedFileNames { get; } = [];
         public bool Exists(string workspaceRelativePath) => true;
         public bool TryDelete(string workspaceRelativePath) => true;
         public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default) => Task.FromResult<Stream>(new MemoryStream([1]));
         public Task<ManagedWorkspaceFile> SaveAsync(string fileName, AssetKind kind, Stream content, CancellationToken cancellationToken = default)
         {
             SaveCount++;
+            SavedFileNames.Add(fileName);
             return Task.FromResult(new ManagedWorkspaceFile(fileName, kind, $"assets/output-{SaveCount}.png", "unused", "unused"));
         }
         public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, AssetKind kind, CancellationToken cancellationToken = default) => throw new NotSupportedException();

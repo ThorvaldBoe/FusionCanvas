@@ -90,7 +90,7 @@ public sealed class MockupGenerationService : IMockupGenerationService
                 await using var templateStream = await _fileStore.OpenReadAsync(sourceAsset.WorkspaceRelativePath, cancellationToken).ConfigureAwait(false);
                 await using var designStream = await _fileStore.OpenReadAsync(designAsset.WorkspaceRelativePath, cancellationToken).ConfigureAwait(false);
                 await using var output = await _compositor.ComposeAsync(templateStream, designStream, source.ImageMapping, cancellationToken).ConfigureAwait(false);
-                managed = await _fileStore.SaveAsync($"{item.Name}-{color}-mockup.png", AssetKind.MockupImage, output, cancellationToken).ConfigureAwait(false);
+                managed = await _fileStore.SaveAsync($"{SafeFileNamePart(item.Name)}-{SafeFileNamePart(color)}-mockup.png", AssetKind.MockupImage, output, cancellationToken).ConfigureAwait(false);
                 var now = _clock();
                 var assetId = _newId();
                 var asset = new Asset(assetId, item.StoreId, managed.Name, null, AssetKind.MockupImage, managed.WorkspaceRelativePath, null, false, false, now, now,
@@ -119,6 +119,16 @@ public sealed class MockupGenerationService : IMockupGenerationService
             if (assignment?.AssetId is not null && snapshot.Assets.Any(value => value.Id == assignment.AssetId && value.Kind == AssetKind.ExportedImage)) return assignment.AssetId;
         }
         return null;
+    }
+
+    private static string SafeFileNamePart(string value)
+    {
+        var invalidCharacters = Path.GetInvalidFileNameChars()
+            .Concat(['<', '>', ':', '"', '/', '\\', '|', '?', '*'])
+            .ToHashSet();
+        var sanitized = new string(value.Select(character =>
+            invalidCharacters.Contains(character) || char.IsControl(character) ? '-' : character).ToArray()).TrimEnd(' ', '.');
+        return string.IsNullOrWhiteSpace(sanitized) ? "untitled" : sanitized;
     }
 
     private static IReadOnlyList<MockupGenerationOutput> Outputs(WorkspaceSnapshot snapshot, Guid itemId) => snapshot.AssetLinks.Where(value => value.EntityKind == WorkspaceEntityKind.Item && value.EntityId == itemId).Join(snapshot.Assets, link => link.AssetId, asset => asset.Id, (_, asset) => asset).Where(value => value.Kind == AssetKind.MockupImage).Select(value => new MockupGenerationOutput(value.Id, value.Name, value.WorkspaceRelativePath, "", Guid.Empty, 0, Guid.Empty)).ToArray();
