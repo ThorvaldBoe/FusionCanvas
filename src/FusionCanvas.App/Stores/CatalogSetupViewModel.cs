@@ -23,6 +23,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private readonly IOfferingManagementService? _offeringManagement;
     private readonly IProviderCatalogCandidateSource? _providerCatalog;
     private readonly IMockupTemplateSourceImageService? _sourceImages;
+    private IReadOnlyList<MockupTemplateSourceImage> _templateSourceImages = [];
+    private IReadOnlyList<MockupTemplateSourceImageOptionValue> _templateSourceConditions = [];
     private IAssetFilePicker _filePicker;
     private BlueprintOffering? _selectedOffering;
     private OfferingOption? _selectedOption;
@@ -626,6 +628,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             var mockups = await _mockups.LoadForStoreAsync(storeId, cancellationToken).ConfigureAwait(true);
             IsAvailable = true;
             IsReadOnly = catalog.IsReadOnly || mockups.IsReadOnly;
+            _templateSourceImages = mockups.SourceImages ?? [];
+            _templateSourceConditions = mockups.SourceImageOptionValues ?? [];
             ApplyCatalog(catalog);
             Replace(Templates, mockups.Templates);
             Replace(TemplateColors, mockups.Colors);
@@ -1291,6 +1295,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void ApplyMockups(MockupTemplateSetupState state)
     {
+        _templateSourceImages = state.SourceImages ?? [];
+        _templateSourceConditions = state.SourceImageOptionValues ?? [];
         Replace(Templates, state.Templates);
         Replace(TemplateColors, state.Colors);
         Replace(TemplateRevisions, state.Revisions);
@@ -1367,7 +1373,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             var revision = TemplateRevisions.FirstOrDefault(value => value.MockupTemplateId == template.Id && value.RevisionNumber == template.CurrentRevision);
             var compatibleVariantIds = AvailableVariants.Where(value => value.OptionValueIds.Any(colorIds.Contains)).Select(value => value.Id).ToArray();
             var effectiveRevision = revision ?? new MockupTemplateRevision(template.Id, template.Id, template.CurrentRevision, template.TargetPlaceholderId, template.CreatedAt);
-            var readiness = MockupTemplateReadinessPolicy.Evaluate(new(template, effectiveRevision, colorIds, Options, OptionValues, Variants, Placeholders));
+            var readiness = MockupTemplateReadinessPolicy.Evaluate(new(template, effectiveRevision, colorIds, Options, OptionValues, Variants, Placeholders,
+                SourceImages: _templateSourceImages, SourceImageOptionValues: _templateSourceConditions));
             return new MockupTemplateSetupSummary(template.Id, template.Name, template.TargetPlaceholderId, targetName, colorIds, compatibleVariantIds, revision?.ProviderMockupReference, template.CurrentRevision, template.IsArchived, readiness.Lifecycle, readiness.Blockers);
         });
         Replace(MockupTemplateCards, templateSummaries.Select(value => MockupTemplateCardViewModel.From(value, OptionValues)));
@@ -1697,6 +1704,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         MockupTemplateReadinessBlocker.MissingImage => "Choose a mockup image.",
         MockupTemplateReadinessBlocker.MissingMapping => "Add a valid design-area placement mapping.",
         MockupTemplateReadinessBlocker.KnownImageColorIncompatibility => "Choose Colors supported by the selected image.",
+        MockupTemplateReadinessBlocker.MissingSourceApplicability => "Choose applicability options for each source image.",
+        MockupTemplateReadinessBlocker.InvalidSourceApplicability => "Remove unavailable applicability options from source images.",
+        MockupTemplateReadinessBlocker.MissingVariantSourceImage => "Configure a matching source image for every compatible Variant.",
+        MockupTemplateReadinessBlocker.AmbiguousVariantSourceImages => "Adjust source-image applicability so each compatible Variant matches exactly one image.",
         _ => blocker.ToString()
     };
 

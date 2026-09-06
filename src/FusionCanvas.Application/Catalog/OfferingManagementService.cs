@@ -1,4 +1,5 @@
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.Mockups;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Domain.Workspace;
@@ -76,9 +77,7 @@ public sealed class OfferingManagementService : IOfferingManagementService
                 var colorIds = snapshot.MockupTemplateColorVariants.Where(value => value.MockupTemplateId == template.Id && !value.IsArchived).Select(value => value.ColorOptionValueId).ToArray();
                 var target = designAreas.SingleOrDefault(value => value.Id == template.TargetPlaceholderId);
                 var revision = snapshot.MockupTemplateRevisions.SingleOrDefault(value => value.MockupTemplateId == template.Id && value.RevisionNumber == template.CurrentRevision);
-                var effectiveRevision = revision ?? new MockupTemplateRevision(template.Id, template.Id, template.CurrentRevision, template.TargetPlaceholderId, template.CreatedAt);
-                var readiness = MockupTemplateReadinessPolicy.Evaluate(new(template, effectiveRevision, colorIds,
-                    snapshot.OfferingOptions, snapshot.OfferingOptionValues, variants, designAreas));
+                var readiness = MockupTemplateReadinessEvaluator.Evaluate(snapshot, template);
                 return new MockupTemplateSetupSummary(
                     template.Id,
                     template.Name,

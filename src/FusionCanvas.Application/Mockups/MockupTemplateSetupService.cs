@@ -405,12 +405,11 @@ public sealed class MockupTemplateSetupService : IMockupTemplateSetupService
         var revisions = snapshot.MockupTemplateRevisions.Where(value => templates.Any(template => template.Id == value.MockupTemplateId)).ToArray();
         var readiness = templates.Select(template =>
         {
-            var revision = revisions.SingleOrDefault(value => value.MockupTemplateId == template.Id && value.RevisionNumber == template.CurrentRevision)
-                ?? new MockupTemplateRevision(template.Id, template.Id, template.CurrentRevision, template.TargetPlaceholderId, template.CreatedAt);
-            var activeColors = colors.Where(value => value.MockupTemplateId == template.Id && !value.IsArchived).Select(value => value.ColorOptionValueId).ToArray();
-            var result = MockupTemplateReadinessPolicy.Evaluate(new(template, revision, activeColors, snapshot.OfferingOptions, snapshot.OfferingOptionValues, snapshot.OfferingVariants, snapshot.OfferingPlaceholders));
+            var result = MockupTemplateReadinessEvaluator.Evaluate(snapshot, template);
             return new MockupTemplateReadinessSummary(template.Id, result.Lifecycle, result.Blockers);
         }).ToArray();
-        return new(storeId, snapshot.Stores.SingleOrDefault(value => value.Id == storeId)?.IsArchived ?? false, templates, colors, revisions, readiness);
+        var images = snapshot.MockupTemplateSourceImages.Where(image => templates.Any(template => template.Id == image.MockupTemplateId)).ToArray();
+        var conditions = snapshot.MockupTemplateSourceImageOptionValues.Where(value => images.Any(image => image.Id == value.SourceImageId)).ToArray();
+        return new(storeId, snapshot.Stores.SingleOrDefault(value => value.Id == storeId)?.IsArchived ?? false, templates, colors, revisions, readiness, images, conditions);
     }
 }

@@ -10,4 +10,6 @@ public sealed record MockupTemplateReadinessContext(
     IReadOnlyList<OfferingOptionValue> OptionValues,
     IReadOnlyList<OfferingVariant> Variants,
     IReadOnlyList<OfferingPlaceholder> DesignAreas,
-    IReadOnlySet<Guid>? KnownSupportedColorOptionValueIds = null);
+    IReadOnlySet<Guid>? KnownSupportedColorOptionValueIds = null,
+    IReadOnlyList<MockupTemplateSourceImage>? SourceImages = null,
+    IReadOnlyList<MockupTemplateSourceImageOptionValue>? SourceImageOptionValues = null);
