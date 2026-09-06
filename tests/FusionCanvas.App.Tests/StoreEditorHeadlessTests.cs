@@ -19,6 +19,8 @@ using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.Products;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
+using FusionCanvas.Application.Settings;
+using FusionCanvas.App.Views;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
 
@@ -1513,6 +1515,30 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void MockupTemplateRequest_WhenStoreEditorIsNotVisible_DoesNotRegisterOrphanedDialog()
+    {
+        var window = CreateEditorWindow(
+            includeNormalizedCatalog: true,
+            useFixedProviderOffering: true,
+            includeOfferingOptions: true,
+            showWindow: false);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        var geometryStore = new RecordingGeometryStore();
+        window.GeometryStore = geometryStore;
+
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        Assert.Empty(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        Assert.False(viewModel.CatalogSetup.IsAddingTemplate);
+        Assert.DoesNotContain(WindowLayoutKeys.MockupTemplateEditor, geometryStore.WindowGeometry.Keys);
+    }
+
+    [AvaloniaFact]
     public void MockupTemplateDialog_AllowsNamedDraftWithoutDesignAreasOrProvider()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: false, includeOfferingOptions: false);
@@ -1969,7 +1995,8 @@ public class StoreEditorHeadlessTests
         bool includeNormalizedCatalog = true,
         bool useFixedProviderOffering = false,
         bool includeOfferingOptions = false,
-        IProviderCatalogCandidateSource? providerCatalog = null)
+        IProviderCatalogCandidateSource? providerCatalog = null,
+        bool showWindow = true)
     {
         var store = new Store(Guid.NewGuid(), "North Star", null, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog, useFixedProviderOffering, includeOfferingOptions));
@@ -1984,10 +2011,26 @@ public class StoreEditorHeadlessTests
             providerCatalog);
         viewModel.LoadAsync(default).GetAwaiter().GetResult();
         var window = new StoreEditorWindow { DataContext = viewModel };
-        window.Show();
-        window.UpdateLayout();
-        window.UpdateLayout();
+        if (showWindow)
+        {
+            window.Show();
+            window.UpdateLayout();
+            window.UpdateLayout();
+        }
         return window;
+    }
+
+    private sealed class RecordingGeometryStore : IWindowGeometryStore
+    {
+        public Dictionary<string, WindowGeometrySettings> WindowGeometry { get; } = new();
+
+        IReadOnlyDictionary<string, WindowGeometrySettings> IWindowGeometryStore.WindowGeometry => WindowGeometry;
+
+        public void UpdateWindowGeometry(string windowKey, WindowGeometrySettings? geometry)
+        {
+            if (geometry is null) WindowGeometry.Remove(windowKey);
+            else WindowGeometry[windowKey] = geometry;
+        }
     }
 
     private static StoreEditorWindow CreateEditorWindowAfterWorkspaceSwitch()
