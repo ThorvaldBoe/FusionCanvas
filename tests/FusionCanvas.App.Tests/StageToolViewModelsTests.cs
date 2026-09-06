@@ -130,6 +130,28 @@ public class StageToolViewModelsTests
         Assert.Empty(vm.TemplateDiagnostics);
     }
 
+    [Fact]
+    public async Task ListingTool_SelectingTemplateEnablesApplyAndUsesNameAsDisplayValue()
+    {
+        var templateId = Guid.NewGuid();
+        var vm = new ListingStageToolViewModel(new StubMockupGenerationService(new MockupGenerationState(
+            Guid.NewGuid(), Guid.NewGuid(), false, string.Empty,
+            [new MockupTemplate(templateId, Guid.NewGuid(), null, "Flatlay no 1", null, 1, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)],
+            templateId, [], [], null, null, [])));
+
+        await vm.LoadAsync(Guid.NewGuid(), ItemStatus.Draft, canEdit: true, TestContext.Current.CancellationToken);
+
+        var template = Assert.Single(vm.Templates);
+        Assert.Equal("Flatlay no 1", template.Name);
+        Assert.Equal(templateId, vm.SelectedTemplateId);
+        Assert.True(vm.CanApply);
+
+        vm.SelectedTemplate = null;
+        Assert.False(vm.CanApply);
+        vm.SelectedTemplate = template;
+        Assert.True(vm.CanApply);
+    }
+
     private sealed class StubMockupGenerationService(MockupGenerationState state) : IMockupGenerationService
     {
         public Task<MockupGenerationState> LoadAsync(Guid itemId, bool isReadOnly, string readOnlyReason, CancellationToken cancellationToken = default) => Task.FromResult(state);

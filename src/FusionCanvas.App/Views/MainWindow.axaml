@@ -1445,8 +1445,8 @@
                                  Foreground="{DynamicResource SecondaryTextBrush}" />
                       <TextBlock Text="Mockup template" FontWeight="SemiBold" />
                       <ComboBox ItemsSource="{Binding ListingTool.Templates}"
-                                SelectedValue="{Binding ListingTool.SelectedTemplateId}"
-                                SelectedValueBinding="{Binding Id}"
+                                SelectedItem="{Binding ListingTool.SelectedTemplate, Mode=TwoWay}"
+                                DisplayMemberBinding="{Binding Name}"
                                 AutomationProperties.Name="Mockup template" />
                       <TextBlock Text="{Binding ListingTool.BlockedReason}"
                                  IsVisible="{Binding ListingTool.HasBlockedReason}"
