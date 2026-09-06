@@ -20,23 +20,41 @@ public sealed class ListingStageToolViewModel : INotifyPropertyChanged
     private bool _isBusy;
     private Guid _itemId;
     private Guid? _selectedTemplateId;
+    private MockupTemplateOptionViewModel? _selectedTemplate;
+    private readonly RelayCommand _applyCommand;
 
-    public ListingStageToolViewModel(IMockupGenerationService? service = null) { _service = service; ApplyCommand = new RelayCommand(parameter => _ = ApplyAsync(), () => CanApply); }
+    public ListingStageToolViewModel(IMockupGenerationService? service = null)
+    {
+        _service = service;
+        _applyCommand = new RelayCommand(parameter => _ = ApplyAsync(), () => CanApply);
+        ApplyCommand = _applyCommand;
+    }
     public event PropertyChangedEventHandler? PropertyChanged;
     public ObservableCollection<MockupTemplateOptionViewModel> Templates { get; } = [];
     public ObservableCollection<MockupTemplateDiagnosticViewModel> TemplateDiagnostics { get; } = [];
     public ObservableCollection<MockupGenerationOutput> Outputs { get; } = [];
     public ICommand ApplyCommand { get; }
     public string StatusSummary { get => _statusSummary; private set { _statusSummary = value; OnPropertyChanged(); } }
-    public bool IsReadOnly { get => _isReadOnly; private set { _isReadOnly = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanApply)); } }
+    public bool IsReadOnly { get => _isReadOnly; private set { _isReadOnly = value; OnPropertyChanged(); NotifyApplyCanExecuteChanged(); } }
     public string ReadOnlyReason { get => _readOnlyReason; private set { _readOnlyReason = value; OnPropertyChanged(); } }
-    public string? BlockedReason { get => _blockedReason; private set { _blockedReason = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasBlockedReason)); OnPropertyChanged(nameof(CanApply)); } }
+    public string? BlockedReason { get => _blockedReason; private set { _blockedReason = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasBlockedReason)); NotifyApplyCanExecuteChanged(); } }
     public bool HasBlockedReason => !string.IsNullOrWhiteSpace(BlockedReason);
     public bool HasTemplateDiagnostics => TemplateDiagnostics.Count > 0;
     public string? ErrorMessage { get => _errorMessage; private set { _errorMessage = value; OnPropertyChanged(); } }
-    public bool IsBusy { get => _isBusy; private set { _isBusy = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanApply)); } }
+    public bool IsBusy { get => _isBusy; private set { _isBusy = value; OnPropertyChanged(); NotifyApplyCanExecuteChanged(); } }
     public bool CanApply => !IsReadOnly && !IsBusy && SelectedTemplateId is not null && string.IsNullOrWhiteSpace(BlockedReason);
-    public Guid? SelectedTemplateId { get => _selectedTemplateId; set { _selectedTemplateId = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanApply)); } }
+    public Guid? SelectedTemplateId { get => _selectedTemplateId; private set { _selectedTemplateId = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanApply)); NotifyApplyCanExecuteChanged(); } }
+    public MockupTemplateOptionViewModel? SelectedTemplate
+    {
+        get => _selectedTemplate;
+        set
+        {
+            if (ReferenceEquals(_selectedTemplate, value)) return;
+            _selectedTemplate = value;
+            OnPropertyChanged();
+            SelectedTemplateId = value?.Id;
+        }
+    }
 
     public void Load(ItemStatus status, bool canEdit)
     {
@@ -60,7 +78,9 @@ public sealed class ListingStageToolViewModel : INotifyPropertyChanged
             TemplateDiagnostics.Add(new(diagnostic.TemplateName, guidance));
         }
         OnPropertyChanged(nameof(HasTemplateDiagnostics));
-        SelectedTemplateId = state.SelectedTemplateId;
+        SelectedTemplate = state.SelectedTemplateId is Guid selectedId
+            ? Templates.SingleOrDefault(value => value.Id == selectedId)
+            : null;
         Outputs.Clear();
         foreach (var output in state.Outputs) Outputs.Add(output);
         BlockedReason = state.BlockedReason;
@@ -101,4 +121,6 @@ public sealed class ListingStageToolViewModel : INotifyPropertyChanged
     }
 
     private void OnPropertyChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new(name));
+
+    private void NotifyApplyCanExecuteChanged() => _applyCommand.NotifyCanExecuteChanged();
 }
