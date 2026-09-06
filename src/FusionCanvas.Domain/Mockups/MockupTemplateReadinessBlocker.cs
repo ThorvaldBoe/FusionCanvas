@@ -13,5 +13,9 @@ public enum MockupTemplateReadinessBlocker
     IncompatibleVariants,
     MissingImage,
     MissingMapping,
-    KnownImageColorIncompatibility
+    KnownImageColorIncompatibility,
+    MissingSourceApplicability,
+    InvalidSourceApplicability,
+    MissingVariantSourceImage,
+    AmbiguousVariantSourceImages
 }

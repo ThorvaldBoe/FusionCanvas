@@ -874,10 +874,22 @@ public sealed class CatalogSetupViewModelTests
         Assert.False(viewModel.IsAddingTemplate);
     }
 
+    [Fact]
+    public async Task LocalMockupTemplateCardUsesSourceImageReadinessAfterReload()
+    {
+        var (viewModel, _, offering) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: true, completeLocalSource: true);
+
+        Assert.Equal("Ready for use", Assert.Single(viewModel.MockupTemplateCards).Status);
+        await viewModel.LoadForStoreAsync(offering.StoreId, TestContext.Current.CancellationToken);
+        viewModel.SelectOffering(offering.Id);
+        Assert.Equal("Ready for use", Assert.Single(viewModel.MockupTemplateCards).Status);
+    }
+
     private static async Task<(CatalogSetupViewModel ViewModel, OfferingPlaceholder Area, BlueprintOffering Offering)> CreateCatalogWithDesignAreaAsync(
         bool referencedByTemplate,
         bool storeArchived = false,
-        IMockupTemplateSourceImageService? sourceImages = null)
+        IMockupTemplateSourceImageService? sourceImages = null,
+        bool completeLocalSource = false)
     {
         var now = DateTimeOffset.UtcNow;
         var snapshot = SampleWorkspace.Create();
@@ -905,6 +917,15 @@ public sealed class CatalogSetupViewModelTests
         {
             var template = new MockupTemplate(Guid.NewGuid(), offering.Id, area.Id, "Front black", null, 1, false, now, now);
             populated = populated with { MockupTemplates = [template] };
+            if (completeLocalSource)
+            {
+                var image = new MockupTemplateSourceImage(Guid.NewGuid(), template.Id, Guid.NewGuid(), new(100, 100, 0, 0, 100, 100), false, now, now);
+                populated = populated with
+                {
+                    MockupTemplateRevisions = [new(Guid.NewGuid(), template.Id, 1, area.Id, now)],
+                    MockupTemplateSourceImages = [image], MockupTemplateSourceImageOptionValues = [new(image.Id, black.Id)]
+                };
+            }
         }
         var repository = new InMemoryWorkspaceRepository(populated);
         var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository), sourceImages: sourceImages);

@@ -28,6 +28,15 @@ public static class MockupTemplateReadinessPolicy
                 blockers.Add(MockupTemplateReadinessBlocker.InvalidTargetDesignArea);
         }
 
+        // Local templates keep applicability and placement on their source images.
+        // Retained archived entries also identify a local template with no active images.
+        var sourceImages = context.SourceImages?.Where(value => value.MockupTemplateId == template.Id).ToArray() ?? [];
+        if (sourceImages.Length > 0)
+        {
+            EvaluateLocalSources(context, target, sourceImages, blockers);
+            return new(blockers);
+        }
+
         var requestedColors = context.ActiveColorOptionValueIds.Distinct().ToArray();
         var validColorIds = context.OptionValues
             .Where(value => requestedColors.Contains(value.Id)
@@ -65,5 +74,39 @@ public static class MockupTemplateReadinessPolicy
             blockers.Add(MockupTemplateReadinessBlocker.KnownImageColorIncompatibility);
 
         return new MockupTemplateReadinessResult(blockers);
+    }
+
+    private static void EvaluateLocalSources(
+        MockupTemplateReadinessContext context,
+        OfferingPlaceholder? target,
+        IReadOnlyList<MockupTemplateSourceImage> sourceImages,
+        List<MockupTemplateReadinessBlocker> blockers)
+    {
+        var images = sourceImages.Where(value => !value.IsArchived).ToArray();
+        var conditions = (context.SourceImageOptionValues ?? [])
+            .Where(value => images.Any(image => image.Id == value.SourceImageId)).ToArray();
+        var validValues = context.OptionValues.Where(value => value.OfferingId == context.Template.BlueprintOfferingId
+            && !value.IsArchived && context.Options.Any(option => option.Id == value.OptionId
+                && option.OfferingId == context.Template.BlueprintOfferingId && !option.IsArchived)).ToArray();
+        var validIds = validValues.Select(value => value.Id).ToHashSet();
+
+        if (images.Length == 0) blockers.Add(MockupTemplateReadinessBlocker.MissingImage);
+        if (images.Any(image => image.ImageMapping is null)) blockers.Add(MockupTemplateReadinessBlocker.MissingMapping);
+        if (images.Any(image => !conditions.Any(value => value.SourceImageId == image.Id)))
+            blockers.Add(MockupTemplateReadinessBlocker.MissingSourceApplicability);
+        if (conditions.Any(value => !validIds.Contains(value.OptionValueId)))
+            blockers.Add(MockupTemplateReadinessBlocker.InvalidSourceApplicability);
+
+        if (target is null) return;
+        var variants = context.Variants.Where(value => value.OfferingId == context.Template.BlueprintOfferingId
+            && !value.IsArchived && target.VariantIds.Contains(value.Id)).ToArray();
+        if (variants.Length == 0) blockers.Add(MockupTemplateReadinessBlocker.MissingCompatibleVariants);
+        var validImages = images.Where(image => conditions.Where(value => value.SourceImageId == image.Id)
+            .All(value => validIds.Contains(value.OptionValueId))).ToArray();
+        var resolutions = MockupTemplateSourcePolicy.Resolve(variants, validImages, conditions, validValues);
+        if (resolutions.Any(value => value.Kind == MockupTemplateSourceResolutionKind.Missing))
+            blockers.Add(MockupTemplateReadinessBlocker.MissingVariantSourceImage);
+        if (resolutions.Any(value => value.Kind == MockupTemplateSourceResolutionKind.Ambiguous))
+            blockers.Add(MockupTemplateReadinessBlocker.AmbiguousVariantSourceImages);
     }
 }

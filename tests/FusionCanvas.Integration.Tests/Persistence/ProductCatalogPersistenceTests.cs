@@ -74,7 +74,7 @@ public class ProductCatalogPersistenceTests
         Assert.Equal(snapshot.PrintProviders, loaded.PrintProviders);
         Assert.Equal(snapshot.BlueprintOfferings, loaded.BlueprintOfferings);
         Assert.Equal(snapshot.OfferingOptions, loaded.OfferingOptions);
-        Assert.Equal(snapshot.OfferingOptionValues, loaded.OfferingOptionValues);
+        Assert.Equal(snapshot.OfferingOptionValues.OrderBy(value => value.Id), loaded.OfferingOptionValues.OrderBy(value => value.Id));
         Assert.Equal(snapshot.OfferingVariants.Select(value => value.Id).OrderBy(value => value), loaded.OfferingVariants.Select(value => value.Id).OrderBy(value => value));
         Assert.Equal(snapshot.OfferingVariants[0].OptionValueIds.OrderBy(value => value), loaded.OfferingVariants[0].OptionValueIds.OrderBy(value => value));
         Assert.Equal(snapshot.OfferingPlaceholders.Select(value => value.Id).OrderBy(value => value), loaded.OfferingPlaceholders.Select(value => value.Id).OrderBy(value => value));

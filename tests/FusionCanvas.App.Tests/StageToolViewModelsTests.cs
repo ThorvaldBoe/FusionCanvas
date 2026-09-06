@@ -97,7 +97,11 @@ public class StageToolViewModelsTests
             null,
             [new MockupTemplateEligibilityDiagnostic(Guid.NewGuid(), "Front image", [
                 MockupTemplateReadinessBlocker.MissingImage,
-                MockupTemplateReadinessBlocker.MissingMapping])])));
+                MockupTemplateReadinessBlocker.MissingMapping,
+                MockupTemplateReadinessBlocker.MissingSourceApplicability,
+                MockupTemplateReadinessBlocker.InvalidSourceApplicability,
+                MockupTemplateReadinessBlocker.MissingVariantSourceImage,
+                MockupTemplateReadinessBlocker.AmbiguousVariantSourceImages])])));
 
         await vm.LoadAsync(Guid.NewGuid(), ItemStatus.Draft, canEdit: true, TestContext.Current.CancellationToken);
 
@@ -105,6 +109,10 @@ public class StageToolViewModelsTests
         Assert.Equal("Front image", diagnostic.TemplateName);
         Assert.Contains("Choose a mockup image.", diagnostic.Guidance);
         Assert.Contains("Add a valid design-area placement mapping.", diagnostic.Guidance);
+        Assert.Contains("Choose applicability options for each source image.", diagnostic.Guidance);
+        Assert.Contains("Remove unavailable applicability options", diagnostic.Guidance);
+        Assert.Contains("Configure a matching source image for every compatible Variant.", diagnostic.Guidance);
+        Assert.Contains("each compatible Variant matches exactly one image", diagnostic.Guidance);
         Assert.True(vm.HasBlockedReason);
         Assert.False(vm.CanApply);
     }

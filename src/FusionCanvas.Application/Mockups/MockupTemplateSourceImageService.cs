@@ -34,7 +34,7 @@ public sealed class MockupTemplateSourceImageService : IMockupTemplateSourceImag
         var variants = snapshot.OfferingVariants.Where(value => value.OfferingId == offering.Id && !value.IsArchived && snapshot.OfferingPlaceholders.Any(area => area.Id == template.TargetPlaceholderId && area.VariantIds.Contains(value.Id))).ToArray();
         var resolutions = MockupTemplateSourcePolicy.Resolve(variants, images, snapshot.MockupTemplateSourceImageOptionValues, snapshot.OfferingOptionValues)
             .Select(value => new MockupTemplateSourceReadiness(value.VariantId, value.Kind, value.SourceImageIds)).ToArray();
-        return new(summaries, resolutions, MockupTemplateSourcePolicy.IsReady(resolutions.Select(value => new MockupTemplateSourceResolution(value.VariantId, value.Kind, value.SourceImageIds))), null);
+        return new(summaries, resolutions, MockupTemplateReadinessEvaluator.Evaluate(snapshot, template).IsReadyForUse, null);
     }
 
     public async Task<MockupTemplateSetupResult> AddAsync(AddLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default)
