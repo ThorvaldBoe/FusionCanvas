@@ -135,6 +135,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private string _brandDirection = string.Empty;
     private string _planningContext = string.Empty;
     private string _url = string.Empty;
+    private int? _printifyShopId;
     private FulfillmentStrategy _fulfillmentStrategy = FulfillmentStrategy.Manual;
     private string _nicheName = string.Empty;
     private string _nicheDescription = string.Empty;
@@ -433,6 +434,46 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public CatalogSetupViewModel? CatalogSetup { get; }
 
+    public StorePrintifyCredentialsViewModel? PrintifyCredentials { get; private set; }
+
+    public void ConfigurePrintify(FusionCanvas.Application.Stores.Printify.IStorePrintifyCredentialStore credentials,
+        FusionCanvas.Application.Stores.Printify.IPrintifyCredentialVerifier verifier)
+    {
+        PrintifyCredentials?.CancelPending();
+        if (PrintifyCredentials is not null) { PrintifyCredentials.ShopSelectionChanged -= OnPrintifyShopSelectionChanged; PrintifyCredentials.CancelPending(); }
+        PrintifyCredentials = new(new FusionCanvas.Application.Stores.Printify.StorePrintifyConfigurationService(_service, credentials, verifier));
+        PrintifyCredentials.ShopSelectionChanged += OnPrintifyShopSelectionChanged;
+        OnPropertyChanged(nameof(PrintifyCredentials));
+        RefreshPrintifyContext();
+    }
+
+    private bool _showStrategyWarning;
+    private Guid? _confirmedStrategyStore;
+    public bool ShowStrategyWarning
+    {
+        get => _showStrategyWarning;
+        private set => SetField(ref _showStrategyWarning, value);
+    }
+
+    public ICommand ConfirmStrategyCommand => new RelayCommand(_ =>
+    {
+        if (!ShowStrategyWarning || SelectedStore is null) return;
+        ShowStrategyWarning = false;
+        _confirmedStrategyStore = SelectedStore.Id;
+        Run(SaveSelectedStoreAsync());
+    });
+
+    public ICommand CancelStrategyCommand => new RelayCommand(_ =>
+    {
+        ShowStrategyWarning = false;
+        if (SelectedStore is not null) SelectedFulfillmentStrategy = SelectedStore.FulfillmentStrategy;
+    });
+
+    private void RefreshPrintifyContext() => PrintifyCredentials?.SetContext(
+        SelectedStore, SelectedFulfillmentStrategy, _isCreatingNewStore, IsStoreEditorOpen);
+
+    private void OnPrintifyShopSelectionChanged(object? sender, int? shopId) { _printifyShopId = shopId; if (SelectedStore is not null && !_isCreatingNewStore && SelectedStore.FulfillmentStrategy == FulfillmentStrategy.ShopifyPrintify) Run(SaveSelectedStoreAsync()); }
+
     public NicheSummary? SelectedNiche { get; private set; }
 
     public bool NeedsFirstStore { get; private set; }
@@ -618,6 +659,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             if (SetField(ref _isStoreEditorOpen, value))
             {
                 RaisePromptProperties();
+                RefreshPrintifyContext();
             }
         }
     }
@@ -1376,6 +1418,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public async Task SetActiveWorkspaceAsync(Guid? workspaceId, CancellationToken cancellationToken = default)
     {
+        PrintifyCredentials?.SetContext(null, FulfillmentStrategy.Manual, false, false);
+        ShowStrategyWarning = false;
         _service.SetActiveWorkspace(workspaceId);
         _nicheService?.SetActiveWorkspace(workspaceId);
         _tagService?.SetActiveStore(null);
@@ -1555,6 +1599,13 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public async Task SaveSelectedStoreAsync(CancellationToken cancellationToken = default)
     {
+        if (!_isCreatingNewStore && SelectedStore is { FulfillmentStrategy: FulfillmentStrategy.ShopifyPrintify }
+            && SelectedFulfillmentStrategy != FulfillmentStrategy.ShopifyPrintify && _confirmedStrategyStore != SelectedStore.Id)
+        {
+            ShowStrategyWarning = true;
+            return;
+        }
+        _confirmedStrategyStore = null;
         if (_isCreatingNewStore)
         {
             var createResult = await _service.CreateStoreAsync(
@@ -3289,6 +3340,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         BrandDirection = store.Context.BrandDirection ?? string.Empty;
         PlanningContext = store.Context.PlanningContext ?? string.Empty;
         Url = store.Context.Url ?? string.Empty;
+        _printifyShopId = store.Context.PrintifyShopId;
         SelectedFulfillmentStrategy = store.FulfillmentStrategy;
     }
 
@@ -3565,7 +3617,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             EmptyToNull(TargetMarket),
             EmptyToNull(BrandDirection),
             EmptyToNull(PlanningContext),
-            EmptyToNull(Url));
+            EmptyToNull(Url),
+            _printifyShopId);
 
     private NicheContext CurrentNicheContext() =>
         new(
@@ -3601,6 +3654,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     private void RaiseEditorActionProperties()
     {
+        RefreshPrintifyContext();
         OnPropertyChanged(nameof(HasUnsavedChanges));
         OnPropertyChanged(nameof(HasAnyUnsavedChanges));
         OnPropertyChanged(nameof(CanSaveSelectedStore));

@@ -15,6 +15,9 @@
         MinWidth="720"
         MinHeight="520"
         Background="{DynamicResource ApplicationBackgroundBrush}">
+  <Window.Resources>
+    <stores:FulfillmentStrategyLabelConverter x:Key="FulfillmentStrategyLabel" />
+  </Window.Resources>
   <Grid ColumnDefinitions="260,*"
         RowDefinitions="*">
     <Border Grid.Column="0"
@@ -133,12 +136,32 @@
               <ComboBox ItemsSource="{Binding AvailableFulfillmentStrategies}"
                         SelectedItem="{Binding SelectedFulfillmentStrategy}"
                         IsEnabled="{Binding CanEditStoreConfiguration}"
-                        AutomationProperties.AutomationId="StoreEditor.FulfillmentStrategy" />
-              <TextBlock Text="Shopify manual — future strategy"
-                         Foreground="{DynamicResource DisabledTextBrush}" />
-              <TextBlock Text="Shopify + Printify — future strategy"
-                         Foreground="{DynamicResource DisabledTextBrush}" />
-              <TextBlock Text="Manual means Fusion Canvas records catalog data locally and does not communicate with Shopify or Printify. Future strategies will add their own configuration."
+                        AutomationProperties.AutomationId="StoreEditor.FulfillmentStrategy">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate><TextBlock Text="{Binding ., Converter={StaticResource FulfillmentStrategyLabel}}" /></DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <StackPanel IsVisible="{Binding ShowStrategyWarning}" Spacing="8">
+                <TextBlock Text="Changing strategy makes Printify configuration unavailable. The saved key and catalog will be retained. Save this change?" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Save strategy change" Command="{Binding ConfirmStrategyCommand}" />
+                  <Button Content="Cancel strategy change" Command="{Binding CancelStrategyCommand}" />
+                </StackPanel>
+              </StackPanel>
+              <StackPanel DataContext="{Binding PrintifyCredentials}" x:DataType="stores:StorePrintifyCredentialsViewModel"
+                          IsVisible="{Binding IsVisible}" Spacing="8">
+                <TextBlock Text="{Binding Status}" IsVisible="{Binding !IsMissing}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Status}" IsVisible="{Binding IsMissing}" Foreground="{DynamicResource DangerStrongBrush}" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button x:Name="PrintifyManageButton" Content="{Binding ManageLabel}" Command="{Binding ManageCommand}" IsEnabled="{Binding CanManage}" />
+                  <Button Content="Verify" Command="{Binding VerifyCommand}" IsVisible="{Binding HasKey}" IsEnabled="{Binding CanVerify}" />
+                  <Button Content="Retry" Command="{Binding RetryCommand}" IsVisible="{Binding HasError}" />
+                </StackPanel>
+                <TextBlock Text="Save the Shopify + Printify strategy before verifying." IsVisible="{Binding ShowSaveGuidance}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Verification}" TextWrapping="Wrap" />
+                <ComboBox ItemsSource="{Binding Shops}" SelectedValue="{Binding SelectedShopId, Mode=TwoWay}" SelectedValueBinding="{Binding Id}" DisplayMemberBinding="{Binding DisplayName}" IsVisible="{Binding HasKey}" PlaceholderText="Select Printify shop" AutomationProperties.AutomationId="StoreEditor.PrintifyShop" />
+              </StackPanel>
+              <TextBlock Text="Manual means Fusion Canvas records catalog data locally without communicating with Shopify or Printify. Catalog work remains local. Shopify integration and publishing are not connected. Only Shopify + Printify uses a Printify key, and Verify runs only when requested."
                          TextWrapping="Wrap"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
             </StackPanel>

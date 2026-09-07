@@ -17,6 +17,19 @@ public partial class StoreEditorWindow : Window
     private bool _mockupTemplateEditorOpen;
     private MockupTemplateEditorWindow? _mockupTemplateEditorWindow;
     private bool _designAreaEditorOpen;
+    private StorePrintifyCredentialsViewModel? _printify;
+    private PrintifyApiKeyWindow? _printifyDialog;
+
+    private async void OnPrintifyEditRequested(object? sender, EventArgs e)
+    {
+        if (_printifyDialog is not null || _printify?.CreateEditor() is not { } model) return;
+        var credentials = _printify;
+        _printifyDialog = new PrintifyApiKeyWindow { DataContext = model };
+        await _printifyDialog.ShowDialog(this);
+        _printifyDialog = null;
+        if (model.Saved) await credentials.RefreshAsync();
+        PrintifyManageButton.Focus();
+    }
 
     internal IWindowGeometryStore? GeometryStore { get; set; }
 
@@ -29,6 +42,11 @@ public partial class StoreEditorWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        if (_printify is not null)
+        {
+            _printify.EditRequested -= OnPrintifyEditRequested;
+            _printify.CancelPending();
+        }
         if (_mockupTemplateEditorWindow is { IsVisible: true } dialog)
         {
             dialog.Close();
@@ -39,6 +57,11 @@ public partial class StoreEditorWindow : Window
 
     private void OnClosing(object? sender, WindowClosingEventArgs e)
     {
+        if (_printifyDialog is { } dialog)
+        {
+            dialog.Close();
+            if (dialog.IsVisible) { e.Cancel = true; return; }
+        }
         if (DataContext is StoreManagementViewModel viewModel && !viewModel.TryCloseStoreEditor())
         {
             e.Cancel = true;
@@ -47,6 +70,9 @@ public partial class StoreEditorWindow : Window
 
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
+        if (_printify is not null) _printify.EditRequested -= OnPrintifyEditRequested;
+        _printify = (DataContext as StoreManagementViewModel)?.PrintifyCredentials;
+        if (_printify is not null) _printify.EditRequested += OnPrintifyEditRequested;
         if (_subscribedViewModel is not null)
         {
             _subscribedViewModel.StoreNameFocusRequested -= OnStoreNameFocusRequested;

@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:stores="clr-namespace:FusionCanvas.App.Stores"
+        x:Class="FusionCanvas.App.Stores.PrintifyApiKeyWindow"
+        x:DataType="stores:PrintifyApiKeyViewModel"
+        Title="{Binding Title}" Width="520" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner" Background="{DynamicResource ApplicationBackgroundBrush}">
+  <StackPanel Margin="20" Spacing="12">
+    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+    <TextBlock Text="Printify API key" />
+    <TextBox x:Name="KeyInput" Text="{Binding Draft}" PasswordChar="●"
+             IsEnabled="{Binding CanEdit}" AutomationProperties.Name="Printify API key"
+             AutomationProperties.AutomationId="Printify.Key" />
+    <TextBlock Text="Save stores this key securely for this Store immediately, independently of Store Save. An existing key is replaced and is never displayed. Verification needs shops.read access."
+               TextWrapping="Wrap" />
+    <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource DangerStrongBrush}" />
+    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+      <Button Content="Save" Command="{Binding SaveCommand}" IsEnabled="{Binding CanSave}" />
+      <Button Content="Cancel" Command="{Binding CancelCommand}" IsEnabled="{Binding CanEdit}" />
+    </StackPanel>
+    <StackPanel IsVisible="{Binding ShowDiscard}" Spacing="8">
+      <TextBlock Text="Discard the unsaved API key?" />
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button Content="Keep editing" Command="{Binding KeepEditingCommand}" />
+        <Button Content="Discard" Command="{Binding DiscardCommand}" />
+      </StackPanel>
+    </StackPanel>
+  </StackPanel>
+</Window>

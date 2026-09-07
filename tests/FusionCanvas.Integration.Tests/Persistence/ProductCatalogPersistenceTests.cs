@@ -15,6 +15,24 @@ public class ProductCatalogPersistenceTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 4, 12, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData(FulfillmentStrategy.Manual)]
+    [InlineData(FulfillmentStrategy.ShopifyManual)]
+    [InlineData(FulfillmentStrategy.ShopifyPrintify)]
+    public async Task FulfillmentStrategies_RoundTripWithCatalogUnchanged(FulfillmentStrategy strategy)
+    {
+        using var directory = new TemporaryDirectory();
+        var repository = new SqliteWorkspaceRepository(directory.GetPath("strategies.db"));
+        var original = CreateCatalogSnapshot();
+        var snapshot = original with { Stores = original.Stores.Select(store => store with { FulfillmentStrategy = strategy }).ToArray() };
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.All(loaded.Stores, store => Assert.Equal(strategy, store.FulfillmentStrategy));
+        Assert.Equal(snapshot.StoreProducts, loaded.StoreProducts);
+        Assert.Equal(snapshot.ProductVariants, loaded.ProductVariants);
+        Assert.Equal(snapshot.DesignAreas, loaded.DesignAreas);
+    }
+
     [Fact]
     public async Task SaveAndLoadAsync_RoundTripsCatalog()
     {
