@@ -2,6 +2,7 @@ using FusionCanvas.Application.Stores;
 using FusionCanvas.Application.Stores.Printify;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.Application.Tests.Stores;
@@ -34,7 +35,7 @@ public sealed class PrintifyCatalogImportServiceTests
 
         var result = await service.LoadBlueprintsAsync(new(store.WorkspaceId, store.Id), TestContext.Current.CancellationToken);
 
-        Assert.True(result.Succeeded);
+        Assert.True(result.Succeeded, result.Message);
         Assert.Equal(1, credentials.Reads);
         Assert.Equal("synthetic-key", client.LastKey);
     }
@@ -67,6 +68,34 @@ public sealed class PrintifyCatalogImportServiceTests
         Assert.Contains("\"kind\":\"option-value\"", optionValue.MetadataJson);
         Assert.Single(repository.Snapshot.OfferingVariants);
         Assert.Single(repository.Snapshot.OfferingPlaceholders);
+    }
+
+    [Fact]
+    public async Task ImportsProviderIdentityWithinTargetStoreOnly()
+    {
+        var workspaceId = Guid.NewGuid();
+        var targetStore = new StoreSummary(Guid.NewGuid(), workspaceId, "Target", new(PrintifyShopId: 42), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, FulfillmentStrategy.ShopifyPrintify);
+        var otherStore = new StoreSummary(Guid.NewGuid(), workspaceId, "Other", new(PrintifyShopId: 84), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, FulfillmentStrategy.ShopifyPrintify);
+        var otherProvider = new PrintProvider(Guid.NewGuid(), otherStore.Id, "Other provider", "7", false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "{}");
+        var repository = new RepositoryStub(new WorkspaceSnapshot([], [
+            new Store(targetStore.Id, workspaceId, targetStore.Name, null, false, targetStore.CreatedAt, targetStore.UpdatedAt, "{}", null, targetStore.FulfillmentStrategy),
+            new Store(otherStore.Id, workspaceId, otherStore.Name, null, false, otherStore.CreatedAt, otherStore.UpdatedAt, "{}", null, otherStore.FulfillmentStrategy)
+        ], [], [], [], [], [], [], [], []) { PrintProviders = [otherProvider] });
+        var client = new ClientStub
+        {
+            SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [new(
+                new(68, "Updated Tee", null, "Gildan", "5000"),
+                [new(7, "Target provider", [], [new(33719, "Black", true, true, [1], [new("front", "dtg", 100, 200)])])])])
+        };
+        var credentials = new CredentialsStub { Result = new(new(PrintifyConfigurationKind.Available, "available"), "synthetic-key") };
+        var service = new PrintifyCatalogImportService(new StoresStub(targetStore), credentials, client, repository);
+
+        var result = await service.LoadSelectedAsync(new(workspaceId, targetStore.Id), [68], TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal(2, repository.Snapshot.PrintProviders.Count);
+        Assert.Contains(repository.Snapshot.PrintProviders, value => value.StoreId == otherStore.Id && value.ExternalProviderId == "7");
+        Assert.Contains(repository.Snapshot.PrintProviders, value => value.StoreId == targetStore.Id && value.ExternalProviderId == "7");
     }
 
     private sealed class StoresStub(StoreSummary store) : IStoreManagementService
