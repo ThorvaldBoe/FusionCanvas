@@ -42,6 +42,8 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
     public bool HasBlueprints => Blueprints.Count > 0;
     public bool CanStart => !IsBusy;
     public bool CanConfirm => IsOpen && !IsBusy && SelectedCount > 0;
+    public event EventHandler? SelectionFocusRequested;
+    public event EventHandler? ImportFocusRequested;
 
     private Task StartLoadAsync()
     {
@@ -81,6 +83,7 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
                 Blueprints.Add(item);
             }
             OnPropertyChanged(nameof(HasBlueprints));
+            SelectionFocusRequested?.Invoke(this, EventArgs.Empty);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception) { ErrorMessage = "Printify catalog could not be loaded. Try again."; }
@@ -104,6 +107,7 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
             if (_onImported is not null)
                 await _onImported(scope, cancellationToken).ConfigureAwait(true);
             IsOpen = false;
+            ImportFocusRequested?.Invoke(this, EventArgs.Empty);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception) { ErrorMessage = "The selected Printify catalog could not be prepared for import."; }
@@ -115,6 +119,7 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
         if (IsBusy) return;
         CancelOperation();
         IsOpen = false;
+        ImportFocusRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private bool IsCurrentScope(StoreCredentialScope expected) => IsOpen && _scope() == expected;

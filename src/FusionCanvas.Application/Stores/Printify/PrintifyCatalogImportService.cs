@@ -58,6 +58,7 @@ public sealed class PrintifyCatalogImportService(
         Guid storeId,
         IReadOnlyList<PrintifyCatalogBlueprint> catalog)
     {
+        ValidateCatalog(catalog);
         var now = DateTimeOffset.UtcNow;
         var blueprints = snapshot.Blueprints.ToList();
         var providers = snapshot.PrintProviders.ToList();
@@ -133,6 +134,35 @@ public sealed class PrintifyCatalogImportService(
         }
 
         return snapshot with { Blueprints = blueprints, PrintProviders = providers, BlueprintOfferings = offerings, OfferingOptions = options, OfferingOptionValues = values, OfferingVariants = variants, OfferingPlaceholders = placeholders };
+    }
+
+    private static void ValidateCatalog(IReadOnlyList<PrintifyCatalogBlueprint> catalog)
+    {
+        if (catalog.GroupBy(value => value.Summary.Id).Any(group => group.Count() > 1))
+            throw new InvalidOperationException("The Printify response contains duplicate Blueprint identities.");
+
+        foreach (var blueprint in catalog)
+        {
+            if (blueprint.Summary.Id <= 0 || string.IsNullOrWhiteSpace(blueprint.Summary.Title))
+                throw new InvalidOperationException("The Printify response contains an invalid Blueprint identity.");
+            if (blueprint.Providers.GroupBy(value => value.Id).Any(group => group.Count() > 1))
+                throw new InvalidOperationException("The Printify response contains duplicate provider identities.");
+
+            foreach (var provider in blueprint.Providers)
+            {
+                if (provider.Id <= 0 || string.IsNullOrWhiteSpace(provider.Title))
+                    throw new InvalidOperationException("The Printify response contains an invalid provider identity.");
+                if (provider.Variants.GroupBy(value => value.Id).Any(group => group.Count() > 1))
+                    throw new InvalidOperationException("The Printify response contains duplicate variant identities.");
+                foreach (var variant in provider.Variants)
+                {
+                    if (variant.Id <= 0 || string.IsNullOrWhiteSpace(variant.Title) || variant.OptionValueIds.Any(value => value <= 0))
+                        throw new InvalidOperationException("The Printify response contains an invalid variant relationship.");
+                    if (variant.Placeholders.Any(value => string.IsNullOrWhiteSpace(value.Position) || value.Width <= 0 || value.Height <= 0))
+                        throw new InvalidOperationException("The Printify response contains an invalid print area.");
+                }
+            }
+        }
     }
 
     private static Dictionary<int, Guid> EnsureOptions(List<OfferingOption> options, List<OfferingOptionValue> values, Guid offeringId, IReadOnlyList<int> sourceIds, DateTimeOffset now)

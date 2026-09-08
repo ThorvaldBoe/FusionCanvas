@@ -63,11 +63,14 @@ public sealed class PrintifyCatalogImportServiceTests
         Assert.Single(repository.Snapshot.PrintProviders);
         Assert.Single(repository.Snapshot.BlueprintOfferings);
         var option = Assert.Single(repository.Snapshot.OfferingOptions);
+        Assert.Equal(OptionKind.Color, option.OptionKind);
         Assert.Contains("\"kind\":\"option\"", option.MetadataJson);
         var optionValue = Assert.Single(repository.Snapshot.OfferingOptionValues);
         Assert.Contains("\"kind\":\"option-value\"", optionValue.MetadataJson);
         Assert.Single(repository.Snapshot.OfferingVariants);
-        Assert.Single(repository.Snapshot.OfferingPlaceholders);
+        var variant = Assert.Single(repository.Snapshot.OfferingVariants);
+        var placeholder = Assert.Single(repository.Snapshot.OfferingPlaceholders);
+        Assert.Equal([variant.Id], placeholder.VariantIds);
     }
 
     [Fact]
@@ -96,6 +99,25 @@ public sealed class PrintifyCatalogImportServiceTests
         Assert.Equal(2, repository.Snapshot.PrintProviders.Count);
         Assert.Contains(repository.Snapshot.PrintProviders, value => value.StoreId == otherStore.Id && value.ExternalProviderId == "7");
         Assert.Contains(repository.Snapshot.PrintProviders, value => value.StoreId == targetStore.Id && value.ExternalProviderId == "7");
+    }
+
+    [Fact]
+    public async Task RejectsDuplicateProviderPayloadWithoutSaving()
+    {
+        var store = new StoreSummary(Guid.NewGuid(), Guid.NewGuid(), "Store", new(PrintifyShopId: 42), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, FulfillmentStrategy.ShopifyPrintify);
+        var repository = new RepositoryStub(WorkspaceSnapshot.Empty with { Stores = [new Store(store.Id, store.WorkspaceId, store.Name, null, false, store.CreatedAt, store.UpdatedAt, "{}", null, store.FulfillmentStrategy)] });
+        var duplicateProvider = new PrintifyCatalogProvider(7, "Provider", [], [new(33719, "Black", true, true, [1], [new("front", "dtg", 100, 200)])]);
+        var client = new ClientStub
+        {
+            SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [new(new(68, "Tee", null, "Brand", "Model"), [duplicateProvider, duplicateProvider])])
+        };
+        var service = new PrintifyCatalogImportService(new StoresStub(store), new CredentialsStub { Result = new(new(PrintifyConfigurationKind.Available, "available"), "key") }, client, repository);
+
+        var result = await service.LoadSelectedAsync(new(store.WorkspaceId, store.Id), [68], TestContext.Current.CancellationToken);
+
+        Assert.Equal(PrintifyCatalogResultKind.UnexpectedResponse, result.Kind);
+        Assert.Empty(repository.Snapshot.Blueprints);
+        Assert.Empty(repository.Snapshot.PrintProviders);
     }
 
     private sealed class StoresStub(StoreSummary store) : IStoreManagementService

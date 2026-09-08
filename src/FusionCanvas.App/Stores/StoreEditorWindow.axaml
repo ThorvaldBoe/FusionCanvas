@@ -466,12 +466,15 @@
                         IsEnabled="{Binding CanCreateCatalogItem}"
                         Classes="primary" />
                 <Button Content="Import from Printify"
+                        x:Name="PrintifyImportButton"
                         Command="{Binding PrintifyCatalogImportSession.OpenCommand}"
                         IsVisible="{Binding PrintifyCatalogImportSession, Converter={x:Static ObjectConverters.IsNotNull}}"
                         Classes="secondary"
                         AutomationProperties.AutomationId="Catalog.ImportFromPrintify" />
               </StackPanel>
-              <Border IsVisible="{Binding PrintifyCatalogImportSession.IsOpen}"
+              <Border x:Name="PrintifyImportPanel" IsVisible="{Binding PrintifyCatalogImportSession.IsOpen}"
+                      Focusable="True"
+                      KeyDown="OnPrintifyImportKeyDown"
                       Classes="panel"
                       Padding="12"
                       AutomationProperties.AutomationId="Catalog.PrintifyImportPanel">
@@ -482,7 +485,7 @@
                              Foreground="{DynamicResource SecondaryTextBrush}" />
                   <ProgressBar IsVisible="{Binding IsBusy}" IsIndeterminate="True" Height="4" />
                   <TextBlock IsVisible="{Binding !HasBlueprints}" Text="No Blueprints are available." Foreground="{DynamicResource SecondaryTextBrush}" />
-                  <ItemsControl ItemsSource="{Binding Blueprints}">
+                  <ItemsControl x:Name="PrintifyBlueprintList" ItemsSource="{Binding Blueprints}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="stores:PrintifyCatalogImportItemViewModel">
                         <CheckBox Content="{Binding Title}"

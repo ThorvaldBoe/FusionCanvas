@@ -47,6 +47,50 @@ public sealed class PrintifyCatalogImportViewModelTests
         Assert.False(viewModel.IsOpen);
     }
 
+    [Fact]
+    public async Task CancellingSelectionDoesNotSubmitAnImport()
+    {
+        var scope = new StoreCredentialScope(Guid.NewGuid(), Guid.NewGuid());
+        var service = new StubService
+        {
+            BlueprintsTask = Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "loaded", [new(68, "Tee", null, null, null)]))
+        };
+        var viewModel = new PrintifyCatalogImportViewModel(service, () => scope);
+
+        viewModel.Open();
+        await WaitForAsync(() => !viewModel.IsBusy);
+        viewModel.Blueprints[0].IsSelected = true;
+        Assert.Equal(1, viewModel.SelectedCount);
+        Assert.True(viewModel.CanConfirm);
+
+        viewModel.CancelCommand.Execute(null);
+
+        Assert.False(viewModel.IsOpen);
+        Assert.Equal(0, service.SelectedCalls);
+    }
+
+    [Fact]
+    public async Task FailedConfirmationLeavesSelectionOpenAndRecoverable()
+    {
+        var scope = new StoreCredentialScope(Guid.NewGuid(), Guid.NewGuid());
+        var service = new StubService
+        {
+            BlueprintsTask = Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "loaded", [new(68, "Tee", null, null, null)])),
+            SelectedTask = Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.PermissionDenied, "Printify rejected the request."))
+        };
+        var viewModel = new PrintifyCatalogImportViewModel(service, () => scope);
+
+        viewModel.Open();
+        await WaitForAsync(() => !viewModel.IsBusy);
+        viewModel.Blueprints[0].IsSelected = true;
+        viewModel.ConfirmCommand.Execute(null);
+        await WaitForAsync(() => !viewModel.IsBusy);
+
+        Assert.True(viewModel.IsOpen);
+        Assert.Equal("Printify rejected the request.", viewModel.ErrorMessage);
+        Assert.True(viewModel.CanConfirm);
+    }
+
     private static async Task WaitForAsync(Func<bool> predicate)
     {
         for (var attempt = 0; attempt < 100 && !predicate(); attempt++)
@@ -58,7 +102,8 @@ public sealed class PrintifyCatalogImportViewModelTests
     {
         public Task<PrintifyCatalogResult> BlueprintsTask { get; init; } = Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Empty, "empty", []));
         public Task<PrintifyCatalogResult> SelectedTask { get; init; } = Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Empty, "empty", []));
+        public int SelectedCalls { get; private set; }
         public Task<PrintifyCatalogResult> LoadBlueprintsAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default) => BlueprintsTask;
-        public Task<PrintifyCatalogResult> LoadSelectedAsync(StoreCredentialScope scope, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken = default) => SelectedTask;
+        public Task<PrintifyCatalogResult> LoadSelectedAsync(StoreCredentialScope scope, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken = default) { SelectedCalls++; return SelectedTask; }
     }
 }
