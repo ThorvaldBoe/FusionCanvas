@@ -629,6 +629,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await MigrateToVersion15Async(connection, cancellationToken);
         }
 
+        if (schemaVersion < 16)
+        {
+            await MigrateToVersion16Async(connection, cancellationToken);
+        }
+
         await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
     }
 
@@ -721,6 +726,15 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         UPDATE offering_option_values
         SET sort_order = (SELECT position FROM ranked WHERE ranked.id = offering_option_values.id)
         WHERE is_archived = 0;
+        """, cancellationToken);
+
+    private static Task MigrateToVersion16Async(SqliteConnection connection, CancellationToken cancellationToken) => ExecuteAsync(connection, null, """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_print_providers_printify_identity
+            ON print_providers(store_id, external_provider_id)
+            WHERE external_provider_id IS NOT NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_blueprint_offerings_printify_identity
+            ON blueprint_offerings(store_id, external_offering_id)
+            WHERE external_offering_id IS NOT NULL;
         """, cancellationToken);
 
     private static async Task MigrateToVersion12Async(SqliteConnection connection, CancellationToken cancellationToken)

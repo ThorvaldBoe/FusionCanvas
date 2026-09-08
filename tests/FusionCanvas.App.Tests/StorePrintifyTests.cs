@@ -191,6 +191,7 @@ public class StorePrintifyTests
         window.Close();
     }
 
+
     private sealed class Service : IStorePrintifyConfigurationService
     {
         public PrintifyConfigurationKind Kind { get; set; } = PrintifyConfigurationKind.Missing;
@@ -243,4 +244,5 @@ public class StorePrintifyTests
         public Task<PrintifyConfigurationResult> VerifyAsync(string key, CancellationToken cancellationToken = default) =>
             Task.FromResult(new PrintifyConfigurationResult(PrintifyConfigurationKind.Verified, "Verified"));
     }
+
 }

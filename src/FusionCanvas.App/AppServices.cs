@@ -14,14 +14,17 @@ public sealed class AppServices : IDisposable
 
     public FusionCanvas.Application.Stores.Printify.IStorePrintifyCredentialStore? PrintifyCredentials { get; private set; }
     public FusionCanvas.Application.Stores.Printify.IPrintifyCredentialVerifier? PrintifyVerifier { get; private set; }
+    public FusionCanvas.Application.Stores.Printify.IPrintifyCatalogClient? PrintifyCatalogClient { get; private set; }
 
     internal void ConfigurePrintify(HttpClient client,
         FusionCanvas.Application.Stores.Printify.IStorePrintifyCredentialStore credentials,
-        FusionCanvas.Application.Stores.Printify.IPrintifyCredentialVerifier verifier)
+        FusionCanvas.Application.Stores.Printify.IPrintifyCredentialVerifier verifier,
+        FusionCanvas.Application.Stores.Printify.IPrintifyCatalogClient catalogClient)
     {
         _printifyHttpClient = client;
         PrintifyCredentials = credentials;
         PrintifyVerifier = verifier;
+        PrintifyCatalogClient = catalogClient;
     }
 
     public AppServices(

@@ -62,8 +62,8 @@ public partial class MainWindow : Window
             services.Settings,
             services.AiTextGeneration);
         _itemCsvImportCodec = services.ItemCsvImportCodec;
-        if (services.PrintifyCredentials is { } printifyCredentials && services.PrintifyVerifier is { } printifyVerifier)
-            viewModel.StoreManagement.ConfigurePrintify(printifyCredentials, printifyVerifier);
+        if (services.PrintifyCredentials is { } printifyCredentials && services.PrintifyVerifier is { } printifyVerifier && services.PrintifyCatalogClient is { } catalogClient)
+            viewModel.StoreManagement.ConfigurePrintify(printifyCredentials, printifyVerifier, catalogClient);
         viewModel.WorkspaceManagement.PackagePicker = new AvaloniaWorkspacePackagePicker(StorageProvider);
         viewModel.WorkspaceTree.FilePicker = new FusionCanvas.App.Items.AvaloniaItemCsvFilePicker(StorageProvider);
         viewModel.WorkspaceTree.CsvCodec = services.ItemCsvExportCodec;

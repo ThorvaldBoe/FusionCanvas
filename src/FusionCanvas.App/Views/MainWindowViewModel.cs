@@ -177,7 +177,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             new OfferingManagementService(workspaceRepository, providerCatalog),
             providerCatalog,
             new MockupTemplateSourceImageService(workspaceRepository, fileStore, metadataReader),
-            new NullAssetFilePicker());
+            new NullAssetFilePicker(),
+            workspaceRepository);
         _groupManagementService = groupManagementService ?? new GroupManagementService(workspaceRepository);
         _itemManagementService = itemManagementService ?? new ItemManagementService(workspaceRepository);
         _itemCsvImportService = itemCsvImportService ?? new ItemCsvImportService(workspaceRepository);
