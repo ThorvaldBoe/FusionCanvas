@@ -14,6 +14,7 @@ public class StorePrintifyConfigurationServiceTests
     [InlineData(FulfillmentStrategy.Manual)]
     [InlineData(FulfillmentStrategy.ShopifyManual)]
     [InlineData(FulfillmentStrategy.ShopifyPrintify)]
+    [InlineData(FulfillmentStrategy.Printify)]
     public async Task Strategies_SaveAndReloadWithoutKeys(FulfillmentStrategy strategy)
     {
         var repository = new Repository();

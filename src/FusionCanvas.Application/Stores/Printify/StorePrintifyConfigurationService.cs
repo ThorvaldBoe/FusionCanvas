@@ -32,7 +32,7 @@ public sealed class StorePrintifyConfigurationService(
         var store = await ResolveAsync(scope, cancellationToken).ConfigureAwait(false);
         if (store is null) return InvalidContext;
         if (!FulfillmentStrategyPolicy.RequiresPrintifyKey(store.FulfillmentStrategy))
-            return new(PrintifyConfigurationKind.InvalidContext, "Save Shopify + Printify as the Store strategy before verifying.");
+            return new(PrintifyConfigurationKind.InvalidContext, "Save a Printify strategy before verifying.");
         var read = await credentials.ReadAsync(scope, cancellationToken).ConfigureAwait(false);
         if (read.Status.Kind != PrintifyConfigurationKind.Available) return read.Status;
         if (!PrintifyToken.IsValid(read.Secret)) return PrintifyConfigurationResult.Unavailable;

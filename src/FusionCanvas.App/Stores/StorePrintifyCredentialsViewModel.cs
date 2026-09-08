@@ -46,10 +46,10 @@ public sealed class StorePrintifyCredentialsViewModel(IStorePrintifyConfiguratio
             Dispatcher.UIThread.Post(() => SetContext(store, selectedStrategy, isDraft, editorOpen));
             return;
         }
-        var visible = editorOpen && selectedStrategy == FulfillmentStrategy.ShopifyPrintify;
+        var visible = editorOpen && FulfillmentStrategyPolicy.RequiresPrintifyKey(selectedStrategy);
         var scope = visible && !isDraft && store is { IsArchived: false }
             ? new StoreCredentialScope(store.WorkspaceId, store.Id) : null;
-        var persisted = store?.FulfillmentStrategy == FulfillmentStrategy.ShopifyPrintify;
+        var persisted = store is not null && FulfillmentStrategyPolicy.RequiresPrintifyKey(store.FulfillmentStrategy);
         if (Equals(_store, store) && Equals(_scope, scope) && IsVisible == visible && _persistedPrintify == persisted) return;
         CancelPending();
         _store = store;

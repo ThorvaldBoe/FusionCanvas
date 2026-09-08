@@ -406,8 +406,10 @@ public class StoreEditorHeadlessTests
         var text = string.Join(" ", window.GetVisualDescendants().OfType<TextBlock>().Select(block => block.Text));
 
         Assert.Contains(FulfillmentStrategy.Manual, strategy.ItemsSource as IEnumerable<FulfillmentStrategy> ?? []);
+        Assert.Contains(FulfillmentStrategy.Printify, strategy.ItemsSource as IEnumerable<FulfillmentStrategy> ?? []);
         Assert.Contains("Manual means", text, StringComparison.Ordinal);
         Assert.Contains("Shopify + Printify", text, StringComparison.Ordinal);
+        Assert.Contains("standalone Printify", text, StringComparison.Ordinal);
 
         window.Close();
     }
