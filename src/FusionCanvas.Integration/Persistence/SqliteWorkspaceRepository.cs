@@ -465,12 +465,13 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             );
             CREATE TABLE IF NOT EXISTS offering_options (
                 id TEXT PRIMARY KEY, offering_id TEXT NOT NULL REFERENCES blueprint_offerings(id) ON DELETE CASCADE,
-                option_kind INTEGER NOT NULL, name TEXT NOT NULL, sort_order INTEGER NOT NULL, is_archived INTEGER NOT NULL
+                option_kind INTEGER NOT NULL, name TEXT NOT NULL, sort_order INTEGER NOT NULL, is_archived INTEGER NOT NULL,
+                metadata_json TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS offering_option_values (
                 id TEXT PRIMARY KEY, option_id TEXT NOT NULL REFERENCES offering_options(id) ON DELETE CASCADE,
                 offering_id TEXT NOT NULL REFERENCES blueprint_offerings(id) ON DELETE CASCADE,
-                value TEXT NOT NULL, sort_order INTEGER NOT NULL, is_archived INTEGER NOT NULL
+                value TEXT NOT NULL, sort_order INTEGER NOT NULL, is_archived INTEGER NOT NULL, metadata_json TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS offering_variants (
                 id TEXT PRIMARY KEY, offering_id TEXT NOT NULL REFERENCES blueprint_offerings(id) ON DELETE CASCADE,
@@ -634,6 +635,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await MigrateToVersion16Async(connection, cancellationToken);
         }
 
+        if (schemaVersion < 17)
+        {
+            await MigrateToVersion17Async(connection, cancellationToken);
+        }
+
         await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
     }
 
@@ -737,6 +743,14 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             WHERE external_offering_id IS NOT NULL;
         """, cancellationToken);
 
+    private static async Task MigrateToVersion17Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        if (!await ColumnExistsAsync(connection, "offering_options", "metadata_json", cancellationToken))
+            await ExecuteAsync(connection, null, "ALTER TABLE offering_options ADD COLUMN metadata_json TEXT NOT NULL DEFAULT '{}';", cancellationToken);
+        if (!await ColumnExistsAsync(connection, "offering_option_values", "metadata_json", cancellationToken))
+            await ExecuteAsync(connection, null, "ALTER TABLE offering_option_values ADD COLUMN metadata_json TEXT NOT NULL DEFAULT '{}';", cancellationToken);
+    }
+
     private static async Task MigrateToVersion12Async(SqliteConnection connection, CancellationToken cancellationToken)
     {
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -839,7 +853,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 {
                     optionId = Guid.NewGuid();
                     optionIds[(offeringId, kind)] = optionId;
-                    await ExecuteAsync(connection, transaction, "INSERT INTO offering_options (id, offering_id, option_kind, name, sort_order, is_archived) VALUES ($id,$offering_id,$option_kind,$name,$sort_order,0);", cancellationToken, ("$id", optionId.ToString()), ("$offering_id", offeringId.ToString()), ("$option_kind", (int)kind), ("$name", name.Trim()), ("$sort_order", (int)kind));
+                    await ExecuteAsync(connection, transaction, "INSERT INTO offering_options (id, offering_id, option_kind, name, sort_order, is_archived, metadata_json) VALUES ($id,$offering_id,$option_kind,$name,$sort_order,0,'{}');", cancellationToken, ("$id", optionId.ToString()), ("$offering_id", offeringId.ToString()), ("$option_kind", (int)kind), ("$name", name.Trim()), ("$sort_order", (int)kind));
                 }
 
                 var valueKey = (optionId, valueText.Trim().ToUpperInvariant());
@@ -847,7 +861,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 {
                     optionValueId = Guid.NewGuid();
                     optionValueIds[valueKey] = optionValueId;
-                    await ExecuteAsync(connection, transaction, "INSERT INTO offering_option_values (id, option_id, offering_id, value, sort_order, is_archived) VALUES ($id,$option_id,$offering_id,$value,0,0);", cancellationToken, ("$id", optionValueId.ToString()), ("$option_id", optionId.ToString()), ("$offering_id", offeringId.ToString()), ("$value", valueText.Trim()));
+                    await ExecuteAsync(connection, transaction, "INSERT INTO offering_option_values (id, option_id, offering_id, value, sort_order, is_archived, metadata_json) VALUES ($id,$option_id,$offering_id,$value,0,0,'{}');", cancellationToken, ("$id", optionValueId.ToString()), ("$option_id", optionId.ToString()), ("$offering_id", offeringId.ToString()), ("$value", valueText.Trim()));
                 }
 
                 optionValues.Add(optionValueId);
@@ -1561,8 +1575,8 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     private static Task InsertBlueprintOfferingAsync(SqliteConnection c, System.Data.Common.DbTransaction t, BlueprintOffering value, CancellationToken ct) =>
         ExecuteAsync(c, t, "INSERT INTO blueprint_offerings (id, blueprint_id, store_id, name, description, kind, print_provider_id, provider_network_code, default_placeholder_id, external_offering_id, is_archived, created_at, updated_at, metadata_json) VALUES ($id,$blueprint_id,$store_id,$name,$description,$kind,$print_provider_id,$provider_network_code,$default_placeholder_id,$external_offering_id,$is_archived,$created_at,$updated_at,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$blueprint_id", value.BlueprintId.ToString()), ("$store_id", value.StoreId.ToString()), ("$name", value.Name), ("$description", value.Description), ("$kind", (int)value.Kind), ("$print_provider_id", value.PrintProviderId?.ToString()), ("$provider_network_code", value.ProviderNetworkCode), ("$default_placeholder_id", value.DefaultPlaceholderId?.ToString()), ("$external_offering_id", value.ExternalOfferingId), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$metadata_json", value.MetadataJson));
 
-    private static Task InsertOfferingOptionAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingOption value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO offering_options (id, offering_id, option_kind, name, sort_order, is_archived) VALUES ($id,$offering_id,$option_kind,$name,$sort_order,$is_archived);", ct, ("$id", value.Id.ToString()), ("$offering_id", value.OfferingId.ToString()), ("$option_kind", (int)value.OptionKind), ("$name", value.Name), ("$sort_order", value.SortOrder), ("$is_archived", value.IsArchived ? 1 : 0));
-    private static Task InsertOfferingOptionValueAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingOptionValue value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO offering_option_values (id, option_id, offering_id, value, sort_order, is_archived) VALUES ($id,$option_id,$offering_id,$value,$sort_order,$is_archived);", ct, ("$id", value.Id.ToString()), ("$option_id", value.OptionId.ToString()), ("$offering_id", value.OfferingId.ToString()), ("$value", value.Value), ("$sort_order", value.SortOrder), ("$is_archived", value.IsArchived ? 1 : 0));
+    private static Task InsertOfferingOptionAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingOption value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO offering_options (id, offering_id, option_kind, name, sort_order, is_archived, metadata_json) VALUES ($id,$offering_id,$option_kind,$name,$sort_order,$is_archived,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$offering_id", value.OfferingId.ToString()), ("$option_kind", (int)value.OptionKind), ("$name", value.Name), ("$sort_order", value.SortOrder), ("$is_archived", value.IsArchived ? 1 : 0), ("$metadata_json", value.MetadataJson));
+    private static Task InsertOfferingOptionValueAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingOptionValue value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO offering_option_values (id, option_id, offering_id, value, sort_order, is_archived, metadata_json) VALUES ($id,$option_id,$offering_id,$value,$sort_order,$is_archived,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$option_id", value.OptionId.ToString()), ("$offering_id", value.OfferingId.ToString()), ("$value", value.Value), ("$sort_order", value.SortOrder), ("$is_archived", value.IsArchived ? 1 : 0), ("$metadata_json", value.MetadataJson));
 
     private static Task InsertOfferingVariantAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingVariant value, CancellationToken ct) => InsertOfferingVariantCoreAsync(c, t, value, ct);
     private static async Task InsertOfferingVariantCoreAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingVariant value, CancellationToken ct)
@@ -1664,7 +1678,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     {
         var result = new List<OfferingOption>();
         await foreach (var r in ReadAsync(c, "SELECT * FROM offering_options ORDER BY sort_order;", ct))
-            result.Add(new OfferingOption(ReadGuid(r, "id"), ReadGuid(r, "offering_id"), (OptionKind)ReadInt(r, "option_kind"), ReadString(r, "name"), ReadInt(r, "sort_order"), ReadBool(r, "is_archived")));
+            result.Add(new OfferingOption(ReadGuid(r, "id"), ReadGuid(r, "offering_id"), (OptionKind)ReadInt(r, "option_kind"), ReadString(r, "name"), ReadInt(r, "sort_order"), ReadBool(r, "is_archived"), ReadString(r, "metadata_json")));
         return result;
     }
 
@@ -1672,7 +1686,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     {
         var result = new List<OfferingOptionValue>();
         await foreach (var r in ReadAsync(c, "SELECT * FROM offering_option_values ORDER BY sort_order, id;", ct))
-            result.Add(new OfferingOptionValue(ReadGuid(r, "id"), ReadGuid(r, "option_id"), ReadGuid(r, "offering_id"), ReadString(r, "value"), ReadInt(r, "sort_order"), ReadBool(r, "is_archived")));
+            result.Add(new OfferingOptionValue(ReadGuid(r, "id"), ReadGuid(r, "option_id"), ReadGuid(r, "offering_id"), ReadString(r, "value"), ReadInt(r, "sort_order"), ReadBool(r, "is_archived"), ReadString(r, "metadata_json")));
         return result;
     }
 

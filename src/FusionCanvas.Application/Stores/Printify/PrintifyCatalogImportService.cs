@@ -142,16 +142,20 @@ public sealed class PrintifyCatalogImportService(
         for (var index = 0; index < sourceIds.Count && index < kinds.Length; index++)
         {
             var sourceId = sourceIds[index];
-            var option = options.SingleOrDefault(value => value.OfferingId == offeringId && value.OptionKind == kinds[index]);
+            var option = options.SingleOrDefault(value => value.OfferingId == offeringId
+                && value.OptionKind == kinds[index]
+                && MetadataHasId(value.MetadataJson, sourceId));
             if (option is null)
             {
-                option = new OfferingOption(Guid.NewGuid(), offeringId, kinds[index], $"Printify option {sourceId}", index);
+                option = new OfferingOption(Guid.NewGuid(), offeringId, kinds[index], $"Printify option {sourceId}", index, metadataJson: Metadata("option", sourceId));
                 options.Add(option);
             }
-            var optionValue = values.SingleOrDefault(value => value.OptionId == option.Id && value.Value == $"Printify value {sourceId}");
+            var optionValue = values.SingleOrDefault(value => value.OptionId == option.Id
+                && value.OfferingId == offeringId
+                && MetadataHasId(value.MetadataJson, sourceId));
             if (optionValue is null)
             {
-                optionValue = new OfferingOptionValue(Guid.NewGuid(), option.Id, offeringId, $"Printify value {sourceId}", 0);
+                optionValue = new OfferingOptionValue(Guid.NewGuid(), option.Id, offeringId, $"Printify value {sourceId}", 0, metadataJson: Metadata("option-value", sourceId));
                 values.Add(optionValue);
             }
             result[sourceId] = optionValue.Id;

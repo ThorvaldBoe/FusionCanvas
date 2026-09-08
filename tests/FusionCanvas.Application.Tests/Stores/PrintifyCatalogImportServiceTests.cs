@@ -61,6 +61,10 @@ public sealed class PrintifyCatalogImportServiceTests
         Assert.Single(repository.Snapshot.Blueprints);
         Assert.Single(repository.Snapshot.PrintProviders);
         Assert.Single(repository.Snapshot.BlueprintOfferings);
+        var option = Assert.Single(repository.Snapshot.OfferingOptions);
+        Assert.Contains("\"kind\":\"option\"", option.MetadataJson);
+        var optionValue = Assert.Single(repository.Snapshot.OfferingOptionValues);
+        Assert.Contains("\"kind\":\"option-value\"", optionValue.MetadataJson);
         Assert.Single(repository.Snapshot.OfferingVariants);
         Assert.Single(repository.Snapshot.OfferingPlaceholders);
     }
