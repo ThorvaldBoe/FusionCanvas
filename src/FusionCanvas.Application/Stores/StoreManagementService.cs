@@ -13,6 +13,7 @@ public sealed class StoreManagementService : IStoreManagementService
     private const string BrandDirectionKey = "brandDirection";
     private const string PlanningContextKey = "planningContext";
     private const string UrlKey = "url";
+    private const string PrintifyShopIdKey = "printifyShopId";
 
     private readonly IWorkspaceRepository _repository;
     private readonly Func<DateTimeOffset> _clock;
@@ -71,7 +72,7 @@ public sealed class StoreManagementService : IStoreManagementService
 
         if (!Enum.IsDefined(request.FulfillmentStrategy) || !FulfillmentStrategyPolicy.IsAvailable(request.FulfillmentStrategy))
         {
-            return StoreManagementResult.Failure("That fulfillment strategy is not available yet. Manual is currently the only supported strategy.", BuildState(snapshot));
+            return StoreManagementResult.Failure("That fulfillment strategy is not supported.", BuildState(snapshot));
         }
 
         var now = _clock();
@@ -116,7 +117,7 @@ public sealed class StoreManagementService : IStoreManagementService
         var fulfillmentStrategy = request.FulfillmentStrategy ?? existing.FulfillmentStrategy;
         if (!Enum.IsDefined(fulfillmentStrategy) || !FulfillmentStrategyPolicy.IsAvailable(fulfillmentStrategy))
         {
-            return StoreManagementResult.Failure("That fulfillment strategy is not available yet. Manual is currently the only supported strategy.", BuildState(snapshot));
+            return StoreManagementResult.Failure("That fulfillment strategy is not supported.", BuildState(snapshot));
         }
 
         var updatedStore = existing with
@@ -375,7 +376,8 @@ public sealed class StoreManagementService : IStoreManagementService
             metadata.GetValueOrDefault(TargetMarketKey),
             metadata.GetValueOrDefault(BrandDirectionKey),
             metadata.GetValueOrDefault(PlanningContextKey),
-            metadata.GetValueOrDefault(UrlKey));
+            metadata.GetValueOrDefault(UrlKey),
+            int.TryParse(metadata.GetValueOrDefault(PrintifyShopIdKey), out var shopId) ? shopId : null);
     }
 
     private static string ToMetadataJson(StoreContext context, string existingMetadataJson = "{}")
@@ -386,6 +388,7 @@ public sealed class StoreManagementService : IStoreManagementService
         SetOptional(metadata, BrandDirectionKey, context.BrandDirection);
         SetOptional(metadata, PlanningContextKey, context.PlanningContext);
         SetOptional(metadata, UrlKey, context.Url);
+        SetOptional(metadata, PrintifyShopIdKey, context.PrintifyShopId?.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         return metadata.Count == 0 ? "{}" : JsonSerializer.Serialize(metadata);
     }

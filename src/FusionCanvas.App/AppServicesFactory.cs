@@ -44,12 +44,17 @@ public static class AppServicesFactory
             new AssemblyApplicationVersionProvider(),
             AvaloniaClipboardService.Instance);
         var textService = new AiTextGenerationService(aiSettings, credentials, catalogCache, openRouter);
-        return new AppServices(
+        var services = new AppServices(
             httpClient,
             settingsStore,
             settings,
             textService,
             new FusionCanvas.Integration.Items.ItemCsvCodec(),
             new FusionCanvas.Integration.Items.Import.ItemCsvCodec());
+        var printifyClient = FusionCanvas.Integration.Stores.Printify.PrintifyCredentialVerifier.CreateHttpClient();
+        services.ConfigurePrintify(printifyClient,
+            new FusionCanvas.Integration.Stores.Printify.NativeStorePrintifyCredentialStore(),
+            new FusionCanvas.Integration.Stores.Printify.PrintifyCredentialVerifier(printifyClient));
+        return services;
     }
 }

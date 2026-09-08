@@ -6,4 +6,5 @@ public sealed record StoreContext(
     string? TargetMarket = null,
     string? BrandDirection = null,
     string? PlanningContext = null,
-    string? Url = null);
+    string? Url = null,
+    int? PrintifyShopId = null);
