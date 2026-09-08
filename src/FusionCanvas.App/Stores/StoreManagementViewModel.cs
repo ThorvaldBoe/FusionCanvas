@@ -472,7 +472,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private void RefreshPrintifyContext() => PrintifyCredentials?.SetContext(
         SelectedStore, SelectedFulfillmentStrategy, _isCreatingNewStore, IsStoreEditorOpen);
 
-    private void OnPrintifyShopSelectionChanged(object? sender, int? shopId) { _printifyShopId = shopId; if (SelectedStore is not null && !_isCreatingNewStore && SelectedStore.FulfillmentStrategy == FulfillmentStrategy.ShopifyPrintify) Run(SaveSelectedStoreAsync()); }
+    private void OnPrintifyShopSelectionChanged(object? sender, int? shopId) { _printifyShopId = shopId; if (SelectedStore is not null && !_isCreatingNewStore && FulfillmentStrategyPolicy.RequiresPrintifyKey(SelectedStore.FulfillmentStrategy)) Run(SaveSelectedStoreAsync()); }
 
     public NicheSummary? SelectedNiche { get; private set; }
 
@@ -1599,8 +1599,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public async Task SaveSelectedStoreAsync(CancellationToken cancellationToken = default)
     {
-        if (!_isCreatingNewStore && SelectedStore is { FulfillmentStrategy: FulfillmentStrategy.ShopifyPrintify }
-            && SelectedFulfillmentStrategy != FulfillmentStrategy.ShopifyPrintify && _confirmedStrategyStore != SelectedStore.Id)
+        if (!_isCreatingNewStore && SelectedStore is not null && FulfillmentStrategyPolicy.RequiresPrintifyKey(SelectedStore.FulfillmentStrategy)
+            && !FulfillmentStrategyPolicy.RequiresPrintifyKey(SelectedFulfillmentStrategy) && _confirmedStrategyStore != SelectedStore.Id)
         {
             ShowStrategyWarning = true;
             return;

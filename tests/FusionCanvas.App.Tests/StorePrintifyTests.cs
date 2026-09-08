@@ -169,11 +169,15 @@ public class StorePrintifyTests
         window.UpdateLayout();
         var selector = window.GetVisualDescendants().OfType<ComboBox>()
             .Single(c => Avalonia.Automation.AutomationProperties.GetAutomationId(c) == "StoreEditor.FulfillmentStrategy");
-        Assert.Equal(3, selector.ItemCount);
+        Assert.Equal(4, selector.ItemCount);
         Assert.Equal(FulfillmentStrategy.ShopifyPrintify, selector.SelectedItem);
         var manage = window.FindControl<Button>("PrintifyManageButton")!;
         Assert.Equal("Add", manage.Content);
         Assert.True(manage.IsEnabled);
+        selector.SelectedItem = FulfillmentStrategy.Printify;
+        Assert.Equal(FulfillmentStrategy.Printify, model.SelectedFulfillmentStrategy);
+        Assert.True(model.PrintifyCredentials.IsVisible);
+        selector.SelectedItem = FulfillmentStrategy.ShopifyPrintify;
         selector.SelectedItem = FulfillmentStrategy.ShopifyManual;
         Assert.Equal(FulfillmentStrategy.ShopifyManual, model.SelectedFulfillmentStrategy);
         Assert.False(model.PrintifyCredentials.IsVisible);

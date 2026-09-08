@@ -157,11 +157,11 @@
                   <Button Content="Verify" Command="{Binding VerifyCommand}" IsVisible="{Binding HasKey}" IsEnabled="{Binding CanVerify}" />
                   <Button Content="Retry" Command="{Binding RetryCommand}" IsVisible="{Binding HasError}" />
                 </StackPanel>
-                <TextBlock Text="Save the Shopify + Printify strategy before verifying." IsVisible="{Binding ShowSaveGuidance}" TextWrapping="Wrap" />
+                <TextBlock Text="Save the selected Printify strategy before verifying." IsVisible="{Binding ShowSaveGuidance}" TextWrapping="Wrap" />
                 <TextBlock Text="{Binding Verification}" TextWrapping="Wrap" />
                 <ComboBox ItemsSource="{Binding Shops}" SelectedValue="{Binding SelectedShopId, Mode=TwoWay}" SelectedValueBinding="{Binding Id}" DisplayMemberBinding="{Binding DisplayName}" IsVisible="{Binding HasKey}" PlaceholderText="Select Printify shop" AutomationProperties.AutomationId="StoreEditor.PrintifyShop" />
               </StackPanel>
-              <TextBlock Text="Manual means Fusion Canvas records catalog data locally without communicating with Shopify or Printify. Catalog work remains local. Shopify integration and publishing are not connected. Only Shopify + Printify uses a Printify key, and Verify runs only when requested."
+              <TextBlock Text="Manual means Fusion Canvas records catalog data locally without communicating with Shopify or Printify. Shopify + Manual does not connect to Printify. Printify and Shopify + Printify use a Printify key; standalone Printify does not enable Shopify integration or publishing. Verify runs only when requested."
                          TextWrapping="Wrap"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
             </StackPanel>

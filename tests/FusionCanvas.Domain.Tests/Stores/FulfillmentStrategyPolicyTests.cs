@@ -8,13 +8,14 @@ public class FulfillmentStrategyPolicyTests
     [InlineData(FulfillmentStrategy.Manual, false)]
     [InlineData(FulfillmentStrategy.ShopifyManual, false)]
     [InlineData(FulfillmentStrategy.ShopifyPrintify, true)]
-    public void SupportedStrategies_OnlyPrintifyRequiresKey(FulfillmentStrategy strategy, bool requiresKey)
+    [InlineData(FulfillmentStrategy.Printify, true)]
+    public void SupportedStrategies_PrintifyStrategiesRequireKey(FulfillmentStrategy strategy, bool requiresKey)
     {
         Assert.True(FulfillmentStrategyPolicy.IsAvailable(strategy));
         Assert.Equal(requiresKey, FulfillmentStrategyPolicy.RequiresPrintifyKey(strategy));
-        Assert.Equal(3, FulfillmentStrategyPolicy.AvailableStrategies.Count);
+        Assert.Equal(4, FulfillmentStrategyPolicy.AvailableStrategies.Count);
     }
 
     [Fact]
-    public void UndefinedValue_IsNotAvailable() => Assert.False(FulfillmentStrategyPolicy.IsAvailable((FulfillmentStrategy)3));
+    public void UndefinedValue_IsNotAvailable() => Assert.False(FulfillmentStrategyPolicy.IsAvailable((FulfillmentStrategy)4));
 }

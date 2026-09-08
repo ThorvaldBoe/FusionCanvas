@@ -11,6 +11,7 @@ public sealed class FulfillmentStrategyLabelConverter : IValueConverter
         FulfillmentStrategy.Manual => "Manual",
         FulfillmentStrategy.ShopifyManual => "Shopify + Manual",
         FulfillmentStrategy.ShopifyPrintify => "Shopify + Printify",
+        FulfillmentStrategy.Printify => "Printify",
         _ => string.Empty
     };
 
