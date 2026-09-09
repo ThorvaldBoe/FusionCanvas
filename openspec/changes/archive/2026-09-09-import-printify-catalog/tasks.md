@@ -35,4 +35,4 @@
 - [x] 5.2 Run focused tests for Domain, Application, Integration, and App projects while implementing and record their results.
 - [x] 5.3 Run `dotnet build .\FusionCanvas.sln`, `dotnet test .\FusionCanvas.sln`, and `openspec validate import-printify-catalog --strict`; all must pass.
 - [x] 5.4 Perform scoped completion QA for architecture, security, persistence, UI, external-request safety, and changed-scope drift; record limitations and retrospective.
-- [ ] 5.5 After acceptance, synchronize/archive the change and follow the repository issue completion workflow; do not merge while approval or verification is blocked.
+- [x] 5.5 After acceptance, synchronize/archive the change and follow the repository issue completion workflow; do not merge while approval or verification is blocked.
