@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Assets;
@@ -42,6 +43,11 @@ public partial class StoreEditorWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        if (_subscribedViewModel?.PrintifyCatalogImportSession is { } printifyImport)
+        {
+            printifyImport.SelectionFocusRequested -= OnPrintifySelectionFocusRequested;
+            printifyImport.ImportFocusRequested -= OnPrintifyImportFocusRequested;
+        }
         if (_printify is not null)
         {
             _printify.EditRequested -= OnPrintifyEditRequested;
@@ -75,6 +81,11 @@ public partial class StoreEditorWindow : Window
         if (_printify is not null) _printify.EditRequested += OnPrintifyEditRequested;
         if (_subscribedViewModel is not null)
         {
+            if (_subscribedViewModel.PrintifyCatalogImportSession is { } previousImport)
+            {
+                previousImport.SelectionFocusRequested -= OnPrintifySelectionFocusRequested;
+                previousImport.ImportFocusRequested -= OnPrintifyImportFocusRequested;
+            }
             _subscribedViewModel.StoreNameFocusRequested -= OnStoreNameFocusRequested;
             _subscribedViewModel.ProductNameFocusRequested -= OnProductNameFocusRequested;
             _subscribedViewModel.OfferingNameFocusRequested -= OnOfferingNameFocusRequested;
@@ -104,6 +115,11 @@ public partial class StoreEditorWindow : Window
         viewModel.StoreNameFocusRequested += OnStoreNameFocusRequested;
         viewModel.ProductNameFocusRequested += OnProductNameFocusRequested;
         viewModel.OfferingNameFocusRequested += OnOfferingNameFocusRequested;
+        if (viewModel.PrintifyCatalogImportSession is { } printifyImport)
+        {
+            printifyImport.SelectionFocusRequested += OnPrintifySelectionFocusRequested;
+            printifyImport.ImportFocusRequested += OnPrintifyImportFocusRequested;
+        }
         if (viewModel.CatalogSetup is { } catalog)
         {
             _subscribedCatalog = catalog;
@@ -119,6 +135,37 @@ public partial class StoreEditorWindow : Window
             catalog.DesignAreaArchiveFocusRequested += OnDesignAreaArchiveFocusRequested;
             catalog.MockupTemplateEditorRequested += OnMockupTemplateEditorRequested;
             catalog.DesignAreaEditorRequested += OnDesignAreaEditorRequested;
+        }
+    }
+
+    private void OnPrintifySelectionFocusRequested(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
+    {
+        if (PrintifyBlueprintList is { } list)
+        {
+            (list.GetVisualDescendants().OfType<CheckBox>().FirstOrDefault() as Control ?? list).Focus();
+        }
+        else
+        {
+            PrintifyImportPanel.Focus();
+        }
+    });
+
+    private void OnPrintifyImportFocusRequested(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() => PrintifyImportButton.Focus());
+
+    private void OnPrintifyImportKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is not StoreManagementViewModel { PrintifyCatalogImportSession: { } session } || !session.IsOpen)
+            return;
+
+        if (e.Key == Key.Escape && !session.IsBusy)
+        {
+            session.CancelCommand.Execute(null);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Enter && session.CanConfirm)
+        {
+            session.ConfirmCommand.Execute(null);
+            e.Handled = true;
         }
     }
 

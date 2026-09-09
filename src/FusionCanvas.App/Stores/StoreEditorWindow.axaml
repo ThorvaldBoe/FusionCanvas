@@ -460,10 +460,47 @@
               <TextBlock Text="Define Blueprints, fulfillment offerings, Variants, and Placeholders. Blueprint is Printify terminology for the base product; Placeholder is the named design target on an offering."
                          TextWrapping="Wrap"
                          Foreground="{DynamicResource SecondaryTextBrush}" />
-              <Button Content="New Blueprint"
-                      Command="{Binding StartCreateProductCommand}"
-                      IsEnabled="{Binding CanCreateCatalogItem}"
-                      Classes="primary" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="New Blueprint"
+                        Command="{Binding StartCreateProductCommand}"
+                        IsEnabled="{Binding CanCreateCatalogItem}"
+                        Classes="primary" />
+                <Button Content="Import from Printify"
+                        x:Name="PrintifyImportButton"
+                        Command="{Binding PrintifyCatalogImportSession.OpenCommand}"
+                        IsVisible="{Binding PrintifyCatalogImportSession, Converter={x:Static ObjectConverters.IsNotNull}}"
+                        Classes="secondary"
+                        AutomationProperties.AutomationId="Catalog.ImportFromPrintify" />
+              </StackPanel>
+              <Border x:Name="PrintifyImportPanel" IsVisible="{Binding PrintifyCatalogImportSession.IsOpen}"
+                      Focusable="True"
+                      KeyDown="OnPrintifyImportKeyDown"
+                      Classes="panel"
+                      Padding="12"
+                      AutomationProperties.AutomationId="Catalog.PrintifyImportPanel">
+                <StackPanel DataContext="{Binding PrintifyCatalogImportSession}" Spacing="8">
+                  <TextBlock Text="Import Blueprints from Printify" FontWeight="SemiBold" />
+                  <TextBlock Text="Select the Blueprints to add or update locally. No changes are saved until you confirm."
+                             TextWrapping="Wrap"
+                             Foreground="{DynamicResource SecondaryTextBrush}" />
+                  <ProgressBar IsVisible="{Binding IsBusy}" IsIndeterminate="True" Height="4" />
+                  <TextBlock IsVisible="{Binding !HasBlueprints}" Text="No Blueprints are available." Foreground="{DynamicResource SecondaryTextBrush}" />
+                  <ItemsControl x:Name="PrintifyBlueprintList" ItemsSource="{Binding Blueprints}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="stores:PrintifyCatalogImportItemViewModel">
+                        <CheckBox Content="{Binding Title}"
+                                  IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                  AutomationProperties.AutomationId="Catalog.PrintifyBlueprintChoice" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Foreground="{DynamicResource DangerTextBrush}" TextWrapping="Wrap" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Load selected" Command="{Binding ConfirmCommand}" Classes="primary fixedAction" />
+                    <Button Content="Cancel" Command="{Binding CancelCommand}" Classes="secondary fixedAction" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
               <TextBlock IsVisible="{Binding !HasProducts}"
                          Text="No Blueprints yet. Add a Blueprint to begin."
                          Foreground="{DynamicResource SecondaryTextBrush}" />

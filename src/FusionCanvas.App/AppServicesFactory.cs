@@ -54,7 +54,8 @@ public static class AppServicesFactory
         var printifyClient = FusionCanvas.Integration.Stores.Printify.PrintifyCredentialVerifier.CreateHttpClient();
         services.ConfigurePrintify(printifyClient,
             new FusionCanvas.Integration.Stores.Printify.NativeStorePrintifyCredentialStore(),
-            new FusionCanvas.Integration.Stores.Printify.PrintifyCredentialVerifier(printifyClient));
+            new FusionCanvas.Integration.Stores.Printify.PrintifyCredentialVerifier(printifyClient),
+            new FusionCanvas.Integration.Stores.Printify.PrintifyCatalogClient(printifyClient));
         return services;
     }
 }

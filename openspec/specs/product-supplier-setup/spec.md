@@ -229,6 +229,20 @@ FusionCanvas SHALL identify Mockup Template local source-image configuration wit
 - **THEN** the editor identifies the recoverable local failure without creating a fabricated candidate
 - **AND** preserves confirmed Template configuration and the editable draft where one exists
 
+### Requirement: Imported catalog records retain provider identity and local terminology
+Imported catalog records SHALL use the existing Blueprint, Blueprint Offering, Option, Option Value, Variant, and Placeholder/design-area concepts, retain stable Printify identities separately from editable display labels, and preserve Store ownership.
+
+#### Scenario: Import maps one provider offering
+- **WHEN** a selected Printify Blueprint has one Print Provider offering
+- **THEN** FusionCanvas creates or updates one Store-owned Blueprint and offering
+- **AND** the offering retains the Printify Blueprint and provider identities
+- **AND** provider titles remain display data rather than relationship keys
+
+#### Scenario: Imported variant compatibility is preserved
+- **WHEN** Printify assigns a design area to a subset of sellable variants
+- **THEN** the corresponding local Placeholder/design area is compatible with exactly those imported variants
+- **AND** the relationship remains stable after a repeated import
+
 ### Requirement: Design Area management uses a focused guarded editor dialog
 FusionCanvas SHALL keep the default Manage Design Areas surface focused on the Offering-scoped collection without reserving an inline editor column. The **Add Design Area** action and each row's **Edit** action SHALL open the same modal dialog, owned by the Store Editor, with mode-specific title and draft values. The dialog SHALL reuse existing Design Area validation, compatibility, persistence, and referenced-record behavior; SHALL close only after successful save or confirmed cancellation; and SHALL not permit a workspace or Offering context change to leave a stale editable dialog open.
 

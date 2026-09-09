@@ -20,6 +20,7 @@ using FusionCanvas.Application.Products;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.Settings;
+using FusionCanvas.Application.Stores.Printify;
 using FusionCanvas.App.Views;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
@@ -29,6 +30,41 @@ namespace FusionCanvas.App.Tests;
 public class StoreEditorHeadlessTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 4, 12, 0, 0, TimeSpan.Zero);
+
+    [AvaloniaFact]
+    public async Task PrintifyImportPanelSupportsKeyboardCancelWithoutProviderImageControls()
+    {
+        var store = new Store(Guid.NewGuid(), "Printify Store", null, false, Now, Now, "{\"printifyShopId\":\"42\"}", null, FulfillmentStrategy.ShopifyPrintify);
+        var window = CreateEditorWindow(includeNormalizedCatalog: false, customStore: store);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        var client = new HeadlessCatalogClient();
+        viewModel.ConfigurePrintify(new HeadlessCredentialStore(), new HeadlessCredentialVerifier(), client);
+        viewModel.SelectProductsTabCommand.Execute(null);
+        window.UpdateLayout();
+
+        var importButton = FindButton(window, "Import from Printify");
+        Assert.NotNull(importButton);
+        Assert.Equal("Catalog.ImportFromPrintify", AutomationProperties.GetAutomationId(importButton));
+
+        importButton!.Command!.Execute(null);
+        await WaitForAsync(() => viewModel.PrintifyCatalogImportSession is { IsBusy: false, HasBlueprints: true });
+        window.UpdateLayout();
+
+        var panel = window.FindControl<Border>("PrintifyImportPanel");
+        Assert.NotNull(panel);
+        Assert.True(IsEffectivelyVisible(panel!));
+        Assert.NotNull(window.FindControl<ItemsControl>("PrintifyBlueprintList"));
+        Assert.Empty(panel!.GetVisualDescendants().OfType<Image>());
+        panel.Focus();
+        Assert.True(panel.IsFocused);
+
+        HeadlessWindowExtensions.KeyPress(window, Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, string.Empty);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        Assert.False(viewModel.PrintifyCatalogImportSession!.IsOpen);
+        Assert.Equal(0, client.SelectedCalls);
+        window.Close();
+    }
 
     [AvaloniaFact]
     public void ProductsTabButton_SelectsProductsTabAndShowsPanel()
@@ -1998,9 +2034,10 @@ public class StoreEditorHeadlessTests
         bool useFixedProviderOffering = false,
         bool includeOfferingOptions = false,
         IProviderCatalogCandidateSource? providerCatalog = null,
-        bool showWindow = true)
+        bool showWindow = true,
+        Store? customStore = null)
     {
-        var store = new Store(Guid.NewGuid(), "North Star", null, false, Now, Now, "{}");
+        var store = customStore ?? new Store(Guid.NewGuid(), "North Star", null, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog, useFixedProviderOffering, includeOfferingOptions));
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository),
@@ -2096,6 +2133,45 @@ public class StoreEditorHeadlessTests
         }
 
         return true;
+    }
+
+    private static async Task WaitForAsync(Func<bool> predicate)
+    {
+        for (var attempt = 0; attempt < 100 && !predicate(); attempt++)
+        {
+            await Task.Delay(10, TestContext.Current.CancellationToken);
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        }
+        Assert.True(predicate());
+    }
+
+    private sealed class HeadlessCredentialStore : IStorePrintifyCredentialStore
+    {
+        public Task<PrintifyCredentialReadResult> ReadAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PrintifyCredentialReadResult(new(PrintifyConfigurationKind.Available, "available"), "test-key"));
+
+        public Task<PrintifyConfigurationResult> SaveAsync(StoreCredentialScope scope, string key, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class HeadlessCredentialVerifier : IPrintifyCredentialVerifier
+    {
+        public Task<PrintifyConfigurationResult> VerifyAsync(string key, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PrintifyConfigurationResult(PrintifyConfigurationKind.Verified, "verified"));
+    }
+
+    private sealed class HeadlessCatalogClient : IPrintifyCatalogClient
+    {
+        public int SelectedCalls { get; private set; }
+
+        public Task<PrintifyCatalogResult> LoadBlueprintsAsync(string key, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "loaded", [new(68, "Tee", null, "Gildan", "5000")]));
+
+        public Task<PrintifyCatalogResult> LoadSelectedAsync(string key, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken = default)
+        {
+            SelectedCalls++;
+            return Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "imported", SelectedCatalog: []));
+        }
     }
 
     private static Control AssertEffectivelyVisible(Window window, string automationId)

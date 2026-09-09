@@ -60,10 +60,10 @@ public class ProductCatalogPersistenceTests
         var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, Now, Now);
         var provider = new PrintProvider(Guid.NewGuid(), store.Id, "Printful", null, false, Now, Now);
         var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Printful Tee", null, BlueprintOfferingKind.FixedPrintProvider, provider.Id, null, null, null, false, Now, Now);
-        var colorOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
-        var sizeOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Size, "Size", 1);
-        var black = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "Black", 0);
-        var medium = new OfferingOptionValue(Guid.NewGuid(), sizeOption.Id, offering.Id, "M", 0);
+        var colorOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0, metadataJson: "{\"source\":\"printify\",\"kind\":\"option\",\"ids\":[10]}");
+        var sizeOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Size, "Size", 1, metadataJson: "{\"source\":\"printify\",\"kind\":\"option\",\"ids\":[11]}");
+        var black = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "Black", 0, metadataJson: "{\"source\":\"printify\",\"kind\":\"option-value\",\"ids\":[20]}");
+        var medium = new OfferingOptionValue(Guid.NewGuid(), sizeOption.Id, offering.Id, "M", 0, metadataJson: "{\"source\":\"printify\",\"kind\":\"option-value\",\"ids\":[21]}");
         var variant = new OfferingVariant(Guid.NewGuid(), offering.Id, "Black / M", [black.Id, medium.Id], false, Now, Now);
         var placeholder = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 3000, 4500, [variant.Id], false, Now, Now, providerReference: "front-print-area", artworkGuidance: new DesignAreaArtworkGuidance(4500, 5400, 300, "PNG", "Transparent"));
         var template = new MockupTemplate(Guid.NewGuid(), offering.Id, placeholder.Id, "Front mockup", null, 1, false, Now, Now);
@@ -143,7 +143,7 @@ public class ProductCatalogPersistenceTests
 
         Assert.Equal(template, Assert.Single(loaded.MockupTemplates));
         Assert.Equal(revision, Assert.Single(loaded.MockupTemplateRevisions));
-        Assert.Equal(15, SqliteWorkspaceRepository.CurrentSchemaVersion);
+        Assert.Equal(17, SqliteWorkspaceRepository.CurrentSchemaVersion);
     }
 
     [Fact]

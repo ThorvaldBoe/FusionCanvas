@@ -12,6 +12,7 @@ using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
+using FusionCanvas.Application.Workspaces;
 
 namespace FusionCanvas.App.Stores;
 
@@ -91,6 +92,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private readonly ITagManagementService? _tagService;
     private readonly IProductSupplierSetupService? _productService;
     private readonly IOfferingManagementService? _offeringManagementService;
+    private readonly IWorkspaceRepository? _workspaceRepository;
     private bool _isSelectorExpanded;
     private bool _isStoreEditorOpen;
     private bool _firstStorePromptDismissed;
@@ -179,13 +181,14 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private string _variantColor = string.Empty;
     private string _variantSize = string.Empty;
 
-    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null, ITagManagementService? tagService = null, IProductSupplierSetupService? productService = null, ICatalogSetupService? catalogService = null, IMockupTemplateSetupService? mockupService = null, IOfferingManagementService? offeringManagementService = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, FusionCanvas.App.Assets.IAssetFilePicker? filePicker = null)
+    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null, ITagManagementService? tagService = null, IProductSupplierSetupService? productService = null, ICatalogSetupService? catalogService = null, IMockupTemplateSetupService? mockupService = null, IOfferingManagementService? offeringManagementService = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, FusionCanvas.App.Assets.IAssetFilePicker? filePicker = null, IWorkspaceRepository? workspaceRepository = null)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _nicheService = nicheService;
         _tagService = tagService;
         _productService = productService;
         _offeringManagementService = offeringManagementService;
+        _workspaceRepository = workspaceRepository;
         CatalogSetup = catalogService is not null && mockupService is not null ? new CatalogSetupViewModel(catalogService, mockupService, offeringManagementService, providerCatalog, sourceImages, filePicker) : null;
         ToggleStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = !IsSelectorExpanded);
         ExpandStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = true);
@@ -435,16 +438,40 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public CatalogSetupViewModel? CatalogSetup { get; }
 
     public StorePrintifyCredentialsViewModel? PrintifyCredentials { get; private set; }
+    public FusionCanvas.Application.Stores.Printify.IPrintifyCatalogImportService? PrintifyCatalogImport { get; private set; }
+    public PrintifyCatalogImportViewModel? PrintifyCatalogImportSession { get; private set; }
 
     public void ConfigurePrintify(FusionCanvas.Application.Stores.Printify.IStorePrintifyCredentialStore credentials,
-        FusionCanvas.Application.Stores.Printify.IPrintifyCredentialVerifier verifier)
+        FusionCanvas.Application.Stores.Printify.IPrintifyCredentialVerifier verifier,
+        FusionCanvas.Application.Stores.Printify.IPrintifyCatalogClient? catalogClient = null)
     {
         PrintifyCredentials?.CancelPending();
         if (PrintifyCredentials is not null) { PrintifyCredentials.ShopSelectionChanged -= OnPrintifyShopSelectionChanged; PrintifyCredentials.CancelPending(); }
         PrintifyCredentials = new(new FusionCanvas.Application.Stores.Printify.StorePrintifyConfigurationService(_service, credentials, verifier));
+        PrintifyCatalogImport = catalogClient is null
+            ? null
+            : new FusionCanvas.Application.Stores.Printify.PrintifyCatalogImportService(_service, credentials, catalogClient, _workspaceRepository);
+        PrintifyCatalogImportSession = PrintifyCatalogImport is null
+            ? null
+            : new PrintifyCatalogImportViewModel(PrintifyCatalogImport, () =>
+                SelectedStore is { WorkspaceId: var workspaceId, Id: var storeId }
+                    ? new FusionCanvas.Application.Stores.Printify.StoreCredentialScope(workspaceId, storeId)
+                    : null,
+                RefreshAfterPrintifyImportAsync);
         PrintifyCredentials.ShopSelectionChanged += OnPrintifyShopSelectionChanged;
         OnPropertyChanged(nameof(PrintifyCredentials));
+        OnPropertyChanged(nameof(PrintifyCatalogImport));
+        OnPropertyChanged(nameof(PrintifyCatalogImportSession));
         RefreshPrintifyContext();
+    }
+
+    private async Task RefreshAfterPrintifyImportAsync(
+        FusionCanvas.Application.Stores.Printify.StoreCredentialScope scope,
+        CancellationToken cancellationToken)
+    {
+        if (SelectedStore is null || SelectedStore.Id != scope.StoreId || SelectedStore.WorkspaceId != scope.WorkspaceId)
+            return;
+        await LoadAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private bool _showStrategyWarning;
