@@ -205,6 +205,14 @@ public partial class StoreEditorWindow : Window
         _optionValueManagementOpen = true;
         try
         {
+            if (VisualRoot is null || !IsVisible)
+            {
+                // Catalog events can outlive the editor during teardown. Do not
+                // attempt to show a modal dialog with a closed owner.
+                catalog.CloseOptionValueManagementCommand.Execute(null);
+                return;
+            }
+
             var dialog = new OptionValueManagementWindow { DataContext = catalog };
             AttachGeometry(dialog, WindowLayoutKeys.OptionValueManagement);
             await dialog.ShowDialog(this);

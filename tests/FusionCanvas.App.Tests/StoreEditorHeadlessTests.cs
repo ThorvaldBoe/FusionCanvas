@@ -800,6 +800,26 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void ManageValues_IgnoresRequestsAfterEditorCloses()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+
+        window.Close();
+
+        viewModel.CatalogSetup!.ManageOptionCommand.Execute(
+            viewModel.CatalogSetup.AvailableChoiceGroups.First().Option);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        Assert.False(viewModel.CatalogSetup.IsManagingOptionValues);
+        Assert.Empty(window.OwnedWindows.OfType<OptionValueManagementWindow>());
+    }
+
+    [AvaloniaFact]
     public void ManageValues_ArchiveActionsAreCompactTargetSpecificAndKeepLongValuesReadable()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
