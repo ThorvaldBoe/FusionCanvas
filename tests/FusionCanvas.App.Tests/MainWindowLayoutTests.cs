@@ -306,6 +306,36 @@ public class MainWindowLayoutTests
         Assert.Equal("0/3 designs showing.", label.Text);
     }
 
+    [AvaloniaFact]
+    public void DraggingOverTopic_ShowsDropFeedbackWithoutExpandingIt()
+    {
+        using var fixture = new MainWindowFixture();
+        var target = Assert.Single(fixture.ViewModel.WorkspaceTree.Roots);
+        var targetRow = fixture.FindControl<Border>(border =>
+            border.Classes.Contains("treeRow") && ReferenceEquals(border.DataContext, target));
+        var transfer = new DataTransfer();
+        var item = fixture.ViewModel.NavigationContexts
+            .First(context => context.Context.EntityKind == WorkspaceEntityKind.Item)
+            .Context;
+        transfer.Add(DataTransferItem.CreateText($"FusionCanvasSelection|Item:{item.Id}"));
+        var args = new DragEventArgs(
+            DragDrop.DragOverEvent,
+            transfer,
+            targetRow,
+            new Avalonia.Point(),
+            KeyModifiers.None);
+
+        var handler = typeof(MainWindow).GetMethod(
+            "OnTreeNodeDragOver",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(handler);
+
+        handler!.Invoke(fixture.Window, [targetRow, args]);
+
+        Assert.False(target.IsExpanded);
+        Assert.True(target.IsDropTarget);
+    }
+
     private static void ClickExpander(MainWindowFixture fixture, ToggleButton expander)
     {
         var clickPoint = GetExpanderClickPoint(expander, 6);
