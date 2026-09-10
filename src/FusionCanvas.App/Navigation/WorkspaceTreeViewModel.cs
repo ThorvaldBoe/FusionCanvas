@@ -588,7 +588,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         set
         {
             if (_ideaRatingFilterIndex == value) return;
-            if (value is < 0 or > 6) return;
+            if (value is < 0 or > 14) return;
             SetField(ref _ideaRatingFilterIndex, value);
             ApplyFilterTransition();
         }
@@ -602,7 +602,17 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         ScopeTopic: _scopeToCurrentTopic ? _scopedTopic : null,
         IncludeArchived: _includeArchived)
     {
-        IdeaRating = _ideaRatingFilterIndex > 0 ? _ideaRatingFilterIndex - 1 : null
+        IdeaRating = _ideaRatingFilterIndex is 1 ? 0 :
+            _ideaRatingFilterIndex is >= 2 and <= 6 ? _ideaRatingFilterIndex - 1 : null,
+        IdeaRatingComparison = _ideaRatingFilterIndex switch
+        {
+            >= 7 and <= 10 => new IdeaRatingComparison(IdeaRatingComparisonOperator.GreaterThan, _ideaRatingFilterIndex - 6),
+            11 => new IdeaRatingComparison(IdeaRatingComparisonOperator.LessThan, 5),
+            12 => new IdeaRatingComparison(IdeaRatingComparisonOperator.LessThan, 4),
+            13 => new IdeaRatingComparison(IdeaRatingComparisonOperator.LessThan, 3),
+            14 => new IdeaRatingComparison(IdeaRatingComparisonOperator.LessThan, 2),
+            _ => null
+        }
     };
 
     public void SetStore(Guid? storeId, WorkspaceSnapshot snapshot)

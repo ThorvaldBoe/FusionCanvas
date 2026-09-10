@@ -273,4 +273,49 @@ public class WorkspaceTreeTests
         Assert.Contains(clear.Roots.Single().Children, node => node.EntityId == unrated.Id);
         Assert.DoesNotContain(clear.Roots.Single().Children, node => node.EntityId == rated.Id);
     }
+
+    [Fact]
+    public void Project_RatingComparisonFiltersUseStrictThresholdsAndExcludeUnratedItems()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
+        var niche = new Niche(Guid.NewGuid(), store.Id, "Niche", null, false, now, now, "{}");
+        var items = Enumerable.Range(0, 6)
+            .Select(rating => new Item(
+                Guid.NewGuid(), store.Id, niche.Id, null, rating == 0 ? "Unrated" : $"Rating {rating}", null,
+                ItemStatus.Draft, WorkflowStage.Idea, false, now, now,
+                rating == 0 ? "{}" : $"{{\"idea.rating\":\"{rating}\"}}"))
+            .ToArray();
+        var snapshot = new WorkspaceSnapshot([store], [niche], [], items, [], [], [], [], []);
+
+        var greaterThanThree = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery
+        {
+            IdeaRatingComparison = new(IdeaRatingComparisonOperator.GreaterThan, 3)
+        });
+        Assert.Equal(["Rating 4", "Rating 5"], ItemNames(greaterThanThree));
+
+        var lessThanThree = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery
+        {
+            IdeaRatingComparison = new(IdeaRatingComparisonOperator.LessThan, 3)
+        });
+        Assert.Equal(["Rating 1", "Rating 2"], ItemNames(lessThanThree));
+
+        var greaterThanFour = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery
+        {
+            IdeaRatingComparison = new(IdeaRatingComparisonOperator.GreaterThan, 4)
+        });
+        Assert.Equal(["Rating 5"], ItemNames(greaterThanFour));
+
+        var lessThanTwo = WorkspaceTreeProjector.Project(snapshot, store.Id, new WorkspaceTreeQuery
+        {
+            IdeaRatingComparison = new(IdeaRatingComparisonOperator.LessThan, 2)
+        });
+        Assert.Equal(["Rating 1"], ItemNames(lessThanTwo));
+    }
+
+    private static string[] ItemNames(WorkspaceTreeProjection projection) =>
+        projection.Roots.Single().Children
+            .Select(node => node.Name)
+            .OrderBy(name => name)
+            .ToArray();
 }

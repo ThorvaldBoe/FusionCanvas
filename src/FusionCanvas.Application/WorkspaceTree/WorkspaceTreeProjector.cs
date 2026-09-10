@@ -117,8 +117,24 @@ public static class WorkspaceTreeProjector
             return false;
         }
 
+        if (query.IdeaRatingComparison is { } comparison &&
+            (node.EntityKind != WorkspaceEntityKind.Item ||
+             context.Snapshot.Items.SingleOrDefault(item => item.Id == node.EntityId) is not { } comparedItem ||
+             !MatchesRatingComparison(ItemMetadataCodec.GetIdeaRating(ItemMetadataCodec.ParseMetadata(comparedItem.MetadataJson)), comparison)))
+        {
+            return false;
+        }
+
         return true;
     }
+
+    private static bool MatchesRatingComparison(int rating, IdeaRatingComparison comparison) =>
+        rating > 0 && comparison.Operator switch
+        {
+            IdeaRatingComparisonOperator.GreaterThan => rating > comparison.Threshold,
+            IdeaRatingComparisonOperator.LessThan => rating < comparison.Threshold,
+            _ => false
+        };
 
     private static bool NodeTextMatches(ProjectionContext context, NavigationNode node, string trimmedText)
     {

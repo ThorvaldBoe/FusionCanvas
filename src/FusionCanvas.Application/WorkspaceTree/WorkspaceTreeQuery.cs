@@ -15,6 +15,7 @@ public sealed record WorkspaceTreeQuery(
     bool IncludeArchived = false)
 {
     public int? IdeaRating { get; init; }
+    public IdeaRatingComparison? IdeaRatingComparison { get; init; }
     public bool IsActive =>
         !string.IsNullOrWhiteSpace(Text) ||
         EntityKinds is { Count: > 0 } ||
@@ -22,6 +23,7 @@ public sealed record WorkspaceTreeQuery(
         WorkflowStages is { Count: > 0 } ||
         TagIds is { Count: > 0 } ||
         IdeaRating is not null ||
+        IdeaRatingComparison is not null ||
         ScopeTopic is not null ||
         IncludeArchived;
 }

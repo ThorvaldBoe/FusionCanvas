@@ -720,6 +720,38 @@ public class WorkspaceTreeViewModelTests
     }
 
     [Fact]
+    public void IdeaRatingComparisonFilter_MapsNewDropdownChoicesAndRefreshesImmediately()
+    {
+        var sample = Sample.Create();
+        var items = Enumerable.Range(1, 5)
+            .Select(rating => new Item(
+                Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, $"Rating {rating}", null,
+                ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now,
+                $"{{\"idea.rating\":\"{rating}\"}}"))
+            .ToArray();
+        var snapshot = sample.Snapshot with { Items = items };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(sample.Store.Id, snapshot);
+
+        viewModel.IdeaRatingFilterIndex = 9;
+        Assert.Equal(["Rating 4", "Rating 5"], ItemNames(viewModel));
+
+        viewModel.IdeaRatingFilterIndex = 13;
+        Assert.Equal(["Rating 1", "Rating 2"], ItemNames(viewModel));
+
+        viewModel.IdeaRatingFilterIndex = 0;
+        Assert.Equal(5, ItemNames(viewModel).Length);
+    }
+
+    private static string[] ItemNames(WorkspaceTreeViewModel viewModel) =>
+        viewModel.Roots.SelectMany(root => root.Children)
+            .Where(node => node.IsItem)
+            .Select(node => node.Name)
+            .OrderBy(name => name)
+            .ToArray();
+
+    [Fact]
     public void RejectedItem_MarkedInactiveInTree()
     {
         var sample = Sample.Create();
