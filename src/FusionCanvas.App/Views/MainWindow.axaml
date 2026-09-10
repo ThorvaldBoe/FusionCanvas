@@ -199,6 +199,14 @@
                 <ComboBoxItem Content="★ 3" />
                 <ComboBoxItem Content="★ 4" />
                 <ComboBoxItem Content="★ 5" />
+                <ComboBoxItem Content="Greater than ★ 1" />
+                <ComboBoxItem Content="Greater than ★ 2" />
+                <ComboBoxItem Content="Greater than ★ 3" />
+                <ComboBoxItem Content="Greater than ★ 4" />
+                <ComboBoxItem Content="Less than ★ 5" />
+                <ComboBoxItem Content="Less than ★ 4" />
+                <ComboBoxItem Content="Less than ★ 3" />
+                <ComboBoxItem Content="Less than ★ 2" />
               </ComboBox>
               <Button Content="Filters"
                       ToolTip.Tip="Filter by tag, topic scope, or archived work"
