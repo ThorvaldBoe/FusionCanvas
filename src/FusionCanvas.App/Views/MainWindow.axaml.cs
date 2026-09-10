@@ -537,10 +537,6 @@ public partial class MainWindow : Window
                 target.IsDropBefore = placement.Kind == GroupPlacementKind.Before;
                 target.IsDropAfter = placement.Kind == GroupPlacementKind.After;
                 target.IsDropTarget = placement.Kind == GroupPlacementKind.Append;
-                if (target.Children.Count > 0)
-                {
-                    target.IsExpanded = true;
-                }
 
                 e.DragEffects = DragDropEffects.Move;
             }
