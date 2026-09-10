@@ -380,6 +380,37 @@ public class WorkspaceTreeViewModelTests
     }
 
     [Fact]
+    public async Task MoveRootGroupIntoAnotherGroup_PersistsNestedParent()
+    {
+        var sample = Sample.Create(withGroup: true);
+        var root = Assert.Single(sample.Snapshot.Groups);
+        var destination = new TopicGroup(
+            Guid.NewGuid(),
+            sample.Store.Id,
+            sample.Niche.Id,
+            null,
+            "Destination",
+            null,
+            false,
+            sample.Now,
+            sample.Now,
+            "{}",
+            1);
+        var snapshot = sample.Snapshot with { Groups = [root, destination] };
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(sample.Store.Id, snapshot);
+
+        var destinationNode = viewModel.Roots.Single().Children.Single(node => node.EntityId == destination.Id);
+
+        await viewModel.MoveAsync(root.Id, destinationNode, new GroupPlacement());
+
+        var moved = repository.Snapshot.Groups.Single(group => group.Id == root.Id);
+        Assert.Null(moved.NicheId);
+        Assert.Equal(destination.Id, moved.ParentGroupId);
+    }
+
+    [Fact]
     public async Task MultiSelectionMove_MovesBothSelectedItemsToGroup()
     {
         var sample = Sample.Create();
