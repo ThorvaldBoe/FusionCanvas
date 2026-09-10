@@ -639,10 +639,13 @@ public partial class MainWindow : Window
         }
 
         var position = e.GetPosition(control).Y / Math.Max(control.Bounds.Height, 1);
+        // Make nesting the forgiving/default gesture. Reordering remains available
+        // near the row edges, but a normal drop anywhere over most of the row
+        // should place the group beneath the target rather than beside it.
         return position switch
         {
-            < 0.25 => new GroupPlacement(GroupPlacementKind.Before, target.EntityId),
-            > 0.75 => new GroupPlacement(GroupPlacementKind.After, target.EntityId),
+            < 0.15 => new GroupPlacement(GroupPlacementKind.Before, target.EntityId),
+            > 0.85 => new GroupPlacement(GroupPlacementKind.After, target.EntityId),
             _ => new GroupPlacement()
         };
     }
