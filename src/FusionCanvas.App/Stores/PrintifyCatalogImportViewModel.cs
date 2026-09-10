@@ -67,7 +67,7 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
     {
         if (IsBusy) return;
         var scope = _scope();
-        if (scope is null) { ErrorMessage = "Save and select an active Shopify + Printify Store first."; return; }
+        if (scope is null) { ErrorMessage = "Save and select an active Printify Store first."; return; }
         IsBusy = true;
         ErrorMessage = null;
         try

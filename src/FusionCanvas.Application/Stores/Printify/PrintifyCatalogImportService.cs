@@ -13,7 +13,7 @@ public sealed class PrintifyCatalogImportService(
     IWorkspaceRepository? repository = null) : IPrintifyCatalogImportService
 {
     private static readonly PrintifyCatalogResult InvalidContext =
-        new(PrintifyCatalogResultKind.InvalidRequest, "Save an active Shopify + Printify Store with a selected Printify shop first.");
+        new(PrintifyCatalogResultKind.InvalidRequest, "Save an active Printify Store with a selected Printify shop first.");
 
     public Task<PrintifyCatalogResult> LoadBlueprintsAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default) =>
         ExecuteAsync(scope, (key, token) => client.LoadBlueprintsAsync(key, token), cancellationToken);
@@ -31,7 +31,7 @@ public sealed class PrintifyCatalogImportService(
         if (state.ActiveWorkspaceId != scope.WorkspaceId || stores.ActiveWorkspaceId != scope.WorkspaceId)
             return InvalidContext;
         var store = state.ActiveStores.SingleOrDefault(candidate => candidate.Id == scope.StoreId && candidate.WorkspaceId == scope.WorkspaceId);
-        if (store is null || store.IsArchived || store.FulfillmentStrategy != FulfillmentStrategy.ShopifyPrintify || store.Context.PrintifyShopId is null)
+        if (store is null || store.IsArchived || !FulfillmentStrategyPolicy.RequiresPrintifyKey(store.FulfillmentStrategy) || store.Context.PrintifyShopId is null)
             return InvalidContext;
         var read = await credentials.ReadAsync(scope, cancellationToken).ConfigureAwait(false);
         if (read.Status.Kind != PrintifyConfigurationKind.Available || string.IsNullOrWhiteSpace(read.Secret))

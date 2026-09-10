@@ -25,10 +25,12 @@ public sealed class PrintifyCatalogImportServiceTests
         Assert.Equal(0, client.Calls);
     }
 
-    [Fact]
-    public async Task LoadsCatalogOnlyAfterAllStoreGuardsPass()
+    [Theory]
+    [InlineData(FulfillmentStrategy.ShopifyPrintify)]
+    [InlineData(FulfillmentStrategy.Printify)]
+    public async Task LoadsCatalogOnlyAfterAllStoreGuardsPass(FulfillmentStrategy strategy)
     {
-        var store = new StoreSummary(Guid.NewGuid(), Guid.NewGuid(), "Store", new(PrintifyShopId: 42), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, FulfillmentStrategy.ShopifyPrintify);
+        var store = new StoreSummary(Guid.NewGuid(), Guid.NewGuid(), "Store", new(PrintifyShopId: 42), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, strategy);
         var credentials = new CredentialsStub { Result = new(new(PrintifyConfigurationKind.Available, "available"), "synthetic-key") };
         var client = new ClientStub { Result = new(PrintifyCatalogResultKind.Succeeded, "loaded", []) };
         var service = new PrintifyCatalogImportService(new StoresStub(store), credentials, client);
@@ -43,7 +45,7 @@ public sealed class PrintifyCatalogImportServiceTests
     [Fact]
     public async Task ImportsSelectedCatalogAndUpdatesExistingPrintifyRecords()
     {
-        var store = new StoreSummary(Guid.NewGuid(), Guid.NewGuid(), "Store", new(PrintifyShopId: 42), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, FulfillmentStrategy.ShopifyPrintify);
+        var store = new StoreSummary(Guid.NewGuid(), Guid.NewGuid(), "Store", new(PrintifyShopId: 42), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, FulfillmentStrategy.Printify);
         var repository = new RepositoryStub(WorkspaceSnapshot.Empty with { Stores = [new Store(store.Id, store.WorkspaceId, store.Name, null, false, store.CreatedAt, store.UpdatedAt, "{}", null, store.FulfillmentStrategy)] });
         var client = new ClientStub
         {
