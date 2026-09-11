@@ -2714,6 +2714,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(EditorProducts));
         OnPropertyChanged(nameof(HasSelectedProduct));
         OnPropertyChanged(nameof(CanDeleteSelectedProduct));
+        IsBlueprintBasicsExpanded = true;
         CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
         OnPropertyChanged(nameof(SelectedProductOfferingCount));
         OnPropertyChanged(nameof(SelectedProductSummary));
