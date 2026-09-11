@@ -872,6 +872,48 @@ public class WorkspaceTreeViewModelTests
     }
 
     [Fact]
+    public void SelectBoundary_UsesVisibleDepthFirstOrderAndRespectsExpansion()
+    {
+        var (snapshot, store, _, group, subGroup) = CreateNestedSample();
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(store.Id, snapshot);
+
+        var nicheNode = Assert.Single(viewModel.Roots);
+        Assert.Same(nicheNode, viewModel.SelectBoundary(end: false));
+        Assert.Same(nicheNode, viewModel.SelectBoundary(end: true));
+
+        nicheNode.IsExpanded = true;
+        var groupNode = nicheNode.Children.Single(node => node.EntityId == group.Id);
+        Assert.Same(groupNode, viewModel.SelectBoundary(end: true));
+
+        groupNode.IsExpanded = true;
+        var subGroupNode = groupNode.Children.Single(node => node.EntityId == subGroup.Id);
+        Assert.Same(subGroupNode, viewModel.SelectBoundary(end: true));
+
+        subGroupNode.IsExpanded = true;
+        Assert.Equal("Item", viewModel.SelectBoundary(end: true)!.Name);
+    }
+
+    [Fact]
+    public void SelectBoundary_UsesFilteredProjectionAndNoOpsWhenEmpty()
+    {
+        var (snapshot, store, _, _, _) = CreateNestedSample();
+        var repository = new TestRepository(snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        viewModel.SetStore(store.Id, snapshot);
+
+        viewModel.QueryText = "Item";
+        Assert.Equal("Coffee", viewModel.SelectBoundary(end: false)!.Name);
+        Assert.Equal("Item", viewModel.SelectBoundary(end: true)!.Name);
+
+        viewModel.QueryText = "does not exist";
+        var selected = viewModel.SelectedNode;
+        Assert.Null(viewModel.SelectBoundary(end: false));
+        Assert.Same(selected, viewModel.SelectedNode);
+    }
+
+    [Fact]
     public void RememberedState_ManualCollapseDoesNotRedirectToggle()
     {
         var (snapshot, store, _, group, _) = CreateNestedSample();

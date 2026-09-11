@@ -542,6 +542,49 @@ public class MainWindowLayoutTests
     }
 
     [AvaloniaFact]
+    public void TreeBoundaryKeys_SelectFirstAndLastVisibleNodes()
+    {
+        using var fixture = new MainWindowFixture();
+        var tree = fixture.FindControl<TreeView>(tv => tv.Name == "WorkspaceTreeControl");
+        fixture.ViewModel.WorkspaceTree.ToggleExpandCollapseAllCommand.Execute(null);
+        fixture.PumpLayout();
+
+        tree.RaiseEvent(new KeyEventArgs
+        {
+            RoutedEvent = InputElement.KeyDownEvent,
+            Key = Key.Home,
+            Source = tree
+        });
+
+        Assert.Equal(fixture.ViewModel.WorkspaceTree.Roots.First().EntityId,
+            fixture.ViewModel.WorkspaceTree.SelectedNode!.EntityId);
+
+        tree.RaiseEvent(new KeyEventArgs
+        {
+            RoutedEvent = InputElement.KeyDownEvent,
+            Key = Key.End,
+            Source = tree
+        });
+
+        var lastVisible = fixture.ViewModel.WorkspaceTree.Roots
+            .SelectMany(VisibleNodes)
+            .Last();
+        Assert.Equal(lastVisible.EntityId, fixture.ViewModel.WorkspaceTree.SelectedNode!.EntityId);
+    }
+
+    private static IEnumerable<WorkspaceTreeNodeViewModel> VisibleNodes(WorkspaceTreeNodeViewModel node)
+    {
+        yield return node;
+        if (node.IsExpanded)
+        {
+            foreach (var child in node.Children.SelectMany(VisibleNodes))
+            {
+                yield return child;
+            }
+        }
+    }
+
+    [AvaloniaFact]
     public void ExpandCollapseAllButton_TracksViewModelState()
     {
         using var fixture = new MainWindowFixture();
