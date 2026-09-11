@@ -301,6 +301,27 @@ public class ProductSupplierSetupServiceTests
     }
 
     [Fact]
+    public async Task UpdateProductAsync_UpdatesNormalizedBlueprintProjection()
+    {
+        var repository = new InMemoryWorkspaceRepository(SeedSnap());
+        var service = New(repository);
+        var created = await service.CreateProductAsync(
+            new CreateProductRequest(StoreId, "Gildan 64000", "Original"),
+            TestContext.Current.CancellationToken);
+        var productId = Assert.Single(created.State.Products).Id;
+
+        var result = await service.UpdateProductAsync(
+            new UpdateProductRequest(productId, "Gildan 64000", "Updated"),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        var blueprint = Assert.Single(repository.Snapshot.Blueprints);
+        Assert.Equal(productId, blueprint.Id);
+        Assert.Equal("Gildan 64000", blueprint.Name);
+        Assert.Equal("Updated", blueprint.Description);
+    }
+
+    [Fact]
     public async Task UpdateOfferingAsync_PersistsChangesAndPreservesId()
     {
         var repository = new InMemoryWorkspaceRepository(SeedSnap());
