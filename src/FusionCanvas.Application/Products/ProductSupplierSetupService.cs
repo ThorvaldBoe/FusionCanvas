@@ -3,6 +3,7 @@ using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.Catalog;
 
 namespace FusionCanvas.Application.Products;
 
@@ -59,15 +60,23 @@ public sealed class ProductSupplierSetupService : IProductSupplierSetupService
             _newId(), request.StoreId, name, NormalizeOptional(request.Description),
             NormalizeOptional(request.ExternalProductId), now, now, "{}");
         var updated = snapshot with { StoreProducts = [.. snapshot.StoreProducts, product] };
-        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        var synchronized = CatalogCompatibilitySynchronizer
+            .SynchronizeStore(updated, request.StoreId, _clock, _newId)
+            .Snapshot;
+        await _repository.SaveAsync(synchronized, cancellationToken).ConfigureAwait(false);
 
-        return ProductSupplierSetupResult.Success(BuildState(updated, request.StoreId));
+        return ProductSupplierSetupResult.Success(BuildState(synchronized, request.StoreId));
     }
 
     public async Task<ProductSupplierSetupResult> UpdateProductAsync(UpdateProductRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        // Product editing is still exposed through the legacy projection, while
+        // the catalog screen reads the normalized Blueprint projection. Repair
+        // and mirror the store first so an edit updates the same record in both
+        // projections (including workspaces created before the catalog migration).
+        snapshot = SynchronizeCatalog(snapshot, request.ProductId);
         var product = snapshot.StoreProducts.SingleOrDefault(item => item.Id == request.ProductId);
         if (product is null)
         {
@@ -103,7 +112,15 @@ public sealed class ProductSupplierSetupService : IProductSupplierSetupService
         };
         var updated = snapshot with
         {
-            StoreProducts = snapshot.StoreProducts.Select(candidate => candidate.Id == updatedProduct.Id ? updatedProduct : candidate).ToArray()
+            StoreProducts = snapshot.StoreProducts.Select(candidate => candidate.Id == updatedProduct.Id ? updatedProduct : candidate).ToArray(),
+            Blueprints = snapshot.Blueprints.Select(candidate => candidate.Id == updatedProduct.Id
+                ? candidate with
+                {
+                    Name = updatedProduct.Name,
+                    Description = updatedProduct.Description,
+                    UpdatedAt = updatedProduct.UpdatedAt
+                }
+                : candidate).ToArray()
         };
         await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
 
@@ -577,6 +594,22 @@ public sealed class ProductSupplierSetupService : IProductSupplierSetupService
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private WorkspaceSnapshot SynchronizeCatalog(
+        WorkspaceSnapshot snapshot,
+        Guid productId)
+    {
+        var storeId = snapshot.StoreProducts.SingleOrDefault(value => value.Id == productId)?.StoreId
+            ?? snapshot.Blueprints.SingleOrDefault(value => value.Id == productId)?.StoreId;
+        if (storeId is not Guid resolvedStoreId)
+        {
+            return snapshot;
+        }
+
+        return CatalogCompatibilitySynchronizer
+            .SynchronizeStore(snapshot, resolvedStoreId, _clock, _newId)
+            .Snapshot;
+    }
 
     private ProductSupplierSetupState BuildState(WorkspaceSnapshot snapshot, Guid? storeId)
     {
