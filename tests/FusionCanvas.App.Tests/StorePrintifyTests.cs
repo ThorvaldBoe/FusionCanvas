@@ -196,27 +196,33 @@ public class StorePrintifyTests
     }
 
     [AvaloniaFact]
-    public async Task StoreEditor_SelectingVerifiedShop_MakesStoreSavableAndPersistsSelection()
+    public async Task StoreEditor_PrintifyShopComboBox_UpdatesSelectionAndPersistsIt()
     {
         var repository = new Repository();
         var stores = new StoreManagementService(repository);
         await stores.CreateStoreAsync(new("Store", FulfillmentStrategy: FulfillmentStrategy.ShopifyPrintify), Ct);
-        var native = new Native { Kind = PrintifyConfigurationKind.Available };
         var model = new StoreManagementViewModel(stores);
-        model.ConfigurePrintify(native, new Verifier
+        model.ConfigurePrintify(new Native { Kind = PrintifyConfigurationKind.Available, Secret = "synthetic-key" }, new Verifier
         {
             Result = new(PrintifyConfigurationKind.Verified, "Verified", [new(123, "DevTest shop")])
         });
-
         await model.LoadAsync(Ct);
         model.OpenStoreEditorCommand.Execute(null);
+        var window = new StoreEditorWindow { DataContext = model };
+        window.Show();
         await model.PrintifyCredentials!.PendingOperation;
         await model.PrintifyCredentials.VerifyAsync();
+        window.UpdateLayout();
 
-        model.PrintifyCredentials.SelectedShopId = 123;
+        var combo = window.GetVisualDescendants().OfType<ComboBox>()
+            .Single(control => Avalonia.Automation.AutomationProperties.GetAutomationId(control) == "StoreEditor.PrintifyShop");
+        Assert.Equal(1, combo.ItemCount);
+        combo.SelectedItem = combo.Items[0];
+        Dispatcher.UIThread.RunJobs();
 
-        var reloaded = await stores.LoadAsync(Ct);
-        Assert.Equal(123, reloaded.ActiveStore!.Context.PrintifyShopId);
+        Assert.Equal(123, model.PrintifyCredentials.SelectedShopId);
+        Assert.Equal(123, (await stores.LoadAsync(Ct)).ActiveStore!.Context.PrintifyShopId);
+        window.Close();
     }
 
 
@@ -263,9 +269,10 @@ public class StorePrintifyTests
     private sealed class Native : IStorePrintifyCredentialStore
     {
         public PrintifyConfigurationKind Kind { get; init; } = PrintifyConfigurationKind.Missing;
+        public string? Secret { get; init; }
 
         public Task<PrintifyCredentialReadResult> ReadAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new PrintifyCredentialReadResult(new(Kind, Kind == PrintifyConfigurationKind.Available ? "Printify api key is provided" : "Printify api key is required")));
+            Task.FromResult(new PrintifyCredentialReadResult(new(Kind, Kind == PrintifyConfigurationKind.Available ? "Printify api key is provided" : "Printify api key is required"), Secret));
         public Task<PrintifyConfigurationResult> SaveAsync(StoreCredentialScope scope, string key, CancellationToken cancellationToken = default) =>
             Task.FromResult(new PrintifyConfigurationResult(PrintifyConfigurationKind.Saved, "Saved"));
     }

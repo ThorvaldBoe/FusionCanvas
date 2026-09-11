@@ -16,6 +16,7 @@ public sealed class StorePrintifyCredentialsViewModel(IStorePrintifyConfiguratio
     private long _generation;
     private bool _persistedPrintify;
     private int? _selectedShopId;
+    private PrintifyShopOption? _selectedShop;
     private IReadOnlyList<PrintifyShopOption> _shops = [];
     private PrintifyConfigurationKind? _kind;
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -26,6 +27,17 @@ public sealed class StorePrintifyCredentialsViewModel(IStorePrintifyConfiguratio
     public string Verification { get; private set; } = string.Empty;
     public IReadOnlyList<PrintifyShopOption> Shops => _shops;
     public int? SelectedShopId { get => _selectedShopId; set { if (_selectedShopId == value) return; _selectedShopId = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedShopId))); ShopSelectionChanged?.Invoke(this, value); } }
+    public PrintifyShopOption? SelectedShop
+    {
+        get => _selectedShop;
+        set
+        {
+            if (Equals(_selectedShop, value)) return;
+            _selectedShop = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedShop)));
+            SelectedShopId = value?.Id;
+        }
+    }
     public event EventHandler<int?>? ShopSelectionChanged;
     public bool HasKey => _kind == PrintifyConfigurationKind.Available;
     public bool IsMissing => _kind == PrintifyConfigurationKind.Missing;
@@ -56,6 +68,7 @@ public sealed class StorePrintifyCredentialsViewModel(IStorePrintifyConfiguratio
         _scope = scope;
         _persistedPrintify = persisted;
         _selectedShopId = store?.Context.PrintifyShopId;
+        _selectedShop = null;
         _shops = [];
         IsVisible = visible;
         _kind = null;
@@ -105,7 +118,20 @@ public sealed class StorePrintifyCredentialsViewModel(IStorePrintifyConfiguratio
         try
         {
             var result = await service.VerifyAsync(scope, cancellation).ConfigureAwait(false);
-            await PublishAsync(generation, () => { Verification = result.Message; _shops = result.Shops ?? []; if (_selectedShopId is not null && !_shops.Any(shop => shop.Id == _selectedShopId)) { _selectedShopId = null; Verification = "Printify key verified. Select a shop for this Store."; ShopSelectionChanged?.Invoke(this, null); } });
+            await PublishAsync(generation, () =>
+            {
+                Verification = result.Message;
+                _shops = result.Shops ?? [];
+                _selectedShop = _selectedShopId is { } selectedShopId
+                    ? _shops.FirstOrDefault(shop => shop.Id == selectedShopId)
+                    : null;
+                if (_selectedShopId is not null && _selectedShop is null)
+                {
+                    _selectedShopId = null;
+                    Verification = "Printify key verified. Select a shop for this Store.";
+                    ShopSelectionChanged?.Invoke(this, null);
+                }
+            });
         }
         catch (OperationCanceledException) { }
         catch (Exception) { await PublishAsync(generation, () => Verification = "Printify verification could not complete. Try again."); }
