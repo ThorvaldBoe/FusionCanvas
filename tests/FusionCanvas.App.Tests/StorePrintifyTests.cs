@@ -195,6 +195,30 @@ public class StorePrintifyTests
         window.Close();
     }
 
+    [AvaloniaFact]
+    public async Task StoreEditor_SelectingVerifiedShop_MakesStoreSavableAndPersistsSelection()
+    {
+        var repository = new Repository();
+        var stores = new StoreManagementService(repository);
+        await stores.CreateStoreAsync(new("Store", FulfillmentStrategy: FulfillmentStrategy.ShopifyPrintify), Ct);
+        var native = new Native { Kind = PrintifyConfigurationKind.Available };
+        var model = new StoreManagementViewModel(stores);
+        model.ConfigurePrintify(native, new Verifier
+        {
+            Result = new(PrintifyConfigurationKind.Verified, "Verified", [new(123, "DevTest shop")])
+        });
+
+        await model.LoadAsync(Ct);
+        model.OpenStoreEditorCommand.Execute(null);
+        await model.PrintifyCredentials!.PendingOperation;
+        await model.PrintifyCredentials.VerifyAsync();
+
+        model.PrintifyCredentials.SelectedShopId = 123;
+
+        var reloaded = await stores.LoadAsync(Ct);
+        Assert.Equal(123, reloaded.ActiveStore!.Context.PrintifyShopId);
+    }
+
 
     private sealed class Service : IStorePrintifyConfigurationService
     {
@@ -238,15 +262,19 @@ public class StorePrintifyTests
     }
     private sealed class Native : IStorePrintifyCredentialStore
     {
+        public PrintifyConfigurationKind Kind { get; init; } = PrintifyConfigurationKind.Missing;
+
         public Task<PrintifyCredentialReadResult> ReadAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new PrintifyCredentialReadResult(new(PrintifyConfigurationKind.Missing, "Printify api key is required")));
+            Task.FromResult(new PrintifyCredentialReadResult(new(Kind, Kind == PrintifyConfigurationKind.Available ? "Printify api key is provided" : "Printify api key is required")));
         public Task<PrintifyConfigurationResult> SaveAsync(StoreCredentialScope scope, string key, CancellationToken cancellationToken = default) =>
             Task.FromResult(new PrintifyConfigurationResult(PrintifyConfigurationKind.Saved, "Saved"));
     }
     private sealed class Verifier : IPrintifyCredentialVerifier
     {
+        public PrintifyConfigurationResult Result { get; init; } = new(PrintifyConfigurationKind.Verified, "Verified");
+
         public Task<PrintifyConfigurationResult> VerifyAsync(string key, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new PrintifyConfigurationResult(PrintifyConfigurationKind.Verified, "Verified"));
+            Task.FromResult(Result);
     }
 
 }

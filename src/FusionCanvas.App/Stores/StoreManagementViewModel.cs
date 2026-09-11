@@ -74,7 +74,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         string BrandDirection,
         string PlanningContext,
         string Url,
-        FulfillmentStrategy FulfillmentStrategy);
+        FulfillmentStrategy FulfillmentStrategy,
+        int? PrintifyShopId);
 
     private sealed record NicheEditorState(
         string Name,
@@ -499,7 +500,15 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private void RefreshPrintifyContext() => PrintifyCredentials?.SetContext(
         SelectedStore, SelectedFulfillmentStrategy, _isCreatingNewStore, IsStoreEditorOpen);
 
-    private void OnPrintifyShopSelectionChanged(object? sender, int? shopId) { _printifyShopId = shopId; if (SelectedStore is not null && !_isCreatingNewStore && FulfillmentStrategyPolicy.RequiresPrintifyKey(SelectedStore.FulfillmentStrategy)) Run(SaveSelectedStoreAsync()); }
+    private void OnPrintifyShopSelectionChanged(object? sender, int? shopId)
+    {
+        _printifyShopId = shopId;
+        RaiseEditorStateProperties();
+        if (SelectedStore is not null && !_isCreatingNewStore && FulfillmentStrategyPolicy.RequiresPrintifyKey(SelectedStore.FulfillmentStrategy))
+        {
+            Run(SaveSelectedStoreAsync());
+        }
+    }
 
     public NicheSummary? SelectedNiche { get; private set; }
 
@@ -3659,7 +3668,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             EmptyToNull(NicheNotes));
 
     private EditorState CurrentEditorState() =>
-        new(NewStoreName, Description, Notes, TargetMarket, BrandDirection, PlanningContext, Url, SelectedFulfillmentStrategy);
+        new(NewStoreName, Description, Notes, TargetMarket, BrandDirection, PlanningContext, Url, SelectedFulfillmentStrategy, _printifyShopId);
 
     private NicheEditorState CurrentNicheEditorState() =>
         new(NicheName, NicheDescription, NicheAudience, NicheHumorStyle, NicheVisualStyleGuidance, NicheConstraints, NicheRisks, NicheResearchNotes, NicheNotes);
@@ -3701,7 +3710,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanDeleteSelectedNiche));
     }
 
-    private static EditorState EmptyEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, FulfillmentStrategy.Manual);
+    private static EditorState EmptyEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, FulfillmentStrategy.Manual, null);
 
     private static NicheEditorState EmptyNicheEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
 
