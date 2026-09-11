@@ -155,6 +155,51 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void NewBlueprintEditor_EnablesSaveAction()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: false);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+
+        viewModel.SelectProductsTabCommand.Execute(null);
+        window.UpdateLayout();
+        FindButton(window, "New Blueprint")!.Command!.Execute(null);
+        window.UpdateLayout();
+
+        var saveButton = FindButton(window, "Save Blueprint");
+        Assert.NotNull(saveButton);
+        Assert.True(viewModel.CanSaveSelectedProduct);
+        Assert.True(saveButton!.IsEnabled);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void EditingBlueprintName_EnablesSaveActionImmediately()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: false);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.IsBlueprintBasicsExpanded = true;
+        window.UpdateLayout();
+
+        var saveButton = FindButton(window, "Save Blueprint");
+        Assert.NotNull(saveButton);
+        Assert.False(saveButton!.IsEnabled);
+
+        var nameTextBox = window.FindControl<TextBox>("ProductNameTextBox");
+        Assert.NotNull(nameTextBox);
+        nameTextBox!.Text = "Updated blueprint";
+        window.UpdateLayout();
+
+        Assert.True(viewModel.CanSaveSelectedProduct);
+        Assert.True(saveButton.IsEnabled);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void OfferingAndFocusedEditorsPreserveApprovedBroadComposition()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);

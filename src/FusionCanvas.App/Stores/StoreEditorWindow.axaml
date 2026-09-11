@@ -549,11 +549,11 @@
                                TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBlock Text="Name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBox x:Name="ProductNameTextBox"
-                             Text="{Binding ProductName}"
+                             Text="{Binding ProductName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              PlaceholderText="Blueprint name"
                              Classes="field" />
                     <TextBlock Text="Description" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <TextBox Text="{Binding ProductDescription}"
+                    <TextBox Text="{Binding ProductDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              AcceptsReturn="True"
                              MinHeight="56"
                              Classes="field" />
