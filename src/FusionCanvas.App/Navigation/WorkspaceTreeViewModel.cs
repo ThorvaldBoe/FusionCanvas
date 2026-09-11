@@ -258,6 +258,19 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
     }
 
+    public WorkspaceTreeNodeViewModel? SelectBoundary(bool end)
+    {
+        var visibleNodes = VisibleNodes(Roots).Where(node => !node.IsDraft).ToArray();
+        var node = end ? visibleNodes.LastOrDefault() : visibleNodes.FirstOrDefault();
+        if (node is null)
+        {
+            return null;
+        }
+
+        Select(node);
+        return node;
+    }
+
     public void PrepareContextSelection(WorkspaceTreeNodeViewModel? node)
     {
         if (node is null || node.IsDraft || node.EntityKind is not (WorkspaceEntityKind.Group or WorkspaceEntityKind.Item))
@@ -1876,6 +1889,22 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             !node.IsDraft &&
             !node.IsInactive &&
             node.EntityKind is WorkspaceEntityKind.Group or WorkspaceEntityKind.Item);
+
+    private static IEnumerable<WorkspaceTreeNodeViewModel> VisibleNodes(
+        IEnumerable<WorkspaceTreeNodeViewModel> nodes)
+    {
+        foreach (var node in nodes)
+        {
+            yield return node;
+            if (node.IsExpanded)
+            {
+                foreach (var child in VisibleNodes(node.Children))
+                {
+                    yield return child;
+                }
+            }
+        }
+    }
 
     private IEnumerable<Guid> SelectableEntityIdsForStore(Guid storeId) =>
         _snapshot.Groups

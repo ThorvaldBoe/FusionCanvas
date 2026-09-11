@@ -49,6 +49,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         WorkspaceTreeControl.AddHandler(PointerPressedEvent, OnWorkspaceTreePointerPressed, RoutingStrategies.Tunnel);
+        WorkspaceTreeControl.AddHandler(KeyDownEvent, OnWorkspaceTreeKeyDown, RoutingStrategies.Tunnel);
         InitializeWindowLayout(null);
     }
 
@@ -57,6 +58,7 @@ public partial class MainWindow : Window
         ArgumentNullException.ThrowIfNull(services);
         InitializeComponent();
         WorkspaceTreeControl.AddHandler(PointerPressedEvent, OnWorkspaceTreePointerPressed, RoutingStrategies.Tunnel);
+        WorkspaceTreeControl.AddHandler(KeyDownEvent, OnWorkspaceTreeKeyDown, RoutingStrategies.Tunnel);
         InitializeWindowLayout(services.Settings);
         var viewModel = MainWindowViewModel.CreateForDefaultWorkspace(
             services.Settings,
@@ -971,6 +973,27 @@ public partial class MainWindow : Window
         {
             await viewModel.WorkspaceTree.CommitEditAsync();
         }
+    }
+
+    private void OnWorkspaceTreeKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key is not (Key.Home or Key.End) ||
+            DataContext is not MainWindowViewModel viewModel ||
+            TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is TextBox)
+        {
+            return;
+        }
+
+        var node = viewModel.WorkspaceTree.SelectBoundary(e.Key == Key.End);
+        if (node is null)
+        {
+            return;
+        }
+
+        var container = WorkspaceTreeControl.TreeContainerFromItem(node) as TreeViewItem;
+        container?.BringIntoView();
+        container?.Focus(NavigationMethod.Directional);
+        e.Handled = true;
     }
 
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
