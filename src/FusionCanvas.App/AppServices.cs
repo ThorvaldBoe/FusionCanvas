@@ -11,6 +11,7 @@ public sealed class AppServices : IDisposable
     private readonly HttpClient _httpClient;
     private bool _disposed;
     private HttpClient? _printifyHttpClient;
+    private HttpClient? _printifyCatalogHttpClient;
 
     public FusionCanvas.Application.Stores.Printify.IStorePrintifyCredentialStore? PrintifyCredentials { get; private set; }
     public FusionCanvas.Application.Stores.Printify.IPrintifyCredentialVerifier? PrintifyVerifier { get; private set; }
@@ -19,9 +20,11 @@ public sealed class AppServices : IDisposable
     internal void ConfigurePrintify(HttpClient client,
         FusionCanvas.Application.Stores.Printify.IStorePrintifyCredentialStore credentials,
         FusionCanvas.Application.Stores.Printify.IPrintifyCredentialVerifier verifier,
-        FusionCanvas.Application.Stores.Printify.IPrintifyCatalogClient catalogClient)
+        FusionCanvas.Application.Stores.Printify.IPrintifyCatalogClient catalogClient,
+        HttpClient? catalogHttpClient = null)
     {
         _printifyHttpClient = client;
+        _printifyCatalogHttpClient = catalogHttpClient;
         PrintifyCredentials = credentials;
         PrintifyVerifier = verifier;
         PrintifyCatalogClient = catalogClient;
@@ -63,5 +66,6 @@ public sealed class AppServices : IDisposable
         _disposed = true;
         _httpClient.Dispose();
         _printifyHttpClient?.Dispose();
+        _printifyCatalogHttpClient?.Dispose();
     }
 }
