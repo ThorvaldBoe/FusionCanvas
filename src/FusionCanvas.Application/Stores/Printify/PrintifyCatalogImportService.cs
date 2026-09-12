@@ -16,14 +16,17 @@ public sealed class PrintifyCatalogImportService(
         new(PrintifyCatalogResultKind.InvalidRequest, "Save an active Printify Store with a selected Printify shop first.");
 
     public Task<PrintifyCatalogResult> LoadBlueprintsAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default) =>
-        ExecuteAsync(scope, (key, token) => client.LoadBlueprintsAsync(key, token), cancellationToken);
+        ExecuteAsync(scope, (key, shopId, token) => client.LoadShopProductsAsync(key, shopId, token), cancellationToken);
+
+    public Task<PrintifyCatalogResult> LoadSelectedAsync(StoreCredentialScope scope, IReadOnlyCollection<string> productIds, CancellationToken cancellationToken = default) =>
+        ExecuteAsync(scope, (key, shopId, token) => client.LoadSelectedProductsAsync(key, shopId, productIds, token), cancellationToken);
 
     public Task<PrintifyCatalogResult> LoadSelectedAsync(StoreCredentialScope scope, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken = default) =>
-        ExecuteAsync(scope, (key, token) => client.LoadSelectedAsync(key, blueprintIds, token), cancellationToken);
+        LoadSelectedAsync(scope, blueprintIds.Select(value => value.ToString()).ToArray(), cancellationToken);
 
     private async Task<PrintifyCatalogResult> ExecuteAsync(
         StoreCredentialScope scope,
-        Func<string, CancellationToken, Task<PrintifyCatalogResult>> operation,
+        Func<string, int, CancellationToken, Task<PrintifyCatalogResult>> operation,
         CancellationToken cancellationToken)
     {
         if (scope.WorkspaceId == Guid.Empty || scope.StoreId == Guid.Empty) return InvalidContext;
@@ -36,14 +39,14 @@ public sealed class PrintifyCatalogImportService(
         var read = await credentials.ReadAsync(scope, cancellationToken).ConfigureAwait(false);
         if (read.Status.Kind != PrintifyConfigurationKind.Available || string.IsNullOrWhiteSpace(read.Secret))
             return new(PrintifyCatalogResultKind.InvalidKey, "Add and verify a Printify key before loading the catalog.");
-        var result = await operation(read.Secret, cancellationToken).ConfigureAwait(false);
-        if (!result.Succeeded || repository is null || result.SelectedCatalog is null)
+        var result = await operation(read.Secret, store.Context.PrintifyShopId.Value, cancellationToken).ConfigureAwait(false);
+        if (!result.Succeeded || repository is null || result.SelectedProducts is null)
             return result;
 
         try
         {
             var snapshot = await repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-            var updated = ImportSelected(snapshot, scope.StoreId, result.SelectedCatalog);
+            var updated = ImportSelected(snapshot, scope.StoreId, result.SelectedProducts);
             await repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
             return result with { Message = "Selected Printify catalog imported." };
         }
@@ -70,10 +73,13 @@ public sealed class PrintifyCatalogImportService(
 
         foreach (var importedBlueprint in catalog)
         {
-            var blueprint = blueprints.FirstOrDefault(value => value.StoreId == storeId && MetadataHasId(value.MetadataJson, importedBlueprint.Summary.Id));
+            var blueprint = blueprints.FirstOrDefault(value => value.StoreId == storeId && (importedBlueprint.ProductId is { } productId
+                ? MetadataHasProductId(value.MetadataJson, productId)
+                : MetadataHasId(value.MetadataJson, importedBlueprint.Summary.Id)));
             if (blueprint is null)
             {
-                blueprint = new Blueprint(Guid.NewGuid(), storeId, importedBlueprint.Summary.Title, importedBlueprint.Summary.Description, false, now, now, Metadata("blueprint", importedBlueprint.Summary.Id));
+                blueprint = new Blueprint(Guid.NewGuid(), storeId, importedBlueprint.Summary.Title, importedBlueprint.Summary.Description, false, now, now,
+                    importedBlueprint.ProductId is { } productId ? Metadata("product", importedBlueprint.Summary.Id, productId) : Metadata("blueprint", importedBlueprint.Summary.Id));
                 blueprints.Add(blueprint);
             }
             else
@@ -96,7 +102,8 @@ public sealed class PrintifyCatalogImportService(
                     Replace(providers, value => value.Id == provider.Id, provider);
                 }
 
-                var externalOfferingId = $"{importedBlueprint.Summary.Id}:{importedProvider.Id}";
+                var externalProductId = importedBlueprint.ProductId ?? importedBlueprint.Summary.Id.ToString();
+                var externalOfferingId = $"{externalProductId}:{importedProvider.Id}";
                 var offering = offerings.SingleOrDefault(value => value.StoreId == storeId && value.ExternalOfferingId == externalOfferingId);
                 if (offering is null)
                 {
@@ -194,6 +201,8 @@ public sealed class PrintifyCatalogImportService(
     }
 
     private static string Metadata(string kind, params int[] ids) => JsonSerializer.Serialize(new { source = "printify", kind, ids });
+    private static string Metadata(string kind, int blueprintId, string productId) => JsonSerializer.Serialize(new { source = "printify", kind, blueprintId, productId });
+    private static bool MetadataHasProductId(string json, string productId) => json.Contains($"\"productId\":\"{productId}\"", StringComparison.Ordinal);
     private static bool MetadataHasId(string json, int id) => json.Contains($"\"ids\":[{id}", StringComparison.Ordinal)
         || json.Contains($",{id}]", StringComparison.Ordinal)
         || json.Contains($",{id},", StringComparison.Ordinal);
