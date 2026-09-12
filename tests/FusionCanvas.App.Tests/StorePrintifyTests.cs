@@ -221,8 +221,26 @@ public class StorePrintifyTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal(123, model.PrintifyCredentials.SelectedShopId);
+        Assert.True(model.CanSaveSelectedStore);
+        Assert.Null((await stores.LoadAsync(Ct)).ActiveStore!.Context.PrintifyShopId);
+
+        await model.SaveSelectedStoreAsync(Ct);
         Assert.Equal(123, (await stores.LoadAsync(Ct)).ActiveStore!.Context.PrintifyShopId);
+
+        Assert.False(model.CanSaveSelectedStore);
         window.Close();
+
+        var reopened = new StoreManagementViewModel(stores);
+        reopened.ConfigurePrintify(new Native { Kind = PrintifyConfigurationKind.Available, Secret = "synthetic-key" }, new Verifier
+        {
+            Result = new(PrintifyConfigurationKind.Verified, "Verified", [new(123, "DevTest shop")])
+        });
+        await reopened.LoadAsync(Ct);
+        reopened.OpenStoreEditorCommand.Execute(null);
+        await reopened.PrintifyCredentials!.PendingOperation;
+
+        Assert.Equal(123, reopened.PrintifyCredentials.SelectedShopId);
+        Assert.Equal(123, Assert.Single(reopened.PrintifyCredentials.Shops).Id);
     }
 
 
