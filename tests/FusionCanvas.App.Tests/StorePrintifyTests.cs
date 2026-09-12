@@ -240,7 +240,13 @@ public class StorePrintifyTests
         await reopened.PrintifyCredentials!.PendingOperation;
 
         Assert.Equal(123, reopened.PrintifyCredentials.SelectedShopId);
-        Assert.Equal(123, Assert.Single(reopened.PrintifyCredentials.Shops).Id);
+        Assert.Empty(reopened.PrintifyCredentials.Shops);
+        Assert.Null(reopened.PrintifyCredentials.SelectedShop);
+
+        await reopened.PrintifyCredentials.VerifyAsync();
+
+        Assert.Equal("DevTest shop", reopened.PrintifyCredentials.SelectedShop?.Title);
+        Assert.True(reopened.CanSaveSelectedStore);
     }
 
 

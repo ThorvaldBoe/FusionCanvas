@@ -35,7 +35,14 @@ public sealed class StorePrintifyCredentialsViewModel(IStorePrintifyConfiguratio
             if (Equals(_selectedShop, value)) return;
             _selectedShop = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedShop)));
-            SelectedShopId = value?.Id;
+            var shopId = value?.Id;
+            if (_selectedShopId != shopId)
+            {
+                _selectedShopId = shopId;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedShopId)));
+            }
+
+            ShopSelectionChanged?.Invoke(this, shopId);
         }
     }
     public event EventHandler<int?>? ShopSelectionChanged;
@@ -68,10 +75,8 @@ public sealed class StorePrintifyCredentialsViewModel(IStorePrintifyConfiguratio
         _scope = scope;
         _persistedPrintify = persisted;
         _selectedShopId = store?.Context.PrintifyShopId;
-        _shops = _selectedShopId is { } selectedShopId
-            ? [new PrintifyShopOption(selectedShopId, $"Saved shop {selectedShopId}")]
-            : [];
-        _selectedShop = _shops.FirstOrDefault();
+        _shops = [];
+        _selectedShop = null;
         IsVisible = visible;
         _kind = null;
         Verification = string.Empty;
@@ -124,7 +129,7 @@ public sealed class StorePrintifyCredentialsViewModel(IStorePrintifyConfiguratio
             {
                 Verification = result.Message;
                 _shops = result.Shops ?? [];
-                _selectedShop = _selectedShopId is { } selectedShopId
+                SelectedShop = _selectedShopId is { } selectedShopId
                     ? _shops.FirstOrDefault(shop => shop.Id == selectedShopId)
                     : null;
                 if (_selectedShopId is not null && _selectedShop is null)

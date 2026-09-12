@@ -75,7 +75,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         string PlanningContext,
         string Url,
         FulfillmentStrategy FulfillmentStrategy,
-        int? PrintifyShopId);
+        int? PrintifyShopId,
+        bool PrintifyShopSelectionChanged);
 
     private sealed record NicheEditorState(
         string Name,
@@ -133,6 +134,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private bool _isAddingDesignArea;
     private string _newStoreName = string.Empty;
     private string _description = string.Empty;
+    private bool _printifyShopSelectionChanged;
     private string _notes = string.Empty;
     private string _targetMarket = string.Empty;
     private string _brandDirection = string.Empty;
@@ -503,6 +505,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private void OnPrintifyShopSelectionChanged(object? sender, int? shopId)
     {
         _printifyShopId = shopId;
+        _printifyShopSelectionChanged = true;
         RaiseEditorStateProperties();
     }
 
@@ -3373,6 +3376,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         PlanningContext = store.Context.PlanningContext ?? string.Empty;
         Url = store.Context.Url ?? string.Empty;
         _printifyShopId = store.Context.PrintifyShopId;
+        _printifyShopSelectionChanged = false;
         SelectedFulfillmentStrategy = store.FulfillmentStrategy;
     }
 
@@ -3664,7 +3668,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             EmptyToNull(NicheNotes));
 
     private EditorState CurrentEditorState() =>
-        new(NewStoreName, Description, Notes, TargetMarket, BrandDirection, PlanningContext, Url, SelectedFulfillmentStrategy, _printifyShopId);
+        new(NewStoreName, Description, Notes, TargetMarket, BrandDirection, PlanningContext, Url, SelectedFulfillmentStrategy, _printifyShopId, _printifyShopSelectionChanged);
 
     private NicheEditorState CurrentNicheEditorState() =>
         new(NicheName, NicheDescription, NicheAudience, NicheHumorStyle, NicheVisualStyleGuidance, NicheConstraints, NicheRisks, NicheResearchNotes, NicheNotes);
@@ -3706,7 +3710,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanDeleteSelectedNiche));
     }
 
-    private static EditorState EmptyEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, FulfillmentStrategy.Manual, null);
+    private static EditorState EmptyEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, FulfillmentStrategy.Manual, null, false);
 
     private static NicheEditorState EmptyNicheEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
 
