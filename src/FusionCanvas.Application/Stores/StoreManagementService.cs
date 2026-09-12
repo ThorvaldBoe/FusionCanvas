@@ -14,6 +14,7 @@ public sealed class StoreManagementService : IStoreManagementService
     private const string PlanningContextKey = "planningContext";
     private const string UrlKey = "url";
     private const string PrintifyShopIdKey = "printifyShopId";
+    private const string PrintifyShopTitleKey = "printifyShopTitle";
 
     private readonly IWorkspaceRepository _repository;
     private readonly Func<DateTimeOffset> _clock;
@@ -378,7 +379,8 @@ public sealed class StoreManagementService : IStoreManagementService
             metadata.GetValueOrDefault(BrandDirectionKey),
             metadata.GetValueOrDefault(PlanningContextKey),
             metadata.GetValueOrDefault(UrlKey),
-            int.TryParse(metadata.GetValueOrDefault(PrintifyShopIdKey), out var shopId) ? shopId : null);
+            int.TryParse(metadata.GetValueOrDefault(PrintifyShopIdKey), out var shopId) ? shopId : null,
+            metadata.GetValueOrDefault(PrintifyShopTitleKey));
     }
 
     private static string ToMetadataJson(StoreContext context, string existingMetadataJson = "{}")
@@ -390,6 +392,7 @@ public sealed class StoreManagementService : IStoreManagementService
         SetOptional(metadata, PlanningContextKey, context.PlanningContext);
         SetOptional(metadata, UrlKey, context.Url);
         SetOptional(metadata, PrintifyShopIdKey, context.PrintifyShopId?.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        SetOptional(metadata, PrintifyShopTitleKey, context.PrintifyShopTitle);
 
         return metadata.Count == 0 ? "{}" : JsonSerializer.Serialize(metadata);
     }

@@ -75,8 +75,10 @@ public sealed class StorePrintifyCredentialsViewModel(IStorePrintifyConfiguratio
         _scope = scope;
         _persistedPrintify = persisted;
         _selectedShopId = store?.Context.PrintifyShopId;
-        _shops = [];
-        _selectedShop = null;
+        _selectedShop = _selectedShopId is { } selectedShopId && !string.IsNullOrWhiteSpace(store?.Context.PrintifyShopTitle)
+            ? new PrintifyShopOption(selectedShopId, store.Context.PrintifyShopTitle)
+            : null;
+        _shops = _selectedShop is null ? [] : [_selectedShop];
         IsVisible = visible;
         _kind = null;
         Verification = string.Empty;
