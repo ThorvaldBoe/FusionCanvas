@@ -1673,7 +1673,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
         var result = await _service.UpdateStoreAsync(
             new StoreManagementUpdateRequest(SelectedStore.Id, NewStoreName, CurrentContext(), SelectedFulfillmentStrategy),
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken);
         ApplyResult(result);
     }
 
@@ -3654,7 +3654,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             EmptyToNull(BrandDirection),
             EmptyToNull(PlanningContext),
             EmptyToNull(Url),
-            _printifyShopId);
+            PrintifyCredentials is null ? _printifyShopId : PrintifyCredentials.SelectedShopId);
 
     private NicheContext CurrentNicheContext() =>
         new(
