@@ -52,10 +52,12 @@ public static class AppServicesFactory
             new FusionCanvas.Integration.Items.ItemCsvCodec(),
             new FusionCanvas.Integration.Items.Import.ItemCsvCodec());
         var printifyClient = FusionCanvas.Integration.Stores.Printify.PrintifyCredentialVerifier.CreateHttpClient();
+        var printifyCatalogClient = FusionCanvas.Integration.Stores.Printify.PrintifyCatalogClient.CreateHttpClient();
         services.ConfigurePrintify(printifyClient,
             new FusionCanvas.Integration.Stores.Printify.NativeStorePrintifyCredentialStore(),
             new FusionCanvas.Integration.Stores.Printify.PrintifyCredentialVerifier(printifyClient),
-            new FusionCanvas.Integration.Stores.Printify.PrintifyCatalogClient(printifyClient));
+            new FusionCanvas.Integration.Stores.Printify.PrintifyCatalogClient(printifyCatalogClient),
+            printifyCatalogClient);
         return services;
     }
 }
