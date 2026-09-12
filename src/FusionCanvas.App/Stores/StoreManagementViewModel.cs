@@ -504,10 +504,6 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     {
         _printifyShopId = shopId;
         RaiseEditorStateProperties();
-        if (SelectedStore is not null && !_isCreatingNewStore && FulfillmentStrategyPolicy.RequiresPrintifyKey(SelectedStore.FulfillmentStrategy))
-        {
-            Run(SaveSelectedStoreAsync());
-        }
     }
 
     public NicheSummary? SelectedNiche { get; private set; }

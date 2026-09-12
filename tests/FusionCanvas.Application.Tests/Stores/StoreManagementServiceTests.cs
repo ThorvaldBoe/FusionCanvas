@@ -89,6 +89,8 @@ public class StoreManagementServiceTests
         Assert.Equal(store.Id, result.Store?.Id);
         Assert.Equal("North Star Gifts", result.Store?.Name);
         Assert.Equal(context, result.Store?.Context);
+        Assert.Equal(store.Id, result.State.ActiveStoreId);
+        Assert.Equal(store.Id, service.ActiveStoreId);
         var saved = await repository.LoadAsync(TestContext.Current.CancellationToken);
         Assert.Equal(store.Id, Assert.Single(saved.Niches).StoreId);
         Assert.Equal(store.Id, Assert.Single(saved.Items).StoreId);

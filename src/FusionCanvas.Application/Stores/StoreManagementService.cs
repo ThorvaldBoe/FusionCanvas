@@ -135,6 +135,7 @@ public sealed class StoreManagementService : IStoreManagementService
         };
         await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
 
+        _activeStoreId = updatedStore.Id;
         return StoreManagementResult.Success(ToSummary(updatedStore), BuildState(updated));
     }
 
