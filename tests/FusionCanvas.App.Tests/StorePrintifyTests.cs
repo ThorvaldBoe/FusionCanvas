@@ -233,7 +233,7 @@ public class StorePrintifyTests
         var reopened = new StoreManagementViewModel(stores);
         reopened.ConfigurePrintify(new Native { Kind = PrintifyConfigurationKind.Available, Secret = "synthetic-key" }, new Verifier
         {
-            Result = new(PrintifyConfigurationKind.Verified, "Verified", [new(123, "DevTest shop")])
+            Result = new(PrintifyConfigurationKind.Verified, "Verified", [new(123, "DevTest shop"), new(456, "Second shop")])
         });
         await reopened.LoadAsync(Ct);
         reopened.OpenStoreEditorCommand.Execute(null);
@@ -247,6 +247,17 @@ public class StorePrintifyTests
 
         Assert.Equal("DevTest shop", reopened.PrintifyCredentials.SelectedShop?.Title);
         Assert.True(reopened.CanSaveSelectedStore);
+
+        var reopenedWindow = new StoreEditorWindow { DataContext = reopened };
+        reopenedWindow.Show();
+        reopenedWindow.UpdateLayout();
+        var reopenedCombo = reopenedWindow.GetVisualDescendants().OfType<ComboBox>()
+            .Single(control => Avalonia.Automation.AutomationProperties.GetAutomationId(control) == "StoreEditor.PrintifyShop");
+        reopenedCombo.SelectedItem = reopenedCombo.Items[1];
+        Dispatcher.UIThread.RunJobs();
+
+        await reopened.SaveSelectedStoreAsync(Ct);
+        Assert.Equal(456, (await stores.LoadAsync(Ct)).ActiveStore!.Context.PrintifyShopId);
     }
 
 
