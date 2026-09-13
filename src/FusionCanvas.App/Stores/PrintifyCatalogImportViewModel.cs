@@ -76,9 +76,11 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
             if (!IsCurrentScope(scope)) return;
             if (!result.Succeeded) { ErrorMessage = result.Message; return; }
             Blueprints.Clear();
-            foreach (var blueprint in result.Blueprints ?? [])
+            var products = result.Products ?? result.Blueprints?.Select(blueprint =>
+                new PrintifyShopProductSummary(blueprint.Id.ToString(), blueprint.Title, blueprint.Description, blueprint.Id, 1)) ?? [];
+            foreach (var product in products)
             {
-                var item = new PrintifyCatalogImportItemViewModel(blueprint);
+                var item = new PrintifyCatalogImportItemViewModel(product);
                 item.PropertyChanged += OnItemPropertyChanged;
                 Blueprints.Add(item);
             }

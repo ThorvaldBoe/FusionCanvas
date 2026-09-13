@@ -7,6 +7,45 @@ namespace FusionCanvas.Integration.Tests.Stores.Printify;
 public sealed class PrintifyCatalogClientTests
 {
     [Fact]
+    public async Task LoadsProductsFromSelectedShopAcrossPages()
+    {
+        var requests = new List<string>();
+        using var client = new HttpClient(new Handler((request, _) =>
+        {
+            requests.Add(request.RequestUri!.AbsoluteUri);
+            var page = request.RequestUri.Query.Contains("page=2", StringComparison.Ordinal);
+            var product = page
+                ? "{\"id\":\"product-b\",\"title\":\"Gift\",\"description\":\"B\",\"blueprint_id\":68,\"print_provider_id\":9,\"options\":[],\"variants\":[{\"id\":2,\"title\":\"One size\",\"options\":[],\"is_enabled\":true,\"is_available\":true}],\"print_areas\":[{\"variant_ids\":[2],\"placeholders\":[{\"position\":\"front\",\"images\":[{\"width\":100,\"height\":100}]}]}]}"
+                : "{\"id\":\"product-a\",\"title\":\"Listing\",\"description\":\"A\",\"blueprint_id\":68,\"print_provider_id\":9,\"options\":[],\"variants\":[{\"id\":1,\"title\":\"One size\",\"options\":[],\"is_enabled\":true,\"is_available\":true}],\"print_areas\":[{\"variant_ids\":[1],\"placeholders\":[{\"position\":\"front\",\"images\":[{\"width\":100,\"height\":100}]}]}]}";
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent($"{{\"current_page\":{(page ? 2 : 1)},\"last_page\":2,\"data\":[{product}]}}")
+            });
+        })) { BaseAddress = PrintifyCatalogClient.ApiBaseUri };
+
+        var result = await new PrintifyCatalogClient(client).LoadShopProductsAsync("synthetic-key", 42, TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal(["product-a", "product-b"], result.Products!.Select(product => product.ProductId));
+        Assert.Equal("https://api.printify.com/v1/shops/42/products.json?limit=50&page=1", requests[0]);
+        Assert.Equal("https://api.printify.com/v1/shops/42/products.json?limit=50&page=2", requests[1]);
+    }
+
+    [Fact]
+    public async Task LoadsProductsThatHaveNoArtworkYet()
+    {
+        using var client = new HttpClient(new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"last_page\":1,\"data\":[{\"id\":\"product-draft\",\"title\":\"Draft product\",\"blueprint_id\":68,\"print_provider_id\":9,\"variants\":[{\"id\":33719,\"title\":\"One size\"}],\"print_areas\":[{\"variant_ids\":[33719],\"placeholders\":[{\"position\":\"front\",\"images\":[]}]}]}]}")
+        }))) { BaseAddress = PrintifyCatalogClient.ApiBaseUri };
+
+        var result = await new PrintifyCatalogClient(client).LoadShopProductsAsync("synthetic-key", 42, TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal("product-draft", Assert.Single(result.Products!).ProductId);
+    }
+
+    [Fact]
     public async Task LoadsBlueprintSummariesWithoutMutatingRequests()
     {
         var requests = new List<HttpRequestMessage>();

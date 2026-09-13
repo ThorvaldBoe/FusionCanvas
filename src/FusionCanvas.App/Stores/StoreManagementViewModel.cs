@@ -76,6 +76,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         string Url,
         FulfillmentStrategy FulfillmentStrategy,
         int? PrintifyShopId,
+        string? PrintifyShopTitle,
         bool PrintifyShopSelectionChanged);
 
     private sealed record NicheEditorState(
@@ -141,6 +142,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private string _planningContext = string.Empty;
     private string _url = string.Empty;
     private int? _printifyShopId;
+    private string? _printifyShopTitle;
     private FulfillmentStrategy _fulfillmentStrategy = FulfillmentStrategy.Manual;
     private string _nicheName = string.Empty;
     private string _nicheDescription = string.Empty;
@@ -505,6 +507,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private void OnPrintifyShopSelectionChanged(object? sender, int? shopId)
     {
         _printifyShopId = shopId;
+        _printifyShopTitle = (sender as StorePrintifyCredentialsViewModel)?.SelectedShop?.Title;
         _printifyShopSelectionChanged = true;
         RaiseEditorStateProperties();
     }
@@ -3377,6 +3380,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         PlanningContext = store.Context.PlanningContext ?? string.Empty;
         Url = store.Context.Url ?? string.Empty;
         _printifyShopId = store.Context.PrintifyShopId;
+        _printifyShopTitle = store.Context.PrintifyShopTitle;
         _printifyShopSelectionChanged = false;
         SelectedFulfillmentStrategy = store.FulfillmentStrategy;
     }
@@ -3655,7 +3659,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             EmptyToNull(BrandDirection),
             EmptyToNull(PlanningContext),
             EmptyToNull(Url),
-            PrintifyCredentials is null ? _printifyShopId : PrintifyCredentials.SelectedShopId);
+            PrintifyCredentials is null ? _printifyShopId : PrintifyCredentials.SelectedShopId,
+            PrintifyCredentials?.SelectedShop?.Title ?? _printifyShopTitle);
 
     private NicheContext CurrentNicheContext() =>
         new(
@@ -3669,7 +3674,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             EmptyToNull(NicheNotes));
 
     private EditorState CurrentEditorState() =>
-        new(NewStoreName, Description, Notes, TargetMarket, BrandDirection, PlanningContext, Url, SelectedFulfillmentStrategy, _printifyShopId, _printifyShopSelectionChanged);
+        new(NewStoreName, Description, Notes, TargetMarket, BrandDirection, PlanningContext, Url, SelectedFulfillmentStrategy, _printifyShopId, _printifyShopTitle, _printifyShopSelectionChanged);
 
     private NicheEditorState CurrentNicheEditorState() =>
         new(NicheName, NicheDescription, NicheAudience, NicheHumorStyle, NicheVisualStyleGuidance, NicheConstraints, NicheRisks, NicheResearchNotes, NicheNotes);
@@ -3711,7 +3716,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanDeleteSelectedNiche));
     }
 
-    private static EditorState EmptyEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, FulfillmentStrategy.Manual, null, false);
+    private static EditorState EmptyEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, FulfillmentStrategy.Manual, null, null, false);
 
     private static NicheEditorState EmptyNicheEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
 

@@ -43,6 +43,22 @@ public sealed class PrintifyCatalogImportServiceTests
     }
 
     [Fact]
+    public async Task LoadsProductsFromTheSelectedPrintifyShop()
+    {
+        var store = new StoreSummary(Guid.NewGuid(), Guid.NewGuid(), "Store", new(PrintifyShopId: 42), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, FulfillmentStrategy.Printify);
+        var credentials = new CredentialsStub { Result = new(new(PrintifyConfigurationKind.Available, "available"), "synthetic-key") };
+        var client = new ShopProductsClientStub();
+        var service = new PrintifyCatalogImportService(new StoresStub(store), credentials, client);
+
+        var result = await service.LoadBlueprintsAsync(new(store.WorkspaceId, store.Id), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal(42, client.ShopId);
+        Assert.Equal("synthetic-key", client.LastKey);
+        Assert.Equal(["product-a"], result.Products!.Select(value => value.ProductId));
+    }
+
+    [Fact]
     public async Task ImportsSelectedCatalogAndUpdatesExistingPrintifyRecords()
     {
         var store = new StoreSummary(Guid.NewGuid(), Guid.NewGuid(), "Store", new(PrintifyShopId: 42), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, FulfillmentStrategy.Printify);
@@ -152,6 +168,22 @@ public sealed class PrintifyCatalogImportServiceTests
         public PrintifyCatalogResult SelectedResult { get; init; } = new(PrintifyCatalogResultKind.Empty, "empty", []);
         public Task<PrintifyCatalogResult> LoadBlueprintsAsync(string key, CancellationToken cancellationToken = default) { Calls++; LastKey = key; return Task.FromResult(Result); }
         public Task<PrintifyCatalogResult> LoadSelectedAsync(string key, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken = default) => Task.FromResult(SelectedResult);
+    }
+
+    private sealed class ShopProductsClientStub : IPrintifyCatalogClient
+    {
+        public int ShopId { get; private set; }
+        public string? LastKey { get; private set; }
+
+        public Task<PrintifyCatalogResult> LoadBlueprintsAsync(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<PrintifyCatalogResult> LoadSelectedAsync(string key, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<PrintifyCatalogResult> LoadShopProductsAsync(string key, int shopId, CancellationToken cancellationToken = default)
+        {
+            LastKey = key;
+            ShopId = shopId;
+            return Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "loaded", Products: [new("product-a", "Test product", null, 68, 9)]));
+        }
     }
 
     private sealed class RepositoryStub(WorkspaceSnapshot initial) : IWorkspaceRepository

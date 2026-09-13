@@ -26,15 +26,16 @@ public class StorePrintifyConfigurationServiceTests
     }
 
     [Fact]
-    public async Task PrintifyShopId_SurvivesStoreReload()
+    public async Task PrintifyShopSelection_SurvivesStoreReload()
     {
         var repository = new Repository();
         var stores = new StoreManagementService(repository);
-        var created = (await stores.CreateStoreAsync(new("Store", new StoreContext(PrintifyShopId: 123), FulfillmentStrategy.ShopifyPrintify), Ct)).Store!;
+        var created = (await stores.CreateStoreAsync(new("Store", new StoreContext(PrintifyShopId: 123, PrintifyShopTitle: "DevTest shop"), FulfillmentStrategy.ShopifyPrintify), Ct)).Store!;
 
         var loaded = await stores.LoadAsync(Ct);
 
         Assert.Equal(123, loaded.ActiveStore!.Context.PrintifyShopId);
+        Assert.Equal("DevTest shop", loaded.ActiveStore.Context.PrintifyShopTitle);
         Assert.Equal(created.Id, loaded.ActiveStore.Id);
     }
 

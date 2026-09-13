@@ -479,12 +479,12 @@
                       Padding="12"
                       AutomationProperties.AutomationId="Catalog.PrintifyImportPanel">
                 <StackPanel DataContext="{Binding PrintifyCatalogImportSession}" Spacing="8">
-                  <TextBlock Text="Import Blueprints from Printify" FontWeight="SemiBold" />
-                  <TextBlock Text="Select the Blueprints to add or update locally. No changes are saved until you confirm."
+                  <TextBlock Text="Import products from Printify" FontWeight="SemiBold" />
+                  <TextBlock Text="Select products from the selected Printify shop to add or update locally. No changes are saved until you confirm."
                              TextWrapping="Wrap"
                              Foreground="{DynamicResource SecondaryTextBrush}" />
                   <ProgressBar IsVisible="{Binding IsBusy}" IsIndeterminate="True" Height="4" />
-                  <TextBlock IsVisible="{Binding !HasBlueprints}" Text="No Blueprints are available." Foreground="{DynamicResource SecondaryTextBrush}" />
+                  <TextBlock IsVisible="{Binding !HasBlueprints}" Text="No products are available in the selected Printify shop." Foreground="{DynamicResource SecondaryTextBrush}" />
                   <ItemsControl x:Name="PrintifyBlueprintList" ItemsSource="{Binding Blueprints}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="stores:PrintifyCatalogImportItemViewModel">

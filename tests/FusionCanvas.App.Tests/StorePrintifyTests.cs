@@ -228,7 +228,10 @@ public class StorePrintifyTests
 
         driver.Save();
         await HeadlessUiWait.UntilAsync(() => !model.CanSaveSelectedStore, "Store Editor Save action completes");
-        Assert.Equal(123, (await stores.LoadAsync(Ct)).ActiveStore!.Context.PrintifyShopId);
+        var saved = (await stores.LoadAsync(Ct)).ActiveStore!;
+        Assert.Equal(123, saved.Context.PrintifyShopId);
+        Assert.Equal("DevTest shop", saved.Context.PrintifyShopTitle);
+        Assert.Equal("DevTest shop", model.PrintifyCredentials.SelectedShop?.Title);
 
         Assert.False(model.CanSaveSelectedStore);
         window.Close();
@@ -243,13 +246,12 @@ public class StorePrintifyTests
         await reopened.PrintifyCredentials!.PendingOperation;
 
         Assert.Equal(123, reopened.PrintifyCredentials.SelectedShopId);
-        Assert.Empty(reopened.PrintifyCredentials.Shops);
-        Assert.Null(reopened.PrintifyCredentials.SelectedShop);
+        Assert.Equal("DevTest shop", reopened.PrintifyCredentials.SelectedShop?.Title);
 
         await reopened.PrintifyCredentials.VerifyAsync();
 
         Assert.Equal("DevTest shop", reopened.PrintifyCredentials.SelectedShop?.Title);
-        Assert.True(reopened.CanSaveSelectedStore);
+        Assert.False(reopened.CanSaveSelectedStore);
 
         var reopenedWindow = new StoreEditorWindow { DataContext = reopened };
         reopenedWindow.Show();
@@ -257,8 +259,23 @@ public class StorePrintifyTests
         var reopenedDriver = new StoreEditorDriver(reopenedWindow);
         Assert.NotNull(reopenedDriver.PrintifyShop);
         Assert.Equal("DevTest shop", reopened.PrintifyCredentials.SelectedShop?.Title);
+        Assert.False(reopened.CanSaveSelectedStore);
+        reopenedDriver.PrintifyShop.SelectedItem = reopenedDriver.PrintifyShop.Items[1];
+        Dispatcher.UIThread.RunJobs();
+        await HeadlessUiWait.UntilAsync(() => reopened.PrintifyCredentials.SelectedShopId == 456, "second Printify shop selection");
+        Assert.True(reopened.CanSaveSelectedStore);
+
         reopenedDriver.Save();
         await HeadlessUiWait.UntilAsync(() => !reopened.CanSaveSelectedStore, "reopened Store Editor clean state");
+        saved = (await stores.LoadAsync(Ct)).ActiveStore!;
+        Assert.Equal(456, saved.Context.PrintifyShopId);
+        Assert.Equal("Second shop", saved.Context.PrintifyShopTitle);
+        Assert.Equal("Second shop", reopened.PrintifyCredentials.SelectedShop?.Title);
+        Assert.True(reopened.TryCloseStoreEditor());
+        reopened.OpenStoreEditorCommand.Execute(null);
+        await reopened.PrintifyCredentials.PendingOperation;
+        Assert.Equal(456, reopened.PrintifyCredentials.SelectedShopId);
+        Assert.Equal("Second shop", reopened.PrintifyCredentials.SelectedShop?.Title);
         reopenedWindow.Close();
     }
 
