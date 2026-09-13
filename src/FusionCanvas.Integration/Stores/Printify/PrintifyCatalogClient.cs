@@ -31,7 +31,7 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
             using var document = response.Json!;
             try
             {
-                var pageResult = ParseProductPage(document);
+                var pageResult = ParseProductPage(document, includeDetails: false);
                 products.AddRange(pageResult.Products);
                 if (pageResult.LastPage <= page) break;
             }
@@ -70,7 +70,7 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
             using var document = response.Json!;
             try
             {
-                var pageResult = ParseProductPage(document);
+                var pageResult = ParseProductPage(document, includeDetails: true);
                 summaries.AddRange(pageResult.Products);
                 details.AddRange(pageResult.Details);
                 if (pageResult.LastPage <= page) break;
@@ -83,7 +83,7 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
             : new(PrintifyCatalogResultKind.Succeeded, "Printify shop products loaded.", Products: summaries, SelectedProducts: details);
     }
 
-    private static ProductPage ParseProductPage(JsonDocument document)
+    private static ProductPage ParseProductPage(JsonDocument document, bool includeDetails)
     {
         var root = document.RootElement;
         if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array)
@@ -98,6 +98,7 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
             var providerId = RequiredInt(item, "print_provider_id");
             var title = RequiredString(item, "title");
             summaries.Add(new(productId, title, OptionalString(item, "description"), blueprintId, providerId));
+            if (!includeDetails) continue;
             var options = ParseProductOptions(item);
             var variants = ParseProductVariants(item);
             details.Add(new(new PrintifyCatalogBlueprintSummary(blueprintId, title, OptionalString(item, "description"), null, null),
@@ -132,6 +133,7 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
                 foreach (var placeholder in areaPlaceholders.EnumerateArray())
                 {
                     var images = placeholder.TryGetProperty("images", out var imageList) && imageList.ValueKind == JsonValueKind.Array ? imageList.EnumerateArray().ToList() : [];
+                    if (images.Count == 0) continue;
                     var image = images.FirstOrDefault();
                     var width = image.ValueKind == JsonValueKind.Object ? RequiredInt(image, "width") : 0;
                     var height = image.ValueKind == JsonValueKind.Object ? RequiredInt(image, "height") : 0;
