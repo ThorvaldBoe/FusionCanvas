@@ -32,6 +32,20 @@ public sealed class PrintifyCatalogClientTests
     }
 
     [Fact]
+    public async Task LoadsProductsThatHaveNoArtworkYet()
+    {
+        using var client = new HttpClient(new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"last_page\":1,\"data\":[{\"id\":\"product-draft\",\"title\":\"Draft product\",\"blueprint_id\":68,\"print_provider_id\":9,\"variants\":[{\"id\":33719,\"title\":\"One size\"}],\"print_areas\":[{\"variant_ids\":[33719],\"placeholders\":[{\"position\":\"front\",\"images\":[]}]}]}]}")
+        }))) { BaseAddress = PrintifyCatalogClient.ApiBaseUri };
+
+        var result = await new PrintifyCatalogClient(client).LoadShopProductsAsync("synthetic-key", 42, TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal("product-draft", Assert.Single(result.Products!).ProductId);
+    }
+
+    [Fact]
     public async Task LoadsBlueprintSummariesWithoutMutatingRequests()
     {
         var requests = new List<HttpRequestMessage>();
