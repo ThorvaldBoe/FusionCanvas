@@ -361,7 +361,7 @@ Events allow plugins to react without tightly coupling components.
 
 ## Testing Strategy
 
-FusionCanvas uses a lowest-reliable-layer testing strategy. Business logic remains testable without the UI framework, UI-owned decision logic is covered through focused view-model and coordinator tests, and meaningful Avalonia framework behavior is covered through deterministic headless view tests that require no interactive display.
+FusionCanvas uses a lowest-reliable-layer testing strategy with a small experience-journey layer. Business logic remains testable without the UI framework, UI-owned decision logic is covered through focused view-model and coordinator tests, meaningful Avalonia framework behavior is covered through deterministic headless component tests, and critical cross-seam user jobs are covered by deterministic headless journeys that require no interactive display.
 
 FusionCanvas should maintain a high level of unit test coverage, especially for domain logic, application services, persistence boundaries, and plugin contracts. New behavior should generally include focused unit tests unless there is a clear reason another test type provides better confidence.
 
@@ -373,7 +373,9 @@ Priority should be given to testing:
 - data persistence
 - import/export functionality
 
-Use Avalonia headless tests when view construction, bindings, control state, routed input, focus, selection, or visual-tree behavior carries meaningful risk. Avoid superficial tests of static markup or framework implementation details. These tests belong in `dotnet test .\FusionCanvas.sln` and must run consistently under Codex, OpenCode, CI, and normal contributor environments.
+Use Avalonia headless tests when view construction, bindings, control state, routed input, focus, selection, or visual-tree behavior carries meaningful risk. Avoid superficial tests of static markup or framework implementation details. These tests belong in `dotnet test .\FusionCanvas.sln -m:1` and must run consistently under Codex, OpenCode, CI, and normal contributor environments.
+
+Organize user-facing coverage by meaningful user jobs rather than by window count. Add a headless experience journey when a critical accepted outcome crosses two or more material rendered UI, orchestration, persistence, lifecycle, or re-entry seams and focused tests could pass while composition fails. Journey action phases use rendered controls and routed input; direct bound-property mutation, command execution, and private-handler reflection remain appropriate only for fixture setup or focused component tests, not as substitutes for the user action. Durable journeys close and reconstruct from scenario-scoped isolated persistence.
 
 The `FusionCanvas.App.Tests` project includes an Avalonia headless harness (`HeadlessTestApp`) and representative view tests (`MainWindowLayoutTests`) covering `MainWindow` construction, compiled bindings, control state, and visual-tree behavior. View-model, command, and navigation tests remain framework-free. Additional headless view coverage should be added as meaningful framework behavior is introduced.
 

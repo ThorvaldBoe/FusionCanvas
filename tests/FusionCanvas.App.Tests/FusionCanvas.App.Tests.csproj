@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\FusionCanvas.App\FusionCanvas.App.csproj" />
+    <ProjectReference Include="..\..\src\FusionCanvas.Integration\FusionCanvas.Integration.csproj" />
   </ItemGroup>
 
 </Project>

@@ -275,12 +275,13 @@ Every behavior change MUST include focused tests at the lowest reliable layer, a
 - Use real domain objects and simple fakes where practical. Mock only at architectural boundaries and verify outcomes rather than incidental call sequences.
 - Persistence and file tests MUST use isolated disposable resources.
 - Avalonia behavior involving construction, bindings, focus, input, selection, or the visual tree MUST use deterministic headless tests when that framework behavior carries meaningful risk.
-- A bug fix SHOULD first add a test that fails for the defect and passes after the correction.
+- A bug fix MUST first add or identify a deterministic test that fails for the user-visible defect and passes after the correction. If deterministic reproduction is unsuitable because the risk is native-window, operating-system input, assistive-technology, platform-integration, or visual-only behavior, record the specific limitation and add focused deterministic coverage for any separable state or decision behavior.
+- Defect fixes MUST record why existing tests passed, inspect similar surfaces for the same escape mechanism, and decide whether prevention remains local or is promoted to shared test support, inventory, QA guidance, specifications, or coding guidance. Do not add project-wide rules for isolated mechanisms without evidence of reuse.
 
 The repository baseline is:
 
 ```powershell
-dotnet test .\FusionCanvas.sln
+dotnet test .\FusionCanvas.sln -m:1
 ```
 
 ## 15. Enforcement and Review
@@ -290,7 +291,7 @@ Standards that can be automated SHOULD be encoded in repository tooling rather t
 1. a root `.editorconfig` for formatting, naming, and code-style rules
 2. built-in .NET analyzers enabled at an agreed analysis level
 3. warnings kept visible and warning-clean for changed code
-4. `dotnet format --verify-no-changes` and `dotnet test .\FusionCanvas.sln` in CI
+4. `dotnet format --verify-no-changes` and `dotnet test .\FusionCanvas.sln -m:1` in CI
 5. narrowly selected additional analyzers only when they provide durable value without excessive noise
 
 Introducing or tightening analyzers SHOULD be a separate maintenance change. Existing diagnostics may be baselined temporarily, but new or modified code MUST follow this standard and MUST NOT expand the baseline.

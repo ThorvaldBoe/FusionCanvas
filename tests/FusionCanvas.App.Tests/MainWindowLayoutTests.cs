@@ -11,8 +11,13 @@ using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Views;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.TitleOptimization;
+using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.WorkspaceTree;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Groups;
+using FusionCanvas.Integration.Persistence;
+using FusionCanvas.App.Tests.TestSupport;
 
 namespace FusionCanvas.App.Tests;
 
@@ -325,15 +330,61 @@ public class MainWindowLayoutTests
             new Avalonia.Point(),
             KeyModifiers.None);
 
-        var handler = typeof(MainWindow).GetMethod(
-            "OnTreeNodeDragOver",
-            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-        Assert.NotNull(handler);
-
-        handler!.Invoke(fixture.Window, [targetRow, args]);
+        targetRow.RaiseEvent(args);
 
         Assert.False(target.IsExpanded);
         Assert.True(target.IsDropTarget);
+    }
+
+    [AvaloniaFact]
+    public async Task GroupDropJourney_PersistsNestedParentAcrossReconstruction()
+    {
+        var snapshot = SampleWorkspace.Create();
+        var sourceId = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+        var source = new TopicGroup(sourceId, SampleWorkspace.StoreNodeId, SampleWorkspace.NicheNodeId, null,
+            "Seasonal ideas", null, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "{}", 1);
+        snapshot = snapshot with { Groups = [.. snapshot.Groups, source] };
+        using var workspace = new DisposableHeadlessWorkspace();
+        var repository = workspace.CreateRepository();
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+        using var fixture = new MainWindowFixture(snapshot: snapshot, repository: repository);
+
+        foreach (var node in Flatten(fixture.ViewModel.WorkspaceTree.Roots))
+            node.IsExpanded = true;
+        fixture.PumpLayout();
+        var targetModel = Flatten(fixture.ViewModel.WorkspaceTree.Roots).Single(node => node.EntityId == SampleWorkspace.TopicNodeId);
+        var targetRow = fixture.FindControl<Border>(border => border.Classes.Contains("treeRow") && ReferenceEquals(border.DataContext, targetModel));
+        var dropPoint = new Point(targetRow.Bounds.Width / 2, targetRow.Bounds.Height / 2);
+        var transfer = new DataTransfer();
+        transfer.Add(DataTransferItem.CreateText($"FusionCanvasSelection|Group:{sourceId}"));
+        targetRow.RaiseEvent(new DragEventArgs(DragDrop.DragOverEvent, transfer, targetRow, dropPoint, KeyModifiers.None));
+        Assert.True(targetModel.IsDropTarget);
+        targetRow.RaiseEvent(new DragEventArgs(DragDrop.DropEvent, transfer, targetRow, dropPoint, KeyModifiers.None));
+        await HeadlessUiWait.UntilAsync(() => repository.LoadAsync(TestContext.Current.CancellationToken).GetAwaiter().GetResult().Groups.Single(group => group.Id == sourceId).ParentGroupId == SampleWorkspace.TopicNodeId,
+            "group parent is persisted after rendered drop");
+        await HeadlessUiWait.UntilAsync(() => Flatten(fixture.ViewModel.WorkspaceTree.Roots)
+            .Any(node => node.EntityId == SampleWorkspace.TopicNodeId && node.Children.Any(child => child.EntityId == sourceId)),
+            "moved group is rendered beneath the target group");
+
+        var reconstructed = await repository.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(SampleWorkspace.TopicNodeId, reconstructed.Groups.Single(group => group.Id == sourceId).ParentGroupId);
+        fixture.Dispose();
+        using var reopened = new MainWindowFixture(snapshot: reconstructed, repository: repository);
+        foreach (var node in Flatten(reopened.ViewModel.WorkspaceTree.Roots))
+            node.IsExpanded = true;
+        reopened.PumpLayout();
+        var reopenedTarget = Flatten(reopened.ViewModel.WorkspaceTree.Roots).Single(node => node.EntityId == SampleWorkspace.TopicNodeId);
+        Assert.Contains(reopenedTarget.Children, child => child.EntityId == sourceId);
+
+        static IEnumerable<WorkspaceTreeNodeViewModel> Flatten(IEnumerable<WorkspaceTreeNodeViewModel> nodes)
+        {
+            foreach (var node in nodes)
+            {
+                yield return node;
+                foreach (var child in Flatten(node.Children))
+                    yield return child;
+            }
+        }
     }
 
     private static void ClickExpander(MainWindowFixture fixture, ToggleButton expander)

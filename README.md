@@ -102,7 +102,7 @@ The API key is never stored in the workspace database or workspace packages. Ide
 Run the automated baseline from the repository root:
 
 ```powershell
-dotnet test .\FusionCanvas.sln
+dotnet test .\FusionCanvas.sln -m:1
 ```
 
 The baseline test suite uses mirrored test projects under `tests/`:

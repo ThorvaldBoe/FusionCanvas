@@ -15,12 +15,13 @@ The durable requirements behind this process live in `openspec/specs/qa-review-b
 Every delivery module receives a scoped completion review before it is reported complete. This is a change gate, not automatically a full repository QA review. Review the module's proposal, delta specs, design and implementation plan, tasks, code changes, and `verification.md`, then check:
 
 1. Every acceptance scenario has a planned method, final result, and material evidence or explicit not-applicable rationale.
-2. `dotnet build .\FusionCanvas.sln`, `dotnet test .\FusionCanvas.sln`, and strict validation of the active OpenSpec change pass.
+2. `dotnet build .\FusionCanvas.sln`, `dotnet test .\FusionCanvas.sln -m:1`, and strict validation of the active OpenSpec change pass.
 3. The implementation stayed within the approved module and did not invent unapproved product behavior or architecture decisions.
 4. Changed-scope spec/code/doc drift is absent.
 5. Changed and newly added C# code conforms to `docs/coding-standard.md`, including correct layer and capability placement, one primary top-level production type per file, namespace and naming consistency, explicit dependencies, nullability, cancellation, and error handling.
 6. Relevant architecture, security, persistence, migration, and recovery risks were reviewed.
-7. A user-facing module has focused UI decision-logic tests and applicable Avalonia headless view tests for meaningful construction, binding, control-state, routed-input, focus, selection, or visual-tree behavior. Static markup needs no superficial test.
+7. A user-facing module has focused UI decision-logic tests and applicable Avalonia headless view tests for meaningful construction, binding, control-state, routed-input, focus, selection, or visual-tree behavior. Critical cross-seam user jobs also have truthful rendered headless journey evidence, including fresh-instance re-entry for durable mutations. Static markup needs no superficial test.
+8. Any defect discovered after automated tests passed has regression evidence, an escape cause, a similar-surface check, and a proportionate local-versus-reusable prevention decision.
 
 If a criterion or validation gate fails, return the module to correction and rerun the affected criterion plus relevant regression checks. Do not convert a failure into a limitation merely to close the change. Expand to the relevant QA tasks—or a full review—when the module affects broad shell/navigation behavior, crosses many capabilities, or creates plausible unrelated regressions.
 
@@ -31,6 +32,8 @@ For the completion record, add an acceptance table to `verification.md`:
 | --- | --- | --- | --- |
 | `<requirement> / <scenario>` | Unit / integration / headless view / inspection / optional live desktop | Pass / Fail / N/A | `<test, command, screenshot, notes>` |
 ```
+
+For user-facing modules, add the affected user-job inventory and identify whether each critical outcome is covered by focused tests, a rendered headless journey, optional live-desktop evidence, or an explicit omission rationale. For defect corrections, include the regression test, escape class, similar surfaces inspected, and the local-versus-global prevention decision.
 
 ### Review Protocol (applies to every task)
 
@@ -185,21 +188,23 @@ This review judges *reasonable* application of the principles, per `openspec/spe
 1. **Baseline passes:**
 
    ```powershell
-   dotnet test .\FusionCanvas.sln
+   dotnet test .\FusionCanvas.sln -m:1
    ```
 
    A failing or non-building suite is Critical. The suite must not require network, external services, or a running UI.
 
 2. **Structural coverage — behavior has tests:**
    - Map production behavior types to tests: for each public domain rule/invariant, application use case, integration adapter, and UI decision-logic type, is there a corresponding test class in the mirrored project (`tests/FusionCanvas.<Layer>.Tests`)? List unprotected behavior.
-   - Optional coverage data: `dotnet test .\FusionCanvas.sln --collect:"XPlat Code Coverage"` (coverlet collector is already referenced; results land in `TestResults/`). Use the data to find untested branches in Domain/Application — treat percentage numbers as a signal, not a gate.
+   - Optional coverage data: `dotnet test .\FusionCanvas.sln -m:1 --collect:"XPlat Code Coverage"` (coverlet collector is already referenced; results land in `TestResults/`). Use the data to find untested branches in Domain/Application — treat percentage numbers as a signal, not a gate.
 3. **Test quality, per layer:**
    - Domain tests: no frameworks, persistence, or file system.
    - Application tests: deterministic collaborators (fakes/stubs), no real SQLite or file system.
    - Integration tests: isolated temporary resources (temp DB/files), no shared state, clean up after themselves.
    - App tests: exercise UI-owned decision logic (view models, navigation, commands) without Avalonia when practical; use Avalonia headless tests for meaningful view construction, bindings, control state, routed input, focus, selection, and visual-tree behavior; do not add superficial tests of static markup.
+   - Experience journeys: use rendered controls and routed input for the action phase; do not replace actions with direct bound-property mutation, command execution, private-handler reflection, arbitrary sleeps, shared persistent state, or assertions hidden in drivers. Durable journeys must close and reconstruct from scenario-scoped persistence.
 4. **Spec-driven coverage:** behavior described by accepted spec requirements/scenarios has corresponding tests, or an explicit documented reason why not.
 5. **Scope discipline:** headless view tests remain focused and deterministic; no live-desktop automation, pixel-perfect visual regression, performance suite, or external-service dependency enters the solution-level baseline.
+6. **Escape learning:** each observed defect records why previous tests passed, checks similar surfaces, and promotes only recurring or cross-surface mechanisms into shared guidance or support.
 
 ---
 
@@ -264,21 +269,22 @@ Context: FusionCanvas is a local-first desktop app with no network attack surfac
 
 ## QA-6 — Headless UI View Coverage
 
-**Goal:** verify that accepted and implemented user-facing views have proportionate automated coverage of meaningful Avalonia framework behavior, using a routine that runs without an interactive desktop.
+**Goal:** verify that accepted and implemented user-facing jobs have proportionate automated coverage of meaningful Avalonia framework behavior and truthful rendered journeys, using a routine that runs without an interactive desktop.
 
 ### Required Environment
 
-1. Run through the normal solution-level command: `dotnet test .\FusionCanvas.sln`.
+1. Run through the normal solution-level command: `dotnet test .\FusionCanvas.sln -m:1`.
 2. Headless view tests must not require a display, installed desktop application, network access, external services, or normal user workspace data.
 3. Use isolated deterministic fixtures for any view behavior that coordinates persistence or mutable application state.
 4. The same mandatory task must be executable under Codex, OpenCode, CI, and a normal contributor environment.
 
 ### Build the View Inventory
 
-1. Inspect Avalonia views under `src/FusionCanvas.App` and identify meaningful framework behavior: construction, bindings, control state, routed input, focus, selection, templates, or visual-tree coordination.
-2. Map each meaningful behavior to a focused headless view test, or record why a framework-free view-model/command test provides sufficient coverage.
-3. Mark static markup or framework-owned rendering **Not applicable** with a concise rationale; do not require existence-only tests.
-4. Report accepted user-facing behavior that has no suitable coverage as a finding. If expected behavior is unclear, route clarification through OpenSpec.
+1. Inspect implemented Avalonia surfaces under `src/FusionCanvas.App` and identify meaningful user jobs and framework behavior: construction, bindings, control state, routed input, focus, selection, templates, or visual-tree coordination.
+2. Map each meaningful outcome to a focused headless component test, a complete headless experience journey when two or more material seams cross, or a concise omission rationale.
+3. For durable critical jobs, confirm the journey closes/reconstructs from isolated persistence and asserts the rehydrated visible state.
+4. Mark static markup or framework-owned rendering **Not applicable** with a concise rationale; do not require existence-only tests.
+5. Report accepted user-facing behavior that has no suitable coverage as a finding. If expected behavior is unclear, route clarification through OpenSpec.
 
 ### Review Dimensions
 
@@ -289,7 +295,7 @@ For each relevant view or surface, check:
 3. **Routed input and commands:** meaningful keyboard/pointer events or command paths reach the expected handler without relying on operating-system input.
 4. **Focus and selection:** framework-owned focus, selection, and synchronization behavior is covered where it affects accepted outcomes.
 5. **Visual tree and templates:** important named controls, presenters, or generated items exist and carry the expected state when that structure is part of behavior rather than mere layout.
-6. **Test quality:** assertions describe product behavior, fixtures isolate dispatcher/application lifetime correctly, and tests avoid sleeps, pixels, incidental tree shape, or duplicated view-model assertions.
+6. **Test quality:** assertions describe product behavior, fixtures isolate dispatcher/application lifetime correctly, action phases use rendered controls, drivers remain thin, and tests avoid sleeps, pixels, incidental tree shape, bypassed UI seams, or duplicated view-model assertions.
 7. **UI-description fixture reconciliation:** when a described inline fixture moves into a modal or another focused surface, reconcile its semantic fixture IDs, deterministic layout and state assertions, and checked-in golden renderings together.
 
 ### Optional Live Desktop Evidence
@@ -305,12 +311,15 @@ A reviewer may launch the built application ad hoc when additional confidence is
 
 - Record the view coverage table using the standard columns above.
 - Cite test classes/methods, omission rationales, and the solution test result.
+- Include the affected user-job inventory and any experience-journey or escape-analysis findings in the report.
 - Any failed required headless test fails QA-6. A justified Not applicable row does not.
 - Until a headless harness exists, QA-6 should report the missing harness and representative view coverage as a test-gap finding; it must not substitute live desktop evidence for the missing deterministic lane.
+- Treat test count, line coverage, and window count as diagnostic signals only. Record baseline duration, flake observations, and failure-localization quality when evaluating strategy health.
 
 ---
 
 ## Maintaining This Playbook
 
 - Update checklists, feature-matrix columns, and commands as the stack evolves (e.g. promote repeatable scenarios into a dedicated UI harness when useful).
+- Promote a defect lesson into shared guidance or test support only when the escape mechanism recurs or plausibly affects multiple surfaces; keep one-off regressions local.
 - Adding/removing a QA area or changing severities' meaning changes the QA baseline requirements — propose it through OpenSpec.

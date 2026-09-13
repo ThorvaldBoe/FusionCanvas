@@ -10,6 +10,8 @@ using FusionCanvas.Application.Stores.Printify;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.App.Tests.TestSupport.Drivers;
+using FusionCanvas.App.Tests.TestSupport;
 
 namespace FusionCanvas.App.Tests;
 
@@ -198,7 +200,8 @@ public class StorePrintifyTests
     [AvaloniaFact]
     public async Task StoreEditor_PrintifyShopComboBox_UpdatesSelectionAndPersistsIt()
     {
-        var repository = new Repository();
+        using var workspace = new DisposableHeadlessWorkspace();
+        var repository = workspace.CreateRepository();
         var stores = new StoreManagementService(repository);
         await stores.CreateStoreAsync(new("Store", FulfillmentStrategy: FulfillmentStrategy.ShopifyPrintify), Ct);
         var model = new StoreManagementViewModel(stores);
@@ -214,17 +217,17 @@ public class StorePrintifyTests
         await model.PrintifyCredentials.VerifyAsync();
         window.UpdateLayout();
 
-        var combo = window.GetVisualDescendants().OfType<ComboBox>()
-            .Single(control => Avalonia.Automation.AutomationProperties.GetAutomationId(control) == "StoreEditor.PrintifyShop");
-        Assert.Equal(1, combo.ItemCount);
-        combo.SelectedItem = combo.Items[0];
-        Dispatcher.UIThread.RunJobs();
+        var driver = new StoreEditorDriver(window);
+        Assert.Equal(1, driver.PrintifyShop.ItemCount);
+        driver.SelectFirstPrintifyShop();
+        await HeadlessUiWait.UntilAsync(() => model.PrintifyCredentials.SelectedShopId == 123, "selected Printify shop");
 
         Assert.Equal(123, model.PrintifyCredentials.SelectedShopId);
         Assert.True(model.CanSaveSelectedStore);
         Assert.Null((await stores.LoadAsync(Ct)).ActiveStore!.Context.PrintifyShopId);
 
-        await model.SaveSelectedStoreAsync(Ct);
+        driver.Save();
+        await HeadlessUiWait.UntilAsync(() => !model.CanSaveSelectedStore, "Store Editor Save action completes");
         Assert.Equal(123, (await stores.LoadAsync(Ct)).ActiveStore!.Context.PrintifyShopId);
 
         Assert.False(model.CanSaveSelectedStore);
@@ -251,13 +254,12 @@ public class StorePrintifyTests
         var reopenedWindow = new StoreEditorWindow { DataContext = reopened };
         reopenedWindow.Show();
         reopenedWindow.UpdateLayout();
-        var reopenedCombo = reopenedWindow.GetVisualDescendants().OfType<ComboBox>()
-            .Single(control => Avalonia.Automation.AutomationProperties.GetAutomationId(control) == "StoreEditor.PrintifyShop");
-        reopenedCombo.SelectedItem = reopenedCombo.Items[1];
-        Dispatcher.UIThread.RunJobs();
-
-        await reopened.SaveSelectedStoreAsync(Ct);
-        Assert.Equal(456, (await stores.LoadAsync(Ct)).ActiveStore!.Context.PrintifyShopId);
+        var reopenedDriver = new StoreEditorDriver(reopenedWindow);
+        Assert.NotNull(reopenedDriver.PrintifyShop);
+        Assert.Equal("DevTest shop", reopened.PrintifyCredentials.SelectedShop?.Title);
+        reopenedDriver.Save();
+        await HeadlessUiWait.UntilAsync(() => !reopened.CanSaveSelectedStore, "reopened Store Editor clean state");
+        reopenedWindow.Close();
     }
 
 

@@ -24,6 +24,8 @@ using FusionCanvas.Application.Stores.Printify;
 using FusionCanvas.App.Views;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
+using FusionCanvas.App.Tests.TestSupport;
+using FusionCanvas.App.Tests.TestSupport.Drivers;
 
 namespace FusionCanvas.App.Tests;
 
@@ -197,6 +199,80 @@ public class StoreEditorHeadlessTests
         Assert.True(saveButton.IsEnabled);
 
         window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task BlueprintNameJourney_UsesRenderedInputAndSaveAction()
+    {
+        // Arrange the existing blueprint; the user boundary starts at the rendered editor.
+        var window = CreateEditorWindow(includeNormalizedCatalog: false);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.IsBlueprintBasicsExpanded = true;
+        window.UpdateLayout();
+
+        var driver = new StoreEditorDriver(window);
+        Assert.False(driver.SaveBlueprint.IsEnabled);
+
+        // User actions traverse the rendered text input and enabled Save control.
+        driver.TypeBlueprintName("Updated blueprint through the UI");
+        await HeadlessUiWait.UntilAsync(() => driver.SaveBlueprint.IsEnabled, "Blueprint Save action becomes enabled");
+        driver.SaveBlueprintChanges();
+        await HeadlessUiWait.UntilAsync(() => !driver.SaveBlueprint.IsEnabled, "Blueprint Save action completes");
+
+        Assert.Equal("Updated blueprint through the UI", viewModel.SelectedProduct!.Name);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task BlueprintNameJourney_ReopensFromDisposableSqlite()
+    {
+        using var workspace = new DisposableHeadlessWorkspace();
+        var store = new Store(Guid.NewGuid(), "Persistent Store", null, false, Now, Now, "{}");
+        var repository = workspace.CreateRepository();
+        await repository.SaveAsync(Snapshot(store, includeNormalizedCatalog: false, useFixedProviderOffering: false, includeOfferingOptions: false), TestContext.Current.CancellationToken);
+
+        static StoreManagementViewModel Compose(IWorkspaceRepository repo) => new(
+            new StoreManagementService(repo),
+            new NicheManagementService(repo),
+            new TagManagementService(repo),
+            new ProductSupplierSetupService(repo),
+            new CatalogSetupService(repo),
+            new MockupTemplateSetupService(repo),
+            new OfferingManagementService(repo),
+            null);
+
+        var first = Compose(repository);
+        await first.LoadAsync(TestContext.Current.CancellationToken);
+        first.OpenStoreEditorCommand.Execute(null);
+        var window = new StoreEditorWindow { DataContext = first };
+        window.Show();
+        window.UpdateLayout();
+        first.SelectProductsTabCommand.Execute(null);
+        first.OpenProductDetailCommand.Execute(Assert.Single(first.Products));
+        first.IsBlueprintBasicsExpanded = true;
+        window.UpdateLayout();
+        var driver = new StoreEditorDriver(window);
+        driver.TypeBlueprintName("Persisted blueprint name");
+        await HeadlessUiWait.UntilAsync(() => driver.SaveBlueprint.IsEnabled, "persistent Blueprint Save action");
+        driver.SaveBlueprintChanges();
+        await HeadlessUiWait.UntilAsync(() => !driver.SaveBlueprint.IsEnabled, "persistent Blueprint save completes");
+        window.Close();
+
+        var second = Compose(repository);
+        await second.LoadAsync(TestContext.Current.CancellationToken);
+        second.OpenStoreEditorCommand.Execute(null);
+        var reopened = new StoreEditorWindow { DataContext = second };
+        reopened.Show();
+        second.SelectProductsTabCommand.Execute(null);
+        second.OpenProductDetailCommand.Execute(Assert.Single(second.Products));
+        second.IsBlueprintBasicsExpanded = true;
+        reopened.UpdateLayout();
+        var reopenedDriver = new StoreEditorDriver(reopened);
+        Assert.Equal("Persisted blueprint name", reopenedDriver.BlueprintName.Text);
+        Assert.False(reopenedDriver.SaveBlueprint.IsEnabled);
+        reopened.Close();
     }
 
     [AvaloniaFact]

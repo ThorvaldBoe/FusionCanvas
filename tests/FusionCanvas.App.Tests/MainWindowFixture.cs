@@ -3,6 +3,7 @@ using Avalonia.VisualTree;
 using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Views;
 using FusionCanvas.Application.TitleOptimization;
+using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.App.Tests;
@@ -15,9 +16,13 @@ internal sealed class MainWindowFixture : IDisposable
     public MainWindowFixture(
         ITitleOptimizationService? titleOptimization = null,
         double width = 1180,
-        double height = 760)
+        double height = 760,
+        WorkspaceSnapshot? snapshot = null,
+        IWorkspaceRepository? repository = null)
     {
-        ViewModel = MainWindowViewModelFactory.CreateSample(titleOptimization);
+        ViewModel = snapshot is null || repository is null
+            ? MainWindowViewModelFactory.CreateSample(titleOptimization)
+            : MainWindowViewModelFactory.CreateFromSnapshot(snapshot, repository, titleOptimization);
         Window = new MainWindow { DataContext = ViewModel };
         Window.Show();
         Window.Width = width;

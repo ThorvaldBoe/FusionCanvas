@@ -1,0 +1,11 @@
+<Project>
+  <!--
+    Avalonia BuildServices telemetry is not part of FusionCanvas behavior and
+    attempts to write a protected per-user log in some non-interactive runners.
+    Keep the deterministic build/test baseline independent of that side effect.
+    This does not suppress compiler, analyzer, or test diagnostics.
+  -->
+  <PropertyGroup>
+    <UsedAvaloniaProducts></UsedAvaloniaProducts>
+  </PropertyGroup>
+</Project>
