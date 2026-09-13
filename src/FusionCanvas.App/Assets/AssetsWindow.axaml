@@ -44,7 +44,8 @@
                           Padding="0"
                           Background="Transparent"
                           BorderThickness="0"
-                          ToolTip.Tip="Open a larger preview">
+                          ToolTip.Tip="Open a larger preview"
+                          AutomationProperties.AutomationId="Assets.Preview">
                     <Image Source="{Binding Thumbnail}" Width="64" Height="64" Stretch="UniformToFill" />
                   </Button>
                   <StackPanel Grid.Column="1" Spacing="2">
@@ -58,14 +59,16 @@
                             SelectedItem="{Binding SelectedPurpose}"
                             IsEnabled="{Binding !Parent.IsBusy}"
                             ToolTip.Tip="Asset purpose"
-                            MinHeight="32" />
+                            MinHeight="32"
+                            AutomationProperties.AutomationId="Assets.Purpose" />
                   <Button Grid.Column="3"
                           Content="Remove…"
                           Command="{Binding $parent[ItemsControl].DataContext.RequestRemoveCommand}"
                           CommandParameter="{Binding}"
                           IsEnabled="{Binding !Parent.IsBusy}"
                           ToolTip.Tip="Permanently remove asset and managed file"
-                          Classes="danger" />
+                          Classes="danger"
+                          AutomationProperties.AutomationId="Assets.Remove" />
                 </Grid>
               </Border>
             </DataTemplate>
@@ -90,11 +93,12 @@
                         IsEnabled="{Binding CanConfirmImport}"
                         ToolTip.Tip="Pre-selected from file extension"
                         MinWidth="160"
-                        MinHeight="32" />
+                        MinHeight="32"
+                        AutomationProperties.AutomationId="Assets.PendingPurpose" />
             </Grid>
             <StackPanel Orientation="Horizontal" Spacing="8">
-              <Button Content="Confirm import" Command="{Binding ConfirmImportCommand}" IsEnabled="{Binding CanConfirmImport}" Classes="primary" />
-              <Button Content="Cancel" Command="{Binding CancelImportCommand}" Classes="secondary" />
+              <Button Content="Confirm import" Command="{Binding ConfirmImportCommand}" IsEnabled="{Binding CanConfirmImport}" Classes="primary" AutomationProperties.AutomationId="Assets.ConfirmImport" />
+              <Button Content="Cancel" Command="{Binding CancelImportCommand}" Classes="secondary" AutomationProperties.AutomationId="Assets.CancelImport" />
             </StackPanel>
           </StackPanel>
         </Border>
@@ -108,8 +112,8 @@
           <StackPanel Spacing="8">
             <TextBlock Text="{Binding RemovalPromptMessage}" TextWrapping="Wrap" FontSize="13" Foreground="{DynamicResource DangerTextBrush}" />
             <StackPanel Orientation="Horizontal" Spacing="8">
-              <Button Content="Remove permanently" Command="{Binding ConfirmRemoveCommand}" Classes="danger" />
-              <Button Content="Cancel" Command="{Binding CancelRemoveCommand}" Classes="secondary" />
+              <Button Content="Remove permanently" Command="{Binding ConfirmRemoveCommand}" Classes="danger" AutomationProperties.AutomationId="Assets.ConfirmRemove" />
+              <Button Content="Cancel" Command="{Binding CancelRemoveCommand}" Classes="secondary" AutomationProperties.AutomationId="Assets.CancelRemove" />
             </StackPanel>
           </StackPanel>
         </Border>
@@ -117,9 +121,9 @@
     </ScrollViewer>
 
     <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-      <Button Grid.Column="0" Content="Import…" Command="{Binding ImportCommand}" IsEnabled="{Binding CanImport}" ToolTip.Tip="Choose a file to import" Classes="primary" />
+      <Button Grid.Column="0" Content="Import…" Command="{Binding ImportCommand}" IsEnabled="{Binding CanImport}" ToolTip.Tip="Choose a file to import" Classes="primary" AutomationProperties.AutomationId="Assets.Import" />
       <TextBlock Grid.Column="1" Text="Loading…" IsVisible="{Binding IsBusy}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
-      <Button Grid.Column="2" Content="Close" Command="{Binding CloseCommand}" Classes="secondary" />
+      <Button Grid.Column="2" Content="Close" Command="{Binding CloseCommand}" Classes="secondary" AutomationProperties.AutomationId="Assets.Close" />
     </Grid>
   </Grid>
 
