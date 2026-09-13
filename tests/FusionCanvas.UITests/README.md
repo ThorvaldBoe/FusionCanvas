@@ -3,7 +3,7 @@
 This project is the selected real-desktop UI automation lane. It is intentionally not part of `FusionCanvas.sln`, so the normal deterministic baseline remains:
 
 ```powershell
-dotnet test .\FusionCanvas.sln
+dotnet test .\FusionCanvas.sln -m:1
 ```
 
 ## Prerequisites

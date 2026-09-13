@@ -551,7 +551,8 @@
                     <TextBox x:Name="ProductNameTextBox"
                              Text="{Binding ProductName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              PlaceholderText="Blueprint name"
-                             Classes="field" />
+                             Classes="field"
+                             AutomationProperties.AutomationId="Catalog.BlueprintName" />
                     <TextBlock Text="Description" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBox Text="{Binding ProductDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              AcceptsReturn="True"
@@ -559,6 +560,7 @@
                              Classes="field" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Content="Save Blueprint"
+                              AutomationProperties.AutomationId="Catalog.SaveBlueprint"
                               Command="{Binding SaveSelectedProductCommand}"
                               IsEnabled="{Binding CanSaveSelectedProduct}"
                               Classes="primary fixedAction" />
