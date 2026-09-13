@@ -3,6 +3,7 @@ using FusionCanvas.Application.Stores.Printify;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Catalog;
+using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.Application.Tests.Stores;
@@ -89,6 +90,47 @@ public sealed class PrintifyCatalogImportServiceTests
         var variant = Assert.Single(repository.Snapshot.OfferingVariants);
         var placeholder = Assert.Single(repository.Snapshot.OfferingPlaceholders);
         Assert.Equal([variant.Id], placeholder.VariantIds);
+    }
+
+    [Fact]
+    public async Task ShopProductImportPreservesLegacyOfferingIdentityAndMockupTemplates()
+    {
+        var store = new StoreSummary(Guid.NewGuid(), Guid.NewGuid(), "Store", new(PrintifyShopId: 42), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, FulfillmentStrategy.Printify);
+        var blueprintId = Guid.NewGuid();
+        var providerId = Guid.NewGuid();
+        var offeringId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var blueprint = new Blueprint(blueprintId, store.Id, "Old Tee", null, false, now, now, "{\"source\":\"printify\",\"kind\":\"blueprint\",\"ids\":[68]}");
+        var provider = new PrintProvider(providerId, store.Id, "Old Provider", "9", false, now, now, "{}");
+        var offering = new BlueprintOffering(offeringId, blueprintId, store.Id, "Old Tee · Old Provider", null, BlueprintOfferingKind.FixedPrintProvider, providerId, null, null, "68:9", false, now, now);
+        var template = new MockupTemplate(templateId, offeringId, null, "Existing mockup", null, 1, false, now, now);
+        var repository = new RepositoryStub(new WorkspaceSnapshot([], [
+            new Store(store.Id, store.WorkspaceId, store.Name, null, false, now, now, "{}", null, store.FulfillmentStrategy)
+        ], [], [], [], [], [], [], [], []) with
+        {
+            Blueprints = [blueprint],
+            PrintProviders = [provider],
+            BlueprintOfferings = [offering],
+            MockupTemplates = [template]
+        });
+        var client = new ClientStub
+        {
+            SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [new PrintifyCatalogBlueprint(
+                new(68, "Updated Tee", null, "Gildan", "5000"),
+                [new(9, "Updated Provider", [], [new(33719, "Black", true, true, [1], [new("front", "dtg", 100, 200)])])])
+                { ProductId = "shop-product-1" }])
+        };
+        var service = new PrintifyCatalogImportService(new StoresStub(store), new CredentialsStub { Result = new(new(PrintifyConfigurationKind.Available, "available"), "key") }, client, repository);
+
+        var result = await service.LoadSelectedAsync(new(store.WorkspaceId, store.Id), [68], TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Single(repository.Snapshot.Blueprints);
+        Assert.Single(repository.Snapshot.BlueprintOfferings);
+        Assert.Equal(offeringId, repository.Snapshot.BlueprintOfferings[0].Id);
+        Assert.Equal(offeringId, repository.Snapshot.MockupTemplates[0].BlueprintOfferingId);
+        Assert.Equal("Updated Tee · Updated Provider", repository.Snapshot.BlueprintOfferings[0].Name);
     }
 
     [Fact]

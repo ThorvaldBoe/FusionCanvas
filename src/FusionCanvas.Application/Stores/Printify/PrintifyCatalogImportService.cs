@@ -73,9 +73,9 @@ public sealed class PrintifyCatalogImportService(
 
         foreach (var importedBlueprint in catalog)
         {
-            var blueprint = blueprints.FirstOrDefault(value => value.StoreId == storeId && (importedBlueprint.ProductId is { } productId
-                ? MetadataHasProductId(value.MetadataJson, productId)
-                : MetadataHasId(value.MetadataJson, importedBlueprint.Summary.Id)));
+            var blueprint = blueprints.FirstOrDefault(value => value.StoreId == storeId
+                && (importedBlueprint.ProductId is { } productId && MetadataHasProductId(value.MetadataJson, productId)
+                    || MetadataHasId(value.MetadataJson, importedBlueprint.Summary.Id)));
             if (blueprint is null)
             {
                 blueprint = new Blueprint(Guid.NewGuid(), storeId, importedBlueprint.Summary.Title, importedBlueprint.Summary.Description, false, now, now,
@@ -104,7 +104,14 @@ public sealed class PrintifyCatalogImportService(
 
                 var externalProductId = importedBlueprint.ProductId ?? importedBlueprint.Summary.Id.ToString();
                 var externalOfferingId = $"{externalProductId}:{importedProvider.Id}";
-                var offering = offerings.SingleOrDefault(value => value.StoreId == storeId && value.ExternalOfferingId == externalOfferingId);
+                var offering = offerings.SingleOrDefault(value => value.StoreId == storeId && value.ExternalOfferingId == externalOfferingId)
+                    // Before shop-product imports, the same stable relationship was stored
+                    // as <blueprint id>:<provider id>. Preserve that offering identity so
+                    // existing mockup templates and local configuration remain attached.
+                    ?? offerings.SingleOrDefault(value => value.StoreId == storeId
+                        && value.BlueprintId == blueprint.Id
+                        && value.PrintProviderId == provider.Id
+                        && value.ExternalOfferingId == $"{importedBlueprint.Summary.Id}:{importedProvider.Id}");
                 if (offering is null)
                 {
                     offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, storeId, $"{importedBlueprint.Summary.Title} · {importedProvider.Title}", importedBlueprint.Summary.Description, BlueprintOfferingKind.FixedPrintProvider, provider.Id, null, null, externalOfferingId, false, now, now, Metadata("offering", importedBlueprint.Summary.Id, importedProvider.Id));
