@@ -496,7 +496,7 @@
                   </ItemsControl>
                   <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Foreground="{DynamicResource DangerTextBrush}" TextWrapping="Wrap" />
                   <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Content="Load selected" Command="{Binding ConfirmCommand}" Classes="primary fixedAction" />
+                    <Button Content="Load selected" Command="{Binding ConfirmCommand}" Classes="primary fixedAction" Width="112" />
                     <Button Content="Cancel" Command="{Binding CancelCommand}" Classes="secondary fixedAction" />
                   </StackPanel>
                 </StackPanel>
