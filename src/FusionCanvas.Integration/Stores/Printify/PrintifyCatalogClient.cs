@@ -80,10 +80,45 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
             catch (JsonException) { return Unexpected(); }
             catch (InvalidOperationException) { return Unexpected(); }
         }
+        var providerNames = await LoadProviderNamesAsync(details, key, cancellationToken).ConfigureAwait(false);
+        if (providerNames.Error is not null) return providerNames.Error;
+        details = details.Select(blueprint => blueprint with
+        {
+            Providers = blueprint.Providers.Select(provider => provider with
+            {
+                Title = providerNames.Names.TryGetValue((blueprint.Summary.Id, provider.Id), out var title)
+                    ? title
+                    : provider.Title
+            }).ToArray()
+        }).ToList();
+
         await EnrichBlueprintNamesAsync(summaries, key, cancellationToken).ConfigureAwait(false);
         return summaries.Count == 0
             ? new(PrintifyCatalogResultKind.Empty, "The selected Printify shop has no products to import.", Products: summaries, SelectedProducts: details)
             : new(PrintifyCatalogResultKind.Succeeded, "Printify shop products loaded.", Products: summaries, SelectedProducts: details);
+    }
+
+    private async Task<(Dictionary<(int BlueprintId, int ProviderId), string> Names, PrintifyCatalogResult? Error)> LoadProviderNamesAsync(
+        IReadOnlyList<PrintifyCatalogBlueprint> products,
+        string key,
+        CancellationToken cancellationToken)
+    {
+        var names = new Dictionary<(int BlueprintId, int ProviderId), string>();
+        foreach (var group in products.GroupBy(product => product.Summary.Id))
+        {
+            var response = await SendJsonAsync($"blueprints/{group.Key}/print_providers.json", key, cancellationToken).ConfigureAwait(false);
+            if (response.Error is not null) return (names, response.Error);
+            using var document = response.Json!;
+            try
+            {
+                foreach (var provider in ParseProviders(document))
+                    names[(group.Key, provider.Id)] = provider.Title;
+            }
+            catch (JsonException) { return (names, Unexpected()); }
+            catch (InvalidOperationException) { return (names, Unexpected()); }
+        }
+
+        return (names, null);
     }
 
     private static ProductPage ParseProductPage(JsonDocument document, bool includeDetails)

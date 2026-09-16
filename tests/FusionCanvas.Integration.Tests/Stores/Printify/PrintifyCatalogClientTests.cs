@@ -68,6 +68,26 @@ public sealed class PrintifyCatalogClientTests
     }
 
     [Fact]
+    public async Task LoadsProviderNameFromPrintifyCatalogWhenConfirmingShopProduct()
+    {
+        var requests = new List<string>();
+        using var client = new HttpClient(new Handler((request, _) =>
+        {
+            requests.Add(request.RequestUri!.AbsolutePath);
+            var body = request.RequestUri.AbsolutePath.EndsWith("products.json", StringComparison.Ordinal)
+                ? "{\"last_page\":1,\"data\":[{\"id\":\"product-a\",\"title\":\"Listing\",\"blueprint_id\":68,\"print_provider_id\":9,\"options\":[],\"variants\":[{\"id\":1,\"title\":\"One size\",\"options\":[]}],\"print_areas\":[]}]}"
+                : "[{\"id\":9,\"title\":\"SwiftPOD\"}]";
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) });
+        })) { BaseAddress = PrintifyCatalogClient.ApiBaseUri };
+
+        var result = await new PrintifyCatalogClient(client).LoadSelectedProductsAsync("synthetic-key", 42, ["product-a"], TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal("SwiftPOD", Assert.Single(Assert.Single(result.SelectedProducts!).Providers).Title);
+        Assert.Contains("/v1/catalog/blueprints/68/print_providers.json", requests);
+    }
+
+    [Fact]
     public async Task LoadsBlueprintSummariesWithoutMutatingRequests()
     {
         var requests = new List<HttpRequestMessage>();
