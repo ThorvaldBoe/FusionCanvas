@@ -574,7 +574,37 @@
                               Command="{Binding RequestDeleteSelectedProductCommand}"
                               IsEnabled="{Binding CanDeleteSelectedProduct}"
                               Classes="danger fixedAction blueprintAction" />
+                      <Button Content="Archive Blueprint"
+                              AutomationProperties.AutomationId="Catalog.ArchiveBlueprint"
+                              Command="{Binding RequestArchiveSelectedProductCommand}"
+                              IsEnabled="{Binding CanArchiveSelectedProduct}"
+                              Classes="danger fixedAction blueprintAction" />
                     </StackPanel>
+                    <Border IsVisible="{Binding ProductArchiveWarningVisible}"
+                            AutomationProperties.AutomationId="Catalog.BlueprintArchiveWarning"
+                            Background="{DynamicResource WarningBackgroundBrush}"
+                            BorderBrush="{DynamicResource WarningBorderBrush}"
+                            BorderThickness="2"
+                            Padding="12">
+                      <StackPanel Spacing="8">
+                        <TextBlock Text="HIGH-IMPACT BLUEPRINT ARCHIVE"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource WarningTextBrush}" />
+                        <TextBlock Text="{Binding ProductArchiveWarningMessage}"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource WarningTextBrush}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Button Content="Archive Blueprint and dependents"
+                                  Command="{Binding ConfirmArchiveSelectedProductCommand}"
+                                  AutomationProperties.Name="Confirm archive Blueprint and dependents"
+                                  Classes="danger fixedAction" />
+                          <Button Content="Cancel"
+                                  Command="{Binding CancelArchiveSelectedProductCommand}"
+                                  AutomationProperties.Name="Cancel Blueprint archive"
+                                  Classes="secondary fixedAction" />
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
                   </StackPanel>
                 </StackPanel>
               </Border>

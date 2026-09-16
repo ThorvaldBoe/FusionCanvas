@@ -620,7 +620,7 @@ public sealed class ProductSupplierSetupService : IProductSupplierSetupService
 
         var store = snapshot.Stores.SingleOrDefault(candidate => candidate.Id == id);
         var products = snapshot.StoreProducts
-            .Where(product => product.StoreId == id)
+            .Where(product => product.StoreId == id && snapshot.Blueprints.All(blueprint => blueprint.Id != product.Id || !blueprint.IsArchived))
             .OrderBy(product => product.Name, StringComparer.OrdinalIgnoreCase)
             .Select(product => ToSummary(snapshot, product))
             .ToArray();
