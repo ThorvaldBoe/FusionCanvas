@@ -164,6 +164,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private bool _isCreatingNewOffering;
     private Guid? _draftProductId;
     private Guid? _draftOfferingId;
+    private Task? _productSaveTask;
     private StoreProductSummary? _pendingDeleteProduct;
     private FulfillmentOfferingSummary? _pendingDeleteOffering;
     private StoreProductSummary? _selectedProduct;
@@ -315,13 +316,13 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 SelectProductForEditing(product);
             }
         });
-        SaveSelectedProductCommand = new RelayCommand(_ => Run(SaveSelectedProductAsync()));
+        SaveSelectedProductCommand = new RelayCommand(_ => StartSaveSelectedProduct());
         RequestDeleteSelectedProductCommand = new RelayCommand(_ => RequestDeleteSelectedProduct());
         ConfirmDeleteProductCommand = new RelayCommand(_ => Run(ConfirmDeleteProductAsync()));
         CancelDeleteProductCommand = new RelayCommand(_ => ClearProductDeleteWarning());
          StartCreateOfferingCommand = new RelayCommand(_ => StartCreateOffering());
          CancelNewOfferingCommand = new RelayCommand(_ => CancelNewOffering());
-         BackToProductsCommand = new RelayCommand(_ => BackToProducts());
+         BackToProductsCommand = new RelayCommand(_ => Run(BackToProductsAsync()));
          BackToProductCommand = new RelayCommand(_ => BackToProduct());
          BackToOfferingOverviewCommand = new RelayCommand(_ => NavigateOfferingCatalog(CatalogEditorLevel.OfferingDetail));
          OpenVariantManagementCommand = new RelayCommand(_ => OpenOfferingManagement(CatalogEditorLevel.VariantManagement));
@@ -2609,6 +2610,16 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         RaiseOfferingEditorStateProperties();
     }
 
+    private async Task BackToProductsAsync()
+    {
+        if (_productSaveTask is { IsCompleted: false })
+        {
+            await _productSaveTask;
+        }
+
+        BackToProducts();
+    }
+
     private void BackToProducts()
     {
         if (HasAnyCatalogUnsavedChanges)
@@ -2772,6 +2783,16 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             new UpdateProductRequest(SelectedProduct.Id, ProductName, EmptyToNull(ProductDescription), EmptyToNull(ExternalProductId)),
             cancellationToken).ConfigureAwait(false);
         ApplyProductResult(updateResult);
+    }
+
+    private void StartSaveSelectedProduct()
+    {
+        if (_productSaveTask is { IsCompleted: false })
+        {
+            return;
+        }
+
+        _productSaveTask = SaveSelectedProductAsync();
     }
 
     private void ApplyProductResult(ProductSupplierSetupResult result)
