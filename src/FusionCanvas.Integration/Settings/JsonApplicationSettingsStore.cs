@@ -95,7 +95,7 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
                 var noAiLayout = TryReadWindowLayout(root, out var noAiLayoutWarning);
                 var noAiGeometry = TryReadWindowGeometry(version, root, out var noAiGeometryWarning);
                 return new ApplicationSettingsLoadResult(
-                    new ApplicationSettings(darkMode, AiConfigurationSettings.Default, noAiLayout, activeWorkspaceId, noAiGeometry),
+                    new ApplicationSettings(darkMode, AiConfigurationSettings.Default, noAiLayout, activeWorkspaceId, noAiGeometry, TryReadGuid(root, "activeStoreId")),
                     UsedDefault: false,
                     CombineWarnings(noAiLayoutWarning, noAiGeometryWarning));
             }
@@ -119,7 +119,7 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
             warning = CombineWarnings(warning, layoutWarning);
             warning = CombineWarnings(warning, geometryWarning);
             return new ApplicationSettingsLoadResult(
-                new ApplicationSettings(darkMode, aiSettings, layout, activeWorkspaceId, geometry),
+                new ApplicationSettings(darkMode, aiSettings, layout, activeWorkspaceId, geometry, TryReadGuid(root, "activeStoreId")),
                 UsedDefault: false,
                 warning);
         }
@@ -150,6 +150,7 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
                         Ai = settings.Ai,
                         WindowLayout = settings.WindowLayout,
                         ActiveWorkspaceId = settings.ActiveWorkspaceId,
+                        ActiveStoreId = settings.ActiveStoreId,
                         WindowGeometry = settings.WindowGeometry is { Count: > 0 } geo
                             ? geo.ToDictionary(p => p.Key, p => p.Value)
                             : null
@@ -346,6 +347,7 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
         public AiConfigurationSettings Ai { get; set; } = AiConfigurationSettings.Default;
         public WindowLayoutSettings? WindowLayout { get; set; }
         public Guid? ActiveWorkspaceId { get; set; }
+        public Guid? ActiveStoreId { get; set; }
         public Dictionary<string, WindowGeometrySettings>? WindowGeometry { get; set; }
     }
 }

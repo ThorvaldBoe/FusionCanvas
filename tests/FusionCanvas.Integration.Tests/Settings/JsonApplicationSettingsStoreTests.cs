@@ -119,9 +119,10 @@ public class JsonApplicationSettingsStoreTests
         var path = tempDirectory.GetPath("settings.json");
         var store = new JsonApplicationSettingsStore(path);
         var workspaceId = Guid.NewGuid();
+        var selectedStoreId = Guid.NewGuid();
 
         var saved = await store.SaveAsync(
-            new ApplicationSettings(DarkMode: true, Ai: AiConfigurationSettings.Default, ActiveWorkspaceId: workspaceId),
+            new ApplicationSettings(DarkMode: true, Ai: AiConfigurationSettings.Default, ActiveWorkspaceId: workspaceId, ActiveStoreId: selectedStoreId),
             TestContext.Current.CancellationToken);
         var reloaded = await store.LoadAsync(TestContext.Current.CancellationToken);
 
@@ -129,7 +130,22 @@ public class JsonApplicationSettingsStoreTests
         Assert.Null(saved.Warning);
         Assert.True(reloaded.Value.DarkMode);
         Assert.Equal(workspaceId, reloaded.Value.ActiveWorkspaceId);
+        Assert.Equal(selectedStoreId, reloaded.Value.ActiveStoreId);
         Assert.False(reloaded.UsedDefault);
+    }
+
+    [Fact]
+    public async Task LoadAsync_WithoutSelectedStorePreferenceRemainsBackwardCompatible()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var path = tempDirectory.GetPath("settings.json");
+        await File.WriteAllTextAsync(path, "{\"version\":4,\"darkMode\":false,\"ai\":{}}", TestContext.Current.CancellationToken);
+
+        var result = await new JsonApplicationSettingsStore(path).LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(result.UsedDefault);
+        Assert.Null(result.Value.ActiveStoreId);
+        Assert.Null(result.Warning);
     }
 
     [Fact]

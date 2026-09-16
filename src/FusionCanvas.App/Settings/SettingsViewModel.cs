@@ -121,6 +121,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
 
     public Guid? ActiveWorkspaceId => _currentSettings.ActiveWorkspaceId;
 
+    public Guid? ActiveStoreId => _currentSettings.ActiveStoreId;
+
     public bool ConfirmDiscardCredentialDraft
     {
         get => _confirmDiscardCredentialDraft;
@@ -240,6 +242,17 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         }
 
         _currentSettings = _currentSettings with { ActiveWorkspaceId = workspaceId };
+        QueueSave(_currentSettings);
+    }
+
+    public void UpdateActiveStore(Guid? storeId)
+    {
+        if (_currentSettings.ActiveStoreId == storeId)
+        {
+            return;
+        }
+
+        _currentSettings = _currentSettings with { ActiveStoreId = storeId };
         QueueSave(_currentSettings);
     }
 

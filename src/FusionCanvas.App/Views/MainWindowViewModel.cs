@@ -168,7 +168,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         var productService = productSupplierSetupService ?? new ProductSupplierSetupService(workspaceRepository);
         var providerCatalog = new UnavailableProviderCatalogCandidateSource();
         StoreManagement = new StoreManagementViewModel(
-            new StoreManagementService(workspaceRepository),
+            new StoreManagementService(
+                workspaceRepository,
+                initialActiveWorkspaceId: Settings.ActiveWorkspaceId,
+                initialActiveStoreId: Settings.ActiveStoreId),
             new NicheManagementService(workspaceRepository),
             new TagManagementService(workspaceRepository),
             productService,
@@ -179,6 +182,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             new MockupTemplateSourceImageService(workspaceRepository, fileStore, metadataReader),
             new NullAssetFilePicker(),
             workspaceRepository);
+        StoreManagement.ActiveStoreChanged += (_, store) => Settings.UpdateActiveStore(store?.Id);
         _groupManagementService = groupManagementService ?? new GroupManagementService(workspaceRepository);
         _itemManagementService = itemManagementService ?? new ItemManagementService(workspaceRepository);
         _itemCsvImportService = itemCsvImportService ?? new ItemCsvImportService(workspaceRepository);

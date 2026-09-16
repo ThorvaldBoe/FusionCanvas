@@ -25,11 +25,15 @@ public sealed class StoreManagementService : IStoreManagementService
     public StoreManagementService(
         IWorkspaceRepository repository,
         Func<DateTimeOffset>? clock = null,
-        Func<Guid>? newId = null)
+        Func<Guid>? newId = null,
+        Guid? initialActiveWorkspaceId = null,
+        Guid? initialActiveStoreId = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _newId = newId ?? Guid.NewGuid;
+        _activeWorkspaceId = initialActiveWorkspaceId;
+        _activeStoreId = initialActiveStoreId;
     }
 
     public Guid? ActiveWorkspaceId => _activeWorkspaceId;
