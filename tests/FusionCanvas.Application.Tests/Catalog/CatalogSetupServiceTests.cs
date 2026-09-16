@@ -1,9 +1,11 @@
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Catalog;
+using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Workflow;
 
 namespace FusionCanvas.Application.Tests.Catalog;
 
@@ -129,6 +131,45 @@ public sealed class CatalogSetupServiceTests
         Assert.Contains("referenced", blocked.Error, StringComparison.OrdinalIgnoreCase);
         Assert.True(restored.Succeeded);
         Assert.False(restored.State.PrintProviders.Single().IsArchived);
+    }
+
+    [Fact]
+    public async Task ArchivesBlueprintAndAllCatalogDependentsWithoutDetachingListingConfiguration()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprintId = Guid.NewGuid();
+        var offeringId = Guid.NewGuid();
+        var optionId = Guid.NewGuid();
+        var valueId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+        var placeholderId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var repository = new MemoryRepository(new WorkspaceSnapshot(
+            [WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "First")], [], [],
+            [new Item(itemId, storeId, null, null, "Listing", null, ItemStatus.Draft, WorkflowStage.Design, false, Now, Now, "{}")], [], [], [], [], [])
+        {
+            Blueprints = [new Blueprint(blueprintId, storeId, "T-shirt", null, false, Now, Now)],
+            BlueprintOfferings = [new BlueprintOffering(offeringId, blueprintId, storeId, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "choice", null, null, false, Now, Now)],
+            OfferingOptions = [new OfferingOption(optionId, offeringId, OptionKind.Color, "Color", 0)],
+            OfferingOptionValues = [new OfferingOptionValue(valueId, optionId, offeringId, "Black", 0)],
+            OfferingVariants = [new OfferingVariant(variantId, offeringId, "Black", [valueId], false, Now, Now)],
+            OfferingPlaceholders = [new OfferingPlaceholder(placeholderId, offeringId, "Front", null, "front", "DTG", 100, 100, [variantId], false, Now, Now)],
+            ItemListingConfigurations = [new ItemListingConfiguration(itemId, offeringId)]
+        });
+        var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
+
+        var result = await service.ArchiveBlueprintWithDependentsAsync(
+            new ArchiveBlueprintWithDependentsRequest(storeId, blueprintId), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.True(result.State.Blueprints.Single(value => value.Id == blueprintId).IsArchived);
+        Assert.True(result.State.Offerings.Single(value => value.Id == offeringId).IsArchived);
+        Assert.True(result.State.Options.Single(value => value.Id == optionId).IsArchived);
+        Assert.True(result.State.OptionValues.Single(value => value.Id == valueId).IsArchived);
+        Assert.True(result.State.Variants.Single(value => value.Id == variantId).IsArchived);
+        Assert.True(result.State.Placeholders.Single(value => value.Id == placeholderId).IsArchived);
+        Assert.Contains((await repository.LoadAsync(TestContext.Current.CancellationToken)).ItemListingConfigurations,
+            configuration => configuration.ItemId == itemId && configuration.OfferingId == offeringId);
     }
 
     [Fact]

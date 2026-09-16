@@ -514,6 +514,33 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public async Task BlueprintArchiveRequiresWarningConfirmationAndRemovesBlueprintFromActiveProducts()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.IsBlueprintBasicsExpanded = true;
+        window.UpdateLayout();
+
+        var archive = FindButton(window, "Archive Blueprint")!;
+        archive.Command!.Execute(null);
+        window.UpdateLayout();
+        Assert.True(viewModel.ProductArchiveWarningVisible);
+        Assert.Contains(window.GetVisualDescendants().OfType<Border>(),
+            border => AutomationProperties.GetAutomationId(border) == "Catalog.BlueprintArchiveWarning");
+
+        viewModel.CancelArchiveSelectedProductCommand.Execute(null);
+        Assert.False(viewModel.ProductArchiveWarningVisible);
+
+        archive.Command!.Execute(null);
+        viewModel.ConfirmArchiveSelectedProductCommand.Execute(null);
+        await WaitForAsync(() => !viewModel.HasSelectedProduct);
+        Assert.Empty(viewModel.Products);
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void CatalogEditorsUseCompactBasicsOnDemandDraftsAndSummaryFirstRegions()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
