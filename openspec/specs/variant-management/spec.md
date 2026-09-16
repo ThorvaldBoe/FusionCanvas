@@ -83,7 +83,7 @@ FusionCanvas SHALL present provider-catalog Options and Option Values that may p
 - **AND** rejects duplicate or provider-invalid combinations without changing confirmed Variants
 
 ### Requirement: Variant drafts and lifecycle actions preserve confirmed setup
-FusionCanvas SHALL keep Option Value, individual Variant, and bulk Variant creation scoped to the current Offering, SHALL allow only the invoked creation dialog to be open at a time, SHALL guard meaningful drafts, and SHALL apply existing archive, dependency, and integrity policies to sellable Variants. Option Value management and individual and bulk Variant creation SHALL occur in focused modal dialogs that close when the Blueprint Offering or workspace context changes so they cannot edit stale data.
+FusionCanvas SHALL keep Option Value, individual Variant, and bulk Variant creation scoped to the current Offering, SHALL allow only the invoked creation dialog to be open at a time, SHALL guard meaningful drafts, and SHALL apply existing archive, dependency, and integrity policies to sellable Variants. When a Variant archive is blocked, the UI SHALL identify the exact active dependent Placeholders or other records and SHALL explain whether the user must archive, edit, reassign, or remove each dependent before retrying. Option Value management and individual and bulk Variant creation SHALL occur in focused modal dialogs that close when the Blueprint Offering or workspace context changes so they cannot edit stale data.
 
 #### Scenario: User cancels a Variant draft
 - **WHEN** the user starts an individual or bulk Variant creation dialog and cancels before confirmation
@@ -104,7 +104,7 @@ FusionCanvas SHALL keep Option Value, individual Variant, and bulk Variant creat
 #### Scenario: User retires a referenced Variant
 - **WHEN** the user requests retirement or removal of a Variant referenced by a Design Area, Item, or other dependent record
 - **THEN** FusionCanvas applies the authoritative dependency and archival safeguards
-- **AND** reports required resolution rather than silently breaking relationships
+- **AND** reports the blocking records by type and name with the required resolution path rather than silently breaking relationships
 
 #### Scenario: Provider catalog is unavailable
 - **WHEN** provider-catalog choices cannot be loaded and no locally persisted choices are available
