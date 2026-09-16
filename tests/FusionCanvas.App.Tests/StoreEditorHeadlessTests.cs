@@ -113,6 +113,60 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public async Task VariantManagement_ArchiveButtonInvokesVariantArchiveCommand()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        var archive = window.GetVisualDescendants()
+            .OfType<Button>()
+            .Single(button => IsEffectivelyVisible(button) && string.Equals(button.Content as string, "Archive", StringComparison.Ordinal));
+
+        Assert.IsType<SellableVariantRowViewModel>(archive.CommandParameter);
+        Assert.Same(viewModel.CatalogSetup!.ArchiveVariantCommand, archive.Command);
+        archive.Command!.Execute(archive.CommandParameter);
+        await WaitForAsync(() => !viewModel.CatalogSetup.IsBusy);
+
+        Assert.Contains("Placeholder", viewModel.CatalogSetup.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Front", viewModel.CatalogSetup.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task OfferingManagement_DisclosesArchiveCascadeAndCanCancel()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        window.UpdateLayout();
+
+        var archive = FindButton(window, "Archive Blueprint Offering");
+        Assert.NotNull(archive);
+        Assert.Same(viewModel.CatalogSetup!.RequestArchiveOfferingCommand, archive!.Command);
+
+        archive.Command!.Execute(archive.CommandParameter);
+        await WaitForAsync(() => viewModel.CatalogSetup.IsArchiveOfferingConfirmationVisible);
+        window.UpdateLayout();
+
+        Assert.Contains(
+            window.GetVisualDescendants().OfType<TextBlock>(),
+            textBlock => IsEffectivelyVisible(textBlock) && (textBlock.Text?.Contains("Variant", StringComparison.OrdinalIgnoreCase) ?? false));
+
+        var cancel = FindButton(window, "Cancel");
+        Assert.NotNull(cancel);
+        cancel!.Command!.Execute(cancel.CommandParameter);
+        Assert.False(viewModel.CatalogSetup.IsArchiveOfferingConfirmationVisible);
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void ProductsPanel_DisclosesProductAndOfferingActionsByLevel()
     {
         var window = CreateEditorWindow();

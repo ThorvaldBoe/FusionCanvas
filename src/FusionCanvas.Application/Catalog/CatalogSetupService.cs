@@ -240,6 +240,44 @@ public sealed class CatalogSetupService : ICatalogSetupService
             return Success(updated, request.StoreId);
         }, cancellationToken);
 
+    public async Task<CatalogArchivePlan> PreviewArchiveOfferingAsync(ArchiveOfferingCascadeRequest request, CancellationToken cancellationToken = default)
+    {
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        return BuildArchivePlan(snapshot, request);
+    }
+
+    public Task<CatalogSetupResult> ArchiveOfferingCascadeAsync(ArchiveOfferingCascadeRequest request, CancellationToken cancellationToken = default) =>
+        MutateAsync(request.StoreId, snapshot =>
+        {
+            var plan = BuildArchivePlan(snapshot, request);
+            if (plan.ExternalBlockers.Count > 0)
+                return Failure(snapshot, request.StoreId, FormatBlockers(plan.ExternalBlockers));
+
+            var offering = snapshot.BlueprintOfferings.SingleOrDefault(value => value.Id == request.OfferingId && value.StoreId == request.StoreId);
+            var check = EnsureWritableStore(snapshot, request.StoreId);
+            if (check is not null) return Failure(snapshot, request.StoreId, check);
+            if (offering is null) return Failure(snapshot, request.StoreId, "Blueprint Offering was not found.");
+            if (offering.IsArchived) return Failure(snapshot, request.StoreId, "Blueprint Offering is already archived.");
+
+            var optionIds = snapshot.OfferingOptions.Where(value => value.OfferingId == offering.Id && !value.IsArchived).Select(value => value.Id).ToHashSet();
+            var variantIds = snapshot.OfferingVariants.Where(value => value.OfferingId == offering.Id && !value.IsArchived).Select(value => value.Id).ToHashSet();
+            var placeholderIds = snapshot.OfferingPlaceholders.Where(value => value.OfferingId == offering.Id && !value.IsArchived).Select(value => value.Id).ToHashSet();
+            var templateIds = snapshot.MockupTemplates.Where(value => value.BlueprintOfferingId == offering.Id && !value.IsArchived).Select(value => value.Id).ToHashSet();
+
+            var updated = snapshot with
+            {
+                BlueprintOfferings = snapshot.BlueprintOfferings.Select(value => value.Id == offering.Id ? value with { IsArchived = true } : value).ToArray(),
+                OfferingOptions = snapshot.OfferingOptions.Select(value => optionIds.Contains(value.Id) ? value with { IsArchived = true } : value).ToArray(),
+                OfferingOptionValues = snapshot.OfferingOptionValues.Select(value => value.OfferingId == offering.Id && !value.IsArchived ? value with { IsArchived = true } : value).ToArray(),
+                OfferingVariants = snapshot.OfferingVariants.Select(value => variantIds.Contains(value.Id) ? value with { IsArchived = true } : value).ToArray(),
+                OfferingPlaceholders = snapshot.OfferingPlaceholders.Select(value => placeholderIds.Contains(value.Id) ? value with { IsArchived = true } : value).ToArray(),
+                MockupTemplates = snapshot.MockupTemplates.Select(value => templateIds.Contains(value.Id) ? value with { IsArchived = true } : value).ToArray(),
+                MockupTemplateColorVariants = snapshot.MockupTemplateColorVariants.Select(value => templateIds.Contains(value.MockupTemplateId) ? value with { IsArchived = true } : value).ToArray(),
+                MockupTemplateSourceImages = snapshot.MockupTemplateSourceImages.Select(value => templateIds.Contains(value.MockupTemplateId) ? value with { IsArchived = true } : value).ToArray()
+            };
+            return Success(updated, request.StoreId);
+        }, cancellationToken);
+
     public Task<CatalogSetupResult> RestoreAsync(ArchiveCatalogRecordRequest request, CancellationToken cancellationToken = default) =>
         MutateAsync(request.StoreId, snapshot =>
         {
@@ -391,8 +429,45 @@ public sealed class CatalogSetupService : ICatalogSetupService
             CatalogRecordKind.Placeholder => snapshot.MockupTemplates.Any(value => value.TargetPlaceholderId == request.RecordId && !value.IsArchived),
             _ => false
         };
-        return active ? "This record is referenced by active catalog configuration. Archive or reassign dependents first." : null;
+        if (!active) return null;
+        var blockers = ResolveDependencies(snapshot, request);
+        return FormatBlockers(blockers);
     }
+
+    private static CatalogArchivePlan BuildArchivePlan(WorkspaceSnapshot snapshot, ArchiveOfferingCascadeRequest request)
+    {
+        var offering = snapshot.BlueprintOfferings.SingleOrDefault(value => value.Id == request.OfferingId && value.StoreId == request.StoreId);
+        if (offering is null)
+            return new(request.StoreId, request.OfferingId, string.Empty, [], [new("Blueprint Offering", request.OfferingId, "Missing Blueprint Offering")]);
+
+        var dependents = snapshot.OfferingOptions.Where(value => value.OfferingId == offering.Id && !value.IsArchived).Select(value => new CatalogArchiveDependency("Option", value.Id, value.Name))
+            .Concat(snapshot.OfferingOptionValues.Where(value => value.OfferingId == offering.Id && !value.IsArchived).Select(value => new CatalogArchiveDependency("Option Value", value.Id, value.Value)))
+            .Concat(snapshot.OfferingVariants.Where(value => value.OfferingId == offering.Id && !value.IsArchived).Select(value => new CatalogArchiveDependency("Variant", value.Id, value.Name)))
+            .Concat(snapshot.OfferingPlaceholders.Where(value => value.OfferingId == offering.Id && !value.IsArchived).Select(value => new CatalogArchiveDependency("Placeholder", value.Id, value.Name)))
+            .Concat(snapshot.MockupTemplates.Where(value => value.BlueprintOfferingId == offering.Id && !value.IsArchived).Select(value => new CatalogArchiveDependency("Mockup Template", value.Id, value.Name)))
+            .ToArray();
+        var blockers = snapshot.ItemListingConfigurations.Where(value => value.OfferingId == offering.Id)
+            .Select(value => new CatalogArchiveDependency("Item listing", value.ItemId, snapshot.Items.FirstOrDefault(item => item.Id == value.ItemId)?.Name ?? value.ItemId.ToString()))
+            .ToArray();
+        return new(request.StoreId, offering.Id, offering.Name, dependents, blockers);
+    }
+
+    private static IReadOnlyList<CatalogArchiveDependency> ResolveDependencies(WorkspaceSnapshot snapshot, ArchiveCatalogRecordRequest request)
+    {
+        return request.Kind switch
+        {
+            CatalogRecordKind.Variant => snapshot.OfferingPlaceholders.Where(value => !value.IsArchived && value.VariantIds.Contains(request.RecordId)).Select(value => new CatalogArchiveDependency("Placeholder", value.Id, value.Name)).ToArray(),
+            CatalogRecordKind.Placeholder => snapshot.MockupTemplates.Where(value => !value.IsArchived && value.TargetPlaceholderId == request.RecordId).Select(value => new CatalogArchiveDependency("Mockup Template", value.Id, value.Name)).ToArray(),
+            CatalogRecordKind.OptionValue => snapshot.MockupTemplateColorVariants.Where(value => !value.IsArchived && value.ColorOptionValueId == request.RecordId).Select(value => new CatalogArchiveDependency("Mockup Template Color", value.Id, value.Id.ToString())).ToArray(),
+            CatalogRecordKind.Offering => BuildArchivePlan(snapshot, new ArchiveOfferingCascadeRequest(request.StoreId, request.RecordId)).ExternalBlockers,
+            _ => []
+        };
+    }
+
+    private static string FormatBlockers(IReadOnlyList<CatalogArchiveDependency> blockers) =>
+        blockers.Count == 0
+            ? "This record is referenced by active catalog configuration. Archive or reassign dependents first."
+            : $"Archive or reassign these referenced dependents first: {string.Join(", ", blockers.Select(value => $"{value.RecordType} '{value.Name}'"))}.";
 
     private static CatalogSetupResult Failure(WorkspaceSnapshot snapshot, Guid? storeId, string error) => CatalogSetupResult.Failure(error, BuildState(snapshot, storeId ?? Guid.Empty));
     private static CatalogSetupResult Success(WorkspaceSnapshot snapshot, Guid storeId) => new(true, null, BuildState(snapshot, storeId), snapshot);
