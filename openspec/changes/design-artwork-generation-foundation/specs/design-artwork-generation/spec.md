@@ -1,106 +1,213 @@
 ## ADDED Requirements
 
-### Requirement: Design stage exposes explicit artwork generation targeting
-FusionCanvas SHALL present a Generate Artwork section below Supporting Images in the editable Design stage. The section SHALL provide a Generate action, a Design Area selector populated only from the active item's selected offering, and a Transparent Background option. The selected target SHALL remain explicit and editable; generation SHALL never silently retarget an artwork request.
+### Requirement: Design stage exposes explicit artwork generation controls
+FusionCanvas SHALL present a Generate Artwork section below Supporting Images. The section SHALL provide a Generate action, a Design Area selector containing every active Design Area from the Item's selected Listing Configuration, and a Transparent Background option. The target SHALL remain explicit and editable, and FusionCanvas SHALL never silently select an arbitrary first area.
 
-#### Scenario: User sees the generation controls
-- **WHEN** an editable Item has a selected offering with at least one active Design Area
-- **THEN** the Design stage shows Generate Artwork below Supporting Images
-- **AND** the section shows Generate, the target Design Area selector, and Transparent Background
+#### Scenario: Primary Design Area supplies the initial target
+- **WHEN** an Item opens at Design with a selected Listing Configuration whose Blueprint Offering has an active primary Design Area
+- **THEN** the generation selector initially selects that primary area
+- **AND** the user can select any other active Design Area from that offering
 
-#### Scenario: No target is available
-- **WHEN** an editable Item has no selected offering or no active Design Area for its offering
-- **THEN** the generation section remains understandable but the Generate action is disabled
-- **AND** guidance explains that a valid Design Area target is required
+#### Scenario: Offering has no primary Design Area
+- **WHEN** the selected Listing Configuration has active Design Areas but none is primary
+- **THEN** the selector initially has no target
+- **AND** Generate is disabled with guidance to choose an area or configure a primary area in Store setup
+
+#### Scenario: No valid Listing Configuration target exists
+- **WHEN** the Item has no selected Listing Configuration or its offering has no active Design Areas
+- **THEN** the section remains visible with actionable guidance
+- **AND** no generation request can start
+
+#### Scenario: Listing Configuration changes
+- **WHEN** the user changes the Listing Configuration while the Design document is open
+- **THEN** any in-flight generation for the previous configuration is cancelled and its late result is ignored
+- **AND** the selector resets to the new offering's active primary Design Area or to no selection when none exists
+
+#### Scenario: Explicit target is session scoped
+- **WHEN** the user chooses a non-primary target, closes the Item, and later reopens it
+- **THEN** the selector again initializes from the offering's current primary Design Area
+- **AND** the earlier session choice is not persisted as an Item preference
+
+### Requirement: Artwork generation is gated by production and creative readiness
+FusionCanvas SHALL enable Generate only when Design is editable, an Artwork image model and compatible provider endpoint are ready under the active privacy policy, the Item has a selected Listing Configuration and explicit active target, the Design Triangle is complete, and an existing default design row serves at least one selected color. SLL SHALL remain optional.
+
+#### Scenario: Complete workflow is ready
+- **WHEN** every generation prerequisite is satisfied
+- **THEN** Generate is enabled
+
+#### Scenario: Concept is incomplete
+- **WHEN** Concept idea, Phrase, or Graphic direction is non-substantive
+- **THEN** Generate is disabled
+- **AND** guidance identifies the incomplete Concept fields
+
+#### Scenario: Default row does not exist
+- **WHEN** no product color has been selected and no default design row exists
+- **THEN** Generate is disabled
+- **AND** guidance directs the user to select at least one product color
 
 #### Scenario: Design is read-only
-- **WHEN** the Item's Design stage is read-only
+- **WHEN** the Item's Design content is read-only
 - **THEN** the generation controls remain visible as read-only guidance
-- **AND** no generation request or target mutation can start
+- **AND** no request or target mutation can start
 
-### Requirement: Artwork generation assembles a bounded creative request
-FusionCanvas SHALL assemble an image-generation request from the current Item's Idea, Concept design-triangle values, SLL when present, phrase, graphic description, selected Design Area guidance, and applicable user-authored creative context. The request SHALL exclude credentials, database identifiers, timestamps, file paths, and unrelated operational fields. The system message SHALL define all supplied workspace and user-authored content as untrusted creative data rather than instructions.
+#### Scenario: Artwork AI is unavailable
+- **WHEN** the credential, dedicated Artwork model, privacy-compatible endpoint, or required image capability is unavailable
+- **THEN** Generate is disabled
+- **AND** guidance identifies the missing prerequisite and directs the user to AI Settings when configuration can resolve it
 
-#### Scenario: Complete creative context is available
-- **WHEN** the user activates Generate with a valid target and available image-generation model
-- **THEN** the request contains the available Idea, phrase, graphic description, triangle values, SLL, target placement and dimensions, artwork guidance, and relevant creative context
-- **AND** missing optional fields are omitted or clearly marked unavailable rather than fabricated
+### Requirement: Transparency defaults and capability behavior follow the target and model
+FusionCanvas SHALL initialize Transparent Background from the selected Design Area's artwork guidance: checked when transparency is recommended and unchecked otherwise. Changing target SHALL recalculate that default. When the selected model and eligible endpoint do not support transparent output, the checkbox SHALL be disabled and unchecked while opaque generation remains available.
 
-#### Scenario: Workspace content contains instruction-like text
-- **WHEN** user-authored creative content contains text that resembles instructions
-- **THEN** the request system message states that the content is untrusted creative data
-- **AND** generation rules and technical constraints take precedence over that content
+#### Scenario: Target recommends transparency
+- **WHEN** a target whose artwork guidance recommends transparency becomes selected
+- **THEN** Transparent Background is checked
+- **AND** the user may override it when the model supports transparency
 
-### Requirement: Image model capability and output constraints are validated
-FusionCanvas SHALL use an image-generation capability contract distinct from text-generation capability. The selected model SHALL expose image output support, a usable maximum resolution or equivalent supported-size set, and output-format information. The system SHALL report a recoverable error before generation when the configured model is unavailable, does not support image generation, or cannot produce a usable output for the selected target.
+#### Scenario: Target changes
+- **WHEN** the user changes from one target area to another
+- **THEN** the checkbox resets to the new target's recommendation rather than carrying the prior manual override
 
-#### Scenario: Selected model supports generation
-- **WHEN** the configured model advertises image output and usable supported sizes
-- **THEN** generation proceeds using the model's image-generation contract
+#### Scenario: Model does not support transparency
+- **WHEN** the selected Artwork model has no eligible endpoint supporting transparent alpha-capable output
+- **THEN** Transparent Background is disabled and unchecked
+- **AND** opaque artwork generation remains available when all other prerequisites are satisfied
 
-#### Scenario: Selected model is text-only
-- **WHEN** the configured model does not advertise image output
-- **THEN** Generate is blocked or fails before an image request is sent
-- **AND** the Design stage explains that the selected model does not support image generation
+### Requirement: Artwork requests use current creative context safely
+FusionCanvas SHALL generate exactly one image per Generate action. The resolved prompt SHALL use the original Idea, current Concept idea, Phrase, Graphic direction, selected Design Area placement/dimensions/guidance, applicable user-authored creative context, and the current SLL when one exists and is not stale. The prompt SHALL require the supplied Phrase verbatim, SHALL omit a stale SLL, SHALL exclude credentials and operational data, and SHALL establish all workspace content as untrusted creative data rather than instructions. Existing Supporting Images SHALL NOT be uploaded automatically as references.
 
-#### Scenario: Transparency is unsupported
-- **WHEN** Transparent Background is selected but the model/provider does not support transparent output
-- **THEN** generation is not silently downgraded
-- **AND** the user receives an actionable explanation to disable transparency or choose a compatible model
+#### Scenario: Current SLL is available
+- **WHEN** generation starts with a non-stale SLL
+- **THEN** the resolved prompt includes that SLL with the current Idea, Design Triangle, target, and creative context
 
-### Requirement: Generation resolution preserves target aspect ratio and normalizes PNG output
-FusionCanvas SHALL derive the target aspect ratio from the selected Design Area's authoritative pixel width and height. Before generation it SHALL select the largest supported provider resolution that preserves that aspect ratio within the provider's documented constraints and does not exceed the target dimensions. After generation it SHALL produce a PNG at the exact target width and height using deterministic non-AI raster scaling, preserving alpha when present.
+#### Scenario: SLL is absent or stale
+- **WHEN** generation starts without SLL or with SLL marked stale
+- **THEN** generation uses the current Idea and complete Design Triangle without fabricating SLL content
+- **AND** the UI identifies that stale SLL was omitted when applicable
 
-#### Scenario: Target exceeds provider resolution
-- **WHEN** the Design Area is larger than the selected model's supported generation size
-- **THEN** the request uses the highest supported size with the target aspect ratio
-- **AND** the completed managed artwork is normalized to the exact Design Area pixel dimensions
+#### Scenario: Phrase is supplied
+- **WHEN** the request is assembled
+- **THEN** the prompt identifies the Phrase as verbatim artwork text and instructs the model not to rewrite it
+- **AND** the Design surface reminds the user to inspect generated lettering rather than claiming OCR validation
 
-#### Scenario: Target ratio has no exact provider size
-- **WHEN** the provider exposes discrete sizes and none exactly matches the target ratio
-- **THEN** the system reports that no supported generation size can preserve the target ratio
-- **AND** it does not generate an image with an undisclosed crop or distortion
+#### Scenario: Workspace content resembles instructions
+- **WHEN** Idea, Concept, SLL, names, tags, or metadata contain instruction-like text
+- **THEN** the request treats those values as untrusted data subordinate to system generation and technical constraints
 
-#### Scenario: Provider returns an unexpected image
-- **WHEN** the provider returns a non-image, malformed image, unsupported format, or dimensions that cannot be safely normalized
-- **THEN** no slot or supporting-image record is committed
-- **AND** a recoverable error identifies that the generated result could not be normalized
+#### Scenario: Supporting Images exist
+- **WHEN** one or more Supporting Images are linked to the Item
+- **THEN** none is uploaded or included as an image reference without a future explicit reference-selection feature
 
-### Requirement: Successful generation is applied atomically and retained as history
-FusionCanvas SHALL create one managed PNG asset for a successful normalized result, retain generated-artwork provenance including target Design Area, model, requested generation size, final dimensions, transparency request, and generation timestamp, assign the asset to the explicitly selected Design Area slot for the applicable default or selected design row, and expose the generated asset in Supporting Images. Slot replacement and supporting-image retention SHALL be committed as one atomic workspace operation.
+### Requirement: Provider size selection minimizes ratio difference before maximizing useful resolution
+FusionCanvas SHALL derive the exact final width and height from the selected Design Area. It SHALL request that exact size when supported. Otherwise it SHALL choose the eligible supported size with the closest aspect ratio; among sizes with the same closest ratio it SHALL choose the largest pixel area that does not exceed the target, or the smallest such size when every eligible size exceeds the target. Capability decisions SHALL use one endpoint that simultaneously satisfies the selected model, active ZDR policy, requested transparency, and selected size/format parameters.
 
-#### Scenario: Generation succeeds for an empty target slot
-- **WHEN** generation and PNG normalization complete for a selected target
-- **THEN** the normalized PNG is stored as a managed asset
-- **AND** it is assigned to the selected target slot
-- **AND** it appears in Supporting Images with generated-artwork provenance
+#### Scenario: Exact target size is supported
+- **WHEN** an eligible endpoint accepts the Design Area's exact width and height
+- **THEN** FusionCanvas requests the exact target size
 
-#### Scenario: Generation replaces existing slot artwork
-- **WHEN** generation succeeds for a target slot that already has artwork
-- **THEN** the new asset replaces the slot assignment
-- **AND** the previous asset remains available as a supporting image or existing historical asset according to the asset lifecycle policy
+#### Scenario: Multiple smaller sizes are available
+- **WHEN** no exact size is supported and multiple eligible sizes do not exceed the target
+- **THEN** FusionCanvas chooses the closest aspect ratio first
+- **AND** chooses the largest pixel area among equally close ratios
 
-#### Scenario: Persistence fails
-- **WHEN** file import succeeds but the atomic workspace save fails
-- **THEN** the slot assignment and generated supporting-image link are not committed
-- **AND** the managed file is removed on a best-effort basis
+#### Scenario: Every supported size is larger
+- **WHEN** no exact size is supported and every eligible supported size exceeds the target
+- **THEN** FusionCanvas chooses the smallest size with the closest aspect ratio and later downscales it
+
+#### Scenario: No compatible endpoint exists
+- **WHEN** no endpoint simultaneously satisfies ZDR, image output, a usable raster format, and the request's size or transparency constraints
+- **THEN** no provider request is sent
+- **AND** the user receives an actionable readiness error without model substitution
+
+### Requirement: Generated raster output is normalized without crop or distortion
+FusionCanvas SHALL prefer native PNG output but MAY accept a supported JPEG, WebP, or other approved raster result and convert it locally. It SHALL decode within bounded byte and pixel limits, proportionally resample using an ordinary deterministic high-quality filter, and produce exactly one final PNG at the target dimensions. The fitted image SHALL be top-centered inside a two-percent safety inset on the left, top, and right; unavoidable remaining canvas SHALL be transparent and vertical remainder SHALL stay below the artwork. FusionCanvas SHALL NOT crop, stretch, sharpen, invoke AI super-resolution, or retain a second provider-original asset.
+
+#### Scenario: Smaller closest-ratio result is returned
+- **WHEN** the provider result is smaller than the target
+- **THEN** FusionCanvas proportionally upscales it into the inset target canvas
+- **AND** writes an exact-dimension PNG with transparent fitting margins
+
+#### Scenario: Larger closest-ratio result is returned
+- **WHEN** every supported provider size exceeded the target and the selected result is larger
+- **THEN** FusionCanvas proportionally downscales it into the same inset target canvas
+
+#### Scenario: Provider returns a non-PNG raster
+- **WHEN** the selected endpoint returns a valid approved raster format other than PNG
+- **THEN** FusionCanvas converts and normalizes it to the final PNG without retaining the provider-original file
+
+#### Scenario: Provider returns invalid or unsafe output
+- **WHEN** output is malformed, non-raster, exceeds configured bounds, or cannot be normalized safely
+- **THEN** no generated asset or slot change is committed
+- **AND** the existing Design state remains unchanged with a recoverable error
+
+#### Scenario: Provider returns no visible artwork
+- **WHEN** the normalized output is fully transparent and contains no visible pixels
+- **THEN** FusionCanvas rejects it, leaves the existing slot unchanged, and does not retain the empty image
+
+### Requirement: Transparency shortfalls produce persistent warnings without blocking application
+FusionCanvas SHALL inspect alpha after normalization. When transparency was requested but the valid output is fully opaque, FusionCanvas SHALL still persist and apply the artwork while attaching a warning that remains visible on its slot and Supporting Images entry after reload.
+
+#### Scenario: Transparency request succeeds
+- **WHEN** transparency was requested and the normalized PNG contains meaningful non-opaque pixels and visible artwork
+- **THEN** the result is applied without a transparency warning
+
+#### Scenario: Provider returns opaque artwork
+- **WHEN** transparency was requested but the normalized valid artwork is fully opaque
+- **THEN** FusionCanvas applies it to the intended slot and retains it in Supporting Images
+- **AND** a persistent warning explains that transparency was requested but not achieved and external background removal may be needed
+
+### Requirement: Successful generation applies to the default row and preserves history
+FusionCanvas SHALL create one managed final PNG asset for a successful result, link it to the Item, assign it to the selected Design Area slot in the existing default row, and expose it in Supporting Images as generated artwork. Replacing occupied slot artwork SHALL require no confirmation because the prior generated asset remains recoverable in history. The generated asset, provenance, link, slot assignment, and persistent warnings SHALL be saved as one logical operation.
+
+#### Scenario: Empty target slot receives artwork
+- **WHEN** generation and normalization succeed for an empty default-row target slot
+- **THEN** the final PNG is stored, linked, assigned, and shown in Supporting Images
+
+#### Scenario: Occupied target slot receives new generated artwork
+- **WHEN** generation succeeds for an occupied default-row target slot
+- **THEN** the new generated asset replaces the slot assignment without confirmation
+- **AND** the previous generated asset remains unassigned and visible in Supporting Images
+- **AND** an inline success message identifies the updated target
+
+#### Scenario: Existing generated artwork is replaced by manual upload
+- **WHEN** the user uploads an externally edited PNG into a slot occupied by generated artwork
+- **THEN** the edited PNG becomes the slot artwork
+- **AND** the generated original remains unassigned and visible in Supporting Images
+
+#### Scenario: Persistence fails after file creation
+- **WHEN** the final managed PNG is written but the logical workspace save fails
+- **THEN** no asset, link, provenance, warning, or slot change is committed
+- **AND** the new managed file is removed on a best-effort basis
 - **AND** the previous confirmed Design state remains intact
 
-### Requirement: Generation operations have safe concurrency and recovery behavior
-FusionCanvas SHALL allow at most one in-flight artwork-generation operation per Item document, disable duplicate submission while it runs, support cancellation when the document closes or the active Item changes, and reject late results for a different Item or target. Failures and cancellation SHALL preserve the existing slot and supporting-image state.
+### Requirement: Artwork operations expose safe progress, cancellation, and retry behavior
+FusionCanvas SHALL allow at most one in-flight artwork operation per Item document. While running, Generate SHALL become a visible Cancel action with progress identifying generation, normalization, or saving as applicable. Closing or changing the Item, changing Listing Configuration, or activating Cancel SHALL cancel local work and prevent late application. FusionCanvas SHALL NOT automatically retry a dispatched generation request; explicit retry remains user initiated, and cancellation guidance SHALL disclose that an already dispatched request may still incur provider cost.
 
-#### Scenario: User submits twice
-- **WHEN** artwork generation is already in flight
-- **THEN** the Generate action is disabled
-- **AND** no second provider request is started
+#### Scenario: Generation is running
+- **WHEN** an artwork request is in flight
+- **THEN** duplicate generation cannot start
+- **AND** the section exposes progress and a keyboard-reachable Cancel action
 
-#### Scenario: Item changes during generation
-- **WHEN** the active Item changes or the document closes during generation
-- **THEN** the operation is cancelled
-- **AND** a late provider result is not applied to the new Item
+#### Scenario: User cancels
+- **WHEN** the user activates Cancel
+- **THEN** local work stops where possible and any late result is ignored
+- **AND** existing slot and Supporting Images state remain unchanged
+- **AND** guidance notes that provider cost may already have occurred
 
-#### Scenario: Generation fails
-- **WHEN** provider, network, credential, rate-limit, cancellation, raster, or persistence failure occurs before commit
-- **THEN** existing slot artwork and supporting images remain unchanged
-- **AND** a recoverable inline error remains visible in the Design stage
+#### Scenario: Request fails after dispatch
+- **WHEN** network, provider, authentication, rate-limit, moderation, or response failure occurs after dispatch
+- **THEN** FusionCanvas does not retry automatically
+- **AND** existing Design state remains unchanged with an explicit user-triggered retry path
+
+### Requirement: Generated provenance is complete, local, and reviewable
+FusionCanvas SHALL persist the exact resolved prompt and non-secret provenance with the final generated asset: intended Design Area, provider name, selected and resolved model IDs, provider request or generation ID when supplied, requested provider size, final dimensions, transparency request and outcome, warnings, generation time, and reported usage or cost when available. The compact Supporting Images entry SHALL show Generated artwork, intended area, resolved model, final dimensions, and warnings; remaining provenance MAY appear through secondary details.
+
+#### Scenario: Provider returns complete metadata
+- **WHEN** generation succeeds with provider identity, request identity, usage, and cost
+- **THEN** those values and the resolved prompt are persisted locally with the generated asset
+- **AND** no API key, credential-store reference, file-system source path, or unrelated operational identifier is stored
+
+#### Scenario: Optional provider metadata is absent
+- **WHEN** generation succeeds without request identity, usage, or cost
+- **THEN** the asset is still persisted and applied
+- **AND** missing optional provenance remains absent rather than fabricated
 
