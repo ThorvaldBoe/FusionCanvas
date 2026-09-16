@@ -275,7 +275,13 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public string ProviderDisplayName => SelectedOffering?.PrintProviderId is Guid id
         ? PrintProviders.FirstOrDefault(value => value.Id == id)?.Name ?? "Unknown Print Provider"
         : string.Empty;
-    public IEnumerable<PrintProvider> AvailablePrintProviders => PrintProviders.Where(value => !value.IsArchived).OrderBy(value => value.Name, StringComparer.OrdinalIgnoreCase);
+    public IEnumerable<PrintProvider> AvailablePrintProviders => PrintProviders
+        .Where(value => !value.IsArchived)
+        .GroupBy(value => string.IsNullOrWhiteSpace(value.ExternalProviderId)
+            ? $"name:{value.Name.Trim()}"
+            : $"external:{value.ExternalProviderId.Trim()}", StringComparer.OrdinalIgnoreCase)
+        .Select(group => group.FirstOrDefault(value => value.Id == SelectedOffering?.PrintProviderId) ?? group.First())
+        .OrderBy(value => value.Name, StringComparer.OrdinalIgnoreCase);
     public PrintProvider? SelectedPrintProvider
     {
         get => _selectedPrintProvider;

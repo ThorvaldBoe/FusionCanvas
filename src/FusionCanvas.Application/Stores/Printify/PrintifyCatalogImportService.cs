@@ -58,9 +58,9 @@ public sealed class PrintifyCatalogImportService(
             await repository.SaveAsync(synchronized, cancellationToken).ConfigureAwait(false);
             return result with { Message = "Selected Printify catalog imported." };
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException exception)
         {
-            return new(PrintifyCatalogResultKind.UnexpectedResponse, "Printify catalog data could not be imported safely.");
+            return new(PrintifyCatalogResultKind.UnexpectedResponse, $"Printify catalog data could not be imported safely: {exception.Message}");
         }
     }
 
@@ -98,7 +98,9 @@ public sealed class PrintifyCatalogImportService(
 
             foreach (var importedProvider in importedBlueprint.Providers)
             {
-                var provider = providers.SingleOrDefault(value => value.StoreId == storeId && value.ExternalProviderId == importedProvider.Id.ToString());
+                var provider = providers.FirstOrDefault(value => value.StoreId == storeId
+                    && (string.Equals(value.ExternalProviderId, importedProvider.Id.ToString(), StringComparison.Ordinal)
+                        || value.ExternalProviderId is null && string.Equals(value.Name, importedProvider.Title, StringComparison.OrdinalIgnoreCase)));
                 if (provider is null)
                 {
                     provider = new PrintProvider(Guid.NewGuid(), storeId, importedProvider.Title, importedProvider.Id.ToString(), false, now, now, Metadata("provider", importedProvider.Id));
