@@ -283,6 +283,38 @@ public sealed class CatalogSetupServiceTests
         Assert.Equal("Updated G64000", repository.Current.FulfillmentOfferings.Single(value => value.Id == offeringId).Name);
     }
 
+    [Fact]
+    public void SynchronizeStore_ExcludesArchivedNormalizedVariantsFromLegacyDesignAreas()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprint = new Blueprint(Guid.NewGuid(), storeId, "T-shirt", null, false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, storeId, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "network", null, null, false, Now, Now);
+        var option = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
+        var activeValue = new OfferingOptionValue(Guid.NewGuid(), option.Id, offering.Id, "Black", 0);
+        var archivedValue = new OfferingOptionValue(Guid.NewGuid(), option.Id, offering.Id, "White", 1);
+        var activeVariant = new OfferingVariant(Guid.NewGuid(), offering.Id, "Black", [activeValue.Id], false, Now, Now);
+        var archivedVariant = new OfferingVariant(Guid.NewGuid(), offering.Id, "White", [archivedValue.Id], true, Now, Now);
+        var placeholder = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 1200, 1400, [activeVariant.Id, archivedVariant.Id], false, Now, Now);
+        var snapshot = new WorkspaceSnapshot(
+            [WorkspaceSnapshot.DefaultWorkspace(Now)],
+            [NewStore(storeId, "First")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint],
+            BlueprintOfferings = [offering],
+            OfferingOptions = [option],
+            OfferingOptionValues = [activeValue, archivedValue],
+            OfferingVariants = [activeVariant, archivedVariant],
+            OfferingPlaceholders = [placeholder]
+        };
+
+        var synchronized = CatalogCompatibilitySynchronizer.SynchronizeStore(snapshot, storeId, () => Now, Guid.NewGuid).Snapshot;
+
+        var legacyVariant = Assert.Single(synchronized.ProductVariants);
+        var legacyArea = Assert.Single(synchronized.DesignAreas);
+        Assert.Equal(activeVariant.Id, legacyVariant.Id);
+        Assert.Equal([legacyVariant.Id], legacyArea.VariantIds);
+    }
+
     private static Store NewStore(Guid id, string name) => new(id, name, null, false, Now, Now, "{}");
 
     private sealed class MemoryRepository(WorkspaceSnapshot? initial = null) : IWorkspaceRepository

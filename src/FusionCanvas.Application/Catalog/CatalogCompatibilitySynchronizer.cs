@@ -240,7 +240,11 @@ public static class CatalogCompatibilitySynchronizer
         }
 
         var legacyVariants = source.ProductVariants.Where(value => !normalizedOfferingIds.Contains(value.FulfillmentOfferingId)).ToList();
-        foreach (var variant in source.OfferingVariants.Where(value => normalizedOfferingIds.Contains(value.OfferingId) && !value.IsArchived))
+        var activeNormalizedVariantIds = source.OfferingVariants
+            .Where(value => normalizedOfferingIds.Contains(value.OfferingId) && !value.IsArchived)
+            .Select(value => value.Id)
+            .ToHashSet();
+        foreach (var variant in source.OfferingVariants.Where(value => activeNormalizedVariantIds.Contains(value.Id)))
         {
             var variantOptions = variant.OptionValueIds.Select(valueId =>
             {
@@ -263,7 +267,7 @@ public static class CatalogCompatibilitySynchronizer
                 value.DecorationMethod,
                 value.Width,
                 value.Height,
-                value.VariantIds,
+                value.VariantIds.Where(activeNormalizedVariantIds.Contains).ToArray(),
                 value.CreatedAt,
                 value.UpdatedAt,
                 value.MetadataJson)));

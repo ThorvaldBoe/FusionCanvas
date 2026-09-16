@@ -2766,7 +2766,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         {
             var result = await _productService.CreateProductAsync(
                 new CreateProductRequest(SelectedStore.Id, ProductName, EmptyToNull(ProductDescription), EmptyToNull(ExternalProductId)),
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken);
             if (result.Succeeded)
             {
                 _isCreatingNewProduct = false;
@@ -2785,7 +2785,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
         var updateResult = await _productService.UpdateProductAsync(
             new UpdateProductRequest(SelectedProduct.Id, ProductName, EmptyToNull(ProductDescription), EmptyToNull(ExternalProductId)),
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken);
         ApplyProductResult(updateResult);
     }
 
@@ -2796,7 +2796,19 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             return;
         }
 
-        _productSaveTask = SaveSelectedProductAsync();
+        _productSaveTask = SaveSelectedProductAndReportFailureAsync();
+    }
+
+    private async Task SaveSelectedProductAndReportFailureAsync()
+    {
+        try
+        {
+            await SaveSelectedProductAsync();
+        }
+        catch (Exception exception)
+        {
+            ErrorMessage = $"Blueprint could not be saved: {exception.Message}";
+        }
     }
 
     private void ApplyProductResult(ProductSupplierSetupResult result)
