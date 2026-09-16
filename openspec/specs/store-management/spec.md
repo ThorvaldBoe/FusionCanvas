@@ -244,12 +244,12 @@ FusionCanvas SHALL follow the shared button and icon-button guidance in `docs/ui
 - **AND** the buttons are not evenly stretched across the full editor width
 
 ### Requirement: Store Editor exposes strategy-gated Printify catalog import
-The Store Editor SHALL show an Import from Printify action beside New Blueprint on Catalog & mockups only when the selected Store uses Shopify + Printify, and SHALL keep the action out of the regular workspace surface.
+The Store Editor SHALL show an Import from Printify action beside New Blueprint on Catalog & mockups only when the selected Store uses standalone `Printify` or `Shopify + Printify`, and SHALL keep the action out of the regular workspace surface. The action and its selection surface SHALL explain that it retrieves products created in the selected Printify shop.
 
-#### Scenario: Printify Store shows import action
-- **WHEN** the user opens Catalog & mockups for a saved Shopify + Printify Store
+#### Scenario: Printify Store shows shop-product import action
+- **WHEN** the user opens Catalog & mockups for a saved Store using standalone Printify or Shopify + Printify
 - **THEN** an Import from Printify action is visible beside New Blueprint
-- **AND** its accessible name explains that it retrieves Blueprints from Printify
+- **AND** its accessible name explains that it retrieves products from the selected Printify shop
 
 #### Scenario: Manual Store hides import action
 - **WHEN** the user opens Catalog & mockups for a Manual or Shopify + Manual Store
@@ -296,3 +296,19 @@ FusionCanvas SHALL allow users to provide an optional storefront URL for a store
 - **THEN** the URL belongs to that store in its workspace
 - **AND** other stores do not share or inherit the URL
 
+### Requirement: Store selector persists the selected store
+FusionCanvas SHALL save the selected active store preference after a successful store-selector change and SHALL use it as the startup selection when it is valid for the active workspace.
+
+#### Scenario: User changes stores and restarts
+- **WHEN** the user changes the selected store using the regular store selector and quits the application
+- **THEN** the next application start selects the store chosen most recently
+- **AND** the store's workspace-scoped navigation opens for that store
+
+#### Scenario: Saved store is no longer selectable
+- **WHEN** the store saved as the startup selection is archived, deleted, or no longer belongs to the active workspace
+- **THEN** FusionCanvas does not select it
+- **AND** it selects the first available active store using the existing fallback behavior
+
+#### Scenario: Failed selection is not persisted
+- **WHEN** a store-selector request is rejected because the store is missing, archived, or outside the active workspace
+- **THEN** FusionCanvas does not replace the previously persisted selected-store preference
