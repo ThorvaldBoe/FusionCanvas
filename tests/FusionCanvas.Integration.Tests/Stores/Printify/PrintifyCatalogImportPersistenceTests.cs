@@ -48,6 +48,10 @@ public sealed class PrintifyCatalogImportPersistenceTests
         Assert.Equal("Changed variant", Assert.Single(loaded.OfferingVariants).Name);
         Assert.Single(loaded.OfferingPlaceholders);
         Assert.Equal(4500, Assert.Single(loaded.OfferingPlaceholders).Width);
+        Assert.Contains(loaded.StoreProducts, value => value.Id != localBlueprint.Id && value.Name == "Changed title");
+        Assert.Single(loaded.FulfillmentOfferings);
+        Assert.Single(loaded.ProductVariants);
+        Assert.Equal(4500, Assert.Single(loaded.DesignAreas).Width);
         Assert.Single(loaded.OfferingOptions);
         Assert.Single(loaded.OfferingOptionValues);
     }

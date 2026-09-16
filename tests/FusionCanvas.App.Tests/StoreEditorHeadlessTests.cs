@@ -510,6 +510,7 @@ public class StoreEditorHeadlessTests
         window.UpdateLayout();
         AssertEffectivelyVisible(window, "Catalog.OfferingStatus");
 
+        viewModel.CatalogSetup!.SelectOffering(null);
         viewModel.OpenVariantManagementCommand.Execute(null);
         window.UpdateLayout();
         Assert.DoesNotContain(window.GetVisualDescendants().OfType<Control>(),

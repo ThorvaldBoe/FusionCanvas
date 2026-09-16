@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Stores;
@@ -47,7 +48,14 @@ public sealed class PrintifyCatalogImportService(
         {
             var snapshot = await repository.LoadAsync(cancellationToken).ConfigureAwait(false);
             var updated = ImportSelected(snapshot, scope.StoreId, result.SelectedProducts);
-            await repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+            // The Products editor still reads the legacy projection while the
+            // catalog editor reads the normalized records written above. Keep
+            // both views aligned so imported variants and design areas are
+            // visible from either route.
+            var synchronized = CatalogCompatibilitySynchronizer
+                .SynchronizeStore(updated, scope.StoreId, () => DateTimeOffset.UtcNow, Guid.NewGuid)
+                .Snapshot;
+            await repository.SaveAsync(synchronized, cancellationToken).ConfigureAwait(false);
             return result with { Message = "Selected Printify catalog imported." };
         }
         catch (InvalidOperationException)
