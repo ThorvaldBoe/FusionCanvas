@@ -218,6 +218,44 @@ public class StoreManagementServiceTests
     }
 
     [Fact]
+    public async Task LoadAsync_RestoresInitialSelectedActiveStore()
+    {
+        var first = NewStore("First");
+        var selected = NewStore("Selected");
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, selected], [], [], [], [], [], [], [], []));
+        var service = new StoreManagementService(
+            repository,
+            initialActiveWorkspaceId: WorkspaceDefaults.DefaultWorkspaceId,
+            initialActiveStoreId: selected.Id);
+
+        var state = await service.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(selected.Id, state.ActiveStoreId);
+        Assert.Equal(selected.Id, state.ActiveStore?.Id);
+    }
+
+    [Fact]
+    public async Task LoadAsync_IgnoresInitialSelectedStoreFromAnotherWorkspace()
+    {
+        var workspace = new FusionCanvas.Domain.Workspace.Workspace(Guid.NewGuid(), "Other", null, false, Now, Now, "{}");
+        var selected = NewStore("Selected") with { WorkspaceId = workspace.Id };
+        var repository = new InMemoryWorkspaceRepository(
+            new WorkspaceSnapshot([selected], [], [], [], [], [], [], [], [])
+            {
+                Workspaces = [WorkspaceSnapshot.DefaultWorkspace(Now), workspace]
+            });
+        var service = new StoreManagementService(
+            repository,
+            initialActiveWorkspaceId: WorkspaceDefaults.DefaultWorkspaceId,
+            initialActiveStoreId: selected.Id);
+
+        var state = await service.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Null(state.ActiveStoreId);
+        Assert.Null(state.ActiveStore);
+    }
+
+    [Fact]
     public async Task StoreManagement_IsScopedToActiveWorkspace()
     {
         var personal = NewWorkspace("Personal");

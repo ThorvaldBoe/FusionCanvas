@@ -8,7 +8,8 @@ public sealed record ApplicationSettings(
     AiConfigurationSettings Ai,
     WindowLayoutSettings? WindowLayout = null,
     Guid? ActiveWorkspaceId = null,
-    ImmutableDictionary<string, WindowGeometrySettings>? WindowGeometry = null)
+    ImmutableDictionary<string, WindowGeometrySettings>? WindowGeometry = null,
+    Guid? ActiveStoreId = null)
 {
     public ApplicationSettings(bool DarkMode)
         : this(DarkMode, AiConfigurationSettings.Default, null, null, null)

@@ -179,6 +179,19 @@ public class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task UpdateActiveStore_QueuesSelectedStoreForSave()
+    {
+        var store = new RecordingStore();
+        var vm = new SettingsViewModel(store, new FakeThemeController(), ApplicationSettings.Default, loadWarning: null);
+        var storeId = Guid.NewGuid();
+
+        vm.UpdateActiveStore(storeId);
+        await vm.FlushAsync();
+
+        Assert.Equal(storeId, store.LastSaved.ActiveStoreId);
+    }
+
+    [Fact]
     public async Task WorkspaceProjection_ShowsNoWorkspaceWhenNoneAttached()
     {
         var vm = NewViewModel();
