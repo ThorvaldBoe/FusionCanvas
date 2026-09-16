@@ -56,6 +56,8 @@ public class StoreEditorHeadlessTests
         Assert.NotNull(panel);
         Assert.True(IsEffectivelyVisible(panel!));
         Assert.NotNull(window.FindControl<ItemsControl>("PrintifyBlueprintList"));
+        Assert.Contains(panel!.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Gildan 64000");
+        Assert.Contains(panel.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Loading Spinner T-shirt | Minimal Tech Graphic");
         Assert.Empty(panel!.GetVisualDescendants().OfType<Image>());
         panel.Focus();
         Assert.True(panel.IsFocused);
@@ -2328,6 +2330,9 @@ public class StoreEditorHeadlessTests
     private sealed class HeadlessCatalogClient : IPrintifyCatalogClient
     {
         public int SelectedCalls { get; private set; }
+
+        public Task<PrintifyCatalogResult> LoadShopProductsAsync(string key, int shopId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "loaded", Products: [new("product-a", "Loading Spinner T-shirt | Minimal Tech Graphic", null, 68, 9, "Gildan 64000")]));
 
         public Task<PrintifyCatalogResult> LoadBlueprintsAsync(string key, CancellationToken cancellationToken = default) =>
             Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "loaded", [new(68, "Tee", null, "Gildan", "5000")]));

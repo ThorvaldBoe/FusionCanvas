@@ -6,6 +6,18 @@ namespace FusionCanvas.App.Tests;
 public sealed class PrintifyCatalogImportViewModelTests
 {
     [Fact]
+    public void ImportItemUsesBlueprintNameBeforeProductTitle()
+    {
+        var named = new PrintifyCatalogImportItemViewModel(new("product-a", "Loading Spinner T-shirt | Minimal Tech Graphic", null, 68, 9, "Gildan 64000"));
+        var fallback = new PrintifyCatalogImportItemViewModel(new("product-b", "Fallback product", null, 77, 9));
+
+        Assert.Equal("Gildan 64000", named.BlueprintName);
+        Assert.Equal("Loading Spinner T-shirt | Minimal Tech Graphic", named.ProductTitle);
+        Assert.Contains("product-a", named.Subtitle);
+        Assert.Equal("Blueprint 77", fallback.BlueprintName);
+    }
+
+    [Fact]
     public async Task LateBlueprintResultForChangedStoreIsIgnored()
     {
         var firstScope = new StoreCredentialScope(Guid.NewGuid(), Guid.NewGuid());

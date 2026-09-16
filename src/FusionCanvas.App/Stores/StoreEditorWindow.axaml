@@ -488,9 +488,15 @@
                   <ItemsControl x:Name="PrintifyBlueprintList" ItemsSource="{Binding Blueprints}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="stores:PrintifyCatalogImportItemViewModel">
-                        <CheckBox Content="{Binding Title}"
-                                  IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                  AutomationProperties.AutomationId="Catalog.PrintifyBlueprintChoice" />
+                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                  AutomationProperties.AutomationId="Catalog.PrintifyBlueprintChoice"
+                                  AutomationProperties.Name="{Binding BlueprintName}">
+                          <StackPanel Spacing="2">
+                            <TextBlock Text="{Binding BlueprintName}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding ProductTitle}" Foreground="{DynamicResource SecondaryTextBrush}" />
+                            <TextBlock Text="{Binding Subtitle}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                          </StackPanel>
+                        </CheckBox>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
