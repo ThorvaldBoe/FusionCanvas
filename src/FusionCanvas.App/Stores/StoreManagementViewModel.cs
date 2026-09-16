@@ -2658,6 +2658,10 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             return;
         }
 
+        // The offering cards are loaded independently from the focused catalog
+        // state. Reassert the context here so a card selected while that load
+        // was still in flight cannot open an empty management surface.
+        CatalogSetup?.SelectOffering(SelectedOffering.Id);
         CatalogEditorLevel = level;
     }
 
