@@ -162,6 +162,32 @@ public sealed class PrintifyCatalogImportServiceTests
     }
 
     [Fact]
+    public async Task ReusesLegacyProviderWithSameNameWhenExternalIdentityIsMissing()
+    {
+        var store = new StoreSummary(Guid.NewGuid(), Guid.NewGuid(), "Store", new(PrintifyShopId: 42), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, FulfillmentStrategy.Printify);
+        var legacyProvider = new PrintProvider(Guid.NewGuid(), store.Id, "SwiftPOD", null, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        var repository = new RepositoryStub(WorkspaceSnapshot.Empty with
+        {
+            Stores = [new Store(store.Id, store.WorkspaceId, store.Name, null, false, store.CreatedAt, store.UpdatedAt, "{}", null, store.FulfillmentStrategy)],
+            PrintProviders = [legacyProvider]
+        });
+        var client = new ClientStub
+        {
+            SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [new(
+                new(68, "Tee", null, null, null),
+                [new(9, "SwiftPOD", [], [new(33719, "Black", true, true, [], [])])]) { ProductId = "product-a" }])
+        };
+        var service = new PrintifyCatalogImportService(new StoresStub(store), new CredentialsStub { Result = new(new(PrintifyConfigurationKind.Available, "available"), "key") }, client, repository);
+
+        var result = await service.LoadSelectedAsync(new(store.WorkspaceId, store.Id), ["product-a"], TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Single(repository.Snapshot.PrintProviders);
+        Assert.Equal(legacyProvider.Id, repository.Snapshot.BlueprintOfferings.Single().PrintProviderId);
+        Assert.Equal("9", repository.Snapshot.PrintProviders.Single().ExternalProviderId);
+    }
+
+    [Fact]
     public async Task RejectsDuplicateProviderPayloadWithoutSaving()
     {
         var store = new StoreSummary(Guid.NewGuid(), Guid.NewGuid(), "Store", new(PrintifyShopId: 42), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, FulfillmentStrategy.ShopifyPrintify);
@@ -176,6 +202,7 @@ public sealed class PrintifyCatalogImportServiceTests
         var result = await service.LoadSelectedAsync(new(store.WorkspaceId, store.Id), [68], TestContext.Current.CancellationToken);
 
         Assert.Equal(PrintifyCatalogResultKind.UnexpectedResponse, result.Kind);
+        Assert.Contains("duplicate provider identities", result.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(repository.Snapshot.Blueprints);
         Assert.Empty(repository.Snapshot.PrintProviders);
     }
