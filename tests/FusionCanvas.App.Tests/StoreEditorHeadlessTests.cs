@@ -230,7 +230,7 @@ public class StoreEditorHeadlessTests
     [AvaloniaFact]
     public async Task SavingBlueprint_AllowsImmediateReturnToBlueprintList()
     {
-        var window = CreateEditorWindow(includeNormalizedCatalog: false);
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
         var viewModel = (StoreManagementViewModel)window.DataContext!;
         viewModel.SelectProductsTabCommand.Execute(null);
         viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
@@ -252,12 +252,34 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public async Task SavingBlueprint_DoesNotPromptWhenNavigatingImmediately()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.IsBlueprintBasicsExpanded = true;
+        window.UpdateLayout();
+
+        var driver = new StoreEditorDriver(window);
+        driver.TypeBlueprintName("Saved immediately");
+        await HeadlessUiWait.UntilAsync(() => driver.SaveBlueprint.IsEnabled, "Blueprint Save action becomes enabled");
+        driver.SaveBlueprintChanges();
+        viewModel.BackToProductsCommand.Execute(null);
+        await HeadlessUiWait.UntilAsync(() => !viewModel.HasAnyCatalogUnsavedChanges, "Blueprint save completes");
+
+        Assert.True(viewModel.IsCatalogOverview);
+        Assert.False(viewModel.DiscardChangesPromptVisible);
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public async Task BlueprintNameJourney_ReopensFromDisposableSqlite()
     {
         using var workspace = new DisposableHeadlessWorkspace();
         var store = new Store(Guid.NewGuid(), "Persistent Store", null, false, Now, Now, "{}");
         var repository = workspace.CreateRepository();
-        await repository.SaveAsync(Snapshot(store, includeNormalizedCatalog: false, useFixedProviderOffering: false, includeOfferingOptions: false), TestContext.Current.CancellationToken);
+        await repository.SaveAsync(Snapshot(store, includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true), TestContext.Current.CancellationToken);
 
         static StoreManagementViewModel Compose(IWorkspaceRepository repo) => new(
             new StoreManagementService(repo),
