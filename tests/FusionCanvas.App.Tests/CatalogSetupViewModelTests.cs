@@ -322,6 +322,43 @@ public sealed class CatalogSetupViewModelTests
     }
 
     [Fact]
+    public async Task ArchiveVariantCommandArchivesTheSellableVariantRow()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "SwiftPOD", null, BlueprintOfferingKind.ProviderNetwork, null, "swiftpod", null, null, false, now, now);
+        var colorOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
+        var sizeOption = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Size, "Size", 1);
+        var black = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "Black", 0);
+        var medium = new OfferingOptionValue(Guid.NewGuid(), sizeOption.Id, offering.Id, "M", 0);
+        var variant = new OfferingVariant(Guid.NewGuid(), offering.Id, "Black / M", [black.Id, medium.Id], false, now, now);
+        var repository = new InMemoryWorkspaceRepository(snapshot with
+        {
+            Blueprints = [blueprint],
+            BlueprintOfferings = [offering],
+            OfferingOptions = [colorOption, sizeOption],
+            OfferingOptionValues = [black, medium],
+            OfferingVariants = [variant]
+        });
+        var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository));
+
+        await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+        viewModel.SelectOffering(offering.Id);
+        var row = Assert.Single(viewModel.SellableVariantRows);
+
+        viewModel.ArchiveVariantCommand.Execute(row);
+        for (var attempt = 0; attempt < 20 && viewModel.IsBusy; attempt++)
+            await Task.Yield();
+
+        Assert.False(viewModel.HasError, viewModel.ErrorMessage);
+        Assert.Empty(viewModel.SellableVariantRows);
+        var saved = (await repository.LoadAsync(TestContext.Current.CancellationToken)).OfferingVariants.Single(candidate => candidate.Id == variant.Id);
+        Assert.True(saved.IsArchived);
+    }
+
+    [Fact]
     public async Task StartAddVariantRaisesRequestEvent()
     {
         var (viewModel, _, _, _) = await CreateCatalogWithOptionsAsync();
