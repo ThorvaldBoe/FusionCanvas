@@ -56,6 +56,8 @@ public class StoreEditorHeadlessTests
         Assert.NotNull(panel);
         Assert.True(IsEffectivelyVisible(panel!));
         Assert.NotNull(window.FindControl<ItemsControl>("PrintifyBlueprintList"));
+        Assert.Contains(panel!.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Gildan 64000");
+        Assert.Contains(panel.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Loading Spinner T-shirt | Minimal Tech Graphic");
         Assert.Empty(panel!.GetVisualDescendants().OfType<Image>());
         panel.Focus();
         Assert.True(panel.IsFocused);
@@ -222,6 +224,30 @@ public class StoreEditorHeadlessTests
         await HeadlessUiWait.UntilAsync(() => !driver.SaveBlueprint.IsEnabled, "Blueprint Save action completes");
 
         Assert.Equal("Updated blueprint through the UI", viewModel.SelectedProduct!.Name);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task SavingBlueprint_AllowsImmediateReturnToBlueprintList()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: false);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.IsBlueprintBasicsExpanded = true;
+        window.UpdateLayout();
+
+        var driver = new StoreEditorDriver(window);
+        driver.TypeBlueprintName("Saved blueprint");
+        await HeadlessUiWait.UntilAsync(() => driver.SaveBlueprint.IsEnabled, "Blueprint Save action becomes enabled");
+        driver.SaveBlueprintChanges();
+        await HeadlessUiWait.UntilAsync(() => !driver.SaveBlueprint.IsEnabled, "Blueprint Save action completes");
+
+        Assert.False(viewModel.HasAnyCatalogUnsavedChanges);
+        viewModel.BackToProductsCommand.Execute(null);
+
+        Assert.True(viewModel.IsCatalogOverview);
+        Assert.False(viewModel.DiscardChangesPromptVisible);
         window.Close();
     }
 
@@ -2304,6 +2330,9 @@ public class StoreEditorHeadlessTests
     private sealed class HeadlessCatalogClient : IPrintifyCatalogClient
     {
         public int SelectedCalls { get; private set; }
+
+        public Task<PrintifyCatalogResult> LoadShopProductsAsync(string key, int shopId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "loaded", Products: [new("product-a", "Loading Spinner T-shirt | Minimal Tech Graphic", null, 68, 9, "Gildan 64000")]));
 
         public Task<PrintifyCatalogResult> LoadBlueprintsAsync(string key, CancellationToken cancellationToken = default) =>
             Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "loaded", [new(68, "Tee", null, "Gildan", "5000")]));

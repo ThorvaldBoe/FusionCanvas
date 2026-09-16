@@ -5,4 +5,5 @@ public sealed record PrintifyShopProductSummary(
     string Title,
     string? Description,
     int BlueprintId,
-    int ProviderId);
+    int ProviderId,
+    string? BlueprintName = null);

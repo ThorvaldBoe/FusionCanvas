@@ -8,8 +8,11 @@ public sealed class PrintifyCatalogImportItemViewModel(PrintifyShopProductSummar
     private bool _isSelected;
 
     public string Id => product.ProductId;
-    public string Title => product.Title;
-    public string Subtitle => $"Blueprint {product.BlueprintId} · Provider {product.ProviderId}";
+    public string BlueprintName => string.IsNullOrWhiteSpace(product.BlueprintName)
+        ? $"Blueprint {product.BlueprintId}"
+        : product.BlueprintName!;
+    public string ProductTitle => product.Title;
+    public string Subtitle => $"Product {product.ProductId} · Provider {product.ProviderId}";
     public bool IsSelected { get => _isSelected; set { if (_isSelected == value) return; _isSelected = value; PropertyChanged?.Invoke(this, new(nameof(IsSelected))); } }
     public event PropertyChangedEventHandler? PropertyChanged;
 }

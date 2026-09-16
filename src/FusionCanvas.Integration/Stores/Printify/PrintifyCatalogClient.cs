@@ -39,6 +39,8 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
             catch (InvalidOperationException) { return Unexpected(); }
         }
 
+        await EnrichBlueprintNamesAsync(products, key, cancellationToken).ConfigureAwait(false);
+
         return products.Count == 0
             ? new(PrintifyCatalogResultKind.Empty, "The selected Printify shop has no products to import.", Products: products)
             : new(PrintifyCatalogResultKind.Succeeded, "Printify shop products loaded.", Products: products);
@@ -78,7 +80,6 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
             catch (JsonException) { return Unexpected(); }
             catch (InvalidOperationException) { return Unexpected(); }
         }
-
         var providerNames = await LoadProviderNamesAsync(details, key, cancellationToken).ConfigureAwait(false);
         if (providerNames.Error is not null) return providerNames.Error;
         details = details.Select(blueprint => blueprint with
@@ -91,6 +92,7 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
             }).ToArray()
         }).ToList();
 
+        await EnrichBlueprintNamesAsync(summaries, key, cancellationToken).ConfigureAwait(false);
         return summaries.Count == 0
             ? new(PrintifyCatalogResultKind.Empty, "The selected Printify shop has no products to import.", Products: summaries, SelectedProducts: details)
             : new(PrintifyCatalogResultKind.Succeeded, "Printify shop products loaded.", Products: summaries, SelectedProducts: details);
@@ -141,6 +143,38 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
                 [new PrintifyCatalogProvider(providerId, $"Printify provider {providerId}", options, variants)]) { ProductId = productId });
         }
         return new(summaries, details, lastPage);
+    }
+
+    private async Task EnrichBlueprintNamesAsync(List<PrintifyShopProductSummary> products, string key, CancellationToken cancellationToken)
+    {
+        foreach (var blueprintId in products.Select(product => product.BlueprintId).Distinct().ToArray())
+        {
+            var response = await SendJsonAsync($"{CatalogBaseUri}blueprints/{blueprintId}.json", key, cancellationToken).ConfigureAwait(false);
+            if (response.Error is not null) continue;
+            using var document = response.Json!;
+            try
+            {
+                var name = ParseBlueprintName(document);
+                if (string.IsNullOrWhiteSpace(name)) continue;
+                for (var index = 0; index < products.Count; index++)
+                {
+                    if (products[index].BlueprintId == blueprintId)
+                        products[index] = products[index] with { BlueprintName = name };
+                }
+            }
+            catch (JsonException) { }
+            catch (InvalidOperationException) { }
+        }
+    }
+
+    private static string? ParseBlueprintName(JsonDocument document)
+    {
+        var root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object) throw new JsonException();
+        var brand = OptionalString(root, "brand")?.Trim();
+        var model = OptionalString(root, "model")?.Trim();
+        var combined = string.Join(" ", new[] { brand, model }.Where(value => !string.IsNullOrWhiteSpace(value)));
+        return string.IsNullOrWhiteSpace(combined) ? OptionalString(root, "title")?.Trim() : combined;
     }
 
     private static List<PrintifyCatalogOption> ParseProductOptions(JsonElement item)

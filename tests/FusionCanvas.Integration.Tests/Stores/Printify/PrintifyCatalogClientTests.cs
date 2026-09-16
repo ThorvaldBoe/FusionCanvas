@@ -7,6 +7,28 @@ namespace FusionCanvas.Integration.Tests.Stores.Printify;
 public sealed class PrintifyCatalogClientTests
 {
     [Fact]
+    public async Task EnrichesShopProductsWithBlueprintNameAndFallsBackWhenMetadataIsUnavailable()
+    {
+        var requests = new List<string>();
+        using var client = new HttpClient(new Handler((request, _) =>
+        {
+            requests.Add(request.RequestUri!.AbsolutePath);
+            if (request.RequestUri.AbsolutePath.EndsWith("/blueprints/68.json", StringComparison.Ordinal))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"id\":68,\"title\":\"T-Shirt\",\"brand\":\"Gildan\",\"model\":\"64000\"}") });
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"last_page\":1,\"data\":[{\"id\":\"product-a\",\"title\":\"Loading Spinner T-shirt | Minimal Tech Graphic\",\"blueprint_id\":68,\"print_provider_id\":9,\"variants\":[{\"id\":1,\"title\":\"One size\"}]}]}")
+            });
+        })) { BaseAddress = PrintifyCatalogClient.ApiBaseUri };
+
+        var result = await new PrintifyCatalogClient(client).LoadShopProductsAsync("synthetic-key", 42, TestContext.Current.CancellationToken);
+
+        var product = Assert.Single(result.Products!);
+        Assert.Equal("Gildan 64000", product.BlueprintName);
+        Assert.Contains("/v1/catalog/blueprints/68.json", requests);
+    }
+
+    [Fact]
     public async Task LoadsProductsFromSelectedShopAcrossPages()
     {
         var requests = new List<string>();
