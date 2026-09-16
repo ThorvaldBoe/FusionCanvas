@@ -79,6 +79,8 @@ public sealed class PrintifyCatalogImportServiceTests
         Assert.True(first.Succeeded);
         Assert.True(second.Succeeded);
         Assert.Single(repository.Snapshot.Blueprints);
+        Assert.Equal("Gildan 5000", Assert.Single(repository.Snapshot.Blueprints).Name);
+        Assert.Equal("Gildan 5000", Assert.Single(repository.Snapshot.StoreProducts).Name);
         Assert.Single(repository.Snapshot.PrintProviders);
         Assert.Single(repository.Snapshot.BlueprintOfferings);
         var option = Assert.Single(repository.Snapshot.OfferingOptions);
@@ -117,7 +119,7 @@ public sealed class PrintifyCatalogImportServiceTests
         var client = new ClientStub
         {
             SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [new PrintifyCatalogBlueprint(
-                new(68, "Updated Tee", null, "Gildan", "5000"),
+                new(68, "Updated Tee", null, null, null),
                 [new(9, "Updated Provider", [], [new(33719, "Black", true, true, [1], [new("front", "dtg", 100, 200)])])])
                 { ProductId = "shop-product-1" }])
         };
@@ -127,6 +129,7 @@ public sealed class PrintifyCatalogImportServiceTests
 
         Assert.True(result.Succeeded, result.Message);
         Assert.Single(repository.Snapshot.Blueprints);
+        Assert.Equal("Updated Tee", Assert.Single(repository.Snapshot.Blueprints).Name);
         Assert.Single(repository.Snapshot.BlueprintOfferings);
         Assert.Equal(offeringId, repository.Snapshot.BlueprintOfferings[0].Id);
         Assert.Equal(offeringId, repository.Snapshot.MockupTemplates[0].BlueprintOfferingId);

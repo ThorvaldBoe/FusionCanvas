@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Stores;
@@ -78,13 +79,13 @@ public sealed class PrintifyCatalogImportService(
                     || MetadataHasId(value.MetadataJson, importedBlueprint.Summary.Id)));
             if (blueprint is null)
             {
-                blueprint = new Blueprint(Guid.NewGuid(), storeId, importedBlueprint.Summary.Title, importedBlueprint.Summary.Description, false, now, now,
+                blueprint = new Blueprint(Guid.NewGuid(), storeId, BlueprintName(importedBlueprint.Summary), importedBlueprint.Summary.Description, false, now, now,
                     importedBlueprint.ProductId is { } productId ? Metadata("product", importedBlueprint.Summary.Id, productId) : Metadata("blueprint", importedBlueprint.Summary.Id));
                 blueprints.Add(blueprint);
             }
             else
             {
-                blueprint = blueprint with { Name = importedBlueprint.Summary.Title, Description = importedBlueprint.Summary.Description, IsArchived = false, UpdatedAt = now };
+                blueprint = blueprint with { Name = BlueprintName(importedBlueprint.Summary), Description = importedBlueprint.Summary.Description, IsArchived = false, UpdatedAt = now };
                 Replace(blueprints, value => value.Id == blueprint.Id, blueprint);
             }
 
@@ -147,7 +148,28 @@ public sealed class PrintifyCatalogImportService(
             }
         }
 
-        return snapshot with { Blueprints = blueprints, PrintProviders = providers, BlueprintOfferings = offerings, OfferingOptions = options, OfferingOptionValues = values, OfferingVariants = variants, OfferingPlaceholders = placeholders };
+        var imported = snapshot with
+        {
+            Blueprints = blueprints,
+            PrintProviders = providers,
+            BlueprintOfferings = offerings,
+            OfferingOptions = options,
+            OfferingOptionValues = values,
+            OfferingVariants = variants,
+            OfferingPlaceholders = placeholders
+        };
+        return CatalogCompatibilitySynchronizer
+            .SynchronizeStore(imported, storeId, () => now, Guid.NewGuid)
+            .Snapshot;
+    }
+
+    private static string BlueprintName(PrintifyCatalogBlueprintSummary summary)
+    {
+        var brand = summary.Brand?.Trim();
+        var model = summary.Model?.Trim();
+        return !string.IsNullOrWhiteSpace(brand) && !string.IsNullOrWhiteSpace(model)
+            ? $"{brand} {model}"
+            : summary.Title.Trim();
     }
 
     private static void ValidateCatalog(IReadOnlyList<PrintifyCatalogBlueprint> catalog)
