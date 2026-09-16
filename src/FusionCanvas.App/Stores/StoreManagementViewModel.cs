@@ -2778,6 +2778,15 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     {
         ErrorMessage = result.Error;
         ApplyProductState(result.State);
+        if (result.Succeeded)
+        {
+            // The product service returns the refreshed state rather than the
+            // saved product. Establish the clean editor baseline explicitly so
+            // navigation immediately after Save does not treat the saved input
+            // as an unsaved draft.
+            CaptureOriginalProductState();
+        }
+
         if (result.Product is not null && result.Succeeded)
         {
             PerformSelectProductForEditing(result.Product);

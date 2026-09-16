@@ -226,6 +226,30 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public async Task SavingBlueprint_AllowsImmediateReturnToBlueprintList()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: false);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.IsBlueprintBasicsExpanded = true;
+        window.UpdateLayout();
+
+        var driver = new StoreEditorDriver(window);
+        driver.TypeBlueprintName("Saved blueprint");
+        await HeadlessUiWait.UntilAsync(() => driver.SaveBlueprint.IsEnabled, "Blueprint Save action becomes enabled");
+        driver.SaveBlueprintChanges();
+        await HeadlessUiWait.UntilAsync(() => !driver.SaveBlueprint.IsEnabled, "Blueprint Save action completes");
+
+        Assert.False(viewModel.HasAnyCatalogUnsavedChanges);
+        viewModel.BackToProductsCommand.Execute(null);
+
+        Assert.True(viewModel.IsCatalogOverview);
+        Assert.False(viewModel.DiscardChangesPromptVisible);
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public async Task BlueprintNameJourney_ReopensFromDisposableSqlite()
     {
         using var workspace = new DisposableHeadlessWorkspace();
