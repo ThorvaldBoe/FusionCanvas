@@ -53,10 +53,40 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
         var loaded = await LoadAllProductsAsync(key, shopId, cancellationToken).ConfigureAwait(false);
         if (!loaded.Succeeded) return loaded;
         var selectedIds = productIds.Distinct(StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
-        var selected = loaded.SelectedProducts!.Where(product => product.ProductId is { } id && selectedIds.Contains(id)).ToList();
-        if (selected.Count != selectedIds.Count)
+        var selectedProducts = loaded.Products!.Where(product => selectedIds.Contains(product.ProductId)).ToList();
+        if (selectedProducts.Count != selectedIds.Count)
             return new(PrintifyCatalogResultKind.InvalidRequest, "One or more selected Printify products is no longer available.");
+        var catalogSummaries = new Dictionary<int, PrintifyCatalogBlueprintSummary>();
+        foreach (var blueprintId in selectedProducts.Select(product => product.BlueprintId).Distinct())
+        {
+            var summary = await LoadCatalogBlueprintSummaryAsync(key, blueprintId, cancellationToken).ConfigureAwait(false);
+            if (!summary.Succeeded) return summary;
+            catalogSummaries[blueprintId] = summary.Blueprints![0];
+        }
+
+        var selected = loaded.SelectedProducts!
+            .Where(product => product.ProductId is { } id && selectedIds.Contains(id))
+            .Select(product => product with
+            {
+                Summary = catalogSummaries.TryGetValue(product.Summary.Id, out var summary) ? summary : product.Summary
+            })
+            .ToList();
+        if (selected.Count != selectedIds.Count)
+            return new(PrintifyCatalogResultKind.UnexpectedResponse, "Printify returned incomplete product details.");
         return new(PrintifyCatalogResultKind.Succeeded, "Selected Printify shop products loaded.", Products: loaded.Products, SelectedProducts: selected);
+    }
+
+    private async Task<PrintifyCatalogResult> LoadCatalogBlueprintSummaryAsync(string key, int blueprintId, CancellationToken cancellationToken)
+    {
+        var response = await SendJsonAsync($"blueprints/{blueprintId}.json", key, cancellationToken).ConfigureAwait(false);
+        if (response.Error is not null) return response.Error;
+        using var document = response.Json!;
+        try
+        {
+            return new(PrintifyCatalogResultKind.Succeeded, "Printify Blueprint loaded.", Blueprints: [ParseBlueprintSummary(document)]);
+        }
+        catch (JsonException) { return Unexpected(); }
+        catch (InvalidOperationException) { return Unexpected(); }
     }
 
     private async Task<PrintifyCatalogResult> LoadAllProductsAsync(string key, int shopId, CancellationToken cancellationToken)
@@ -323,9 +353,17 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
     private static List<PrintifyCatalogBlueprintSummary> ParseBlueprintSummaries(JsonDocument document)
     {
         if (document.RootElement.ValueKind != JsonValueKind.Array) throw new JsonException();
-        return document.RootElement.EnumerateArray().Select(item => new PrintifyCatalogBlueprintSummary(
-            RequiredInt(item, "id"), RequiredString(item, "title"), OptionalString(item, "description"),
-            OptionalString(item, "brand"), OptionalString(item, "model"))).ToList();
+        return document.RootElement.EnumerateArray().Select(ParseBlueprintSummary).ToList();
+    }
+
+    private static PrintifyCatalogBlueprintSummary ParseBlueprintSummary(JsonElement item) => new(
+        RequiredInt(item, "id"), RequiredString(item, "title"), OptionalString(item, "description"),
+        OptionalString(item, "brand"), OptionalString(item, "model"));
+
+    private static PrintifyCatalogBlueprintSummary ParseBlueprintSummary(JsonDocument document)
+    {
+        if (document.RootElement.ValueKind != JsonValueKind.Object) throw new JsonException();
+        return ParseBlueprintSummary(document.RootElement);
     }
 
     private static List<PrintifyCatalogProvider> ParseProviders(JsonDocument document)

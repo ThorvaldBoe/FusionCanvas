@@ -54,6 +54,34 @@ public sealed class PrintifyCatalogClientTests
     }
 
     [Fact]
+    public async Task SelectedShopProductUsesAuthoritativeCatalogBlueprintIdentity()
+    {
+        using var client = new HttpClient(new Handler((request, _) =>
+        {
+            if (request.RequestUri!.AbsolutePath.EndsWith("/blueprints/68.json", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"id\":68,\"title\":\"Gildan 64000 t-shirt\",\"description\":\"Cotton\",\"brand\":\"Gildan\",\"model\":\"64000\"}")
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"last_page\":1,\"data\":[{\"id\":\"product-a\",\"title\":\"My shop title\",\"description\":\"A\",\"blueprint_id\":68,\"print_provider_id\":9,\"options\":[],\"variants\":[{\"id\":1,\"title\":\"One size\",\"options\":[],\"is_enabled\":true,\"is_available\":true}],\"print_areas\":[]}]}")
+            });
+        })) { BaseAddress = PrintifyCatalogClient.ApiBaseUri };
+
+        var result = await new PrintifyCatalogClient(client).LoadSelectedProductsAsync("synthetic-key", 42, ["product-a"], TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Message);
+        var blueprint = Assert.Single(result.SelectedProducts!);
+        Assert.Equal("Gildan 64000 t-shirt", blueprint.Summary.Title);
+        Assert.Equal("Gildan", blueprint.Summary.Brand);
+        Assert.Equal("64000", blueprint.Summary.Model);
+    }
+
+    [Fact]
     public async Task LoadsProductsThatHaveNoArtworkYet()
     {
         using var client = new HttpClient(new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
