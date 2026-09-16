@@ -6,7 +6,7 @@
 
 - [ ] Focused tests added or updated at the lowest reliable layer.
 - [ ] Applicable Avalonia headless component or experience tests added/updated.
-- [ ] `dotnet test .\FusionCanvas.sln` passed (or the failure is explained below).
+- [ ] `dotnet test .\FusionCanvas.sln -m:1` passed locally (or the failure is explained below).
 - [ ] OpenSpec acceptance scenarios have criterion-level evidence.
 
 ## Defect escape analysis (complete for bug fixes; otherwise write “Not applicable”)

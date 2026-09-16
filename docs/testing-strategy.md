@@ -69,7 +69,7 @@ Local-only regression or reusable prevention (and why):
 
 Promote a lesson into shared helpers, this inventory, QA guidance, specifications, or coding standards only when the mechanism recurs or plausibly affects multiple surfaces. Otherwise keep the focused regression without adding process or duplicate tests.
 
-## Pull-request baseline
+## Local and daily baseline
 
 The canonical deterministic command is:
 
@@ -77,7 +77,7 @@ The canonical deterministic command is:
 dotnet test .\FusionCanvas.sln -m:1
 ```
 
-It includes App headless tests and excludes `FusionCanvas.UITests`. The same command must work in local contributor environments and pull-request CI using repository-controlled non-secret configuration. Real-desktop Appium runs remain a separately selectable supplemental lane.
+It includes App headless tests and excludes `FusionCanvas.UITests`. Contributors should run it locally before merging. GitHub Actions runs the same command once per day on the default branch and also supports a manual dispatch; failures remain visible in the workflow result. Real-desktop Appium runs remain a separately selectable supplemental lane.
 
 ## Strategy-health signals
 

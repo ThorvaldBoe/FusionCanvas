@@ -291,7 +291,7 @@ Standards that can be automated SHOULD be encoded in repository tooling rather t
 1. a root `.editorconfig` for formatting, naming, and code-style rules
 2. built-in .NET analyzers enabled at an agreed analysis level
 3. warnings kept visible and warning-clean for changed code
-4. `dotnet format --verify-no-changes` and `dotnet test .\FusionCanvas.sln -m:1` in CI
+4. `dotnet format --verify-no-changes` and `dotnet test .\FusionCanvas.sln -m:1` in the documented verification workflow, including daily CI
 5. narrowly selected additional analyzers only when they provide durable value without excessive noise
 
 Introducing or tightening analyzers SHOULD be a separate maintenance change. Existing diagnostics may be baselined temporarily, but new or modified code MUST follow this standard and MUST NOT expand the baseline.
