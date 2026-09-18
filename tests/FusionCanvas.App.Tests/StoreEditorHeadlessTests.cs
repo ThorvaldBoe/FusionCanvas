@@ -1751,6 +1751,49 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public async Task DesignAreaManagement_EditDialogCanClearPrimaryArtworkSelection()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true, primaryArtworkDesignArea: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenDesignAreaManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        var card = Assert.Single(viewModel.CatalogSetup!.DesignAreaCards);
+        var edit = window.GetVisualDescendants().OfType<Button>()
+            .Single(button => IsEffectivelyVisible(button)
+                && string.Equals(button.Content as string, "Edit", StringComparison.Ordinal)
+                && button.DataContext is DesignAreaCardViewModel value
+                && value.Id == card.Id);
+        edit.Command!.Execute(edit.CommandParameter);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+
+        var dialog = Assert.Single(window.OwnedWindows.OfType<DesignAreaEditorWindow>());
+        dialog.UpdateLayout();
+        var primary = dialog.GetVisualDescendants().OfType<CheckBox>()
+            .Single(checkBox => AutomationProperties.GetName(checkBox) == "Primary for artwork generation");
+        Assert.True(primary.IsChecked);
+
+        primary.IsChecked = false;
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.False(viewModel.CatalogSetup.PlaceholderPrimaryForArtworkGeneration);
+
+        var save = FindButton(dialog, "Save design area")!;
+        Assert.True(save.Command!.CanExecute(save.CommandParameter));
+        save.Command.Execute(save.CommandParameter);
+        await WaitForAsync(() => window.OwnedWindows.OfType<DesignAreaEditorWindow>().Any() == false);
+        window.UpdateLayout();
+
+        Assert.Null(viewModel.CatalogSetup.SelectedOffering!.PrimaryArtworkDesignAreaId);
+        Assert.False(Assert.Single(viewModel.CatalogSetup.DesignAreaCards).IsPrimaryForArtworkGeneration);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void SaveMockupTemplateButton_ShowsFullLabelWithoutClipping()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
@@ -2329,10 +2372,11 @@ public class StoreEditorHeadlessTests
         bool includeOfferingOptions = false,
         IProviderCatalogCandidateSource? providerCatalog = null,
         bool showWindow = true,
-        Store? customStore = null)
+        Store? customStore = null,
+        bool primaryArtworkDesignArea = false)
     {
         var store = customStore ?? new Store(Guid.NewGuid(), "North Star", null, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog, useFixedProviderOffering, includeOfferingOptions));
+        var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog, useFixedProviderOffering, includeOfferingOptions, primaryArtworkDesignArea));
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository),
             new NicheManagementService(repository),
@@ -2483,7 +2527,8 @@ public class StoreEditorHeadlessTests
         Store store,
         bool includeNormalizedCatalog,
         bool useFixedProviderOffering,
-        bool includeOfferingOptions)
+        bool includeOfferingOptions,
+        bool primaryArtworkDesignArea = false)
     {
         var product = new StoreProduct(Guid.NewGuid(), store.Id, "Gildan 64000", null, null, Now, Now, "{}");
         var offering = new FulfillmentOffering(Guid.NewGuid(), product.Id, "Printful", null, FulfillmentKind.FixedProvider, "Printful", null, Now, Now, "{}");
@@ -2524,6 +2569,10 @@ public class StoreEditorHeadlessTests
         var medium = new OfferingOptionValue(Guid.NewGuid(), sizeOption.Id, offering.Id, "M", 1);
         var variant = new OfferingVariant(Guid.NewGuid(), offering.Id, "Black / S", [black.Id, small.Id], false, Now, Now);
         var area = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 4500, 5400, [variant.Id], false, Now, Now);
+        if (primaryArtworkDesignArea)
+        {
+            normalizedOffering = normalizedOffering with { PrimaryArtworkDesignAreaId = area.Id };
+        }
         var template = new MockupTemplate(Guid.NewGuid(), offering.Id, area.Id, "Front black", null, 1, false, Now, Now);
         var revision = new MockupTemplateRevision(Guid.NewGuid(), template.Id, 1, area.Id, Now, providerMockupReference: "front-black", imageMapping: new MockupImageSpaceMapping(1200, 1200, 250, 200, 600, 700));
         var templateColor = new MockupTemplateColorVariant(Guid.NewGuid(), template.Id, black.Id, false, Now, Now);

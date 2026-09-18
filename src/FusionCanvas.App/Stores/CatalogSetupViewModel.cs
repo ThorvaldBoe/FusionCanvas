@@ -1285,11 +1285,25 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void ApplyOfferingState(OfferingManagementState state)
     {
+        var selectedPlaceholderId = SelectedPlaceholder?.Id;
         Replace(Options, Options.Where(value => value.OfferingId != state.Offering.Id).Concat(state.Options));
         Replace(OptionValues, OptionValues.Where(value => value.OfferingId != state.Offering.Id).Concat(state.OptionValues));
         Replace(Variants, Variants.Where(value => value.OfferingId != state.Offering.Id).Concat(state.Variants));
         Replace(Placeholders, Placeholders.Where(value => value.OfferingId != state.Offering.Id).Concat(state.DesignAreas));
         Replace(Templates, Templates.Where(value => value.BlueprintOfferingId != state.Offering.Id).Concat(state.MockupTemplates));
+        if (SelectedOffering?.Id == state.Offering.Id && SetField(ref _selectedOffering, state.Offering, nameof(SelectedOffering)))
+        {
+            LoadOfferingFields();
+            OnPropertyChanged(nameof(SelectedOfferingId));
+            OnPropertyChanged(nameof(HasSelectedOffering));
+            OnPropertyChanged(nameof(IsOfferingContextUnavailable));
+            OnPropertyChanged(nameof(OfferingKindLabel));
+            OnPropertyChanged(nameof(IsProviderNetworkOffering));
+            OnPropertyChanged(nameof(ProviderDisplayName));
+        }
+        SelectedPlaceholder = state.DesignAreas.FirstOrDefault(value => value.Id == selectedPlaceholderId)
+            ?? state.DesignAreas.FirstOrDefault(value => value.Id == state.Offering.DefaultPlaceholderId)
+            ?? state.DesignAreas.FirstOrDefault();
         RefreshOfferingCollections();
     }
 
