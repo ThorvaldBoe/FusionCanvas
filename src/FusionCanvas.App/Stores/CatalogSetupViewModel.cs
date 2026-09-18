@@ -192,6 +192,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public event EventHandler? MockupTemplateEditorRequested;
     public event EventHandler? EnlargedPlacementEditorRequested;
     public event EventHandler? DesignAreaEditorRequested;
+    public event EventHandler? CatalogChanged;
 
     public ObservableCollection<Blueprint> Blueprints { get; } = [];
     public ObservableCollection<PrintProvider> PrintProviders { get; } = [];
@@ -458,8 +459,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     }
 
     public string OfferingName { get => _offeringName; set { if (SetField(ref _offeringName, value)) NotifyCommands(); } }
-    public string OfferingDescription { get => _offeringDescription; set => SetField(ref _offeringDescription, value); }
-    public string ProviderNetworkCode { get => _providerNetworkCode; set => SetField(ref _providerNetworkCode, value); }
+    public string OfferingDescription { get => _offeringDescription; set { if (SetField(ref _offeringDescription, value)) NotifyCommands(); } }
+    public string ProviderNetworkCode { get => _providerNetworkCode; set { if (SetField(ref _providerNetworkCode, value)) NotifyCommands(); } }
     public string NewPrintProviderName { get => _newPrintProviderName; set { if (SetField(ref _newPrintProviderName, value)) NotifyCommands(); } }
     public string ExternalOfferingId { get => _externalOfferingId; set => SetField(ref _externalOfferingId, value); }
     public string OptionName { get => _optionName; set { if (SetField(ref _optionName, value)) NotifyCommands(); } }
@@ -1305,7 +1306,11 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         {
             var result = await mutation().ConfigureAwait(true);
             if (!result.Succeeded) ErrorMessage = result.Error ?? "Catalog change failed.";
-            else ApplyCatalog(result.State);
+            else
+            {
+                ApplyCatalog(result.State);
+                CatalogChanged?.Invoke(this, EventArgs.Empty);
+            }
         }
         catch (Exception exception) { ErrorMessage = exception.Message; }
         finally { IsBusy = false; }

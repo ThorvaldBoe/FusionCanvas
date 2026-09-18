@@ -772,11 +772,12 @@
                                  TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     </StackPanel>
                     <TextBlock Text="Description" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <TextBox Text="{Binding CatalogSetup.OfferingDescription}" AcceptsReturn="True" MinHeight="44" Classes="field" />
-                      <Button Content="Save Blueprint Offering" Command="{Binding CatalogSetup.SaveOfferingCommand}" Classes="primary fixedAction" />
+                    <TextBox Text="{Binding CatalogSetup.OfferingDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True" MinHeight="44" Classes="field" />
+                      <Button Content="Save Blueprint Offering" Command="{Binding CatalogSetup.SaveOfferingCommand}" Classes="primary offeringAction" />
                       <Button Content="Archive Blueprint Offering"
                               Command="{Binding CatalogSetup.RequestArchiveOfferingCommand}"
-                              Classes="danger fixedAction"
+                              Classes="danger offeringAction"
                               AutomationProperties.AutomationId="Catalog.ArchiveOffering" />
                     </StackPanel>
                 </StackPanel>
@@ -1227,6 +1228,10 @@
     </Style>
     <Style Selector="Button.fixedAction">
       <Setter Property="Width" Value="104" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <Style Selector="Button.offeringAction">
+      <Setter Property="Width" Value="200" />
       <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
     <Style Selector="Button.blueprintAction">
