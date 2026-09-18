@@ -220,9 +220,13 @@ public static class CatalogCompatibilitySynchronizer
         }
 
         var normalizedOfferingIds = source.BlueprintOfferings.Where(value => value.StoreId == storeId).Select(value => value.Id).ToHashSet();
-        var legacyOfferings = source.FulfillmentOfferings.Where(value => !normalizedOfferingIds.Contains(value.Id)).ToList();
+        // Keep legacy projection rows for archived normalized records. They may
+        // still be referenced by listing/design relationships, and removing
+        // them would make the compatibility save violate those foreign keys.
+        var legacyOfferings = source.FulfillmentOfferings.ToList();
         foreach (var offering in source.BlueprintOfferings.Where(value => value.StoreId == storeId && !value.IsArchived))
         {
+            legacyOfferings.RemoveAll(value => value.Id == offering.Id);
             var providerName = offering.PrintProviderId is Guid providerId
                 ? source.PrintProviders.SingleOrDefault(value => value.Id == providerId)?.Name
                 : null;
@@ -239,13 +243,14 @@ public static class CatalogCompatibilitySynchronizer
                 offering.MetadataJson));
         }
 
-        var legacyVariants = source.ProductVariants.Where(value => !normalizedOfferingIds.Contains(value.FulfillmentOfferingId)).ToList();
+        var legacyVariants = source.ProductVariants.ToList();
         var activeNormalizedVariantIds = source.OfferingVariants
             .Where(value => normalizedOfferingIds.Contains(value.OfferingId) && !value.IsArchived)
             .Select(value => value.Id)
             .ToHashSet();
         foreach (var variant in source.OfferingVariants.Where(value => activeNormalizedVariantIds.Contains(value.Id)))
         {
+            legacyVariants.RemoveAll(value => value.Id == variant.Id);
             var variantOptions = variant.OptionValueIds.Select(valueId =>
             {
                 var optionValue = source.OfferingOptionValues.Single(value => value.Id == valueId);
@@ -255,10 +260,13 @@ public static class CatalogCompatibilitySynchronizer
             legacyVariants.Add(new ProductVariant(variant.Id, variant.OfferingId, variantOptions, variant.CreatedAt, variant.UpdatedAt));
         }
 
-        var legacyAreas = source.DesignAreas.Where(value => !normalizedOfferingIds.Contains(value.FulfillmentOfferingId)).ToList();
+        var legacyAreas = source.DesignAreas.ToList();
         legacyAreas.AddRange(source.OfferingPlaceholders
             .Where(value => normalizedOfferingIds.Contains(value.OfferingId) && !value.IsArchived)
-            .Select(value => new DesignArea(
+            .Select(value =>
+            {
+                legacyAreas.RemoveAll(area => area.Id == value.Id);
+                return new DesignArea(
                 value.Id,
                 value.OfferingId,
                 value.Name,
@@ -270,7 +278,8 @@ public static class CatalogCompatibilitySynchronizer
                 value.VariantIds.Where(activeNormalizedVariantIds.Contains).ToArray(),
                 value.CreatedAt,
                 value.UpdatedAt,
-                value.MetadataJson)));
+                value.MetadataJson);
+            }));
 
         var changed = alreadyChanged
             || !products.SequenceEqual(source.StoreProducts)
