@@ -1423,6 +1423,7 @@
                         <ComboBox ItemsSource="{Binding DesignTool.ArtworkTargets}"
                                   SelectedValue="{Binding DesignTool.SelectedArtworkTargetId, Mode=TwoWay}"
                                   SelectedValueBinding="{Binding Id}"
+                                  DisplayMemberBinding="{Binding Name}"
                                   IsEnabled="{Binding !DesignTool.IsReadOnly}"
                                   AutomationProperties.Name="Artwork target Design Area" />
                         <CheckBox Content="Transparent Background"

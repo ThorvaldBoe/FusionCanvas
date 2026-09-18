@@ -342,6 +342,9 @@ public class ProductCatalogViewModelTests
         public Task<DesignStageResult> SelectConfigurationAsync(Guid itemId, Guid offeringId, CancellationToken cancellationToken = default) =>
             Task.FromResult(DesignStageResult.Failure("Not implemented in tests."));
 
+        public Task<DesignStageResult> SaveArtworkPreferencesAsync(Guid itemId, Guid? designAreaId, bool transparentBackground, CancellationToken cancellationToken = default) =>
+            Task.FromResult(DesignStageResult.Failure("Not implemented in tests."));
+
         public Task<DesignStageResult> AddSelectedColorAsync(Guid itemId, string colorValue, CancellationToken cancellationToken = default) =>
             Task.FromResult(DesignStageResult.Failure("Not implemented in tests."));
 

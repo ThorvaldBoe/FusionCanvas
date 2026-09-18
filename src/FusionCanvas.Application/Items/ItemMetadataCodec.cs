@@ -15,6 +15,9 @@ internal static class ItemMetadataCodec
     public const string IdeaRatingKey = "idea.rating";
     public const string SllKey = "sll";
     public const string SllSourceFingerprintKey = "sll.sourceFingerprint";
+    public const string ArtworkTargetIdKey = "design.artworkTargetId";
+    public const string ArtworkTargetPreferenceKey = "design.artworkTargetPreference";
+    public const string ArtworkTransparentBackgroundKey = "design.transparentBackground";
     public const string InheritedFromPrefix = "inheritedFrom:";
 
     public static string NormalizeName(string? value) => value?.Trim() ?? string.Empty;

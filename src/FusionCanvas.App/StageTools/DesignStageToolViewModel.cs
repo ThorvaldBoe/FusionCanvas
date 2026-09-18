@@ -43,6 +43,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
     private readonly IArtworkGenerationService? _artworkGenerationService;
     private readonly AiSettingsViewModel? _aiSettings;
     private CancellationTokenSource? _artworkCts;
+    private readonly SemaphoreSlim _artworkPreferenceSaveGate = new(1, 1);
     private bool _isArtworkBusy;
     private Guid? _selectedArtworkTargetId;
     private bool _transparentBackground;
@@ -62,7 +63,14 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
     public bool HasConfiguration
     {
         get => _hasConfiguration;
-        private set { _hasConfiguration = value; OnPropertyChanged(); }
+        private set
+        {
+            if (_hasConfiguration == value) return;
+            _hasConfiguration = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CanGenerateArtwork));
+            GenerateArtworkCommand.NotifyCanExecuteChanged();
+        }
     }
 
     public string ConfigPrompt
@@ -137,7 +145,14 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
     public bool IsReadOnly
     {
         get => _isReadOnly;
-        private set { _isReadOnly = value; OnPropertyChanged(); }
+        private set
+        {
+            if (_isReadOnly == value) return;
+            _isReadOnly = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CanGenerateArtwork));
+            GenerateArtworkCommand.NotifyCanExecuteChanged();
+        }
     }
 
     public string ReadOnlyReason
@@ -276,15 +291,35 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
             _selectedArtworkTargetId = value;
             OnPropertyChanged();
             var target = ArtworkTargets.SingleOrDefault(candidate => candidate.Id == value);
-            TransparentBackground = target?.RecommendsTransparency ?? false;
+            if (!_isApplyingState)
+            {
+                var recommendedTransparency = target?.RecommendsTransparency ?? false;
+                if (_transparentBackground != recommendedTransparency)
+                {
+                    _transparentBackground = recommendedTransparency;
+                    OnPropertyChanged(nameof(TransparentBackground));
+                }
+                _ = PersistArtworkPreferencesAsync();
+            }
             OnPropertyChanged(nameof(ArtworkGenerationGuidance));
+            OnPropertyChanged(nameof(CanGenerateArtwork));
+            GenerateArtworkCommand.NotifyCanExecuteChanged();
         }
     }
 
     public bool TransparentBackground
     {
         get => _transparentBackground;
-        set { if (_transparentBackground == value) return; _transparentBackground = value; OnPropertyChanged(); }
+        set
+        {
+            if (_transparentBackground == value) return;
+            _transparentBackground = value;
+            OnPropertyChanged();
+            if (!_isApplyingState)
+            {
+                _ = PersistArtworkPreferencesAsync();
+            }
+        }
     }
 
     public string ArtworkGenerationGuidance => !HasConfiguration
@@ -335,6 +370,36 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             ErrorMessage = $"The listing configuration could not be persisted. {ex.Message}";
+        }
+    }
+
+    private async Task PersistArtworkPreferencesAsync()
+    {
+        if (_isApplyingState || _itemId == Guid.Empty || IsReadOnly)
+        {
+            return;
+        }
+
+        try
+        {
+            await _artworkPreferenceSaveGate.WaitAsync().ConfigureAwait(true);
+            try
+            {
+                var result = await _designStageService.SaveArtworkPreferencesAsync(
+                    _itemId, _selectedArtworkTargetId, _transparentBackground).ConfigureAwait(true);
+                if (!result.Succeeded && !string.IsNullOrWhiteSpace(result.Error))
+                {
+                    ErrorMessage = result.Error;
+                }
+            }
+            finally
+            {
+                _artworkPreferenceSaveGate.Release();
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            ErrorMessage = $"The artwork preferences could not be persisted. {exception.Message}";
         }
     }
 
@@ -634,10 +699,13 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
             return;
         }
 
-        HasConfiguration = state.SelectedOfferingId is not null;
-        SelectedOfferingId = state.SelectedOfferingId;
-        SelectedOfferingName = state.SelectedOfferingName;
-        SelectedBlueprintName = state.SelectedBlueprintName;
+        _isApplyingState = true;
+        try
+        {
+            HasConfiguration = state.SelectedOfferingId is not null;
+            SelectedOfferingId = state.SelectedOfferingId;
+            SelectedOfferingName = state.SelectedOfferingName;
+            SelectedBlueprintName = state.SelectedBlueprintName;
             ProviderNetworkWarning = state.ProviderNetworkWarning;
             ArtworkTargets.Clear();
             var selectedBlueprint = state.SelectedOfferingId is Guid offeringId
@@ -649,19 +717,26 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
                 ArtworkTargets.Add(new ArtworkTargetOption(placeholder.Id, placeholder.Name,
                     $"{placeholder.Position} · {placeholder.Width}×{placeholder.Height}px", selectedBlueprint?.PrimaryArtworkDesignAreaId == placeholder.Id, recommendsTransparency));
             }
-            SelectedArtworkTargetId = selectedBlueprint?.PrimaryArtworkDesignAreaId is Guid primary && ArtworkTargets.Any(value => value.Id == primary) ? primary : null;
-        var selectedOffering = state.SelectedOfferingId is not null
-            ? state.AvailableOfferings.SingleOrDefault(o => o.Id == state.SelectedOfferingId.Value)
-            : null;
-        if (state.IsReadOnly)
-        {
-            IsReadOnly = true;
-            ReadOnlyReason = state.ReadOnlyReason;
-        }
 
-        _isApplyingState = true;
-        try
-        {
+            var defaultTargetId = selectedBlueprint?.PrimaryArtworkDesignAreaId is Guid primary && ArtworkTargets.Any(value => value.Id == primary)
+                ? primary
+                : (Guid?)null;
+            SelectedArtworkTargetId = state.HasPersistedArtworkTargetPreference
+                ? state.PersistedArtworkTargetId
+                : defaultTargetId;
+            TransparentBackground = state.PersistedTransparentBackground
+                ?? ArtworkTargets.SingleOrDefault(value => value.Id == SelectedArtworkTargetId)?.RecommendsTransparency
+                ?? false;
+
+            var selectedOffering = state.SelectedOfferingId is not null
+                ? state.AvailableOfferings.SingleOrDefault(o => o.Id == state.SelectedOfferingId.Value)
+                : null;
+            if (state.IsReadOnly)
+            {
+                IsReadOnly = true;
+                ReadOnlyReason = state.ReadOnlyReason;
+            }
+
             // Available offerings
             AvailableOfferings.Clear();
             foreach (var offering in state.AvailableOfferings)

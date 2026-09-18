@@ -40,7 +40,7 @@
 - [x] 6.2 Add `Primary for artwork generation` to the Design Area editor, including sole-primary behavior, read-only presentation, and confirmed archive/delete clearing.
 - [x] 6.3 Add Concept's non-modal stale-SLL warning with Reset SLL, Keep for reference, and regeneration-clears-stale behavior.
 - [x] 6.4 Add Generate Artwork below Supporting Images with Design Area selector, Generate/Cancel, Transparent Background, prerequisite guidance, progress, errors, and success target message.
-- [x] 6.5 Initialize target from the offering primary, keep explicit overrides session-scoped, reset on Listing Configuration change, and recalculate the transparency default per target/capability.
+- [x] 6.5 Initialize target from the offering primary, persist valid per-Item target/transparency preferences, reset them on Listing Configuration change, and recalculate the transparency default per target/capability.
 - [x] 6.6 Show generated history/provenance and persistent transparency warnings while preserving manual import, preview, download, missing-state, and read-only behavior.
 - [x] 6.7 Add focused Avalonia headless tests for all meaningful bindings, selection/defaulting, keyboard flow, disabled/read-only/busy states, cancellation, stale-SLL actions, primary editing, generated lifecycle actions, and warning persistence.
 
