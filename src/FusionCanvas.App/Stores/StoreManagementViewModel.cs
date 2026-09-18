@@ -493,6 +493,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         if (SelectedStore is null || SelectedStore.Id != scope.StoreId || SelectedStore.WorkspaceId != scope.WorkspaceId)
             return;
         await LoadAsync(cancellationToken).ConfigureAwait(false);
+        await LoadProductsForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private bool _showStrategyWarning;

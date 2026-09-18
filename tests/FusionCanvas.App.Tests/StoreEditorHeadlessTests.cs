@@ -71,6 +71,34 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public async Task PrintifyImportRefreshesBlueprintListAfterConfirmation()
+    {
+        var store = new Store(Guid.NewGuid(), "Printify Store", null, false, Now, Now, "{\"printifyShopId\":\"42\"}", null, FulfillmentStrategy.ShopifyPrintify);
+        var window = CreateEditorWindow(includeNormalizedCatalog: false, customStore: store);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        var client = new HeadlessCatalogClient();
+        viewModel.ConfigurePrintify(new HeadlessCredentialStore(), new HeadlessCredentialVerifier(), client);
+        viewModel.SelectProductsTabCommand.Execute(null);
+
+        var importButton = FindButton(window, "Import from Printify");
+        Assert.NotNull(importButton);
+        importButton!.Command!.Execute(null);
+        await WaitForAsync(() => viewModel.PrintifyCatalogImportSession is { IsBusy: false, HasBlueprints: true });
+        window.UpdateLayout();
+
+        var choice = window.GetVisualDescendants().OfType<CheckBox>()
+            .Single(control => AutomationProperties.GetAutomationId(control) == "Catalog.PrintifyBlueprintChoice");
+        choice.IsChecked = true;
+        var loadSelected = FindButton(window, "Load selected");
+        Assert.NotNull(loadSelected);
+        loadSelected!.Command!.Execute(null);
+
+        await WaitForAsync(() => !viewModel.PrintifyCatalogImportSession!.IsOpen && viewModel.HasProducts);
+        Assert.Contains(viewModel.Products, product => product.Name == "Gildan 5000");
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void ProductsTabButton_SelectsProductsTabAndShowsPanel()
     {
         var window = CreateEditorWindow();
@@ -2341,7 +2369,8 @@ public class StoreEditorHeadlessTests
             new CatalogSetupService(repository),
             new MockupTemplateSetupService(repository),
             new OfferingManagementService(repository, providerCatalog),
-            providerCatalog);
+            providerCatalog,
+            workspaceRepository: repository);
         viewModel.LoadAsync(default).GetAwaiter().GetResult();
         var window = new StoreEditorWindow { DataContext = viewModel };
         if (showWindow)
@@ -2467,7 +2496,11 @@ public class StoreEditorHeadlessTests
         public Task<PrintifyCatalogResult> LoadSelectedAsync(string key, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken = default)
         {
             SelectedCalls++;
-            return Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "imported", SelectedCatalog: []));
+            return Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "imported", SelectedCatalog:
+            [new(new(68, "Tee", null, "Gildan", "5000"), [new(9, "Gildan", [], [])])
+            {
+                ProductId = "product-a"
+            }]));
         }
     }
 
