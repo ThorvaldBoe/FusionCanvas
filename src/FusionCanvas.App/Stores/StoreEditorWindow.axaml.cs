@@ -279,6 +279,14 @@ public partial class StoreEditorWindow : Window
         var originId = catalog.SelectedPlaceholderId;
         try
         {
+            if (VisualRoot is null || !IsVisible)
+            {
+                // Catalog events can outlive the editor during teardown. Do not
+                // attempt to show a modal dialog with a closed owner.
+                catalog.CancelAddPlaceholderCommand.Execute(null);
+                return;
+            }
+
             var dialog = new DesignAreaEditorWindow { DataContext = catalog };
             AttachGeometry(dialog, WindowLayoutKeys.DesignAreaEditor);
             await dialog.ShowDialog(this);
