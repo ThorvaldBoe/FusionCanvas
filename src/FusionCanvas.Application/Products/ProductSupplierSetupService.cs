@@ -619,27 +619,37 @@ public sealed class ProductSupplierSetupService : IProductSupplierSetupService
         }
 
         var store = snapshot.Stores.SingleOrDefault(candidate => candidate.Id == id);
+        var archivedBlueprintIds = snapshot.Blueprints
+            .Where(blueprint => blueprint.StoreId == id && blueprint.IsArchived)
+            .Select(blueprint => blueprint.Id)
+            .ToHashSet();
         var products = snapshot.StoreProducts
-            .Where(product => product.StoreId == id && snapshot.Blueprints.All(blueprint => blueprint.Id != product.Id || !blueprint.IsArchived))
+            .Where(product => product.StoreId == id && !archivedBlueprintIds.Contains(product.Id))
             .OrderBy(product => product.Name, StringComparer.OrdinalIgnoreCase)
             .Select(product => ToSummary(snapshot, product))
+            .ToArray();
+        var archivedProducts = snapshot.StoreProducts
+            .Where(product => product.StoreId == id && archivedBlueprintIds.Contains(product.Id))
+            .OrderBy(product => product.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(product => ToSummary(snapshot, product, isArchived: true))
             .ToArray();
 
         return new ProductSupplierSetupState(
             id,
             store is { IsArchived: true },
             products.Length == 0,
-            products);
+            products,
+            archivedProducts);
     }
 
-    private static StoreProductSummary ToSummary(WorkspaceSnapshot snapshot, StoreProduct product)
+    private static StoreProductSummary ToSummary(WorkspaceSnapshot snapshot, StoreProduct product, bool isArchived = false)
     {
         var offerings = snapshot.FulfillmentOfferings
             .Where(offering => offering.StoreProductId == product.Id)
             .OrderBy(offering => offering.Name, StringComparer.OrdinalIgnoreCase)
             .Select(offering => ToSummary(snapshot, offering))
             .ToArray();
-        return new StoreProductSummary(product.Id, product.StoreId, product.Name, product.Description, product.ExternalProductId, offerings);
+        return new StoreProductSummary(product.Id, product.StoreId, product.Name, product.Description, product.ExternalProductId, offerings, isArchived);
     }
 
     private static FulfillmentOfferingSummary ToSummary(WorkspaceSnapshot snapshot, FulfillmentOffering offering)

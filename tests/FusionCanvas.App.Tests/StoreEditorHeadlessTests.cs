@@ -623,7 +623,7 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
-    public async Task BlueprintDeleteUsesTheCatalogCascadeAndRemovesBlueprintFromActiveProducts()
+    public async Task ArchivedBlueprintCanBePermanentlyDeletedAfterOptingIntoArchivedProducts()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
         var viewModel = (StoreManagementViewModel)window.DataContext!;
@@ -632,7 +632,22 @@ public class StoreEditorHeadlessTests
         viewModel.IsBlueprintBasicsExpanded = true;
         window.UpdateLayout();
 
-        var delete = FindButton(window, "Delete Blueprint")!;
+        Assert.Null(FindButton(window, "Delete Blueprint"));
+        Assert.Null(FindButton(window, "Delete permanently"));
+
+        var archive = FindButton(window, "Archive Blueprint")!;
+        archive.Command!.Execute(null);
+        viewModel.ConfirmArchiveSelectedProductCommand.Execute(null);
+        await WaitForAsync(() => !viewModel.HasSelectedProduct);
+        Assert.Empty(viewModel.Products);
+        Assert.Single(viewModel.ArchivedProducts);
+
+        viewModel.ShowArchivedProducts = true;
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.ArchivedProducts));
+        viewModel.IsBlueprintBasicsExpanded = true;
+        window.UpdateLayout();
+
+        var delete = FindButton(window, "Delete permanently")!;
         Assert.True(delete.IsEffectivelyEnabled);
         delete.Command!.Execute(null);
         window.UpdateLayout();
@@ -642,6 +657,7 @@ public class StoreEditorHeadlessTests
         await WaitForAsync(() => !viewModel.HasSelectedProduct);
 
         Assert.Empty(viewModel.Products);
+        Assert.Empty(viewModel.ArchivedProducts);
         window.Close();
     }
 

@@ -465,6 +465,9 @@
                         Command="{Binding StartCreateProductCommand}"
                         IsEnabled="{Binding CanCreateCatalogItem}"
                         Classes="primary" />
+                <CheckBox Content="Show archived Blueprints"
+                          IsChecked="{Binding ShowArchivedProducts, Mode=TwoWay}"
+                          AutomationProperties.AutomationId="Catalog.ShowArchivedBlueprints" />
                 <Button Content="Import from Printify"
                         x:Name="PrintifyImportButton"
                         Command="{Binding PrintifyCatalogImportSession.OpenCommand}"
@@ -522,6 +525,10 @@
                         <TextBlock Text="{Binding Offerings.Count, StringFormat='{}{0} Blueprint Offering(s)'}"
                                    FontSize="12"
                                    Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <TextBlock IsVisible="{Binding IsArchived}"
+                                   Text="Archived"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource WarningTextBrush}" />
                       </StackPanel>
                     </Button>
                   </DataTemplate>
@@ -570,14 +577,17 @@
                               Command="{Binding SaveSelectedProductCommand}"
                               IsEnabled="{Binding CanSaveSelectedProduct}"
                               Classes="primary fixedAction blueprintAction" />
-                      <Button Content="Delete Blueprint"
-                              Command="{Binding RequestDeleteSelectedProductCommand}"
-                              IsEnabled="{Binding CanDeleteSelectedProduct}"
-                              Classes="danger fixedAction blueprintAction" />
                       <Button Content="Archive Blueprint"
                               AutomationProperties.AutomationId="Catalog.ArchiveBlueprint"
                               Command="{Binding RequestArchiveSelectedProductCommand}"
+                              IsVisible="{Binding !SelectedProduct.IsArchived}"
                               IsEnabled="{Binding CanArchiveSelectedProduct}"
+                              Classes="danger fixedAction blueprintAction" />
+                      <Button Content="Delete permanently"
+                              AutomationProperties.AutomationId="Catalog.DeleteArchivedBlueprint"
+                              Command="{Binding RequestDeleteSelectedProductCommand}"
+                              IsVisible="{Binding SelectedProduct.IsArchived}"
+                              IsEnabled="{Binding CanDeleteSelectedProduct}"
                               Classes="danger fixedAction blueprintAction" />
                     </StackPanel>
                     <Border IsVisible="{Binding ProductArchiveWarningVisible}"

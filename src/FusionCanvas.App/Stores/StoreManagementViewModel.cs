@@ -161,6 +161,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     private bool _productDeleteWarningVisible;
     private bool _productArchiveWarningVisible;
+    private bool _showArchivedProducts;
     private bool _offeringDeleteWarningVisible;
     private bool _isCreatingNewProduct;
     private bool _isCreatingNewOffering;
@@ -1014,15 +1015,29 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     }
 
     public IReadOnlyList<StoreProductSummary> Products { get; private set; } = [];
+    public IReadOnlyList<StoreProductSummary> ArchivedProducts { get; private set; } = [];
     public ObservableCollection<BlueprintOfferingCardViewModel> BlueprintOfferingCards { get; } = [];
     public bool HasBlueprintOfferingCards => BlueprintOfferingCards.Count > 0;
 
-    public bool HasProducts => Products.Count > 0;
+    public bool HasProducts => EditorProducts.Count > 0;
+
+    public bool ShowArchivedProducts
+    {
+        get => _showArchivedProducts;
+        set
+        {
+            if (SetField(ref _showArchivedProducts, value))
+            {
+                OnPropertyChanged(nameof(EditorProducts));
+                OnPropertyChanged(nameof(HasProducts));
+            }
+        }
+    }
 
     public IReadOnlyList<StoreProductSummary> EditorProducts =>
-        _isCreatingNewProduct && _draftProductId is not null
-            ? Products.Concat([DraftProduct()!]).ToArray()
-            : Products;
+        (ShowArchivedProducts ? Products.Concat(ArchivedProducts) : Products)
+            .Concat(_isCreatingNewProduct && _draftProductId is not null ? [DraftProduct()!] : [])
+            .ToArray();
 
     public StoreProductSummary? SelectedProduct
     {
@@ -1106,9 +1121,9 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public bool CanSaveSelectedOffering => _productService is not null && SelectedProduct is not null && SelectedStore is { IsArchived: false } && HasUnsavedOfferingChanges;
 
-    public bool CanDeleteSelectedProduct => _productService is not null && SelectedProduct is not null && !_isCreatingNewProduct && SelectedStore is { IsArchived: false };
+    public bool CanDeleteSelectedProduct => _catalogService is not null && SelectedProduct is { IsArchived: true } && !_isCreatingNewProduct && SelectedStore is { IsArchived: false };
 
-    public bool CanArchiveSelectedProduct => _catalogService is not null && SelectedProduct is not null && !_isCreatingNewProduct && !HasUnsavedProductChanges && SelectedStore is { IsArchived: false };
+    public bool CanArchiveSelectedProduct => _catalogService is not null && SelectedProduct is { IsArchived: false } && !_isCreatingNewProduct && !HasUnsavedProductChanges && SelectedStore is { IsArchived: false };
 
     public bool ProductArchiveWarningVisible
     {
@@ -1138,7 +1153,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public string ProductDeleteWarningMessage => _pendingDeleteProduct is null
         ? "Permanent deletion cannot be undone."
-        : $"Delete Blueprint '{_pendingDeleteProduct.Name}' permanently? This cannot be undone.";
+        : $"Delete archived Blueprint '{_pendingDeleteProduct.Name}' and its catalog records permanently? This cannot be undone.";
 
     public string OfferingDeleteWarningMessage => _pendingDeleteOffering is null
         ? "Permanent deletion cannot be undone."
@@ -1552,6 +1567,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     {
         _isCreatingNewStore = false;
         _draftStoreId = null;
+        ShowArchivedProducts = false;
         SelectedStore = store;
         ApplySelectedStoreFields(store);
         CaptureOriginalEditorState();
@@ -2445,6 +2461,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
         SelectedEditorTab = StoreManagementEditorTab.Products;
         CatalogEditorLevel = CatalogEditorLevel.Overview;
+        ShowArchivedProducts = false;
         IsAddingVariant = false;
         IsAddingDesignArea = false;
 
@@ -2465,16 +2482,19 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private void ApplyProductState(ProductSupplierSetupState state)
     {
         Products = state.Products;
+        ArchivedProducts = state.Archived;
+        var visibleProducts = ShowArchivedProducts ? Products.Concat(ArchivedProducts) : Products;
         SelectedProduct = _isCreatingNewProduct
             ? DraftProduct()
-            : state.Products.FirstOrDefault(product => product.Id == SelectedProduct?.Id)
-                ?? state.Products.FirstOrDefault();
+            : visibleProducts.FirstOrDefault(product => product.Id == SelectedProduct?.Id)
+                ?? visibleProducts.FirstOrDefault();
         if (!_isCreatingNewProduct)
         {
             ApplySelectedProductFields(SelectedProduct);
         }
 
         OnPropertyChanged(nameof(Products));
+        OnPropertyChanged(nameof(ArchivedProducts));
         OnPropertyChanged(nameof(HasProducts));
         OnPropertyChanged(nameof(EditorProducts));
         OnPropertyChanged(nameof(SelectedProduct));
@@ -2877,6 +2897,12 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             return;
         }
 
+        if (!SelectedProduct.IsArchived)
+        {
+            ErrorMessage = "Archive the Blueprint before permanently deleting it.";
+            return;
+        }
+
         _pendingDeleteProduct = SelectedProduct;
         ProductDeleteWarningVisible = true;
         OnPropertyChanged(nameof(ProductDeleteWarningMessage));
@@ -2935,11 +2961,11 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     {
         if (_catalogService is not null && SelectedStore is not null && _pendingDeleteProduct is not null)
         {
-        var archiveResult = await _catalogService.ArchiveBlueprintWithDependentsAsync(
-            new ArchiveBlueprintWithDependentsRequest(SelectedStore.Id, _pendingDeleteProduct.Id),
-            cancellationToken).ConfigureAwait(true);
-            ErrorMessage = archiveResult.Error;
-            if (archiveResult.Succeeded)
+            var deleteResult = await _catalogService.DeleteBlueprintPermanentlyAsync(
+                new DeleteBlueprintPermanentlyRequest(SelectedStore.Id, _pendingDeleteProduct.Id, Confirm: true),
+                cancellationToken).ConfigureAwait(true);
+            ErrorMessage = deleteResult.Error;
+            if (deleteResult.Succeeded)
             {
                 ClearProductDeleteWarning();
                 await LoadProductsForSelectedStoreAsync(cancellationToken).ConfigureAwait(true);
@@ -2952,9 +2978,15 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             return;
         }
 
-        if (_productService is null)
+        if (_pendingDeleteProduct is { IsArchived: false })
         {
-            ErrorMessage = "Product and fulfillment setup is not available.";
+            ErrorMessage = "Archive the Blueprint before permanently deleting it.";
+            return;
+        }
+
+        if (_catalogService is null || _productService is null)
+        {
+            ErrorMessage = "Catalog permanent deletion is not available.";
             return;
         }
 
