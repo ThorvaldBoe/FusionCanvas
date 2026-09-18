@@ -1197,12 +1197,15 @@
                                   IsEnabled="{Binding !DesignTool.IsReadOnly}"
                                   AutomationProperties.Name="Change configuration" />
 <TextBlock Text="{Binding DesignTool.SelectedOfferingName, StringFormat='Selected: {0}'}"
+                                           TextWrapping="Wrap"
                                            FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                         <TextBlock Text="{Binding DesignTool.SelectedOfferingStatus}"
                                    IsVisible="{Binding DesignTool.SelectedOfferingStatus, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                   TextWrapping="Wrap"
                                    FontSize="11" Foreground="{DynamicResource AccentBrush}" />
                         <TextBlock Text="{Binding DesignTool.SelectedBlueprintName, StringFormat='Blueprint: {0}'}"
                                    IsVisible="{Binding DesignTool.SelectedBlueprintName, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                   TextWrapping="Wrap"
                                    FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
                         <TextBlock Text="{Binding DesignTool.ProviderNetworkWarning}"
                                    IsVisible="{Binding DesignTool.ProviderNetworkWarning, Converter={x:Static ObjectConverters.IsNotNull}}"
@@ -1214,7 +1217,7 @@
                       <StackPanel IsVisible="{Binding DesignTool.HasConfiguration}" Spacing="6">
                         <TextBlock Text="Color Working Set" FontSize="13" FontWeight="SemiBold"
                                    Foreground="{DynamicResource StrongTextBrush}" />
-                        <TextBlock Text="Select the colors this design will use." FontSize="11"
+                        <TextBlock Text="Select the colors this design will use." TextWrapping="Wrap" FontSize="11"
                                    Foreground="{DynamicResource SecondaryTextBrush}" />
 
                         <ItemsControl ItemsSource="{Binding DesignTool.AvailableColors}">
@@ -1363,7 +1366,7 @@
                       <StackPanel Spacing="6">
                         <TextBlock Text="Supporting Images" FontSize="13" FontWeight="SemiBold"
                                    Foreground="{DynamicResource StrongTextBrush}" />
-                        <TextBlock Text="Sketches, references, and existing artwork." FontSize="11"
+                        <TextBlock Text="Sketches, references, and existing artwork." TextWrapping="Wrap" FontSize="11"
                                    Foreground="{DynamicResource SecondaryTextBrush}" />
                         <Button Content="Import supporting image&#x2026;"
                                 IsEnabled="{Binding !DesignTool.IsReadOnly}"
