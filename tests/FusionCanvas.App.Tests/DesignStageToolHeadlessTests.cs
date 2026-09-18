@@ -3,6 +3,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Automation;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.VisualTree;
 using FusionCanvas.App.StageTools;
 using FusionCanvas.App.Tests.TestSupport;
@@ -492,6 +493,43 @@ public class DesignStageToolHeadlessTests
         Assert.True(vm.DesignTool.HasConfiguration);
         Assert.NotNull(vm.DesignTool.SelectedOfferingStatus);
         Assert.Equal("Printify Choice network", vm.DesignTool.SelectedOfferingStatus);
+    }
+
+    [AvaloniaFact]
+    public void ConfiguredState_ResponsiveTextWrapsLongConfigurationAndSupportingCopy()
+    {
+        var vm = CreateConfiguredDesignViewModel();
+        NavigateToDesign(vm);
+        var window = ShowDesignWindow(vm);
+
+        try
+        {
+            var wrappingTexts = window.GetVisualDescendants()
+                .OfType<TextBlock>()
+                .Where(textBlock => textBlock.Text is
+                    "Select the colors this design will use." or
+                    "Sketches, references, and existing artwork.")
+                .ToArray();
+
+            Assert.Equal(2, wrappingTexts.Length);
+            Assert.All(wrappingTexts, textBlock => Assert.Equal(TextWrapping.Wrap, textBlock.TextWrapping));
+
+            Assert.NotNull(vm.DesignTool.SelectedOfferingName);
+            var selectedOfferingName = vm.DesignTool.SelectedOfferingName!;
+            var selectedOffering = Assert.Single(window.GetVisualDescendants()
+                .OfType<TextBlock>()
+                .Where(textBlock => textBlock.Text == $"Selected: {selectedOfferingName}"));
+            var selectedOfferingStatus = Assert.Single(window.GetVisualDescendants()
+                .OfType<TextBlock>()
+                .Where(textBlock => textBlock.Text == "Fixed provider: Printful"));
+
+            Assert.Equal(TextWrapping.Wrap, selectedOffering.TextWrapping);
+            Assert.Equal(TextWrapping.Wrap, selectedOfferingStatus.TextWrapping);
+        }
+        finally
+        {
+            window.Close();
+        }
     }
 
     [AvaloniaFact]
