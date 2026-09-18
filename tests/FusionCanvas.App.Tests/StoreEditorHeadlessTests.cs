@@ -1726,6 +1726,25 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void DesignAreaEditor_IgnoresRequestsAfterEditorCloses()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenDesignAreaManagementCommand.Execute(null);
+
+        window.Close();
+
+        viewModel.CatalogSetup!.StartAddPlaceholderCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        Assert.False(viewModel.CatalogSetup.IsAddingPlaceholder);
+        Assert.Empty(window.OwnedWindows.OfType<DesignAreaEditorWindow>());
+    }
+
+    [AvaloniaFact]
     public void DesignAreaManagement_EditDialogPopulatesSavesAndReturnsFocus()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
