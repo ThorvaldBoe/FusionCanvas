@@ -9,4 +9,5 @@ public sealed record StoreProductSummary
     string Name,
     string? Description,
     string? ExternalProductId,
-    IReadOnlyList<FulfillmentOfferingSummary> Offerings);
+    IReadOnlyList<FulfillmentOfferingSummary> Offerings,
+    bool IsArchived = false);

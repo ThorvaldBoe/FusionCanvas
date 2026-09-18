@@ -173,6 +173,103 @@ public sealed class CatalogSetupServiceTests
     }
 
     [Fact]
+    public async Task RejectsPermanentDeletionOfAnActiveBlueprint()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprint = new Blueprint(Guid.NewGuid(), storeId, "Active", null, false, Now, Now);
+        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "Store")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint]
+        });
+        var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
+
+        var result = await service.DeleteBlueprintPermanentlyAsync(
+            new DeleteBlueprintPermanentlyRequest(storeId, blueprint.Id, Confirm: true), TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("archive", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(repository.Current.Blueprints, value => value.Id == blueprint.Id && !value.IsArchived);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task PermanentlyDeletesArchivedBlueprintGraphAndCompatibilityProjection()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprintId = Guid.NewGuid();
+        var offeringId = Guid.NewGuid();
+        var optionId = Guid.NewGuid();
+        var valueId = Guid.NewGuid();
+        var variantId = Guid.NewGuid();
+        var placeholderId = Guid.NewGuid();
+        var otherBlueprint = new Blueprint(Guid.NewGuid(), storeId, "Keep", null, false, Now, Now);
+        var blueprint = new Blueprint(blueprintId, storeId, "Remove me", null, true, Now, Now);
+        var offering = new BlueprintOffering(offeringId, blueprintId, storeId, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "choice", null, null, true, Now, Now);
+        var option = new OfferingOption(optionId, offeringId, OptionKind.Color, "Color", 0, true);
+        var value = new OfferingOptionValue(valueId, optionId, offeringId, "Black", 0, true);
+        var variant = new OfferingVariant(variantId, offeringId, "Black", [valueId], true, Now, Now);
+        var placeholder = new OfferingPlaceholder(placeholderId, offeringId, "Front", null, "front", "DTG", 100, 100, [variantId], true, Now, Now);
+        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "Store")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint, otherBlueprint],
+            StoreProducts = [new StoreProduct(blueprintId, storeId, "Remove me", null, null, Now, Now, "{}"), new StoreProduct(otherBlueprint.Id, storeId, "Keep", null, null, Now, Now, "{}")],
+            BlueprintOfferings = [offering],
+            FulfillmentOfferings = [new FulfillmentOffering(offeringId, blueprintId, "Tee", null, FulfillmentKind.PrintifyChoiceNetwork, null, null, Now, Now, "{}")],
+            OfferingOptions = [option],
+            OfferingOptionValues = [value],
+            OfferingVariants = [variant],
+            ProductVariants = [new ProductVariant(variantId, offeringId, [new VariantOption("Color", "Black")], Now, Now)],
+            OfferingPlaceholders = [placeholder],
+            DesignAreas = [new DesignArea(placeholderId, offeringId, "Front", null, "front", "DTG", 100, 100, [variantId], Now, Now, "{}")]
+        });
+        var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
+
+        var result = await service.DeleteBlueprintPermanentlyAsync(
+            new DeleteBlueprintPermanentlyRequest(storeId, blueprintId, Confirm: true), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.DoesNotContain(repository.Current.Blueprints, value => value.Id == blueprintId);
+        Assert.Contains(repository.Current.Blueprints, value => value.Id == otherBlueprint.Id);
+        Assert.DoesNotContain(repository.Current.StoreProducts, value => value.Id == blueprintId);
+        Assert.DoesNotContain(repository.Current.BlueprintOfferings, value => value.Id == offeringId);
+        Assert.DoesNotContain(repository.Current.FulfillmentOfferings, value => value.Id == offeringId);
+        Assert.DoesNotContain(repository.Current.OfferingOptions, value => value.Id == optionId);
+        Assert.DoesNotContain(repository.Current.OfferingOptionValues, value => value.Id == valueId);
+        Assert.DoesNotContain(repository.Current.OfferingVariants, value => value.Id == variantId);
+        Assert.DoesNotContain(repository.Current.OfferingPlaceholders, value => value.Id == placeholderId);
+
+        var reloaded = await service.LoadForStoreAsync(storeId, TestContext.Current.CancellationToken);
+        Assert.DoesNotContain(reloaded.Blueprints, value => value.Id == blueprintId);
+    }
+
+    [Fact]
+    public async Task BlocksPermanentDeletionWhenAnArchivedBlueprintStillHasAnItemListing()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprintId = Guid.NewGuid();
+        var offeringId = Guid.NewGuid();
+        var item = new Item(Guid.NewGuid(), storeId, null, null, "Protected listing", null, ItemStatus.Draft, WorkflowStage.Design, false, Now, Now, "{}");
+        var blueprint = new Blueprint(blueprintId, storeId, "Protected", null, true, Now, Now);
+        var offering = new BlueprintOffering(offeringId, blueprintId, storeId, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "choice", null, null, true, Now, Now);
+        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "Store")], [], [], [item], [], [], [], [], [])
+        {
+            Blueprints = [blueprint],
+            BlueprintOfferings = [offering],
+            ItemListingConfigurations = [new ItemListingConfiguration(item.Id, offeringId)]
+        });
+        var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
+
+        var result = await service.DeleteBlueprintPermanentlyAsync(
+            new DeleteBlueprintPermanentlyRequest(storeId, blueprintId, Confirm: true), TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(item.Name, result.Error, StringComparison.Ordinal);
+        Assert.Contains(repository.Current.Blueprints, value => value.Id == blueprintId);
+        Assert.Contains(repository.Current.ItemListingConfigurations, value => value.OfferingId == offeringId);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Fact]
     public async Task PreviewsAndArchivesOfferingWithCatalogOwnedDependentsAtomically()
     {
         var storeId = Guid.NewGuid();

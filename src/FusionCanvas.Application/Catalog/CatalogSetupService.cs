@@ -240,6 +240,78 @@ public sealed class CatalogSetupService : ICatalogSetupService
             return Success(updated, request.StoreId);
         }, cancellationToken);
 
+    public Task<CatalogSetupResult> DeleteBlueprintPermanentlyAsync(DeleteBlueprintPermanentlyRequest request, CancellationToken cancellationToken = default) =>
+        MutateAsync(request.StoreId, snapshot =>
+        {
+            var storeCheck = EnsureWritableStore(snapshot, request.StoreId);
+            if (storeCheck is not null) return Failure(snapshot, request.StoreId, storeCheck);
+            if (!request.Confirm) return Failure(snapshot, request.StoreId, "Permanent Blueprint deletion requires confirmation.");
+
+            var blueprint = snapshot.Blueprints.SingleOrDefault(value => value.Id == request.BlueprintId && value.StoreId == request.StoreId);
+            if (blueprint is null) return Failure(snapshot, request.StoreId, "Blueprint was not found in this Store.");
+            if (!blueprint.IsArchived) return Failure(snapshot, request.StoreId, "Archive the Blueprint before permanently deleting it.");
+
+            var offeringIds = snapshot.BlueprintOfferings
+                .Where(value => value.BlueprintId == blueprint.Id && value.StoreId == request.StoreId)
+                .Select(value => value.Id)
+                .ToHashSet();
+            var legacyOfferingIds = snapshot.FulfillmentOfferings
+                .Where(value => value.StoreProductId == blueprint.Id)
+                .Select(value => value.Id)
+                .ToHashSet();
+            offeringIds.UnionWith(legacyOfferingIds);
+
+            var placeholderIds = snapshot.OfferingPlaceholders
+                .Where(value => offeringIds.Contains(value.OfferingId))
+                .Select(value => value.Id)
+                .ToHashSet();
+            placeholderIds.UnionWith(snapshot.DesignAreas
+                .Where(value => offeringIds.Contains(value.FulfillmentOfferingId))
+                .Select(value => value.Id));
+
+            var blockers = snapshot.ItemListingConfigurations
+                .Where(value => offeringIds.Contains(value.OfferingId))
+                .Select(value => $"Item listing '{snapshot.Items.FirstOrDefault(item => item.Id == value.ItemId)?.Name ?? value.ItemId.ToString()}'")
+                .Concat(snapshot.DesignSlotAssignments
+                    .Where(value => placeholderIds.Contains(value.DesignAreaId))
+                    .Select(value => $"Design slot '{value.RowId}/{value.DesignAreaId}'"))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            if (blockers.Length > 0)
+                return Failure(snapshot, request.StoreId, $"Cannot permanently delete Blueprint '{blueprint.Name}'. Resolve these protected references first: {string.Join(", ", blockers)}.");
+
+            var optionIds = snapshot.OfferingOptions.Where(value => offeringIds.Contains(value.OfferingId)).Select(value => value.Id).ToHashSet();
+            var optionValueIds = snapshot.OfferingOptionValues.Where(value => offeringIds.Contains(value.OfferingId)).Select(value => value.Id).ToHashSet();
+            var variantIds = snapshot.OfferingVariants.Where(value => offeringIds.Contains(value.OfferingId)).Select(value => value.Id).ToHashSet();
+            var templateIds = snapshot.MockupTemplates.Where(value => offeringIds.Contains(value.BlueprintOfferingId)).Select(value => value.Id).ToHashSet();
+            var revisionIds = snapshot.MockupTemplateRevisions.Where(value => templateIds.Contains(value.MockupTemplateId)).Select(value => value.Id).ToHashSet();
+            var sourceImageIds = snapshot.MockupTemplateSourceImages.Where(value => templateIds.Contains(value.MockupTemplateId)).Select(value => value.Id).ToHashSet();
+            var revisionSourceImageIds = snapshot.MockupTemplateRevisionSourceImages.Where(value => revisionIds.Contains(value.RevisionId)).Select(value => value.Id).ToHashSet();
+
+            var updated = snapshot with
+            {
+                Blueprints = snapshot.Blueprints.Where(value => value.Id != blueprint.Id).ToArray(),
+                StoreProducts = snapshot.StoreProducts.Where(value => value.Id != blueprint.Id).ToArray(),
+                BlueprintOfferings = snapshot.BlueprintOfferings.Where(value => !offeringIds.Contains(value.Id)).ToArray(),
+                FulfillmentOfferings = snapshot.FulfillmentOfferings.Where(value => !offeringIds.Contains(value.Id)).ToArray(),
+                OfferingOptions = snapshot.OfferingOptions.Where(value => !optionIds.Contains(value.Id)).ToArray(),
+                OfferingOptionValues = snapshot.OfferingOptionValues.Where(value => !optionValueIds.Contains(value.Id)).ToArray(),
+                OfferingVariants = snapshot.OfferingVariants.Where(value => !variantIds.Contains(value.Id)).ToArray(),
+                ProductVariants = snapshot.ProductVariants.Where(value => !offeringIds.Contains(value.FulfillmentOfferingId)).ToArray(),
+                OfferingPlaceholders = snapshot.OfferingPlaceholders.Where(value => !placeholderIds.Contains(value.Id)).ToArray(),
+                DesignAreas = snapshot.DesignAreas.Where(value => !offeringIds.Contains(value.FulfillmentOfferingId)).ToArray(),
+                MockupTemplates = snapshot.MockupTemplates.Where(value => !templateIds.Contains(value.Id)).ToArray(),
+                MockupTemplateColorVariants = snapshot.MockupTemplateColorVariants.Where(value => !templateIds.Contains(value.MockupTemplateId)).ToArray(),
+                MockupTemplateRevisions = snapshot.MockupTemplateRevisions.Where(value => !revisionIds.Contains(value.Id)).ToArray(),
+                MockupTemplateRevisionColors = snapshot.MockupTemplateRevisionColors.Where(value => !revisionIds.Contains(value.RevisionId)).ToArray(),
+                MockupTemplateSourceImages = snapshot.MockupTemplateSourceImages.Where(value => !sourceImageIds.Contains(value.Id)).ToArray(),
+                MockupTemplateSourceImageOptionValues = snapshot.MockupTemplateSourceImageOptionValues.Where(value => !sourceImageIds.Contains(value.SourceImageId)).ToArray(),
+                MockupTemplateRevisionSourceImages = snapshot.MockupTemplateRevisionSourceImages.Where(value => !revisionSourceImageIds.Contains(value.Id)).ToArray(),
+                MockupTemplateRevisionSourceImageOptionValues = snapshot.MockupTemplateRevisionSourceImageOptionValues.Where(value => !revisionSourceImageIds.Contains(value.RevisionSourceImageId)).ToArray()
+            };
+            return Success(updated, request.StoreId);
+        }, cancellationToken);
+
     public async Task<CatalogArchivePlan> PreviewArchiveOfferingAsync(ArchiveOfferingCascadeRequest request, CancellationToken cancellationToken = default)
     {
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
