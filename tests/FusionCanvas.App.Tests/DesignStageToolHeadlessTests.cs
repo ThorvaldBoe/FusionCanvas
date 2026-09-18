@@ -638,4 +638,24 @@ public class DesignStageToolHeadlessTests
         Assert.True(importButton.IsVisible);
         Assert.True(importButton.IsEnabled);
     }
+
+    [AvaloniaFact]
+    public void ArtworkGenerationSection_ExposesTargetAndTransparencyControls()
+    {
+        var vm = CreateConfiguredDesignViewModel();
+        NavigateToDesign(vm);
+        var window = ShowDesignWindow(vm);
+
+        var target = window.GetVisualDescendants().OfType<ComboBox>()
+            .SingleOrDefault(combo => AutomationProperties.GetName(combo) == "Artwork target Design Area");
+        var transparency = window.GetVisualDescendants().OfType<CheckBox>()
+            .SingleOrDefault(checkBox => AutomationProperties.GetName(checkBox) == "Transparent Background");
+        var generate = window.GetVisualDescendants().OfType<Button>()
+            .SingleOrDefault(button => AutomationProperties.GetName(button) == "Generate Artwork");
+
+        Assert.NotNull(target);
+        Assert.NotNull(transparency);
+        Assert.NotNull(generate);
+        Assert.False(generate!.IsEnabled);
+    }
 }

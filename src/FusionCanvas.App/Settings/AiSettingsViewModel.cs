@@ -46,10 +46,12 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         Ideation = new AiProfileEditorViewModel(settings.Ideation.CustomProfile);
         Concept = new AiProfileEditorViewModel(settings.Concept.CustomProfile);
         Sll = new AiProfileEditorViewModel(settings.Sll.CustomProfile);
+        Artwork = new AiProfileEditorViewModel(settings.Artwork);
         General.SettingsChanged += (_, _) => ApplyProfiles();
         Ideation.SettingsChanged += (_, _) => ApplyProfiles();
         Concept.SettingsChanged += (_, _) => ApplyProfiles();
         Sll.SettingsChanged += (_, _) => ApplyProfiles();
+        Artwork.SettingsChanged += (_, _) => ApplyProfiles();
 
         AddOrReplaceCommand = new DocumentWindow.RelayCommand(_ => BeginCredentialEdit());
         CancelCredentialCommand = new DocumentWindow.RelayCommand(_ => CancelCredentialEdit());
@@ -73,6 +75,9 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
     public AiProfileEditorViewModel Ideation { get; }
     public AiProfileEditorViewModel Concept { get; }
     public AiProfileEditorViewModel Sll { get; }
+    public AiProfileEditorViewModel Artwork { get; }
+    public IReadOnlyList<AiModelDescriptor> AvailableModels => _allModels;
+    public string ArtworkReadiness => ArtworkAvailability(_settings, _allModels);
     public string GeneralReadiness => Readiness(AiRequestPurpose.General);
     public string IdeationReadiness => IdeationUseGeneral
         ? $"Using General — {Readiness(AiRequestPurpose.Ideation)}"
@@ -83,6 +88,22 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
     public string SllReadiness => SllUseGeneral
         ? $"Using General — {Readiness(AiRequestPurpose.Sll)}"
         : Readiness(AiRequestPurpose.Sll);
+
+    public async Task<string?> ReadApiKeyAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await _credentials.ReadAsync(cancellationToken).ConfigureAwait(false);
+        return result.State == AiCredentialStateKind.Available ? result.Secret : null;
+    }
+
+    public async Task<IReadOnlyList<AiImageEndpointCapabilities>> GetArtworkEndpointsAsync(CancellationToken cancellationToken = default)
+    {
+        if (_catalogProvider is not IAiImageEndpointCatalogProvider provider || string.IsNullOrWhiteSpace(_settings.Artwork.ModelId))
+            return [];
+        var key = await ReadApiKeyAsync(cancellationToken).ConfigureAwait(false);
+        return string.IsNullOrWhiteSpace(key)
+            ? []
+            : await provider.GetImageEndpointsAsync(key, _settings.Artwork.ModelId, _settings.RequireZeroDataRetention, cancellationToken).ConfigureAwait(false);
+    }
 
     public bool IsBusy
     {
@@ -478,9 +499,13 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
             var catalog = await _catalogProvider.GetModelsAsync(
                 credential.Secret,
                 RequireZeroDataRetention).ConfigureAwait(true);
-            SetModels(catalog.Models);
+            var imageCatalog = _catalogProvider is IAiImageModelCatalogProvider imageProvider
+                ? await imageProvider.GetImageModelsAsync(credential.Secret, RequireZeroDataRetention).ConfigureAwait(true)
+                : new AiModelCatalog(RequireZeroDataRetention, catalog.RetrievedAt, []);
+            var combinedCatalog = catalog with { Models = catalog.Models.Concat(imageCatalog.Models).ToArray() };
+            SetModels(combinedCatalog.Models);
             Message = null;
-            await SaveCatalogCacheAsync(catalog).ConfigureAwait(true);
+            await SaveCatalogCacheAsync(combinedCatalog).ConfigureAwait(true);
             if (catalog.Models.Count == 0)
             {
                 Message = "No compatible text models were returned.";
@@ -565,6 +590,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         Ideation.Models = models;
         Concept.Models = models;
         Sll.Models = models;
+        Artwork.Models = models.Where(model => model.OutputModalities.Any(modality => string.Equals(modality, "image", StringComparison.OrdinalIgnoreCase))).ToArray();
     }
 
     private void ApplyZdrOptOut()
@@ -602,7 +628,8 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
             General = General.Snapshot,
             Ideation = ideation,
             Concept = concept,
-            Sll = sll
+            Sll = sll,
+            Artwork = Artwork.Snapshot
         });
     }
 
@@ -644,12 +671,26 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         };
     }
 
+    private static string ArtworkAvailability(AiConfigurationSettings settings, IReadOnlyList<AiModelDescriptor> models)
+    {
+        var resolution = AiConfigurationResolver.ResolveArtwork(settings, models);
+        return resolution.Availability switch
+        {
+            AiConfigurationAvailability.Ready => $"Ready - {resolution.Model!.Name}",
+            AiConfigurationAvailability.MissingModel => "Select an image model",
+            AiConfigurationAvailability.ModelUnavailable => "Selected image model is unavailable",
+            AiConfigurationAvailability.PrivacyIncompatible => "Selected image model is incompatible with ZDR",
+            _ => resolution.Errors.FirstOrDefault() ?? "Review Artwork settings"
+        };
+    }
+
     private void NotifyReadiness()
     {
         OnPropertyChanged(nameof(GeneralReadiness));
         OnPropertyChanged(nameof(IdeationReadiness));
         OnPropertyChanged(nameof(ConceptReadiness));
         OnPropertyChanged(nameof(SllReadiness));
+        OnPropertyChanged(nameof(ArtworkReadiness));
     }
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? name = null)

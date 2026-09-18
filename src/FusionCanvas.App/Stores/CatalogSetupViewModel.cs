@@ -49,6 +49,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private string _placeholderWidth = string.Empty;
     private string _placeholderHeight = string.Empty;
     private bool _placeholderUsesAllVariants = true;
+    private bool _placeholderPrimaryForArtworkGeneration;
     private string _placeholderProviderReference = string.Empty;
     private string _artworkWidth = string.Empty;
     private string _artworkHeight = string.Empty;
@@ -473,6 +474,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public string PlaceholderWidth { get => _placeholderWidth; set { if (SetField(ref _placeholderWidth, value)) { OnPropertyChanged(nameof(PhysicalSizeSummary)); NotifyDesignAreaDraftChanged(); NotifyCommands(); } } }
     public string PlaceholderHeight { get => _placeholderHeight; set { if (SetField(ref _placeholderHeight, value)) { OnPropertyChanged(nameof(PhysicalSizeSummary)); NotifyDesignAreaDraftChanged(); NotifyCommands(); } } }
     public bool PlaceholderUsesAllVariants { get => _placeholderUsesAllVariants; set { if (SetField(ref _placeholderUsesAllVariants, value)) { NotifyDesignAreaDraftChanged(); NotifyCommands(); } } }
+    public bool PlaceholderPrimaryForArtworkGeneration { get => _placeholderPrimaryForArtworkGeneration; set { if (SetField(ref _placeholderPrimaryForArtworkGeneration, value)) { NotifyDesignAreaDraftChanged(); NotifyCommands(); } } }
     public string PlaceholderProviderReference { get => _placeholderProviderReference; set { if (SetField(ref _placeholderProviderReference, value)) NotifyDesignAreaDraftChanged(); } }
     public string ArtworkWidth { get => _artworkWidth; set { if (SetField(ref _artworkWidth, value)) { NotifyDesignAreaDraftChanged(); NotifyCommands(); } } }
     public string ArtworkHeight { get => _artworkHeight; set { if (SetField(ref _artworkHeight, value)) { NotifyDesignAreaDraftChanged(); NotifyCommands(); } } }
@@ -827,10 +829,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
                     ? await _offeringManagement.UpdateDesignAreaAsync(new UpdateFocusedDesignAreaRequest(
                         CurrentContext(), SelectedPlaceholder.Id, PlaceholderName, PlaceholderPosition, PlaceholderDecorationMethod,
                         width, height, selectedVariantIds, PlaceholderUsesAllVariants, EmptyToNull(PlaceholderDescription),
-                        EmptyToNull(PlaceholderProviderReference), guidance)).ConfigureAwait(true)
+                        EmptyToNull(PlaceholderProviderReference), guidance, PlaceholderPrimaryForArtworkGeneration)).ConfigureAwait(true)
                     : await _offeringManagement.CreateDesignAreaAsync(new CreateFocusedDesignAreaRequest(
                         CurrentContext(), PlaceholderName, PlaceholderPosition, PlaceholderDecorationMethod, width, height,
-                        selectedVariantIds, PlaceholderUsesAllVariants, EmptyToNull(PlaceholderDescription), EmptyToNull(PlaceholderProviderReference), guidance)).ConfigureAwait(true);
+                        selectedVariantIds, PlaceholderUsesAllVariants, EmptyToNull(PlaceholderDescription), EmptyToNull(PlaceholderProviderReference), guidance, PlaceholderPrimaryForArtworkGeneration)).ConfigureAwait(true);
                 if (result.Succeeded) { ApplyOfferingState(result.State); ResetPlaceholderDraft(); }
                 else ErrorMessage = result.Error ?? "Design Area could not be created.";
             }
@@ -1418,7 +1420,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             value.ArtworkGuidance,
             activeVariantIds.SetEquals(value.VariantIds),
             value.VariantIds.Count,
-            value.ProviderReference));
+            value.ProviderReference)
+        {
+            IsPrimaryForArtworkGeneration = SelectedOffering?.PrimaryArtworkDesignAreaId == value.Id
+        });
         Replace(DesignAreaCards, areaSummaries.Select(DesignAreaCardViewModel.From));
 
         var templateSummaries = AvailableTemplates.Select(template =>
@@ -1612,6 +1617,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         PlaceholderWidth = string.Empty;
         PlaceholderHeight = string.Empty;
         PlaceholderUsesAllVariants = true;
+        PlaceholderPrimaryForArtworkGeneration = false;
         PlaceholderProviderReference = string.Empty;
         ArtworkWidth = string.Empty;
         ArtworkHeight = string.Empty;
@@ -1644,6 +1650,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         PlaceholderWidth = area.Width.ToString();
         PlaceholderHeight = area.Height.ToString();
         PlaceholderProviderReference = area.ProviderReference ?? string.Empty;
+        PlaceholderPrimaryForArtworkGeneration = SelectedOffering?.PrimaryArtworkDesignAreaId == area.Id;
         ArtworkWidth = area.ArtworkGuidance?.RecommendedWidthPixels?.ToString() ?? string.Empty;
         ArtworkHeight = area.ArtworkGuidance?.RecommendedHeightPixels?.ToString() ?? string.Empty;
         ArtworkDpi = area.ArtworkGuidance?.DotsPerInch?.ToString() ?? string.Empty;
@@ -1886,6 +1893,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         PlaceholderWidth,
         PlaceholderHeight,
         PlaceholderUsesAllVariants,
+        PlaceholderPrimaryForArtworkGeneration,
         PlaceholderProviderReference,
         ArtworkWidth,
         ArtworkHeight,
@@ -1947,6 +1955,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         string Width,
         string Height,
         bool UsesAllVariants,
+        bool PrimaryForArtworkGeneration,
         string ProviderReference,
         string ArtworkWidth,
         string ArtworkHeight,

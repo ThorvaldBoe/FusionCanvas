@@ -11,7 +11,10 @@ namespace FusionCanvas.Integration.AI;
 public sealed class OpenRouterClient :
     IAiCredentialValidator,
     IAiModelCatalogProvider,
-    IAiTextProvider
+    IAiImageModelCatalogProvider,
+    IAiImageEndpointCatalogProvider,
+    IAiTextProvider,
+    IAiImageGenerationProvider
 {
     public static readonly Uri DefaultBaseAddress = new("https://openrouter.ai/");
     private static readonly TimeSpan MetadataTimeout = TimeSpan.FromSeconds(30);
@@ -293,6 +296,121 @@ public sealed class OpenRouterClient :
         }
     }
 
+    public async Task<AiModelCatalog> GetImageModelsAsync(
+        string apiKey,
+        bool requireZeroDataRetention,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var response = await SendGetAsync("api/v1/images/models", apiKey, cancellationToken).ConfigureAwait(false);
+            EnsureCatalogSuccess(response);
+            using var json = await ReadJsonAsync(response, cancellationToken).ConfigureAwait(false);
+            var zdrModelIds = await GetZdrModelIdsAsync(requireZeroDataRetention, cancellationToken).ConfigureAwait(false);
+            var models = RequiredArray(json.RootElement, "data").EnumerateArray()
+                .Select(item => ParseImageModel(item, zdrModelIds))
+                .OfType<AiModelDescriptor>()
+                .OrderBy(model => model.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            return new AiModelCatalog(requireZeroDataRetention, DateTimeOffset.UtcNow, models);
+        }
+        catch (AiModelCatalogFetchException) { throw; }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception exception) when (exception is HttpRequestException or IOException or JsonException or InvalidDataException or InvalidOperationException)
+        {
+            throw new AiModelCatalogFetchException(AiModelCatalogFailureKind.InvalidResponse, "OpenRouter image model catalog could not be loaded.");
+        }
+    }
+
+    public async Task<IReadOnlyList<AiImageEndpointCapabilities>> GetImageEndpointsAsync(
+        string apiKey,
+        string modelId,
+        bool requireZeroDataRetention,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(modelId) || !modelId.Contains('/'))
+            return [];
+
+        var path = "api/v1/models/" + string.Join('/', modelId.Split('/').Select(Uri.EscapeDataString)) + "/endpoints";
+        using var response = await SendGetAsync(path, apiKey, cancellationToken).ConfigureAwait(false);
+        EnsureCatalogSuccess(response);
+        using var json = await ReadJsonAsync(response, cancellationToken).ConfigureAwait(false);
+        var zdrIds = requireZeroDataRetention ? await FetchZdrModelIdsAsync(cancellationToken).ConfigureAwait(false) : [];
+        var data = RequiredArray(json.RootElement, "data");
+        return data.EnumerateArray()
+            .Select(item => ParseImageEndpoint(item, modelId, zdrIds))
+            .OfType<AiImageEndpointCapabilities>()
+            .ToArray();
+    }
+
+    public async Task<(AiImageGenerationResult? Result, AiImageGenerationFailure? Failure)> GenerateAsync(
+        AiImageGenerationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrWhiteSpace(request.ApiKey))
+            return (null, new(AiImageGenerationFailureKind.Authentication, "An OpenRouter API key is required."));
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(GenerationTimeout);
+        try
+        {
+            using var message = new HttpRequestMessage(HttpMethod.Post, "api/v1/images");
+            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", request.ApiKey);
+            message.Content = new StringContent(BuildImageRequestJson(request), Encoding.UTF8, "application/json");
+            using var response = await _httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+                return (null, new(MapImageFailure(response.StatusCode), "OpenRouter could not complete the image request."));
+
+            using var json = await ReadJsonAsync(response, timeout.Token).ConfigureAwait(false);
+            var data = RequiredArray(json.RootElement, "data");
+            if (data.GetArrayLength() != 1)
+                return (null, new(AiImageGenerationFailureKind.InvalidResponse, "OpenRouter did not return exactly one image."));
+            var image = data[0];
+            var encoded = ReadString(image, "b64_json");
+            if (string.IsNullOrWhiteSpace(encoded) || !Convert.TryFromBase64String(encoded, new byte[MaximumResponseBytes], out var _))
+                return (null, new(AiImageGenerationFailureKind.InvalidResponse, "OpenRouter returned invalid image data."));
+            var bytes = Convert.FromBase64String(encoded);
+            var usageElement = ReadObject(json.RootElement, "usage");
+            var usage = usageElement.ValueKind == JsonValueKind.Object
+                ? new AiImageUsage(ReadInt32(usageElement, "prompt_tokens"), ReadInt32(usageElement, "completion_tokens"), ReadDecimal(usageElement, "cost"))
+                : null;
+            return (new AiImageGenerationResult(bytes, ReadString(image, "media_type") ?? "image/png", "OpenRouter", request.ModelId, ReadString(json.RootElement, "model") ?? request.ModelId, ReadString(json.RootElement, "id"), usage), null);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (OperationCanceledException) { return (null, new(AiImageGenerationFailureKind.Cancelled, "The image request timed out.")); }
+        catch (HttpRequestException) { return (null, new(AiImageGenerationFailureKind.Unavailable, "The OpenRouter image request failed.")); }
+        catch (Exception exception) when (exception is IOException or JsonException or InvalidDataException or FormatException)
+        { return (null, new(AiImageGenerationFailureKind.InvalidResponse, "OpenRouter returned an invalid image response.")); }
+    }
+
+    private static string BuildImageRequestJson(AiImageGenerationRequest request)
+    {
+        var root = new JsonObject
+        {
+            ["model"] = request.ModelId,
+            ["prompt"] = request.Prompt,
+            ["size"] = $"{request.ProviderSize.Width}x{request.ProviderSize.Height}",
+            ["output_format"] = "png",
+            ["background"] = request.TransparentBackground ? "transparent" : "opaque",
+            ["n"] = 1
+        };
+        var provider = new JsonObject { ["require_parameters"] = true, ["allow_fallbacks"] = false };
+        if (request.RequireZeroDataRetention) provider["zdr"] = true;
+        if (!string.IsNullOrWhiteSpace(request.ProviderTag)) provider["only"] = new JsonArray(JsonValue.Create(request.ProviderTag));
+        root["provider"] = provider;
+        return root.ToJsonString();
+    }
+
+    private static AiImageGenerationFailureKind MapImageFailure(HttpStatusCode status) => status switch
+    {
+        HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => AiImageGenerationFailureKind.Authentication,
+        (HttpStatusCode)429 => AiImageGenerationFailureKind.RateLimited,
+        HttpStatusCode.BadRequest => AiImageGenerationFailureKind.InvalidResponse,
+        HttpStatusCode.NotFound => AiImageGenerationFailureKind.Unavailable,
+        _ => AiImageGenerationFailureKind.Unknown
+    };
+
     private async Task<HttpResponseMessage> SendGetAsync(
         string path,
         string? apiKey,
@@ -424,6 +542,57 @@ public sealed class OpenRouterClient :
             ReadDecimal(pricing, "completion"),
             zdrModelIds.Contains(id),
             ParseReasoning(item, supported));
+    }
+
+    private static AiModelDescriptor? ParseImageModel(JsonElement item, IReadOnlyCollection<string> zdrModelIds)
+    {
+        var id = ReadString(item, "id");
+        var name = ReadString(item, "name");
+        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name)) return null;
+        var architecture = ReadObject(item, "architecture");
+        var outputs = ReadStrings(architecture, "output_modalities");
+        if (!outputs.Contains("image", StringComparer.OrdinalIgnoreCase)) return null;
+        var supported = ReadObject(item, "supported_parameters").ValueKind == JsonValueKind.Object
+            ? ReadObject(item, "supported_parameters").EnumerateObject().Select(property => property.Name).ToArray()
+            : Array.Empty<string>();
+        return new AiModelDescriptor(id, name, id.Contains('/') ? id[..id.IndexOf('/')] : null,
+            Bound(ReadString(item, "description")), ["text"], outputs, supported, null, null, null, null,
+            zdrModelIds.Contains(id), null);
+    }
+
+    private static AiImageEndpointCapabilities? ParseImageEndpoint(JsonElement item, string modelId, IReadOnlyCollection<string> zdrModelIds)
+    {
+        var endpointId = ReadString(item, "name") ?? ReadString(item, "provider_name") ?? ReadString(item, "id");
+        if (string.IsNullOrWhiteSpace(endpointId)) return null;
+        var endpointModel = ReadString(item, "model_id") ?? modelId;
+        var supportedElement = ReadObject(item, "supported_parameters");
+        var supported = supportedElement.ValueKind == JsonValueKind.Object
+            ? supportedElement.EnumerateObject().Select(property => property.Name).ToArray()
+            : ReadStrings(item, "supported_parameters");
+        var architecture = ReadObject(item, "architecture");
+        var outputModalities = ReadStrings(item, "output_modalities");
+        var supportsImage = outputModalities.Count == 0
+            ? supported.Any(value => value.Contains("image", StringComparison.OrdinalIgnoreCase) || value.Contains("size", StringComparison.OrdinalIgnoreCase))
+            : outputModalities.Contains("image", StringComparer.OrdinalIgnoreCase);
+        IReadOnlyList<string> formats = supported.Any(value => value.Contains("output_format", StringComparison.OrdinalIgnoreCase)) ? new[] { "png", "jpeg", "webp" } : new[] { "png" };
+        var sizes = ReadImageSizes(item);
+        if (sizes.Count == 0 && supported.Any(value => value.Contains("size", StringComparison.OrdinalIgnoreCase)))
+            sizes = [new AiImageSize(256, 256), new AiImageSize(512, 512), new AiImageSize(1024, 1024), new AiImageSize(1536, 1024), new AiImageSize(1024, 1536)];
+        var supportsTransparency = supported.Any(value => value.Contains("background", StringComparison.OrdinalIgnoreCase) || value.Contains("transparen", StringComparison.OrdinalIgnoreCase));
+        return new AiImageEndpointCapabilities(endpointId, endpointModel, zdrModelIds.Contains(endpointModel), supportsImage, formats, sizes, supportsTransparency,
+            ReadString(item, "provider_name") ?? ReadString(item, "provider") ?? ReadString(architecture, "provider_name"));
+    }
+
+    private static IReadOnlyList<AiImageSize> ReadImageSizes(JsonElement item)
+    {
+        var sizes = new List<AiImageSize>();
+        foreach (var value in ReadStrings(item, "supported_sizes").Concat(ReadStrings(item, "sizes")))
+        {
+            var parts = value.Split('x', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 2 && int.TryParse(parts[0], out var width) && int.TryParse(parts[1], out var height) && width > 0 && height > 0)
+                sizes.Add(new AiImageSize(width, height));
+        }
+        return sizes.Distinct().ToArray();
     }
 
     private static AiReasoningCapabilities? ParseReasoning(

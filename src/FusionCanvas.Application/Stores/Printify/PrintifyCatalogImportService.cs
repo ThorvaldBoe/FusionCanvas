@@ -108,7 +108,13 @@ public sealed class PrintifyCatalogImportService(
                 }
                 else
                 {
-                    provider = provider with { Name = importedProvider.Title, IsArchived = false, UpdatedAt = now };
+                    provider = provider with
+                    {
+                        Name = importedProvider.Title,
+                        ExternalProviderId = provider.ExternalProviderId ?? importedProvider.Id.ToString(),
+                        IsArchived = false,
+                        UpdatedAt = now
+                    };
                     Replace(providers, value => value.Id == provider.Id, provider);
                 }
 
@@ -174,6 +180,13 @@ public sealed class PrintifyCatalogImportService(
 
     private static string BlueprintName(PrintifyCatalogBlueprintSummary summary)
     {
+        // Printify's catalog title is the stable user-facing name when the
+        // response includes a description. Older blueprint-only responses
+        // often omit the description and expose the brand/model pair as the
+        // useful fallback name.
+        if (!string.IsNullOrWhiteSpace(summary.Description))
+            return summary.Title.Trim();
+
         var brand = summary.Brand?.Trim();
         var model = summary.Model?.Trim();
         return !string.IsNullOrWhiteSpace(brand) && !string.IsNullOrWhiteSpace(model)

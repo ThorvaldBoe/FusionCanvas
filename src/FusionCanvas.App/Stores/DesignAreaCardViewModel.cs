@@ -12,6 +12,8 @@ public sealed record DesignAreaCardViewModel(
     int MaximumHeightPixels,
     string CompatibilitySummary)
 {
+    public bool IsPrimaryForArtworkGeneration { get; init; }
+
     public string MaximumSizeSummary => $"{MaximumWidthPixels:N0} × {MaximumHeightPixels:N0} px";
 
     public static DesignAreaCardViewModel From(DesignAreaSetupSummary summary)
@@ -23,6 +25,9 @@ public sealed record DesignAreaCardViewModel(
             summary.Placement,
             summary.MaximumWidthPixels,
             summary.MaximumHeightPixels,
-            summary.AppliesToAllActiveVariants ? "All active Variants" : $"{summary.CompatibleVariantCount} compatible Variants");
+            summary.AppliesToAllActiveVariants ? "All active Variants" : $"{summary.CompatibleVariantCount} compatible Variants")
+        {
+            IsPrimaryForArtworkGeneration = summary.IsPrimaryForArtworkGeneration
+        };
     }
 }

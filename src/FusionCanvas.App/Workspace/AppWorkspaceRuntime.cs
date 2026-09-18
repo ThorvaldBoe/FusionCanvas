@@ -14,6 +14,7 @@ using FusionCanvas.Application.SllGeneration;
 using FusionCanvas.Application.Products;
 using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Application.TitleOptimization;
+using FusionCanvas.Application.DesignFiles;
 
 namespace FusionCanvas.App.Workspace;
 
@@ -41,4 +42,5 @@ public sealed record AppWorkspaceRuntime(
     IProductSupplierSetupService ProductSupplierSetup,
     IItemCsvImportService ItemCsvImport,
     ISllDocumentCodec SllDocumentCodec,
-    IMockupGenerationService MockupGeneration);
+    IMockupGenerationService MockupGeneration,
+    IArtworkGenerationService? ArtworkGeneration = null);

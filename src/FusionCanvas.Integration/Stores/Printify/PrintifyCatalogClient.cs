@@ -60,8 +60,14 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
         foreach (var blueprintId in selectedProducts.Select(product => product.BlueprintId).Distinct())
         {
             var summary = await LoadCatalogBlueprintSummaryAsync(key, blueprintId, cancellationToken).ConfigureAwait(false);
-            if (!summary.Succeeded) return summary;
-            catalogSummaries[blueprintId] = summary.Blueprints![0];
+            if (summary.Succeeded)
+            {
+                catalogSummaries[blueprintId] = summary.Blueprints![0];
+            }
+            else if (summary.Kind != PrintifyCatalogResultKind.UnexpectedResponse)
+            {
+                return summary;
+            }
         }
 
         var selected = loaded.SelectedProducts!
@@ -111,7 +117,8 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
             catch (InvalidOperationException) { return Unexpected(); }
         }
         var providerNames = await LoadProviderNamesAsync(details, key, cancellationToken).ConfigureAwait(false);
-        if (providerNames.Error is not null) return providerNames.Error;
+        if (providerNames.Error is not null && providerNames.Error.Kind != PrintifyCatalogResultKind.UnexpectedResponse)
+            return providerNames.Error;
         details = details.Select(blueprint => blueprint with
         {
             Providers = blueprint.Providers.Select(provider => provider with
@@ -136,7 +143,7 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
         var names = new Dictionary<(int BlueprintId, int ProviderId), string>();
         foreach (var group in products.GroupBy(product => product.Summary.Id))
         {
-            var response = await SendJsonAsync($"blueprints/{group.Key}/print_providers.json", key, cancellationToken).ConfigureAwait(false);
+            var response = await SendJsonAsync($"{CatalogBaseUri}blueprints/{group.Key}/print_providers.json", key, cancellationToken).ConfigureAwait(false);
             if (response.Error is not null) return (names, response.Error);
             using var document = response.Json!;
             try

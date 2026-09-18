@@ -21,6 +21,8 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
     private CancellationTokenSource? _sessionCts;
     private int _operationSequence;
     private SllDocument? _current;
+    private bool _localSourceChanged;
+    private bool _keepAsReference;
     private sealed record CapturedOperation(int Sequence, Guid ItemId);
 
     public SllGenerationSessionViewModel(
@@ -36,6 +38,8 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
 
         GenerateCommand = new RelayCommand(_ => Run(ExecuteGenerateAsync()), () => CanGenerate);
         RegenerateCommand = new RelayCommand(_ => Run(ExecuteGenerateAsync()), () => CanRegenerate);
+        ResetSllCommand = new RelayCommand(_ => Run(ResetSllAsync()), () => HasCurrentSll && !IsBusy && _inspector.CanEditStage);
+        KeepSllReferenceCommand = new RelayCommand(_ => KeepSllAsReference(), () => IsStale && !IsBusy);
 
         _inspector.PropertyChanged += OnInspectorPropertyChanged;
         _accessStatus.AvailabilityChanged += OnAccessAvailabilityChanged;
@@ -91,7 +95,7 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
 
     public string AsciiSketch => _current?.AsciiSketch ?? string.Empty;
 
-    public bool IsStale => HasCurrentSll && !IsComplete;
+    public bool IsStale => HasCurrentSll && !_keepAsReference && (_localSourceChanged || _inspector.State?.IsSllStale == true || !IsComplete);
 
     private bool IsComplete =>
         DesignTriangleScore.FromValues(
@@ -156,6 +160,8 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
 
     public RelayCommand GenerateCommand { get; }
     public RelayCommand RegenerateCommand { get; }
+    public RelayCommand ResetSllCommand { get; }
+    public RelayCommand KeepSllReferenceCommand { get; }
 
     // --- Session lifecycle ---
 
@@ -164,6 +170,7 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
         CancelInFlight();
         ErrorMessage = null;
         _sessionItemId = _inspector.LoadedItemId;
+        _keepAsReference = false;
         LoadCurrentFromInspector();
         if (_sessionItemId is not null)
         {
@@ -221,6 +228,8 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
             }
 
             _current = result.Document;
+            _localSourceChanged = false;
+            _keepAsReference = false;
             _inspector.Sll = _codec.Serialize(result.Document!);
 
             await _inspector.CommitEditsAsync(ct).ConfigureAwait(true);
@@ -248,10 +257,14 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
         if (string.IsNullOrWhiteSpace(sllText) || !_codec.TryDeserialize(sllText, out var document))
         {
             _current = null;
+            _localSourceChanged = false;
+            _keepAsReference = false;
         }
         else
         {
             _current = document;
+            _localSourceChanged = _inspector.State?.IsSllStale == true;
+            _keepAsReference = false;
         }
 
         RaiseCurrentChanged();
@@ -292,6 +305,8 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
     {
         GenerateCommand.NotifyCanExecuteChanged();
         RegenerateCommand.NotifyCanExecuteChanged();
+        ResetSllCommand.NotifyCanExecuteChanged();
+        KeepSllReferenceCommand.NotifyCanExecuteChanged();
 
         OnPropertyChanged(nameof(AccessStatus));
         OnPropertyChanged(nameof(IsAvailable));
@@ -302,6 +317,30 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(RegenerateDisabledReason));
         OnPropertyChanged(nameof(IsStale));
         OnPropertyChanged(nameof(HasError));
+    }
+
+    private async Task ResetSllAsync()
+    {
+        if (!HasCurrentSll || !_inspector.CanEditStage)
+            return;
+
+        _inspector.Sll = string.Empty;
+        _current = null;
+        _localSourceChanged = false;
+        _keepAsReference = false;
+        await _inspector.CommitEditsAsync(_sessionCts?.Token ?? CancellationToken.None).ConfigureAwait(true);
+        RaiseCurrentChanged();
+        RaiseCommandStates();
+    }
+
+    private void KeepSllAsReference()
+    {
+        if (!IsStale)
+            return;
+
+        _keepAsReference = true;
+        RaiseCurrentChanged();
+        RaiseCommandStates();
     }
 
     // --- Inspector events ---
@@ -322,6 +361,13 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
             if (args.PropertyName == nameof(ItemInspectorViewModel.Sll))
             {
                 LoadCurrentFromInspector();
+            }
+            else if (HasCurrentSll && (args.PropertyName is nameof(ItemInspectorViewModel.Idea)
+                or nameof(ItemInspectorViewModel.ConceptIdea)
+                or nameof(ItemInspectorViewModel.Phrase)
+                or nameof(ItemInspectorViewModel.GraphicDirection)))
+            {
+                _localSourceChanged = true;
             }
 
             RaiseCommandStates();

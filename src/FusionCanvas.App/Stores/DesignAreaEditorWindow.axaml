@@ -66,6 +66,9 @@
         <CheckBox Content="Compatible with all current Variants"
                   IsChecked="{Binding PlaceholderUsesAllVariants, Mode=TwoWay}"
                   AutomationProperties.Name="Compatible with all current Variants" />
+        <CheckBox Content="Primary for artwork generation"
+                  IsChecked="{Binding PlaceholderPrimaryForArtworkGeneration, Mode=TwoWay}"
+                  AutomationProperties.Name="Primary for artwork generation" />
         <StackPanel IsVisible="{Binding !PlaceholderUsesAllVariants}" Spacing="4">
           <TextBlock Text="Compatible Variants" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
           <ItemsControl ItemsSource="{Binding PlaceholderVariantChoices}">

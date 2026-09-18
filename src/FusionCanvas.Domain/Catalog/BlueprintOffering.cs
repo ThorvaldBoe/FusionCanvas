@@ -2,7 +2,7 @@ namespace FusionCanvas.Domain.Catalog;
 
 public sealed record BlueprintOffering
 {
-    public BlueprintOffering(Guid id, Guid blueprintId, Guid storeId, string name, string? description, BlueprintOfferingKind kind, Guid? printProviderId, string? providerNetworkCode, Guid? defaultPlaceholderId, string? externalOfferingId, bool isArchived, DateTimeOffset createdAt, DateTimeOffset updatedAt, string metadataJson = "{}")
+    public BlueprintOffering(Guid id, Guid blueprintId, Guid storeId, string name, string? description, BlueprintOfferingKind kind, Guid? printProviderId, string? providerNetworkCode, Guid? defaultPlaceholderId, string? externalOfferingId, bool isArchived, DateTimeOffset createdAt, DateTimeOffset updatedAt, string metadataJson = "{}", Guid? primaryArtworkDesignAreaId = null)
     {
         Id = CatalogRecordValidation.Id(id, nameof(id));
         BlueprintId = CatalogRecordValidation.Id(blueprintId, nameof(blueprintId));
@@ -13,6 +13,7 @@ public sealed record BlueprintOffering
         PrintProviderId = printProviderId == Guid.Empty ? throw new ArgumentException("Provider identifier must not be empty.", nameof(printProviderId)) : printProviderId;
         ProviderNetworkCode = CatalogRecordValidation.Optional(providerNetworkCode)?.ToLowerInvariant();
         DefaultPlaceholderId = defaultPlaceholderId == Guid.Empty ? throw new ArgumentException("Placeholder identifier must not be empty.", nameof(defaultPlaceholderId)) : defaultPlaceholderId;
+        PrimaryArtworkDesignAreaId = primaryArtworkDesignAreaId == Guid.Empty ? throw new ArgumentException("Primary artwork Design Area identifier must not be empty.", nameof(primaryArtworkDesignAreaId)) : primaryArtworkDesignAreaId;
         ExternalOfferingId = CatalogRecordValidation.Optional(externalOfferingId);
         IsArchived = isArchived;
         CreatedAt = createdAt;
@@ -29,6 +30,7 @@ public sealed record BlueprintOffering
     public Guid? PrintProviderId { get; init; }
     public string? ProviderNetworkCode { get; init; }
     public Guid? DefaultPlaceholderId { get; init; }
+    public Guid? PrimaryArtworkDesignAreaId { get; init; }
     public string? ExternalOfferingId { get; init; }
     public bool IsArchived { get; init; }
     public DateTimeOffset CreatedAt { get; init; }

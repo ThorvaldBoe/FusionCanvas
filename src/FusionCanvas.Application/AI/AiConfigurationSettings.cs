@@ -8,6 +8,8 @@ public sealed record AiConfigurationSettings(
     AiPurposeProfileSettings Concept,
     AiPurposeProfileSettings Sll)
 {
+    public AiProfileSettings Artwork { get; init; } = AiProfileSettings.Empty;
+
     public static AiConfigurationSettings Default { get; } = new(
         RequireZeroDataRetention: true,
         AdvancedMode: false,

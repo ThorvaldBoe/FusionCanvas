@@ -35,6 +35,7 @@ public sealed class AppServices : IDisposable
         IApplicationSettingsStore settingsStore,
         SettingsViewModel settings,
         IAiTextGenerationService aiTextGeneration,
+        IAiImageGenerationProvider aiImageGeneration,
         IItemCsvCodec itemCsvExportCodec,
         ImportItemCsvCodec itemCsvImportCodec)
     {
@@ -42,6 +43,7 @@ public sealed class AppServices : IDisposable
         SettingsStore = settingsStore;
         Settings = settings;
         AiTextGeneration = aiTextGeneration;
+        AiImageGeneration = aiImageGeneration;
         ItemCsvExportCodec = itemCsvExportCodec;
         ItemCsvImportCodec = itemCsvImportCodec;
     }
@@ -49,6 +51,7 @@ public sealed class AppServices : IDisposable
     public IApplicationSettingsStore SettingsStore { get; }
     public SettingsViewModel Settings { get; }
     public IAiTextGenerationService AiTextGeneration { get; }
+    public IAiImageGenerationProvider AiImageGeneration { get; }
     public IItemCsvCodec ItemCsvExportCodec { get; }
     public ImportItemCsvCodec ItemCsvImportCodec { get; }
 

@@ -109,7 +109,8 @@ public class AiSettingsViewTests
             window.UpdateLayout();
 
             var modelBox = window.GetVisualDescendants().OfType<AiSettingsView>().Single()
-                .GetVisualDescendants().OfType<ComboBox>().First();
+                .GetVisualDescendants().OfType<ComboBox>()
+                .Single(box => box.Items.OfType<string>().Contains("zdr/model"));
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text =>
                 text.Text == "Search the models allowed by the privacy setting below. Requiring Zero Data Retention narrows the list to compatible models.");
             var items = modelBox.Items.OfType<string>().ToArray();

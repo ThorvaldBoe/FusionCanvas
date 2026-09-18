@@ -2934,11 +2934,11 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     {
         if (_catalogService is not null && SelectedStore is not null && _pendingDeleteProduct is not null)
         {
-            var result = await _catalogService.ArchiveBlueprintWithDependentsAsync(
-                new ArchiveBlueprintWithDependentsRequest(SelectedStore.Id, _pendingDeleteProduct.Id),
-                cancellationToken).ConfigureAwait(true);
-            ErrorMessage = result.Error;
-            if (result.Succeeded)
+        var archiveResult = await _catalogService.ArchiveBlueprintWithDependentsAsync(
+            new ArchiveBlueprintWithDependentsRequest(SelectedStore.Id, _pendingDeleteProduct.Id),
+            cancellationToken).ConfigureAwait(true);
+            ErrorMessage = archiveResult.Error;
+            if (archiveResult.Succeeded)
             {
                 ClearProductDeleteWarning();
                 await LoadProductsForSelectedStoreAsync(cancellationToken).ConfigureAwait(true);

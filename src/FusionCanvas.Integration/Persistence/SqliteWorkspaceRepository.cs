@@ -460,7 +460,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 id TEXT PRIMARY KEY, blueprint_id TEXT NOT NULL REFERENCES catalog_blueprints(id) ON DELETE CASCADE,
                 store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE, name TEXT NOT NULL,
                 description TEXT NULL, kind INTEGER NOT NULL, print_provider_id TEXT NULL REFERENCES print_providers(id) ON DELETE RESTRICT,
-                provider_network_code TEXT NULL, default_placeholder_id TEXT NULL, external_offering_id TEXT NULL,
+                provider_network_code TEXT NULL, default_placeholder_id TEXT NULL, primary_artwork_design_area_id TEXT NULL, external_offering_id TEXT NULL,
                 is_archived INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS offering_options (
@@ -640,6 +640,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await MigrateToVersion17Async(connection, cancellationToken);
         }
 
+        if (schemaVersion < 18)
+        {
+            await MigrateToVersion18Async(connection, cancellationToken);
+        }
+
         await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
     }
 
@@ -751,6 +756,12 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await ExecuteAsync(connection, null, "ALTER TABLE offering_option_values ADD COLUMN metadata_json TEXT NOT NULL DEFAULT '{}';", cancellationToken);
     }
 
+    private static async Task MigrateToVersion18Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        if (!await ColumnExistsAsync(connection, "blueprint_offerings", "primary_artwork_design_area_id", cancellationToken))
+            await ExecuteAsync(connection, null, "ALTER TABLE blueprint_offerings ADD COLUMN primary_artwork_design_area_id TEXT NULL;", cancellationToken);
+    }
+
     private static async Task MigrateToVersion12Async(SqliteConnection connection, CancellationToken cancellationToken)
     {
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -831,7 +842,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 providerId = existingProviderId;
             }
 
-            await ExecuteAsync(connection, transaction, "INSERT OR IGNORE INTO blueprint_offerings (id, blueprint_id, store_id, name, description, kind, print_provider_id, provider_network_code, default_placeholder_id, external_offering_id, is_archived, created_at, updated_at, metadata_json) VALUES ($id,$blueprint_id,$store_id,$name,$description,$kind,$print_provider_id,$provider_network_code,NULL,$external_offering_id,0,$created_at,$updated_at,$metadata_json);", cancellationToken,
+            await ExecuteAsync(connection, transaction, "INSERT OR IGNORE INTO blueprint_offerings (id, blueprint_id, store_id, name, description, kind, print_provider_id, provider_network_code, default_placeholder_id, primary_artwork_design_area_id, external_offering_id, is_archived, created_at, updated_at, metadata_json) VALUES ($id,$blueprint_id,$store_id,$name,$description,$kind,$print_provider_id,$provider_network_code,NULL,NULL,$external_offering_id,0,$created_at,$updated_at,$metadata_json);", cancellationToken,
                 ("$id", offeringId.ToString()), ("$blueprint_id", blueprintId.ToString()), ("$store_id", storeId.ToString()), ("$name", ReadString(reader, "name")), ("$description", ReadNullableString(reader, "description")), ("$kind", (int)kind), ("$print_provider_id", providerId?.ToString()), ("$provider_network_code", kind == BlueprintOfferingKind.ProviderNetwork ? "printify-choice" : null), ("$external_offering_id", ReadNullableString(reader, "external_offering_id")), ("$created_at", ReadDate(reader, "created_at").ToString("O")), ("$updated_at", ReadDate(reader, "updated_at").ToString("O")), ("$metadata_json", ReadString(reader, "metadata_json")));
         }
 
@@ -1573,7 +1584,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         ExecuteAsync(c, t, "INSERT INTO print_providers (id, store_id, name, external_provider_id, is_archived, created_at, updated_at, metadata_json) VALUES ($id,$store_id,$name,$external_provider_id,$is_archived,$created_at,$updated_at,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$store_id", value.StoreId.ToString()), ("$name", value.Name), ("$external_provider_id", value.ExternalProviderId), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$metadata_json", value.MetadataJson));
 
     private static Task InsertBlueprintOfferingAsync(SqliteConnection c, System.Data.Common.DbTransaction t, BlueprintOffering value, CancellationToken ct) =>
-        ExecuteAsync(c, t, "INSERT INTO blueprint_offerings (id, blueprint_id, store_id, name, description, kind, print_provider_id, provider_network_code, default_placeholder_id, external_offering_id, is_archived, created_at, updated_at, metadata_json) VALUES ($id,$blueprint_id,$store_id,$name,$description,$kind,$print_provider_id,$provider_network_code,$default_placeholder_id,$external_offering_id,$is_archived,$created_at,$updated_at,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$blueprint_id", value.BlueprintId.ToString()), ("$store_id", value.StoreId.ToString()), ("$name", value.Name), ("$description", value.Description), ("$kind", (int)value.Kind), ("$print_provider_id", value.PrintProviderId?.ToString()), ("$provider_network_code", value.ProviderNetworkCode), ("$default_placeholder_id", value.DefaultPlaceholderId?.ToString()), ("$external_offering_id", value.ExternalOfferingId), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$metadata_json", value.MetadataJson));
+        ExecuteAsync(c, t, "INSERT INTO blueprint_offerings (id, blueprint_id, store_id, name, description, kind, print_provider_id, provider_network_code, default_placeholder_id, primary_artwork_design_area_id, external_offering_id, is_archived, created_at, updated_at, metadata_json) VALUES ($id,$blueprint_id,$store_id,$name,$description,$kind,$print_provider_id,$provider_network_code,$default_placeholder_id,$primary_artwork_design_area_id,$external_offering_id,$is_archived,$created_at,$updated_at,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$blueprint_id", value.BlueprintId.ToString()), ("$store_id", value.StoreId.ToString()), ("$name", value.Name), ("$description", value.Description), ("$kind", (int)value.Kind), ("$print_provider_id", value.PrintProviderId?.ToString()), ("$provider_network_code", value.ProviderNetworkCode), ("$default_placeholder_id", value.DefaultPlaceholderId?.ToString()), ("$primary_artwork_design_area_id", value.PrimaryArtworkDesignAreaId?.ToString()), ("$external_offering_id", value.ExternalOfferingId), ("$is_archived", value.IsArchived ? 1 : 0), ("$created_at", value.CreatedAt.ToString("O")), ("$updated_at", value.UpdatedAt.ToString("O")), ("$metadata_json", value.MetadataJson));
 
     private static Task InsertOfferingOptionAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingOption value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO offering_options (id, offering_id, option_kind, name, sort_order, is_archived, metadata_json) VALUES ($id,$offering_id,$option_kind,$name,$sort_order,$is_archived,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$offering_id", value.OfferingId.ToString()), ("$option_kind", (int)value.OptionKind), ("$name", value.Name), ("$sort_order", value.SortOrder), ("$is_archived", value.IsArchived ? 1 : 0), ("$metadata_json", value.MetadataJson));
     private static Task InsertOfferingOptionValueAsync(SqliteConnection c, System.Data.Common.DbTransaction t, OfferingOptionValue value, CancellationToken ct) => ExecuteAsync(c, t, "INSERT INTO offering_option_values (id, option_id, offering_id, value, sort_order, is_archived, metadata_json) VALUES ($id,$option_id,$offering_id,$value,$sort_order,$is_archived,$metadata_json);", ct, ("$id", value.Id.ToString()), ("$option_id", value.OptionId.ToString()), ("$offering_id", value.OfferingId.ToString()), ("$value", value.Value), ("$sort_order", value.SortOrder), ("$is_archived", value.IsArchived ? 1 : 0), ("$metadata_json", value.MetadataJson));
@@ -1670,7 +1681,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     {
         var result = new List<BlueprintOffering>();
         await foreach (var r in ReadAsync(c, "SELECT * FROM blueprint_offerings ORDER BY name;", ct))
-            result.Add(new BlueprintOffering(ReadGuid(r, "id"), ReadGuid(r, "blueprint_id"), ReadGuid(r, "store_id"), ReadString(r, "name"), ReadNullableString(r, "description"), (BlueprintOfferingKind)ReadInt(r, "kind"), ReadNullableGuid(r, "print_provider_id"), ReadNullableString(r, "provider_network_code"), ReadNullableGuid(r, "default_placeholder_id"), ReadNullableString(r, "external_offering_id"), ReadBool(r, "is_archived"), ReadDate(r, "created_at"), ReadDate(r, "updated_at"), ReadString(r, "metadata_json")));
+            result.Add(new BlueprintOffering(ReadGuid(r, "id"), ReadGuid(r, "blueprint_id"), ReadGuid(r, "store_id"), ReadString(r, "name"), ReadNullableString(r, "description"), (BlueprintOfferingKind)ReadInt(r, "kind"), ReadNullableGuid(r, "print_provider_id"), ReadNullableString(r, "provider_network_code"), ReadNullableGuid(r, "default_placeholder_id"), ReadNullableString(r, "external_offering_id"), ReadBool(r, "is_archived"), ReadDate(r, "created_at"), ReadDate(r, "updated_at"), ReadString(r, "metadata_json"), ReadNullableGuid(r, "primary_artwork_design_area_id")));
         return result;
     }
 

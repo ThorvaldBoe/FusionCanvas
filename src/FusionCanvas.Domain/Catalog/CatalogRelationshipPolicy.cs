@@ -2,6 +2,34 @@ namespace FusionCanvas.Domain.Catalog;
 
 public static class CatalogRelationshipPolicy
 {
+    public static IReadOnlyList<BlueprintOffering> ReplacePrimaryArtworkDesignArea(
+        IReadOnlyList<BlueprintOffering> offerings,
+        IReadOnlyList<OfferingPlaceholder> placeholders,
+        Guid offeringId,
+        Guid? designAreaId)
+    {
+        ArgumentNullException.ThrowIfNull(offerings);
+        ArgumentNullException.ThrowIfNull(placeholders);
+
+        var offering = offerings.SingleOrDefault(value => value.Id == offeringId)
+            ?? throw new InvalidOperationException("Offering was not found.");
+
+        if (designAreaId is Guid selectedAreaId)
+        {
+            var area = placeholders.SingleOrDefault(value => value.Id == selectedAreaId);
+            if (area is null || area.OfferingId != offering.Id)
+                throw new InvalidOperationException("Primary artwork Design Area must belong to the same offering.");
+            if (area.IsArchived)
+                throw new InvalidOperationException("Primary artwork Design Area must be active.");
+        }
+
+        return offerings
+            .Select(value => value.Id == offering.Id
+                ? value with { PrimaryArtworkDesignAreaId = designAreaId }
+                : value)
+            .ToArray();
+    }
+
     public static void ValidateOffering(
         BlueprintOffering offering,
         Blueprint blueprint,
@@ -49,6 +77,15 @@ public static class CatalogRelationshipPolicy
         {
             if (placeholder.VariantIds.Any(variantId => variants.All(variant => variant.Id != variantId || variant.OfferingId != offering.Id)))
                 throw new InvalidOperationException("Placeholder compatibility must reference concrete Variants from the same offering.");
+        }
+
+        if (offering.PrimaryArtworkDesignAreaId is Guid primaryAreaId)
+        {
+            var primary = placeholders.SingleOrDefault(value => value.Id == primaryAreaId);
+            if (primary is null || primary.OfferingId != offering.Id)
+                throw new InvalidOperationException("Primary artwork Design Area must belong to the same offering.");
+            if (primary.IsArchived)
+                throw new InvalidOperationException("Primary artwork Design Area must be active.");
         }
     }
 

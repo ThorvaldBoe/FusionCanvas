@@ -21,5 +21,6 @@ public sealed record ItemInspectorState(
     string? Sll)
 {
     public int IdeaRating { get; init; }
+    public bool IsSllStale { get; init; }
     public bool IsReadOnly => !IsEffectivelyActive;
 }

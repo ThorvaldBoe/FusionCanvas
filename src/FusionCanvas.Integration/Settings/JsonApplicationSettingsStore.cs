@@ -183,6 +183,7 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
         settings with
         {
             General = Normalize(settings.General),
+            Artwork = Normalize(settings.Artwork),
             Ideation = settings.Ideation is null
                 ? AiPurposeProfileSettings.InheritGeneral
                 : Normalize(settings.Ideation),

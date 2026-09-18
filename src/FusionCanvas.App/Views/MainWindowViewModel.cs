@@ -76,13 +76,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public static MainWindowViewModel CreateForDefaultWorkspace(
         SettingsViewModel settings,
         IAiTextGenerationService ai,
-        AppWorkspaceRuntime? workspace = null) =>
+        AppWorkspaceRuntime? workspace = null,
+        IAiImageGenerationProvider? artworkProvider = null) =>
         new(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
             new DocumentWindowViewModel(),
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            workspace ?? AppWorkspaceFactory.CreateDefault(ai),
+            workspace ?? AppWorkspaceFactory.CreateDefault(ai, artworkProvider),
             settings);
 
     private MainWindowViewModel(
@@ -120,7 +121,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.ProductSupplierSetup,
             runtime.ItemCsvImport,
             runtime.SllDocumentCodec,
-            mockupGenerationService: runtime.MockupGeneration)
+            mockupGenerationService: runtime.MockupGeneration,
+            artworkGenerationService: runtime.ArtworkGeneration)
     {
 }
     public MainWindowViewModel(
@@ -153,7 +155,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ISllDocumentCodec? sllDocumentCodec = null,
         ICatalogSetupService? catalogSetupService = null,
         IMockupTemplateSetupService? mockupTemplateSetupService = null,
-        IMockupGenerationService? mockupGenerationService = null)
+        IMockupGenerationService? mockupGenerationService = null,
+        IArtworkGenerationService? artworkGenerationService = null)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
@@ -205,7 +208,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         AssetsManagement = new AssetsViewModel(_assetManagementService);
         ItemInspector = new ItemInspectorViewModel(_itemInspectorService, _itemManagementService, _tagManagementService, titleOptimizationService);
         DesignTool = new DesignStageToolViewModel(
-            new DesignStageService(workspaceRepository, fileStore));
+            new DesignStageService(workspaceRepository, fileStore),
+            artworkGenerationService,
+            Settings.Ai);
         ListingTool = new ListingStageToolViewModel(mockupGenerationService);
         Ideation = new IdeationViewModel(_ideationService, _ideationAccessStatus, snowcloneLibrary, rejectedPhrases);
         ConceptRefinement = new ConceptRefinementSessionViewModel(

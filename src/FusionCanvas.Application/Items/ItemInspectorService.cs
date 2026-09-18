@@ -150,6 +150,7 @@ public sealed class ItemInspectorService : IItemInspectorService
         }
 
         var metadata = ItemMetadataCodec.ParseMetadata(existing.MetadataJson);
+        var previousSll = metadata.GetValueOrDefault(ItemMetadataCodec.SllKey);
         if (request.IdeaRating is int rating)
         {
             var ratingError = ItemMetadataCodec.ValidateIdeaRating(rating);
@@ -158,6 +159,15 @@ public sealed class ItemInspectorService : IItemInspectorService
         }
         ApplyInspectorField(metadata, ItemMetadataCodec.NotesKey, request.Notes);
         ApplyStagePayload(metadata, request.StagePayload, existing.Stage);
+        var currentSll = metadata.GetValueOrDefault(ItemMetadataCodec.SllKey);
+        if (!string.Equals(previousSll, currentSll, StringComparison.Ordinal))
+        {
+            if (string.IsNullOrWhiteSpace(currentSll))
+                metadata.Remove(ItemMetadataCodec.SllSourceFingerprintKey);
+            else
+                metadata[ItemMetadataCodec.SllSourceFingerprintKey] = ItemMetadataCodec.ComputeSllSourceFingerprint(
+                    metadata.GetValueOrDefault(ItemMetadataCodec.IdeaKey), metadata.GetValueOrDefault(ItemMetadataCodec.ConceptIdeaKey), metadata.GetValueOrDefault(ItemMetadataCodec.PhraseKey), metadata.GetValueOrDefault(ItemMetadataCodec.GraphicDirectionKey));
+        }
 
         var (resolvedTagIds, createdTags) = ResolveOrCreateTags(snapshot, existing.StoreId, normalizedTagNames);
 
@@ -303,6 +313,8 @@ public sealed class ItemInspectorService : IItemInspectorService
         var phrase = metadata.GetValueOrDefault(ItemMetadataCodec.PhraseKey);
         var graphicDirection = metadata.GetValueOrDefault(ItemMetadataCodec.GraphicDirectionKey);
         var sll = metadata.GetValueOrDefault(ItemMetadataCodec.SllKey);
+        var sllFingerprint = metadata.GetValueOrDefault(ItemMetadataCodec.SllSourceFingerprintKey);
+        var currentFingerprint = ItemMetadataCodec.ComputeSllSourceFingerprint(idea, conceptIdea, phrase, graphicDirection);
         var ideaRating = ItemMetadataCodec.GetIdeaRating(metadata);
         var creative = new ItemInspectorCreativeFields(
             string.IsNullOrWhiteSpace(idea) ? null : idea,
@@ -352,7 +364,8 @@ public sealed class ItemInspectorService : IItemInspectorService
             listing.UpdatedAt,
             string.IsNullOrWhiteSpace(sll) ? null : sll)
         {
-            IdeaRating = ideaRating
+            IdeaRating = ideaRating,
+            IsSllStale = !string.IsNullOrWhiteSpace(sll) && !string.Equals(sllFingerprint, currentFingerprint, StringComparison.Ordinal)
         };
     }
 

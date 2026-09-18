@@ -26,6 +26,8 @@ public sealed class DesignSlotViewModel : INotifyPropertyChanged, IDisposable
         IsMissing = summary.IsMissing;
         CanPreview = summary.CanPreview;
         CanExport = summary.CanExport;
+        IsGenerated = summary.IsGenerated;
+        ArtworkWarning = summary.ArtworkWarning;
         IsReadOnly = isReadOnly;
 
         if (summary.ThumbnailPath is not null && File.Exists(summary.ThumbnailPath))
@@ -54,6 +56,8 @@ public sealed class DesignSlotViewModel : INotifyPropertyChanged, IDisposable
     public bool CanPreview { get; }
     public bool CanExport { get; }
     public bool IsReadOnly { get; }
+    public bool IsGenerated { get; }
+    public string? ArtworkWarning { get; }
     public bool HasImage => AssetId is not null;
     public string ArtworkUploadActionText => HasImage ? "Replace artwork..." : "Browse artwork...";
     public string ArtworkUploadAccessibleName => HasImage

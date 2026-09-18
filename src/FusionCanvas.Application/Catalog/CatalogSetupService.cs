@@ -181,11 +181,11 @@ public sealed class CatalogSetupService : ICatalogSetupService
             {
                 CatalogRecordKind.Blueprint => snapshot with { Blueprints = snapshot.Blueprints.Select(value => value.Id == request.RecordId ? value with { IsArchived = true } : value).ToArray() },
                 CatalogRecordKind.PrintProvider => snapshot with { PrintProviders = snapshot.PrintProviders.Select(value => value.Id == request.RecordId ? value with { IsArchived = true } : value).ToArray() },
-                CatalogRecordKind.Offering => snapshot with { BlueprintOfferings = snapshot.BlueprintOfferings.Select(value => value.Id == request.RecordId ? value with { IsArchived = true } : value).ToArray() },
+                CatalogRecordKind.Offering => snapshot with { BlueprintOfferings = snapshot.BlueprintOfferings.Select(value => value.Id == request.RecordId ? value with { IsArchived = true, PrimaryArtworkDesignAreaId = null } : value).ToArray() },
                 CatalogRecordKind.Option => snapshot with { OfferingOptions = snapshot.OfferingOptions.Select(value => value.Id == request.RecordId ? value with { IsArchived = true } : value).ToArray() },
                 CatalogRecordKind.OptionValue => NormalizeOptionValueSnapshot(snapshot, request.RecordId, true),
                 CatalogRecordKind.Variant => snapshot with { OfferingVariants = snapshot.OfferingVariants.Select(value => value.Id == request.RecordId ? value with { IsArchived = true } : value).ToArray() },
-                CatalogRecordKind.Placeholder => snapshot with { OfferingPlaceholders = snapshot.OfferingPlaceholders.Select(value => value.Id == request.RecordId ? value with { IsArchived = true } : value).ToArray() },
+                CatalogRecordKind.Placeholder => ArchivePlaceholderSnapshot(snapshot, request.RecordId),
                 _ => snapshot
             };
             return Success(updated, request.StoreId);
@@ -410,6 +410,21 @@ public sealed class CatalogSetupService : ICatalogSetupService
         var value = snapshot.OfferingOptionValues.Single(candidate => candidate.Id == valueId);
         var values = snapshot.OfferingOptionValues.Select(candidate => candidate.Id == valueId ? candidate with { IsArchived = archived } : candidate).ToArray();
         return snapshot with { OfferingOptionValues = NormalizeOptionValues(values, value.OptionId) };
+    }
+
+    private static WorkspaceSnapshot ArchivePlaceholderSnapshot(WorkspaceSnapshot snapshot, Guid placeholderId)
+    {
+        var placeholder = snapshot.OfferingPlaceholders.Single(value => value.Id == placeholderId);
+        var offerings = snapshot.BlueprintOfferings
+            .Select(offering => offering.Id == placeholder.OfferingId && offering.PrimaryArtworkDesignAreaId == placeholderId
+                ? offering with { PrimaryArtworkDesignAreaId = null }
+                : offering)
+            .ToArray();
+        return snapshot with
+        {
+            OfferingPlaceholders = snapshot.OfferingPlaceholders.Select(value => value.Id == placeholderId ? value with { IsArchived = true } : value).ToArray(),
+            BlueprintOfferings = offerings
+        };
     }
 
     private static string? GetDependencyError(WorkspaceSnapshot snapshot, ArchiveCatalogRecordRequest request)
