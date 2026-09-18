@@ -95,6 +95,42 @@ public sealed class PrintifyCatalogImportServiceTests
     }
 
     [Fact]
+    public async Task ImportsPrintifyOptionDefinitionsAndAllDeclaredValues()
+    {
+        var store = new StoreSummary(Guid.NewGuid(), Guid.NewGuid(), "Store", new(PrintifyShopId: 42), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, FulfillmentStrategy.Printify);
+        var repository = new RepositoryStub(WorkspaceSnapshot.Empty with
+        {
+            Stores = [new Store(store.Id, store.WorkspaceId, store.Name, null, false, store.CreatedAt, store.UpdatedAt, "{}", null, store.FulfillmentStrategy)]
+        });
+        var option = new PrintifyCatalogOption("Color", "color", [
+            new(101, "Black"),
+            new(102, "White")
+        ]);
+        var client = new ClientStub
+        {
+            SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [new(
+                new(68, "Tee", null, "Brand", "Model"),
+                [new(9, "Provider", [option], [new(33719, "Black", true, true, [101], [])])])])
+        };
+        var service = new PrintifyCatalogImportService(
+            new StoresStub(store),
+            new CredentialsStub { Result = new(new(PrintifyConfigurationKind.Available, "available"), "synthetic-key") },
+            client,
+            repository);
+
+        var result = await service.LoadSelectedAsync(new(store.WorkspaceId, store.Id), [68], TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Message);
+        var importedOption = Assert.Single(repository.Snapshot.OfferingOptions);
+        Assert.Equal("Color", importedOption.Name);
+        Assert.Equal(OptionKind.Color, importedOption.OptionKind);
+        Assert.Equal(["Black", "White"], repository.Snapshot.OfferingOptionValues.OrderBy(value => value.SortOrder).Select(value => value.Value));
+        Assert.Contains(
+            repository.Snapshot.OfferingOptionValues.Single(value => value.Value == "Black").Id,
+            Assert.Single(repository.Snapshot.OfferingVariants).OptionValueIds);
+    }
+
+    [Fact]
     public async Task ShopProductImportPreservesLegacyOfferingIdentityAndMockupTemplates()
     {
         var store = new StoreSummary(Guid.NewGuid(), Guid.NewGuid(), "Store", new(PrintifyShopId: 42), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, FulfillmentStrategy.Printify);

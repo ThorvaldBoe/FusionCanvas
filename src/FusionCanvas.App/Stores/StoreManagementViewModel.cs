@@ -94,6 +94,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private readonly INicheManagementService? _nicheService;
     private readonly ITagManagementService? _tagService;
     private readonly IProductSupplierSetupService? _productService;
+    private readonly ICatalogSetupService? _catalogService;
     private readonly IOfferingManagementService? _offeringManagementService;
     private readonly IWorkspaceRepository? _workspaceRepository;
     private bool _isSelectorExpanded;
@@ -159,6 +160,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private string? _errorMessage;
 
     private bool _productDeleteWarningVisible;
+    private bool _productArchiveWarningVisible;
     private bool _offeringDeleteWarningVisible;
     private bool _isCreatingNewProduct;
     private bool _isCreatingNewOffering;
@@ -166,6 +168,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private Guid? _draftOfferingId;
     private Task? _productSaveTask;
     private StoreProductSummary? _pendingDeleteProduct;
+    private StoreProductSummary? _pendingArchiveProduct;
     private FulfillmentOfferingSummary? _pendingDeleteOffering;
     private StoreProductSummary? _selectedProduct;
     private FulfillmentOfferingSummary? _selectedOffering;
@@ -193,9 +196,12 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         _nicheService = nicheService;
         _tagService = tagService;
         _productService = productService;
+        _catalogService = catalogService;
         _offeringManagementService = offeringManagementService;
         _workspaceRepository = workspaceRepository;
         CatalogSetup = catalogService is not null && mockupService is not null ? new CatalogSetupViewModel(catalogService, mockupService, offeringManagementService, providerCatalog, sourceImages, filePicker) : null;
+        if (CatalogSetup is not null)
+            CatalogSetup.CatalogChanged += OnCatalogChanged;
         ToggleStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = !IsSelectorExpanded);
         ExpandStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = true);
         CollapseStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = false);
@@ -320,6 +326,9 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         RequestDeleteSelectedProductCommand = new RelayCommand(_ => RequestDeleteSelectedProduct());
         ConfirmDeleteProductCommand = new RelayCommand(_ => Run(ConfirmDeleteProductAsync()));
         CancelDeleteProductCommand = new RelayCommand(_ => ClearProductDeleteWarning());
+        RequestArchiveSelectedProductCommand = new RelayCommand(_ => RequestArchiveSelectedProduct());
+        ConfirmArchiveSelectedProductCommand = new RelayCommand(_ => Run(ConfirmArchiveSelectedProductAsync()));
+        CancelArchiveSelectedProductCommand = new RelayCommand(_ => ClearProductArchiveWarning());
          StartCreateOfferingCommand = new RelayCommand(_ => StartCreateOffering());
          CancelNewOfferingCommand = new RelayCommand(_ => CancelNewOffering());
          BackToProductsCommand = new RelayCommand(_ => Run(BackToProductsAsync()));
@@ -377,6 +386,12 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 Run(RemoveDesignAreaAsync(area));
             }
         });
+    }
+
+    private void OnCatalogChanged(object? sender, EventArgs e)
+    {
+        if (CatalogEditorLevel == CatalogEditorLevel.ProductDetail)
+            Run(RefreshBlueprintOfferingCardsAsync());
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -1092,7 +1107,17 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public bool CanDeleteSelectedProduct => _productService is not null && SelectedProduct is not null && !_isCreatingNewProduct && SelectedStore is { IsArchived: false };
 
-    public bool CanArchiveSelectedProduct => false;
+    public bool CanArchiveSelectedProduct => _catalogService is not null && SelectedProduct is not null && !_isCreatingNewProduct && !HasUnsavedProductChanges && SelectedStore is { IsArchived: false };
+
+    public bool ProductArchiveWarningVisible
+    {
+        get => _productArchiveWarningVisible;
+        private set => SetField(ref _productArchiveWarningVisible, value);
+    }
+
+    public string ProductArchiveWarningMessage => _pendingArchiveProduct is null
+        ? "Archiving this Blueprint will affect its connected catalog configuration."
+        : $"This is a high-impact action. Archiving Blueprint '{_pendingArchiveProduct.Name}' will also archive its fulfillment offerings, variants, design areas, and mockup configuration. Existing listing and design relationships will be preserved, but this Blueprint will leave active use.";
 
     public bool CanDeleteSelectedOffering => _productService is not null && SelectedOffering is not null && !_isCreatingNewOffering && SelectedStore is { IsArchived: false };
 
@@ -1411,6 +1436,12 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public ICommand ConfirmDeleteProductCommand { get; }
 
     public ICommand CancelDeleteProductCommand { get; }
+
+    public ICommand RequestArchiveSelectedProductCommand { get; }
+
+    public ICommand ConfirmArchiveSelectedProductCommand { get; }
+
+    public ICommand CancelArchiveSelectedProductCommand { get; }
 
     public ICommand StartCreateOfferingCommand { get; }
     public ICommand CancelNewOfferingCommand { get; }
@@ -2850,8 +2881,76 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ProductDeleteWarningMessage));
     }
 
+    public void RequestArchiveSelectedProduct()
+    {
+        if (!CanArchiveSelectedProduct)
+        {
+            ErrorMessage = "Select an active Blueprint before archiving it.";
+            return;
+        }
+
+        _pendingArchiveProduct = SelectedProduct;
+        ProductArchiveWarningVisible = true;
+        OnPropertyChanged(nameof(ProductArchiveWarningMessage));
+    }
+
+    public async Task ConfirmArchiveSelectedProductAsync(CancellationToken cancellationToken = default)
+    {
+        if (_catalogService is null || _pendingArchiveProduct is null || SelectedStore is null)
+        {
+            ErrorMessage = "Select a Blueprint before archiving it.";
+            return;
+        }
+
+        try
+        {
+            var result = await _catalogService.ArchiveBlueprintWithDependentsAsync(
+                new ArchiveBlueprintWithDependentsRequest(SelectedStore.Id, _pendingArchiveProduct.Id), cancellationToken).ConfigureAwait(true);
+            ErrorMessage = result.Error;
+            if (result.Succeeded)
+            {
+                ClearProductArchiveWarning();
+                await LoadProductsForSelectedStoreAsync(cancellationToken).ConfigureAwait(true);
+                if (SelectedProduct is null)
+                {
+                    CatalogEditorLevel = CatalogEditorLevel.Overview;
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            ErrorMessage = $"The Blueprint could not be archived. {exception.Message}";
+        }
+    }
+
+    private void ClearProductArchiveWarning()
+    {
+        _pendingArchiveProduct = null;
+        ProductArchiveWarningVisible = false;
+        OnPropertyChanged(nameof(ProductArchiveWarningMessage));
+    }
+
     public async Task ConfirmDeleteProductAsync(CancellationToken cancellationToken = default)
     {
+        if (_catalogService is not null && SelectedStore is not null && _pendingDeleteProduct is not null)
+        {
+            var result = await _catalogService.ArchiveBlueprintWithDependentsAsync(
+                new ArchiveBlueprintWithDependentsRequest(SelectedStore.Id, _pendingDeleteProduct.Id),
+                cancellationToken).ConfigureAwait(true);
+            ErrorMessage = result.Error;
+            if (result.Succeeded)
+            {
+                ClearProductDeleteWarning();
+                await LoadProductsForSelectedStoreAsync(cancellationToken).ConfigureAwait(true);
+                if (SelectedProduct is null)
+                {
+                    CatalogEditorLevel = CatalogEditorLevel.Overview;
+                }
+            }
+
+            return;
+        }
+
         if (_productService is null)
         {
             ErrorMessage = "Product and fulfillment setup is not available.";

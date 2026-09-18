@@ -140,7 +140,7 @@ public sealed class PrintifyCatalogImportService(
                 }
 
                 var optionIds = importedProvider.Variants.SelectMany(value => value.OptionValueIds).Distinct().ToArray();
-                var optionValuesBySourceId = EnsureOptions(options, values, offering.Id, optionIds, now);
+                var optionValuesBySourceId = EnsureOptions(options, values, offering.Id, importedProvider.Options, optionIds, now);
                 foreach (var importedVariant in importedProvider.Variants)
                 {
                     var optionValueIds = importedVariant.OptionValueIds.Where(optionValuesBySourceId.ContainsKey).Select(id => optionValuesBySourceId[id]).ToArray();
@@ -223,33 +223,78 @@ public sealed class PrintifyCatalogImportService(
         }
     }
 
-    private static Dictionary<int, Guid> EnsureOptions(List<OfferingOption> options, List<OfferingOptionValue> values, Guid offeringId, IReadOnlyList<int> sourceIds, DateTimeOffset now)
+    private static Dictionary<int, Guid> EnsureOptions(
+        List<OfferingOption> options,
+        List<OfferingOptionValue> values,
+        Guid offeringId,
+        IReadOnlyList<PrintifyCatalogOption> importedOptions,
+        IReadOnlyList<int> variantValueIds,
+        DateTimeOffset now)
     {
         var result = new Dictionary<int, Guid>();
-        var kinds = new[] { OptionKind.Color, OptionKind.Size, OptionKind.Other };
-        for (var index = 0; index < sourceIds.Count && index < kinds.Length; index++)
+        foreach (var importedOption in importedOptions)
         {
-            var sourceId = sourceIds[index];
+            var kind = ParseOptionKind(importedOption);
+            var declaredValues = importedOption.Values.Where(value => value.Id > 0).ToArray();
+            if (declaredValues.Length == 0) continue;
             var option = options.SingleOrDefault(value => value.OfferingId == offeringId
-                && value.OptionKind == kinds[index]
-                && MetadataHasId(value.MetadataJson, sourceId));
+                && value.OptionKind == kind);
             if (option is null)
             {
-                option = new OfferingOption(Guid.NewGuid(), offeringId, kinds[index], $"Printify option {sourceId}", index, metadataJson: Metadata("option", sourceId));
+                option = new OfferingOption(Guid.NewGuid(), offeringId, kind, importedOption.Name.Trim(), options.Count(value => value.OfferingId == offeringId), metadataJson: Metadata("option", declaredValues.Select(value => value.Id).ToArray()));
                 options.Add(option);
             }
-            var optionValue = values.SingleOrDefault(value => value.OptionId == option.Id
-                && value.OfferingId == offeringId
-                && MetadataHasId(value.MetadataJson, sourceId));
-            if (optionValue is null)
+            else if (!string.Equals(option.Name, importedOption.Name.Trim(), StringComparison.Ordinal))
             {
-                optionValue = new OfferingOptionValue(Guid.NewGuid(), option.Id, offeringId, $"Printify value {sourceId}", 0, metadataJson: Metadata("option-value", sourceId));
-                values.Add(optionValue);
+                Replace(options, value => value.Id == option.Id, option with { Name = importedOption.Name.Trim() });
             }
-            result[sourceId] = optionValue.Id;
+
+            foreach (var declaredValue in declaredValues)
+            {
+                var optionValue = values.SingleOrDefault(value => value.OptionId == option.Id
+                    && value.OfferingId == offeringId
+                    && MetadataHasId(value.MetadataJson, declaredValue.Id));
+                if (optionValue is null)
+                {
+                    optionValue = new OfferingOptionValue(Guid.NewGuid(), option.Id, offeringId, declaredValue.Title.Trim(), values.Count(value => value.OptionId == option.Id), metadataJson: Metadata("option-value", declaredValue.Id));
+                    values.Add(optionValue);
+                }
+                else if (!string.Equals(optionValue.Value, declaredValue.Title.Trim(), StringComparison.Ordinal))
+                {
+                    Replace(values, value => value.Id == optionValue.Id, optionValue with { Value = declaredValue.Title.Trim() });
+                }
+                result[declaredValue.Id] = optionValue.Id;
+            }
+        }
+
+        // Older test fixtures and previously accepted provider responses did not
+        // include option definitions. Keep those imports readable and usable,
+        // while real Printify responses use the names and values above.
+        if (result.Count == 0)
+        {
+            var kinds = new[] { OptionKind.Color, OptionKind.Size, OptionKind.Other };
+            for (var index = 0; index < variantValueIds.Count && index < kinds.Length; index++)
+            {
+                var sourceId = variantValueIds[index];
+                var option = options.SingleOrDefault(value => value.OfferingId == offeringId && value.OptionKind == kinds[index])
+                    ?? new OfferingOption(Guid.NewGuid(), offeringId, kinds[index], $"Printify option {sourceId}", index, metadataJson: Metadata("option", sourceId));
+                if (!options.Any(value => value.Id == option.Id)) options.Add(option);
+                var optionValue = values.SingleOrDefault(value => value.OptionId == option.Id && MetadataHasId(value.MetadataJson, sourceId))
+                    ?? new OfferingOptionValue(Guid.NewGuid(), option.Id, offeringId, $"Printify value {sourceId}", 0, metadataJson: Metadata("option-value", sourceId));
+                if (!values.Any(value => value.Id == optionValue.Id)) values.Add(optionValue);
+                result[sourceId] = optionValue.Id;
+            }
         }
         return result;
     }
+
+    private static OptionKind ParseOptionKind(PrintifyCatalogOption option) =>
+        (option.Type.Trim().ToLowerInvariant(), option.Name.Trim().ToLowerInvariant()) switch
+        {
+            ("color", _) or (_, "color") => OptionKind.Color,
+            ("size", _) or (_, "size") => OptionKind.Size,
+            _ => OptionKind.Other
+        };
 
     private static string Metadata(string kind, params int[] ids) => JsonSerializer.Serialize(new { source = "printify", kind, ids });
     private static string Metadata(string kind, int blueprintId, string productId) => JsonSerializer.Serialize(new { source = "printify", kind, blueprintId, productId });

@@ -105,6 +105,8 @@ Run the automated baseline from the repository root:
 dotnet test .\FusionCanvas.sln -m:1
 ```
 
+Run the full baseline locally before merging. GitHub Actions runs the same deterministic suite daily on the default branch and supports a manual run; pull requests do not wait for the full solution suite.
+
 The baseline test suite uses mirrored test projects under `tests/`:
 
 * `FusionCanvas.Domain.Tests` protects domain rules, entity relationships, invariants, workflow decisions, and persistence-neutral boundaries.

@@ -574,7 +574,37 @@
                               Command="{Binding RequestDeleteSelectedProductCommand}"
                               IsEnabled="{Binding CanDeleteSelectedProduct}"
                               Classes="danger fixedAction blueprintAction" />
+                      <Button Content="Archive Blueprint"
+                              AutomationProperties.AutomationId="Catalog.ArchiveBlueprint"
+                              Command="{Binding RequestArchiveSelectedProductCommand}"
+                              IsEnabled="{Binding CanArchiveSelectedProduct}"
+                              Classes="danger fixedAction blueprintAction" />
                     </StackPanel>
+                    <Border IsVisible="{Binding ProductArchiveWarningVisible}"
+                            AutomationProperties.AutomationId="Catalog.BlueprintArchiveWarning"
+                            Background="{DynamicResource WarningBackgroundBrush}"
+                            BorderBrush="{DynamicResource WarningBorderBrush}"
+                            BorderThickness="2"
+                            Padding="12">
+                      <StackPanel Spacing="8">
+                        <TextBlock Text="HIGH-IMPACT BLUEPRINT ARCHIVE"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource WarningTextBrush}" />
+                        <TextBlock Text="{Binding ProductArchiveWarningMessage}"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource WarningTextBrush}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Button Content="Archive Blueprint and dependents"
+                                  Command="{Binding ConfirmArchiveSelectedProductCommand}"
+                                  AutomationProperties.Name="Confirm archive Blueprint and dependents"
+                                  Classes="danger fixedAction" />
+                          <Button Content="Cancel"
+                                  Command="{Binding CancelArchiveSelectedProductCommand}"
+                                  AutomationProperties.Name="Cancel Blueprint archive"
+                                  Classes="secondary fixedAction" />
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
                   </StackPanel>
                 </StackPanel>
               </Border>
@@ -742,8 +772,50 @@
                                  TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     </StackPanel>
                     <TextBlock Text="Description" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <TextBox Text="{Binding CatalogSetup.OfferingDescription}" AcceptsReturn="True" MinHeight="44" Classes="field" />
-                    <Button Content="Save Blueprint Offering" Command="{Binding CatalogSetup.SaveOfferingCommand}" Classes="primary fixedAction" />
+                    <TextBox Text="{Binding CatalogSetup.OfferingDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True" MinHeight="44" Classes="field" />
+                      <Button Content="Save Blueprint Offering" Command="{Binding CatalogSetup.SaveOfferingCommand}" Classes="primary offeringAction" />
+                      <Button Content="Archive Blueprint Offering"
+                              Command="{Binding CatalogSetup.RequestArchiveOfferingCommand}"
+                              Classes="danger offeringAction"
+                              AutomationProperties.AutomationId="Catalog.ArchiveOffering" />
+                    </StackPanel>
+                </StackPanel>
+              </Border>
+
+              <Border IsVisible="{Binding CatalogSetup.IsArchiveOfferingConfirmationVisible}"
+                      Background="{DynamicResource DangerBackgroundBrush}"
+                      BorderBrush="{DynamicResource DangerBorderBrush}"
+                      BorderThickness="1" Padding="12">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="Archive Blueprint Offering?" FontWeight="SemiBold" />
+                  <TextBlock Text="This is reversible. The Offering and its active catalog-owned dependents will be archived together; nothing will be permanently deleted."
+                             TextWrapping="Wrap" Foreground="{DynamicResource DangerTextBrush}" />
+                  <TextBlock Text="{Binding CatalogSetup.ArchiveOfferingPlan.OfferingName}" FontWeight="SemiBold" />
+                  <ItemsControl ItemsSource="{Binding CatalogSetup.ArchiveOfferingPlan.CatalogDependents}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding DisplayText}"
+                                   Foreground="{DynamicResource SecondaryTextBrush}" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock IsVisible="{Binding CatalogSetup.ArchiveOfferingPlan.HasExternalBlockers}"
+                             Text="Resolve the external dependents below before archiving this Offering:"
+                             TextWrapping="Wrap" Foreground="{DynamicResource DangerTextBrush}" />
+                  <ItemsControl ItemsSource="{Binding CatalogSetup.ArchiveOfferingPlan.ExternalBlockers}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding DisplayText}"
+                                   Foreground="{DynamicResource DangerTextBrush}" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Archive Offering and Dependents"
+                            Command="{Binding CatalogSetup.ConfirmArchiveOfferingCommand}"
+                            Classes="danger fixedDanger" />
+                    <Button Content="Cancel" Command="{Binding CatalogSetup.CancelArchiveOfferingCommand}" Classes="secondary fixedAction" />
                   </StackPanel>
                 </StackPanel>
               </Border>
@@ -1157,6 +1229,10 @@
     </Style>
     <Style Selector="Button.fixedAction">
       <Setter Property="Width" Value="104" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <Style Selector="Button.offeringAction">
+      <Setter Property="Width" Value="200" />
       <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
     <Style Selector="Button.blueprintAction">

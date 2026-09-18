@@ -71,6 +71,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private bool _isAddingBulkVariants;
     private bool _isAddingPlaceholder;
     private bool _isAddingTemplate;
+    private CatalogArchivePlan? _archiveOfferingPlan;
+    private bool _isArchiveOfferingConfirmationVisible;
     private OptionKind _selectedOptionKind = OptionKind.Color;
     private OfferingOptionValue? _bulkColor;
     private string _bulkResultMessage = string.Empty;
@@ -161,6 +163,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         ArchiveOptionCommand = new RelayCommand(parameter => RunArchive(parameter, CatalogRecordKind.Option));
         ArchiveOptionValueCommand = new RelayCommand(parameter => RunArchive(parameter, CatalogRecordKind.OptionValue));
         ArchiveVariantCommand = new RelayCommand(parameter => RunArchive(parameter, CatalogRecordKind.Variant));
+        RequestArchiveOfferingCommand = new AsyncRelayCommand(PreviewArchiveOfferingAsync, () => CanEdit && SelectedOffering is { IsArchived: false });
+        ConfirmArchiveOfferingCommand = new AsyncRelayCommand(ConfirmArchiveOfferingAsync, () => CanEdit && IsArchiveOfferingConfirmationVisible && ArchiveOfferingPlan?.CanConfirm == true);
+        CancelArchiveOfferingCommand = new RelayCommand(_ => CancelArchiveOfferingArchive(), () => IsArchiveOfferingConfirmationVisible);
         ArchivePlaceholderCommand = new RelayCommand(parameter => RequestDesignAreaArchive(parameter));
         ConfirmDesignAreaArchiveCommand = new AsyncRelayCommand(ConfirmDesignAreaArchiveAsync, () => CanEdit && _isDesignAreaArchiveConfirmationVisible);
         CancelDesignAreaArchiveCommand = new RelayCommand(_ => CancelDesignAreaArchive(), () => _isDesignAreaArchiveConfirmationVisible);
@@ -188,6 +193,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public event EventHandler? MockupTemplateEditorRequested;
     public event EventHandler? EnlargedPlacementEditorRequested;
     public event EventHandler? DesignAreaEditorRequested;
+    public event EventHandler? CatalogChanged;
 
     public ObservableCollection<Blueprint> Blueprints { get; } = [];
     public ObservableCollection<PrintProvider> PrintProviders { get; } = [];
@@ -454,8 +460,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     }
 
     public string OfferingName { get => _offeringName; set { if (SetField(ref _offeringName, value)) NotifyCommands(); } }
-    public string OfferingDescription { get => _offeringDescription; set => SetField(ref _offeringDescription, value); }
-    public string ProviderNetworkCode { get => _providerNetworkCode; set => SetField(ref _providerNetworkCode, value); }
+    public string OfferingDescription { get => _offeringDescription; set { if (SetField(ref _offeringDescription, value)) NotifyCommands(); } }
+    public string ProviderNetworkCode { get => _providerNetworkCode; set { if (SetField(ref _providerNetworkCode, value)) NotifyCommands(); } }
     public string NewPrintProviderName { get => _newPrintProviderName; set { if (SetField(ref _newPrintProviderName, value)) NotifyCommands(); } }
     public string ExternalOfferingId { get => _externalOfferingId; set => SetField(ref _externalOfferingId, value); }
     public string OptionName { get => _optionName; set { if (SetField(ref _optionName, value)) NotifyCommands(); } }
@@ -504,6 +510,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public string ErrorMessage { get => _error; private set { if (SetField(ref _error, value)) OnPropertyChanged(nameof(HasError)); } }
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
     public bool HasActiveDraft => IsAddingPrintProvider || IsAddingOption || IsAddingOptionValue || IsEditingOptionValue || IsAddingVariant || IsAddingBulkVariants || IsAddingPlaceholder || IsAddingTemplate;
+    public CatalogArchivePlan? ArchiveOfferingPlan { get => _archiveOfferingPlan; private set { if (SetField(ref _archiveOfferingPlan, value)) { OnPropertyChanged(nameof(HasArchiveOfferingPlan)); NotifyCommands(); } } }
+    public bool HasArchiveOfferingPlan => ArchiveOfferingPlan is not null;
+    public bool IsArchiveOfferingConfirmationVisible { get => _isArchiveOfferingConfirmationVisible; private set { if (SetField(ref _isArchiveOfferingConfirmationVisible, value)) NotifyCommands(); } }
     public bool HasMeaningfulMockupTemplateDraft => IsAddingTemplate && _mockupTemplateDraftBaseline is not null && CurrentMockupTemplateDraftState() != _mockupTemplateDraftBaseline;
     public string MockupTemplateLifecycleLabel => CurrentMockupTemplateReadiness().Lifecycle == MockupTemplateLifecycle.ReadyForUse ? "Ready for use" : "Draft";
     public IReadOnlyList<string> MockupTemplateReadinessMessages => CurrentMockupTemplateReadiness().Blockers.Select(ReadinessMessage).ToArray();
@@ -614,6 +623,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ICommand ArchiveOptionCommand { get; }
     public ICommand ArchiveOptionValueCommand { get; }
     public ICommand ArchiveVariantCommand { get; }
+    public ICommand RequestArchiveOfferingCommand { get; }
+    public ICommand ConfirmArchiveOfferingCommand { get; }
+    public ICommand CancelArchiveOfferingCommand { get; }
     public ICommand ArchivePlaceholderCommand { get; }
     public ICommand ConfirmDesignAreaArchiveCommand { get; }
     public ICommand CancelDesignAreaArchiveCommand { get; }
@@ -624,6 +636,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     public async Task LoadForStoreAsync(Guid storeId, CancellationToken cancellationToken = default)
     {
+        CancelArchiveOfferingArchive();
         ClearDesignAreaArchiveConfirmation();
         ResetOptionValueManagement();
         ResetVariantCreation();
@@ -664,6 +677,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     {
         if (offeringId != SelectedOffering?.Id)
         {
+            CancelArchiveOfferingArchive();
             ClearDesignAreaArchiveConfirmation();
         }
         _requestedOfferingId = offeringId;
@@ -1181,6 +1195,37 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         _ = RunMutationAsync(() => _catalog.ArchiveAsync(new ArchiveCatalogRecordRequest(SelectedOffering.StoreId, kind, id)));
     }
 
+    private async Task PreviewArchiveOfferingAsync()
+    {
+        if (SelectedOffering is null) return;
+        IsBusy = true;
+        ErrorMessage = string.Empty;
+        try
+        {
+            ArchiveOfferingPlan = await _catalog.PreviewArchiveOfferingAsync(new ArchiveOfferingCascadeRequest(SelectedOffering.StoreId, SelectedOffering.Id)).ConfigureAwait(true);
+            IsArchiveOfferingConfirmationVisible = true;
+        }
+        catch (Exception exception) { ErrorMessage = exception.Message; }
+        finally { IsBusy = false; }
+    }
+
+    private async Task ConfirmArchiveOfferingAsync()
+    {
+        if (SelectedOffering is null || ArchiveOfferingPlan is not { CanConfirm: true }) return;
+        await RunMutationAsync(() => _catalog.ArchiveOfferingCascadeAsync(new ArchiveOfferingCascadeRequest(SelectedOffering.StoreId, SelectedOffering.Id))).ConfigureAwait(true);
+        if (!HasError)
+        {
+            IsArchiveOfferingConfirmationVisible = false;
+            ArchiveOfferingPlan = null;
+        }
+    }
+
+    private void CancelArchiveOfferingArchive()
+    {
+        IsArchiveOfferingConfirmationVisible = false;
+        ArchiveOfferingPlan = null;
+    }
+
     private bool CanPreviewBulkVariants() => CanEdit && _offeringManagement is not null && BulkColor is not null && BulkSizeChoices.Any(value => value.IsSelected);
 
     private OfferingContext CurrentContext()
@@ -1263,7 +1308,11 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         {
             var result = await mutation().ConfigureAwait(true);
             if (!result.Succeeded) ErrorMessage = result.Error ?? "Catalog change failed.";
-            else ApplyCatalog(result.State);
+            else
+            {
+                ApplyCatalog(result.State);
+                CatalogChanged?.Invoke(this, EventArgs.Empty);
+            }
         }
         catch (Exception exception) { ErrorMessage = exception.Message; }
         finally { IsBusy = false; }
@@ -1868,6 +1917,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             ConfirmDesignAreaArchiveCommand, CancelDesignAreaArchiveCommand,
             RequestCancelMockupTemplateCommand, ConfirmDiscardMockupTemplateCommand, KeepEditingMockupTemplateCommand,
             RequestCancelDesignAreaCommand, ConfirmDiscardDesignAreaCommand, KeepEditingDesignAreaCommand
+            ,RequestArchiveOfferingCommand, ConfirmArchiveOfferingCommand, CancelArchiveOfferingCommand
         })
         {
             switch (command)

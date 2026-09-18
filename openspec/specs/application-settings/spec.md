@@ -120,9 +120,11 @@ FusionCanvas SHALL include an About section in the Settings window that displays
 - **THEN** the About pane replaces the previous pane in the content region
 
 ### Requirement: Additional AI parameters are understandable
+
 The AI settings profile editor SHALL present each supported additional parameter with a visible human-readable label and concise explanatory text, while preserving capability-based visibility and the existing bound value.
 
 #### Scenario: Supported parameters are displayed with guidance
+
 - **GIVEN** the selected model supports one or more additional parameters
 - **WHEN** the user expands Additional parameters
 - **THEN** each supported parameter is shown in a clearly labeled, consistently arranged field
@@ -130,16 +132,11 @@ The AI settings profile editor SHALL present each supported additional parameter
 - **AND** unsupported parameters remain hidden
 
 #### Scenario: Parameter editing behavior is unchanged
+
 - **GIVEN** a visible additional parameter field
 - **WHEN** the user edits its value
 - **THEN** the same existing profile property is updated
 - **AND** capability gating, validation, persistence, and provider serialization remain unchanged
-- **AND** the About pane shows the FusionCanvas product name and the user-friendly product version
-- **AND** the About pane exposes a copy action for the diagnostic block
-
-#### Scenario: About section is reachable by keyboard
-- **WHEN** keyboard focus enters the Settings window
-- **THEN** the `About` entry participates in the existing section rail and is reachable in a predictable tab order alongside the other sections
 
 ### Requirement: Per-window geometry persists locally with backward compatibility
 
@@ -155,4 +152,21 @@ FusionCanvas SHALL persist per-window geometry as an optional section of the ver
 - **WHEN** the per-window geometry section contains one malformed or out-of-range entry alongside valid entries
 - **THEN** FusionCanvas discards only the invalid entry
 - **AND** preserves the remaining geometry entries, the main window layout, and the rest of the readable settings
+
+### Requirement: Selected store preference persists locally
+FusionCanvas SHALL persist the identity of the most recently selected active store in the local application-settings document, independently of workspace data.
+
+#### Scenario: Selected store survives restart
+- **WHEN** the user selects an active store in the current workspace, quits FusionCanvas, and starts it again
+- **THEN** FusionCanvas restores that store as the selected store when the store still belongs to the active workspace and remains active
+
+#### Scenario: Missing or stale selected store falls back safely
+- **WHEN** the saved selected store ID is missing, malformed, archived, deleted, or belongs to another workspace
+- **THEN** FusionCanvas ignores that ID
+- **AND** the existing first-active-store fallback behavior is used
+
+#### Scenario: Existing settings remain backward compatible
+- **WHEN** FusionCanvas loads a settings document written without a selected store preference
+- **THEN** the document loads successfully
+- **AND** all existing readable settings remain available
 
