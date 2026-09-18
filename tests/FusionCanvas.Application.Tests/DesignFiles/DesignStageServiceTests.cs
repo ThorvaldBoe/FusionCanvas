@@ -33,6 +33,42 @@ public class DesignStageServiceTests
     }
 
     [Fact]
+    public async Task SaveArtworkPreferencesAsync_LegacyDesignArea_RoundTripsAndIsRestored()
+    {
+        var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
+        var service = New(repo);
+        var (itemId, offeringId) = await AddItemWithConfig(service, repo);
+        var areaId = repo.Snapshot.DesignAreas.Single(area => area.FulfillmentOfferingId == offeringId).Id;
+
+        var result = await service.SaveArtworkPreferencesAsync(itemId, areaId, transparentBackground: true, TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        var state = await service.LoadDesignStageStateAsync(itemId, TestContext.Current.CancellationToken);
+        Assert.True(state.HasPersistedArtworkTargetPreference);
+        Assert.Equal(areaId, state.PersistedArtworkTargetId);
+        Assert.True(state.PersistedTransparentBackground == true);
+        Assert.Single(state.AvailablePlaceholders);
+    }
+
+    [Fact]
+    public async Task SelectConfigurationAsync_ClearsPersistedArtworkPreferences()
+    {
+        var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
+        var service = New(repo);
+        var (itemId, offeringId) = await AddItemWithConfig(service, repo);
+        var areaId = repo.Snapshot.DesignAreas.Single(area => area.FulfillmentOfferingId == offeringId).Id;
+        await service.SaveArtworkPreferencesAsync(itemId, areaId, transparentBackground: true, TestContext.Current.CancellationToken);
+
+        var result = await service.SelectConfigurationAsync(itemId, offeringId, TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        var state = await service.LoadDesignStageStateAsync(itemId, TestContext.Current.CancellationToken);
+        Assert.False(state.HasPersistedArtworkTargetPreference);
+        Assert.Null(state.PersistedArtworkTargetId);
+        Assert.Null(state.PersistedTransparentBackground);
+    }
+
+    [Fact]
     public async Task SelectConfigurationAsync_CrossStoreOffering_Rejected()
     {
         var repo = new InMemoryWorkspaceRepository(SeedWithProduct());

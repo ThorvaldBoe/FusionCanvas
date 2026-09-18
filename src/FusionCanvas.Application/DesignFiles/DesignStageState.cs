@@ -23,4 +23,7 @@ public sealed record DesignStageState(
     public string? SelectedProviderNetworkCode { get; init; }
     public string? SelectedBlueprintName { get; init; }
     public string? ProviderNetworkWarning { get; init; }
+    public Guid? PersistedArtworkTargetId { get; init; }
+    public bool HasPersistedArtworkTargetPreference { get; init; }
+    public bool? PersistedTransparentBackground { get; init; }
 }

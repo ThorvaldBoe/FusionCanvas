@@ -23,10 +23,11 @@ FusionCanvas SHALL present a Generate Artwork section below Supporting Images. T
 - **THEN** any in-flight generation for the previous configuration is cancelled and its late result is ignored
 - **AND** the selector resets to the new offering's active primary Design Area or to no selection when none exists
 
-#### Scenario: Explicit target is session scoped
-- **WHEN** the user chooses a non-primary target, closes the Item, and later reopens it
-- **THEN** the selector again initializes from the offering's current primary Design Area
-- **AND** the earlier session choice is not persisted as an Item preference
+#### Scenario: Explicit target and transparency preference are persisted per Item
+- **WHEN** the user chooses a target or changes Transparent Background, closes the Item, and later reopens it with the same Listing Configuration
+- **THEN** the selector and checkbox restore the saved choices when the target remains an active Design Area
+- **AND** an invalid or stale saved target is ignored without selecting an arbitrary area
+- **AND** changing Listing Configuration clears the saved choices before applying the new offering's primary/defaults
 
 ### Requirement: Artwork generation is gated by production and creative readiness
 FusionCanvas SHALL enable Generate only when Design is editable, an Artwork image model and compatible provider endpoint are ready under the active privacy policy, the Item has a selected Listing Configuration and explicit active target, the Design Triangle is complete, and an existing default design row serves at least one selected color. SLL SHALL remain optional.

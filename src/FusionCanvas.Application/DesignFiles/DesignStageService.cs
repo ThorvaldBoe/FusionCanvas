@@ -2,9 +2,11 @@ using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Products;
+using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.AI;
+using FusionCanvas.Application.Items;
 
 namespace FusionCanvas.Application.DesignFiles;
 
@@ -70,8 +72,19 @@ public sealed class DesignStageService : IDesignStageService
             .Where(a => newAreaIds.Contains(a.DesignAreaId) && !oldRows.Contains(a.RowId))
             .ToArray();
 
+        var itemMetadata = ItemMetadataCodec.ParseMetadata(item.MetadataJson);
+        itemMetadata.Remove(ItemMetadataCodec.ArtworkTargetIdKey);
+        itemMetadata.Remove(ItemMetadataCodec.ArtworkTargetPreferenceKey);
+        itemMetadata.Remove(ItemMetadataCodec.ArtworkTransparentBackgroundKey);
+        var updatedItem = item with
+        {
+            MetadataJson = ItemMetadataCodec.SerializeMetadata(itemMetadata),
+            UpdatedAt = _clock()
+        };
+
         var updated = snapshot with
         {
+            Items = [.. snapshot.Items.Where(value => value.Id != itemId), updatedItem],
             ItemListingConfigurations = [.. snapshot.ItemListingConfigurations.Where(c => c.ItemId != itemId),
                 new ItemListingConfiguration(itemId, offeringId)],
             DesignSlotAssignments = keptAssignments,
@@ -81,6 +94,45 @@ public sealed class DesignStageService : IDesignStageService
             DesignVariantRowColors = [.. snapshot.DesignVariantRowColors.Where(c => !oldRows.Contains(c.RowId))]
         };
 
+        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        return DesignStageResult.Success(BuildState(updated, itemId));
+    }
+
+    public async Task<DesignStageResult> SaveArtworkPreferencesAsync(Guid itemId, Guid? designAreaId, bool transparentBackground, CancellationToken cancellationToken = default)
+    {
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var item = snapshot.Items.SingleOrDefault(value => value.Id == itemId);
+        if (item is null)
+        {
+            return DesignStageResult.Failure("Item was not found.");
+        }
+
+        var editDecision = ItemWorkflowPolicy.CanPerformOperation(item, ItemOperationKind.DesignStage);
+        if (!editDecision.IsAllowed)
+        {
+            return DesignStageResult.Failure(editDecision.Reason, BuildState(snapshot, itemId));
+        }
+
+        var offeringId = snapshot.ItemListingConfigurations.SingleOrDefault(value => value.ItemId == itemId)?.OfferingId;
+        if (designAreaId is not null && (offeringId is null || !PlaceholderIdsForOffering(snapshot, offeringId.Value).Contains(designAreaId.Value)))
+        {
+            return DesignStageResult.Failure("The selected Design Area is not active for this Listing Configuration.", BuildState(snapshot, itemId));
+        }
+
+        var metadata = ItemMetadataCodec.ParseMetadata(item.MetadataJson);
+        metadata[ItemMetadataCodec.ArtworkTargetPreferenceKey] = "true";
+        metadata[ItemMetadataCodec.ArtworkTargetIdKey] = designAreaId?.ToString() ?? string.Empty;
+        metadata[ItemMetadataCodec.ArtworkTransparentBackgroundKey] = transparentBackground.ToString();
+
+        var updatedItem = item with
+        {
+            MetadataJson = ItemMetadataCodec.SerializeMetadata(metadata),
+            UpdatedAt = _clock()
+        };
+        var updated = snapshot with
+        {
+            Items = [.. snapshot.Items.Where(value => value.Id != itemId), updatedItem]
+        };
         await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
         return DesignStageResult.Success(BuildState(updated, itemId));
     }
@@ -732,6 +784,7 @@ public sealed class DesignStageService : IDesignStageService
             : string.Empty;
 
         var config = snapshot.ItemListingConfigurations.SingleOrDefault(c => c.ItemId == itemId);
+        var itemMetadata = ItemMetadataCodec.ParseMetadata(item.MetadataJson);
 
         // Available offerings: all offerings whose product belongs to this item's store
         var storeProductIds = snapshot.StoreProducts
@@ -834,6 +887,39 @@ public sealed class DesignStageService : IDesignStageService
         var normalizedPlaceholders = configOfferingId is Guid selectedOfferingId
             ? snapshot.OfferingPlaceholders.Where(placeholder => placeholder.OfferingId == selectedOfferingId && !placeholder.IsArchived).ToArray()
             : [];
+        if (normalizedPlaceholders.Length == 0 && configOfferingId is Guid legacyOfferingId)
+        {
+            normalizedPlaceholders = snapshot.DesignAreas
+                .Where(area => area.FulfillmentOfferingId == legacyOfferingId)
+                .Select(area => new OfferingPlaceholder(
+                    area.Id,
+                    area.FulfillmentOfferingId,
+                    area.Name,
+                    area.Description,
+                    area.Position,
+                    area.DecorationMethod,
+                    area.Width,
+                    area.Height,
+                    area.VariantIds,
+                    false,
+                    area.CreatedAt,
+                    area.UpdatedAt,
+                    area.MetadataJson))
+                .ToArray();
+        }
+        var activeArtworkAreaIds = configOfferingId is Guid configuredOfferingId
+            ? PlaceholderIdsForOffering(snapshot, configuredOfferingId).ToHashSet()
+            : [];
+        var hasPersistedArtworkTargetPreference = itemMetadata.ContainsKey(ItemMetadataCodec.ArtworkTargetPreferenceKey);
+        var persistedArtworkTargetId = hasPersistedArtworkTargetPreference
+            && Guid.TryParse(itemMetadata.GetValueOrDefault(ItemMetadataCodec.ArtworkTargetIdKey), out var savedArtworkTargetId)
+            && activeArtworkAreaIds.Contains(savedArtworkTargetId)
+                ? savedArtworkTargetId
+                : (Guid?)null;
+        var persistedTransparentBackground = persistedArtworkTargetId is not null
+            && bool.TryParse(itemMetadata.GetValueOrDefault(ItemMetadataCodec.ArtworkTransparentBackgroundKey), out var savedTransparentBackground)
+                ? savedTransparentBackground
+                : (bool?)null;
         var selectedNetworkCode = configOfferingId is Guid selectedId
             ? normalizedOfferings.SingleOrDefault(offering => offering.Id == selectedId)?.ProviderNetworkCode
             : null;
@@ -851,7 +937,10 @@ public sealed class DesignStageService : IDesignStageService
             SelectedBlueprintName = selectedBlueprintName,
             ProviderNetworkWarning = selectedNetworkCode is not null
                 ? "Printify Choice is a Provider Network; the final Print Provider may vary."
-                : null
+                : null,
+            PersistedArtworkTargetId = persistedArtworkTargetId,
+            HasPersistedArtworkTargetPreference = hasPersistedArtworkTargetPreference,
+            PersistedTransparentBackground = persistedTransparentBackground
         };
     }
 
