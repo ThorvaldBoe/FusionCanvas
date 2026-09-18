@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FusionCanvas.Application.Stores;
 using FusionCanvas.Application.Stores.Printify;
 using FusionCanvas.Domain.Stores;
@@ -68,7 +69,7 @@ public sealed class PrintifyCatalogImportServiceTests
         {
             SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [new(
                 new(68, "Updated Tee", null, "Gildan", "5000"),
-                [new(9, "Provider", [], [new(33719, "Black", true, true, [1], [new("front", "dtg", 100, 200)])])])])
+                 [new(9, "Provider", [new("Color", "color", [new(1, "Black")])], [new(33719, "Black", true, true, [1], [new("front", "dtg", 100, 200)])])])])
         };
         var credentials = new CredentialsStub { Result = new(new(PrintifyConfigurationKind.Available, "available"), "synthetic-key") };
         var service = new PrintifyCatalogImportService(new StoresStub(store), credentials, client, repository);
@@ -156,7 +157,7 @@ public sealed class PrintifyCatalogImportServiceTests
         {
             SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [new PrintifyCatalogBlueprint(
                 new(68, "Updated Tee", null, null, null),
-                [new(9, "Updated Provider", [], [new(33719, "Black", true, true, [1], [new("front", "dtg", 100, 200)])])])
+                 [new(9, "Updated Provider", [new("Color", "color", [new(1, "Black")])], [new(33719, "Black", true, true, [1], [new("front", "dtg", 100, 200)])])])
                 { ProductId = "shop-product-1" }])
         };
         var service = new PrintifyCatalogImportService(new StoresStub(store), new CredentialsStub { Result = new(new(PrintifyConfigurationKind.Available, "available"), "key") }, client, repository);
@@ -187,7 +188,7 @@ public sealed class PrintifyCatalogImportServiceTests
         {
             SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [new(
                 new(68, "Updated Tee", null, "Gildan", "5000"),
-                [new(7, "Target provider", [], [new(33719, "Black", true, true, [1], [new("front", "dtg", 100, 200)])])])])
+                 [new(7, "Target provider", [new("Color", "color", [new(1, "Black")])], [new(33719, "Black", true, true, [1], [new("front", "dtg", 100, 200)])])])])
         };
         var credentials = new CredentialsStub { Result = new(new(PrintifyConfigurationKind.Available, "available"), "synthetic-key") };
         var service = new PrintifyCatalogImportService(new StoresStub(targetStore), credentials, client, repository);
@@ -214,7 +215,7 @@ public sealed class PrintifyCatalogImportServiceTests
         {
             SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [new(
                 new(68, "Tee", null, null, null),
-                [new(9, "SwiftPOD", [], [new(33719, "Black", true, true, [], [])])]) { ProductId = "product-a" }])
+                 [new(9, "SwiftPOD", [new("Color", "color", [new(1, "Black")])], [new(33719, "Black", true, true, [1], [])])]) { ProductId = "product-a" }])
         };
         var service = new PrintifyCatalogImportService(new StoresStub(store), new CredentialsStub { Result = new(new(PrintifyConfigurationKind.Available, "available"), "key") }, client, repository);
 
@@ -245,6 +246,109 @@ public sealed class PrintifyCatalogImportServiceTests
         Assert.Empty(repository.Snapshot.Blueprints);
         Assert.Empty(repository.Snapshot.PrintProviders);
     }
+
+    [Fact]
+    public async Task KeepsDistinctShopProductsThatShareBlueprintIdSeparate()
+    {
+        var store = TestStore();
+        var repository = TestRepository(store);
+        var client = new ClientStub { SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [
+            Product("product-a", "A"), Product("product-b", "B")]) };
+        var service = TestService(store, repository, client);
+
+        var result = await service.LoadSelectedAsync(new(store.WorkspaceId, store.Id), ["product-a", "product-b"], TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal(2, repository.Snapshot.Blueprints.Count);
+        Assert.Equal(["product-a", "product-b"], repository.Snapshot.Blueprints.Select(value => JsonDocument.Parse(value.MetadataJson).RootElement.GetProperty("productId").GetString()).OrderBy(value => value));
+    }
+
+    [Fact]
+    public async Task UsesBrandAndModelWhenDescriptionIsPresent()
+    {
+        var store = TestStore();
+        var repository = TestRepository(store);
+        var client = new ClientStub { SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [new(
+            new(68, "Catalog title", "Description", "Gildan", "5000"), []) { ProductId = "product-a" }]) };
+        var result = await TestService(store, repository, client).LoadSelectedAsync(new(store.WorkspaceId, store.Id), ["product-a"], TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal("Gildan 5000", Assert.Single(repository.Snapshot.Blueprints).Name);
+    }
+
+    [Fact]
+    public async Task RejectsVariantReferencesToUndeclaredOptionValuesAtomically()
+    {
+        var store = TestStore();
+        var repository = TestRepository(store);
+        var invalid = new PrintifyCatalogBlueprint(new(68, "Tee", null, "Brand", "Model"), [
+            new(9, "Provider", [new("Color", "color", [new(1, "Black")])], [new(33719, "Blue", true, true, [999], [])])
+        ]) { ProductId = "product-a" };
+        var result = await TestService(store, repository, new ClientStub { SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [invalid]) })
+            .LoadSelectedAsync(new(store.WorkspaceId, store.Id), ["product-a"], TestContext.Current.CancellationToken);
+
+        Assert.Equal(PrintifyCatalogResultKind.UnexpectedResponse, result.Kind);
+        Assert.Empty(repository.Snapshot.Blueprints);
+    }
+
+    [Fact]
+    public async Task GroupsMatchingPrintAreasAndRebuildsMembershipWhenGeometryChanges()
+    {
+        var store = TestStore();
+        var repository = TestRepository(store);
+        var first = new PrintifyCatalogBlueprint(
+            new(68, "Tee", null, "Brand", "Model"),
+            [new(9, "Provider", [new("Color", "color", [new(1, "Black"), new(2, "White")])], [
+                new(33, "Black", true, true, [1], [new("front", "dtg", 100, 200)]),
+                new(337, "White", true, true, [2], [new("front", "dtg", 100, 200)])
+            ])]) { ProductId = "product-a" };
+        var firstResult = await TestService(store, repository, new ClientStub
+        {
+            SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [first])
+        }).LoadSelectedAsync(new(store.WorkspaceId, store.Id), ["product-a"], TestContext.Current.CancellationToken);
+
+        Assert.True(firstResult.Succeeded, firstResult.Message);
+        var firstArea = Assert.Single(repository.Snapshot.OfferingPlaceholders);
+        var firstVariantIds = repository.Snapshot.OfferingVariants.ToDictionary(value => JsonDocument.Parse(value.MetadataJson).RootElement.GetProperty("ids")[0].GetInt32(), value => value.Id);
+        Assert.Equal(firstVariantIds.Values.OrderBy(value => value), firstArea.VariantIds.OrderBy(value => value));
+
+        var repeatResult = await TestService(store, repository, new ClientStub
+        {
+            SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [first])
+        }).LoadSelectedAsync(new(store.WorkspaceId, store.Id), ["product-a"], TestContext.Current.CancellationToken);
+
+        Assert.True(repeatResult.Succeeded, repeatResult.Message);
+        Assert.Equal(firstArea.Id, Assert.Single(repository.Snapshot.OfferingPlaceholders).Id);
+        Assert.Equal(firstArea.VariantIds.OrderBy(value => value), repository.Snapshot.OfferingPlaceholders.Single().VariantIds.OrderBy(value => value));
+
+        var changed = first with
+        {
+            Providers = [new(9, "Provider", [new("Color", "color", [new(1, "Black"), new(2, "White")])], [
+                new(33, "Black", true, true, [1], [new("front", "dtg", 100, 200)]),
+                new(337, "White", true, true, [2], [new("front", "dtg", 120, 200)])
+            ])]
+        };
+        var changedResult = await TestService(store, repository, new ClientStub
+        {
+            SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [changed])
+        }).LoadSelectedAsync(new(store.WorkspaceId, store.Id), ["product-a"], TestContext.Current.CancellationToken);
+
+        Assert.True(changedResult.Succeeded, changedResult.Message);
+        var areas = repository.Snapshot.OfferingPlaceholders.OrderBy(value => value.Width).ToArray();
+        Assert.Equal(2, areas.Length);
+        Assert.Equal([firstVariantIds[33]], areas[0].VariantIds);
+        Assert.Equal([firstVariantIds[337]], areas[1].VariantIds);
+    }
+
+    private static StoreSummary TestStore() => new(Guid.NewGuid(), Guid.NewGuid(), "Store", new(PrintifyShopId: 42), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, FulfillmentStrategy.Printify);
+    private static RepositoryStub TestRepository(StoreSummary store) => new(WorkspaceSnapshot.Empty with
+    {
+        Stores = [new Store(store.Id, store.WorkspaceId, store.Name, null, false, store.CreatedAt, store.UpdatedAt, "{}", null, store.FulfillmentStrategy)]
+    });
+    private static PrintifyCatalogImportService TestService(StoreSummary store, RepositoryStub repository, ClientStub client) => new(
+        new StoresStub(store), new CredentialsStub { Result = new(new(PrintifyConfigurationKind.Available, "available"), "key") }, client, repository);
+    private static PrintifyCatalogBlueprint Product(string productId, string title) => new(
+        new(68, title, null, "Brand", "Model"), [new(9, "Provider", [new("Color", "color", [new(1, "Black")])], [new(33719, title, true, true, [1], [])])]) { ProductId = productId };
 
     private sealed class StoresStub(StoreSummary store) : IStoreManagementService
     {

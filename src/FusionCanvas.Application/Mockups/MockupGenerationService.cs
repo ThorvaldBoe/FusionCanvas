@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Assets;
+using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Domain.Products;
@@ -74,8 +75,34 @@ public sealed class MockupGenerationService : IMockupGenerationService
         foreach (var color in colors)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var colorOption = snapshot.OfferingOptionValues.FirstOrDefault(value => value.OfferingId == config.OfferingId && string.Equals(value.Value, color, StringComparison.OrdinalIgnoreCase) && !value.IsArchived);
-            var source = colorOption is null ? null : revisionImages.FirstOrDefault(image => conditions[image.Id].Contains(colorOption.Id));
+            var colorOption = snapshot.OfferingOptionValues.FirstOrDefault(value => value.OfferingId == config.OfferingId
+                && string.Equals(value.Value, color, StringComparison.OrdinalIgnoreCase)
+                && !value.IsArchived
+                && snapshot.OfferingOptions.Any(option => option.Id == value.OptionId && option.OptionKind == OptionKind.Color && !option.IsArchived));
+            var compatibleVariants = colorOption is null
+                ? Array.Empty<OfferingVariant>()
+                : snapshot.OfferingVariants.Where(variant => !variant.IsArchived
+                    && variant.OfferingId == config.OfferingId
+                    && variant.OptionValueIds.Contains(colorOption.Id)
+                    && snapshot.OfferingPlaceholders.Any(area => area.Id == template.TargetPlaceholderId && area.VariantIds.Contains(variant.Id)))
+                    .ToArray();
+            var sources = revisionImages.Select(image => new MockupTemplateSourceImage(
+                image.Id, template.Id, image.SourceAssetId, image.ImageMapping, false, revision.CreatedAt, revision.CreatedAt,
+                image.ImageWidth, image.ImageHeight)).ToArray();
+            var sourceConditions = revisionImages.SelectMany(image => conditions[image.Id]
+                .Select(optionValueId => new MockupTemplateSourceImageOptionValue(image.Id, optionValueId))).ToArray();
+            var resolutions = MockupTemplateSourcePolicy.Resolve(compatibleVariants, sources, sourceConditions,
+                snapshot.OfferingOptionValues.Where(value => value.OfferingId == config.OfferingId));
+            var resolvedSourceIds = resolutions.SelectMany(value => value.SourceImageIds).Distinct().ToArray();
+            if (resolutions.Count == 0 || resolutions.Any(value => value.Kind != MockupTemplateSourceResolutionKind.Resolved) || resolvedSourceIds.Length != 1)
+            {
+                var message = resolvedSourceIds.Length > 1 || resolutions.Any(value => value.Kind == MockupTemplateSourceResolutionKind.Ambiguous)
+                    ? "Multiple template source images match this Color; refine applicability so generation has one deterministic source."
+                    : "No template source image is configured for this Color and its compatible Variants.";
+                diagnostics.Add(new(color, message));
+                continue;
+            }
+            var source = revisionImages.Single(image => image.Id == resolvedSourceIds[0]);
             var design = FindDesignAsset(snapshot, item.Id, color, template.TargetPlaceholderId);
             if (source is null) { diagnostics.Add(new(color, "No template source image is configured for this Color.")); continue; }
             if (design is null) { diagnostics.Add(new(color, "No Design PNG is assigned for this Color and Design Area.")); continue; }

@@ -170,13 +170,16 @@ public sealed class MockupTemplateSetupService : IMockupTemplateSetupService
             var previousRevision = CurrentRevision(snapshot, template);
             var revision = new MockupTemplateRevision(_newId(), template.Id, revisionNumber, template.TargetPlaceholderId, now, "Color configuration changed", previousRevision?.ProviderMockupReference, previousRevision?.ImageMapping);
             var revisionColors = nextColors.Select(colorId => new MockupTemplateRevisionColor(_newId(), revision.Id, colorId)).ToArray();
+            var revisionSources = SnapshotActiveSourceImages(snapshot, template.Id, revision.Id);
             var updatedTemplate = template with { CurrentRevision = revisionNumber, UpdatedAt = now };
             var updated = snapshot with
             {
                 MockupTemplates = snapshot.MockupTemplates.Select(candidate => candidate.Id == template.Id ? updatedTemplate : candidate).ToArray(),
                 MockupTemplateColorVariants = [.. snapshot.MockupTemplateColorVariants, binding],
                 MockupTemplateRevisions = [.. snapshot.MockupTemplateRevisions, revision],
-                MockupTemplateRevisionColors = [.. snapshot.MockupTemplateRevisionColors, .. revisionColors]
+                MockupTemplateRevisionColors = [.. snapshot.MockupTemplateRevisionColors, .. revisionColors],
+                MockupTemplateRevisionSourceImages = [.. snapshot.MockupTemplateRevisionSourceImages, .. revisionSources.Images],
+                MockupTemplateRevisionSourceImageOptionValues = [.. snapshot.MockupTemplateRevisionSourceImageOptionValues, .. revisionSources.Conditions]
             };
             return Success(updated, request.StoreId);
         }, cancellationToken);
@@ -202,12 +205,15 @@ public sealed class MockupTemplateSetupService : IMockupTemplateSetupService
                 .ToArray();
             var revision = new MockupTemplateRevision(_newId(), template.Id, revisionNumber, template.TargetPlaceholderId, now, "Color configuration changed", previousRevision?.ProviderMockupReference, previousRevision?.ImageMapping);
             var revisionColors = remainingColors.Select(colorId => new MockupTemplateRevisionColor(_newId(), revision.Id, colorId)).ToArray();
+            var revisionSources = SnapshotActiveSourceImages(snapshot, template.Id, revision.Id);
             var updated = snapshot with
             {
                 MockupTemplates = snapshot.MockupTemplates.Select(value => value.Id == template.Id ? value with { CurrentRevision = revisionNumber, UpdatedAt = now } : value).ToArray(),
                 MockupTemplateColorVariants = snapshot.MockupTemplateColorVariants.Select(value => value.Id == binding.Id ? value with { IsArchived = true, UpdatedAt = now } : value).ToArray(),
                 MockupTemplateRevisions = [.. snapshot.MockupTemplateRevisions, revision],
-                MockupTemplateRevisionColors = [.. snapshot.MockupTemplateRevisionColors, .. revisionColors]
+                MockupTemplateRevisionColors = [.. snapshot.MockupTemplateRevisionColors, .. revisionColors],
+                MockupTemplateRevisionSourceImages = [.. snapshot.MockupTemplateRevisionSourceImages, .. revisionSources.Images],
+                MockupTemplateRevisionSourceImageOptionValues = [.. snapshot.MockupTemplateRevisionSourceImageOptionValues, .. revisionSources.Conditions]
             };
             return Success(updated, request.StoreId);
         }, cancellationToken);
@@ -293,6 +299,8 @@ public sealed class MockupTemplateSetupService : IMockupTemplateSetupService
             };
             MockupTemplateRevision? revision = null;
             MockupTemplateRevisionColor[] revisionColors = [];
+            MockupTemplateRevisionSourceImage[] revisionImages = [];
+            MockupTemplateRevisionSourceImageOptionValue[] revisionConditions = [];
             if (outputChanged)
             {
                 try
@@ -304,6 +312,9 @@ public sealed class MockupTemplateSetupService : IMockupTemplateSetupService
                     return Failure(snapshot, request.StoreId, exception.Message);
                 }
                 revisionColors = nextColors.Select(colorId => new MockupTemplateRevisionColor(_newId(), revision.Id, colorId)).ToArray();
+                var revisionSources = SnapshotActiveSourceImages(snapshot, template.Id, revision.Id);
+                revisionImages = revisionSources.Images;
+                revisionConditions = revisionSources.Conditions;
             }
             var colorsChanged = !activeColors.SetEquals(nextColors);
             var nextBindings = colorsChanged
@@ -316,7 +327,9 @@ public sealed class MockupTemplateSetupService : IMockupTemplateSetupService
                     ? [.. snapshot.MockupTemplateColorVariants.Select(value => value.MockupTemplateId == template.Id && !value.IsArchived ? value with { IsArchived = true, UpdatedAt = now } : value), .. nextBindings]
                     : snapshot.MockupTemplateColorVariants,
                 MockupTemplateRevisions = revision is null ? snapshot.MockupTemplateRevisions : [.. snapshot.MockupTemplateRevisions, revision],
-                MockupTemplateRevisionColors = [.. snapshot.MockupTemplateRevisionColors, .. revisionColors]
+                MockupTemplateRevisionColors = [.. snapshot.MockupTemplateRevisionColors, .. revisionColors],
+                MockupTemplateRevisionSourceImages = [.. snapshot.MockupTemplateRevisionSourceImages, .. revisionImages],
+                MockupTemplateRevisionSourceImageOptionValues = [.. snapshot.MockupTemplateRevisionSourceImageOptionValues, .. revisionConditions]
             };
             return Success(updated, request.StoreId);
         }, cancellationToken);
@@ -340,6 +353,24 @@ public sealed class MockupTemplateSetupService : IMockupTemplateSetupService
     private static MockupTemplateSetupResult Success(WorkspaceSnapshot snapshot, Guid storeId, Guid? templateId = null) => new(true, null, BuildState(snapshot, storeId), snapshot, templateId);
     private static MockupTemplateRevision? CurrentRevision(WorkspaceSnapshot snapshot, MockupTemplate template) =>
         snapshot.MockupTemplateRevisions.SingleOrDefault(value => value.MockupTemplateId == template.Id && value.RevisionNumber == template.CurrentRevision);
+
+    private (MockupTemplateRevisionSourceImage[] Images, MockupTemplateRevisionSourceImageOptionValue[] Conditions) SnapshotActiveSourceImages(
+        WorkspaceSnapshot snapshot,
+        Guid templateId,
+        Guid revisionId)
+    {
+        var active = snapshot.MockupTemplateSourceImages
+            .Where(value => value.MockupTemplateId == templateId && !value.IsArchived)
+            .ToArray();
+        var conditions = snapshot.MockupTemplateSourceImageOptionValues;
+        var revisionImages = active.ToDictionary(value => value.Id, value =>
+            new MockupTemplateRevisionSourceImage(_newId(), revisionId, value.SourceAssetId, value.ImageMapping, value.ImageWidth, value.ImageHeight));
+        var revisionConditions = active.SelectMany(value => conditions
+            .Where(condition => condition.SourceImageId == value.Id)
+            .Select(condition => new MockupTemplateRevisionSourceImageOptionValue(revisionImages[value.Id].Id, condition.OptionValueId)))
+            .ToArray();
+        return (revisionImages.Values.ToArray(), revisionConditions);
+    }
 
     private static string NextCopyName(WorkspaceSnapshot snapshot, MockupTemplate source)
     {

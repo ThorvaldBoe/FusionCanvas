@@ -10,6 +10,36 @@ namespace FusionCanvas.App.Tests;
 public sealed class CatalogSetupViewModelTests
 {
     [Fact]
+    public async Task SavingAfterArchivingLastLocalSourceSubmitsArchiveUpdate()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Manual tee", null, BlueprintOfferingKind.ProviderNetwork, null, "manual", null, null, false, now, now);
+        var repository = new InMemoryWorkspaceRepository(snapshot with { Blueprints = [blueprint], BlueprintOfferings = [offering] });
+        var sourceImages = new RecordingSourceImageService();
+        var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository), sourceImages: sourceImages);
+        await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+        viewModel.SelectOffering(offering.Id);
+        viewModel.StartAddTemplateCommand.Execute(null);
+        viewModel.TemplateName = "Manual front";
+        var draft = new LocalMockupSourceDraftViewModel("C:\\source.png", [], isManaged: true, sourceImageId: sourceImages.SourceImageId);
+        viewModel.LocalSourceDrafts.Add(draft);
+        viewModel.SelectLocalSourceCommand.Execute(draft);
+        viewModel.RemoveLocalSourceCommand.Execute(draft);
+
+        Assert.Empty(viewModel.LocalSourceDrafts);
+        Assert.True(viewModel.CreateTemplateCommand.CanExecute(null));
+        viewModel.CreateTemplateCommand.Execute(null);
+        for (var attempt = 0; attempt < 100 && viewModel.IsBusy; attempt++) await Task.Delay(1, TestContext.Current.CancellationToken);
+
+        var archive = Assert.Single(sourceImages.Updates);
+        Assert.Equal(sourceImages.SourceImageId, archive.SourceImageId);
+        Assert.True(archive.Archive);
+        Assert.False(viewModel.IsAddingTemplate);
+    }
+    [Fact]
     public async Task LoadsNormalizedSelectionsAndEnablesTypedSetupCommands()
     {
         var now = DateTimeOffset.UtcNow;
@@ -986,6 +1016,24 @@ public sealed class CatalogSetupViewModelTests
 
         public Task<MockupTemplateSetupResult> UpdateAsync(UpdateLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+    }
+
+    private sealed class RecordingSourceImageService : IMockupTemplateSourceImageService
+    {
+        public Guid SourceImageId { get; } = Guid.NewGuid();
+        public List<UpdateLocalMockupTemplateSourceRequest> Updates { get; } = [];
+
+        public Task<MockupTemplateSourceState> LoadAsync(Guid storeId, Guid templateId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new MockupTemplateSourceState([], [], false));
+
+        public Task<MockupTemplateSetupResult> AddAsync(AddLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<MockupTemplateSetupResult> UpdateAsync(UpdateLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default)
+        {
+            Updates.Add(request);
+            return Task.FromResult(MockupTemplateSetupResult.Success(new MockupTemplateSetupState(request.StoreId, false, [], [], [])));
+        }
     }
 
     private static (CatalogSetupViewModel ViewModel, Guid StoreId) CreateProviderCatalogStateViewModel(IProviderCatalogCandidateSource? source)

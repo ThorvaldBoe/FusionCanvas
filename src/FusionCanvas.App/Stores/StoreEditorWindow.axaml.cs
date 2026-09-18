@@ -157,7 +157,7 @@ public partial class StoreEditorWindow : Window
         if (DataContext is not StoreManagementViewModel { PrintifyCatalogImportSession: { } session } || !session.IsOpen)
             return;
 
-        if (e.Key == Key.Escape && !session.IsBusy)
+        if (e.Key == Key.Escape)
         {
             session.CancelCommand.Execute(null);
             e.Handled = true;

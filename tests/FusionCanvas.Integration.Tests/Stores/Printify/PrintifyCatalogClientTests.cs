@@ -66,6 +66,15 @@ public sealed class PrintifyCatalogClientTests
                 });
             }
 
+            if (request.RequestUri.AbsolutePath.EndsWith("/products/product-a.json", StringComparison.Ordinal))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"id\":\"product-a\",\"title\":\"My shop title\",\"description\":\"A\",\"blueprint_id\":68,\"print_provider_id\":9,\"options\":[],\"variants\":[{\"id\":1,\"title\":\"One size\",\"options\":[],\"is_enabled\":true,\"is_available\":true}],\"print_areas\":[]}") });
+
+            if (request.RequestUri.AbsolutePath.EndsWith("/print_providers.json", StringComparison.Ordinal))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("[{\"id\":9,\"title\":\"Provider\"}]") });
+
+            if (request.RequestUri.AbsolutePath.EndsWith("/variants.json", StringComparison.Ordinal))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"variants\":[{\"id\":1,\"title\":\"One size\",\"options\":[],\"placeholders\":[]}]}" ) });
+
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent("{\"last_page\":1,\"data\":[{\"id\":\"product-a\",\"title\":\"My shop title\",\"description\":\"A\",\"blueprint_id\":68,\"print_provider_id\":9,\"options\":[],\"variants\":[{\"id\":1,\"title\":\"One size\",\"options\":[],\"is_enabled\":true,\"is_available\":true}],\"print_areas\":[]}]}")
@@ -104,7 +113,13 @@ public sealed class PrintifyCatalogClientTests
             requests.Add(request.RequestUri!.AbsolutePath);
             var body = request.RequestUri.AbsolutePath.EndsWith("products.json", StringComparison.Ordinal)
                 ? "{\"last_page\":1,\"data\":[{\"id\":\"product-a\",\"title\":\"Listing\",\"blueprint_id\":68,\"print_provider_id\":9,\"options\":[],\"variants\":[{\"id\":1,\"title\":\"One size\",\"options\":[]}],\"print_areas\":[]}]}"
-                : "[{\"id\":9,\"title\":\"SwiftPOD\"}]";
+                : request.RequestUri.AbsolutePath.EndsWith("/products/product-a.json", StringComparison.Ordinal)
+                    ? "{\"id\":\"product-a\",\"title\":\"Listing\",\"blueprint_id\":68,\"print_provider_id\":9,\"options\":[],\"variants\":[{\"id\":1,\"title\":\"One size\",\"options\":[]}],\"print_areas\":[]}"
+                    : request.RequestUri.AbsolutePath.EndsWith("/blueprints/68.json", StringComparison.Ordinal)
+                        ? "{\"id\":68,\"title\":\"Tee\",\"brand\":\"Gildan\",\"model\":\"64000\"}"
+                    : request.RequestUri.AbsolutePath.EndsWith("/variants.json", StringComparison.Ordinal)
+                        ? "{\"variants\":[{\"id\":1,\"title\":\"One size\",\"options\":[],\"placeholders\":[]}]}"
+                        : "[{\"id\":9,\"title\":\"SwiftPOD\"}]";
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) });
         })) { BaseAddress = PrintifyCatalogClient.ApiBaseUri };
 
@@ -113,6 +128,92 @@ public sealed class PrintifyCatalogClientTests
         Assert.True(result.Succeeded, result.Message);
         Assert.Equal("SwiftPOD", Assert.Single(Assert.Single(result.SelectedProducts!).Providers).Title);
         Assert.Contains("/v1/catalog/blueprints/68/print_providers.json", requests);
+    }
+
+    [Fact]
+    public async Task SelectedProductUsesCatalogPlaceholderDimensionsAndDoesNotFetchUnselectedDetail()
+    {
+        var requests = new List<string>();
+        using var client = new HttpClient(new Handler((request, _) =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            requests.Add(path);
+            var body = path.EndsWith("products.json", StringComparison.Ordinal)
+                ? "{\"last_page\":1,\"data\":[{\"id\":\"selected\",\"title\":\"Selected\",\"blueprint_id\":68,\"print_provider_id\":9},{\"id\":\"unselected\",\"title\":\"Other\",\"blueprint_id\":68,\"print_provider_id\":9}]}"
+                : path.EndsWith("/products/selected.json", StringComparison.Ordinal)
+                    ? "{\"id\":\"selected\",\"title\":\"Selected\",\"blueprint_id\":68,\"print_provider_id\":9,\"options\":[],\"variants\":[{\"id\":1,\"title\":\"One size\",\"options\":[]}],\"print_areas\":[{\"variant_ids\":[1],\"placeholders\":[{\"position\":\"front\",\"decoration_method\":\"dtg\",\"images\":[]}]}]}"
+                    : path.EndsWith("/blueprints/68.json", StringComparison.Ordinal)
+                        ? "{\"id\":68,\"title\":\"Tee\",\"brand\":\"Gildan\",\"model\":\"64000\"}"
+                        : path.EndsWith("/print_providers.json", StringComparison.Ordinal)
+                            ? "[{\"id\":9,\"title\":\"Provider\"}]"
+                            : "{\"variants\":[{\"id\":1,\"title\":\"One size\",\"options\":[],\"placeholders\":[{\"position\":\"front\",\"decoration_method\":\"dtg\",\"width\":4350,\"height\":5850}]}]}";
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) });
+        })) { BaseAddress = PrintifyCatalogClient.ApiBaseUri };
+
+        var result = await new PrintifyCatalogClient(client).LoadSelectedProductsAsync("synthetic-key", 42, ["selected"], TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Message);
+        var placeholder = Assert.Single(Assert.Single(Assert.Single(result.SelectedProducts!).Providers).Variants).Placeholders;
+        var area = Assert.Single(placeholder);
+        Assert.Equal(4350, area.Width);
+        Assert.Equal(5850, area.Height);
+        Assert.DoesNotContain("/products/unselected.json", requests);
+    }
+
+    [Fact]
+    public async Task SelectedImportFailsWhenAuthoritativeBlueprintLookupFails()
+    {
+        using var client = new HttpClient(new Handler((request, _) =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            var body = path.EndsWith("products.json", StringComparison.Ordinal)
+                ? "{\"last_page\":1,\"data\":[{\"id\":\"selected\",\"title\":\"Selected\",\"blueprint_id\":68,\"print_provider_id\":9}]}"
+                : "provider failure";
+            var status = path.EndsWith("/blueprints/68.json", StringComparison.Ordinal) ? HttpStatusCode.BadGateway : HttpStatusCode.OK;
+            return Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(body) });
+        })) { BaseAddress = PrintifyCatalogClient.ApiBaseUri };
+
+        var result = await new PrintifyCatalogClient(client).LoadSelectedProductsAsync("synthetic-key", 42, ["selected"], TestContext.Current.CancellationToken);
+
+        Assert.Equal(PrintifyCatalogResultKind.NetworkFailure, result.Kind);
+    }
+
+    [Fact]
+    public async Task SelectedImportRejectsBlueprintIdentityMismatch()
+    {
+        using var client = new HttpClient(new Handler((request, _) =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            var body = path.EndsWith("products.json", StringComparison.Ordinal)
+                ? "{\"last_page\":1,\"data\":[{\"id\":\"selected\",\"title\":\"Selected\",\"blueprint_id\":68,\"print_provider_id\":9}]}"
+                : "{\"id\":99,\"title\":\"Wrong\"}";
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) });
+        })) { BaseAddress = PrintifyCatalogClient.ApiBaseUri };
+
+        var result = await new PrintifyCatalogClient(client).LoadSelectedProductsAsync("synthetic-key", 42, ["selected"], TestContext.Current.CancellationToken);
+
+        Assert.Equal(PrintifyCatalogResultKind.UnexpectedResponse, result.Kind);
+    }
+
+    [Fact]
+    public async Task SelectedImportRejectsUnknownPrintAreaVariant()
+    {
+        using var client = new HttpClient(new Handler((request, _) =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            var body = path.EndsWith("products.json", StringComparison.Ordinal)
+                ? "{\"last_page\":1,\"data\":[{\"id\":\"selected\",\"title\":\"Selected\",\"blueprint_id\":68,\"print_provider_id\":9}]}"
+                : path.EndsWith("/products/selected.json", StringComparison.Ordinal)
+                    ? "{\"id\":\"selected\",\"title\":\"Selected\",\"blueprint_id\":68,\"print_provider_id\":9,\"variants\":[{\"id\":1,\"title\":\"One size\"}],\"print_areas\":[{\"variant_ids\":[999],\"placeholders\":[]}]}"
+                    : path.EndsWith("/blueprints/68.json", StringComparison.Ordinal)
+                        ? "{\"id\":68,\"title\":\"Tee\"}"
+                        : "[]";
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) });
+        })) { BaseAddress = PrintifyCatalogClient.ApiBaseUri };
+
+        var result = await new PrintifyCatalogClient(client).LoadSelectedProductsAsync("synthetic-key", 42, ["selected"], TestContext.Current.CancellationToken);
+
+        Assert.Equal(PrintifyCatalogResultKind.UnexpectedResponse, result.Kind);
     }
 
     [Fact]

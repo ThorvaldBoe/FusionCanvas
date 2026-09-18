@@ -34,8 +34,8 @@ public sealed class LocalMockupSourceDraftViewModel(string path, IReadOnlyList<G
     public string Path { get; } = path;
     public string DisplayName => System.IO.Path.GetFileName(Path);
     public IReadOnlyList<Guid> OptionValueIds { get; private set; } = optionValueIds;
-    public bool IsManaged { get; } = isManaged;
-    public Guid? SourceImageId { get; } = sourceImageId;
+    public bool IsManaged { get; private set; } = isManaged;
+    public Guid? SourceImageId { get; private set; } = sourceImageId;
     public string PreviewPath { get; } = previewPath ?? path;
     public MockupImageSpaceMapping? Mapping { get; private set; } = mapping;
     public int ImageWidth => _previewDimensions.Width;
@@ -50,6 +50,14 @@ public sealed class LocalMockupSourceDraftViewModel(string path, IReadOnlyList<G
         OptionValueIds = optionValueIds;
         Mapping = mapping;
         ApplicabilitySummary = summary;
+    }
+
+    public void MarkManaged(Guid sourceImageId)
+    {
+        IsManaged = true;
+        SourceImageId = sourceImageId;
+        PropertyChanged?.Invoke(this, new(nameof(IsManaged)));
+        PropertyChanged?.Invoke(this, new(nameof(SourceImageId)));
     }
 }
 
