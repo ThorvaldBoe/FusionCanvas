@@ -331,12 +331,17 @@ public sealed class OpenRouterClient :
         if (string.IsNullOrWhiteSpace(modelId) || !modelId.Contains('/'))
             return [];
 
-        var path = "api/v1/models/" + string.Join('/', modelId.Split('/').Select(Uri.EscapeDataString)) + "/endpoints";
+        var path = "api/v1/images/models/" + string.Join('/', modelId.Split('/').Select(Uri.EscapeDataString)) + "/endpoints";
         using var response = await SendGetAsync(path, apiKey, cancellationToken).ConfigureAwait(false);
         EnsureCatalogSuccess(response);
         using var json = await ReadJsonAsync(response, cancellationToken).ConfigureAwait(false);
         var zdrIds = requireZeroDataRetention ? await FetchZdrModelIdsAsync(cancellationToken).ConfigureAwait(false) : [];
-        var data = RequiredArray(json.RootElement, "data");
+        // The current endpoint catalog returns { "id": ..., "endpoints": [...] }.
+        // Older responses used the same endpoint records in a top-level data array.
+        var data = json.RootElement.TryGetProperty("endpoints", out var endpoints)
+            && endpoints.ValueKind == JsonValueKind.Array
+            ? endpoints
+            : RequiredArray(json.RootElement, "data");
         return data.EnumerateArray()
             .Select(item => ParseImageEndpoint(item, modelId, zdrIds))
             .OfType<AiImageEndpointCapabilities>()
@@ -562,7 +567,7 @@ public sealed class OpenRouterClient :
 
     private static AiImageEndpointCapabilities? ParseImageEndpoint(JsonElement item, string modelId, IReadOnlyCollection<string> zdrModelIds)
     {
-        var endpointId = ReadString(item, "name") ?? ReadString(item, "provider_name") ?? ReadString(item, "id");
+        var endpointId = ReadString(item, "provider_tag") ?? ReadString(item, "name") ?? ReadString(item, "provider_name") ?? ReadString(item, "id");
         if (string.IsNullOrWhiteSpace(endpointId)) return null;
         var endpointModel = ReadString(item, "model_id") ?? modelId;
         var supportedElement = ReadObject(item, "supported_parameters");
