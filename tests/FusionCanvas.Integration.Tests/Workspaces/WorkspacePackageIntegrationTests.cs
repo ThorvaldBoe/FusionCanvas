@@ -426,7 +426,7 @@ public class WorkspacePackageIntegrationTests
         {
             Blueprints = [blueprint],
             PrintProviders = [provider],
-            BlueprintOfferings = [offering],
+            BlueprintOfferings = [offering with { PrimaryArtworkDesignAreaId = area.Id }],
             OfferingOptions = [colorOption, sizeOption],
             OfferingOptionValues = [black, medium],
             OfferingVariants = [variant],

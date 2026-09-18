@@ -73,6 +73,44 @@ public class OpenRouterClientTests
     }
 
     [Fact]
+    public async Task GetImageModelsAsync_UsesDedicatedImageCatalogAndKeepsImageOnlyModels()
+    {
+        var handler = new RecordingHandler(
+            Json(HttpStatusCode.OK, """{"data":[{"id":"image/model","name":"Image","architecture":{"input_modalities":["text"],"output_modalities":["image"]},"supported_parameters":{"size":{"type":"string"}}}]}"""),
+            Json(HttpStatusCode.OK, """{"data":[{"model_id":"image/model"}]}"""));
+        var client = CreateClient(handler);
+
+        var catalog = await client.GetImageModelsAsync("secret", true, TestContext.Current.CancellationToken);
+
+        var model = Assert.Single(catalog.Models);
+        Assert.Equal("image/model", model.Id);
+        Assert.Contains("size", model.SupportedParameters);
+        Assert.Equal("/api/v1/images/models", handler.Requests[0].Uri.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task ImageGenerateAsync_SendsOnePinnedRequestWithoutRetry()
+    {
+        var encoded = Convert.ToBase64String([1, 2, 3]);
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK,
+            "{\"id\":\"img-1\",\"model\":\"resolved/model\",\"data\":[{\"b64_json\":\"" + encoded + "\",\"media_type\":\"image/png\"}],\"usage\":{\"prompt_tokens\":2,\"completion_tokens\":3,\"cost\":0.04}}"));
+        var client = CreateClient(handler);
+
+        var (result, failure) = await client.GenerateAsync(new AiImageGenerationRequest(
+            "selected/model", "safe prompt", new AiImageSize(512, 512), true,
+            "secret", true, "provider-tag"), TestContext.Current.CancellationToken);
+
+        Assert.Null(failure);
+        Assert.NotNull(result);
+        Assert.Equal([1, 2, 3], result.ImageBytes);
+        using var body = JsonDocument.Parse(handler.Requests[0].Body!);
+        Assert.Equal("512x512", body.RootElement.GetProperty("size").GetString());
+        Assert.Equal("transparent", body.RootElement.GetProperty("background").GetString());
+        Assert.False(body.RootElement.GetProperty("provider").GetProperty("allow_fallbacks").GetBoolean());
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
     public async Task GetModelsAsync_FailsClosedWhenZdrListUnavailableWhileRequired()
     {
         var handler = new RecordingHandler(

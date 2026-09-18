@@ -10,6 +10,7 @@ using FusionCanvas.Domain.Stores;
 using FusionCanvas.Integration.Persistence;
 using Microsoft.Data.Sqlite;
 using FusionCanvas.Application.Groups;
+using FusionCanvas.Domain.Catalog;
 
 namespace FusionCanvas.Integration.Tests;
 
@@ -36,6 +37,30 @@ public class SqliteWorkspaceRepositoryTests
         Assert.Equal(snapshot.Tags[0], Assert.Single(loaded.Tags));
         Assert.Equal(snapshot.ItemTags[0], Assert.Single(loaded.ItemTags));
         Assert.Equal(snapshot.AssetLinks[0], Assert.Single(loaded.AssetLinks));
+    }
+
+    [Fact]
+    public async Task SaveAndLoadAsync_RoundTripsOfferingPrimaryArtworkDesignArea()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var repository = new SqliteWorkspaceRepository(tempDirectory.GetPath("workspace.db"));
+        var now = new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero);
+        var store = new Store(Guid.NewGuid(), "Studio", null, false, now, now, "{}");
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "Tee", null, false, now, now);
+        var areaId = Guid.NewGuid();
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Tee offering", null,
+            BlueprintOfferingKind.ProviderNetwork, null, "network", null, null, false, now, now,
+            primaryArtworkDesignAreaId: areaId);
+        var area = new OfferingPlaceholder(areaId, offering.Id, "Front", null, "front", "DTG", 1200, 1400, [], false, now, now);
+        var snapshot = new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []) with
+        {
+            Blueprints = [blueprint], BlueprintOfferings = [offering], OfferingPlaceholders = [area]
+        };
+
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(areaId, Assert.Single(loaded.BlueprintOfferings).PrimaryArtworkDesignAreaId);
     }
 
     [Fact]

@@ -70,7 +70,10 @@ public sealed class OfferingManagementService : IOfferingManagementService
                 value.ArtworkGuidance,
                 activeVariantIds.SetEquals(value.VariantIds),
                 value.VariantIds.Count,
-                value.ProviderReference)).ToArray(),
+                value.ProviderReference)
+            {
+                IsPrimaryForArtworkGeneration = offering.PrimaryArtworkDesignAreaId == value.Id
+            }).ToArray(),
             templates,
             templates.Select(template =>
             {
@@ -148,7 +151,25 @@ public sealed class OfferingManagementService : IOfferingManagementService
         {
             return Failure(snapshot, request.Context, exception.Message);
         }
-        var updated = snapshot with { OfferingPlaceholders = [.. snapshot.OfferingPlaceholders, designArea] };
+        IReadOnlyList<BlueprintOffering> offerings;
+        try
+        {
+            offerings = CatalogRelationshipPolicy.ReplacePrimaryArtworkDesignArea(
+                snapshot.BlueprintOfferings,
+                [.. snapshot.OfferingPlaceholders, designArea],
+                offering.Id,
+                request.PrimaryForArtworkGeneration ? designArea.Id : null);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Failure(snapshot, request.Context, exception.Message);
+        }
+
+        var updated = snapshot with
+        {
+            BlueprintOfferings = offerings,
+            OfferingPlaceholders = [.. snapshot.OfferingPlaceholders, designArea]
+        };
         await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
         return Success(updated, request.Context);
     }
@@ -176,7 +197,25 @@ public sealed class OfferingManagementService : IOfferingManagementService
                 existing.CreatedAt, _clock(), existing.MetadataJson, request.ProviderReference, request.ArtworkGuidance);
         }
         catch (ArgumentException exception) { return Failure(snapshot, request.Context, exception.Message); }
-        var updated = snapshot with { OfferingPlaceholders = snapshot.OfferingPlaceholders.Select(value => value.Id == replacement.Id ? replacement : value).ToArray() };
+        IReadOnlyList<BlueprintOffering> offerings;
+        try
+        {
+            offerings = CatalogRelationshipPolicy.ReplacePrimaryArtworkDesignArea(
+                snapshot.BlueprintOfferings,
+                snapshot.OfferingPlaceholders,
+                offering.Id,
+                request.PrimaryForArtworkGeneration ? replacement.Id : null);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Failure(snapshot, request.Context, exception.Message);
+        }
+
+        var updated = snapshot with
+        {
+            BlueprintOfferings = offerings,
+            OfferingPlaceholders = snapshot.OfferingPlaceholders.Select(value => value.Id == replacement.Id ? replacement : value).ToArray()
+        };
         await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
         return Success(updated, request.Context);
     }

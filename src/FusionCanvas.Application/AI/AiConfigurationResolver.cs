@@ -34,7 +34,37 @@ public static class AiConfigurationResolver
         AiRequestPurpose purpose,
         IReadOnlyList<AiModelDescriptor> models)
     {
-        var profile = ProfileFor(settings, purpose);
+        return ResolveProfile(settings, ProfileFor(settings, purpose), models);
+    }
+
+    public static AiConfigurationResolution ResolveArtwork(
+        AiConfigurationSettings settings,
+        IReadOnlyList<AiModelDescriptor> models)
+    {
+        var resolution = ResolveProfile(settings, settings.Artwork, models);
+        if (resolution.Availability != AiConfigurationAvailability.Ready || resolution.Model is null)
+        {
+            return resolution;
+        }
+
+        if (!resolution.Model.OutputModalities.Any(modality =>
+                string.Equals(modality, "image", StringComparison.OrdinalIgnoreCase)))
+        {
+            return new(
+                AiConfigurationAvailability.ModelUnavailable,
+                resolution.Profile,
+                resolution.Model,
+                ["The selected model does not support image output."]);
+        }
+
+        return resolution;
+    }
+
+    private static AiConfigurationResolution ResolveProfile(
+        AiConfigurationSettings settings,
+        AiProfileSettings profile,
+        IReadOnlyList<AiModelDescriptor> models)
+    {
         if (string.IsNullOrWhiteSpace(profile.ModelId))
         {
             return new(AiConfigurationAvailability.MissingModel, profile, null, ["Select a model."]);

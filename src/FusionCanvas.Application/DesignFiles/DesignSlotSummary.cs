@@ -18,6 +18,8 @@ public sealed record DesignSlotSummary(
     public string? DecorationMethod { get; init; }
     public int? Width { get; init; }
     public int? Height { get; init; }
+    public bool IsGenerated { get; init; }
+    public string? ArtworkWarning { get; init; }
 }
 
 /// <summary>Summary of a design variant row for the UI.</summary>

@@ -62,7 +62,8 @@ public partial class MainWindow : Window
         InitializeWindowLayout(services.Settings);
         var viewModel = MainWindowViewModel.CreateForDefaultWorkspace(
             services.Settings,
-            services.AiTextGeneration);
+            services.AiTextGeneration,
+            artworkProvider: services.AiImageGeneration);
         _itemCsvImportCodec = services.ItemCsvImportCodec;
         if (services.PrintifyCredentials is { } printifyCredentials && services.PrintifyVerifier is { } printifyVerifier && services.PrintifyCatalogClient is { } catalogClient)
             viewModel.StoreManagement.ConfigurePrintify(printifyCredentials, printifyVerifier, catalogClient);

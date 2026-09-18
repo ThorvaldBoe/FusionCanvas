@@ -4,6 +4,7 @@ using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.AI;
 
 namespace FusionCanvas.Application.DesignFiles;
 
@@ -595,6 +596,11 @@ public sealed class DesignStageService : IDesignStageService
             return DesignStageResult.Failure("Supporting image not found.");
         }
 
+        if (snapshot.DesignSlotAssignments.Any(assignment => assignment.AssetId == assetId))
+        {
+            return DesignStageResult.Failure("Remove the artwork from its slot before permanently deleting the generated asset.", BuildState(snapshot, itemId));
+        }
+
         var updated = snapshot with
         {
             Assets = [.. snapshot.Assets.Where(a => a.Id != assetId)],
@@ -669,7 +675,8 @@ public sealed class DesignStageService : IDesignStageService
         if (oldAssetId is not null)
         {
             var oldAsset = snapshot.Assets.SingleOrDefault(a => a.Id == oldAssetId);
-            if (oldAsset is not null)
+            var preserveGenerated = oldAsset is not null && AiImageProvenanceCodec.TryDeserialize(oldAsset.MetadataJson, out _);
+            if (oldAsset is not null && !preserveGenerated)
             {
                 updatedAssets.RemoveAll(a => a.Id == oldAssetId);
                 updatedLinks.RemoveAll(l => l.AssetId == oldAssetId);
@@ -697,7 +704,8 @@ public sealed class DesignStageService : IDesignStageService
         if (oldAssetId is not null)
         {
             var oldAsset = snapshot.Assets.SingleOrDefault(a => a.Id == oldAssetId);
-            if (oldAsset is not null)
+            var preserveGenerated = oldAsset is not null && AiImageProvenanceCodec.TryDeserialize(oldAsset.MetadataJson, out _);
+            if (oldAsset is not null && !preserveGenerated)
             {
                 _fileStore.TryDelete(oldAsset.WorkspaceRelativePath);
             }
@@ -853,15 +861,24 @@ public sealed class DesignStageService : IDesignStageService
             .Where(l => l.EntityKind == WorkspaceEntityKind.Item && l.EntityId == itemId)
             .Select(l => snapshot.Assets.SingleOrDefault(a => a.Id == l.AssetId))
             .Where(a => a is not null)
-            .Where(a => a!.Kind != AssetKind.ExportedImage) // Exclude slot images
+            .Where(a => a!.Kind != AssetKind.ExportedImage || AiImageProvenanceCodec.TryDeserialize(a.MetadataJson, out _))
+            .OrderByDescending(a => a!.Kind == AssetKind.ExportedImage ? a.CreatedAt : DateTimeOffset.MinValue)
             .Select(a => new DesignSlotSummary(
                 a!.Id,
-                a.Name,
+                a.Kind == AssetKind.ExportedImage && AiImageProvenanceCodec.TryDeserialize(a.MetadataJson, out var provenance)
+                    ? $"Generated artwork · {provenance!.FinalSize.Width}×{provenance.FinalSize.Height}px"
+                    : a.Name,
                 a.Id,
                 ResolveThumbnailPath(a),
                 a.IsMissing,
                 !a.IsMissing,
-                !a.IsMissing))
+                !a.IsMissing)
+            {
+                IsGenerated = a.Kind == AssetKind.ExportedImage,
+                ArtworkWarning = a.Kind == AssetKind.ExportedImage && AiImageProvenanceCodec.TryDeserialize(a.MetadataJson, out var generatedProvenance)
+                    ? generatedProvenance!.Warnings?.FirstOrDefault()
+                    : null
+            })
             .ToArray();
     }
 

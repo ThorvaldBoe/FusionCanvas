@@ -921,6 +921,7 @@
                                 <TextBlock Text="{Binding Placement}" Foreground="{DynamicResource SecondaryTextBrush}" />
                                 <TextBlock Text="{Binding MaximumSizeSummary}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                                 <TextBlock Text="{Binding CompatibilitySummary}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+                                <TextBlock Text="Primary for artwork generation" IsVisible="{Binding IsPrimaryForArtworkGeneration}" FontSize="12" Foreground="{DynamicResource AccentBrush}" />
                               </StackPanel>
                               <StackPanel Grid.Column="1" Spacing="8" Orientation="Horizontal">
                                 <Button Content="Edit" Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.EditPlaceholderCommand}" CommandParameter="{Binding}" Classes="secondary" />

@@ -5,6 +5,10 @@ using System.Runtime.CompilerServices;
 using Avalonia.Media.Imaging;
 using FusionCanvas.Application.DesignFiles;
 using FusionCanvas.Domain.Products;
+using FusionCanvas.Domain.Catalog;
+using FusionCanvas.Application.AI;
+using FusionCanvas.App.Settings;
+using FusionCanvas.App.DocumentWindow;
 
 namespace FusionCanvas.App.StageTools;
 
@@ -36,10 +40,20 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
     private string _removalConfirmationMessage = string.Empty;
     private long _loadGeneration;
     private bool _isApplyingState;
+    private readonly IArtworkGenerationService? _artworkGenerationService;
+    private readonly AiSettingsViewModel? _aiSettings;
+    private CancellationTokenSource? _artworkCts;
+    private bool _isArtworkBusy;
+    private Guid? _selectedArtworkTargetId;
+    private bool _transparentBackground;
 
-    public DesignStageToolViewModel(IDesignStageService designStageService)
+    public DesignStageToolViewModel(IDesignStageService designStageService, IArtworkGenerationService? artworkGenerationService = null, AiSettingsViewModel? aiSettings = null)
     {
         _designStageService = designStageService ?? throw new ArgumentNullException(nameof(designStageService));
+        _artworkGenerationService = artworkGenerationService;
+        _aiSettings = aiSettings;
+        GenerateArtworkCommand = new RelayCommand(_ => _ = GenerateArtworkAsync(), () => CanGenerateArtwork);
+        CancelArtworkCommand = new RelayCommand(_ => _artworkCts?.Cancel(), () => IsArtworkBusy);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -251,6 +265,46 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
     public ObservableCollection<DesignColorViewModel> SelectedColors { get; } = [];
     public ObservableCollection<DesignRowViewModel> Rows { get; } = [];
     public ObservableCollection<DesignSlotViewModel> SupportingImages { get; } = [];
+    public ObservableCollection<ArtworkTargetOption> ArtworkTargets { get; } = [];
+
+    public Guid? SelectedArtworkTargetId
+    {
+        get => _selectedArtworkTargetId;
+        set
+        {
+            if (_selectedArtworkTargetId == value) return;
+            _selectedArtworkTargetId = value;
+            OnPropertyChanged();
+            var target = ArtworkTargets.SingleOrDefault(candidate => candidate.Id == value);
+            TransparentBackground = target?.RecommendsTransparency ?? false;
+            OnPropertyChanged(nameof(ArtworkGenerationGuidance));
+        }
+    }
+
+    public bool TransparentBackground
+    {
+        get => _transparentBackground;
+        set { if (_transparentBackground == value) return; _transparentBackground = value; OnPropertyChanged(); }
+    }
+
+    public string ArtworkGenerationGuidance => !HasConfiguration
+        ? "Select a Listing Configuration to choose an artwork target."
+        : ArtworkTargets.Count == 0
+            ? "Configure an active Design Area and optional primary in Store setup before generating artwork."
+            : SelectedArtworkTargetId is null
+                ? "Choose a Design Area before generating artwork."
+                : "Generation uses the current Concept triangle and does not upload Supporting Images automatically.";
+
+    public bool IsArtworkBusy
+    {
+        get => _isArtworkBusy;
+        private set { if (_isArtworkBusy == value) return; _isArtworkBusy = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanGenerateArtwork)); GenerateArtworkCommand.NotifyCanExecuteChanged(); CancelArtworkCommand.NotifyCanExecuteChanged(); }
+    }
+
+    public bool CanGenerateArtwork => _artworkGenerationService is not null && !IsArtworkBusy && !IsReadOnly && _selectedArtworkTargetId is not null && HasConfiguration;
+    public string ArtworkProgress => IsArtworkBusy ? "Generating artwork…" : string.Empty;
+    public RelayCommand GenerateArtworkCommand { get; }
+    public RelayCommand CancelArtworkCommand { get; }
 
     // --- Commands ---
     public async Task SelectConfigurationAsync(Guid offeringId, CancellationToken ct = default)
@@ -522,9 +576,53 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
         PreviewStream = null;
     }
 
+    public async Task GenerateArtworkAsync(CancellationToken cancellationToken = default)
+    {
+        if (!CanGenerateArtwork || _aiSettings is null || _selectedArtworkTargetId is not Guid targetId)
+            return;
+
+        _artworkCts?.Dispose();
+        _artworkCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        IsArtworkBusy = true;
+        ErrorMessage = null;
+        try
+        {
+            var key = await _aiSettings.ReadApiKeyAsync(_artworkCts.Token).ConfigureAwait(true);
+            var profile = _aiSettings.Current.Artwork;
+            var endpoints = await _aiSettings.GetArtworkEndpointsAsync(_artworkCts.Token).ConfigureAwait(true);
+            if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(profile.ModelId))
+            {
+                ErrorMessage = "Configure an Artwork image model and API key in AI Settings.";
+                return;
+            }
+
+            var result = await _artworkGenerationService!.GenerateAsync(new ArtworkGenerationRequest(
+                _itemId, targetId, key, profile, _aiSettings.AvailableModels, endpoints,
+                TransparentBackground, _aiSettings.RequireZeroDataRetention), _artworkCts.Token).ConfigureAwait(true);
+            ErrorMessage = result.Error;
+            if (result.Succeeded)
+                await LoadAsync(_itemId, !IsReadOnly, _artworkCts.Token).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            ErrorMessage = "Artwork generation cancelled. A dispatched provider request may still incur cost.";
+        }
+        catch (Exception exception)
+        {
+            ErrorMessage = exception.Message;
+        }
+        finally
+        {
+            IsArtworkBusy = false;
+            _artworkCts?.Dispose();
+            _artworkCts = null;
+        }
+    }
+
     // --- Load ---
     public async Task LoadAsync(Guid itemId, bool canEdit, CancellationToken cancellationToken = default)
     {
+        _artworkCts?.Cancel();
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         IsReadOnly = !canEdit;
         ReadOnlyReason = canEdit ? string.Empty : "Design stage content is read-only while the item is protected or an earlier stage is being reviewed.";
@@ -540,7 +638,18 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
         SelectedOfferingId = state.SelectedOfferingId;
         SelectedOfferingName = state.SelectedOfferingName;
         SelectedBlueprintName = state.SelectedBlueprintName;
-        ProviderNetworkWarning = state.ProviderNetworkWarning;
+            ProviderNetworkWarning = state.ProviderNetworkWarning;
+            ArtworkTargets.Clear();
+            var selectedBlueprint = state.SelectedOfferingId is Guid offeringId
+                ? state.AvailableBlueprintOfferings.FirstOrDefault(value => value.Id == offeringId)
+                : null;
+            foreach (var placeholder in state.AvailablePlaceholders)
+            {
+                var recommendsTransparency = string.Equals(placeholder.ArtworkGuidance?.Background, "transparent", StringComparison.OrdinalIgnoreCase);
+                ArtworkTargets.Add(new ArtworkTargetOption(placeholder.Id, placeholder.Name,
+                    $"{placeholder.Position} · {placeholder.Width}×{placeholder.Height}px", selectedBlueprint?.PrimaryArtworkDesignAreaId == placeholder.Id, recommendsTransparency));
+            }
+            SelectedArtworkTargetId = selectedBlueprint?.PrimaryArtworkDesignAreaId is Guid primary && ArtworkTargets.Any(value => value.Id == primary) ? primary : null;
         var selectedOffering = state.SelectedOfferingId is not null
             ? state.AvailableOfferings.SingleOrDefault(o => o.Id == state.SelectedOfferingId.Value)
             : null;

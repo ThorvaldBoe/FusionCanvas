@@ -20,6 +20,42 @@ public sealed class CatalogModelTests
     }
 
     [Fact]
+    public void PrimaryArtworkArea_RequiresActiveAreaFromTheSameOffering()
+    {
+        var offeringId = Guid.NewGuid();
+        var otherOfferingId = Guid.NewGuid();
+        var area = new OfferingPlaceholder(Guid.NewGuid(), offeringId, "Front", null, "front", "DTG", 1200, 1200, [], false, Now, Now);
+        var otherArea = area with { Id = Guid.NewGuid(), OfferingId = otherOfferingId };
+        var offerings = new[]
+        {
+            new BlueprintOffering(offeringId, Guid.NewGuid(), Guid.NewGuid(), "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "network", null, null, false, Now, Now),
+            new BlueprintOffering(otherOfferingId, Guid.NewGuid(), Guid.NewGuid(), "Other", null, BlueprintOfferingKind.ProviderNetwork, null, "network", null, null, false, Now, Now)
+        };
+
+        var updated = CatalogRelationshipPolicy.ReplacePrimaryArtworkDesignArea(offerings, [area, otherArea], offeringId, area.Id);
+
+        Assert.Equal(area.Id, updated.Single(value => value.Id == offeringId).PrimaryArtworkDesignAreaId);
+        Assert.Null(updated.Single(value => value.Id == otherOfferingId).PrimaryArtworkDesignAreaId);
+        Assert.Throws<InvalidOperationException>(() => CatalogRelationshipPolicy.ReplacePrimaryArtworkDesignArea(offerings, [area, otherArea], offeringId, otherArea.Id));
+        Assert.Throws<InvalidOperationException>(() => CatalogRelationshipPolicy.ReplacePrimaryArtworkDesignArea(offerings, [area with { IsArchived = true }], offeringId, area.Id));
+    }
+
+    [Fact]
+    public void PrimaryArtworkArea_ReplacementAndClearingAreAtomic()
+    {
+        var offeringId = Guid.NewGuid();
+        var first = new OfferingPlaceholder(Guid.NewGuid(), offeringId, "Front", null, "front", "DTG", 1200, 1200, [], false, Now, Now);
+        var second = new OfferingPlaceholder(Guid.NewGuid(), offeringId, "Back", null, "back", "DTG", 1200, 1200, [], false, Now, Now);
+        var offering = new BlueprintOffering(offeringId, Guid.NewGuid(), Guid.NewGuid(), "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "network", null, null, false, Now, Now, primaryArtworkDesignAreaId: first.Id);
+
+        var replaced = CatalogRelationshipPolicy.ReplacePrimaryArtworkDesignArea([offering], [first, second], offering.Id, second.Id);
+        var cleared = CatalogRelationshipPolicy.ReplacePrimaryArtworkDesignArea(replaced, [first, second], offering.Id, null);
+
+        Assert.Equal(second.Id, replaced[0].PrimaryArtworkDesignAreaId);
+        Assert.Null(cleared[0].PrimaryArtworkDesignAreaId);
+    }
+
+    [Fact]
     public void MockupColorBinding_RejectsNonColorValues()
     {
         var offeringId = Guid.NewGuid();

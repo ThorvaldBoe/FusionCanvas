@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace FusionCanvas.Application.Items;
 
@@ -12,6 +14,7 @@ internal static class ItemMetadataCodec
     public const string GraphicDirectionKey = "graphicDirection";
     public const string IdeaRatingKey = "idea.rating";
     public const string SllKey = "sll";
+    public const string SllSourceFingerprintKey = "sll.sourceFingerprint";
     public const string InheritedFromPrefix = "inheritedFrom:";
 
     public static string NormalizeName(string? value) => value?.Trim() ?? string.Empty;
@@ -47,6 +50,12 @@ internal static class ItemMetadataCodec
 
     public static string SerializeMetadata(IReadOnlyDictionary<string, string> metadata) =>
         metadata.Count == 0 ? "{}" : JsonSerializer.Serialize(metadata);
+
+    public static string ComputeSllSourceFingerprint(string? idea, string? conceptIdea, string? phrase, string? graphicDirection)
+    {
+        var source = string.Join("\u001f", NormalizeOptional(idea) ?? "", NormalizeOptional(conceptIdea) ?? "", NormalizeOptional(phrase) ?? "", NormalizeOptional(graphicDirection) ?? "");
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)));
+    }
 
     public static string? TryGetNotes(string? metadataJson)
     {

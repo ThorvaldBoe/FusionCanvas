@@ -400,6 +400,32 @@ public class ItemInspectorServiceTests
     }
 
     [Fact]
+    public async Task Load_MarksCommittedSllStaleWhenItsSourceFieldsChange()
+    {
+        var sample = Sample.Create();
+        var item = sample.Item with { Stage = WorkflowStage.Concept };
+        var repository = new TestRepository(sample.Snapshot with { Items = [item] });
+        var service = new ItemInspectorService(repository);
+
+        var committed = await service.SaveStageAsync(new ItemStageAwareSaveRequest(
+            item.Id, WorkflowStage.Concept, item.Name, null,
+            new ItemStageSavePayload(WorkflowStage.Concept, null, "concept", "phrase", "graphic", "sll"), []),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(committed.Succeeded);
+        Assert.False(committed.State!.IsSllStale);
+
+        var changed = await service.SaveStageAsync(new ItemStageAwareSaveRequest(
+            item.Id, WorkflowStage.Concept, item.Name, null,
+            new ItemStageSavePayload(WorkflowStage.Concept, null, "changed concept", "phrase", "graphic", "sll"), []),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(changed.Succeeded);
+        Assert.True(changed.State!.IsSllStale);
+        Assert.True((await service.LoadAsync(item.Id, TestContext.Current.CancellationToken))!.IsSllStale);
+    }
+
+    [Fact]
     public async Task SaveStageAsync_WritesOnlyTheSelectedStagesMetadata()
     {
         var sample = Sample.Create();

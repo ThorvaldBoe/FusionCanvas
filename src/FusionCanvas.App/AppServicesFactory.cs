@@ -49,6 +49,7 @@ public static class AppServicesFactory
             settingsStore,
             settings,
             textService,
+            openRouter,
             new FusionCanvas.Integration.Items.ItemCsvCodec(),
             new FusionCanvas.Integration.Items.Import.ItemCsvCodec());
         var printifyClient = FusionCanvas.Integration.Stores.Printify.PrintifyCredentialVerifier.CreateHttpClient();

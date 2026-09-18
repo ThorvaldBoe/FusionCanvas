@@ -1042,6 +1042,16 @@
                                  FontSize="11"
                                  Foreground="{DynamicResource WarningTextBrush}" />
 
+                      <StackPanel Orientation="Horizontal" Spacing="6"
+                                  IsVisible="{Binding SllGeneration.IsStale}">
+                        <Button Content="Reset SLL"
+                                Command="{Binding SllGeneration.ResetSllCommand}"
+                                AutomationProperties.Name="Reset stale SLL" />
+                        <Button Content="Keep for reference"
+                                Command="{Binding SllGeneration.KeepSllReferenceCommand}"
+                                AutomationProperties.Name="Keep stale SLL for reference" />
+                      </StackPanel>
+
                       <TextBox Text="{Binding SllGeneration.AsciiSketch}"
                                IsReadOnly="True"
                                IsVisible="{Binding SllGeneration.HasCurrentSll}"
@@ -1378,6 +1388,10 @@
                                   <TextBlock Text="{Binding AreaName}" FontSize="10"
                                              Foreground="{DynamicResource PrimaryTextBrush}"
                                              TextTrimming="CharacterEllipsis" MaxWidth="64" />
+                                  <TextBlock Text="{Binding ArtworkWarning}"
+                                             IsVisible="{Binding ArtworkWarning, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                             TextWrapping="Wrap" FontSize="9"
+                                             Foreground="{DynamicResource WarningTextBrush}" />
                                   <StackPanel Orientation="Horizontal" Spacing="2">
                                     <Button Content="View" Click="OnViewSupportingImage"
                                             Tag="{Binding .}"
@@ -1397,6 +1411,38 @@
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                      </StackPanel>
+
+                      <!-- Artwork generation target -->
+                      <StackPanel Spacing="6">
+                        <TextBlock Text="Generate Artwork" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource StrongTextBrush}" />
+                        <TextBlock Text="{Binding DesignTool.ArtworkGenerationGuidance}"
+                                   TextWrapping="Wrap" FontSize="11"
+                                   Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <ComboBox ItemsSource="{Binding DesignTool.ArtworkTargets}"
+                                  SelectedValue="{Binding DesignTool.SelectedArtworkTargetId, Mode=TwoWay}"
+                                  SelectedValueBinding="{Binding Id}"
+                                  IsEnabled="{Binding !DesignTool.IsReadOnly}"
+                                  AutomationProperties.Name="Artwork target Design Area" />
+                        <CheckBox Content="Transparent Background"
+                                  IsChecked="{Binding DesignTool.TransparentBackground, Mode=TwoWay}"
+                                  IsEnabled="{Binding !DesignTool.IsReadOnly}"
+                                  AutomationProperties.Name="Transparent Background" />
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <Button Content="Generate"
+                                  Command="{Binding DesignTool.GenerateArtworkCommand}"
+                                  IsEnabled="{Binding DesignTool.CanGenerateArtwork}"
+                                  AutomationProperties.Name="Generate Artwork" />
+                          <Button Content="Cancel"
+                                  Command="{Binding DesignTool.CancelArtworkCommand}"
+                                  IsVisible="{Binding DesignTool.IsArtworkBusy}"
+                                  AutomationProperties.Name="Cancel artwork generation" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding DesignTool.ArtworkProgress}"
+                                   IsVisible="{Binding DesignTool.IsArtworkBusy}"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource SecondaryTextBrush}" />
                       </StackPanel>
 
                       <!-- Error message -->

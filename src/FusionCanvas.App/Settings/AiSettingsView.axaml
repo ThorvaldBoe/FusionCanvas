@@ -79,6 +79,16 @@
     <Border Padding="14" Background="{DynamicResource ElevatedSurfaceBrush}"
             BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
       <StackPanel Spacing="12">
+        <TextBlock Text="Artwork" FontWeight="SemiBold" FontSize="16" />
+        <TextBlock Text="{Binding ArtworkReadiness}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <TextBlock Text="Choose an image-capable model independently from General text generation." TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <settings:AiProfileEditorView DataContext="{Binding Artwork}" />
+      </StackPanel>
+    </Border>
+
+    <Border Padding="14" Background="{DynamicResource ElevatedSurfaceBrush}"
+            BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6">
+      <StackPanel Spacing="12">
         <TextBlock Text="General" FontWeight="SemiBold" FontSize="16" />
         <TextBlock Text="{Binding GeneralReadiness}" FontSize="12"
                    Foreground="{DynamicResource SecondaryTextBrush}" />

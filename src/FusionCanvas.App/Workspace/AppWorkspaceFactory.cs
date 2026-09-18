@@ -5,6 +5,7 @@ using FusionCanvas.Integration.Packages;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Workspaces.Transfer;
 using FusionCanvas.Application.Mockups;
+using FusionCanvas.Application.DesignFiles;
 using FusionCanvas.Application.Groups;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Assets;
@@ -30,16 +31,17 @@ public static class AppWorkspaceFactory
     public const string WorkspaceDatabaseEnvironmentVariable = "FUSIONCANVAS_WORKSPACE_DB";
     public const string WorkspaceRootEnvironmentVariable = "FUSIONCANVAS_WORKSPACE_ROOT";
 
-    public static AppWorkspaceRuntime CreateDefault(IAiTextGenerationService ai)
-        => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()), ai);
+    public static AppWorkspaceRuntime CreateDefault(IAiTextGenerationService ai, IAiImageGenerationProvider? artworkProvider = null)
+        => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()), ai, artworkProvider);
 
-    public static AppWorkspaceRuntime Create(string databasePath, IAiTextGenerationService ai)
-        => Create(databasePath, DefaultWorkspaceRoot(databasePath), ai);
+    public static AppWorkspaceRuntime Create(string databasePath, IAiTextGenerationService ai, IAiImageGenerationProvider? artworkProvider = null)
+        => Create(databasePath, DefaultWorkspaceRoot(databasePath), ai, artworkProvider);
 
     public static AppWorkspaceRuntime Create(
         string databasePath,
         string workspaceRootPath,
-        IAiTextGenerationService ai)
+        IAiTextGenerationService ai,
+        IAiImageGenerationProvider? artworkProvider = null)
     {
         ArgumentNullException.ThrowIfNull(ai);
         var repository = new SqliteWorkspaceRepository(databasePath);
@@ -102,7 +104,8 @@ public static class AppWorkspaceFactory
             new ProductSupplierSetupService(repository),
             new ItemCsvImportService(repository),
             new SllDocumentCodec(),
-            new MockupGenerationService(repository, fileStore, new MockupTemplateSetupService(repository), new ImageSharpMockupRasterCompositor()));
+            new MockupGenerationService(repository, fileStore, new MockupTemplateSetupService(repository), new ImageSharpMockupRasterCompositor()),
+            artworkProvider is null ? null : new ArtworkGenerationService(repository, fileStore, artworkProvider, new ImageSharpArtworkNormalizer()));
     }
 
     private static string DefaultDatabasePath()
