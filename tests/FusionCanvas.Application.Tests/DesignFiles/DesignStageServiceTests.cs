@@ -510,6 +510,38 @@ public class DesignStageServiceTests
     }
 
     [Fact]
+    public async Task LoadDesignStageStateAsync_ExcludesOfferingsMissingFromActiveCatalog()
+    {
+        var snapshot = SeedWithProduct();
+        var product = snapshot.StoreProducts.Single();
+        var activeLegacyOffering = snapshot.FulfillmentOfferings.Single();
+        var staleLegacyOffering = new FulfillmentOffering(
+            Guid.NewGuid(), product.Id, "Retired shirt", null, FulfillmentKind.FixedProvider,
+            "Printful", null, Now, Now, "{}");
+        var blueprint = new Blueprint(product.Id, StoreId, product.Name, product.Description, false, Now, Now, "{}");
+        var activeNormalizedOffering = new BlueprintOffering(
+            activeLegacyOffering.Id, blueprint.Id, StoreId, activeLegacyOffering.Name, activeLegacyOffering.Description,
+            BlueprintOfferingKind.FixedPrintProvider, Guid.NewGuid(), null, null, null, false, Now, Now, "{}");
+        var staleNormalizedOffering = new BlueprintOffering(
+            Guid.NewGuid(), blueprint.Id, StoreId, staleLegacyOffering.Name, staleLegacyOffering.Description,
+            BlueprintOfferingKind.FixedPrintProvider, Guid.NewGuid(), null, null, null, true, Now, Now, "{}");
+        var itemId = Guid.NewGuid();
+        var item = new Item(itemId, StoreId, null, null, "Item", null, ItemStatus.Draft, WorkflowStage.Design, false, Now, Now, "{}");
+        var repo = new InMemoryWorkspaceRepository(snapshot with
+        {
+            Items = [item],
+            FulfillmentOfferings = [activeLegacyOffering, staleLegacyOffering],
+            Blueprints = [blueprint],
+            BlueprintOfferings = [activeNormalizedOffering, staleNormalizedOffering]
+        });
+
+        var state = await New(repo).LoadDesignStageStateAsync(itemId, TestContext.Current.CancellationToken);
+
+        var offering = Assert.Single(state.AvailableOfferings);
+        Assert.Equal(activeLegacyOffering.Id, offering.Id);
+    }
+
+    [Fact]
     public async Task LoadDesignStageStateAsync_UsesCurrentCatalogColors()
     {
         var itemId = Guid.NewGuid();

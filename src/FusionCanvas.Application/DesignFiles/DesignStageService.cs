@@ -786,17 +786,32 @@ public sealed class DesignStageService : IDesignStageService
         var config = snapshot.ItemListingConfigurations.SingleOrDefault(c => c.ItemId == itemId);
         var itemMetadata = ItemMetadataCodec.ParseMetadata(item.MetadataJson);
 
-        // Available offerings: all offerings whose product belongs to this item's store
+        // The legacy offering projection retains archived rows so existing external
+        // references remain valid. The Design selector is for new active choices only,
+        // so once a store has a normalized catalog, expose only active normalized rows.
         var storeProductIds = snapshot.StoreProducts
             .Where(p => p.StoreId == item.StoreId)
             .Select(p => p.Id)
             .ToHashSet();
+        var normalizedStoreOfferings = snapshot.BlueprintOfferings
+            .Where(offering => offering.StoreId == item.StoreId)
+            .ToArray();
+        var hasNormalizedCatalog = snapshot.Blueprints.Any(blueprint => blueprint.StoreId == item.StoreId)
+            || normalizedStoreOfferings.Length > 0;
+        var activeNormalizedOfferingIds = normalizedStoreOfferings
+            .Where(offering => !offering.IsArchived)
+            .Select(offering => offering.Id)
+            .ToHashSet();
         var availableOfferings = snapshot.FulfillmentOfferings
             .Where(o => storeProductIds.Contains(o.StoreProductId))
+            .Where(o => !hasNormalizedCatalog || activeNormalizedOfferingIds.Contains(o.Id))
             .ToArray();
 
         // Available colors: from the selected offering's variants
-        var configOfferingId = config?.OfferingId;
+        var configOfferingId = config?.OfferingId is Guid selectedConfigOfferingId
+            && availableOfferings.Any(offering => offering.Id == selectedConfigOfferingId)
+                ? selectedConfigOfferingId
+                : (Guid?)null;
         var availableColors = configOfferingId is not null && snapshot.BlueprintOfferings.Any(o => o.Id == configOfferingId.Value)
             ? DesignStagePolicy.AvailableColors(snapshot.OfferingOptions, snapshot.OfferingOptionValues, snapshot.OfferingVariants, configOfferingId.Value)
             : configOfferingId is not null
@@ -907,8 +922,8 @@ public sealed class DesignStageService : IDesignStageService
                     area.MetadataJson))
                 .ToArray();
         }
-        var activeArtworkAreaIds = configOfferingId is Guid configuredOfferingId
-            ? PlaceholderIdsForOffering(snapshot, configuredOfferingId).ToHashSet()
+        var activeArtworkAreaIds = configOfferingId is Guid activeOfferingId
+            ? PlaceholderIdsForOffering(snapshot, activeOfferingId).ToHashSet()
             : [];
         var hasPersistedArtworkTargetPreference = itemMetadata.ContainsKey(ItemMetadataCodec.ArtworkTargetPreferenceKey);
         var persistedArtworkTargetId = hasPersistedArtworkTargetPreference
