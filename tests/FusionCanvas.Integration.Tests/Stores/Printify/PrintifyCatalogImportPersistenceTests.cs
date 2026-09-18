@@ -36,9 +36,10 @@ public sealed class PrintifyCatalogImportPersistenceTests
         var second = await service.LoadSelectedAsync(new(workspaceId, storeId), [68], TestContext.Current.CancellationToken);
         var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.True(first.Succeeded);
-        Assert.True(second.Succeeded);
+        Assert.True(first.Succeeded, first.Message);
+        Assert.True(second.Succeeded, second.Message);
         Assert.Single(loaded.Blueprints, value => value.Id != localBlueprint.Id);
+        Assert.Equal("Brand Model", loaded.Blueprints.Single(value => value.Id != localBlueprint.Id).Name);
         Assert.Contains(loaded.Blueprints, value => value.Id == localBlueprint.Id && value.Name == "Local Draft");
         Assert.Single(loaded.PrintProviders);
         Assert.Equal("Changed provider", Assert.Single(loaded.PrintProviders).Name);
@@ -48,7 +49,7 @@ public sealed class PrintifyCatalogImportPersistenceTests
         Assert.Equal("Changed variant", Assert.Single(loaded.OfferingVariants).Name);
         Assert.Single(loaded.OfferingPlaceholders);
         Assert.Equal(4500, Assert.Single(loaded.OfferingPlaceholders).Width);
-        Assert.Contains(loaded.StoreProducts, value => value.Id != localBlueprint.Id && value.Name == "Changed title");
+        Assert.Contains(loaded.StoreProducts, value => value.Id != localBlueprint.Id && value.Name == "Brand Model");
         Assert.Single(loaded.FulfillmentOfferings);
         Assert.Single(loaded.ProductVariants);
         Assert.Equal(4500, Assert.Single(loaded.DesignAreas).Width);
@@ -60,7 +61,7 @@ public sealed class PrintifyCatalogImportPersistenceTests
     [
         new(
             new(68, title, "Description", "Brand", "Model"),
-            [new(7, "Changed provider", [], [new(33719, "Changed variant", true, true, [1], [new("front", "dtg", width, 4500)])])])
+             [new(7, "Changed provider", [new("Color", "color", [new(1, "Black")])], [new(33719, "Changed variant", true, true, [1], [new("front", "dtg", width, 4500)])])])
     ];
 
     private sealed class StoresStub(StoreSummary store) : IStoreManagementService

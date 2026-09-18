@@ -867,7 +867,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         {
             CaptureSelectedLocalSource();
             var colors = TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).ToArray();
-            if (_sourceImages is not null && HasLocalSource && SelectedProviderMockup is null)
+            if (_sourceImages is not null && HasPendingLocalSourceChanges && SelectedProviderMockup is null)
             {
                 var template = SelectedTemplate is not null && AvailableTemplates.Any(value => value.Id == SelectedTemplate.Id)
                     ? SelectedTemplate
@@ -879,10 +879,13 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
                     var created = await _mockups.CreateTemplateAsync(new CreateMockupTemplateRequest(SelectedOffering.StoreId, SelectedOffering.Id, TemplateName, SelectedPlaceholder?.Id)).ConfigureAwait(true);
                     if (!created.Succeeded) { ErrorMessage = created.Error ?? "Mockup Template could not be created."; return; }
                     ApplyMockups(created.State);
-                    template = created.State.Templates.LastOrDefault(value => value.Name == TemplateName.Trim());
+                    template = created.TemplateId is Guid createdTemplateId
+                        ? created.State.Templates.SingleOrDefault(value => value.Id == createdTemplateId)
+                        : created.State.Templates.LastOrDefault(value => value.Name == TemplateName.Trim());
                     sourceState = created.State;
                 }
                 if (template is null) { ErrorMessage = "The Mockup Template could not be selected."; return; }
+                SelectedTemplate = template;
                 if (templateWasExisting)
                 {
                     var templateResult = await _mockups.UpdateTemplateAsync(new UpdateMockupTemplateRequest(
@@ -898,10 +901,16 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
                 }
                 foreach (var draft in LocalSourceDrafts)
                 {
+                    var existingSourceImageIds = sourceState?.SourceImages?.Select(image => image.Id).ToHashSet() ?? [];
                     var sourceResult = draft.IsManaged
                         ? await _sourceImages.UpdateAsync(new UpdateLocalMockupTemplateSourceRequest(SelectedOffering.StoreId, template.Id, draft.SourceImageId ?? Guid.Empty, draft.OptionValueIds, draft.Mapping)).ConfigureAwait(true)
                         : await _sourceImages.AddAsync(new AddLocalMockupTemplateSourceRequest(SelectedOffering.StoreId, template.Id, draft.Path, draft.OptionValueIds, draft.Mapping)).ConfigureAwait(true);
                     if (!sourceResult.Succeeded) { ErrorMessage = sourceResult.Error ?? $"The local source image '{draft.DisplayName}' could not be added."; return; }
+                    if (!draft.IsManaged && sourceResult.State.SourceImages is { } savedImages)
+                    {
+                        var addedImage = savedImages.SingleOrDefault(image => !existingSourceImageIds.Contains(image.Id));
+                        if (addedImage is not null) draft.MarkManaged(addedImage.Id);
+                    }
                     sourceState = sourceResult.State;
                 }
                 foreach (var draft in _archivedLocalSourceDrafts.Where(value => value.SourceImageId is not null))
@@ -1582,10 +1591,12 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private bool CanCreateTemplate()
     {
         if (!CanEdit || !IsAddingTemplate || SelectedOffering is null || string.IsNullOrWhiteSpace(TemplateName)) return false;
-        if (_sourceImages is not null && HasLocalSource && SelectedProviderMockup is null)
+        if (_sourceImages is not null && HasPendingLocalSourceChanges && SelectedProviderMockup is null)
             return true;
         return SelectedProviderMockup is null || TryCreateMapping(out _);
     }
+
+    private bool HasPendingLocalSourceChanges => HasLocalSource || _archivedLocalSourceDrafts.Count > 0;
 
     private static bool OptionalPositivePair(string width, string height) =>
         string.IsNullOrWhiteSpace(width) && string.IsNullOrWhiteSpace(height)

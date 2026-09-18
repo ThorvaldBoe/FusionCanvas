@@ -37,6 +37,75 @@ public sealed class PrintifyCatalogImportViewModelTests
     }
 
     [Fact]
+    public async Task CancellingInFlightLoadReturnsToStableStateAndIgnoresLateResult()
+    {
+        var scope = new StoreCredentialScope(Guid.NewGuid(), Guid.NewGuid());
+        var pending = new TaskCompletionSource<PrintifyCatalogResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var service = new StubService { BlueprintsTask = pending.Task };
+        var viewModel = new PrintifyCatalogImportViewModel(service, () => scope);
+
+        viewModel.Open();
+        await WaitForAsync(() => viewModel.IsBusy);
+        viewModel.CancelCommand.Execute(null);
+
+        Assert.False(viewModel.IsBusy);
+        Assert.False(viewModel.IsOpen);
+        pending.SetResult(new(PrintifyCatalogResultKind.Succeeded, "late", [new(68, "Late", null, null, null)]));
+        await Task.Yield();
+
+        Assert.Empty(viewModel.Blueprints);
+    }
+
+    [Fact]
+    public async Task ReopeningSameScopeIgnoresOldResultAndKeepsNewCatalog()
+    {
+        var scope = new StoreCredentialScope(Guid.NewGuid(), Guid.NewGuid());
+        var oldPending = new TaskCompletionSource<PrintifyCatalogResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var newPending = new TaskCompletionSource<PrintifyCatalogResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var service = new StubService { BlueprintTasks = new Queue<Task<PrintifyCatalogResult>>([oldPending.Task, newPending.Task]) };
+        var viewModel = new PrintifyCatalogImportViewModel(service, () => scope);
+
+        viewModel.Open();
+        await WaitForAsync(() => viewModel.IsBusy);
+        viewModel.CancelCommand.Execute(null);
+        viewModel.Open();
+        await WaitForAsync(() => viewModel.IsBusy);
+
+        oldPending.SetResult(new(PrintifyCatalogResultKind.Succeeded, "old", [new(68, "Old", null, null, null)]));
+        newPending.SetResult(new(PrintifyCatalogResultKind.Succeeded, "new", [new(77, "New", null, null, null)]));
+        await WaitForAsync(() => !viewModel.IsBusy);
+
+        Assert.Single(viewModel.Blueprints);
+        Assert.Equal("77", viewModel.Blueprints[0].Id);
+    }
+
+    [Fact]
+    public async Task CancellingInFlightImportDoesNotInvokeRefresh()
+    {
+        var scope = new StoreCredentialScope(Guid.NewGuid(), Guid.NewGuid());
+        var pending = new TaskCompletionSource<PrintifyCatalogResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var refreshed = false;
+        var service = new StubService
+        {
+            BlueprintsTask = Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Succeeded, "loaded", [new(68, "Tee", null, null, null)])),
+            SelectedTask = pending.Task
+        };
+        var viewModel = new PrintifyCatalogImportViewModel(service, () => scope, (_, _) => { refreshed = true; return Task.CompletedTask; });
+
+        viewModel.Open();
+        await WaitForAsync(() => !viewModel.IsBusy);
+        viewModel.Blueprints[0].IsSelected = true;
+        viewModel.ConfirmCommand.Execute(null);
+        await WaitForAsync(() => viewModel.IsBusy);
+        viewModel.CancelCommand.Execute(null);
+        pending.SetResult(new(PrintifyCatalogResultKind.Succeeded, "late", SelectedCatalog: []));
+        await Task.Yield();
+
+        Assert.False(viewModel.IsBusy);
+        Assert.False(refreshed);
+    }
+
+    [Fact]
     public async Task SuccessfulConfirmationRefreshesAndClosesSession()
     {
         var scope = new StoreCredentialScope(Guid.NewGuid(), Guid.NewGuid());
@@ -113,9 +182,10 @@ public sealed class PrintifyCatalogImportViewModelTests
     private sealed class StubService : IPrintifyCatalogImportService
     {
         public Task<PrintifyCatalogResult> BlueprintsTask { get; init; } = Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Empty, "empty", []));
+        public Queue<Task<PrintifyCatalogResult>>? BlueprintTasks { get; init; }
         public Task<PrintifyCatalogResult> SelectedTask { get; init; } = Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Empty, "empty", []));
         public int SelectedCalls { get; private set; }
-        public Task<PrintifyCatalogResult> LoadBlueprintsAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default) => BlueprintsTask;
+        public Task<PrintifyCatalogResult> LoadBlueprintsAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default) => BlueprintTasks is null ? BlueprintsTask : BlueprintTasks.Dequeue();
         public Task<PrintifyCatalogResult> LoadSelectedAsync(StoreCredentialScope scope, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken = default) { SelectedCalls++; return SelectedTask; }
     }
 }

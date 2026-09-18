@@ -14,6 +14,7 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
     private readonly Func<StoreCredentialScope?> _scope;
     private readonly Func<StoreCredentialScope, CancellationToken, Task>? _onImported;
     private CancellationTokenSource? _operationCancellation;
+    private long _operationVersion;
     private bool _isOpen;
     private bool _isBusy;
     private string? _errorMessage;
@@ -48,22 +49,24 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
     private Task StartLoadAsync()
     {
         if (IsBusy) return Task.CompletedTask;
-        CancelOperation();
+        InvalidateOperation();
+        ClearBlueprints();
         _operationCancellation = new CancellationTokenSource();
-        return LoadAsync(_operationCancellation.Token);
+        return LoadAsync(_operationVersion, _operationCancellation.Token);
     }
 
     public void Open()
     {
         if (IsBusy) return;
-        CancelOperation();
+        InvalidateOperation();
+        ClearBlueprints();
         IsOpen = true;
         ErrorMessage = null;
         _operationCancellation = new CancellationTokenSource();
-        _ = LoadAsync(_operationCancellation.Token);
+        _ = LoadAsync(_operationVersion, _operationCancellation.Token);
     }
 
-    private async Task LoadAsync(CancellationToken cancellationToken)
+    private async Task LoadAsync(long operationVersion, CancellationToken cancellationToken)
     {
         if (IsBusy) return;
         var scope = _scope();
@@ -73,9 +76,8 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
         try
         {
             var result = await _service.LoadBlueprintsAsync(scope, cancellationToken).ConfigureAwait(true);
-            if (!IsCurrentScope(scope)) return;
+            if (!CanPublish(operationVersion, scope)) return;
             if (!result.Succeeded) { ErrorMessage = result.Message; return; }
-            Blueprints.Clear();
             var products = result.Products ?? result.Blueprints?.Select(blueprint =>
                 new PrintifyShopProductSummary(blueprint.Id.ToString(), blueprint.Title, blueprint.Description, blueprint.Id, 1)) ?? [];
             foreach (var product in products)
@@ -88,49 +90,97 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
             SelectionFocusRequested?.Invoke(this, EventArgs.Empty);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch (Exception) { ErrorMessage = "Printify catalog could not be loaded. Try again."; }
-        finally { IsBusy = false; NotifyCommands(); }
+        catch (Exception)
+        {
+            if (CanPublish(operationVersion, scope))
+            {
+                ErrorMessage = "Printify catalog could not be loaded. Try again.";
+            }
+        }
+        finally
+        {
+            if (IsCurrentVersion(operationVersion))
+            {
+                IsBusy = false;
+                NotifyCommands();
+            }
+        }
     }
 
     private async Task ConfirmAsync()
     {
         var scope = _scope();
         if (scope is null || !CanConfirm) return;
-        CancelOperation();
+        InvalidateOperation();
         _operationCancellation = new CancellationTokenSource();
+        var operationVersion = _operationVersion;
         var cancellationToken = _operationCancellation.Token;
         IsBusy = true;
         ErrorMessage = null;
         try
         {
             var result = await _service.LoadSelectedAsync(scope, Blueprints.Where(item => item.IsSelected).Select(item => item.Id).ToArray(), cancellationToken).ConfigureAwait(true);
-            if (!IsCurrentScope(scope)) return;
+            if (!CanPublish(operationVersion, scope)) return;
             if (!result.Succeeded) { ErrorMessage = result.Message; return; }
-            if (_onImported is not null)
+            if (_onImported is not null && CanPublish(operationVersion, scope))
                 await _onImported(scope, cancellationToken).ConfigureAwait(true);
+            if (!CanPublish(operationVersion, scope)) return;
             IsOpen = false;
             ImportFocusRequested?.Invoke(this, EventArgs.Empty);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch (Exception) { ErrorMessage = "The selected Printify catalog could not be prepared for import."; }
-        finally { IsBusy = false; NotifyCommands(); }
+        catch (Exception)
+        {
+            if (CanPublish(operationVersion, scope))
+            {
+                ErrorMessage = "The selected Printify catalog could not be prepared for import.";
+            }
+        }
+        finally
+        {
+            if (IsCurrentVersion(operationVersion))
+            {
+                IsBusy = false;
+                NotifyCommands();
+            }
+        }
     }
 
     private void Cancel()
     {
-        if (IsBusy) return;
-        CancelOperation();
+        InvalidateOperation();
+        IsBusy = false;
         IsOpen = false;
+        ErrorMessage = null;
+        NotifyCommands();
         ImportFocusRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    private bool IsCurrentScope(StoreCredentialScope expected) => IsOpen && _scope() == expected;
+    private bool IsCurrentOperation(long operationVersion, StoreCredentialScope expected) =>
+        IsCurrentVersion(operationVersion) && _scope() == expected;
 
-    private void CancelOperation()
+    private bool IsCurrentVersion(long operationVersion) => operationVersion == _operationVersion;
+
+    private bool CanPublish(long operationVersion, StoreCredentialScope expected) =>
+        IsOpen && IsCurrentOperation(operationVersion, expected);
+
+    private void InvalidateOperation()
     {
         _operationCancellation?.Cancel();
         _operationCancellation?.Dispose();
         _operationCancellation = null;
+        _operationVersion++;
+    }
+
+    private void ClearBlueprints()
+    {
+        foreach (var blueprint in Blueprints)
+        {
+            blueprint.PropertyChanged -= OnItemPropertyChanged;
+        }
+
+        Blueprints.Clear();
+        OnPropertyChanged(nameof(HasBlueprints));
     }
 
     private void OnItemPropertyChanged(object? sender, PropertyChangedEventArgs args)

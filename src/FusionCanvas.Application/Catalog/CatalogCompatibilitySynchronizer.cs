@@ -102,8 +102,18 @@ public static class CatalogCompatibilitySynchronizer
             }
 
             var normalizedOffering = offerings.Single(value => value.Id == legacy.Id);
+            if (normalizedOffering.IsArchived)
+            {
+                continue;
+            }
+
             foreach (var legacyVariant in source.ProductVariants.Where(value => value.FulfillmentOfferingId == legacy.Id))
             {
+                if (variants.Any(value => value.Id == legacyVariant.Id))
+                {
+                    continue;
+                }
+
                 var optionValueIds = new List<Guid>();
                 foreach (var legacyOption in legacyVariant.Options)
                 {
@@ -141,7 +151,7 @@ public static class CatalogCompatibilitySynchronizer
                     optionValueIds.Add(optionValue.Id);
                 }
 
-                if (variants.All(value => value.Id != legacyVariant.Id) && optionValueIds.Count > 0)
+                if (optionValueIds.Count > 0)
                 {
                     variants.Add(new OfferingVariant(
                         legacyVariant.Id,

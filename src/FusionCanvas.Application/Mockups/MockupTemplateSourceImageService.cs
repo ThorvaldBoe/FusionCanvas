@@ -66,20 +66,21 @@ public sealed class MockupTemplateSourceImageService : IMockupTemplateSourceImag
         var asset = new Asset(_newId(), store.Id, managed.Name, null, AssetKind.MockupImage, managed.WorkspaceRelativePath, managed.OriginalSourcePath, false, false, now, now, "{}");
         var image = new MockupTemplateSourceImage(_newId(), template.Id, asset.Id, mapping, false, now, now, dimensions.Width, dimensions.Height);
         var conditions = ids.Select(id => new MockupTemplateSourceImageOptionValue(image.Id, id)).ToArray();
+        var nextImages = snapshot.MockupTemplateSourceImages.Append(image).ToArray();
+        var nextConditions = snapshot.MockupTemplateSourceImageOptionValues.Concat(conditions).ToArray();
         var revisionNumber = template.CurrentRevision + 1;
         var revision = new MockupTemplateRevision(_newId(), template.Id, revisionNumber, template.TargetPlaceholderId, now, "Local source image added");
-        var revisionImage = new MockupTemplateRevisionSourceImage(_newId(), revision.Id, asset.Id, mapping, dimensions.Width, dimensions.Height);
-        var revisionConditions = ids.Select(id => new MockupTemplateRevisionSourceImageOptionValue(revisionImage.Id, id)).ToArray();
+        var revisionData = SnapshotActiveSourceImages(nextImages, nextConditions, template.Id, revision.Id);
         var updated = snapshot with
         {
             Assets = [.. snapshot.Assets, asset],
             AssetLinks = [.. snapshot.AssetLinks, new AssetLink(asset.Id, WorkspaceEntityKind.Store, store.Id)],
             MockupTemplates = snapshot.MockupTemplates.Select(value => value.Id == template.Id ? value with { CurrentRevision = revisionNumber, UpdatedAt = now } : value).ToArray(),
-            MockupTemplateSourceImages = [.. snapshot.MockupTemplateSourceImages, image],
-            MockupTemplateSourceImageOptionValues = [.. snapshot.MockupTemplateSourceImageOptionValues, .. conditions],
+            MockupTemplateSourceImages = nextImages,
+            MockupTemplateSourceImageOptionValues = nextConditions,
             MockupTemplateRevisions = [.. snapshot.MockupTemplateRevisions, revision],
-            MockupTemplateRevisionSourceImages = [.. snapshot.MockupTemplateRevisionSourceImages, revisionImage],
-            MockupTemplateRevisionSourceImageOptionValues = [.. snapshot.MockupTemplateRevisionSourceImageOptionValues, .. revisionConditions]
+            MockupTemplateRevisionSourceImages = [.. snapshot.MockupTemplateRevisionSourceImages, .. revisionData.Images],
+            MockupTemplateRevisionSourceImageOptionValues = [.. snapshot.MockupTemplateRevisionSourceImageOptionValues, .. revisionData.Conditions]
         };
         try { await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false); }
         catch (Exception exception) when (exception is not OperationCanceledException) { _fileStore.TryDelete(managed.WorkspaceRelativePath); return MockupTemplateSetupResult.Failure($"The source image could not be saved. {exception.Message}", await LoadForStoreAsync(request.StoreId, cancellationToken)); }
@@ -102,6 +103,15 @@ public sealed class MockupTemplateSourceImageService : IMockupTemplateSourceImag
         if (request.ImageMapping is { } mapping && (mapping.ImageWidth != image.ImageWidth || mapping.ImageHeight != image.ImageHeight))
             return MockupTemplateSetupResult.Failure("The mapping dimensions must match the source image.", await LoadForStoreAsync(request.StoreId, cancellationToken));
 
+        var existingIds = snapshot.MockupTemplateSourceImageOptionValues
+            .Where(value => value.SourceImageId == image.Id)
+            .Select(value => value.OptionValueId)
+            .ToHashSet();
+        var currentRevision = snapshot.MockupTemplateRevisions.SingleOrDefault(value => value.MockupTemplateId == template.Id && value.RevisionNumber == template.CurrentRevision);
+        var currentRevisionComplete = currentRevision is not null && RevisionMatchesActiveSources(snapshot, currentRevision, template.Id);
+        if (image.ImageMapping == request.ImageMapping && image.IsArchived == request.Archive && existingIds.SetEquals(ids) && currentRevisionComplete)
+            return MockupTemplateSetupResult.Success(await LoadForStoreAsync(request.StoreId, cancellationToken));
+
         var now = _clock();
         var updatedImage = image with { ImageMapping = request.ImageMapping, IsArchived = request.Archive, UpdatedAt = now };
         var nextImages = snapshot.MockupTemplateSourceImages.Select(value => value.Id == image.Id ? updatedImage : value).ToArray();
@@ -111,21 +121,15 @@ public sealed class MockupTemplateSourceImageService : IMockupTemplateSourceImag
             .ToArray();
         var revisionNumber = template.CurrentRevision + 1;
         var revision = new MockupTemplateRevision(_newId(), template.Id, revisionNumber, template.TargetPlaceholderId, now, "Local source image metadata changed");
-        var revisionImages = nextImages.Where(value => value.MockupTemplateId == template.Id && !value.IsArchived)
-            .Select(value => new MockupTemplateRevisionSourceImage(_newId(), revision.Id, value.SourceAssetId, value.ImageMapping, value.ImageWidth, value.ImageHeight)).ToArray();
-        var revisionConditions = revisionImages.SelectMany((value, index) =>
-        {
-            var current = nextImages.Where(source => source.MockupTemplateId == template.Id && !source.IsArchived).ElementAt(index);
-            return nextConditions.Where(condition => condition.SourceImageId == current.Id).Select(condition => new MockupTemplateRevisionSourceImageOptionValue(value.Id, condition.OptionValueId));
-        }).ToArray();
+        var revisionData = SnapshotActiveSourceImages(nextImages, nextConditions, template.Id, revision.Id);
         var updated = snapshot with
         {
             MockupTemplates = snapshot.MockupTemplates.Select(value => value.Id == template.Id ? value with { CurrentRevision = revisionNumber, UpdatedAt = now } : value).ToArray(),
             MockupTemplateSourceImages = nextImages,
             MockupTemplateSourceImageOptionValues = nextConditions,
             MockupTemplateRevisions = [.. snapshot.MockupTemplateRevisions, revision],
-            MockupTemplateRevisionSourceImages = [.. snapshot.MockupTemplateRevisionSourceImages, .. revisionImages],
-            MockupTemplateRevisionSourceImageOptionValues = [.. snapshot.MockupTemplateRevisionSourceImageOptionValues, .. revisionConditions]
+            MockupTemplateRevisionSourceImages = [.. snapshot.MockupTemplateRevisionSourceImages, .. revisionData.Images],
+            MockupTemplateRevisionSourceImageOptionValues = [.. snapshot.MockupTemplateRevisionSourceImageOptionValues, .. revisionData.Conditions]
         };
         try { await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false); }
         catch (Exception exception) when (exception is not OperationCanceledException) { return MockupTemplateSetupResult.Failure($"The source image could not be saved. {exception.Message}", await LoadForStoreAsync(request.StoreId, cancellationToken)); }
@@ -138,6 +142,41 @@ public sealed class MockupTemplateSourceImageService : IMockupTemplateSourceImag
         var conditions = snapshot.MockupTemplateSourceImageOptionValues.Where(value => value.SourceImageId == image.Id).Select(value => value.OptionValueId).ToArray();
         var dimensions = new RasterImageInfo(image.ImageWidth, image.ImageHeight);
         return new(image.Id, asset.Id, asset.Name, asset.WorkspaceRelativePath, dimensions, image.ImageMapping, conditions, Path.Combine(_fileStore.WorkspaceRoot, asset.WorkspaceRelativePath));
+    }
+
+    private (MockupTemplateRevisionSourceImage[] Images, MockupTemplateRevisionSourceImageOptionValue[] Conditions) SnapshotActiveSourceImages(
+        IReadOnlyList<MockupTemplateSourceImage> images,
+        IReadOnlyList<MockupTemplateSourceImageOptionValue> conditions,
+        Guid templateId,
+        Guid revisionId)
+    {
+        var active = images.Where(value => value.MockupTemplateId == templateId && !value.IsArchived).ToArray();
+        var revisionImages = active.ToDictionary(value => value.Id, value =>
+            new MockupTemplateRevisionSourceImage(_newId(), revisionId, value.SourceAssetId, value.ImageMapping, value.ImageWidth, value.ImageHeight));
+        var revisionConditions = active.SelectMany(value => conditions
+            .Where(condition => condition.SourceImageId == value.Id)
+            .Select(condition => new MockupTemplateRevisionSourceImageOptionValue(revisionImages[value.Id].Id, condition.OptionValueId)))
+            .ToArray();
+        return (revisionImages.Values.ToArray(), revisionConditions);
+    }
+
+    private static bool RevisionMatchesActiveSources(WorkspaceSnapshot snapshot, MockupTemplateRevision revision, Guid templateId)
+    {
+        var active = snapshot.MockupTemplateSourceImages.Where(value => value.MockupTemplateId == templateId && !value.IsArchived).ToArray();
+        var revisionImages = snapshot.MockupTemplateRevisionSourceImages.Where(value => value.RevisionId == revision.Id).ToArray();
+        if (active.Length != revisionImages.Length) return false;
+        foreach (var image in active)
+        {
+            var revisionImage = revisionImages.SingleOrDefault(value => value.SourceAssetId == image.SourceAssetId
+                && value.ImageMapping == image.ImageMapping
+                && value.ImageWidth == image.ImageWidth
+                && value.ImageHeight == image.ImageHeight);
+            if (revisionImage is null) return false;
+            var expected = snapshot.MockupTemplateSourceImageOptionValues.Where(value => value.SourceImageId == image.Id).Select(value => value.OptionValueId).ToHashSet();
+            var actual = snapshot.MockupTemplateRevisionSourceImageOptionValues.Where(value => value.RevisionSourceImageId == revisionImage.Id).Select(value => value.OptionValueId).ToHashSet();
+            if (!expected.SetEquals(actual)) return false;
+        }
+        return true;
     }
 
     private async Task<MockupTemplateSetupState> LoadForStoreAsync(Guid storeId, CancellationToken cancellationToken) =>

@@ -48,9 +48,20 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
 
     public async Task<PrintifyCatalogResult> LoadSelectedProductsAsync(string key, int shopId, IReadOnlyCollection<string> productIds, CancellationToken cancellationToken = default)
     {
+        try
+        {
+            return await LoadSelectedProductsCoreAsync(key, shopId, productIds, cancellationToken).ConfigureAwait(false);
+        }
+        catch (JsonException) { return Unexpected(); }
+        catch (InvalidOperationException) { return Unexpected(); }
+        catch (ArgumentException) { return Unexpected(); }
+    }
+
+    private async Task<PrintifyCatalogResult> LoadSelectedProductsCoreAsync(string key, int shopId, IReadOnlyCollection<string> productIds, CancellationToken cancellationToken = default)
+    {
         if (productIds is null || productIds.Count == 0 || productIds.Any(string.IsNullOrWhiteSpace))
             return new(PrintifyCatalogResultKind.InvalidRequest, "Select at least one valid Printify product.");
-        var loaded = await LoadAllProductsAsync(key, shopId, cancellationToken).ConfigureAwait(false);
+        var loaded = await LoadShopProductSummariesAsync(key, shopId, cancellationToken).ConfigureAwait(false);
         if (!loaded.Succeeded) return loaded;
         var selectedIds = productIds.Distinct(StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
         var selectedProducts = loaded.Products!.Where(product => selectedIds.Contains(product.ProductId)).ToList();
@@ -64,22 +75,127 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
             {
                 catalogSummaries[blueprintId] = summary.Blueprints![0];
             }
-            else if (summary.Kind != PrintifyCatalogResultKind.UnexpectedResponse)
-            {
-                return summary;
-            }
+            else return summary;
         }
 
-        var selected = loaded.SelectedProducts!
-            .Where(product => product.ProductId is { } id && selectedIds.Contains(id))
-            .Select(product => product with
+        var selected = new List<PrintifyCatalogBlueprint>();
+        foreach (var product in selectedProducts)
+        {
+            var detail = await LoadShopProductDetailAsync(key, shopId, product.ProductId, cancellationToken).ConfigureAwait(false);
+            if (!detail.Succeeded) return detail;
+            var productDetail = detail.SelectedProducts![0];
+            if (productDetail.ProductId != product.ProductId || productDetail.Summary.Id != product.BlueprintId || productDetail.Providers.Count != 1 || productDetail.Providers[0].Id != product.ProviderId)
+                return Unexpected();
+            var provider = productDetail.Providers.Single();
+            var catalogProvider = await LoadCatalogProviderAsync(key, product.BlueprintId, provider.Id, cancellationToken).ConfigureAwait(false);
+            if (!catalogProvider.Succeeded) return catalogProvider;
+            var resolvedProvider = catalogProvider.SelectedCatalog![0].Providers.Single();
+            var productVariants = new Dictionary<int, PrintifyCatalogVariant>();
+            foreach (var productVariant in provider.Variants)
             {
-                Summary = catalogSummaries.TryGetValue(product.Summary.Id, out var summary) ? summary : product.Summary
-            })
-            .ToList();
+                if (!productVariants.TryAdd(productVariant.Id, productVariant)) return Unexpected();
+            }
+            var resolvedVariants = new List<PrintifyCatalogVariant>();
+            foreach (var catalogVariant in resolvedProvider.Variants)
+            {
+                if (!productVariants.TryGetValue(catalogVariant.Id, out var productVariant)) continue;
+                var requestedPlaceholders = productVariant.Placeholders;
+                var placeholders = requestedPlaceholders.Count == 0
+                    ? []
+                    : requestedPlaceholders.Select(requested => MatchPlaceholder(catalogVariant.Placeholders, requested)).ToArray();
+                resolvedVariants.Add(catalogVariant with { OptionValueIds = productVariant.OptionValueIds, Title = productVariant.Title, IsEnabled = productVariant.IsEnabled, IsAvailable = productVariant.IsAvailable, Placeholders = placeholders });
+            }
+            if (resolvedVariants.Count != productVariants.Count)
+                return Unexpected();
+            selected.Add(productDetail with
+            {
+                Summary = catalogSummaries[product.BlueprintId],
+                Providers = [provider with { Title = resolvedProvider.Title, Variants = resolvedVariants }]
+            });
+        }
         if (selected.Count != selectedIds.Count)
             return new(PrintifyCatalogResultKind.UnexpectedResponse, "Printify returned incomplete product details.");
         return new(PrintifyCatalogResultKind.Succeeded, "Selected Printify shop products loaded.", Products: loaded.Products, SelectedProducts: selected);
+    }
+
+    private async Task<PrintifyCatalogResult> LoadShopProductSummariesAsync(string key, int shopId, CancellationToken cancellationToken)
+    {
+        if (!PrintifyToken.IsValid(key)) return new(PrintifyCatalogResultKind.InvalidKey, "Enter a valid Printify key before loading shop products.");
+        if (shopId <= 0) return new(PrintifyCatalogResultKind.InvalidRequest, "Select a valid Printify shop before loading products.");
+        var products = new List<PrintifyShopProductSummary>();
+        for (var page = 1; ; page++)
+        {
+            var response = await SendJsonAsync($"{ApiBaseUri}shops/{shopId}/products.json?limit=50&page={page}", key, cancellationToken).ConfigureAwait(false);
+            if (response.Error is not null) return response.Error;
+            using var document = response.Json!;
+            try
+            {
+                var pageResult = ParseProductPage(document, includeDetails: false);
+                products.AddRange(pageResult.Products);
+                if (pageResult.LastPage <= page) break;
+            }
+            catch (JsonException) { return Unexpected(); }
+            catch (InvalidOperationException) { return Unexpected(); }
+        }
+
+        return products.Count == 0
+            ? new(PrintifyCatalogResultKind.Empty, "The selected Printify shop has no products to import.", Products: products)
+            : new(PrintifyCatalogResultKind.Succeeded, "Printify shop products loaded.", Products: products);
+    }
+
+    private async Task<PrintifyCatalogResult> LoadShopProductDetailAsync(string key, int shopId, string productId, CancellationToken cancellationToken)
+    {
+        var response = await SendJsonAsync($"{ApiBaseUri}shops/{shopId}/products/{Uri.EscapeDataString(productId)}.json", key, cancellationToken).ConfigureAwait(false);
+        if (response.Error is not null) return response.Error;
+        using var document = response.Json!;
+        try
+        {
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                throw new JsonException();
+            var detail = ParseProductDetail(document.RootElement);
+            return new(PrintifyCatalogResultKind.Succeeded, "Printify shop product loaded.", SelectedProducts: [detail]);
+        }
+        catch (JsonException) { return Unexpected(); }
+        catch (InvalidOperationException) { return Unexpected(); }
+    }
+
+    private static PrintifyCatalogBlueprint ParseProductDetail(JsonElement item)
+    {
+        var productId = RequiredString(item, "id");
+        var blueprintId = RequiredInt(item, "blueprint_id");
+        var providerId = RequiredInt(item, "print_provider_id");
+        var options = ParseProductOptions(item);
+        var variants = ParseProductVariants(item);
+        return new(new PrintifyCatalogBlueprintSummary(blueprintId, RequiredString(item, "title"), OptionalString(item, "description"), null, null),
+            [new PrintifyCatalogProvider(providerId, $"Printify provider {providerId}", options, variants)]) { ProductId = productId };
+    }
+
+    private async Task<PrintifyCatalogResult> LoadCatalogProviderAsync(string key, int blueprintId, int providerId, CancellationToken cancellationToken)
+    {
+        var providersResponse = await SendJsonAsync($"{CatalogBaseUri}blueprints/{blueprintId}/print_providers.json", key, cancellationToken).ConfigureAwait(false);
+        if (providersResponse.Error is not null) return providersResponse.Error;
+        using var providersDocument = providersResponse.Json!;
+        try
+        {
+            var provider = ParseProviders(providersDocument).SingleOrDefault(value => value.Id == providerId);
+            if (provider is null) return Unexpected();
+            var variantsResponse = await SendJsonAsync($"{CatalogBaseUri}blueprints/{blueprintId}/print_providers/{providerId}/variants.json", key, cancellationToken).ConfigureAwait(false);
+            if (variantsResponse.Error is not null) return variantsResponse.Error;
+            using var variantsDocument = variantsResponse.Json!;
+            return new(PrintifyCatalogResultKind.Succeeded, "Printify provider loaded.", SelectedCatalog: [new PrintifyCatalogBlueprint(
+                new PrintifyCatalogBlueprintSummary(blueprintId, $"Blueprint {blueprintId}", null, null, null),
+                [provider with { Variants = ParseVariants(variantsDocument) }])]);
+        }
+        catch (JsonException) { return Unexpected(); }
+        catch (InvalidOperationException) { return Unexpected(); }
+    }
+
+    private static PrintifyCatalogPlaceholder MatchPlaceholder(IReadOnlyList<PrintifyCatalogPlaceholder> candidates, PrintifyCatalogPlaceholder requested)
+    {
+        var matches = candidates.Where(candidate =>
+            string.Equals(candidate.Position, requested.Position, StringComparison.OrdinalIgnoreCase) &&
+            (requested.DecorationMethod == "unknown" || string.Equals(candidate.DecorationMethod, requested.DecorationMethod, StringComparison.OrdinalIgnoreCase))).ToArray();
+        return matches.Length == 1 ? matches[0] : throw new JsonException();
     }
 
     private async Task<PrintifyCatalogResult> LoadCatalogBlueprintSummaryAsync(string key, int blueprintId, CancellationToken cancellationToken)
@@ -89,7 +205,9 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
         using var document = response.Json!;
         try
         {
-            return new(PrintifyCatalogResultKind.Succeeded, "Printify Blueprint loaded.", Blueprints: [ParseBlueprintSummary(document)]);
+            var summary = ParseBlueprintSummary(document);
+            if (summary.Id != blueprintId) return Unexpected();
+            return new(PrintifyCatalogResultKind.Succeeded, "Printify Blueprint loaded.", Blueprints: [summary]);
         }
         catch (JsonException) { return Unexpected(); }
         catch (InvalidOperationException) { return Unexpected(); }
@@ -229,6 +347,15 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
         if (!item.TryGetProperty("variants", out var variants) || variants.ValueKind != JsonValueKind.Array) throw new JsonException();
         var areas = item.TryGetProperty("print_areas", out var printAreas) && printAreas.ValueKind == JsonValueKind.Array
             ? printAreas.EnumerateArray().ToList() : [];
+        var variantIds = variants.EnumerateArray().Select(variant => RequiredInt(variant, "id")).ToHashSet();
+        foreach (var area in areas)
+        {
+            if (!area.TryGetProperty("variant_ids", out var ids) || ids.ValueKind != JsonValueKind.Array) throw new JsonException();
+            foreach (var value in ids.EnumerateArray())
+            {
+                if (!value.TryGetInt32(out var areaId) || areaId <= 0 || !variantIds.Contains(areaId)) throw new JsonException();
+            }
+        }
         return variants.EnumerateArray().Select(variant =>
         {
             var id = RequiredInt(variant, "id");
@@ -239,13 +366,7 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
                 if (!area.TryGetProperty("placeholders", out var areaPlaceholders) || areaPlaceholders.ValueKind != JsonValueKind.Array) throw new JsonException();
                 foreach (var placeholder in areaPlaceholders.EnumerateArray())
                 {
-                    var images = placeholder.TryGetProperty("images", out var imageList) && imageList.ValueKind == JsonValueKind.Array ? imageList.EnumerateArray().ToList() : [];
-                    if (images.Count == 0) continue;
-                    var image = images.FirstOrDefault();
-                    var width = image.ValueKind == JsonValueKind.Object ? RequiredInt(image, "width") : 0;
-                    var height = image.ValueKind == JsonValueKind.Object ? RequiredInt(image, "height") : 0;
-                    if (width <= 0 || height <= 0) throw new JsonException();
-                    placeholders.Add(new(RequiredString(placeholder, "position"), OptionalString(placeholder, "decoration_method") ?? "unknown", width, height));
+                    placeholders.Add(new(RequiredString(placeholder, "position"), OptionalString(placeholder, "decoration_method") ?? "unknown", 1, 1));
                 }
             }
             return new PrintifyCatalogVariant(id, RequiredString(variant, "title"), OptionalBool(variant, "is_enabled", true), OptionalBool(variant, "is_available", true), ParseOptionIds(variant), placeholders);
@@ -382,8 +503,12 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
 
     private static List<PrintifyCatalogVariant> ParseVariants(JsonDocument document)
     {
-        if (document.RootElement.ValueKind != JsonValueKind.Array) throw new JsonException();
-        return document.RootElement.EnumerateArray().Select(item => new PrintifyCatalogVariant(
+        var root = document.RootElement;
+        var variants = root.ValueKind == JsonValueKind.Object && root.TryGetProperty("variants", out var objectVariants)
+            ? objectVariants
+            : root;
+        if (variants.ValueKind != JsonValueKind.Array) throw new JsonException();
+        return variants.EnumerateArray().Select(item => new PrintifyCatalogVariant(
             RequiredInt(item, "id"), RequiredString(item, "title"),
             OptionalBool(item, "is_enabled", true), OptionalBool(item, "is_available", true),
             ParseOptionIds(item), ParsePlaceholders(item))).ToList();
@@ -393,7 +518,7 @@ public sealed class PrintifyCatalogClient(HttpClient client) : IPrintifyCatalogC
     {
         if (!item.TryGetProperty("options", out var options)) return [];
         if (options.ValueKind == JsonValueKind.Array)
-            return options.EnumerateArray().Select(value => value.GetInt32()).ToList();
+            return options.EnumerateArray().Select(value => value.TryGetInt32(out var optionId) ? optionId : throw new JsonException()).ToList();
         return [];
     }
 

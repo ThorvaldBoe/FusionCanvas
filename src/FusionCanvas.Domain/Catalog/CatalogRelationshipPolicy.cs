@@ -55,7 +55,8 @@ public static class CatalogRelationshipPolicy
 
         var offeringOptions = options.Where(option => option.OfferingId == offering.Id).ToArray();
         var optionIds = offeringOptions.Select(option => option.Id).ToHashSet();
-        if (offeringOptions.Select(option => option.OptionKind).Distinct().Count() != offeringOptions.Length)
+        var activeOfferingOptions = offeringOptions.Where(option => !option.IsArchived).ToArray();
+        if (activeOfferingOptions.Select(option => option.OptionKind).Distinct().Count() != activeOfferingOptions.Length)
             throw new InvalidOperationException("An offering cannot contain duplicate active option kinds.");
 
         var offeringValues = values.Where(value => value.OfferingId == offering.Id).ToArray();
@@ -84,7 +85,7 @@ public static class CatalogRelationshipPolicy
             var primary = placeholders.SingleOrDefault(value => value.Id == primaryAreaId);
             if (primary is null || primary.OfferingId != offering.Id)
                 throw new InvalidOperationException("Primary artwork Design Area must belong to the same offering.");
-            if (primary.IsArchived)
+            if (!offering.IsArchived && primary.IsArchived)
                 throw new InvalidOperationException("Primary artwork Design Area must be active.");
         }
     }
