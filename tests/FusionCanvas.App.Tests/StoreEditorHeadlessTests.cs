@@ -2316,6 +2316,60 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void SelectedSourceEditor_LongColorListScrollsWithoutHidingDialogActions()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+        viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        dialog.Height = dialog.MinHeight;
+        dialog.UpdateLayout();
+
+        var catalog = viewModel.CatalogSetup;
+        var color = Assert.Single(catalog.TemplateColorChoices);
+        for (var index = 0; index < 40; index++)
+        {
+            var value = new OfferingOptionValue(
+                Guid.NewGuid(),
+                color.Value.OptionId,
+                color.Value.OfferingId,
+                $"Color {index + 2}",
+                index + 1);
+            catalog.TemplateColorChoices.Add(new OptionValueChoiceViewModel(value, $"Colors: {value.Value}"));
+        }
+
+        var source = new LocalMockupSourceDraftViewModel(
+            "many-colors.png",
+            [],
+            mapping: new MockupImageSpaceMapping(1000, 1000, 100, 100, 500, 600),
+            imageWidth: 1000,
+            imageHeight: 1000);
+        catalog.LocalSourceDrafts.Add(source);
+        catalog.SelectLocalSourceCommand.Execute(source);
+        dialog.UpdateLayout();
+
+        var colorScrollViewer = dialog.FindControl<ScrollViewer>("ColorChoicesScrollViewer");
+        Assert.NotNull(colorScrollViewer);
+        Assert.Equal(ScrollBarVisibility.Auto, colorScrollViewer!.VerticalScrollBarVisibility);
+        Assert.True(colorScrollViewer.Bounds.Height <= 240);
+        Assert.True(colorScrollViewer.Extent.Height > colorScrollViewer.Bounds.Height);
+
+        Assert.True(IsEffectivelyVisible(FindButton(dialog, "Save Mockup Template")!));
+        Assert.True(IsEffectivelyVisible(FindButton(dialog, "Cancel")!));
+
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void DesignAreaArchiveCommand_OpensConfirmationWithoutMutationAndCancelRestoresFocus()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);

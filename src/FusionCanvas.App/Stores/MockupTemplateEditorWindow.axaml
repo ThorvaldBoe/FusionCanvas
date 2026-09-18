@@ -102,13 +102,19 @@
         <StackPanel Grid.Column="1" Spacing="8">
           <TextBlock Text="Image metadata" FontSize="16" FontWeight="SemiBold" />
           <TextBlock Text="Color (choose one or more)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-          <ItemsControl ItemsSource="{Binding TemplateColorChoices}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="stores:OptionValueChoiceViewModel">
-                <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" IsEnabled="{Binding $parent[Window].DataContext.CanEdit}" />
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+          <ScrollViewer x:Name="ColorChoicesScrollViewer"
+                        AutomationProperties.AutomationId="Catalog.MockupColorChoices"
+                        MaxHeight="240"
+                        VerticalScrollBarVisibility="Auto"
+                        HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl ItemsSource="{Binding TemplateColorChoices}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="stores:OptionValueChoiceViewModel">
+                  <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" IsEnabled="{Binding $parent[Window].DataContext.CanEdit}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
           <StackPanel Orientation="Horizontal" Spacing="8">
             <TextBlock Text="Size and other options" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
             <Button Content="Select all" Command="{Binding SelectAllTemplateSizesCommand}" Classes="link" Padding="0" />
