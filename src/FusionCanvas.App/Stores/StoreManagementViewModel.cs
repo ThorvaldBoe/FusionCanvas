@@ -200,6 +200,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         _offeringManagementService = offeringManagementService;
         _workspaceRepository = workspaceRepository;
         CatalogSetup = catalogService is not null && mockupService is not null ? new CatalogSetupViewModel(catalogService, mockupService, offeringManagementService, providerCatalog, sourceImages, filePicker) : null;
+        if (CatalogSetup is not null)
+            CatalogSetup.CatalogChanged += OnCatalogChanged;
         ToggleStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = !IsSelectorExpanded);
         ExpandStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = true);
         CollapseStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = false);
@@ -384,6 +386,12 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 Run(RemoveDesignAreaAsync(area));
             }
         });
+    }
+
+    private void OnCatalogChanged(object? sender, EventArgs e)
+    {
+        if (CatalogEditorLevel == CatalogEditorLevel.ProductDetail)
+            Run(RefreshBlueprintOfferingCardsAsync());
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
