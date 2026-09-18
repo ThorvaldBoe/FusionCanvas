@@ -89,6 +89,58 @@ public class OpenRouterClientTests
     }
 
     [Fact]
+    public async Task GetImageEndpointsAsync_ReadsCurrentEndpointsEnvelopeAndUsesProviderTag()
+    {
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK, """
+            {
+              "id":"image/model",
+              "endpoints":[
+                {
+                  "provider_name":"OpenAI",
+                  "provider_tag":"openai",
+                  "supported_parameters":{
+                    "size":{"type":"string"},
+                    "background":{"type":"enum","values":["transparent","opaque"]},
+                    "output_format":{"type":"enum","values":["png"]}
+                  }
+                }
+              ]
+            }
+            """));
+        var client = CreateClient(handler);
+
+        var endpoints = await client.GetImageEndpointsAsync("secret", "image/model", false, TestContext.Current.CancellationToken);
+
+        var endpoint = Assert.Single(endpoints);
+        Assert.Equal("openai", endpoint.EndpointId);
+        Assert.Equal("OpenAI", endpoint.ProviderName);
+        Assert.True(endpoint.SupportsImageOutput);
+        Assert.True(endpoint.SupportsTransparency);
+        Assert.Contains(new AiImageSize(1024, 1024), endpoint.SupportedSizes);
+        Assert.Equal("/api/v1/images/models/image/model/endpoints", handler.Requests[0].Uri.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task GetImageEndpointsAsync_RetainsLegacyDataEnvelopeCompatibility()
+    {
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK, """
+            {
+              "data":[
+                {
+                  "name":"legacy-provider",
+                  "supported_parameters":["size"]
+                }
+              ]
+            }
+            """));
+        var client = CreateClient(handler);
+
+        var endpoints = await client.GetImageEndpointsAsync("secret", "image/model", false, TestContext.Current.CancellationToken);
+
+        Assert.Equal("legacy-provider", Assert.Single(endpoints).EndpointId);
+    }
+
+    [Fact]
     public async Task ImageGenerateAsync_SendsOnePinnedRequestWithoutRetry()
     {
         var encoded = Convert.ToBase64String([1, 2, 3]);
