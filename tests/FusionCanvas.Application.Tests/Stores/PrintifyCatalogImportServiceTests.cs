@@ -5,6 +5,7 @@ using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
+using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.Application.Tests.Stores;
@@ -292,7 +293,7 @@ public sealed class PrintifyCatalogImportServiceTests
     }
 
     [Fact]
-    public async Task GroupsMatchingPrintAreasAndRebuildsMembershipWhenGeometryChanges()
+    public async Task ConsolidatesVariantSpecificPrintAreasAndRebuildsMembershipWhenGeometryChanges()
     {
         var store = TestStore();
         var repository = TestRepository(store);
@@ -334,10 +335,57 @@ public sealed class PrintifyCatalogImportServiceTests
         }).LoadSelectedAsync(new(store.WorkspaceId, store.Id), ["product-a"], TestContext.Current.CancellationToken);
 
         Assert.True(changedResult.Succeeded, changedResult.Message);
-        var areas = repository.Snapshot.OfferingPlaceholders.OrderBy(value => value.Width).ToArray();
-        Assert.Equal(2, areas.Length);
-        Assert.Equal([firstVariantIds[33]], areas[0].VariantIds);
-        Assert.Equal([firstVariantIds[337]], areas[1].VariantIds);
+        var area = Assert.Single(repository.Snapshot.OfferingPlaceholders);
+        Assert.Equal(120, area.Width);
+        Assert.Equal(200, area.Height);
+        Assert.Equal(firstVariantIds.Values.OrderBy(value => value), area.VariantIds.OrderBy(value => value));
+    }
+
+    [Fact]
+    public async Task ConsolidationArchivesOlderSplitAreasAndMigratesReferences()
+    {
+        var store = TestStore();
+        var repository = TestRepository(store);
+        var first = new PrintifyCatalogBlueprint(
+            new(68, "Tee", null, "Brand", "Model"),
+            [new(9, "Provider", [new("Color", "color", [new(1, "Black"), new(2, "White")])], [
+                new(33, "Black", true, true, [1], [new("front", "dtg", 100, 200)]),
+                new(337, "White", true, true, [2], [new("front", "dtg", 100, 200)])
+            ])]) { ProductId = "product-a" };
+        await TestService(store, repository, new ClientStub
+        {
+            SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [first])
+        }).LoadSelectedAsync(new(store.WorkspaceId, store.Id), ["product-a"], TestContext.Current.CancellationToken);
+
+        var offering = Assert.Single(repository.Snapshot.BlueprintOfferings);
+        var area = Assert.Single(repository.Snapshot.OfferingPlaceholders);
+        var duplicate = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "front", null, "front", "dtg", 80, 160,
+            area.VariantIds, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, area.MetadataJson, "front");
+        var template = new MockupTemplate(Guid.NewGuid(), offering.Id, duplicate.Id, "Front template", null, 1, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        var revision = new MockupTemplateRevision(Guid.NewGuid(), template.Id, 1, duplicate.Id, DateTimeOffset.UtcNow);
+        var assignment = new DesignSlotAssignment(Guid.NewGuid(), duplicate.Id, Guid.NewGuid());
+        repository.SetSnapshot(repository.Snapshot with
+        {
+            BlueprintOfferings = [offering with { DefaultPlaceholderId = duplicate.Id, PrimaryArtworkDesignAreaId = duplicate.Id }],
+            OfferingPlaceholders = [area, duplicate],
+            MockupTemplates = [template],
+            MockupTemplateRevisions = [revision],
+            DesignSlotAssignments = [assignment]
+        });
+
+        var result = await TestService(store, repository, new ClientStub
+        {
+            SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [first])
+        }).LoadSelectedAsync(new(store.WorkspaceId, store.Id), ["product-a"], TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Message);
+        var canonical = Assert.Single(repository.Snapshot.OfferingPlaceholders, value => !value.IsArchived);
+        Assert.True(repository.Snapshot.OfferingPlaceholders.Single(value => value.Id == duplicate.Id).IsArchived);
+        Assert.Equal(canonical.Id, repository.Snapshot.BlueprintOfferings.Single().DefaultPlaceholderId);
+        Assert.Equal(canonical.Id, repository.Snapshot.BlueprintOfferings.Single().PrimaryArtworkDesignAreaId);
+        Assert.Equal(canonical.Id, repository.Snapshot.MockupTemplates.Single().TargetPlaceholderId);
+        Assert.Equal(canonical.Id, repository.Snapshot.MockupTemplateRevisions.Single().TargetPlaceholderId);
+        Assert.Equal(canonical.Id, repository.Snapshot.DesignSlotAssignments.Single().DesignAreaId);
     }
 
     private static StoreSummary TestStore() => new(Guid.NewGuid(), Guid.NewGuid(), "Store", new(PrintifyShopId: 42), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, FulfillmentStrategy.Printify);
@@ -401,6 +449,7 @@ public sealed class PrintifyCatalogImportServiceTests
     private sealed class RepositoryStub(WorkspaceSnapshot initial) : IWorkspaceRepository
     {
         public WorkspaceSnapshot Snapshot { get; private set; } = initial;
+        public void SetSnapshot(WorkspaceSnapshot snapshot) => Snapshot = snapshot;
         public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(Snapshot);
         public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default) { Snapshot = snapshot; return Task.CompletedTask; }
     }
