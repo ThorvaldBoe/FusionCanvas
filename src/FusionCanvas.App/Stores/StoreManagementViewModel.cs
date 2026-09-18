@@ -2924,6 +2924,25 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public async Task ConfirmDeleteProductAsync(CancellationToken cancellationToken = default)
     {
+        if (_catalogService is not null && SelectedStore is not null && _pendingDeleteProduct is not null)
+        {
+            var result = await _catalogService.ArchiveBlueprintWithDependentsAsync(
+                new ArchiveBlueprintWithDependentsRequest(SelectedStore.Id, _pendingDeleteProduct.Id),
+                cancellationToken).ConfigureAwait(true);
+            ErrorMessage = result.Error;
+            if (result.Succeeded)
+            {
+                ClearProductDeleteWarning();
+                await LoadProductsForSelectedStoreAsync(cancellationToken).ConfigureAwait(true);
+                if (SelectedProduct is null)
+                {
+                    CatalogEditorLevel = CatalogEditorLevel.Overview;
+                }
+            }
+
+            return;
+        }
+
         if (_productService is null)
         {
             ErrorMessage = "Product and fulfillment setup is not available.";

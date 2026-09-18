@@ -595,6 +595,29 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public async Task BlueprintDeleteUsesTheCatalogCascadeAndRemovesBlueprintFromActiveProducts()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.IsBlueprintBasicsExpanded = true;
+        window.UpdateLayout();
+
+        var delete = FindButton(window, "Delete Blueprint")!;
+        Assert.True(delete.IsEffectivelyEnabled);
+        delete.Command!.Execute(null);
+        window.UpdateLayout();
+        Assert.True(viewModel.ProductDeleteWarningVisible);
+
+        viewModel.ConfirmDeleteProductCommand.Execute(null);
+        await WaitForAsync(() => !viewModel.HasSelectedProduct);
+
+        Assert.Empty(viewModel.Products);
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void CatalogEditorsUseCompactBasicsOnDemandDraftsAndSummaryFirstRegions()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
