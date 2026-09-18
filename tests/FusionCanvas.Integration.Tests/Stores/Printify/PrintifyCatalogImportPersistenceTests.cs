@@ -2,6 +2,8 @@ using FusionCanvas.Application.Stores;
 using FusionCanvas.Application.Stores.Printify;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Catalog;
+using FusionCanvas.Domain.Mockups;
+using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Integration.Persistence;
@@ -55,6 +57,56 @@ public sealed class PrintifyCatalogImportPersistenceTests
         Assert.Equal(4500, Assert.Single(loaded.DesignAreas).Width);
         Assert.Single(loaded.OfferingOptions);
         Assert.Single(loaded.OfferingOptionValues);
+    }
+
+    [Fact]
+    public async Task ConsolidationRoundTripsArchivedDuplicateAndMigratedMockupReferences()
+    {
+        using var directory = new TemporaryDirectory();
+        var databasePath = directory.GetPath("printify-consolidation.db");
+        var workspaceId = Guid.NewGuid();
+        var storeId = Guid.NewGuid();
+        var store = new Store(storeId, workspaceId, "Printify Store", null, false, Now, Now, "{\"printifyShopId\":\"42\"}", null, FulfillmentStrategy.ShopifyPrintify);
+        var repository = new SqliteWorkspaceRepository(databasePath, useConnectionPooling: false);
+        await repository.SaveAsync(new WorkspaceSnapshot([new Workspace(workspaceId, "Workspace", null, false, Now, Now, "{}")], [store], [], [], [], [], [], [], [], []), TestContext.Current.CancellationToken);
+
+        var summary = new StoreSummary(storeId, workspaceId, store.Name, new(PrintifyShopId: 42), false, Now, Now, FulfillmentStrategy.ShopifyPrintify);
+        var client = new ClientStub { Catalog = Catalog("Initial title", 100) };
+        var service = new PrintifyCatalogImportService(new StoresStub(summary), new CredentialStore(), client, repository);
+        var first = await service.LoadSelectedAsync(new(workspaceId, storeId), [68], TestContext.Current.CancellationToken);
+        var imported = await repository.LoadAsync(TestContext.Current.CancellationToken);
+        var offering = Assert.Single(imported.BlueprintOfferings);
+        var area = Assert.Single(imported.OfferingPlaceholders);
+        var duplicate = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "front", null, "front", "dtg", 80, 160,
+            area.VariantIds, false, Now, Now, area.MetadataJson, "front");
+        var template = new MockupTemplate(Guid.NewGuid(), offering.Id, duplicate.Id, "Front template", null, 1, false, Now, Now);
+        var revision = new MockupTemplateRevision(Guid.NewGuid(), template.Id, 1, duplicate.Id, Now);
+        var legacyDuplicate = new DesignArea(duplicate.Id, offering.Id, duplicate.Name, duplicate.Description, duplicate.Position, duplicate.DecorationMethod,
+            duplicate.Width, duplicate.Height, duplicate.VariantIds, duplicate.CreatedAt, duplicate.UpdatedAt, duplicate.MetadataJson);
+        await repository.SaveAsync(imported with
+        {
+            BlueprintOfferings = [offering with { DefaultPlaceholderId = duplicate.Id, PrimaryArtworkDesignAreaId = duplicate.Id }],
+            OfferingPlaceholders = [area, duplicate],
+            MockupTemplates = [template],
+            MockupTemplateRevisions = [revision],
+            DesignAreas = [.. imported.DesignAreas, legacyDuplicate]
+        }, TestContext.Current.CancellationToken);
+
+        client.Catalog = Catalog("Updated title", 120);
+        var second = await service.LoadSelectedAsync(new(workspaceId, storeId), [68], TestContext.Current.CancellationToken);
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(first.Succeeded, first.Message);
+        Assert.True(second.Succeeded, second.Message);
+        var canonical = Assert.Single(loaded.OfferingPlaceholders, value => !value.IsArchived);
+        Assert.True(loaded.OfferingPlaceholders.Single(value => value.Id == duplicate.Id).IsArchived);
+        Assert.Equal(canonical.Id, loaded.BlueprintOfferings.Single().DefaultPlaceholderId);
+        Assert.Equal(canonical.Id, loaded.BlueprintOfferings.Single().PrimaryArtworkDesignAreaId);
+        Assert.Equal(canonical.Id, loaded.MockupTemplates.Single().TargetPlaceholderId);
+        Assert.Equal(canonical.Id, loaded.MockupTemplateRevisions.Single().TargetPlaceholderId);
+        Assert.Single(loaded.DesignAreas);
+        Assert.Equal(canonical.Id, loaded.DesignAreas.Single().Id);
+        Assert.Equal(120, canonical.Width);
     }
 
     private static IReadOnlyList<PrintifyCatalogBlueprint> Catalog(string title, int width) =>

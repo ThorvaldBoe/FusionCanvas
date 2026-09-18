@@ -96,6 +96,7 @@ public sealed class PrintifyCatalogImportService(
         var values = snapshot.OfferingOptionValues.ToList();
         var variants = snapshot.OfferingVariants.ToList();
         var placeholders = snapshot.OfferingPlaceholders.ToList();
+        var placeholderReplacements = new Dictionary<Guid, Guid>();
 
         foreach (var importedBlueprint in catalog)
         {
@@ -179,9 +180,8 @@ public sealed class PrintifyCatalogImportService(
 
                 var incomingGroups = importedProvider.Variants
                     .SelectMany(variant => variant.Placeholders.Select(placeholder => (variant.Id, Placeholder: placeholder)))
-                    .GroupBy(value => (value.Placeholder.Position, value.Placeholder.DecorationMethod, value.Placeholder.Width, value.Placeholder.Height));
-                var incomingPositionGroups = incomingGroups.GroupBy(group => (group.Key.Position, group.Key.DecorationMethod))
-                    .ToDictionary(group => group.Key, group => group.Count());
+                    .GroupBy(value => (value.Placeholder.Position, value.Placeholder.DecorationMethod))
+                    .ToArray();
                 var importedLocalIds = localVariantIds.Values.ToHashSet();
                 foreach (var existing in placeholders.Where(value => value.OfferingId == offering.Id
                     && MetadataHasId(value.MetadataJson, importedBlueprint.Summary.Id)
@@ -199,21 +199,35 @@ public sealed class PrintifyCatalogImportService(
                         && value.DecorationMethod == sample.DecorationMethod
                         && MetadataHasId(value.MetadataJson, importedBlueprint.Summary.Id)
                         && MetadataHasId(value.MetadataJson, importedProvider.Id)).ToArray();
-                    var exact = owned.Where(value => value.Width == sample.Width && value.Height == sample.Height).ToArray();
-                    OfferingPlaceholder? placeholder = exact.Length == 1
-                        ? exact[0]
-                        : exact.Length == 0 && incomingPositionGroups[(sample.Position, sample.DecorationMethod)] == 1 && owned.Length == 1
-                            ? owned[0]
-                            : null;
+                    var placeholder = owned.Where(value => !value.IsArchived)
+                        .OrderByDescending(value => value.Width)
+                        .ThenByDescending(value => value.Height)
+                        .ThenBy(value => value.CreatedAt)
+                        .ThenBy(value => value.Id)
+                        .FirstOrDefault()
+                        ?? owned.OrderByDescending(value => value.Width)
+                            .ThenByDescending(value => value.Height)
+                            .ThenBy(value => value.CreatedAt)
+                            .ThenBy(value => value.Id)
+                            .FirstOrDefault();
                     var presentVariantIds = group.Select(value => localVariantIds[value.Id]).Distinct().ToArray();
                     var variantIds = (placeholder?.VariantIds ?? []).Concat(presentVariantIds).Distinct().ToArray();
-                    var replacement = new OfferingPlaceholder(placeholder?.Id ?? Guid.NewGuid(), offering.Id, sample.Position, null, sample.Position, sample.DecorationMethod, sample.Width, sample.Height, variantIds, false, placeholder?.CreatedAt ?? now, now, Metadata("placeholder", importedBlueprint.Summary.Id, importedProvider.Id), sample.Position);
+                    var replacement = new OfferingPlaceholder(placeholder?.Id ?? Guid.NewGuid(), offering.Id, sample.Position, null, sample.Position, sample.DecorationMethod,
+                        group.Max(value => value.Placeholder.Width), group.Max(value => value.Placeholder.Height), variantIds, false,
+                        placeholder?.CreatedAt ?? now, now, Metadata("placeholder", importedBlueprint.Summary.Id, importedProvider.Id), sample.Position);
                     if (placeholder is null) placeholders.Add(replacement); else Replace(placeholders, value => value.Id == placeholder.Id, replacement);
+
+                    foreach (var duplicate in owned.Where(value => value.Id != replacement.Id))
+                    {
+                        placeholderReplacements[duplicate.Id] = replacement.Id;
+                        if (!duplicate.IsArchived)
+                            Replace(placeholders, value => value.Id == duplicate.Id, duplicate with { IsArchived = true, UpdatedAt = now });
+                    }
                 }
             }
         }
 
-        var imported = snapshot with
+        var imported = MigratePlaceholderReferences(snapshot with
         {
             Blueprints = blueprints,
             PrintProviders = providers,
@@ -222,10 +236,51 @@ public sealed class PrintifyCatalogImportService(
             OfferingOptionValues = values,
             OfferingVariants = variants,
             OfferingPlaceholders = placeholders
-        };
+        }, placeholderReplacements);
         return CatalogCompatibilitySynchronizer
             .SynchronizeStore(imported, storeId, () => now, Guid.NewGuid)
             .Snapshot;
+    }
+
+    private static WorkspaceSnapshot MigratePlaceholderReferences(
+        WorkspaceSnapshot snapshot,
+        IReadOnlyDictionary<Guid, Guid> replacements)
+    {
+        if (replacements.Count == 0)
+            return snapshot;
+
+        Guid Map(Guid id) => replacements.TryGetValue(id, out var replacement) ? replacement : id;
+        Guid? MapNullable(Guid? id) => id is Guid value ? Map(value) : null;
+
+        var offerings = snapshot.BlueprintOfferings
+            .Select(value => value with
+            {
+                DefaultPlaceholderId = MapNullable(value.DefaultPlaceholderId),
+                PrimaryArtworkDesignAreaId = MapNullable(value.PrimaryArtworkDesignAreaId)
+            })
+            .ToArray();
+        var templates = snapshot.MockupTemplates
+            .Select(value => value with { TargetPlaceholderId = MapNullable(value.TargetPlaceholderId) })
+            .ToArray();
+        var revisions = snapshot.MockupTemplateRevisions
+            .Select(value => value with { TargetPlaceholderId = MapNullable(value.TargetPlaceholderId) })
+            .ToArray();
+        var assignments = snapshot.DesignSlotAssignments
+            .GroupBy(value => (value.RowId, DesignAreaId: Map(value.DesignAreaId)))
+            .Select(group => group
+                .OrderBy(value => replacements.ContainsKey(value.DesignAreaId))
+                .ThenByDescending(value => value.AssetId is not null)
+                .First() with { DesignAreaId = group.Key.DesignAreaId })
+            .ToArray();
+
+        return snapshot with
+        {
+            BlueprintOfferings = offerings,
+            MockupTemplates = templates,
+            MockupTemplateRevisions = revisions,
+            DesignSlotAssignments = assignments,
+            DesignAreas = snapshot.DesignAreas.Where(value => !replacements.ContainsKey(value.Id)).ToArray()
+        };
     }
 
     private static string BlueprintName(PrintifyCatalogBlueprintSummary summary)
