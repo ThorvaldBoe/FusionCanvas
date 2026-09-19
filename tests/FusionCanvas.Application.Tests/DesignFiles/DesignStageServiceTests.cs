@@ -542,6 +542,37 @@ public class DesignStageServiceTests
     }
 
     [Fact]
+    public async Task LoadDesignStageStateAsync_PreservesStaleConfiguredOfferingAndColorsReadOnly()
+    {
+        var snapshot = SeedWithProduct();
+        var product = snapshot.StoreProducts.Single();
+        var offering = snapshot.FulfillmentOfferings.Single();
+        var blueprint = new Blueprint(product.Id, StoreId, product.Name, product.Description, false, Now, Now, "{}");
+        var archivedOffering = new BlueprintOffering(
+            offering.Id, blueprint.Id, StoreId, offering.Name, offering.Description,
+            BlueprintOfferingKind.FixedPrintProvider, Guid.NewGuid(), null, null, null, true, Now, Now, "{}");
+        var itemId = Guid.NewGuid();
+        var item = new Item(itemId, StoreId, null, null, "Item", null, ItemStatus.Draft, WorkflowStage.Design, false, Now, Now, "{}");
+        var repo = new InMemoryWorkspaceRepository(snapshot with
+        {
+            Items = [item],
+            Blueprints = [blueprint],
+            BlueprintOfferings = [archivedOffering],
+            ItemListingConfigurations = [new ItemListingConfiguration(itemId, offering.Id)],
+            DesignSelectedColors = [new DesignSelectedColor(itemId, "Black")]
+        });
+
+        var state = await New(repo).LoadDesignStageStateAsync(itemId, TestContext.Current.CancellationToken);
+
+        Assert.Equal(offering.Id, state.SelectedOfferingId);
+        Assert.True(state.IsReadOnly);
+        Assert.Contains("read-only", state.ReadOnlyReason, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(["Black", "White"], state.AvailableColors);
+        Assert.Equal(["Black"], state.SelectedColors);
+        Assert.Contains(state.AvailableOfferings, value => value.Id == offering.Id);
+    }
+
+    [Fact]
     public async Task LoadDesignStageStateAsync_UsesCurrentCatalogColors()
     {
         var itemId = Guid.NewGuid();
