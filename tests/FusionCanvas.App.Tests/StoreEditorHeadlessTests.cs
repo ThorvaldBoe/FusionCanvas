@@ -452,6 +452,40 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void OfferingDescriptionFields_AreMultilineAndTaller()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        window.UpdateLayout();
+
+        var existingDescription = Assert.IsType<TextBox>(window.GetVisualDescendants()
+            .Single(control => AutomationProperties.GetAutomationId(control) == "Catalog.OfferingDescription"));
+        Assert.True(IsEffectivelyVisible(existingDescription));
+        Assert.True(existingDescription.AcceptsReturn);
+        Assert.Equal(96, existingDescription.MinHeight);
+
+        window.Close();
+
+        var newWindow = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var newViewModel = (StoreManagementViewModel)newWindow.DataContext!;
+        newViewModel.SelectProductsTabCommand.Execute(null);
+        newViewModel.OpenProductDetailCommand.Execute(Assert.Single(newViewModel.Products));
+        newViewModel.StartCreateOfferingCommand.Execute(null);
+        newWindow.UpdateLayout();
+
+        var newDescription = Assert.IsType<TextBox>(newWindow.GetVisualDescendants()
+            .Single(control => AutomationProperties.GetAutomationId(control) == "Catalog.NewOfferingDescription"));
+        Assert.True(IsEffectivelyVisible(newDescription));
+        Assert.True(newDescription.AcceptsReturn);
+        Assert.Equal(96, newDescription.MinHeight);
+
+        newWindow.Close();
+    }
+
+    [AvaloniaFact]
     public void OfferingSetupRows_ShareAlignedCountAndActionColumns()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);

@@ -724,7 +724,8 @@
                              PlaceholderText="Print Provider name"
                              Classes="field" />
                     <TextBlock Text="Description" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <TextBox Text="{Binding OfferingDescription}" AcceptsReturn="True" MinHeight="44" Classes="field" />
+                    <TextBox Text="{Binding OfferingDescription}" AcceptsReturn="True" MinHeight="96" Classes="field"
+                             AutomationProperties.AutomationId="Catalog.NewOfferingDescription" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Content="Save Blueprint Offering"
                               Command="{Binding SaveSelectedOfferingCommand}"
@@ -783,7 +784,8 @@
                     </StackPanel>
                     <TextBlock Text="Description" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBox Text="{Binding CatalogSetup.OfferingDescription, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                             AcceptsReturn="True" MinHeight="44" Classes="field" />
+                             AcceptsReturn="True" MinHeight="96" Classes="field"
+                             AutomationProperties.AutomationId="Catalog.OfferingDescription" />
                       <Button Content="Save Blueprint Offering" Command="{Binding CatalogSetup.SaveOfferingCommand}" Classes="primary offeringAction" />
                       <Button Content="Archive Blueprint Offering"
                               Command="{Binding CatalogSetup.RequestArchiveOfferingCommand}"
