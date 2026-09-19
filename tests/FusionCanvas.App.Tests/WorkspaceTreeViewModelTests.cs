@@ -577,7 +577,7 @@ public class WorkspaceTreeViewModelTests
     }
 
     [Fact]
-    public void IncludeArchived_RevealsArchivedItemWithoutMakingItCanonicalContext()
+    public void IncludeArchived_RevealsArchivedItemAndOpensItForReviewWithoutMakingItCanonicalContext()
     {
         var sample = Sample.Create();
         var archived = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Ghost", null, ItemStatus.Draft, WorkflowStage.Idea, true, sample.Now, sample.Now, "{}");
@@ -593,10 +593,10 @@ public class WorkspaceTreeViewModelTests
         Assert.True(archivedNode.IsInactive);
         WorkspaceTreeSelection? observed = null;
         viewModel.SelectionChanged += (_, selection) => observed = selection;
-        viewModel.SelectNodeCommand.Execute(archivedNode);
+        viewModel.SelectNodeWithModifiers(archivedNode, toggle: false, range: false);
 
         Assert.Equal(archivedNode, viewModel.SelectedNode);
-        Assert.Null(observed);
+        Assert.Equal(new WorkspaceTreeSelection(WorkspaceEntityKind.Item, archived.Id), observed);
     }
 
     [Fact]
