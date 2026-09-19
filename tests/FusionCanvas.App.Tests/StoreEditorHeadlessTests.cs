@@ -732,6 +732,12 @@ public class StoreEditorHeadlessTests
         AssertEffectivelyVisible(window, "Catalog.BlueprintBasics");
         AssertEffectivelyVisible(window, "Catalog.BlueprintOfferingList");
         Assert.False(viewModel.IsBlueprintBasicsExpanded);
+        Assert.Contains(
+            window.GetVisualDescendants().OfType<ToggleButton>(),
+            toggle => IsEffectivelyVisible(toggle) && string.Equals(toggle.Content as string, "Basics", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            window.GetVisualDescendants().OfType<ToggleButton>(),
+            toggle => IsEffectivelyVisible(toggle) && string.Equals(toggle.Content as string, "Basic", StringComparison.Ordinal));
         Assert.Equal("Ready", Assert.Single(viewModel.BlueprintOfferingCards).Status);
         viewModel.IsBlueprintBasicsExpanded = true;
         window.UpdateLayout();
