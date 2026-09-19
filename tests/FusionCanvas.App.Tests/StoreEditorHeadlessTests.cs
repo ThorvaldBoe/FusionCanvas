@@ -5,6 +5,7 @@ using Avalonia.Automation;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Stores;
 using FusionCanvas.Domain.Workspace;
@@ -191,6 +192,30 @@ public class StoreEditorHeadlessTests
         Assert.NotNull(cancel);
         cancel!.Command!.Execute(cancel.CommandParameter);
         Assert.False(viewModel.CatalogSetup.IsArchiveOfferingConfirmationVisible);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void OfferingBasics_ActionButtonsShareHorizontalRow()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        window.UpdateLayout();
+
+        var save = FindButton(window, "Save Blueprint Offering");
+        var archive = FindButton(window, "Archive Blueprint Offering");
+        Assert.NotNull(save);
+        Assert.NotNull(archive);
+
+        var actionRow = Assert.IsType<StackPanel>(save!.Parent);
+        Assert.Same(actionRow, archive!.Parent);
+        Assert.Equal(Orientation.Horizontal, actionRow.Orientation);
+        Assert.Equal(save.Bounds.Top, archive.Bounds.Top, 0.5);
+        Assert.True(archive.Bounds.Left > save.Bounds.Right);
+
         window.Close();
     }
 
