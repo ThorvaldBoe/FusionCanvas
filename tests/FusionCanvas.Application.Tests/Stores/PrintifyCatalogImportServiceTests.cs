@@ -229,6 +229,36 @@ public sealed class PrintifyCatalogImportServiceTests
     }
 
     [Fact]
+    public async Task ConsolidatesSameNameProvidersWithDifferentExternalIdsAndIsIdempotent()
+    {
+        var store = TestStore();
+        var repository = TestRepository(store);
+        var catalog = new PrintifyCatalogBlueprint(
+            new(68, "Tee", null, null, null),
+            [
+                new(9, "SwiftPOD", [new("Color", "color", [new(1, "Black")])], [new(33719, "Black", true, true, [1], [])]),
+                new(23, " swiftpod ", [new("Color", "color", [new(2, "White")])], [new(33720, "White", true, true, [2], [])])
+            ]);
+        var service = TestService(store, repository, new ClientStub
+        {
+            SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [catalog])
+        });
+
+        var first = await service.LoadSelectedAsync(new(store.WorkspaceId, store.Id), [68], TestContext.Current.CancellationToken);
+        var second = await service.LoadSelectedAsync(new(store.WorkspaceId, store.Id), [68], TestContext.Current.CancellationToken);
+
+        Assert.True(first.Succeeded, first.Message);
+        Assert.True(second.Succeeded, second.Message);
+        Assert.Single(repository.Snapshot.PrintProviders, value => !value.IsArchived);
+        var activeProvider = repository.Snapshot.PrintProviders.Single(value => !value.IsArchived);
+        Assert.Equal("9", activeProvider.ExternalProviderId);
+        var aliases = System.Text.Json.JsonDocument.Parse(activeProvider.MetadataJson).RootElement.GetProperty("externalProviderIds").EnumerateArray().Select(value => value.GetString()).OrderBy(value => value);
+        Assert.Equal(["23", "9"], aliases);
+        Assert.Equal(2, repository.Snapshot.BlueprintOfferings.Count);
+        Assert.All(repository.Snapshot.BlueprintOfferings, offering => Assert.Equal(activeProvider.Id, offering.PrintProviderId));
+    }
+
+    [Fact]
     public async Task RejectsDuplicateProviderPayloadWithoutSaving()
     {
         var store = new StoreSummary(Guid.NewGuid(), Guid.NewGuid(), "Store", new(PrintifyShopId: 42), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, FulfillmentStrategy.ShopifyPrintify);

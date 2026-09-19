@@ -476,6 +476,54 @@ public sealed class CatalogSetupServiceTests
     }
 
     [Fact]
+    public async Task RepairsDuplicateProviderNamesByArchivingAndReassigningToTheDeterministicSurvivor()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprintId = Guid.NewGuid();
+        var offeringId = Guid.NewGuid();
+        var survivorId = Guid.NewGuid();
+        var duplicateId = Guid.NewGuid();
+        var older = Now.AddMinutes(-2);
+        var survivor = new PrintProvider(survivorId, storeId, " SwiftPOD ", "9", false, older, older, "{\"custom\":\"keep\"}");
+        var duplicate = new PrintProvider(duplicateId, storeId, "swiftpod", "23", false, Now.AddMinutes(-1), Now.AddMinutes(-1), "{}");
+        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "First")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [new Blueprint(blueprintId, storeId, "T-shirt", null, false, Now, Now)],
+            PrintProviders = [survivor, duplicate],
+            BlueprintOfferings = [new BlueprintOffering(offeringId, blueprintId, storeId, "Tee", null, BlueprintOfferingKind.FixedPrintProvider, duplicateId, null, null, null, false, Now, Now)]
+        });
+        var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
+
+        var state = await service.LoadForStoreAsync(storeId, TestContext.Current.CancellationToken);
+
+        Assert.Equal(survivorId, Assert.Single(state.Offerings).PrintProviderId);
+        Assert.False(repository.Current.PrintProviders.Single(value => value.Id == survivorId).IsArchived);
+        Assert.True(repository.Current.PrintProviders.Single(value => value.Id == duplicateId).IsArchived);
+        var metadata = System.Text.Json.JsonDocument.Parse(repository.Current.PrintProviders.Single(value => value.Id == survivorId).MetadataJson).RootElement;
+        Assert.Equal("keep", metadata.GetProperty("custom").GetString());
+        Assert.Equal(["23", "9"], metadata.GetProperty("externalProviderIds").EnumerateArray().Select(value => value.GetString()).OrderBy(value => value));
+    }
+
+    [Fact]
+    public async Task RejectsManualProviderWithAnActiveNormalizedNameDuplicateWithoutSaving()
+    {
+        var storeId = Guid.NewGuid();
+        var provider = new PrintProvider(Guid.NewGuid(), storeId, "SwiftPOD", null, false, Now, Now);
+        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "First")], [], [], [], [], [], [], [], [])
+        {
+            PrintProviders = [provider]
+        });
+        var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
+
+        var result = await service.CreatePrintProviderAsync(new CreatePrintProviderRequest(storeId, "  swiftpod  "), TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("already uses", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(repository.Current.PrintProviders);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Fact]
     public void SynchronizeStore_ExcludesArchivedNormalizedVariantsFromLegacyDesignAreas()
     {
         var storeId = Guid.NewGuid();

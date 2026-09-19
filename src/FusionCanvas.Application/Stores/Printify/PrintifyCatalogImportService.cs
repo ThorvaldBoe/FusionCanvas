@@ -89,13 +89,14 @@ public sealed class PrintifyCatalogImportService(
     {
         ValidateCatalog(catalog);
         var now = DateTimeOffset.UtcNow;
-        var blueprints = snapshot.Blueprints.ToList();
-        var providers = snapshot.PrintProviders.ToList();
-        var offerings = snapshot.BlueprintOfferings.ToList();
-        var options = snapshot.OfferingOptions.ToList();
-        var values = snapshot.OfferingOptionValues.ToList();
-        var variants = snapshot.OfferingVariants.ToList();
-        var placeholders = snapshot.OfferingPlaceholders.ToList();
+        var normalized = PrintProviderIdentityNormalizer.NormalizeStore(snapshot, storeId, now).Snapshot;
+        var blueprints = normalized.Blueprints.ToList();
+        var providers = normalized.PrintProviders.ToList();
+        var offerings = normalized.BlueprintOfferings.ToList();
+        var options = normalized.OfferingOptions.ToList();
+        var values = normalized.OfferingOptionValues.ToList();
+        var variants = normalized.OfferingVariants.ToList();
+        var placeholders = normalized.OfferingPlaceholders.ToList();
         var placeholderReplacements = new Dictionary<Guid, Guid>();
 
         foreach (var importedBlueprint in catalog)
@@ -126,10 +127,11 @@ public sealed class PrintifyCatalogImportService(
             {
                 var provider = providers.FirstOrDefault(value => value.StoreId == storeId
                     && (string.Equals(value.ExternalProviderId, importedProvider.Id.ToString(), StringComparison.Ordinal)
-                        || value.ExternalProviderId is null && string.Equals(value.Name, importedProvider.Title, StringComparison.OrdinalIgnoreCase)));
+                        || string.Equals(PrintProviderIdentityNormalizer.NormalizeName(value.Name), PrintProviderIdentityNormalizer.NormalizeName(importedProvider.Title), StringComparison.OrdinalIgnoreCase)));
                 if (provider is null)
                 {
                     provider = new PrintProvider(Guid.NewGuid(), storeId, importedProvider.Title, importedProvider.Id.ToString(), false, now, now, Metadata("provider", importedProvider.Id));
+                    provider = provider with { MetadataJson = PrintProviderIdentityNormalizer.MergeExternalProviderMetadata(provider, [importedProvider.Id.ToString()]) };
                     providers.Add(provider);
                 }
                 else
@@ -139,7 +141,8 @@ public sealed class PrintifyCatalogImportService(
                         Name = importedProvider.Title,
                         ExternalProviderId = provider.ExternalProviderId ?? importedProvider.Id.ToString(),
                         IsArchived = false,
-                        UpdatedAt = now
+                        UpdatedAt = now,
+                        MetadataJson = PrintProviderIdentityNormalizer.MergeExternalProviderMetadata(provider, [importedProvider.Id.ToString()])
                     };
                     Replace(providers, value => value.Id == provider.Id, provider);
                 }
@@ -227,7 +230,7 @@ public sealed class PrintifyCatalogImportService(
             }
         }
 
-        var imported = MigratePlaceholderReferences(snapshot with
+        var imported = MigratePlaceholderReferences(normalized with
         {
             Blueprints = blueprints,
             PrintProviders = providers,
@@ -237,8 +240,9 @@ public sealed class PrintifyCatalogImportService(
             OfferingVariants = variants,
             OfferingPlaceholders = placeholders
         }, placeholderReplacements);
+        var repaired = PrintProviderIdentityNormalizer.NormalizeStore(imported, storeId, now).Snapshot;
         return CatalogCompatibilitySynchronizer
-            .SynchronizeStore(imported, storeId, () => now, Guid.NewGuid)
+            .SynchronizeStore(repaired, storeId, () => now, Guid.NewGuid)
             .Snapshot;
     }
 
