@@ -553,7 +553,7 @@
               <Border Classes="panel" Padding="12"
                       AutomationProperties.AutomationId="Catalog.BlueprintBasics">
                 <StackPanel Spacing="8">
-                  <ToggleButton Content="Basic"
+                  <ToggleButton Content="Basics"
                                 IsChecked="{Binding IsBlueprintBasicsExpanded, Mode=TwoWay}"
                                 HorizontalContentAlignment="Left"
                                 ToolTip.Tip="Edit the Blueprint name and description without leaving this page." />
