@@ -776,12 +776,6 @@ public sealed class DesignStageService : IDesignStageService
 
         var editDecision = ItemWorkflowPolicy.CanPerformOperation(item, ItemOperationKind.DesignStage);
         var store = snapshot.Stores.SingleOrDefault(s => s.Id == item.StoreId);
-        var isReadOnly = store is { IsArchived: true } || !editDecision.IsAllowed;
-        var readOnlyReason = isReadOnly
-            ? (store is { IsArchived: true }
-                ? "This item's Store is archived and its Design stage is read-only."
-                : editDecision.Reason)
-            : string.Empty;
 
         var config = snapshot.ItemListingConfigurations.SingleOrDefault(c => c.ItemId == itemId);
         var itemMetadata = ItemMetadataCodec.ParseMetadata(item.MetadataJson);
@@ -807,12 +801,35 @@ public sealed class DesignStageService : IDesignStageService
             .Where(o => !hasNormalizedCatalog || activeNormalizedOfferingIds.Contains(o.Id))
             .ToArray();
 
+        var configuredOffering = config?.OfferingId is Guid configuredOfferingId
+            ? snapshot.FulfillmentOfferings.SingleOrDefault(offering =>
+                offering.Id == configuredOfferingId && storeProductIds.Contains(offering.StoreProductId))
+            : null;
+        var configuredOfferingIsStale = configuredOffering is not null
+            && availableOfferings.All(offering => offering.Id != configuredOffering.Id);
+        if (configuredOfferingIsStale)
+        {
+            // Preserve an existing Item relationship for review, but do not make
+            // an offering that is no longer active a new selectable choice.
+            availableOfferings = [.. availableOfferings, configuredOffering];
+        }
+
+        var isReadOnly = store is { IsArchived: true }
+            || !editDecision.IsAllowed
+            || configuredOfferingIsStale;
+        var readOnlyReason = isReadOnly
+            ? store is { IsArchived: true }
+                ? "This item's Store is archived and its Design stage is read-only."
+                : !editDecision.IsAllowed
+                    ? editDecision.Reason
+                    : "The selected listing configuration is no longer active; existing Design data is read-only."
+            : string.Empty;
+
         // Available colors: from the selected offering's variants
-        var configOfferingId = config?.OfferingId is Guid selectedConfigOfferingId
-            && availableOfferings.Any(offering => offering.Id == selectedConfigOfferingId)
-                ? selectedConfigOfferingId
-                : (Guid?)null;
-        var availableColors = configOfferingId is not null && snapshot.BlueprintOfferings.Any(o => o.Id == configOfferingId.Value)
+        var configOfferingId = configuredOffering?.Id;
+        var availableColors = configOfferingId is not null
+            && snapshot.BlueprintOfferings.Any(o => o.Id == configOfferingId.Value)
+            && !configuredOfferingIsStale
             ? DesignStagePolicy.AvailableColors(snapshot.OfferingOptions, snapshot.OfferingOptionValues, snapshot.OfferingVariants, configOfferingId.Value)
             : configOfferingId is not null
                 ? DesignStagePolicy.AvailableColors(snapshot.ProductVariants, configOfferingId.Value)
