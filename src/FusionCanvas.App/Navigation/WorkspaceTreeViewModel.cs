@@ -1308,6 +1308,11 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         SelectedNode = node;
         if (node.IsInactive)
         {
+            if (notifySelectionChanged && node.EntityKind == WorkspaceEntityKind.Item)
+            {
+                SelectionChanged?.Invoke(this, new WorkspaceTreeSelection(node.EntityKind, node.EntityId));
+            }
+
             return;
         }
 
