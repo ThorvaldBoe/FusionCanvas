@@ -109,6 +109,46 @@ public sealed class PrintifyCatalogImportPersistenceTests
         Assert.Equal(120, canonical.Width);
     }
 
+    [Fact]
+    public async Task ProviderIdentityConsolidationRoundTripsAliasesArchivedDuplicateAndOfferingReference()
+    {
+        using var directory = new TemporaryDirectory();
+        var databasePath = directory.GetPath("provider-identity.db");
+        var workspaceId = Guid.NewGuid();
+        var storeId = Guid.NewGuid();
+        var blueprintId = Guid.NewGuid();
+        var survivorId = Guid.NewGuid();
+        var duplicateId = Guid.NewGuid();
+        var offeringId = Guid.NewGuid();
+        var store = new Store(storeId, workspaceId, "Printify Store", null, false, Now, Now, "{\"printifyShopId\":\"42\"}", null, FulfillmentStrategy.ShopifyPrintify);
+        var blueprint = new Blueprint(blueprintId, storeId, "Tee", null, false, Now, Now);
+        var survivor = new PrintProvider(survivorId, storeId, "SwiftPOD", "9", false, Now.AddMinutes(-2), Now.AddMinutes(-2), "{\"custom\":\"preserve\"}");
+        var duplicate = new PrintProvider(duplicateId, storeId, " swiftpod ", "23", false, Now.AddMinutes(-1), Now.AddMinutes(-1));
+        var offering = new BlueprintOffering(offeringId, blueprintId, storeId, "Tee · SwiftPOD", null, BlueprintOfferingKind.FixedPrintProvider, duplicateId, null, null, "68:23", false, Now, Now);
+        var repository = new SqliteWorkspaceRepository(databasePath, useConnectionPooling: false);
+        await repository.SaveAsync(new WorkspaceSnapshot([new Workspace(workspaceId, "Workspace", null, false, Now, Now, "{}")], [store], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint], PrintProviders = [survivor, duplicate], BlueprintOfferings = [offering]
+        }, TestContext.Current.CancellationToken);
+
+        var summary = new StoreSummary(storeId, workspaceId, store.Name, new(PrintifyShopId: 42), false, Now, Now, FulfillmentStrategy.ShopifyPrintify);
+        var service = new PrintifyCatalogImportService(new StoresStub(summary), new CredentialStore(), new ClientStub
+        {
+            Catalog = [new(new(68, "Tee", null, null, null), [new(23, "SwiftPOD", [new("Color", "color", [new(1, "Black")])], [new(33719, "Black", true, true, [1], [])])])]
+        }, repository);
+
+        var result = await service.LoadSelectedAsync(new(workspaceId, storeId), [68], TestContext.Current.CancellationToken);
+        var loaded = await new SqliteWorkspaceRepository(databasePath, useConnectionPooling: false).LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Message);
+        var canonical = loaded.PrintProviders.Single(value => !value.IsArchived);
+        Assert.Equal(survivorId, canonical.Id);
+        Assert.True(loaded.PrintProviders.Single(value => value.Id == duplicateId).IsArchived);
+        Assert.Equal(survivorId, loaded.BlueprintOfferings.Single().PrintProviderId);
+        Assert.Equal("preserve", System.Text.Json.JsonDocument.Parse(canonical.MetadataJson).RootElement.GetProperty("custom").GetString());
+        Assert.Equal(["23", "9"], System.Text.Json.JsonDocument.Parse(canonical.MetadataJson).RootElement.GetProperty("externalProviderIds").EnumerateArray().Select(value => value.GetString()).OrderBy(value => value));
+    }
+
     private static IReadOnlyList<PrintifyCatalogBlueprint> Catalog(string title, int width) =>
     [
         new(

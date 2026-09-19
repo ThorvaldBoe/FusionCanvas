@@ -284,9 +284,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         : string.Empty;
     public IEnumerable<PrintProvider> AvailablePrintProviders => PrintProviders
         .Where(value => !value.IsArchived)
-        .GroupBy(value => string.IsNullOrWhiteSpace(value.ExternalProviderId)
-            ? $"name:{value.Name.Trim()}"
-            : $"external:{value.ExternalProviderId.Trim()}", StringComparer.OrdinalIgnoreCase)
+        .GroupBy(value => value.Name.Trim(), StringComparer.OrdinalIgnoreCase)
         .Select(group => group.FirstOrDefault(value => value.Id == SelectedOffering?.PrintProviderId) ?? group.First())
         .OrderBy(value => value.Name, StringComparer.OrdinalIgnoreCase);
     public PrintProvider? SelectedPrintProvider

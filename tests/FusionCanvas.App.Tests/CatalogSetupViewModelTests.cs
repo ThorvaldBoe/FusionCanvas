@@ -3,6 +3,7 @@ using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
+using FusionCanvas.Domain.Workspace;
 using FusionCanvas.App.Tests.TestSupport;
 
 namespace FusionCanvas.App.Tests;
@@ -78,6 +79,34 @@ public sealed class CatalogSetupViewModelTests
         Assert.True(viewModel.CreateOptionValueCommand.CanExecute(null));
         Assert.True(viewModel.CreateTemplateCommand.CanExecute(null));
         Assert.True(viewModel.AddTemplateColorCommand.CanExecute(null) == false);
+    }
+
+    [Fact]
+    public async Task ProviderPickerShowsOneCanonicalEntryAndKeepsOfferingSelectionAfterNormalization()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = SampleWorkspace.Create().Stores.Single();
+        var snapshot = WorkspaceSnapshot.Empty with
+        {
+            Workspaces = [WorkspaceSnapshot.DefaultWorkspace(now)],
+            Stores = [store]
+        };
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
+        var survivor = new PrintProvider(Guid.NewGuid(), store.Id, "SwiftPOD", "9", false, now.AddMinutes(-2), now.AddMinutes(-2));
+        var duplicate = new PrintProvider(Guid.NewGuid(), store.Id, " swiftpod ", "23", false, now.AddMinutes(-1), now.AddMinutes(-1));
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Tee", null, BlueprintOfferingKind.FixedPrintProvider, duplicate.Id, null, null, null, false, now, now);
+        var repository = new InMemoryWorkspaceRepository(snapshot with
+        {
+            Blueprints = [blueprint], PrintProviders = [survivor, duplicate], BlueprintOfferings = [offering]
+        });
+        var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository));
+
+        await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+        viewModel.SelectOffering(offering.Id);
+
+        Assert.Single(viewModel.AvailablePrintProviders);
+        Assert.Equal(survivor.Id, viewModel.SelectedPrintProvider?.Id);
+        Assert.Equal(survivor.Id, viewModel.SelectedOffering?.PrintProviderId);
     }
 
     [Fact]

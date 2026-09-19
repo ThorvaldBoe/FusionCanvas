@@ -22,12 +22,14 @@ public sealed class CatalogSetupService : ICatalogSetupService
     {
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
         var synchronized = CatalogCompatibilitySynchronizer.SynchronizeStore(snapshot, storeId, _clock, _newId);
-        if (synchronized.Changed)
+        var normalized = PrintProviderIdentityNormalizer.NormalizeStore(synchronized.Snapshot, storeId, _clock());
+        var final = CatalogCompatibilitySynchronizer.SynchronizeStore(normalized.Snapshot, storeId, _clock, _newId);
+        if (synchronized.Changed || normalized.Changed || final.Changed)
         {
-            await _repository.SaveAsync(synchronized.Snapshot, cancellationToken).ConfigureAwait(false);
+            await _repository.SaveAsync(final.Snapshot, cancellationToken).ConfigureAwait(false);
         }
 
-        return BuildState(synchronized.Snapshot, storeId);
+        return BuildState(final.Snapshot, storeId);
     }
 
     public Task<CatalogSetupResult> CreateBlueprintAsync(CreateBlueprintRequest request, CancellationToken cancellationToken = default) =>
@@ -46,6 +48,11 @@ public sealed class CatalogSetupService : ICatalogSetupService
         {
             var storeCheck = EnsureWritableStore(snapshot, request.StoreId);
             if (storeCheck is not null) return Failure(snapshot, request.StoreId, storeCheck);
+            var normalizedName = PrintProviderIdentityNormalizer.NormalizeName(request.Name);
+            if (snapshot.PrintProviders.Any(value => value.StoreId == request.StoreId
+                && !value.IsArchived
+                && string.Equals(PrintProviderIdentityNormalizer.NormalizeName(value.Name), normalizedName, StringComparison.OrdinalIgnoreCase)))
+                return Failure(snapshot, request.StoreId, "An active Print Provider already uses this name in the Store.");
             var now = _clock();
             return Success(snapshot with { PrintProviders = [.. snapshot.PrintProviders, new PrintProvider(_newId(), request.StoreId, request.Name, request.ExternalProviderId, false, now, now)] }, request.StoreId);
         }, cancellationToken);
