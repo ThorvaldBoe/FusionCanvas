@@ -821,7 +821,7 @@
 
                       <!-- VR-009: Visible guidance when Initialize is disabled -->
                       <TextBlock Text="{Binding ConceptRefinement.InitializeDisabledReason}"
-                                 IsVisible="{Binding ConceptRefinement.InitializeDisabledReason, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                 IsVisible="{Binding ConceptRefinement.ShowInitializeDisabledReason}"
                                  TextWrapping="Wrap"
                                  FontSize="11"
                                  Foreground="{DynamicResource DangerTextBrush}" />

@@ -277,6 +277,44 @@ public sealed class ConceptRefinementViewTests
     }
 
     [AvaloniaFact]
+    public void ReadOnlyReview_ShowsStageReadOnlyReasonOnceAndKeepsInitializeTooltip()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Concept);
+        fixture.PumpLayout();
+
+        Assert.False(fixture.ViewModel.ItemInspector.CanEditStage);
+        Assert.False(fixture.ViewModel.ConceptRefinement.ShowInitializeDisabledReason);
+        var reason = fixture.ViewModel.ItemInspector.StageReadOnlyReason;
+        var matches = fixture.Window.GetVisualDescendants()
+            .OfType<TextBlock>()
+            .Where(textBlock => textBlock.Text == reason)
+            .ToArray();
+        var visibleMatches = matches.Count(IsEffectivelyVisible);
+        Assert.True(visibleMatches == 1,
+            string.Join(" | ", matches.Select(textBlock => $"visible={textBlock.IsVisible}, bounds={textBlock.Bounds}, parent={textBlock.Parent?.GetType().Name}")));
+
+        var initializeButton = fixture.FindControlOrDefault<Button>(button =>
+            AutomationProperties.GetName(button) == "Initialize from base idea");
+        Assert.NotNull(initializeButton);
+        Assert.Equal(reason, ToolTip.GetTip(initializeButton));
+    }
+
+    private static bool IsEffectivelyVisible(Control control)
+    {
+        for (Control? current = control; current is not null; current = current.Parent as Control)
+        {
+            if (!current.IsVisible)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    [AvaloniaFact]
     public void FineTuneButtonOnEmptyCorner_HasEmptyCornerTooltip()
     {
         using var fixture = new MainWindowFixture();
