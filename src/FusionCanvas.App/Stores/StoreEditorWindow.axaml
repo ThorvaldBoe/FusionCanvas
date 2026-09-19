@@ -834,8 +834,9 @@
                 </StackPanel>
               </Border>
 
-              <StackPanel IsVisible="{Binding IsOfferingDetail}" Spacing="10"
-                          AutomationProperties.AutomationId="Catalog.OfferingSetup">
+              <Border Classes="panel" Padding="12" IsVisible="{Binding IsOfferingDetail}">
+                <StackPanel Spacing="10"
+                            AutomationProperties.AutomationId="Catalog.OfferingSetup">
                 <TextBlock Text="Setup" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
                 <TextBlock Text="Configure each part of this Offering in a focused screen. Provider means the fulfillment partner that produces the item; Printify is the catalog and integration source."
                            TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -890,7 +891,8 @@
                     <Button Grid.Row="4" Grid.Column="2" Content="Manage Mockup Templates" Command="{Binding OpenMockupTemplateManagementCommand}" Classes="secondary" HorizontalAlignment="Stretch" />
                   </Grid>
                 </Border>
-              </StackPanel>
+                </StackPanel>
+              </Border>
 
               <Border Classes="panel" Padding="12" IsVisible="{Binding IsVariantManagement}"
                       AutomationProperties.AutomationId="Catalog.VariantAvailableChoices">
