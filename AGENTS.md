@@ -39,7 +39,16 @@ Discover → Define module → Propose → Review → Apply → Verify → Learn
 - Spec deltas use `## ADDED / MODIFIED / REMOVED / RENAMED Requirements` sections. Accepted specs live in `openspec/specs/`; active work in `openspec/changes/`; history in `openspec/changes/archive/`.
 - Never edit `openspec/specs/` directly to change behavior. Change behavior through a change's delta specs, then sync and archive through the workflow.
 - Small maintenance work that does not alter accepted behavior (bug fixes, internal refactors, docs, dependency updates) may proceed without a proposal — see `openspec/specs/openspec-project-workflow/spec.md`.
-- GitHub Issues complement OpenSpec: use the relevant primary issue for report origin, triage, and delivery tracking, but use OpenSpec artifacts as the authority for significant behavior, acceptance criteria, design, verification, and archive. Follow `CONTRIBUTING.md` for the GitHub Project workflow and status meanings, labels, issue promotion, branch naming, and pull-request linking; do not invent behavior from an issue that has not been resolved through OpenSpec.
+- GitHub Issues and the LifeOS IssueTracker complement OpenSpec. Use GitHub Issues primarily for feature development and larger issues. Use the LifeOS IssueTracker for quick, low-overhead reports of small bugs, focused improvements, refactoring, regression fixes, and CBR work; a screenshot and concise description are sufficient to create an issue there. OpenSpec artifacts remain the authority for accepted behavior, acceptance criteria, design, verification, and archive. Follow `CONTRIBUTING.md` for GitHub workflow details, and do not invent behavior from an issue that has not been resolved through OpenSpec.
+
+### IssueTracker and issue routing
+
+- The LifeOS IssueTracker is located at `C:\Users\boe74\Dropbox\Areas\LifeOS\10-Projects\20-FusionCanvas\Living Documents\IssueTracker`.
+- Its lightweight workflow is intended for small bugs, improvements, focused refactoring, regression fixes, and CBR follow-up work. Reports should be easy to create from a screenshot and short description without requiring extensive metadata.
+- GitHub Issues remain the preferred home for feature requests, larger changes, and work that benefits from public discussion or repository-level collaboration.
+- OpenSpec remains the source of truth for accepted behavior. An IssueTracker or GitHub issue may describe a problem or desired outcome, but it does not by itself authorize new behavior.
+- The IssueTracker may use `Open issues`, `Issues in progress`, `Issues completed`, and `Issues blocked` states. An issue belongs in `Issues blocked` when it requires a product, UX, architecture, data-model, acceptance, security, migration, dependency, or other decision that an unattended agent must not make.
+- CBR automation must leave blocked issues for manual handling and record the specific reason and decision needed.
 
 ### Delivery Module Rules
 
