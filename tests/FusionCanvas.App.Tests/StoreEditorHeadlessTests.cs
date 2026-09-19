@@ -441,8 +441,12 @@ public class StoreEditorHeadlessTests
         window.UpdateLayout();
 
         AssertEffectivelyVisible(window, "Catalog.OfferingBasics");
-        AssertEffectivelyVisible(window, "Catalog.OfferingSetup");
+        var setup = AssertEffectivelyVisible(window, "Catalog.OfferingSetup");
         AssertEffectivelyVisible(window, "Catalog.OfferingProvider");
+        var setupPanel = setup.GetVisualAncestors().OfType<Border>()
+            .Single(border => border.Classes.Contains("panel"));
+        Assert.Equal(12, setupPanel.Padding.Left);
+        Assert.Equal(12, setupPanel.Padding.Right);
 
         viewModel.OpenVariantManagementCommand.Execute(null);
         window.UpdateLayout();
