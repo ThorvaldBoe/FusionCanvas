@@ -788,6 +788,7 @@
                                  Foreground="{DynamicResource SecondaryTextBrush}" />
                       <TextBox Text="{Binding ItemInspector.Idea}"
                                IsReadOnly="True"
+                               Classes="readOnlyContext"
                                AcceptsReturn="True"
                                MinHeight="64"
                                AutomationProperties.Name="Base idea" />
@@ -2141,6 +2142,11 @@
     </Style>
     <Style Selector="Button.stageMove:disabled">
       <Setter Property="Opacity" Value="0.5" />
+    </Style>
+    <Style Selector="TextBox.readOnlyContext">
+      <Setter Property="Background" Value="{DynamicResource UnavailableBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}" />
     </Style>
     <Style Selector="ComboBox.statusSelector">
       <Setter Property="MinWidth" Value="120" />

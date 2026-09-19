@@ -43,6 +43,7 @@ public sealed class ConceptRefinementViewTests
             AutomationProperties.GetName(tb) == "Base idea" && tb.IsVisible);
         Assert.NotNull(baseIdea);
         Assert.True(baseIdea!.IsReadOnly);
+        Assert.Contains("readOnlyContext", baseIdea.Classes);
 
         var initializeButton = fixture.FindControlOrDefault<Button>(b =>
             AutomationProperties.GetName(b) == "Initialize from base idea" && b.IsVisible);
