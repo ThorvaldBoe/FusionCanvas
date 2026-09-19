@@ -253,6 +253,8 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
         }
     }
 
+    public bool ShowInitializeDisabledReason => _inspector.CanEditStage && InitializeDisabledReason is not null;
+
     // --- History visibility (VR-007a) ---
 
     public bool HasHistory => History.Count > 0;
@@ -806,6 +808,7 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(UnavailableReason));
         OnPropertyChanged(nameof(CanInitialize));
         OnPropertyChanged(nameof(InitializeDisabledReason));
+        OnPropertyChanged(nameof(ShowInitializeDisabledReason));
         OnPropertyChanged(nameof(CanFineTuneConceptIdea));
         OnPropertyChanged(nameof(FineTuneConceptIdeaDisabledReason));
         OnPropertyChanged(nameof(CanFineTunePhrase));
