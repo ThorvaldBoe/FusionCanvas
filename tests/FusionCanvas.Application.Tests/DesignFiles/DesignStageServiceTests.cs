@@ -592,7 +592,7 @@ public class DesignStageServiceTests
             ItemListingConfigurations = [new ItemListingConfiguration(itemId, offeringId)],
             FulfillmentOfferings = [legacyOffering with { Id = offeringId }],
             BlueprintOfferings = [new BlueprintOffering(offeringId, blueprintId, StoreId, "Gildan 64000", null, BlueprintOfferingKind.FixedPrintProvider, null, null, null, null, false, Now, Now)],
-            OfferingOptions = [new OfferingOption(colorOptionId, offeringId, OptionKind.Color, "Color", 0)],
+            OfferingOptions = [new OfferingOption(colorOptionId, offeringId, OptionKind.Color, "Colors", 0)],
             OfferingOptionValues =
             [
                 new OfferingOptionValue(blackId, colorOptionId, offeringId, "Black", 0),

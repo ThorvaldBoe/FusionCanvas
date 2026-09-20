@@ -1,3 +1,4 @@
+using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Items;
@@ -303,6 +304,29 @@ public sealed class DesignStagePolicyTests
         Assert.Equal(2, colors.Count);
         Assert.DoesNotContain(colors, c => c.Equals("XL"));
         Assert.DoesNotContain(colors, c => c.Equals("S"));
+    }
+
+    [Fact]
+    public void AvailableColors_UsesStableOptionKindInsteadOfEditableName()
+    {
+        var offeringId = Guid.NewGuid();
+        var colorOption = new OfferingOption(Guid.NewGuid(), offeringId, OptionKind.Color, "Garment shades", 0);
+        var sizeOption = new OfferingOption(Guid.NewGuid(), offeringId, OptionKind.Size, "Color", 1);
+        var black = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offeringId, "Black", 0);
+        var medium = new OfferingOptionValue(Guid.NewGuid(), sizeOption.Id, offeringId, "M", 0);
+        var variants = new[]
+        {
+            new OfferingVariant(Guid.NewGuid(), offeringId, "Black / M", [black.Id, medium.Id], false,
+                DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)
+        };
+
+        var colors = DesignStagePolicy.AvailableColors(
+            [colorOption, sizeOption],
+            [black, medium],
+            variants,
+            offeringId);
+
+        Assert.Equal(["Black"], colors);
     }
 
     // --- AreaIdsForOffering ---
