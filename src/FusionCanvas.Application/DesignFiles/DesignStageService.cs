@@ -61,39 +61,46 @@ public sealed class DesignStageService : IDesignStageService
             return DesignStageResult.Failure("The selected configuration is not valid for this item.", BuildState(snapshot, itemId));
         }
 
-        // Clear existing slot assignments for areas not in the new offering
-        var newAreaIds = snapshot.OfferingPlaceholders.Any(placeholder => placeholder.OfferingId == offeringId)
-            ? snapshot.OfferingPlaceholders.Where(placeholder => placeholder.OfferingId == offeringId && !placeholder.IsArchived).Select(placeholder => placeholder.Id).ToHashSet()
-            : DesignStagePolicy.AreaIdsForOffering(snapshot.DesignAreas, offeringId).ToHashSet();
-        var oldConfig = snapshot.ItemListingConfigurations.SingleOrDefault(c => c.ItemId == itemId);
-        var oldRows = snapshot.DesignVariantRows.Where(r => r.ItemId == itemId).Select(r => r.Id).ToHashSet();
+        var updated = ReplaceConfiguration(snapshot, item, offeringId);
 
-        var keptAssignments = snapshot.DesignSlotAssignments
-            .Where(a => newAreaIds.Contains(a.DesignAreaId) && !oldRows.Contains(a.RowId))
-            .ToArray();
+        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        return DesignStageResult.Success(BuildState(updated, itemId));
+    }
 
-        var itemMetadata = ItemMetadataCodec.ParseMetadata(item.MetadataJson);
-        itemMetadata.Remove(ItemMetadataCodec.ArtworkTargetIdKey);
-        itemMetadata.Remove(ItemMetadataCodec.ArtworkTargetPreferenceKey);
-        itemMetadata.Remove(ItemMetadataCodec.ArtworkTransparentBackgroundKey);
-        var updatedItem = item with
+    public async Task<DesignStageResult> RecoverStaleConfigurationAsync(Guid itemId, Guid offeringId, CancellationToken cancellationToken = default)
+    {
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var item = snapshot.Items.SingleOrDefault(value => value.Id == itemId);
+        if (item is null)
         {
-            MetadataJson = ItemMetadataCodec.SerializeMetadata(itemMetadata),
-            UpdatedAt = _clock()
-        };
+            return DesignStageResult.Failure("Item was not found.", BuildState(snapshot, itemId));
+        }
 
-        var updated = snapshot with
+        var editDecision = ItemWorkflowPolicy.CanPerformOperation(item, ItemOperationKind.DesignStage);
+        if (!editDecision.IsAllowed)
         {
-            Items = [.. snapshot.Items.Where(value => value.Id != itemId), updatedItem],
-            ItemListingConfigurations = [.. snapshot.ItemListingConfigurations.Where(c => c.ItemId != itemId),
-                new ItemListingConfiguration(itemId, offeringId)],
-            DesignSlotAssignments = keptAssignments,
-            // Clear rows and selected colors when switching configuration
-            DesignSelectedColors = [.. snapshot.DesignSelectedColors.Where(c => c.ItemId != itemId)],
-            DesignVariantRows = [.. snapshot.DesignVariantRows.Where(r => r.ItemId != itemId)],
-            DesignVariantRowColors = [.. snapshot.DesignVariantRowColors.Where(c => !oldRows.Contains(c.RowId))]
-        };
+            return DesignStageResult.Failure(editDecision.Reason, BuildState(snapshot, itemId));
+        }
 
+        var store = snapshot.Stores.SingleOrDefault(value => value.Id == item.StoreId);
+        if (store is null || store.IsArchived)
+        {
+            return DesignStageResult.Failure("The item's Store must be active before its listing configuration can be recovered.", BuildState(snapshot, itemId));
+        }
+
+        var currentConfiguration = snapshot.ItemListingConfigurations.SingleOrDefault(value => value.ItemId == itemId);
+        if (currentConfiguration is null || !IsStaleConfiguration(snapshot, item, currentConfiguration.OfferingId))
+        {
+            return DesignStageResult.Failure("The item's listing configuration is no longer stale. Reload Design before trying again.", BuildState(snapshot, itemId));
+        }
+
+        if (!IsActiveNormalizedOfferingForStore(snapshot, item.StoreId, offeringId)
+            || !HasSameStoreCompatibilityOffering(snapshot, item.StoreId, offeringId))
+        {
+            return DesignStageResult.Failure("The replacement listing configuration must be an active Offering from this item's Store.", BuildState(snapshot, itemId));
+        }
+
+        var updated = ReplaceConfiguration(snapshot, item, offeringId);
         await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
         return DesignStageResult.Success(BuildState(updated, itemId));
     }
@@ -792,22 +799,29 @@ public sealed class DesignStageService : IDesignStageService
             .ToArray();
         var hasNormalizedCatalog = snapshot.Blueprints.Any(blueprint => blueprint.StoreId == item.StoreId)
             || normalizedStoreOfferings.Length > 0;
+        var activeBlueprintIds = snapshot.Blueprints
+            .Where(blueprint => blueprint.StoreId == item.StoreId && !blueprint.IsArchived)
+            .Select(blueprint => blueprint.Id)
+            .ToHashSet();
         var activeNormalizedOfferingIds = normalizedStoreOfferings
-            .Where(offering => !offering.IsArchived)
+            .Where(offering => !offering.IsArchived && activeBlueprintIds.Contains(offering.BlueprintId))
             .Select(offering => offering.Id)
             .ToHashSet();
         var availableOfferings = snapshot.FulfillmentOfferings
             .Where(o => storeProductIds.Contains(o.StoreProductId))
             .Where(o => !hasNormalizedCatalog || activeNormalizedOfferingIds.Contains(o.Id))
             .ToArray();
+        var recoveryOfferings = availableOfferings
+            .Where(offering => activeNormalizedOfferingIds.Contains(offering.Id))
+            .ToArray();
 
         var configuredOffering = config?.OfferingId is Guid configuredOfferingId
             ? snapshot.FulfillmentOfferings.SingleOrDefault(offering =>
                 offering.Id == configuredOfferingId && storeProductIds.Contains(offering.StoreProductId))
             : null;
-        var configuredOfferingIsStale = configuredOffering is not null
-            && availableOfferings.All(offering => offering.Id != configuredOffering.Id);
-        if (configuredOfferingIsStale)
+        var configuredOfferingIsStale = config is not null
+            && IsStaleConfiguration(snapshot, item, config.OfferingId);
+        if (configuredOfferingIsStale && configuredOffering is not null)
         {
             // Preserve an existing Item relationship for review, but do not make
             // an offering that is no longer active a new selectable choice.
@@ -826,7 +840,7 @@ public sealed class DesignStageService : IDesignStageService
             : string.Empty;
 
         // Available colors: from the selected offering's variants
-        var configOfferingId = configuredOffering?.Id;
+        var configOfferingId = config?.OfferingId;
         var availableColors = configOfferingId is not null
             && snapshot.BlueprintOfferings.Any(o => o.Id == configOfferingId.Value)
             && !configuredOfferingIsStale
@@ -887,17 +901,17 @@ public sealed class DesignStageService : IDesignStageService
 
         var supportingImages = ListSupportingImages(snapshot, itemId);
 
-        var offeringName = configOfferingId is not null
-            ? availableOfferings.SingleOrDefault(o => o.Id == configOfferingId)?.Name
+        var normalizedConfiguredOffering = configOfferingId is Guid normalizedConfiguredOfferingId
+            ? normalizedStoreOfferings.SingleOrDefault(offering => offering.Id == normalizedConfiguredOfferingId)
+            : null;
+        var offeringName = configuredOffering?.Name ?? normalizedConfiguredOffering?.Name;
+        var staleConfigurationDisplayName = configOfferingId is Guid staleOfferingId
+            ? offeringName ?? $"Unavailable offering ({staleOfferingId})"
             : null;
 
-        var offeringKind = configOfferingId is not null
-            ? availableOfferings.SingleOrDefault(o => o.Id == configOfferingId)?.Kind
-            : null;
+        var offeringKind = configuredOffering?.Kind;
 
-        var offeringProviderName = configOfferingId is not null
-            ? availableOfferings.SingleOrDefault(o => o.Id == configOfferingId)?.ProviderName
-            : null;
+        var offeringProviderName = configuredOffering?.ProviderName;
 
         var state = new DesignStageState(
             itemId,
@@ -914,7 +928,9 @@ public sealed class DesignStageService : IDesignStageService
             supportingImages);
 
         var normalizedOfferings = snapshot.BlueprintOfferings
-            .Where(offering => offering.StoreId == item.StoreId && !offering.IsArchived)
+            .Where(offering => offering.StoreId == item.StoreId
+                && !offering.IsArchived
+                && activeBlueprintIds.Contains(offering.BlueprintId))
             .ToArray();
         var normalizedPlaceholders = configOfferingId is Guid selectedOfferingId
             ? snapshot.OfferingPlaceholders.Where(placeholder => placeholder.OfferingId == selectedOfferingId && !placeholder.IsArchived).ToArray()
@@ -972,8 +988,92 @@ public sealed class DesignStageService : IDesignStageService
                 : null,
             PersistedArtworkTargetId = persistedArtworkTargetId,
             HasPersistedArtworkTargetPreference = hasPersistedArtworkTargetPreference,
-            PersistedTransparentBackground = persistedTransparentBackground
+            PersistedTransparentBackground = persistedTransparentBackground,
+            HasStaleConfiguration = configuredOfferingIsStale,
+            CanRecoverStaleConfiguration = configuredOfferingIsStale
+                && store is { IsArchived: false }
+                && editDecision.IsAllowed
+                && recoveryOfferings.Length > 0,
+            StaleConfigurationDisplayName = configuredOfferingIsStale ? staleConfigurationDisplayName : null,
+            RecoveryGuidance = configuredOfferingIsStale
+                ? recoveryOfferings.Length > 0
+                    ? "Choose an active replacement from this Store to continue Design work."
+                    : "No active replacement is available. Create or restore a Blueprint Offering in Store Editor."
+                : string.Empty,
+            RecoveryOfferings = configuredOfferingIsStale ? recoveryOfferings : []
         };
+    }
+
+    private WorkspaceSnapshot ReplaceConfiguration(WorkspaceSnapshot snapshot, Item item, Guid offeringId)
+    {
+        var oldRows = snapshot.DesignVariantRows
+            .Where(row => row.ItemId == item.Id)
+            .Select(row => row.Id)
+            .ToHashSet();
+        var itemMetadata = ItemMetadataCodec.ParseMetadata(item.MetadataJson);
+        itemMetadata.Remove(ItemMetadataCodec.ArtworkTargetIdKey);
+        itemMetadata.Remove(ItemMetadataCodec.ArtworkTargetPreferenceKey);
+        itemMetadata.Remove(ItemMetadataCodec.ArtworkTransparentBackgroundKey);
+        var updatedItem = item with
+        {
+            MetadataJson = ItemMetadataCodec.SerializeMetadata(itemMetadata),
+            UpdatedAt = _clock()
+        };
+
+        return snapshot with
+        {
+            Items = [.. snapshot.Items.Where(value => value.Id != item.Id), updatedItem],
+            ItemListingConfigurations = [.. snapshot.ItemListingConfigurations.Where(value => value.ItemId != item.Id),
+                new ItemListingConfiguration(item.Id, offeringId)],
+            DesignSelectedColors = [.. snapshot.DesignSelectedColors.Where(value => value.ItemId != item.Id)],
+            DesignVariantRows = [.. snapshot.DesignVariantRows.Where(value => value.ItemId != item.Id)],
+            DesignVariantRowColors = [.. snapshot.DesignVariantRowColors.Where(value => !oldRows.Contains(value.RowId))],
+            DesignSlotAssignments = [.. snapshot.DesignSlotAssignments.Where(value => !oldRows.Contains(value.RowId))]
+        };
+    }
+
+    private static bool IsStaleConfiguration(WorkspaceSnapshot snapshot, Item item, Guid offeringId)
+    {
+        var storeProductIds = snapshot.StoreProducts
+            .Where(product => product.StoreId == item.StoreId)
+            .Select(product => product.Id)
+            .ToHashSet();
+        var compatibilityOfferingExists = snapshot.FulfillmentOfferings.Any(offering =>
+            offering.Id == offeringId && storeProductIds.Contains(offering.StoreProductId));
+        var normalizedStoreOfferings = snapshot.BlueprintOfferings
+            .Where(offering => offering.StoreId == item.StoreId)
+            .ToArray();
+        var hasNormalizedCatalog = snapshot.Blueprints.Any(blueprint => blueprint.StoreId == item.StoreId)
+            || normalizedStoreOfferings.Length > 0;
+
+        if (!hasNormalizedCatalog)
+        {
+            return !compatibilityOfferingExists;
+        }
+
+        return !IsActiveNormalizedOfferingForStore(snapshot, item.StoreId, offeringId)
+            || !compatibilityOfferingExists;
+    }
+
+    private static bool IsActiveNormalizedOfferingForStore(WorkspaceSnapshot snapshot, Guid storeId, Guid offeringId)
+    {
+        var offering = snapshot.BlueprintOfferings.SingleOrDefault(value => value.Id == offeringId);
+        return offering is { IsArchived: false }
+            && offering.StoreId == storeId
+            && snapshot.Blueprints.Any(blueprint =>
+                blueprint.Id == offering.BlueprintId
+                && blueprint.StoreId == storeId
+                && !blueprint.IsArchived);
+    }
+
+    private static bool HasSameStoreCompatibilityOffering(WorkspaceSnapshot snapshot, Guid storeId, Guid offeringId)
+    {
+        var storeProductIds = snapshot.StoreProducts
+            .Where(product => product.StoreId == storeId)
+            .Select(product => product.Id)
+            .ToHashSet();
+        return snapshot.FulfillmentOfferings.Any(offering =>
+            offering.Id == offeringId && storeProductIds.Contains(offering.StoreProductId));
     }
 
     private IReadOnlyList<DesignSlotSummary> ListSupportingImages(WorkspaceSnapshot snapshot, Guid itemId)

@@ -13,6 +13,9 @@ public interface IDesignStageService
     /// <summary>Selects a catalog offering as the item's listing configuration.</summary>
     Task<DesignStageResult> SelectConfigurationAsync(Guid itemId, Guid offeringId, CancellationToken cancellationToken = default);
 
+    /// <summary>Replaces a stale listing configuration after explicit user confirmation.</summary>
+    Task<DesignStageResult> RecoverStaleConfigurationAsync(Guid itemId, Guid offeringId, CancellationToken cancellationToken = default);
+
     /// <summary>Persists the Design-stage artwork target and transparency preference for an item.</summary>
     Task<DesignStageResult> SaveArtworkPreferencesAsync(Guid itemId, Guid? designAreaId, bool transparentBackground, CancellationToken cancellationToken = default);
 

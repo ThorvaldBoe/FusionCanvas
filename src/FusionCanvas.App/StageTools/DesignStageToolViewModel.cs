@@ -47,6 +47,15 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
     private bool _isArtworkBusy;
     private Guid? _selectedArtworkTargetId;
     private bool _transparentBackground;
+    private bool _hasStaleConfiguration;
+    private bool _canRecoverStaleConfiguration;
+    private string? _staleConfigurationDisplayName;
+    private string _recoveryGuidance = string.Empty;
+    private FulfillmentOffering? _selectedRecoveryOffering;
+    private FulfillmentOffering? _pendingRecoveryOffering;
+    private bool _isRecoveryConfirmationVisible;
+    private string _recoveryConfirmationMessage = string.Empty;
+    private bool _canEditContext;
 
     public DesignStageToolViewModel(IDesignStageService designStageService, IArtworkGenerationService? artworkGenerationService = null, AiSettingsViewModel? aiSettings = null)
     {
@@ -68,8 +77,100 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
             if (_hasConfiguration == value) return;
             _hasConfiguration = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(ShowsUnconfiguredState));
+            OnPropertyChanged(nameof(ShowsConfiguredState));
             OnPropertyChanged(nameof(CanGenerateArtwork));
             GenerateArtworkCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    public bool HasStaleConfiguration
+    {
+        get => _hasStaleConfiguration;
+        private set
+        {
+            if (_hasStaleConfiguration == value) return;
+            _hasStaleConfiguration = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ShowsUnconfiguredState));
+            OnPropertyChanged(nameof(ShowsConfiguredState));
+        }
+    }
+
+    public bool ShowsUnconfiguredState => !HasConfiguration && !HasStaleConfiguration;
+
+    public bool ShowsConfiguredState => HasConfiguration && !HasStaleConfiguration;
+
+    public bool CanRecoverStaleConfiguration
+    {
+        get => _canRecoverStaleConfiguration;
+        private set
+        {
+            if (_canRecoverStaleConfiguration == value) return;
+            _canRecoverStaleConfiguration = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CanChooseRecoveryOffering));
+        }
+    }
+
+    public bool CanChooseRecoveryOffering => CanRecoverStaleConfiguration && !IsBusy;
+
+    public string? StaleConfigurationDisplayName
+    {
+        get => _staleConfigurationDisplayName;
+        private set
+        {
+            if (_staleConfigurationDisplayName == value) return;
+            _staleConfigurationDisplayName = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public string RecoveryGuidance
+    {
+        get => _recoveryGuidance;
+        private set
+        {
+            if (_recoveryGuidance == value) return;
+            _recoveryGuidance = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public FulfillmentOffering? SelectedRecoveryOffering
+    {
+        get => _selectedRecoveryOffering;
+        set
+        {
+            if (_selectedRecoveryOffering?.Id == value?.Id) return;
+            _selectedRecoveryOffering = value;
+            OnPropertyChanged();
+            if (value is not null && !_isApplyingState)
+            {
+                RequestStaleConfigurationRecovery(value);
+            }
+        }
+    }
+
+    public bool IsRecoveryConfirmationVisible
+    {
+        get => _isRecoveryConfirmationVisible;
+        private set
+        {
+            if (_isRecoveryConfirmationVisible == value) return;
+            _isRecoveryConfirmationVisible = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public string RecoveryConfirmationMessage
+    {
+        get => _recoveryConfirmationMessage;
+        private set
+        {
+            if (_recoveryConfirmationMessage == value) return;
+            _recoveryConfirmationMessage = value;
+            OnPropertyChanged();
         }
     }
 
@@ -164,7 +265,13 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
     public bool IsBusy
     {
         get => _isBusy;
-        set { _isBusy = value; OnPropertyChanged(); }
+        set
+        {
+            if (_isBusy == value) return;
+            _isBusy = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CanChooseRecoveryOffering));
+        }
     }
 
     public string? ErrorMessage
@@ -276,6 +383,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
 
     // --- Collections ---
     public ObservableCollection<FulfillmentOffering> AvailableOfferings { get; } = [];
+    public ObservableCollection<FulfillmentOffering> RecoveryOfferings { get; } = [];
     public ObservableCollection<DesignColorViewModel> AvailableColors { get; } = [];
     public ObservableCollection<DesignColorViewModel> SelectedColors { get; } = [];
     public ObservableCollection<DesignRowViewModel> Rows { get; } = [];
@@ -359,6 +467,59 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
         {
             IsBusy = false;
         }
+    }
+
+    public void RequestStaleConfigurationRecovery(FulfillmentOffering offering)
+    {
+        if (!CanRecoverStaleConfiguration || IsBusy)
+        {
+            return;
+        }
+
+        _pendingRecoveryOffering = offering;
+        RecoveryConfirmationMessage =
+            $"Replace '{StaleConfigurationDisplayName ?? "the unavailable configuration"}' with '{offering.Name}'? " +
+            "Selected colors, design rows, slot assignments, and artwork target settings will be cleared. " +
+            "Concept/SLL, managed files, Supporting Images, and Listing data will remain, but prior outputs are not validated for the replacement.";
+        IsRecoveryConfirmationVisible = true;
+    }
+
+    public async Task ConfirmStaleConfigurationRecoveryAsync(CancellationToken cancellationToken = default)
+    {
+        if (_pendingRecoveryOffering is null || !CanRecoverStaleConfiguration || IsBusy)
+        {
+            return;
+        }
+
+        var replacementOfferingId = _pendingRecoveryOffering.Id;
+        IsBusy = true;
+        try
+        {
+            var result = await _designStageService.RecoverStaleConfigurationAsync(
+                _itemId, replacementOfferingId, cancellationToken).ConfigureAwait(true);
+            ErrorMessage = result.Error;
+            ClearPendingRecovery();
+            await LoadAsync(_itemId, _canEditContext, cancellationToken).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            ErrorMessage = $"The listing configuration could not be recovered. {exception.Message}";
+            ClearPendingRecovery();
+            await LoadAsync(_itemId, _canEditContext, cancellationToken).ConfigureAwait(true);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public void CancelStaleConfigurationRecovery()
+    {
+        ClearPendingRecovery();
     }
 
     private async Task PersistSelectedOfferingAsync(Guid offeringId)
@@ -689,6 +850,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
     {
         _artworkCts?.Cancel();
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
+        _canEditContext = canEdit;
+        ClearPendingRecovery();
         IsReadOnly = !canEdit;
         ReadOnlyReason = canEdit ? string.Empty : "Design stage content is read-only while the item is protected or an earlier stage is being reviewed.";
         _itemId = itemId;
@@ -714,6 +877,10 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
         _isApplyingState = true;
         try
         {
+            HasStaleConfiguration = state.HasStaleConfiguration;
+            CanRecoverStaleConfiguration = canEdit && state.CanRecoverStaleConfiguration;
+            StaleConfigurationDisplayName = state.StaleConfigurationDisplayName;
+            RecoveryGuidance = state.RecoveryGuidance;
             HasConfiguration = state.SelectedOfferingId is not null;
             SelectedOfferingId = state.SelectedOfferingId;
             SelectedOfferingName = state.SelectedOfferingName;
@@ -754,6 +921,12 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
             foreach (var offering in state.AvailableOfferings)
             {
                 AvailableOfferings.Add(offering);
+            }
+
+            RecoveryOfferings.Clear();
+            foreach (var offering in state.RecoveryOfferings)
+            {
+                RecoveryOfferings.Add(offering);
             }
 
             // Reapply the selected item after rebuilding the source collection. Avalonia
@@ -809,6 +982,15 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
         {
             _isApplyingState = false;
         }
+    }
+
+    private void ClearPendingRecovery()
+    {
+        _pendingRecoveryOffering = null;
+        _selectedRecoveryOffering = null;
+        OnPropertyChanged(nameof(SelectedRecoveryOffering));
+        IsRecoveryConfirmationVisible = false;
+        RecoveryConfirmationMessage = string.Empty;
     }
 
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>

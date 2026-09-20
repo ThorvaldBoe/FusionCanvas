@@ -7,6 +7,7 @@ using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.DesignFiles;
+using System.Text.Json;
 
 namespace FusionCanvas.Application.Tests.DesignFiles;
 
@@ -570,6 +571,166 @@ public class DesignStageServiceTests
         Assert.Equal(["Black", "White"], state.AvailableColors);
         Assert.Equal(["Black"], state.SelectedColors);
         Assert.Contains(state.AvailableOfferings, value => value.Id == offering.Id);
+        Assert.True(state.HasStaleConfiguration);
+        Assert.False(state.CanRecoverStaleConfiguration);
+        Assert.Contains("create or restore", state.RecoveryGuidance, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task LoadDesignStageStateAsync_StaleConfigurationExposesOnlyActiveSameStoreRecoveryCandidates()
+    {
+        var fixture = CreateRecoveryFixture();
+        var state = await New(fixture.Repository).LoadDesignStageStateAsync(
+            fixture.ItemId, TestContext.Current.CancellationToken);
+
+        Assert.True(state.IsReadOnly);
+        Assert.True(state.HasStaleConfiguration);
+        Assert.True(state.CanRecoverStaleConfiguration);
+        Assert.Equal(fixture.StaleOfferingName, state.StaleConfigurationDisplayName);
+        var candidate = Assert.Single(state.RecoveryOfferings);
+        Assert.Equal(fixture.ReplacementOfferingId, candidate.Id);
+        Assert.DoesNotContain(state.RecoveryOfferings, value => value.Id == fixture.StaleOfferingId);
+    }
+
+    [Fact]
+    public async Task LoadDesignStageStateAsync_MissingConfiguredOfferingUsesStableFallbackIdentity()
+    {
+        var fixture = CreateRecoveryFixture();
+        fixture.Repository.Snapshot = fixture.Repository.Snapshot with
+        {
+            FulfillmentOfferings = [.. fixture.Repository.Snapshot.FulfillmentOfferings.Where(value => value.Id != fixture.StaleOfferingId)],
+            BlueprintOfferings = [.. fixture.Repository.Snapshot.BlueprintOfferings.Where(value => value.Id != fixture.StaleOfferingId)]
+        };
+
+        var state = await New(fixture.Repository).LoadDesignStageStateAsync(
+            fixture.ItemId, TestContext.Current.CancellationToken);
+
+        Assert.True(state.HasStaleConfiguration);
+        Assert.Equal(fixture.StaleOfferingId, state.SelectedOfferingId);
+        Assert.Contains(fixture.StaleOfferingId.ToString(), state.StaleConfigurationDisplayName, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(fixture.ReplacementOfferingId, Assert.Single(state.RecoveryOfferings).Id);
+    }
+
+    [Fact]
+    public async Task LoadDesignStageStateAsync_ProtectedItemDoesNotExposeRecoveryAuthority()
+    {
+        var fixture = CreateRecoveryFixture();
+        var item = fixture.Repository.Snapshot.Items.Single(value => value.Id == fixture.ItemId);
+        fixture.Repository.Snapshot = fixture.Repository.Snapshot with
+        {
+            Items = [.. fixture.Repository.Snapshot.Items.Where(value => value.Id != fixture.ItemId), item with { Status = ItemStatus.Published }]
+        };
+
+        var state = await New(fixture.Repository).LoadDesignStageStateAsync(
+            fixture.ItemId, TestContext.Current.CancellationToken);
+
+        Assert.True(state.HasStaleConfiguration);
+        Assert.False(state.CanRecoverStaleConfiguration);
+        Assert.Contains("published", state.ReadOnlyReason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RecoverStaleConfigurationAsync_ValidReplacementResetsOnlyOfferingSpecificRelationships()
+    {
+        var fixture = CreateRecoveryFixture();
+        var before = fixture.Repository.Snapshot;
+        var service = New(fixture.Repository);
+
+        var result = await service.RecoverStaleConfigurationAsync(
+            fixture.ItemId, fixture.ReplacementOfferingId, TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        var after = fixture.Repository.Snapshot;
+        Assert.Equal(fixture.ReplacementOfferingId,
+            Assert.Single(after.ItemListingConfigurations, value => value.ItemId == fixture.ItemId).OfferingId);
+        Assert.DoesNotContain(after.DesignSelectedColors, value => value.ItemId == fixture.ItemId);
+        Assert.DoesNotContain(after.DesignVariantRows, value => value.ItemId == fixture.ItemId);
+        Assert.DoesNotContain(after.DesignVariantRowColors, value => value.RowId == fixture.ItemRowId);
+        Assert.DoesNotContain(after.DesignSlotAssignments, value => value.RowId == fixture.ItemRowId);
+        Assert.Contains(after.DesignVariantRows, value => value.Id == fixture.OtherItemRowId);
+        Assert.Contains(after.DesignSlotAssignments, value => value.RowId == fixture.OtherItemRowId);
+        Assert.Equal(before.Assets, after.Assets);
+        Assert.Equal(before.AssetLinks, after.AssetLinks);
+        Assert.Equal(before.MockupTemplates, after.MockupTemplates);
+
+        var updatedItem = after.Items.Single(value => value.Id == fixture.ItemId);
+        Assert.Equal(WorkflowStage.Design, updatedItem.Stage);
+        Assert.Equal(ItemStatus.Draft, updatedItem.Status);
+        using var metadata = JsonDocument.Parse(updatedItem.MetadataJson);
+        Assert.Equal("Keep idea", metadata.RootElement.GetProperty("idea").GetString());
+        Assert.Equal("Keep SLL", metadata.RootElement.GetProperty("sll").GetString());
+        Assert.False(metadata.RootElement.TryGetProperty("design.artworkTargetId", out _));
+        Assert.False(metadata.RootElement.TryGetProperty("design.artworkTargetPreference", out _));
+        Assert.False(metadata.RootElement.TryGetProperty("design.transparentBackground", out _));
+
+        Assert.NotNull(result.State);
+        Assert.False(result.State.HasStaleConfiguration);
+        Assert.False(result.State.IsReadOnly);
+        Assert.Equal(fixture.ReplacementOfferingId, result.State.SelectedOfferingId);
+        Assert.Empty(result.State.SelectedColors);
+        Assert.Empty(result.State.Rows);
+
+        var reopened = await service.LoadDesignStageStateAsync(
+            fixture.ItemId, TestContext.Current.CancellationToken);
+        Assert.False(reopened.HasStaleConfiguration);
+        Assert.False(reopened.IsReadOnly);
+        Assert.Equal(fixture.ReplacementOfferingId, reopened.SelectedOfferingId);
+        Assert.Empty(reopened.SelectedColors);
+        Assert.Empty(reopened.Rows);
+    }
+
+    [Fact]
+    public async Task RecoverStaleConfigurationAsync_InactiveOrCrossStoreReplacementLeavesSnapshotUnchanged()
+    {
+        var fixture = CreateRecoveryFixture();
+        var before = fixture.Repository.Snapshot;
+        var archivedReplacement = before.BlueprintOfferings.Single(value => value.Id == fixture.ReplacementOfferingId) with { IsArchived = true };
+        fixture.Repository.Snapshot = before with
+        {
+            BlueprintOfferings = [.. before.BlueprintOfferings.Where(value => value.Id != fixture.ReplacementOfferingId), archivedReplacement]
+        };
+        var service = New(fixture.Repository);
+
+        var result = await service.RecoverStaleConfigurationAsync(
+            fixture.ItemId, fixture.ReplacementOfferingId, TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(before.ItemListingConfigurations, fixture.Repository.Snapshot.ItemListingConfigurations);
+        Assert.Equal(before.DesignSelectedColors, fixture.Repository.Snapshot.DesignSelectedColors);
+        Assert.Equal(before.DesignVariantRows, fixture.Repository.Snapshot.DesignVariantRows);
+        Assert.Equal(before.DesignSlotAssignments, fixture.Repository.Snapshot.DesignSlotAssignments);
+    }
+
+    [Fact]
+    public async Task RecoverStaleConfigurationAsync_ProtectedItemLeavesSnapshotUnchanged()
+    {
+        var fixture = CreateRecoveryFixture();
+        var item = fixture.Repository.Snapshot.Items.Single(value => value.Id == fixture.ItemId);
+        fixture.Repository.Snapshot = fixture.Repository.Snapshot with
+        {
+            Items = [.. fixture.Repository.Snapshot.Items.Where(value => value.Id != fixture.ItemId), item with { Status = ItemStatus.Published }]
+        };
+        var before = fixture.Repository.Snapshot;
+
+        var result = await New(fixture.Repository).RecoverStaleConfigurationAsync(
+            fixture.ItemId, fixture.ReplacementOfferingId, TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("published", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Same(before, fixture.Repository.Snapshot);
+    }
+
+    [Fact]
+    public async Task RecoverStaleConfigurationAsync_SaveFailureDoesNotReplaceRepositorySnapshot()
+    {
+        var fixture = CreateRecoveryFixture();
+        var before = fixture.Repository.Snapshot;
+        fixture.Repository.ThrowOnSave = true;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => New(fixture.Repository).RecoverStaleConfigurationAsync(
+            fixture.ItemId, fixture.ReplacementOfferingId, TestContext.Current.CancellationToken));
+
+        Assert.Same(before, fixture.Repository.Snapshot);
     }
 
     [Fact]
@@ -591,6 +752,7 @@ public class DesignStageServiceTests
             Items = [item],
             ItemListingConfigurations = [new ItemListingConfiguration(itemId, offeringId)],
             FulfillmentOfferings = [legacyOffering with { Id = offeringId }],
+            Blueprints = [new Blueprint(blueprintId, StoreId, "Gildan", null, false, Now, Now)],
             BlueprintOfferings = [new BlueprintOffering(offeringId, blueprintId, StoreId, "Gildan 64000", null, BlueprintOfferingKind.FixedPrintProvider, null, null, null, null, false, Now, Now)],
             OfferingOptions = [new OfferingOption(colorOptionId, offeringId, OptionKind.Color, "Colors", 0)],
             OfferingOptionValues =
@@ -653,6 +815,90 @@ public class DesignStageServiceTests
         };
     }
 
+    private static RecoveryFixture CreateRecoveryFixture()
+    {
+        var snapshot = SeedWithProduct();
+        var product = snapshot.StoreProducts.Single();
+        var staleCompatibilityOffering = snapshot.FulfillmentOfferings.Single();
+        var replacementOfferingId = Guid.NewGuid();
+        var replacementCompatibilityOffering = new FulfillmentOffering(
+            replacementOfferingId, product.Id, "Replacement shirt", null,
+            FulfillmentKind.FixedProvider, "Printful", null, Now, Now, "{}");
+        var blueprint = new Blueprint(product.Id, StoreId, product.Name, product.Description, false, Now, Now, "{}");
+        var staleOffering = new BlueprintOffering(
+            staleCompatibilityOffering.Id, blueprint.Id, StoreId, staleCompatibilityOffering.Name,
+            staleCompatibilityOffering.Description, BlueprintOfferingKind.FixedPrintProvider,
+            Guid.NewGuid(), null, null, null, true, Now, Now, "{}");
+        var replacementOffering = new BlueprintOffering(
+            replacementOfferingId, blueprint.Id, StoreId, replacementCompatibilityOffering.Name,
+            replacementCompatibilityOffering.Description, BlueprintOfferingKind.FixedPrintProvider,
+            Guid.NewGuid(), null, null, null, false, Now, Now, "{}");
+        var replacementArea = new DesignArea(
+            Guid.NewGuid(), replacementOfferingId, "Back", null, "back", "DTG",
+            2400, 3200, null, Now, Now, "{}");
+        var itemId = Guid.NewGuid();
+        var itemRowId = Guid.NewGuid();
+        var otherItemId = Guid.NewGuid();
+        var otherItemRowId = Guid.NewGuid();
+        var slotAssetId = Guid.NewGuid();
+        var supportingAssetId = Guid.NewGuid();
+        var oldArea = snapshot.DesignAreas.Single();
+        var item = new Item(
+            itemId, StoreId, null, null, "Item", null, ItemStatus.Draft, WorkflowStage.Design,
+            false, Now, Now,
+            $"{{\"idea\":\"Keep idea\",\"sll\":\"Keep SLL\",\"design.artworkTargetId\":\"{oldArea.Id}\",\"design.artworkTargetPreference\":\"true\",\"design.transparentBackground\":\"true\"}}");
+        var otherItem = new Item(
+            otherItemId, StoreId, null, null, "Other Item", null, ItemStatus.Draft,
+            WorkflowStage.Design, false, Now, Now, "{}");
+        var slotAsset = new Asset(
+            slotAssetId, StoreId, "slot.png", null, AssetKind.SourceDesign,
+            "designs/slot.png", null, false, false, Now, Now, "{}");
+        var supportingAsset = new Asset(
+            supportingAssetId, StoreId, "reference.png", null, AssetKind.ReferenceImage,
+            "supporting/reference.png", null, false, false, Now, Now, "{}");
+
+        var repository = new InMemoryWorkspaceRepository(snapshot with
+        {
+            Items = [item, otherItem],
+            Assets = [slotAsset, supportingAsset],
+            AssetLinks = [new AssetLink(supportingAssetId, WorkspaceEntityKind.Item, itemId)],
+            FulfillmentOfferings = [staleCompatibilityOffering, replacementCompatibilityOffering],
+            DesignAreas = [oldArea, replacementArea],
+            Blueprints = [blueprint],
+            BlueprintOfferings = [staleOffering, replacementOffering],
+            ItemListingConfigurations =
+            [
+                new ItemListingConfiguration(itemId, staleCompatibilityOffering.Id),
+                new ItemListingConfiguration(otherItemId, replacementOfferingId)
+            ],
+            DesignSelectedColors = [new DesignSelectedColor(itemId, "Black"), new DesignSelectedColor(otherItemId, "White")],
+            DesignVariantRows =
+            [
+                new DesignVariantRow(itemRowId, itemId, true, 0),
+                new DesignVariantRow(otherItemRowId, otherItemId, true, 0)
+            ],
+            DesignVariantRowColors =
+            [
+                new DesignVariantRowColor(itemRowId, "Black"),
+                new DesignVariantRowColor(otherItemRowId, "White")
+            ],
+            DesignSlotAssignments =
+            [
+                new DesignSlotAssignment(itemRowId, oldArea.Id, slotAssetId),
+                new DesignSlotAssignment(otherItemRowId, replacementArea.Id, null)
+            ]
+        });
+
+        return new RecoveryFixture(
+            repository,
+            itemId,
+            itemRowId,
+            otherItemRowId,
+            staleCompatibilityOffering.Id,
+            staleCompatibilityOffering.Name,
+            replacementOfferingId);
+    }
+
     private sealed class InMemoryWorkspaceRepository(WorkspaceSnapshot? snapshot = null) : IWorkspaceRepository
     {
         private WorkspaceSnapshot _snapshot = snapshot ?? WorkspaceSnapshot.Empty;
@@ -663,8 +909,15 @@ public class DesignStageServiceTests
             set => _snapshot = value;
         }
 
+        public bool ThrowOnSave { get; set; }
+
         public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
         {
+            if (ThrowOnSave)
+            {
+                throw new InvalidOperationException("Simulated save failure.");
+            }
+
             _snapshot = snapshot;
             return Task.CompletedTask;
         }
@@ -672,6 +925,15 @@ public class DesignStageServiceTests
         public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(_snapshot);
     }
+
+    private sealed record RecoveryFixture(
+        InMemoryWorkspaceRepository Repository,
+        Guid ItemId,
+        Guid ItemRowId,
+        Guid OtherItemRowId,
+        Guid StaleOfferingId,
+        string StaleOfferingName,
+        Guid ReplacementOfferingId);
 
     private sealed class DeterministicFileStore : IWorkspaceFileStore
     {
