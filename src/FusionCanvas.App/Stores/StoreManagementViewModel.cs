@@ -162,6 +162,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private bool _productDeleteWarningVisible;
     private bool _productArchiveWarningVisible;
     private bool _showArchivedProducts;
+    private bool _showArchivedOfferings;
     private bool _offeringDeleteWarningVisible;
     private bool _isCreatingNewProduct;
     private bool _isCreatingNewOffering;
@@ -358,7 +359,13 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
          CancelAddDesignAreaCommand = new RelayCommand(_ => IsAddingDesignArea = false);
         SelectOfferingCommand = new RelayCommand(parameter =>
         {
-            if (parameter is BlueprintOfferingCardViewModel card && SelectedProduct?.Offerings.FirstOrDefault(value => value.Id == card.Id) is { } cardOffering)
+            if (parameter is BlueprintOfferingCardViewModel card && card.Status == "Archived")
+            {
+                CatalogSetup?.SelectOffering(card.Id);
+                SelectedOffering = null;
+                CatalogEditorLevel = CatalogEditorLevel.OfferingDetail;
+            }
+            else if (parameter is BlueprintOfferingCardViewModel activeCard && SelectedProduct?.Offerings.FirstOrDefault(value => value.Id == activeCard.Id) is { } cardOffering)
             {
                 SelectOfferingForEditing(cardOffering);
             }
@@ -1018,6 +1025,12 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public IReadOnlyList<StoreProductSummary> ArchivedProducts { get; private set; } = [];
     public ObservableCollection<BlueprintOfferingCardViewModel> BlueprintOfferingCards { get; } = [];
     public bool HasBlueprintOfferingCards => BlueprintOfferingCards.Count > 0;
+
+    public bool ShowArchivedOfferings
+    {
+        get => _showArchivedOfferings;
+        set { if (SetField(ref _showArchivedOfferings, value)) Run(RefreshBlueprintOfferingCardsAsync()); }
+    }
 
     public bool HasProducts => EditorProducts.Count > 0;
 
@@ -2580,7 +2593,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         {
             try
             {
-                cards = (await _offeringManagementService.LoadForBlueprintAsync(store.Id, blueprint.Id).ConfigureAwait(true))
+                cards = (await _offeringManagementService.LoadForBlueprintAsync(store.Id, blueprint.Id, ShowArchivedOfferings, CancellationToken.None).ConfigureAwait(true))
                     .Select(BlueprintOfferingCardViewModel.From)
                     .ToArray();
                 if (SelectedStore?.Id != store.Id || SelectedProduct?.Id != blueprint.Id)

@@ -555,6 +555,64 @@ public sealed class CatalogSetupServiceTests
         Assert.Equal([legacyVariant.Id], legacyArea.VariantIds);
     }
 
+    [Fact]
+    public async Task RestoresArchivedOfferingCascadeWithStableIdentities()
+    {
+        var storeId = Guid.NewGuid(); var blueprintId = Guid.NewGuid(); var offeringId = Guid.NewGuid(); var optionId = Guid.NewGuid(); var valueId = Guid.NewGuid();
+        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "Store")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [new Blueprint(blueprintId, storeId, "Blueprint", null, false, Now, Now)],
+            BlueprintOfferings = [new BlueprintOffering(offeringId, blueprintId, storeId, "Archived", null, BlueprintOfferingKind.ProviderNetwork, null, "choice", null, null, true, Now, Now)],
+            OfferingOptions = [new OfferingOption(optionId, offeringId, OptionKind.Color, "Color", 0, true)],
+            OfferingOptionValues = [new OfferingOptionValue(valueId, optionId, offeringId, "Black", 0, true)]
+        });
+        var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
+        var result = await service.RestoreOfferingCascadeAsync(new RestoreOfferingCascadeRequest(storeId, offeringId, true), TestContext.Current.CancellationToken);
+        Assert.True(result.Succeeded);
+        Assert.False(repository.Current.BlueprintOfferings.Single().IsArchived);
+        Assert.False(repository.Current.OfferingOptions.Single().IsArchived);
+        Assert.False(repository.Current.OfferingOptionValues.Single().IsArchived);
+        Assert.Equal(offeringId, result.State.Offerings.Single().Id);
+    }
+
+    [Fact]
+    public async Task PermanentOfferingDeleteReportsNamedBlockerAndDoesNotMutate()
+    {
+        var storeId = Guid.NewGuid(); var blueprintId = Guid.NewGuid(); var offeringId = Guid.NewGuid(); var itemId = Guid.NewGuid();
+        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "Store")], [], [], [new Item(itemId, storeId, null, null, "Listing", null, ItemStatus.Draft, WorkflowStage.Design, false, Now, Now, "{}")], [], [], [], [], [])
+        {
+            Blueprints = [new Blueprint(blueprintId, storeId, "Blueprint", null, false, Now, Now)],
+            BlueprintOfferings = [new BlueprintOffering(offeringId, blueprintId, storeId, "Archived", null, BlueprintOfferingKind.ProviderNetwork, null, "choice", null, null, true, Now, Now)],
+            ItemListingConfigurations = [new ItemListingConfiguration(itemId, offeringId)]
+        });
+        var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
+        var plan = await service.PreviewDeleteOfferingPermanentlyAsync(new DeleteOfferingPermanentlyRequest(storeId, offeringId, false), TestContext.Current.CancellationToken);
+        var result = await service.DeleteOfferingPermanentlyAsync(new DeleteOfferingPermanentlyRequest(storeId, offeringId, true), TestContext.Current.CancellationToken);
+        Assert.True(plan.HasExternalBlockers);
+        Assert.Contains(plan.ExternalBlockers, blocker => blocker.Name == "Listing");
+        Assert.False(result.Succeeded);
+        Assert.Contains(repository.Current.BlueprintOfferings, value => value.Id == offeringId);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task PermanentOfferingDeleteRemovesOwnedCatalogGraphOnlyWhenArchived()
+    {
+        var storeId = Guid.NewGuid(); var blueprintId = Guid.NewGuid(); var offeringId = Guid.NewGuid(); var optionId = Guid.NewGuid(); var valueId = Guid.NewGuid();
+        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "Store")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [new Blueprint(blueprintId, storeId, "Blueprint", null, false, Now, Now)],
+            BlueprintOfferings = [new BlueprintOffering(offeringId, blueprintId, storeId, "Archived", null, BlueprintOfferingKind.ProviderNetwork, null, "choice", null, null, true, Now, Now)],
+            OfferingOptions = [new OfferingOption(optionId, offeringId, OptionKind.Color, "Color", 0, true)],
+            OfferingOptionValues = [new OfferingOptionValue(valueId, optionId, offeringId, "Black", 0, true)]
+        });
+        var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
+        var result = await service.DeleteOfferingPermanentlyAsync(new DeleteOfferingPermanentlyRequest(storeId, offeringId, true), TestContext.Current.CancellationToken);
+        Assert.True(result.Succeeded);
+        Assert.Empty(repository.Current.BlueprintOfferings);
+        Assert.Empty(repository.Current.OfferingOptions);
+        Assert.Empty(repository.Current.OfferingOptionValues);
+    }
     private static Store NewStore(Guid id, string name) => new(id, name, null, false, Now, Now, "{}");
 
     private sealed class MemoryRepository(WorkspaceSnapshot? initial = null) : IWorkspaceRepository

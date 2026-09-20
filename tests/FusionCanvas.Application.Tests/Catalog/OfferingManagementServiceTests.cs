@@ -31,6 +31,18 @@ public sealed class OfferingManagementServiceTests
     }
 
     [Fact]
+    public async Task BlueprintListExcludesArchivedOfferingsByDefaultAndIncludesThemOnRequest()
+    {
+        var fixture = Fixture.Create();
+        var archived = new BlueprintOffering(Guid.NewGuid(), fixture.Blueprint.Id, fixture.Store.Id, "Archived", null, BlueprintOfferingKind.ProviderNetwork, null, "choice", null, null, true, Now, Now);
+        var repository = new MemoryRepository(fixture.Snapshot with { BlueprintOfferings = [.. fixture.Snapshot.BlueprintOfferings, archived] });
+        var service = new OfferingManagementService(repository);
+        var active = await service.LoadForBlueprintAsync(fixture.Store.Id, fixture.Blueprint.Id, TestContext.Current.CancellationToken);
+        var all = await service.LoadForBlueprintAsync(fixture.Store.Id, fixture.Blueprint.Id, true, TestContext.Current.CancellationToken);
+        Assert.DoesNotContain(active, value => value.Context.OfferingId == archived.Id);
+        Assert.Contains(all, value => value.Context.OfferingId == archived.Id && value.IsArchived);
+    }
+    [Fact]
     public async Task ProviderNetworkDoesNotFabricateFixedProviderAndArchivedStoreIsReadOnly()
     {
         var fixture = Fixture.Create(providerNetwork: true, archivedStore: true);

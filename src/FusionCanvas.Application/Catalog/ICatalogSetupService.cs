@@ -19,6 +19,9 @@ public interface ICatalogSetupService
     Task<CatalogSetupResult> DeleteBlueprintPermanentlyAsync(DeleteBlueprintPermanentlyRequest request, CancellationToken cancellationToken = default);
     Task<CatalogArchivePlan> PreviewArchiveOfferingAsync(ArchiveOfferingCascadeRequest request, CancellationToken cancellationToken = default);
     Task<CatalogSetupResult> ArchiveOfferingCascadeAsync(ArchiveOfferingCascadeRequest request, CancellationToken cancellationToken = default);
+    Task<CatalogSetupResult> RestoreOfferingCascadeAsync(RestoreOfferingCascadeRequest request, CancellationToken cancellationToken = default);
+    Task<CatalogOfferingDeletePlan> PreviewDeleteOfferingPermanentlyAsync(DeleteOfferingPermanentlyRequest request, CancellationToken cancellationToken = default);
+    Task<CatalogSetupResult> DeleteOfferingPermanentlyAsync(DeleteOfferingPermanentlyRequest request, CancellationToken cancellationToken = default);
     Task<CatalogSetupResult> RestoreAsync(ArchiveCatalogRecordRequest request, CancellationToken cancellationToken = default);
     Task<CatalogSetupResult> UpdateAsync(UpdateCatalogRecordRequest request, CancellationToken cancellationToken = default);
     Task<CatalogSetupResult> DeleteAsync(ArchiveCatalogRecordRequest request, CancellationToken cancellationToken = default);
