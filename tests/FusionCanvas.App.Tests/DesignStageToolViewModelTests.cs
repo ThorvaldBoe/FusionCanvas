@@ -1,5 +1,8 @@
 using FusionCanvas.App.StageTools;
+using FusionCanvas.App.Settings;
+using FusionCanvas.Application.AI;
 using FusionCanvas.Application.DesignFiles;
+using FusionCanvas.Application.Settings;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Products;
 
@@ -7,6 +10,38 @@ namespace FusionCanvas.App.Tests;
 
 public class DesignStageToolViewModelTests
 {
+    [Fact]
+    public async Task LoadAsync_OpaqueOnlyAspectRatioEndpointDisablesTransparencyAndKeepsGenerationAvailable()
+    {
+        var itemId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        const string modelId = "openai/gpt-5.4-image-2";
+        var designService = new DelayedArtworkPreferenceService(itemId, targetId, Guid.NewGuid(), persistInitialTarget: true, initialTransparency: true);
+        var endpoint = new AiImageEndpointCapabilities(
+            "openai", modelId, false, true, ["png"], [], false, "OpenAI",
+            new AiImageEndpointParameterCapabilities(["1:1", "2:3", "3:4"], [], false, false, ["auto", "opaque"], true));
+        var catalog = new ArtworkCatalogProvider([endpoint]);
+        var aiSettings = new AiSettingsViewModel(
+            AiConfigurationSettings.Default with
+            {
+                RequireZeroDataRetention = false,
+                Artwork = AiProfileSettings.Empty with { ModelId = modelId }
+            },
+            new AvailableCredentialStore(),
+            new ValidCredentialValidator(),
+            catalog,
+            new EmptyCatalogCache());
+        var viewModel = new DesignStageToolViewModel(designService, new UnusedArtworkGenerationService(), aiSettings);
+
+        await viewModel.LoadAsync(itemId, canEdit: true, TestContext.Current.CancellationToken);
+
+        Assert.Equal(targetId, viewModel.SelectedArtworkTargetId);
+        Assert.False(viewModel.TransparentBackground);
+        Assert.False(viewModel.CanUseTransparentBackground);
+        Assert.True(viewModel.CanGenerateArtwork);
+        Assert.Contains("opaque artwork", viewModel.ArtworkGenerationGuidance, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task LoadAsync_AfterTargetChange_WaitsForPendingPreferenceSave()
     {
@@ -34,7 +69,12 @@ public class DesignStageToolViewModelTests
         private readonly Guid _itemId;
         private readonly TaskCompletionSource _saveCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public DelayedArtworkPreferenceService(Guid itemId, Guid firstTargetId, Guid selectedTargetId)
+        public DelayedArtworkPreferenceService(
+            Guid itemId,
+            Guid firstTargetId,
+            Guid selectedTargetId,
+            bool persistInitialTarget = false,
+            bool? initialTransparency = null)
         {
             _itemId = itemId;
             var now = DateTimeOffset.UtcNow;
@@ -45,7 +85,10 @@ public class DesignStageToolViewModelTests
                 [
                     new OfferingPlaceholder(firstTargetId, offeringId, "Front", null, "front", "DTG", 3000, 4500, [], false, now, now),
                     new OfferingPlaceholder(selectedTargetId, offeringId, "Back", null, "back", "DTG", 3000, 4500, [], false, now, now)
-                ]
+                ],
+                HasPersistedArtworkTargetPreference = persistInitialTarget,
+                PersistedArtworkTargetId = persistInitialTarget ? firstTargetId : null,
+                PersistedTransparentBackground = initialTransparency
             };
         }
 
@@ -85,5 +128,47 @@ public class DesignStageToolViewModelTests
         public Task<IReadOnlyList<DesignSlotSummary>> ListSupportingImagesAsync(Guid itemId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<DesignStageResult> ImportSupportingImageAsync(Guid itemId, string sourcePath, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<DesignStageResult> RemoveSupportingImageAsync(Guid itemId, Guid assetId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
+
+    private sealed class ArtworkCatalogProvider(IReadOnlyList<AiImageEndpointCapabilities> endpoints) :
+        IAiModelCatalogProvider,
+        IAiImageEndpointCatalogProvider
+    {
+        public Task<AiModelCatalog> GetModelsAsync(string apiKey, bool requireZeroDataRetention, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AiModelCatalog(requireZeroDataRetention, DateTimeOffset.UtcNow, []));
+
+        public Task<IReadOnlyList<AiImageEndpointCapabilities>> GetImageEndpointsAsync(
+            string apiKey,
+            string modelId,
+            bool requireZeroDataRetention,
+            CancellationToken cancellationToken = default) => Task.FromResult(endpoints);
+    }
+
+    private sealed class AvailableCredentialStore : IAiCredentialStore
+    {
+        public Task<AiCredentialReadResult> ReadAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(AiCredentialReadResult.Available("secret"));
+        public Task<AiCredentialOperationResult> SaveAsync(string apiKey, CancellationToken cancellationToken = default) =>
+            Task.FromResult(AiCredentialOperationResult.Success);
+        public Task<AiCredentialOperationResult> RemoveAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(AiCredentialOperationResult.Success);
+    }
+
+    private sealed class ValidCredentialValidator : IAiCredentialValidator
+    {
+        public Task<AiCredentialValidationResult> ValidateAsync(string apiKey, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AiCredentialValidationResult(AiCredentialValidationKind.Valid));
+    }
+
+    private sealed class EmptyCatalogCache : IAiModelCatalogCache
+    {
+        public Task<AiModelCatalog?> LoadAsync(bool requireZeroDataRetention, CancellationToken cancellationToken = default) => Task.FromResult<AiModelCatalog?>(null);
+        public Task SaveAsync(AiModelCatalog catalog, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class UnusedArtworkGenerationService : IArtworkGenerationService
+    {
+        public Task<DesignStageResult> GenerateAsync(ArtworkGenerationRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }

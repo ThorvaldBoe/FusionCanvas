@@ -232,6 +232,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         Settings.Ai.AvailabilityChanged += (_, _) => _ = SllGeneration.RefreshAvailabilityAsync();
         Settings.Ai.SettingsChanged += (_, _) => _ = ItemInspector.RefreshTitleOptimizationAvailabilityAsync();
         Settings.Ai.AvailabilityChanged += (_, _) => _ = ItemInspector.RefreshTitleOptimizationAvailabilityAsync();
+        Settings.Ai.SettingsChanged += (_, _) => _ = DesignTool.RefreshArtworkAvailabilityAsync();
+        Settings.Ai.AvailabilityChanged += (_, _) => _ = DesignTool.RefreshArtworkAvailabilityAsync();
         _ = _ideationAccessStatus.RefreshAsync();
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;

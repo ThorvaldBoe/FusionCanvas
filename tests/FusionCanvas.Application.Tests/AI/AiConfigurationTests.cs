@@ -120,6 +120,60 @@ public class AiConfigurationTests
     }
 
     [Fact]
+    public void ImageEndpointPolicy_PlansCurrentAspectRatioOnlyEndpointWithoutUnsupportedSizeOrFormat()
+    {
+        var endpoint = new AiImageEndpointCapabilities(
+            "openai",
+            "openai/gpt-5.4-image-2",
+            true,
+            true,
+            ["png"],
+            [],
+            false,
+            "OpenAI",
+            new AiImageEndpointParameterCapabilities(
+                ["1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16", "21:9", "auto"],
+                [],
+                false,
+                false,
+                ["auto", "opaque"],
+                true));
+
+        var opaque = AiImageEndpointPolicy.SelectEndpoint([endpoint], endpoint.ModelId, true, false, new(3000, 4500));
+        var transparent = AiImageEndpointPolicy.SelectEndpoint([endpoint], endpoint.ModelId, true, true, new(3000, 4500));
+
+        Assert.NotNull(opaque);
+        Assert.Equal("2:3", opaque.Options.AspectRatio);
+        Assert.Equal("opaque", opaque.Options.Background);
+        Assert.Equal(1, opaque.Options.Count);
+        Assert.Null(opaque.Options.Size);
+        Assert.Null(opaque.Options.OutputFormat);
+        Assert.Null(transparent);
+    }
+
+    [Fact]
+    public void ImageEndpointPolicy_SelectsClosestAspectRatioAndLargestUsefulResolutionTier()
+    {
+        var endpoint = new AiImageEndpointCapabilities(
+            "google-vertex/global",
+            "google/gemini-3.1-flash-image",
+            true,
+            true,
+            ["png"],
+            [],
+            false,
+            "Google Vertex",
+            new AiImageEndpointParameterCapabilities(["1:1", "3:4", "16:9"], ["512", "1K", "2K", "4K"], false, false, [], true));
+
+        var selected = AiImageEndpointPolicy.SelectEndpoint([endpoint], endpoint.ModelId, true, false, new(3000, 4000));
+
+        Assert.NotNull(selected);
+        Assert.Equal("3:4", selected.Options.AspectRatio);
+        Assert.Equal("2K", selected.Options.Resolution);
+        Assert.Equal(new AiImageSize(1536, 2048), selected.ProviderSize);
+    }
+
+    [Fact]
     public void StaleCatalog_IsExplicitlyRepresentedForUnavailableSelectionGuidance()
     {
         var catalog = new AiModelCatalog(true, DateTimeOffset.UtcNow.AddHours(-2), [], IsStale: true);

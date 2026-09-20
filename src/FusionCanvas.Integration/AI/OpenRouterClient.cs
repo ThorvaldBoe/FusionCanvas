@@ -148,7 +148,9 @@ public sealed class OpenRouterClient :
     {
         try
         {
-            return await FetchZdrModelIdsAsync(cancellationToken).ConfigureAwait(false);
+            return (await FetchZdrEndpointIdentitiesAsync(cancellationToken).ConfigureAwait(false))
+                .Select(endpoint => endpoint.ModelId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
         }
         catch (OperationCanceledException)
         {
@@ -166,7 +168,7 @@ public sealed class OpenRouterClient :
         }
     }
 
-    private async Task<IReadOnlyCollection<string>> FetchZdrModelIdsAsync(CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<ZdrEndpointIdentity>> FetchZdrEndpointIdentitiesAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -174,17 +176,20 @@ public sealed class OpenRouterClient :
             EnsureCatalogSuccess(response);
             using var json = await ReadJsonAsync(response, cancellationToken).ConfigureAwait(false);
             var data = RequiredArray(json.RootElement, "data");
-            var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var endpoints = new List<ZdrEndpointIdentity>();
             foreach (var item in data.EnumerateArray())
             {
                 var modelId = ReadString(item, "model_id");
                 if (!string.IsNullOrWhiteSpace(modelId))
                 {
-                    ids.Add(modelId);
+                    endpoints.Add(new ZdrEndpointIdentity(
+                        modelId,
+                        ReadString(item, "tag"),
+                        ReadString(item, "provider_name")));
                 }
             }
 
-            return ids;
+            return endpoints;
         }
         catch (AiModelCatalogFetchException)
         {
@@ -335,7 +340,7 @@ public sealed class OpenRouterClient :
         using var response = await SendGetAsync(path, apiKey, cancellationToken).ConfigureAwait(false);
         EnsureCatalogSuccess(response);
         using var json = await ReadJsonAsync(response, cancellationToken).ConfigureAwait(false);
-        var zdrIds = requireZeroDataRetention ? await FetchZdrModelIdsAsync(cancellationToken).ConfigureAwait(false) : [];
+        var zdrEndpoints = requireZeroDataRetention ? await FetchZdrEndpointIdentitiesAsync(cancellationToken).ConfigureAwait(false) : [];
         // The current endpoint catalog returns { "id": ..., "endpoints": [...] }.
         // Older responses used the same endpoint records in a top-level data array.
         var data = json.RootElement.TryGetProperty("endpoints", out var endpoints)
@@ -343,7 +348,7 @@ public sealed class OpenRouterClient :
             ? endpoints
             : RequiredArray(json.RootElement, "data");
         return data.EnumerateArray()
-            .Select(item => ParseImageEndpoint(item, modelId, zdrIds))
+            .Select(item => ParseImageEndpoint(item, modelId, zdrEndpoints))
             .OfType<AiImageEndpointCapabilities>()
             .ToArray();
     }
@@ -394,12 +399,24 @@ public sealed class OpenRouterClient :
         var root = new JsonObject
         {
             ["model"] = request.ModelId,
-            ["prompt"] = request.Prompt,
-            ["size"] = $"{request.ProviderSize.Width}x{request.ProviderSize.Height}",
-            ["output_format"] = "png",
-            ["background"] = request.TransparentBackground ? "transparent" : "opaque",
-            ["n"] = 1
+            ["prompt"] = request.Prompt
         };
+        if (request.Options is null)
+        {
+            root["size"] = $"{request.ProviderSize.Width}x{request.ProviderSize.Height}";
+            root["output_format"] = "png";
+            root["background"] = request.TransparentBackground ? "transparent" : "opaque";
+            root["n"] = 1;
+        }
+        else
+        {
+            if (request.Options.Size is { } size) root["size"] = $"{size.Width}x{size.Height}";
+            if (!string.IsNullOrWhiteSpace(request.Options.Resolution)) root["resolution"] = request.Options.Resolution;
+            if (!string.IsNullOrWhiteSpace(request.Options.AspectRatio)) root["aspect_ratio"] = request.Options.AspectRatio;
+            if (!string.IsNullOrWhiteSpace(request.Options.OutputFormat)) root["output_format"] = request.Options.OutputFormat;
+            if (!string.IsNullOrWhiteSpace(request.Options.Background)) root["background"] = request.Options.Background;
+            if (request.Options.Count is { } count) root["n"] = count;
+        }
         var provider = new JsonObject { ["require_parameters"] = true, ["allow_fallbacks"] = false };
         if (request.RequireZeroDataRetention) provider["zdr"] = true;
         if (!string.IsNullOrWhiteSpace(request.ProviderTag)) provider["only"] = new JsonArray(JsonValue.Create(request.ProviderTag));
@@ -565,27 +582,56 @@ public sealed class OpenRouterClient :
             zdrModelIds.Contains(id), null);
     }
 
-    private static AiImageEndpointCapabilities? ParseImageEndpoint(JsonElement item, string modelId, IReadOnlyCollection<string> zdrModelIds)
+    private static AiImageEndpointCapabilities? ParseImageEndpoint(
+        JsonElement item,
+        string modelId,
+        IReadOnlyList<ZdrEndpointIdentity> zdrEndpoints)
     {
-        var endpointId = ReadString(item, "provider_tag") ?? ReadString(item, "name") ?? ReadString(item, "provider_name") ?? ReadString(item, "id");
+        var providerTag = ReadString(item, "provider_tag");
+        var providerName = ReadString(item, "provider_name") ?? ReadString(item, "provider") ?? ReadString(ReadObject(item, "architecture"), "provider_name");
+        var endpointId = providerTag ?? ReadString(item, "name") ?? providerName ?? ReadString(item, "id");
         if (string.IsNullOrWhiteSpace(endpointId)) return null;
         var endpointModel = ReadString(item, "model_id") ?? modelId;
         var supportedElement = ReadObject(item, "supported_parameters");
         var supported = supportedElement.ValueKind == JsonValueKind.Object
             ? supportedElement.EnumerateObject().Select(property => property.Name).ToArray()
             : ReadStrings(item, "supported_parameters");
-        var architecture = ReadObject(item, "architecture");
-        var outputModalities = ReadStrings(item, "output_modalities");
-        var supportsImage = outputModalities.Count == 0
-            ? supported.Any(value => value.Contains("image", StringComparison.OrdinalIgnoreCase) || value.Contains("size", StringComparison.OrdinalIgnoreCase))
-            : outputModalities.Contains("image", StringComparer.OrdinalIgnoreCase);
-        IReadOnlyList<string> formats = supported.Any(value => value.Contains("output_format", StringComparison.OrdinalIgnoreCase)) ? new[] { "png", "jpeg", "webp" } : new[] { "png" };
-        var sizes = ReadImageSizes(item);
-        if (sizes.Count == 0 && supported.Any(value => value.Contains("size", StringComparison.OrdinalIgnoreCase)))
+        var supportsExplicitSize = supported.Contains("size", StringComparer.OrdinalIgnoreCase);
+        var sizes = ReadImageSizes(item)
+            .Concat(ParseImageSizes(ReadParameterValues(supportedElement, "size")))
+            .Distinct()
+            .ToArray();
+        if (sizes.Length == 0 && supportsExplicitSize)
             sizes = [new AiImageSize(256, 256), new AiImageSize(512, 512), new AiImageSize(1024, 1024), new AiImageSize(1536, 1024), new AiImageSize(1024, 1536)];
-        var supportsTransparency = supported.Any(value => value.Contains("background", StringComparison.OrdinalIgnoreCase) || value.Contains("transparen", StringComparison.OrdinalIgnoreCase));
-        return new AiImageEndpointCapabilities(endpointId, endpointModel, zdrModelIds.Contains(endpointModel), supportsImage, formats, sizes, supportsTransparency,
-            ReadString(item, "provider_name") ?? ReadString(item, "provider") ?? ReadString(architecture, "provider_name"));
+        var supportsOutputFormat = supported.Contains("output_format", StringComparer.OrdinalIgnoreCase);
+        var advertisedFormats = ReadParameterValues(supportedElement, "output_format");
+        IReadOnlyList<string> formats = supportsOutputFormat
+            ? advertisedFormats.Count > 0 ? advertisedFormats : ["png", "jpeg", "webp"]
+            : ["png"];
+        var backgrounds = ReadParameterValues(supportedElement, "background");
+        var supportsTransparency = backgrounds.Contains("transparent", StringComparer.OrdinalIgnoreCase);
+        var aspectRatios = ReadParameterValues(supportedElement, "aspect_ratio");
+        var resolutions = ReadParameterValues(supportedElement, "resolution");
+        var isZdrCompatible = zdrEndpoints.Any(endpoint =>
+            string.Equals(endpoint.ModelId, endpointModel, StringComparison.OrdinalIgnoreCase) &&
+            ((!string.IsNullOrWhiteSpace(providerTag) && string.Equals(endpoint.ProviderTag, providerTag, StringComparison.OrdinalIgnoreCase)) ||
+             (string.IsNullOrWhiteSpace(providerTag) && !string.IsNullOrWhiteSpace(providerName) && string.Equals(endpoint.ProviderName, providerName, StringComparison.OrdinalIgnoreCase))));
+        return new AiImageEndpointCapabilities(
+            endpointId,
+            endpointModel,
+            isZdrCompatible,
+            true,
+            formats,
+            sizes,
+            supportsTransparency,
+            providerName,
+            new AiImageEndpointParameterCapabilities(
+                aspectRatios,
+                resolutions,
+                supportsExplicitSize,
+                supportsOutputFormat,
+                backgrounds,
+                supported.Contains("n", StringComparer.OrdinalIgnoreCase)));
     }
 
     private static IReadOnlyList<AiImageSize> ReadImageSizes(JsonElement item)
@@ -598,6 +644,34 @@ public sealed class OpenRouterClient :
                 sizes.Add(new AiImageSize(width, height));
         }
         return sizes.Distinct().ToArray();
+    }
+
+    private static IReadOnlyList<AiImageSize> ParseImageSizes(IReadOnlyList<string> values)
+    {
+        var sizes = new List<AiImageSize>();
+        foreach (var value in values)
+        {
+            var parts = value.Split('x', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 2 && int.TryParse(parts[0], out var width) && int.TryParse(parts[1], out var height) && width > 0 && height > 0)
+                sizes.Add(new AiImageSize(width, height));
+        }
+        return sizes.Distinct().ToArray();
+    }
+
+    private static IReadOnlyList<string> ReadParameterValues(JsonElement supportedParameters, string parameterName)
+    {
+        if (supportedParameters.ValueKind != JsonValueKind.Object ||
+            !supportedParameters.TryGetProperty(parameterName, out var descriptor) ||
+            descriptor.ValueKind != JsonValueKind.Object ||
+            !descriptor.TryGetProperty("values", out var values) ||
+            values.ValueKind != JsonValueKind.Array)
+            return [];
+        return values.EnumerateArray()
+            .Where(value => value.ValueKind == JsonValueKind.String)
+            .Select(value => Bound(value.GetString(), 128))
+            .OfType<string>()
+            .Take(128)
+            .ToArray();
     }
 
     private static AiReasoningCapabilities? ParseReasoning(
@@ -827,6 +901,8 @@ public sealed class OpenRouterClient :
             : value.Length <= maximum
                 ? value
                 : value[..maximum];
+
+    private sealed record ZdrEndpointIdentity(string ModelId, string? ProviderTag, string? ProviderName);
 
     private sealed class BoundedReadStream(Stream source, long maximumBytes) : Stream
     {

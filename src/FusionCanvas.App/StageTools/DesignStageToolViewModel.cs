@@ -47,6 +47,10 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
     private bool _isArtworkBusy;
     private Guid? _selectedArtworkTargetId;
     private bool _transparentBackground;
+    private IReadOnlyList<AiImageEndpointCapabilities> _artworkEndpoints = [];
+    private bool _artworkCapabilitiesLoaded;
+    private string? _artworkCapabilityMessage;
+    private long _artworkAvailabilityGeneration;
 
     public DesignStageToolViewModel(IDesignStageService designStageService, IArtworkGenerationService? artworkGenerationService = null, AiSettingsViewModel? aiSettings = null)
     {
@@ -294,6 +298,10 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
             if (!_isApplyingState)
             {
                 var recommendedTransparency = target?.RecommendsTransparency ?? false;
+                if (_artworkCapabilitiesLoaded && !HasCompatibleArtworkEndpoint(transparentBackground: true))
+                {
+                    recommendedTransparency = false;
+                }
                 if (_transparentBackground != recommendedTransparency)
                 {
                     _transparentBackground = recommendedTransparency;
@@ -303,6 +311,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
             }
             OnPropertyChanged(nameof(ArtworkGenerationGuidance));
             OnPropertyChanged(nameof(CanGenerateArtwork));
+            OnPropertyChanged(nameof(CanUseTransparentBackground));
             GenerateArtworkCommand.NotifyCanExecuteChanged();
         }
     }
@@ -312,6 +321,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
         get => _transparentBackground;
         set
         {
+            if (value && _artworkCapabilitiesLoaded && !HasCompatibleArtworkEndpoint(transparentBackground: true))
+                value = false;
             if (_transparentBackground == value) return;
             _transparentBackground = value;
             OnPropertyChanged();
@@ -328,7 +339,13 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
             ? "Configure an active Design Area and optional primary in Store setup before generating artwork."
             : SelectedArtworkTargetId is null
                 ? "Choose a Design Area before generating artwork."
-                : "Generation uses the current Concept triangle and does not upload Supporting Images automatically.";
+                : !_artworkCapabilitiesLoaded
+                    ? "Checking the selected image model's endpoint capabilities…"
+                    : !HasCompatibleArtworkEndpoint(transparentBackground: false)
+                        ? _artworkCapabilityMessage ?? "The selected image model has no endpoint compatible with this target and privacy policy. Review Artwork AI Settings."
+                        : !CanUseTransparentBackground
+                            ? "The selected image model supports opaque artwork for this target; transparent background is unavailable."
+                            : "Generation uses the current Concept triangle and does not upload Supporting Images automatically.";
 
     public bool IsArtworkBusy
     {
@@ -336,7 +353,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
         private set { if (_isArtworkBusy == value) return; _isArtworkBusy = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanGenerateArtwork)); GenerateArtworkCommand.NotifyCanExecuteChanged(); CancelArtworkCommand.NotifyCanExecuteChanged(); }
     }
 
-    public bool CanGenerateArtwork => _artworkGenerationService is not null && !IsArtworkBusy && !IsReadOnly && _selectedArtworkTargetId is not null && HasConfiguration;
+    public bool CanGenerateArtwork => _artworkGenerationService is not null && !IsArtworkBusy && !IsReadOnly && _selectedArtworkTargetId is not null && HasConfiguration && HasCompatibleArtworkEndpoint(transparentBackground: false);
+    public bool CanUseTransparentBackground => !IsReadOnly && HasCompatibleArtworkEndpoint(transparentBackground: true);
     public string ArtworkProgress => IsArtworkBusy ? "Generating artwork…" : string.Empty;
     public RelayCommand GenerateArtworkCommand { get; }
     public RelayCommand CancelArtworkCommand { get; }
@@ -655,9 +673,15 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
             var key = await _aiSettings.ReadApiKeyAsync(_artworkCts.Token).ConfigureAwait(true);
             var profile = _aiSettings.Current.Artwork;
             var endpoints = await _aiSettings.GetArtworkEndpointsAsync(_artworkCts.Token).ConfigureAwait(true);
+            ApplyArtworkEndpointCapabilities(endpoints);
             if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(profile.ModelId))
             {
                 ErrorMessage = "Configure an Artwork image model and API key in AI Settings.";
+                return;
+            }
+            if (!HasCompatibleArtworkEndpoint(transparentBackground: false))
+            {
+                ErrorMessage = _artworkCapabilityMessage ?? "The selected image model has no endpoint compatible with this target and privacy policy.";
                 return;
             }
 
@@ -689,6 +713,10 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
     {
         _artworkCts?.Cancel();
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
+        _artworkCapabilitiesLoaded = false;
+        _artworkEndpoints = [];
+        _artworkCapabilityMessage = null;
+        NotifyArtworkCapabilityState();
         IsReadOnly = !canEdit;
         ReadOnlyReason = canEdit ? string.Empty : "Design stage content is read-only while the item is protected or an earlier stage is being reviewed.";
         _itemId = itemId;
@@ -727,7 +755,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
             {
                 var recommendsTransparency = string.Equals(placeholder.ArtworkGuidance?.Background, "transparent", StringComparison.OrdinalIgnoreCase);
                 ArtworkTargets.Add(new ArtworkTargetOption(placeholder.Id, placeholder.Name,
-                    $"{placeholder.Position} · {placeholder.Width}×{placeholder.Height}px", selectedBlueprint?.PrimaryArtworkDesignAreaId == placeholder.Id, recommendsTransparency));
+                    $"{placeholder.Position} · {placeholder.Width}×{placeholder.Height}px", selectedBlueprint?.PrimaryArtworkDesignAreaId == placeholder.Id, recommendsTransparency,
+                    placeholder.Width, placeholder.Height));
             }
 
             var defaultTargetId = selectedBlueprint?.PrimaryArtworkDesignAreaId is Guid primary && ArtworkTargets.Any(value => value.Id == primary)
@@ -809,6 +838,70 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
         {
             _isApplyingState = false;
         }
+
+        await RefreshArtworkAvailabilityAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    public async Task RefreshArtworkAvailabilityAsync(CancellationToken cancellationToken = default)
+    {
+        var generation = Interlocked.Increment(ref _artworkAvailabilityGeneration);
+        if (_aiSettings is null || _itemId == Guid.Empty)
+        {
+            ApplyArtworkEndpointCapabilities([], "Configure an Artwork image model and API key in AI Settings.");
+            return;
+        }
+
+        try
+        {
+            var endpoints = await _aiSettings.GetArtworkEndpointsAsync(cancellationToken).ConfigureAwait(true);
+            if (generation != Volatile.Read(ref _artworkAvailabilityGeneration)) return;
+            ApplyArtworkEndpointCapabilities(endpoints);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            if (generation != Volatile.Read(ref _artworkAvailabilityGeneration)) return;
+            ApplyArtworkEndpointCapabilities([], "Image endpoint capabilities could not be loaded. Review Artwork AI Settings and try again.");
+        }
+    }
+
+    private void ApplyArtworkEndpointCapabilities(
+        IReadOnlyList<AiImageEndpointCapabilities> endpoints,
+        string? unavailableMessage = null)
+    {
+        _artworkEndpoints = endpoints;
+        _artworkCapabilitiesLoaded = true;
+        _artworkCapabilityMessage = unavailableMessage;
+        if (_transparentBackground && !HasCompatibleArtworkEndpoint(transparentBackground: true))
+        {
+            _transparentBackground = false;
+            OnPropertyChanged(nameof(TransparentBackground));
+        }
+        NotifyArtworkCapabilityState();
+    }
+
+    private bool HasCompatibleArtworkEndpoint(bool transparentBackground)
+    {
+        if (!_artworkCapabilitiesLoaded || _aiSettings?.Current.Artwork.ModelId is not { Length: > 0 } modelId)
+            return false;
+        var target = ArtworkTargets.SingleOrDefault(candidate => candidate.Id == _selectedArtworkTargetId);
+        return target is not null && AiImageEndpointPolicy.SelectEndpoint(
+            _artworkEndpoints,
+            modelId,
+            _aiSettings.RequireZeroDataRetention,
+            transparentBackground,
+            new AiImageSize(target.Width, target.Height)) is not null;
+    }
+
+    private void NotifyArtworkCapabilityState()
+    {
+        OnPropertyChanged(nameof(ArtworkGenerationGuidance));
+        OnPropertyChanged(nameof(CanGenerateArtwork));
+        OnPropertyChanged(nameof(CanUseTransparentBackground));
+        GenerateArtworkCommand.NotifyCanExecuteChanged();
     }
 
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>

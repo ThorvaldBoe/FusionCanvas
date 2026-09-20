@@ -141,6 +141,67 @@ public class OpenRouterClientTests
     }
 
     [Fact]
+    public async Task GetImageEndpointsAsync_ParsesCurrentGptImageCapabilitiesWithoutInventingTransparency()
+    {
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK, """
+            {
+              "id":"openai/gpt-5.4-image-2",
+              "endpoints":[
+                {
+                  "provider_name":"OpenAI",
+                  "provider_slug":"openai",
+                  "provider_tag":"openai",
+                  "supported_parameters":{
+                    "aspect_ratio":{"type":"enum","values":["1:1","3:2","2:3","4:3","3:4","16:9","9:16","21:9","auto"]},
+                    "quality":{"type":"enum","values":["auto","low","medium","high"]},
+                    "background":{"type":"enum","values":["auto","opaque"]},
+                    "n":{"type":"range","min":1,"max":10},
+                    "input_references":{"type":"range","min":0,"max":16},
+                    "output_compression":{"type":"range","min":0,"max":100}
+                  }
+                }
+              ]
+            }
+            """));
+        var client = CreateClient(handler);
+
+        var endpoints = await client.GetImageEndpointsAsync("secret", "openai/gpt-5.4-image-2", false, TestContext.Current.CancellationToken);
+
+        var endpoint = Assert.Single(endpoints);
+        Assert.True(endpoint.SupportsImageOutput);
+        Assert.False(endpoint.SupportsTransparency);
+        Assert.Empty(endpoint.SupportedSizes);
+        Assert.Equal(["1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16", "21:9", "auto"], endpoint.Parameters!.AspectRatios);
+        Assert.Equal(["auto", "opaque"], endpoint.Parameters.Backgrounds);
+        Assert.False(endpoint.Parameters.SupportsExplicitSize);
+        Assert.False(endpoint.Parameters.SupportsOutputFormat);
+        Assert.True(endpoint.Parameters.SupportsImageCount);
+        var opaque = AiImageEndpointPolicy.SelectEndpoint(endpoints, endpoint.ModelId, false, false, new(3000, 4500));
+        Assert.NotNull(opaque);
+        Assert.Equal("2:3", opaque.Options.AspectRatio);
+        Assert.Null(AiImageEndpointPolicy.SelectEndpoint(endpoints, endpoint.ModelId, false, true, new(3000, 4500)));
+    }
+
+    [Fact]
+    public async Task GetImageEndpointsAsync_MarksOnlyThePublishedProviderTagAsZdrCompatible()
+    {
+        var handler = new RecordingHandler(
+            Json(HttpStatusCode.OK, """
+                {"id":"image/model","endpoints":[
+                  {"provider_name":"Provider A","provider_tag":"provider-a","supported_parameters":{"aspect_ratio":{"type":"enum","values":["1:1"]}}},
+                  {"provider_name":"Provider B","provider_tag":"provider-b","supported_parameters":{"aspect_ratio":{"type":"enum","values":["1:1"]}}}
+                ]}
+                """),
+            Json(HttpStatusCode.OK, """{"data":[{"model_id":"image/model","provider_name":"Provider B","tag":"provider-b"}]}"""));
+        var client = CreateClient(handler);
+
+        var endpoints = await client.GetImageEndpointsAsync("secret", "image/model", true, TestContext.Current.CancellationToken);
+
+        Assert.False(Assert.Single(endpoints, endpoint => endpoint.EndpointId == "provider-a").ZeroDataRetentionCompatible);
+        Assert.True(Assert.Single(endpoints, endpoint => endpoint.EndpointId == "provider-b").ZeroDataRetentionCompatible);
+    }
+
+    [Fact]
     public async Task ImageGenerateAsync_SendsOnePinnedRequestWithoutRetry()
     {
         var encoded = Convert.ToBase64String([1, 2, 3]);
@@ -160,6 +221,29 @@ public class OpenRouterClientTests
         Assert.Equal("transparent", body.RootElement.GetProperty("background").GetString());
         Assert.False(body.RootElement.GetProperty("provider").GetProperty("allow_fallbacks").GetBoolean());
         Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task ImageGenerateAsync_SendsOnlyThePlannedAdvertisedParameters()
+    {
+        var encoded = Convert.ToBase64String([1, 2, 3]);
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK,
+            "{\"data\":[{\"b64_json\":\"" + encoded + "\"}]}"));
+        var client = CreateClient(handler);
+
+        var (_, failure) = await client.GenerateAsync(new AiImageGenerationRequest(
+            "openai/gpt-5.4-image-2", "safe prompt", new AiImageSize(1200, 1600), false,
+            "secret", false, "openai", new AiImageGenerationOptions(
+                AspectRatio: "3:4", Background: "opaque", Count: 1)), TestContext.Current.CancellationToken);
+
+        Assert.Null(failure);
+        using var body = JsonDocument.Parse(handler.Requests[0].Body!);
+        Assert.Equal("3:4", body.RootElement.GetProperty("aspect_ratio").GetString());
+        Assert.Equal("opaque", body.RootElement.GetProperty("background").GetString());
+        Assert.Equal(1, body.RootElement.GetProperty("n").GetInt32());
+        Assert.False(body.RootElement.TryGetProperty("size", out _));
+        Assert.False(body.RootElement.TryGetProperty("resolution", out _));
+        Assert.False(body.RootElement.TryGetProperty("output_format", out _));
     }
 
     [Fact]
