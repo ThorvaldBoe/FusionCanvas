@@ -74,7 +74,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
 
         var dispatch = await _provider.GenerateAsync(new AiImageGenerationRequest(
             request.ArtworkProfile.ModelId!, prompt, selection.ProviderSize, request.TransparentBackground, request.ApiKey,
-            request.RequireZeroDataRetention, selection.Endpoint.EndpointId), cancellationToken).ConfigureAwait(false);
+            request.RequireZeroDataRetention, selection.Endpoint.EndpointId, selection.Options), cancellationToken).ConfigureAwait(false);
         if (dispatch.Failure is not null || dispatch.Result is null)
             return DesignStageResult.Failure(dispatch.Failure?.Message ?? "The image provider returned no artwork.");
 

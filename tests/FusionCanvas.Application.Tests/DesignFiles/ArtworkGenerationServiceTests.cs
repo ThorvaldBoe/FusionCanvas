@@ -43,6 +43,7 @@ public sealed class ArtworkGenerationServiceTests
         Assert.Single(repo.Snapshot.AssetLinks);
         Assert.Contains("RUN", repo.Snapshot.Assets[0].MetadataJson);
         Assert.Equal(1, provider.Calls);
+        Assert.Equal(new AiImageSize(1200, 1400), provider.LastRequest!.Options!.Size);
     }
 
     private sealed class Repo(WorkspaceSnapshot snapshot) : IWorkspaceRepository
@@ -55,9 +56,11 @@ public sealed class ArtworkGenerationServiceTests
     private sealed class Provider : IAiImageGenerationProvider
     {
         public int Calls { get; private set; }
+        public AiImageGenerationRequest? LastRequest { get; private set; }
         public Task<(AiImageGenerationResult? Result, AiImageGenerationFailure? Failure)> GenerateAsync(AiImageGenerationRequest request, CancellationToken cancellationToken = default)
         {
             Calls++;
+            LastRequest = request;
             return Task.FromResult<(AiImageGenerationResult?, AiImageGenerationFailure?)>((new([1, 2, 3], "image/png", "OpenRouter", request.ModelId, request.ModelId), null));
         }
     }

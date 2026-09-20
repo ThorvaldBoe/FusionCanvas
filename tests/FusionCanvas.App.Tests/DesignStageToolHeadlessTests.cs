@@ -695,6 +695,7 @@ public class DesignStageToolHeadlessTests
         Assert.NotNull(transparency);
         Assert.NotNull(generate);
         Assert.Equal(2, target!.ItemCount);
+        Assert.False(transparency!.IsEnabled);
         Assert.False(generate!.IsEnabled);
     }
 }
