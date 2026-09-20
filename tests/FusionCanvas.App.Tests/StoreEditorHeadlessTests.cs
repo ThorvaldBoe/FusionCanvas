@@ -996,6 +996,40 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void NicheDetailsFields_ExposePersistentTooltips()
+    {
+        var window = CreateEditorWindow();
+
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectNichesTabCommand.Execute(null);
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        var expectedTooltips = new Dictionary<string, string>
+        {
+            ["Niche name"] = "Niche name",
+            ["Description"] = "Description",
+            ["Audience"] = "Audience",
+            ["Humor style"] = "Humor style",
+            ["Visual style guidance"] = "Visual style guidance",
+            ["Constraints"] = "Constraints",
+            ["Risks"] = "Risks",
+            ["Research notes"] = "Research notes",
+            ["Notes"] = "Notes",
+        };
+
+        var nicheFields = window.GetVisualDescendants()
+            .OfType<TextBox>()
+            .Where(textBox => textBox.IsVisible && expectedTooltips.ContainsKey(textBox.PlaceholderText ?? string.Empty))
+            .ToArray();
+
+        Assert.Equal(expectedTooltips.Count, nicheFields.Length);
+        Assert.All(nicheFields, textBox =>
+            Assert.Equal(expectedTooltips[textBox.PlaceholderText!], ToolTip.GetTip(textBox)));
+
+        window.Close();
+    }
+    [AvaloniaFact]
     public void OptionCardsMoveArchiveIntoOverflowMenu()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
