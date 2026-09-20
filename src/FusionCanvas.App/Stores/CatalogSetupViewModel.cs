@@ -73,6 +73,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private bool _isAddingTemplate;
     private CatalogArchivePlan? _archiveOfferingPlan;
     private bool _isArchiveOfferingConfirmationVisible;
+    private CatalogOfferingDeletePlan? _deleteOfferingPlan;
+    private bool _isDeleteOfferingConfirmationVisible;
     private OptionKind _selectedOptionKind = OptionKind.Color;
     private OfferingOptionValue? _bulkColor;
     private string _bulkResultMessage = string.Empty;
@@ -166,6 +168,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         RequestArchiveOfferingCommand = new AsyncRelayCommand(PreviewArchiveOfferingAsync, () => CanEdit && SelectedOffering is { IsArchived: false });
         ConfirmArchiveOfferingCommand = new AsyncRelayCommand(ConfirmArchiveOfferingAsync, () => CanEdit && IsArchiveOfferingConfirmationVisible && ArchiveOfferingPlan?.CanConfirm == true);
         CancelArchiveOfferingCommand = new RelayCommand(_ => CancelArchiveOfferingArchive(), () => IsArchiveOfferingConfirmationVisible);
+        RequestRestoreOfferingCommand = new AsyncRelayCommand(RestoreOfferingAsync, CanRestoreOffering);
+        RequestDeleteOfferingCommand = new AsyncRelayCommand(PreviewDeleteOfferingAsync, CanDeleteOffering);
+        ConfirmDeleteOfferingCommand = new AsyncRelayCommand(ConfirmDeleteOfferingAsync, () => CanDeleteOffering() && IsDeleteOfferingConfirmationVisible && DeleteOfferingPlan?.CanConfirm == true);
+        CancelDeleteOfferingCommand = new RelayCommand(_ => CancelOfferingDelete(), () => IsDeleteOfferingConfirmationVisible);
         ArchivePlaceholderCommand = new RelayCommand(parameter => RequestDesignAreaArchive(parameter));
         ConfirmDesignAreaArchiveCommand = new AsyncRelayCommand(ConfirmDesignAreaArchiveAsync, () => CanEdit && _isDesignAreaArchiveConfirmationVisible);
         CancelDesignAreaArchiveCommand = new RelayCommand(_ => CancelDesignAreaArchive(), () => _isDesignAreaArchiveConfirmationVisible);
@@ -503,12 +509,15 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public bool IsAddingTemplate { get => _isAddingTemplate; private set { if (SetField(ref _isAddingTemplate, value)) { OnPropertyChanged(nameof(IsEditingMockupTemplate)); OnPropertyChanged(nameof(MockupTemplateEditorDialogTitle)); NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
     public bool IsAvailable { get; private set; }
     public bool IsReadOnly { get; private set; }
-    public bool CanEdit => IsAvailable && !IsReadOnly && !IsBusy;
+    public bool CanEdit => IsAvailable && !IsReadOnly && !IsBusy && SelectedOffering?.IsArchived != true;
     public bool IsBusy { get => _isBusy; private set { if (SetField(ref _isBusy, value)) { OnPropertyChanged(nameof(CanEdit)); OnPropertyChanged(nameof(CanKeepAspectRatio)); NotifyCommands(); } } }
     public string ErrorMessage { get => _error; private set { if (SetField(ref _error, value)) OnPropertyChanged(nameof(HasError)); } }
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
     public bool HasActiveDraft => IsAddingPrintProvider || IsAddingOption || IsAddingOptionValue || IsEditingOptionValue || IsAddingVariant || IsAddingBulkVariants || IsAddingPlaceholder || IsAddingTemplate;
     public CatalogArchivePlan? ArchiveOfferingPlan { get => _archiveOfferingPlan; private set { if (SetField(ref _archiveOfferingPlan, value)) { OnPropertyChanged(nameof(HasArchiveOfferingPlan)); NotifyCommands(); } } }
+    public CatalogOfferingDeletePlan? DeleteOfferingPlan { get => _deleteOfferingPlan; private set { if (SetField(ref _deleteOfferingPlan, value)) { OnPropertyChanged(nameof(HasDeleteOfferingPlan)); NotifyCommands(); } } }
+    public bool HasDeleteOfferingPlan => DeleteOfferingPlan is not null;
+    public bool IsDeleteOfferingConfirmationVisible { get => _isDeleteOfferingConfirmationVisible; private set { if (SetField(ref _isDeleteOfferingConfirmationVisible, value)) NotifyCommands(); } }
     public bool HasArchiveOfferingPlan => ArchiveOfferingPlan is not null;
     public bool IsArchiveOfferingConfirmationVisible { get => _isArchiveOfferingConfirmationVisible; private set { if (SetField(ref _isArchiveOfferingConfirmationVisible, value)) NotifyCommands(); } }
     public bool HasMeaningfulMockupTemplateDraft => IsAddingTemplate && _mockupTemplateDraftBaseline is not null && CurrentMockupTemplateDraftState() != _mockupTemplateDraftBaseline;
@@ -624,6 +633,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ICommand RequestArchiveOfferingCommand { get; }
     public ICommand ConfirmArchiveOfferingCommand { get; }
     public ICommand CancelArchiveOfferingCommand { get; }
+    public ICommand RequestRestoreOfferingCommand { get; }
+    public ICommand RequestDeleteOfferingCommand { get; }
+    public ICommand ConfirmDeleteOfferingCommand { get; }
+    public ICommand CancelDeleteOfferingCommand { get; }
     public ICommand ArchivePlaceholderCommand { get; }
     public ICommand ConfirmDesignAreaArchiveCommand { get; }
     public ICommand CancelDesignAreaArchiveCommand { get; }
@@ -635,6 +648,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public async Task LoadForStoreAsync(Guid storeId, CancellationToken cancellationToken = default)
     {
         CancelArchiveOfferingArchive();
+        CancelOfferingDelete();
         ClearDesignAreaArchiveConfirmation();
         ResetOptionValueManagement();
         ResetVariantCreation();
@@ -676,6 +690,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         if (offeringId != SelectedOffering?.Id)
         {
             CancelArchiveOfferingArchive();
+            CancelOfferingDelete();
             ClearDesignAreaArchiveConfirmation();
         }
         _requestedOfferingId = offeringId;
@@ -1233,6 +1248,37 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         ArchiveOfferingPlan = null;
     }
 
+    private bool CanRestoreOffering() => IsAvailable && !IsReadOnly && !IsBusy && SelectedOffering?.IsArchived == true;
+    private bool CanDeleteOffering() => IsAvailable && !IsReadOnly && !IsBusy && SelectedOffering?.IsArchived == true;
+
+    private async Task RestoreOfferingAsync()
+    {
+        if (SelectedOffering is null) return;
+        await RunMutationAsync(() => _catalog.RestoreOfferingCascadeAsync(new RestoreOfferingCascadeRequest(SelectedOffering.StoreId, SelectedOffering.Id, true))).ConfigureAwait(true);
+    }
+
+    private async Task PreviewDeleteOfferingAsync()
+    {
+        if (SelectedOffering is null) return;
+        IsBusy = true; ErrorMessage = string.Empty;
+        try
+        {
+            DeleteOfferingPlan = await _catalog.PreviewDeleteOfferingPermanentlyAsync(new DeleteOfferingPermanentlyRequest(SelectedOffering.StoreId, SelectedOffering.Id, false)).ConfigureAwait(true);
+            IsDeleteOfferingConfirmationVisible = true;
+        }
+        catch (Exception exception) { ErrorMessage = exception.Message; }
+        finally { IsBusy = false; }
+    }
+
+    private async Task ConfirmDeleteOfferingAsync()
+    {
+        if (SelectedOffering is null || DeleteOfferingPlan is not { CanConfirm: true }) return;
+        await RunMutationAsync(() => _catalog.DeleteOfferingPermanentlyAsync(new DeleteOfferingPermanentlyRequest(SelectedOffering.StoreId, SelectedOffering.Id, true))).ConfigureAwait(true);
+        if (!HasError) { IsDeleteOfferingConfirmationVisible = false; DeleteOfferingPlan = null; SelectOffering(null); }
+    }
+
+    private void CancelOfferingDelete() { IsDeleteOfferingConfirmationVisible = false; DeleteOfferingPlan = null; }
+    private void CancelArchiveOfferingDelete() { CancelOfferingDelete(); }
     private bool CanPreviewBulkVariants() => CanEdit && _offeringManagement is not null && BulkColor is not null && BulkSizeChoices.Any(value => value.IsSelected);
 
     private OfferingContext CurrentContext()

@@ -21,12 +21,14 @@ public sealed class OfferingManagementService : IOfferingManagementService
         _newId = newId ?? Guid.NewGuid;
     }
 
-    public async Task<IReadOnlyList<BlueprintOfferingSetupSummary>> LoadForBlueprintAsync(Guid storeId, Guid blueprintId, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<BlueprintOfferingSetupSummary>> LoadForBlueprintAsync(Guid storeId, Guid blueprintId, CancellationToken cancellationToken = default) => LoadForBlueprintAsync(storeId, blueprintId, false, cancellationToken);
+
+    public async Task<IReadOnlyList<BlueprintOfferingSetupSummary>> LoadForBlueprintAsync(Guid storeId, Guid blueprintId, bool includeArchived = false, CancellationToken cancellationToken = default)
     {
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
         RequireBlueprint(snapshot, storeId, blueprintId);
         return snapshot.BlueprintOfferings
-            .Where(value => value.StoreId == storeId && value.BlueprintId == blueprintId)
+            .Where(value => value.StoreId == storeId && value.BlueprintId == blueprintId && (includeArchived || !value.IsArchived))
             .OrderBy(value => value.Name)
             .Select(value => ToSummary(snapshot, value))
             .ToArray();

@@ -631,6 +631,7 @@
                           Command="{Binding StartCreateOfferingCommand}"
                           IsEnabled="{Binding CanCreateCatalogItem}"
                           Classes="primary" />
+                  <CheckBox Content="Show archived Blueprint Offerings" IsChecked="{Binding ShowArchivedOfferings, Mode=TwoWay}" />
                   <TextBlock IsVisible="{Binding !HasBlueprintOfferingCards}"
                              Text="No Blueprint Offerings yet. Add an Offering to connect this Blueprint to a fulfillment setup."
                              TextWrapping="Wrap"
@@ -792,6 +793,14 @@
                               Command="{Binding CatalogSetup.RequestArchiveOfferingCommand}"
                               Classes="danger offeringAction"
                               AutomationProperties.AutomationId="Catalog.ArchiveOffering" />
+                      <Button Content="Restore Blueprint Offering"
+                              Command="{Binding CatalogSetup.RequestRestoreOfferingCommand}"
+                              IsVisible="{Binding CatalogSetup.SelectedOffering.IsArchived}"
+                              Classes="primary offeringAction" />
+                      <Button Content="Delete permanently"
+                              Command="{Binding CatalogSetup.RequestDeleteOfferingCommand}"
+                              IsVisible="{Binding CatalogSetup.SelectedOffering.IsArchived}"
+                              Classes="danger offeringAction" />
                     </StackPanel>
                     </StackPanel>
                 </StackPanel>
@@ -831,6 +840,19 @@
                             Classes="danger fixedDanger" />
                     <Button Content="Cancel" Command="{Binding CatalogSetup.CancelArchiveOfferingCommand}" Classes="secondary fixedAction" />
                   </StackPanel>
+                </StackPanel>
+              </Border>
+
+              <Border IsVisible="{Binding CatalogSetup.IsDeleteOfferingConfirmationVisible}"
+                      Background="{DynamicResource DangerBackgroundBrush}"
+                      BorderBrush="{DynamicResource DangerBorderBrush}"
+                      BorderThickness="1" Padding="12">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="Delete Blueprint Offering permanently?" FontWeight="SemiBold" />
+                  <TextBlock Text="This cannot be undone. All catalog-owned descendants will be removed. External references block deletion until they are resolved." TextWrapping="Wrap" Foreground="{DynamicResource DangerTextBrush}" />
+                  <TextBlock Text="{Binding CatalogSetup.DeleteOfferingPlan.OfferingName}" FontWeight="SemiBold" />
+                  <ItemsControl ItemsSource="{Binding CatalogSetup.DeleteOfferingPlan.ExternalBlockers}"><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding DisplayText}" Foreground="{DynamicResource DangerTextBrush}" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                  <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="Delete permanently" Command="{Binding CatalogSetup.ConfirmDeleteOfferingCommand}" Classes="danger fixedDanger" /><Button Content="Cancel" Command="{Binding CatalogSetup.CancelDeleteOfferingCommand}" Classes="secondary fixedAction" /></StackPanel>
                 </StackPanel>
               </Border>
 

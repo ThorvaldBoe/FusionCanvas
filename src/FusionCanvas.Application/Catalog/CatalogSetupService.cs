@@ -357,6 +357,76 @@ public sealed class CatalogSetupService : ICatalogSetupService
             return Success(updated, request.StoreId);
         }, cancellationToken);
 
+    public Task<CatalogSetupResult> RestoreOfferingCascadeAsync(RestoreOfferingCascadeRequest request, CancellationToken cancellationToken = default) =>
+        MutateAsync(request.StoreId, snapshot =>
+        {
+            var check = EnsureWritableStore(snapshot, request.StoreId);
+            if (check is not null) return Failure(snapshot, request.StoreId, check);
+            if (!request.Confirm) return Failure(snapshot, request.StoreId, "Restore confirmation is required.");
+            var offering = snapshot.BlueprintOfferings.SingleOrDefault(value => value.Id == request.OfferingId && value.StoreId == request.StoreId);
+            if (offering is null) return Failure(snapshot, request.StoreId, "Blueprint Offering was not found.");
+            if (!offering.IsArchived) return Failure(snapshot, request.StoreId, "Blueprint Offering is already active.");
+            var optionIds = snapshot.OfferingOptions.Where(value => value.OfferingId == offering.Id).Select(value => value.Id).ToHashSet();
+            var templateIds = snapshot.MockupTemplates.Where(value => value.BlueprintOfferingId == offering.Id).Select(value => value.Id).ToHashSet();
+            var updated = snapshot with
+            {
+                BlueprintOfferings = snapshot.BlueprintOfferings.Select(value => value.Id == offering.Id ? value with { IsArchived = false } : value).ToArray(),
+                OfferingOptions = snapshot.OfferingOptions.Select(value => optionIds.Contains(value.Id) ? value with { IsArchived = false } : value).ToArray(),
+                OfferingOptionValues = snapshot.OfferingOptionValues.Select(value => value.OfferingId == offering.Id ? value with { IsArchived = false } : value).ToArray(),
+                OfferingVariants = snapshot.OfferingVariants.Select(value => value.OfferingId == offering.Id ? value with { IsArchived = false } : value).ToArray(),
+                OfferingPlaceholders = snapshot.OfferingPlaceholders.Select(value => value.OfferingId == offering.Id ? value with { IsArchived = false } : value).ToArray(),
+                MockupTemplates = snapshot.MockupTemplates.Select(value => templateIds.Contains(value.Id) ? value with { IsArchived = false } : value).ToArray(),
+                MockupTemplateColorVariants = snapshot.MockupTemplateColorVariants.Select(value => templateIds.Contains(value.MockupTemplateId) ? value with { IsArchived = false } : value).ToArray(),
+                MockupTemplateSourceImages = snapshot.MockupTemplateSourceImages.Select(value => templateIds.Contains(value.MockupTemplateId) ? value with { IsArchived = false } : value).ToArray()
+            };
+            return Success(updated, request.StoreId);
+        }, cancellationToken);
+
+    public async Task<CatalogOfferingDeletePlan> PreviewDeleteOfferingPermanentlyAsync(DeleteOfferingPermanentlyRequest request, CancellationToken cancellationToken = default)
+    {
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        return BuildDeleteOfferingPlan(snapshot, request);
+    }
+
+    public Task<CatalogSetupResult> DeleteOfferingPermanentlyAsync(DeleteOfferingPermanentlyRequest request, CancellationToken cancellationToken = default) =>
+        MutateAsync(request.StoreId, snapshot =>
+        {
+            var check = EnsureWritableStore(snapshot, request.StoreId);
+            if (check is not null) return Failure(snapshot, request.StoreId, check);
+            var plan = BuildDeleteOfferingPlan(snapshot, request);
+            if (!request.Confirm) return Failure(snapshot, request.StoreId, "Permanent deletion confirmation is required.");
+            if (plan.ExternalBlockers.Count > 0) return Failure(snapshot, request.StoreId, FormatBlockers(plan.ExternalBlockers));
+            var offering = snapshot.BlueprintOfferings.SingleOrDefault(value => value.Id == request.OfferingId && value.StoreId == request.StoreId);
+            if (offering is null) return Failure(snapshot, request.StoreId, "Blueprint Offering was not found.");
+            if (!offering.IsArchived) return Failure(snapshot, request.StoreId, "Only archived Blueprint Offerings can be permanently deleted.");
+            var optionIds = snapshot.OfferingOptions.Where(value => value.OfferingId == offering.Id).Select(value => value.Id).ToHashSet();
+            var variantIds = snapshot.OfferingVariants.Where(value => value.OfferingId == offering.Id).Select(value => value.Id).ToHashSet();
+            var placeholderIds = snapshot.OfferingPlaceholders.Where(value => value.OfferingId == offering.Id).Select(value => value.Id).ToHashSet();
+            var templateIds = snapshot.MockupTemplates.Where(value => value.BlueprintOfferingId == offering.Id).Select(value => value.Id).ToHashSet();
+            var revisionIds = snapshot.MockupTemplateRevisions.Where(value => templateIds.Contains(value.MockupTemplateId)).Select(value => value.Id).ToHashSet();
+            var sourceImageIds = snapshot.MockupTemplateSourceImages.Where(value => templateIds.Contains(value.MockupTemplateId)).Select(value => value.Id).ToHashSet();
+            var revisionSourceImageIds = snapshot.MockupTemplateRevisionSourceImages.Where(value => revisionIds.Contains(value.RevisionId)).Select(value => value.Id).ToHashSet();
+            var updated = snapshot with
+            {
+                BlueprintOfferings = snapshot.BlueprintOfferings.Where(value => value.Id != offering.Id).ToArray(),
+                FulfillmentOfferings = snapshot.FulfillmentOfferings.Where(value => value.Id != offering.Id).ToArray(),
+                OfferingOptions = snapshot.OfferingOptions.Where(value => !optionIds.Contains(value.Id)).ToArray(),
+                OfferingOptionValues = snapshot.OfferingOptionValues.Where(value => value.OfferingId != offering.Id).ToArray(),
+                OfferingVariants = snapshot.OfferingVariants.Where(value => !variantIds.Contains(value.Id)).ToArray(),
+                ProductVariants = snapshot.ProductVariants.Where(value => value.FulfillmentOfferingId != offering.Id).ToArray(),
+                OfferingPlaceholders = snapshot.OfferingPlaceholders.Where(value => !placeholderIds.Contains(value.Id)).ToArray(),
+                DesignAreas = snapshot.DesignAreas.Where(value => value.FulfillmentOfferingId != offering.Id).ToArray(),
+                MockupTemplates = snapshot.MockupTemplates.Where(value => !templateIds.Contains(value.Id)).ToArray(),
+                MockupTemplateColorVariants = snapshot.MockupTemplateColorVariants.Where(value => !templateIds.Contains(value.MockupTemplateId)).ToArray(),
+                MockupTemplateRevisions = snapshot.MockupTemplateRevisions.Where(value => !revisionIds.Contains(value.Id)).ToArray(),
+                MockupTemplateRevisionColors = snapshot.MockupTemplateRevisionColors.Where(value => !revisionIds.Contains(value.RevisionId)).ToArray(),
+                MockupTemplateSourceImages = snapshot.MockupTemplateSourceImages.Where(value => !sourceImageIds.Contains(value.Id)).ToArray(),
+                MockupTemplateSourceImageOptionValues = snapshot.MockupTemplateSourceImageOptionValues.Where(value => !sourceImageIds.Contains(value.SourceImageId)).ToArray(),
+                MockupTemplateRevisionSourceImages = snapshot.MockupTemplateRevisionSourceImages.Where(value => !revisionSourceImageIds.Contains(value.Id)).ToArray(),
+                MockupTemplateRevisionSourceImageOptionValues = snapshot.MockupTemplateRevisionSourceImageOptionValues.Where(value => !revisionSourceImageIds.Contains(value.RevisionSourceImageId)).ToArray()
+            };
+            return Success(updated, request.StoreId);
+        }, cancellationToken);
     public Task<CatalogSetupResult> RestoreAsync(ArchiveCatalogRecordRequest request, CancellationToken cancellationToken = default) =>
         MutateAsync(request.StoreId, snapshot =>
         {
@@ -546,6 +616,25 @@ public sealed class CatalogSetupService : ICatalogSetupService
         return new(request.StoreId, offering.Id, offering.Name, dependents, blockers);
     }
 
+    private static CatalogOfferingDeletePlan BuildDeleteOfferingPlan(WorkspaceSnapshot snapshot, DeleteOfferingPermanentlyRequest request)
+    {
+        var offering = snapshot.BlueprintOfferings.SingleOrDefault(value => value.Id == request.OfferingId && value.StoreId == request.StoreId);
+        if (offering is null) return new(request.StoreId, request.OfferingId, string.Empty, [], [new("Blueprint Offering", request.OfferingId, "Missing Blueprint Offering")]);
+        var optionIds = snapshot.OfferingOptions.Where(value => value.OfferingId == offering.Id).Select(value => value.Id).ToHashSet();
+        var templateIds = snapshot.MockupTemplates.Where(value => value.BlueprintOfferingId == offering.Id).Select(value => value.Id).ToHashSet();
+        var placeholders = snapshot.OfferingPlaceholders.Where(value => value.OfferingId == offering.Id).ToArray();
+        var dependents = snapshot.OfferingOptions.Where(value => optionIds.Contains(value.Id)).Select(value => new CatalogArchiveDependency("Option", value.Id, value.Name))
+            .Concat(snapshot.OfferingOptionValues.Where(value => value.OfferingId == offering.Id).Select(value => new CatalogArchiveDependency("Option Value", value.Id, value.Value)))
+            .Concat(snapshot.OfferingVariants.Where(value => value.OfferingId == offering.Id).Select(value => new CatalogArchiveDependency("Variant", value.Id, value.Name)))
+            .Concat(placeholders.Select(value => new CatalogArchiveDependency("Placeholder", value.Id, value.Name)))
+            .Concat(snapshot.MockupTemplates.Where(value => templateIds.Contains(value.Id)).Select(value => new CatalogArchiveDependency("Mockup Template", value.Id, value.Name))).ToArray();
+        var blockers = snapshot.ItemListingConfigurations.Where(value => value.OfferingId == offering.Id)
+            .Select(value => new CatalogArchiveDependency("Item listing", value.ItemId, snapshot.Items.FirstOrDefault(item => item.Id == value.ItemId)?.Name ?? value.ItemId.ToString()))
+            .Concat(snapshot.DesignSlotAssignments.Where(value => placeholders.Any(area => area.Id == value.DesignAreaId))
+                .Select(value => new CatalogArchiveDependency("Design slot", value.DesignAreaId, value.DesignAreaId.ToString())))
+            .ToArray();
+        return new(request.StoreId, offering.Id, offering.Name, dependents, blockers);
+    }
     private static IReadOnlyList<CatalogArchiveDependency> ResolveDependencies(WorkspaceSnapshot snapshot, ArchiveCatalogRecordRequest request)
     {
         return request.Kind switch
