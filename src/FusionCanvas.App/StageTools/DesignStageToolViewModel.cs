@@ -693,7 +693,19 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
         ReadOnlyReason = canEdit ? string.Empty : "Design stage content is read-only while the item is protected or an earlier stage is being reviewed.";
         _itemId = itemId;
 
-        var state = await _designStageService.LoadDesignStageStateAsync(itemId, cancellationToken).ConfigureAwait(true);
+        // A target change persists asynchronously from the selection setter. Serialize a
+        // subsequent stage load behind that save so immediate navigation cannot reload
+        // the previous preference and overwrite the in-memory selection.
+        DesignStageState state;
+        await _artworkPreferenceSaveGate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        try
+        {
+            state = await _designStageService.LoadDesignStageStateAsync(itemId, cancellationToken).ConfigureAwait(true);
+        }
+        finally
+        {
+            _artworkPreferenceSaveGate.Release();
+        }
         if (loadGeneration != Volatile.Read(ref _loadGeneration))
         {
             return;
