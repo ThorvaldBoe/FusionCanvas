@@ -147,7 +147,7 @@ public static class DesignStagePolicy
     /// <summary>
     /// Gets available color values from the authoritative catalog offering graph.
     /// A color value is referenced by a non-archived variant through an option
-    /// whose name is "Color" (case-insensitive).
+    /// whose stable kind is <see cref="OptionKind.Color"/>.
     /// </summary>
     public static IReadOnlyList<string> AvailableColors(
         IReadOnlyList<OfferingOption> options,
@@ -158,7 +158,7 @@ public static class DesignStagePolicy
         var colorOptionIds = options
             .Where(option => option.OfferingId == offeringId
                 && !option.IsArchived
-                && string.Equals(option.Name, "Color", StringComparison.OrdinalIgnoreCase))
+                && option.OptionKind == OptionKind.Color)
             .Select(option => option.Id)
             .ToHashSet();
 
