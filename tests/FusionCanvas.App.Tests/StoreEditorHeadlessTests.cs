@@ -1018,7 +1018,11 @@ public class StoreEditorHeadlessTests
             ["Notes"] = "Notes",
         };
 
-        var nicheFields = window.GetVisualDescendants()
+        var nicheDetailsHeader = Assert.Single(
+            window.GetVisualDescendants().OfType<TextBlock>(),
+            textBlock => textBlock.IsVisible && textBlock.Text == "Niche details");
+        var nicheDetailsPanel = Assert.IsType<StackPanel>(nicheDetailsHeader.Parent);
+        var nicheFields = nicheDetailsPanel.GetVisualDescendants()
             .OfType<TextBox>()
             .Where(textBox => textBox.IsVisible && expectedTooltips.ContainsKey(textBox.PlaceholderText ?? string.Empty))
             .ToArray();
