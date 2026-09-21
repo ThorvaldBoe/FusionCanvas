@@ -52,6 +52,54 @@ For durable mutations, use a scenario-owned disposable database, workspace root,
 
 Use dispatcher-aware settling with a bounded timeout and a diagnostic condition name. Do not use arbitrary sleeps as readiness evidence.
 
+## Desktop/Appium eligibility and scenario packs
+
+Appium is a supplemental verification lane for compiled-process, Windows accessibility, native-window, keyboard, focus, lifecycle, and other real-desktop risks. It is not a default requirement for every OpenSpec scenario. Every new or materially changed user-facing feature gets an explicit Appium eligibility decision, even when the decision is to omit a new desktop journey.
+
+When Appium coverage is warranted, decide:
+
+1. **Coverage need** — what desktop-specific risk would escape domain, application, integration, view-model, or headless tests?
+2. **Journey count** — whether the feature needs a new journey, a step in an existing journey, or multiple journeys for independent success, validation, cancellation, destructive, or re-entry outcomes.
+3. **Scenario pack** — which ordered workflow should own the journey and which earlier actions provide intentional shared state.
+4. **Starting state** — the disposable workspace, store, items, or other fixture data arranged before user actions begin.
+5. **User actions and oracles** — the rendered controls and routed input used by the user, the visible result, and any persistence/re-entry result.
+6. **Cadence and selection** — traits such as `Pack=ItemOrganization` and `Cadence=Daily`, plus the workflow that runs the pack.
+7. **Lower-layer evidence** — the focused and headless tests that cover variants without repeating them through Appium.
+
+Use a short test specification in the module design or verification artifacts:
+
+```text
+Capability/scenario:
+Appium eligible? Why or why not:
+Scenario pack:
+Journey count:
+Starting state:
+User actions:
+Visible outcome:
+Persistence/re-entry outcome:
+Lower-layer coverage:
+Cadence/filter:
+Omission or scope rationale:
+```
+
+For example, grouping two items into a group in the left-pane navigation is a good Appium candidate because selection, routed input, navigation projection, and persistence cross desktop seams. A first journey could belong to an `ItemOrganization` or broader `ContentLifecycle` pack:
+
+```text
+Arrange disposable workspace and store
+→ create two items through the UI
+→ select both items
+→ invoke the group action
+→ name/confirm the group
+→ assert the group and both items appear in the left navigation
+→ close/reopen and assert the grouping is still visible
+```
+
+The grouping command, validation rules, persistence mapping, and lower-risk binding behavior should still have focused or headless coverage. The Appium journey proves the composed desktop job; it does not replace those tests.
+
+Keep shared state intentional. A pack may use one application session and one disposable data root for related ordered steps, but unrelated tests must not depend on xUnit execution order. If independent reporting or retry behavior is important, use separate packs or an explicit pack runner that reports named steps.
+
+For small bug fixes, refactors, and low-risk maintenance, adding a new Appium journey is a judgment call. Add one when the defect is desktop-specific, escaped lower-layer coverage, or exposes a reusable cross-surface risk; otherwise add the narrowest lower-layer regression and record why a new desktop journey is unnecessary.
+
 ## Bug escape review
 
 Every defect discovered after automated tests passed gets a local regression and a short record:

@@ -33,7 +33,7 @@ For the completion record, add an acceptance table to `verification.md`:
 | `<requirement> / <scenario>` | Unit / integration / headless view / inspection / optional live desktop | Pass / Fail / N/A | `<test, command, screenshot, notes>` |
 ```
 
-For user-facing modules, add the affected user-job inventory and identify whether each critical outcome is covered by focused tests, a rendered headless journey, optional live-desktop evidence, or an explicit omission rationale. For defect corrections, include the regression test, escape class, similar surfaces inspected, and the local-versus-global prevention decision.
+For user-facing modules, add the affected user-job inventory and identify whether each critical outcome is covered by focused tests, a rendered headless journey, optional live-desktop evidence, or an explicit omission rationale. For each new or materially changed user-facing feature, also review the Appium eligibility decision: expected journey count, scenario-pack placement, shared starting state, user-action/oracle specification, cadence, and lower-layer coverage. For defect corrections, include the regression test, escape class, similar surfaces inspected, and the local-versus-global prevention decision.
 
 ### Review Protocol (applies to every task)
 
