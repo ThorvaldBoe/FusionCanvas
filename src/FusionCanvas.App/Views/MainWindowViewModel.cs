@@ -84,7 +84,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             workspace ?? AppWorkspaceFactory.CreateDefault(ai, artworkProvider),
-            settings);
+            settings,
+            ai);
 
     private MainWindowViewModel(
         WorkflowStageNavigatorViewModel workflowNavigator,
@@ -92,7 +93,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IToolContextResolver toolContextResolver,
         IStageToolHostService stageToolHostService,
         AppWorkspaceRuntime runtime,
-        SettingsViewModel? settings)
+        SettingsViewModel? settings,
+        IAiTextGenerationService aiTextGenerationService)
         : this(
             workflowNavigator,
             documentWindow,
@@ -122,7 +124,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.ItemCsvImport,
             runtime.SllDocumentCodec,
             mockupGenerationService: runtime.MockupGeneration,
-            artworkGenerationService: runtime.ArtworkGeneration)
+            artworkGenerationService: runtime.ArtworkGeneration,
+            nichePopulationService: new NichePopulationService(aiTextGenerationService))
     {
 }
     public MainWindowViewModel(
@@ -156,7 +159,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ICatalogSetupService? catalogSetupService = null,
         IMockupTemplateSetupService? mockupTemplateSetupService = null,
         IMockupGenerationService? mockupGenerationService = null,
-        IArtworkGenerationService? artworkGenerationService = null)
+        IArtworkGenerationService? artworkGenerationService = null,
+        INichePopulationService? nichePopulationService = null)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
@@ -184,7 +188,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             providerCatalog,
             new MockupTemplateSourceImageService(workspaceRepository, fileStore, metadataReader),
             new NullAssetFilePicker(),
-            workspaceRepository);
+            workspaceRepository,
+            nichePopulationService);
         StoreManagement.ActiveStoreChanged += (_, store) => Settings.UpdateActiveStore(store?.Id);
         _groupManagementService = groupManagementService ?? new GroupManagementService(workspaceRepository);
         _itemManagementService = itemManagementService ?? new ItemManagementService(workspaceRepository);
@@ -234,7 +239,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         Settings.Ai.AvailabilityChanged += (_, _) => _ = ItemInspector.RefreshTitleOptimizationAvailabilityAsync();
         Settings.Ai.SettingsChanged += (_, _) => _ = DesignTool.RefreshArtworkAvailabilityAsync();
         Settings.Ai.AvailabilityChanged += (_, _) => _ = DesignTool.RefreshArtworkAvailabilityAsync();
+        Settings.Ai.SettingsChanged += (_, _) => _ = StoreManagement.RefreshNichePopulationAvailabilityAsync();
+        Settings.Ai.AvailabilityChanged += (_, _) => _ = StoreManagement.RefreshNichePopulationAvailabilityAsync();
         _ = _ideationAccessStatus.RefreshAsync();
+        _ = StoreManagement.RefreshNichePopulationAvailabilityAsync();
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
         _workspaceRepository = workspaceRepository;
