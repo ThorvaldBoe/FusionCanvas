@@ -569,12 +569,12 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         TemplateName = string.Empty;
     }
 
-    public IEnumerable<OfferingOption> AvailableOptions => Options.Where(value => value.OfferingId == SelectedOffering?.Id && !value.IsArchived).OrderBy(value => value.SortOrder);
-    public IEnumerable<OfferingOptionValue> AvailableValues => OptionValues.Where(value => value.OfferingId == SelectedOffering?.Id && value.OptionId == SelectedOption?.Id && !value.IsArchived).OrderBy(value => value.SortOrder);
-    public IEnumerable<OfferingVariant> AvailableVariants => Variants.Where(value => value.OfferingId == SelectedOffering?.Id && !value.IsArchived);
-    public IEnumerable<OfferingPlaceholder> AvailablePlaceholders => Placeholders.Where(value => value.OfferingId == SelectedOffering?.Id && !value.IsArchived);
-    public IEnumerable<MockupTemplate> AvailableTemplates => Templates.Where(value => value.BlueprintOfferingId == SelectedOffering?.Id && !value.IsArchived);
-    public IEnumerable<OfferingOptionValue> AvailableColors => OptionValues.Where(value => value.OfferingId == SelectedOffering?.Id && !value.IsArchived && Options.Any(option => option.Id == value.OptionId && option.OptionKind == OptionKind.Color)).OrderBy(value => value.SortOrder).ThenBy(value => value.Id);
+    public IEnumerable<OfferingOption> AvailableOptions => CatalogSetupQueries.ActiveOptions(Options, SelectedOffering?.Id);
+    public IEnumerable<OfferingOptionValue> AvailableValues => CatalogSetupQueries.ActiveValues(OptionValues, SelectedOffering?.Id, SelectedOption?.Id);
+    public IEnumerable<OfferingVariant> AvailableVariants => CatalogSetupQueries.ActiveVariants(Variants, SelectedOffering?.Id);
+    public IEnumerable<OfferingPlaceholder> AvailablePlaceholders => CatalogSetupQueries.ActiveDesignAreas(Placeholders, SelectedOffering?.Id);
+    public IEnumerable<MockupTemplate> AvailableTemplates => CatalogSetupQueries.ActiveTemplates(Templates, SelectedOffering?.Id);
+    public IEnumerable<OfferingOptionValue> AvailableColors => CatalogSetupQueries.ActiveColors(OptionValues, Options, SelectedOffering?.Id);
     public bool HasAvailableOptions => AvailableOptions.Any();
     public bool HasAvailableValues => AvailableValues.Any();
     public bool HasAvailableVariants => AvailableVariants.Any();
@@ -583,11 +583,21 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public int AvailableVariantCount => AvailableVariants.Count();
     public int AvailableDesignAreaCount => AvailablePlaceholders.Count();
     public int AvailableTemplateCount => AvailableTemplates.Count();
-    public string OfferingReadinessStatus => SelectedOffering?.IsArchived == true
-        ? "Archived"
-        : AvailableVariantCount > 0 && AvailableDesignAreaCount > 0 && AvailableTemplateCount > 0
-            ? "Ready"
-            : "Setup incomplete";
+    public string OfferingReadinessStatus
+    {
+        get
+        {
+            if (SelectedOffering?.IsArchived == true)
+            {
+                return "Archived";
+            }
+
+            var counts = CatalogSetupQueries.CountSetup(Variants, Placeholders, Templates, SelectedOffering?.Id);
+            return counts.VariantsComplete && counts.DesignAreasComplete && counts.MockupTemplatesComplete
+                ? "Ready"
+                : "Setup incomplete";
+        }
+    }
 
     public ICommand SaveOfferingCommand { get; }
     public ICommand StartAddPrintProviderCommand { get; }
