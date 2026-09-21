@@ -1786,37 +1786,16 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
     }
 
-    private IEnumerable<Guid> SelectableEntityIdsForStore(Guid storeId) =>
-        _snapshot.Groups
-            .Where(group => group.StoreId == storeId && !group.IsArchived && GroupHierarchy.IsEffectivelyActive(_snapshot, group))
-            .Select(group => group.Id)
-            .Concat(_snapshot.Items.Where(item => item.StoreId == storeId && !item.IsArchived).Select(item => item.Id));
+    private IReadOnlyList<Guid> SelectableEntityIdsForStore(Guid storeId) =>
+        WorkspaceTreeSelectionScope.GetSelectableEntityIds(_snapshot, storeId);
 
     private Guid? SelectedNicheId() =>
         _multiSelection.SelectedIds
             .Select(TopLevelNicheId)
             .FirstOrDefault(nicheId => nicheId.HasValue);
 
-    private Guid? TopLevelNicheId(Guid entityId)
-    {
-        if (_snapshot.Niches.Any(niche => niche.Id == entityId))
-        {
-            return entityId;
-        }
-
-        if (_snapshot.Items.SingleOrDefault(item => item.Id == entityId) is { } item)
-        {
-            return item.NicheId;
-        }
-
-        if (_snapshot.Groups.SingleOrDefault(group => group.Id == entityId) is { } group)
-        {
-            return group.NicheId ??
-                   (group.ParentGroupId is Guid parentId ? TopLevelNicheId(parentId) : null);
-        }
-
-        return null;
-    }
+    private Guid? TopLevelNicheId(Guid entityId) =>
+        WorkspaceTreeSelectionScope.ResolveTopLevelNicheId(_snapshot, entityId);
 
     private void ConstrainSelectionToOneNiche()
     {
