@@ -2,7 +2,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <ApplicationIcon>Assets\FusionCanvas.ico</ApplicationIcon>
+    <ApplicationIcon>Assets\FusionCanvasLogo_Square_LightBg.ico</ApplicationIcon>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
@@ -19,6 +19,8 @@
     <AvaloniaResource Include="Assets\FusionCanvasBanner.jpg" />
     <AvaloniaResource Include="Assets\FusionCanvas.ico" />
     <AvaloniaResource Include="Assets\FusionCanvasLogo_Square.png" />
+    <AvaloniaResource Include="Assets\FusionCanvasLogo_Square_LightBg.png" />
+    <AvaloniaResource Include="Assets\FusionCanvasLogo_Square_LightBg.ico" />
   </ItemGroup>
 
   <ItemGroup>

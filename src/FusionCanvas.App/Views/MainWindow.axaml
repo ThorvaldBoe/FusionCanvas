@@ -15,7 +15,7 @@
         x:DataType="views:MainWindowViewModel"
         KeyDown="OnWindowKeyDown"
         Title="FusionCanvas"
-        Icon="avares://FusionCanvas.App/Assets/FusionCanvas.ico"
+        Icon="avares://FusionCanvas.App/Assets/FusionCanvasLogo_Square_LightBg.png"
         Width="1180"
         Height="760"
         MinWidth="900"

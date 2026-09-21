@@ -4,7 +4,7 @@
         x:Class="FusionCanvas.App.SplashWindow"
         x:DataType="versioning:ApplicationVersionInfo"
         Title="FusionCanvas"
-        Icon="avares://FusionCanvas.App/Assets/FusionCanvas.ico"
+        Icon="avares://FusionCanvas.App/Assets/FusionCanvasLogo_Square_LightBg.png"
         Width="760"
         Height="380"
         MinWidth="560"
