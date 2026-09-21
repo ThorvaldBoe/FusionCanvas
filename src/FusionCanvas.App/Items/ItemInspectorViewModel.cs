@@ -147,8 +147,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
     public bool CanEditStage =>
         _state is { IsEffectivelyActive: true } state
         && !IsBusy
-        && state.Stage == _currentStage
-        && state.Status is not (ItemStatus.Published or ItemStatus.Rejected);
+        && ItemWorkflowPolicy.CanEditStage(ToPolicyItem(state), _currentStage).IsAllowed;
 
     public string StageReadOnlyReason
     {
@@ -164,12 +163,13 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
                 return "Restore the item before editing its content.";
             }
 
-            return ItemWorkflowPolicy.CanEditStage(
-                new Item(state.Id, Guid.Empty, null, null, state.Title, state.Description, state.Status, state.Stage,
-                    state.IsArchived, state.UpdatedAt, state.UpdatedAt, "{}"),
-                _currentStage).Reason;
+            return ItemWorkflowPolicy.CanEditStage(ToPolicyItem(state), _currentStage).Reason;
         }
     }
+
+    private static Item ToPolicyItem(ItemInspectorState state) =>
+        new(state.Id, Guid.Empty, null, null, state.Title, state.Description, state.Status, state.Stage,
+            state.IsArchived, state.UpdatedAt, state.UpdatedAt, "{}");
 
     public string InactiveNotice => IsReadOnly
         ? "This item is archived or inactive. Restore it to edit its details."

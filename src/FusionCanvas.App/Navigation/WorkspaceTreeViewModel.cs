@@ -1166,45 +1166,15 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         ArgumentNullException.ThrowIfNull(sources);
         ArgumentNullException.ThrowIfNull(target);
 
-        var effectiveSources = WorkspaceTreeSelectionNormalizer.Normalize(_snapshot, sources);
-        if (effectiveSources.Count == 0)
-        {
-            error = "Select an active Item or group before dragging.";
-            return false;
-        }
-
-        if (effectiveSources.Any(source => source.Id == target.EntityId))
-        {
-            error = "The destination must be outside the selected hierarchy.";
-            return false;
-        }
-
-        if (effectiveSources.Any(source =>
-                source.Kind == WorkspaceEntityKind.Group &&
-                target.EntityKind == WorkspaceEntityKind.Group &&
-                GroupHierarchy.IsDescendant(_snapshot, target.EntityId, source.Id)))
-        {
-            error = "The destination must be outside the selected hierarchy.";
-            return false;
-        }
-
-        if (effectiveSources.Any(source => source.Kind == WorkspaceEntityKind.Item) &&
-            placement.Kind != GroupPlacementKind.Append)
-        {
-            error = "Items can only be moved inside a niche or group.";
-            return false;
-        }
-
-        foreach (var source in effectiveSources)
-        {
-            if (!CanDrop(source.Kind, source.Id, target, placement, out error))
-            {
-                return false;
-            }
-        }
-
-        error = null;
-        return true;
+        var validation = WorkspaceTreeMoveValidator.Validate(
+            _snapshot,
+            sources,
+            target.EntityKind,
+            target.EntityId,
+            placement,
+            IsFiltering);
+        error = validation.Error;
+        return validation.IsValid;
     }
 
     public bool CanDrop(
@@ -1214,71 +1184,16 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         GroupPlacement placement,
         out string? error)
     {
-        if (sourceKind == WorkspaceEntityKind.Item)
-        {
-            var item = _snapshot.Items.SingleOrDefault(candidate => candidate.Id == sourceId);
-            if (item is null || !ItemHierarchy.IsEffectivelyActive(_snapshot, item))
-            {
-                error = "Only an active item can be moved.";
-                return false;
-            }
-
-            if (target.EntityKind is not (WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group))
-            {
-                error = "Drop the item onto an active niche or group.";
-                return false;
-            }
-
-            var listingTargetStoreId = target.EntityKind == WorkspaceEntityKind.Niche
-                ? _snapshot.Niches.SingleOrDefault(niche => niche.Id == target.EntityId && !niche.IsArchived)?.StoreId
-                : _snapshot.Groups.SingleOrDefault(group => group.Id == target.EntityId && GroupHierarchy.IsEffectivelyActive(_snapshot, group))?.StoreId;
-            if (listingTargetStoreId != item.StoreId)
-            {
-                error = "The destination must be active and belong to the same store.";
-                return false;
-            }
-
-            error = null;
-            return true;
-        }
-
-        var source = _snapshot.Groups.SingleOrDefault(group => group.Id == sourceId);
-        if (source is null || !GroupHierarchy.IsEffectivelyActive(_snapshot, source))
-        {
-            error = "Only an active group can be moved.";
-            return false;
-        }
-
-        if (target.EntityKind is not (WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group))
-        {
-            error = "Drop the group onto an active niche or group.";
-            return false;
-        }
-
-        if (IsFiltering && placement.Kind != GroupPlacementKind.Append)
-        {
-            error = "Clear filtering before positioning a group between siblings.";
-            return false;
-        }
-
-        if (target.EntityKind == WorkspaceEntityKind.Group &&
-            (target.EntityId == source.Id || GroupHierarchy.IsDescendant(_snapshot, target.EntityId, source.Id)))
-        {
-            error = "A group cannot be moved beneath itself or one of its descendants.";
-            return false;
-        }
-
-        var targetStoreId = target.EntityKind == WorkspaceEntityKind.Niche
-            ? _snapshot.Niches.SingleOrDefault(niche => niche.Id == target.EntityId && !niche.IsArchived)?.StoreId
-            : _snapshot.Groups.SingleOrDefault(group => group.Id == target.EntityId && GroupHierarchy.IsEffectivelyActive(_snapshot, group))?.StoreId;
-        if (targetStoreId is null || targetStoreId != source.StoreId)
-        {
-            error = "The destination must be active and belong to the same store.";
-            return false;
-        }
-
-        error = null;
-        return true;
+        var validation = WorkspaceTreeMoveValidator.ValidateSingle(
+            _snapshot,
+            sourceKind,
+            sourceId,
+            target.EntityKind,
+            target.EntityId,
+            placement,
+            IsFiltering);
+        error = validation.Error;
+        return validation.IsValid;
     }
 
     public void ShowDropFeedback(string? error) => ErrorMessage = error;
@@ -1415,62 +1330,22 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
 
     public IReadOnlyList<GroupDestination> GetGroupDestinationsForSelection()
     {
-        if (_storeId is not Guid storeId)
-        {
-            return [];
-        }
-
-        var selectedGroups = _multiSelection.SelectedIds
-            .Select(id => _snapshot.Groups.SingleOrDefault(group => group.Id == id))
-            .Where(group => group is not null)
-            .Select(group => group!.Id)
-            .ToHashSet();
-        var excluded = selectedGroups
-            .SelectMany(id => GroupHierarchy.GetDescendants(_snapshot, _snapshot.Groups.Single(group => group.Id == id)).Select(group => group.Id).Append(id))
-            .ToHashSet();
-        var destinations = new List<GroupDestination>();
-        foreach (var niche in _snapshot.Niches.Where(niche => niche.StoreId == storeId && !niche.IsArchived))
-        {
-            destinations.Add(new GroupDestination(new GroupParentReference(WorkspaceEntityKind.Niche, niche.Id), storeId, niche.Id, niche.Name));
-            foreach (var group in _snapshot.Groups
-                         .Where(group => group.StoreId == storeId && !group.IsArchived && !excluded.Contains(group.Id) &&
-                                         GroupHierarchy.IsEffectivelyActive(_snapshot, group) &&
-                                         GroupHierarchy.GetEffectiveNiche(_snapshot, group).Id == niche.Id)
-                         .OrderBy(group => group.SortOrder)
-                         .ThenBy(group => group.Name, StringComparer.OrdinalIgnoreCase))
-            {
-                var path = GroupHierarchy.GetAncestors(_snapshot, group).Select(ancestor => ancestor.Name).Append(group.Name);
-                destinations.Add(new GroupDestination(new GroupParentReference(WorkspaceEntityKind.Group, group.Id), storeId, niche.Id, $"{niche.Name} / {string.Join(" / ", path)}"));
-            }
-        }
-
-        return destinations;
+        var selections = _multiSelection.SelectedIds
+            .Select(FindNode)
+            .Where(node => node is { IsDraft: false })
+            .Select(node => new WorkspaceTreeSelection(node!.EntityKind, node.EntityId))
+            .ToArray();
+        return WorkspaceTreeMovePlanner.BuildGroupDestinations(_snapshot, _storeId, selections);
     }
 
     public GroupDestination? GetDefaultGroupDestination(IReadOnlyList<GroupDestination> destinations)
     {
-        var sources = WorkspaceTreeSelectionNormalizer.Normalize(
-            _snapshot,
-            _multiSelection.SelectedIds.Select(id => FindNode(id))
-                .Where(node => node is { IsDraft: false })
-                .Select(node => new WorkspaceTreeSelection(node!.EntityKind, node.EntityId)));
-        if (sources.Count == 0)
-        {
-            return destinations.FirstOrDefault();
-        }
-
-        var parents = sources.Select(source => source.Kind == WorkspaceEntityKind.Group
-                ? new GroupParentReference(
-                    _snapshot.Groups.Single(group => group.Id == source.Id).NicheId is not null ? WorkspaceEntityKind.Niche : WorkspaceEntityKind.Group,
-                    _snapshot.Groups.Single(group => group.Id == source.Id).NicheId ?? _snapshot.Groups.Single(group => group.Id == source.Id).ParentGroupId!.Value)
-                : _snapshot.Items.Single(item => item.Id == source.Id).GroupId is Guid groupId
-                    ? new GroupParentReference(WorkspaceEntityKind.Group, groupId)
-                    : new GroupParentReference(WorkspaceEntityKind.Niche, _snapshot.Items.Single(item => item.Id == source.Id).NicheId!.Value))
-            .Distinct()
+        var selections = _multiSelection.SelectedIds
+            .Select(FindNode)
+            .Where(node => node is { IsDraft: false })
+            .Select(node => new WorkspaceTreeSelection(node!.EntityKind, node.EntityId))
             .ToArray();
-        return parents.Length == 1
-            ? destinations.SingleOrDefault(destination => destination.Parent == parents[0]) ?? destinations.FirstOrDefault()
-            : destinations.FirstOrDefault();
+        return WorkspaceTreeMovePlanner.ResolveDefaultGroupDestination(_snapshot, selections, destinations);
     }
 
     public async Task GroupSelectedAsync(string name, GroupDestination destination)
@@ -1911,37 +1786,16 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
     }
 
-    private IEnumerable<Guid> SelectableEntityIdsForStore(Guid storeId) =>
-        _snapshot.Groups
-            .Where(group => group.StoreId == storeId && !group.IsArchived && GroupHierarchy.IsEffectivelyActive(_snapshot, group))
-            .Select(group => group.Id)
-            .Concat(_snapshot.Items.Where(item => item.StoreId == storeId && !item.IsArchived).Select(item => item.Id));
+    private IReadOnlyList<Guid> SelectableEntityIdsForStore(Guid storeId) =>
+        WorkspaceTreeSelectionScope.GetSelectableEntityIds(_snapshot, storeId);
 
     private Guid? SelectedNicheId() =>
         _multiSelection.SelectedIds
             .Select(TopLevelNicheId)
             .FirstOrDefault(nicheId => nicheId.HasValue);
 
-    private Guid? TopLevelNicheId(Guid entityId)
-    {
-        if (_snapshot.Niches.Any(niche => niche.Id == entityId))
-        {
-            return entityId;
-        }
-
-        if (_snapshot.Items.SingleOrDefault(item => item.Id == entityId) is { } item)
-        {
-            return item.NicheId;
-        }
-
-        if (_snapshot.Groups.SingleOrDefault(group => group.Id == entityId) is { } group)
-        {
-            return group.NicheId ??
-                   (group.ParentGroupId is Guid parentId ? TopLevelNicheId(parentId) : null);
-        }
-
-        return null;
-    }
+    private Guid? TopLevelNicheId(Guid entityId) =>
+        WorkspaceTreeSelectionScope.ResolveTopLevelNicheId(_snapshot, entityId);
 
     private void ConstrainSelectionToOneNiche()
     {

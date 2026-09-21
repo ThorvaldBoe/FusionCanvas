@@ -360,9 +360,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public bool HasActiveItem => ActiveItem is not null;
 
-    public bool CanMoveStageForward => ActiveItem is { } item && !IsInactive(item) && item.Stage != WorkflowStage.Listing;
+    public bool CanMoveStageForward => ActiveItem is { } item
+        && ItemWorkflowPolicy.CanPerformOperation(item, ItemOperationKind.StageMovement).IsAllowed
+        && item.Stage != WorkflowStage.Listing;
 
-    public bool CanMoveStageBack => ActiveItem is { } item && !IsInactive(item) && item.Stage != WorkflowStage.Idea;
+    public bool CanMoveStageBack => ActiveItem is { } item
+        && ItemWorkflowPolicy.CanPerformOperation(item, ItemOperationKind.StageMovement).IsAllowed
+        && item.Stage != WorkflowStage.Idea;
 
     public string? StageMoveForwardLabel => ActiveItem is { } item && item.Stage < WorkflowStage.Listing
         ? $"Move to {WorkflowStages.GetDisplayName(item.Stage + 1)} \u25B8"
@@ -486,9 +490,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ? _workspaceSnapshot.Items.SingleOrDefault(candidate => candidate.Id == context.Id)
         : null;
 
-    private static bool IsInactive(Item item) =>
-        item.IsArchived || item.Status is ItemStatus.Published or ItemStatus.Rejected;
-
     public ICommand CreateGroupCommand { get; private set; } = null!;
 
     public bool CanCreateGroup => StoreManagement.SelectedStore is not null;
@@ -533,7 +534,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private async Task MoveStageForwardAsync()
     {
         var item = ActiveItem;
-        if (item is null || item.Stage == WorkflowStage.Listing)
+        if (item is null || !CanMoveStageForward)
         {
             return;
         }
@@ -544,7 +545,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private async Task MoveStageBackAsync()
     {
         var item = ActiveItem;
-        if (item is null || item.Stage == WorkflowStage.Idea)
+        if (item is null || !CanMoveStageBack)
         {
             return;
         }
@@ -839,8 +840,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         {
             if (GroupDetails.Group?.Id != group.Id)
             {
-                var nicheId = GroupHierarchy.GetEffectiveNiche(_workspaceSnapshot, group).Id;
-                Run(GroupDetails.LoadAsync(group.Id, group.StoreId, nicheId));
+                var nicheId = WorkspaceContextResolver.ResolveEffectiveNicheId(_workspaceSnapshot, group.Id);
+                if (nicheId is Guid effectiveNicheId)
+                {
+                    Run(GroupDetails.LoadAsync(group.Id, group.StoreId, effectiveNicheId));
+                }
             }
 
             return;
@@ -948,17 +952,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         await AssetsManagement.OpenForContextAsync(new AssetContextReference(WorkspaceEntityKind.Store, store.Id)).ConfigureAwait(false);
     }
 
-    private Guid? ResolveContextStoreId(WorkspaceTreeSelection selection)
-    {
-        return selection.Kind switch
-        {
-            WorkspaceEntityKind.Store => selection.Id,
-            WorkspaceEntityKind.Niche => _workspaceSnapshot.Niches.SingleOrDefault(niche => niche.Id == selection.Id)?.StoreId,
-            WorkspaceEntityKind.Group => _workspaceSnapshot.Groups.SingleOrDefault(group => group.Id == selection.Id)?.StoreId,
-            WorkspaceEntityKind.Item => _workspaceSnapshot.Items.SingleOrDefault(item => item.Id == selection.Id)?.StoreId,
-            _ => null
-        };
-    }
+    private Guid? ResolveContextStoreId(WorkspaceTreeSelection selection) =>
+        WorkspaceContextResolver.ResolveStoreId(_workspaceSnapshot, selection);
 
     private void OpenTreeSelectionInTab(WorkspaceTreeSelection selection)
     {
@@ -1167,58 +1162,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             DocumentWindow.CloseTab(tab);
         }
     }
-
-    private GroupParentReference? ResolveGroupParent()
-    {
-        var context = DocumentWindow.ActiveContext;
-        if (context?.EntityKind == WorkspaceEntityKind.Niche &&
-            _workspaceSnapshot.Niches.Any(niche => niche.Id == context.Id && !niche.IsArchived))
-        {
-            return new GroupParentReference(WorkspaceEntityKind.Niche, context.Id);
-        }
-
-        if (context?.EntityKind == WorkspaceEntityKind.Group && ActiveGroupContext() is not null)
-        {
-            return new GroupParentReference(WorkspaceEntityKind.Group, context.Id);
-        }
-
-        if (context?.EntityKind == WorkspaceEntityKind.Item)
-        {
-            var item = _workspaceSnapshot.Items.SingleOrDefault(candidate => candidate.Id == context.Id && !candidate.IsArchived);
-            if (item?.GroupId is Guid groupId && _workspaceSnapshot.Groups.SingleOrDefault(group => group.Id == groupId) is { } group && GroupHierarchy.IsEffectivelyActive(_workspaceSnapshot, group))
-            {
-                return new GroupParentReference(WorkspaceEntityKind.Group, groupId);
-            }
-
-            if (item?.NicheId is Guid nicheId)
-            {
-                return new GroupParentReference(WorkspaceEntityKind.Niche, nicheId);
-            }
-        }
-
-        return StoreManagement.SelectedNiche is { IsArchived: false } niche
-            ? new GroupParentReference(WorkspaceEntityKind.Niche, niche.Id)
-            : null;
-    }
-
-    private TopicGroup? ActiveGroupContext()
-    {
-        var context = DocumentWindow.ActiveContext;
-        if (context?.EntityKind != WorkspaceEntityKind.Group)
-        {
-            return null;
-        }
-
-        var group = _workspaceSnapshot.Groups.SingleOrDefault(candidate => candidate.Id == context.Id);
-        return group is not null && GroupHierarchy.IsEffectivelyActive(_workspaceSnapshot, group) ? group : null;
-    }
-
-    private Guid? ResolveParentNicheId(GroupParentReference parent) =>
-        parent.Kind == WorkspaceEntityKind.Niche
-            ? parent.Id
-            : _workspaceSnapshot.Groups.SingleOrDefault(group => group.Id == parent.Id) is { } group
-                ? GroupHierarchy.GetEffectiveNiche(_workspaceSnapshot, group).Id
-                : null;
 
     private void HandleGroupStructureChanged(GroupSummary? group)
     {
