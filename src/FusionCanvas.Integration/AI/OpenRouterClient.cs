@@ -20,6 +20,8 @@ public sealed class OpenRouterClient :
     private static readonly TimeSpan MetadataTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan GenerationTimeout = TimeSpan.FromMinutes(5);
     private const int MaximumResponseBytes = 8 * 1024 * 1024;
+    private const int MaximumImageBytes = 25_000_000;
+    private const int MaximumImageResponseBytes = 34 * 1024 * 1024;
     private const int MaximumDisplayText = 4096;
 
     private readonly HttpClient _httpClient;
@@ -372,13 +374,13 @@ public sealed class OpenRouterClient :
             if (!response.IsSuccessStatusCode)
                 return (null, new(MapImageFailure(response.StatusCode), "OpenRouter could not complete the image request."));
 
-            using var json = await ReadJsonAsync(response, timeout.Token).ConfigureAwait(false);
+            using var json = await ReadJsonAsync(response, timeout.Token, MaximumImageResponseBytes).ConfigureAwait(false);
             var data = RequiredArray(json.RootElement, "data");
             if (data.GetArrayLength() != 1)
                 return (null, new(AiImageGenerationFailureKind.InvalidResponse, "OpenRouter did not return exactly one image."));
             var image = data[0];
             var encoded = ReadString(image, "b64_json");
-            if (string.IsNullOrWhiteSpace(encoded) || !Convert.TryFromBase64String(encoded, new byte[MaximumResponseBytes], out var _))
+            if (string.IsNullOrWhiteSpace(encoded) || !Convert.TryFromBase64String(encoded, new byte[MaximumImageBytes], out var _))
                 return (null, new(AiImageGenerationFailureKind.InvalidResponse, "OpenRouter returned invalid image data."));
             var bytes = Convert.FromBase64String(encoded);
             var usageElement = ReadObject(json.RootElement, "usage");
@@ -785,15 +787,16 @@ public sealed class OpenRouterClient :
 
     private static async Task<JsonDocument> ReadJsonAsync(
         HttpResponseMessage response,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int maximumResponseBytes = MaximumResponseBytes)
     {
-        if (response.Content.Headers.ContentLength is > MaximumResponseBytes)
+        if (response.Content.Headers.ContentLength is > maximumResponseBytes)
         {
             throw new InvalidDataException("The OpenRouter response exceeds the size limit.");
         }
 
         await using var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        await using var bounded = new BoundedReadStream(source, MaximumResponseBytes);
+        await using var bounded = new BoundedReadStream(source, maximumResponseBytes);
         return await JsonDocument.ParseAsync(bounded, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
