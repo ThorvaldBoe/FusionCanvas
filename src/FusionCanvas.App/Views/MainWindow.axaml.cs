@@ -665,21 +665,8 @@ public partial class MainWindow : Window
         Control control,
         DragEventArgs e)
     {
-        if (target.EntityKind != FusionCanvas.Domain.Workspace.WorkspaceEntityKind.Group)
-        {
-            return new GroupPlacement();
-        }
-
         var position = e.GetPosition(control).Y / Math.Max(control.Bounds.Height, 1);
-        // Make nesting the forgiving/default gesture. Reordering remains available
-        // near the row edges, but a normal drop anywhere over most of the row
-        // should place the group beneath the target rather than beside it.
-        return position switch
-        {
-            < 0.15 => new GroupPlacement(GroupPlacementKind.Before, target.EntityId),
-            > 0.85 => new GroupPlacement(GroupPlacementKind.After, target.EntityId),
-            _ => new GroupPlacement()
-        };
+        return WorkspaceTreeDropPlacementResolver.Resolve(target.EntityKind, target.EntityId, position);
     }
 
     private void OnDetailsFieldLostFocus(object? sender, RoutedEventArgs e)
