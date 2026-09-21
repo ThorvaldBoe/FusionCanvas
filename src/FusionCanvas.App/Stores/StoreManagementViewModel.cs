@@ -13,6 +13,7 @@ using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.AI;
 
 namespace FusionCanvas.App.Stores;
 
@@ -97,6 +98,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private readonly ICatalogSetupService? _catalogService;
     private readonly IOfferingManagementService? _offeringManagementService;
     private readonly IWorkspaceRepository? _workspaceRepository;
+    private readonly INichePopulationService? _nichePopulationService;
     private bool _isSelectorExpanded;
     private bool _isStoreEditorOpen;
     private bool _firstStorePromptDismissed;
@@ -158,6 +160,11 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private string? _tagColor;
     private string _tagDescription = string.Empty;
     private string? _errorMessage;
+    private AiAvailabilityResult _nichePopulationAvailability =
+        new(AiAvailabilityKind.MissingModel, "Configure General AI settings before populating niche fields.");
+    private bool _isNichePopulationBusy;
+    private string? _nichePopulationMessage;
+    private Guid _nichePopulationOperationId;
 
     private bool _productDeleteWarningVisible;
     private bool _productArchiveWarningVisible;
@@ -192,7 +199,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private string _variantColor = string.Empty;
     private string _variantSize = string.Empty;
 
-    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null, ITagManagementService? tagService = null, IProductSupplierSetupService? productService = null, ICatalogSetupService? catalogService = null, IMockupTemplateSetupService? mockupService = null, IOfferingManagementService? offeringManagementService = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, FusionCanvas.App.Assets.IAssetFilePicker? filePicker = null, IWorkspaceRepository? workspaceRepository = null)
+    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null, ITagManagementService? tagService = null, IProductSupplierSetupService? productService = null, ICatalogSetupService? catalogService = null, IMockupTemplateSetupService? mockupService = null, IOfferingManagementService? offeringManagementService = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, FusionCanvas.App.Assets.IAssetFilePicker? filePicker = null, IWorkspaceRepository? workspaceRepository = null, INichePopulationService? nichePopulationService = null)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _nicheService = nicheService;
@@ -201,6 +208,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         _catalogService = catalogService;
         _offeringManagementService = offeringManagementService;
         _workspaceRepository = workspaceRepository;
+        _nichePopulationService = nichePopulationService;
         CatalogSetup = catalogService is not null && mockupService is not null ? new CatalogSetupViewModel(catalogService, mockupService, offeringManagementService, providerCatalog, sourceImages, filePicker) : null;
         if (CatalogSetup is not null)
             CatalogSetup.CatalogChanged += OnCatalogChanged;
@@ -218,6 +226,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         SelectTagsTabCommand = new RelayCommand(_ => SelectTagsTab());
         StartCreateStoreCommand = new RelayCommand(_ => StartCreateStore());
         StartCreateNicheCommand = new RelayCommand(_ => StartCreateNiche());
+        PopulateNicheCommand = new RelayCommand(_ => Run(PopulateNicheAsync()));
         CloseStoreEditorCommand = new RelayCommand(_ => TryCloseStoreEditor());
         AcceptFirstStorePromptCommand = new RelayCommand(_ =>
         {
@@ -574,6 +583,27 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public bool CanDeleteSelectedStore => SelectedStore is not null && !_isCreatingNewStore;
 
     public bool CanSaveSelectedNiche => _nicheService is not null && (_isCreatingNewNiche || (SelectedNiche is not null && HasUnsavedNicheChanges));
+
+    public bool CanPopulateNiche =>
+        _nichePopulationService is not null &&
+        !_isNichePopulationBusy &&
+        _nichePopulationAvailability.IsReady &&
+        SelectedStore is { IsArchived: false } &&
+        SelectedNiche is { IsArchived: false } &&
+        !string.IsNullOrWhiteSpace(NicheName);
+
+    public bool IsNichePopulationBusy => _isNichePopulationBusy;
+
+    public string NichePopulationButtonText => _isNichePopulationBusy ? "Populating…" : "Populate";
+
+    public string NichePopulationStatusMessage =>
+        _isNichePopulationBusy
+            ? "Generating suggestions…"
+            : _nichePopulationAvailability.IsReady
+                ? _nichePopulationMessage ?? string.Empty
+                : _nichePopulationAvailability.Message;
+
+    public bool HasNichePopulationStatus => !string.IsNullOrWhiteSpace(NichePopulationStatusMessage);
 
     public bool CanArchiveSelectedNiche => _nicheService is not null && SelectedNiche is { IsArchived: false } && !_isCreatingNewNiche;
 
@@ -1390,6 +1420,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
 
     public ICommand StartCreateNicheCommand { get; }
 
+    public ICommand PopulateNicheCommand { get; }
+
     public ICommand CloseStoreEditorCommand { get; }
 
     public ICommand AcceptFirstStorePromptCommand { get; }
@@ -1651,6 +1683,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     {
         _isCreatingNewNiche = false;
         _draftNicheId = null;
+        _nichePopulationMessage = null;
         SelectedNiche = niche;
         ApplySelectedNicheFields(niche);
         CaptureOriginalNicheEditorState();
@@ -1684,6 +1717,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     {
         _isCreatingNewNiche = true;
         _draftNicheId = Guid.NewGuid();
+        _nichePopulationMessage = null;
         SelectedNiche = DraftNiche();
         ErrorMessage = null;
         ClearNicheDeleteWarning();
@@ -1695,6 +1729,152 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(HasSelectedNiche));
         OnPropertyChanged(nameof(CanRestoreSelectedNiche));
         RaiseNicheEditorActionProperties();
+    }
+
+    public async Task RefreshNichePopulationAvailabilityAsync(CancellationToken cancellationToken = default)
+    {
+        if (_nichePopulationService is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _nichePopulationAvailability = await _nichePopulationService
+                .GetAvailabilityAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            _nichePopulationAvailability = new(
+                AiAvailabilityKind.InvalidConfiguration,
+                "AI settings could not be checked. Open AI settings and try again.");
+        }
+
+        OnPropertyChanged(nameof(CanPopulateNiche));
+        OnPropertyChanged(nameof(NichePopulationStatusMessage));
+        OnPropertyChanged(nameof(HasNichePopulationStatus));
+    }
+
+    public async Task PopulateNicheAsync(CancellationToken cancellationToken = default)
+    {
+        if (!CanPopulateNiche || _nichePopulationService is null)
+        {
+            return;
+        }
+
+        var fields = GetBlankNichePopulationFields();
+        if (fields.Count == 0)
+        {
+            _nichePopulationMessage = "All eligible niche fields already contain values.";
+            RaiseNichePopulationProperties();
+            return;
+        }
+
+        var operationId = Guid.NewGuid();
+        _nichePopulationOperationId = operationId;
+        var nicheId = SelectedNiche!.Id;
+        var isDraft = _isCreatingNewNiche;
+        _isNichePopulationBusy = true;
+        _nichePopulationMessage = null;
+        RaiseNichePopulationProperties();
+
+        try
+        {
+            var result = await _nichePopulationService.PopulateAsync(
+                new NichePopulationRequest(NicheName, fields),
+                cancellationToken).ConfigureAwait(false);
+
+            if (operationId != _nichePopulationOperationId ||
+                SelectedNiche?.Id != nicheId ||
+                _isCreatingNewNiche != isDraft)
+            {
+                return;
+            }
+
+            if (!result.Succeeded)
+            {
+                _nichePopulationMessage = result.Message ?? "No usable niche suggestions were returned. Try again.";
+                return;
+            }
+
+            var applied = 0;
+            foreach (var suggestion in result.Suggestions)
+            {
+                if (ApplyNichePopulationSuggestion(suggestion.Key, suggestion.Value))
+                {
+                    applied++;
+                }
+            }
+
+            _nichePopulationMessage = applied > 0
+                ? "Suggestions were added to the draft. Review them before saving."
+                : "No new suggestions were applied because the fields were edited while the request was running.";
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _nichePopulationMessage = "Population was canceled. Your existing niche values were preserved.";
+        }
+        catch
+        {
+            _nichePopulationMessage = "AI could not populate the niche fields. Check AI settings or try again.";
+        }
+        finally
+        {
+            if (operationId == _nichePopulationOperationId)
+            {
+                _isNichePopulationBusy = false;
+                RaiseNichePopulationProperties();
+            }
+        }
+    }
+
+    private IReadOnlyList<NichePopulationField> GetBlankNichePopulationFields()
+    {
+        var fields = new List<NichePopulationField>();
+        if (string.IsNullOrWhiteSpace(NicheDescription)) fields.Add(NichePopulationField.Description);
+        if (string.IsNullOrWhiteSpace(NicheAudience)) fields.Add(NichePopulationField.Audience);
+        if (string.IsNullOrWhiteSpace(NicheHumorStyle)) fields.Add(NichePopulationField.HumorStyle);
+        if (string.IsNullOrWhiteSpace(NicheVisualStyleGuidance)) fields.Add(NichePopulationField.VisualStyleGuidance);
+        if (string.IsNullOrWhiteSpace(NicheConstraints)) fields.Add(NichePopulationField.Constraints);
+        if (string.IsNullOrWhiteSpace(NicheNotes)) fields.Add(NichePopulationField.Notes);
+        return fields;
+    }
+
+    private bool ApplyNichePopulationSuggestion(NichePopulationField field, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        switch (field)
+        {
+            case NichePopulationField.Description when string.IsNullOrWhiteSpace(NicheDescription):
+                NicheDescription = value;
+                return true;
+            case NichePopulationField.Audience when string.IsNullOrWhiteSpace(NicheAudience):
+                NicheAudience = value;
+                return true;
+            case NichePopulationField.HumorStyle when string.IsNullOrWhiteSpace(NicheHumorStyle):
+                NicheHumorStyle = value;
+                return true;
+            case NichePopulationField.VisualStyleGuidance when string.IsNullOrWhiteSpace(NicheVisualStyleGuidance):
+                NicheVisualStyleGuidance = value;
+                return true;
+            case NichePopulationField.Constraints when string.IsNullOrWhiteSpace(NicheConstraints):
+                NicheConstraints = value;
+                return true;
+            case NichePopulationField.Notes when string.IsNullOrWhiteSpace(NicheNotes):
+                NicheNotes = value;
+                return true;
+            default:
+                return false;
+        }
     }
 
     public async Task SaveSelectedStoreAsync(CancellationToken cancellationToken = default)
@@ -3540,6 +3720,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     {
         _isCreatingNewNiche = false;
         _draftNicheId = null;
+        _nichePopulationMessage = null;
         ActiveNiches = [];
         ArchivedNiches = [];
         SelectedNiche = null;
@@ -3905,6 +4086,16 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanSaveSelectedNiche));
         OnPropertyChanged(nameof(CanArchiveSelectedNiche));
         OnPropertyChanged(nameof(CanDeleteSelectedNiche));
+        RaiseNichePopulationProperties();
+    }
+
+    private void RaiseNichePopulationProperties()
+    {
+        OnPropertyChanged(nameof(CanPopulateNiche));
+        OnPropertyChanged(nameof(IsNichePopulationBusy));
+        OnPropertyChanged(nameof(NichePopulationButtonText));
+        OnPropertyChanged(nameof(NichePopulationStatusMessage));
+        OnPropertyChanged(nameof(HasNichePopulationStatus));
     }
 
     private static EditorState EmptyEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, FulfillmentStrategy.Manual, null, null, false);

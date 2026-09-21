@@ -14,6 +14,7 @@ using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Stores;
 using FusionCanvas.Application.Niches;
 using FusionCanvas.Application.Tags;
@@ -25,6 +26,7 @@ using FusionCanvas.Application.Stores.Printify;
 using FusionCanvas.App.Views;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
+using FusionCanvas.Domain.Niches;
 using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Tests.TestSupport.Drivers;
 
@@ -118,6 +120,47 @@ public class StoreEditorHeadlessTests
         Assert.NotNull(newProductButton);
         Assert.True(newProductButton!.IsVisible);
 
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task NichePopulationButton_IsPlacedBesideNameAndAppliesDraftSuggestions()
+    {
+        var store = new Store(Guid.NewGuid(), "North Star", null, false, Now, Now, "{}");
+        var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, Now, Now, "{}");
+        var population = new HeadlessNichePopulationService
+        {
+            Result = NichePopulationResult.Success(new Dictionary<NichePopulationField, string>
+            {
+                [NichePopulationField.Description] = "A reviewed coffee niche"
+            })
+        };
+        var window = CreateEditorWindow(customStore: store, customNiche: niche, nichePopulationService: population);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.OpenNichesTabCommand.Execute(null);
+        await viewModel.RefreshNichePopulationAvailabilityAsync(TestContext.Current.CancellationToken);
+        window.UpdateLayout();
+
+        var name = window.GetVisualDescendants().OfType<TextBox>()
+            .Single(textBox => textBox.PlaceholderText == "Niche name");
+        var populate = Assert.IsType<Button>(window.GetVisualDescendants().OfType<Button>()
+            .Single(button => AutomationProperties.GetAutomationId(button) == "StoreEditor.PopulateNiche"));
+
+        Assert.True(populate.IsEnabled);
+        Assert.Equal("Populate niche fields", AutomationProperties.GetName(populate));
+        Assert.Same(name.Parent, populate.Parent);
+        Assert.True(populate.Bounds.Left > name.Bounds.Left);
+        Assert.Same(viewModel.PopulateNicheCommand, populate.Command);
+
+        populate.Command!.Execute(null);
+        await WaitForAsync(() => !viewModel.IsNichePopulationBusy);
+        Assert.Equal("A reviewed coffee niche", viewModel.NicheDescription);
+        Assert.True(viewModel.HasUnsavedNicheChanges);
+
+        Assert.False(viewModel.TryCloseStoreEditor());
+        Assert.True(viewModel.DiscardChangesPromptVisible);
+        viewModel.KeepEditingCommand.Execute(null);
+        Assert.Equal("A reviewed coffee niche", viewModel.NicheDescription);
         window.Close();
     }
 
@@ -2597,10 +2640,12 @@ public class StoreEditorHeadlessTests
         IProviderCatalogCandidateSource? providerCatalog = null,
         bool showWindow = true,
         Store? customStore = null,
-        bool primaryArtworkDesignArea = false)
+        bool primaryArtworkDesignArea = false,
+        Niche? customNiche = null,
+        INichePopulationService? nichePopulationService = null)
     {
         var store = customStore ?? new Store(Guid.NewGuid(), "North Star", null, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog, useFixedProviderOffering, includeOfferingOptions, primaryArtworkDesignArea));
+        var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog, useFixedProviderOffering, includeOfferingOptions, primaryArtworkDesignArea, customNiche));
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository),
             new NicheManagementService(repository),
@@ -2610,7 +2655,8 @@ public class StoreEditorHeadlessTests
             new MockupTemplateSetupService(repository),
             new OfferingManagementService(repository, providerCatalog),
             providerCatalog,
-            workspaceRepository: repository);
+            workspaceRepository: repository,
+            nichePopulationService: nichePopulationService);
         viewModel.LoadAsync(default).GetAwaiter().GetResult();
         var window = new StoreEditorWindow { DataContext = viewModel };
         if (showWindow)
@@ -2757,7 +2803,8 @@ public class StoreEditorHeadlessTests
         bool includeNormalizedCatalog,
         bool useFixedProviderOffering,
         bool includeOfferingOptions,
-        bool primaryArtworkDesignArea = false)
+        bool primaryArtworkDesignArea = false,
+        Niche? customNiche = null)
     {
         var product = new StoreProduct(Guid.NewGuid(), store.Id, "Gildan 64000", null, null, Now, Now, "{}");
         var offering = new FulfillmentOffering(Guid.NewGuid(), product.Id, "Printful", null, FulfillmentKind.FixedProvider, "Printful", null, Now, Now, "{}");
@@ -2765,7 +2812,7 @@ public class StoreEditorHeadlessTests
         var snapshot = new WorkspaceSnapshot(
             [WorkspaceSnapshot.DefaultWorkspace(Now)],
             [store],
-            [],
+            customNiche is null ? [] : [customNiche],
             [],
             [item],
             [],
@@ -2844,5 +2891,16 @@ public class StoreEditorHeadlessTests
     {
         public Task<ProviderCatalogCandidateDescriptor> LoadAsync(OfferingContext context, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("Provider request failed.");
+    }
+
+    private sealed class HeadlessNichePopulationService : INichePopulationService
+    {
+        public NichePopulationResult Result { get; set; } = NichePopulationResult.Success(new Dictionary<NichePopulationField, string>());
+
+        public Task<AiAvailabilityResult> GetAvailabilityAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(AiAvailabilityResult.Ready);
+
+        public Task<NichePopulationResult> PopulateAsync(NichePopulationRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Result);
     }
 }
