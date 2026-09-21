@@ -224,6 +224,24 @@ public class OpenRouterClientTests
     }
 
     [Fact]
+    public async Task ImageGenerateAsync_AcceptsResponseLargerThanCatalogLimitWhenImagePayloadIsWithinArtworkLimit()
+    {
+        var imageBytes = new byte[9 * 1024 * 1024];
+        var encoded = Convert.ToBase64String(imageBytes);
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK,
+            "{\"data\":[{\"b64_json\":\"" + encoded + "\",\"media_type\":\"image/png\"}]}"));
+        var client = CreateClient(handler);
+
+        var (result, failure) = await client.GenerateAsync(new AiImageGenerationRequest(
+            "selected/model", "safe prompt", new AiImageSize(1024, 1024), false,
+            "secret", false, "provider-tag"), TestContext.Current.CancellationToken);
+
+        Assert.Null(failure);
+        Assert.NotNull(result);
+        Assert.Equal(imageBytes.Length, result.ImageBytes.Length);
+    }
+
+    [Fact]
     public async Task ImageGenerateAsync_SendsOnlyThePlannedAdvertisedParameters()
     {
         var encoded = Convert.ToBase64String([1, 2, 3]);
