@@ -26,4 +26,9 @@ public sealed record DesignStageState(
     public Guid? PersistedArtworkTargetId { get; init; }
     public bool HasPersistedArtworkTargetPreference { get; init; }
     public bool? PersistedTransparentBackground { get; init; }
+    public bool HasStaleConfiguration { get; init; }
+    public bool CanRecoverStaleConfiguration { get; init; }
+    public string? StaleConfigurationDisplayName { get; init; }
+    public string RecoveryGuidance { get; init; } = string.Empty;
+    public IReadOnlyList<FulfillmentOffering> RecoveryOfferings { get; init; } = [];
 }

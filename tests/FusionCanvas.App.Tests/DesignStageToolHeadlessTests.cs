@@ -1,14 +1,17 @@
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Automation;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FusionCanvas.App.StageTools;
 using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Views;
 using FusionCanvas.Domain.Assets;
+using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Workspace;
@@ -22,6 +25,42 @@ namespace FusionCanvas.App.Tests;
 /// </summary>
 public class DesignStageToolHeadlessTests
 {
+    private static StaleDesignFixture CreateStaleDesignFixture(bool withReplacement = true)
+    {
+        var baseSnapshot = SampleWorkspace.Create();
+        var designItem = baseSnapshot.Items.Single(item => item.Id == SampleWorkspace.DesignNodeId);
+        var product = baseSnapshot.StoreProducts.Single();
+        var replacementProjection = baseSnapshot.FulfillmentOfferings.Single() with { Name = "Active shirt" };
+        var now = DateTimeOffset.UtcNow;
+        var staleOfferingId = Guid.Parse("51000000-0000-0000-0000-000000000001");
+        var staleProjection = new FulfillmentOffering(
+            staleOfferingId, product.Id, "Archived shirt", null, FulfillmentKind.FixedProvider,
+            "Legacy provider", null, now, now, "{}");
+        var blueprint = new Blueprint(Guid.Parse("52000000-0000-0000-0000-000000000001"),
+            designItem.StoreId, "Shirt", null, false, now, now, "{}");
+        var staleOffering = new BlueprintOffering(
+            staleOfferingId, blueprint.Id, designItem.StoreId, "Archived shirt", null,
+            BlueprintOfferingKind.FixedPrintProvider, null, null, null, null, true, now, now, "{}");
+        var replacementOffering = new BlueprintOffering(
+            replacementProjection.Id, blueprint.Id, designItem.StoreId, replacementProjection.Name, null,
+            BlueprintOfferingKind.FixedPrintProvider, null, null, null, null, !withReplacement, now, now, "{}");
+        var rowId = Guid.Parse("53000000-0000-0000-0000-000000000001");
+
+        var snapshot = baseSnapshot with
+        {
+            FulfillmentOfferings = [replacementProjection, staleProjection],
+            Blueprints = [blueprint],
+            BlueprintOfferings = [staleOffering, replacementOffering],
+            ItemListingConfigurations = [new ItemListingConfiguration(designItem.Id, staleOfferingId)],
+            DesignSelectedColors = [new DesignSelectedColor(designItem.Id, "Black")],
+            DesignVariantRows = [new DesignVariantRow(rowId, designItem.Id, true, 0)],
+            DesignVariantRowColors = [new DesignVariantRowColor(rowId, "Black")]
+        };
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+        var viewModel = MainWindowViewModelFactory.CreateFromSnapshot(snapshot, repository);
+        return new StaleDesignFixture(viewModel, repository, replacementProjection);
+    }
+
     /// <summary>
     /// Creates a ViewModel with a Design-stage item that has a listing configuration,
     /// selected colors, a default row, and slot areas.
@@ -167,6 +206,100 @@ public class DesignStageToolHeadlessTests
             && c.Context.Id == SampleWorkspace.DesignNodeId);
         vm.OpenFromNavigation(ctx);
         vm.SelectWorkflowStage(WorkflowStage.Design);
+    }
+
+    [AvaloniaFact]
+    public async Task StaleConfiguration_ShowsOnlyEnabledRecoveryMutationAndEscapeReturnsFocus()
+    {
+        var stale = CreateStaleDesignFixture();
+        NavigateToDesign(stale.ViewModel);
+        using var windowScope = new DesignWindowScope(ShowDesignWindow(stale.ViewModel));
+        var window = windowScope.Window;
+        Dispatcher.UIThread.RunJobs();
+
+        var recovery = window.FindControl<ComboBox>("RecoveryOfferingComboBox")!;
+        Assert.True(stale.ViewModel.DesignTool.HasStaleConfiguration);
+        Assert.True(stale.ViewModel.DesignTool.IsReadOnly);
+        Assert.True(recovery.IsVisible);
+        Assert.True(recovery.IsEnabled);
+        Assert.Equal("Replacement listing configuration", AutomationProperties.GetName(recovery));
+        Assert.Null(window.GetVisualDescendants().OfType<TextBlock>().SingleOrDefault(text =>
+            text.IsEffectivelyVisible && text.Text == "Color Working Set"));
+        Assert.False(window.GetVisualDescendants().OfType<Button>().Single(button =>
+            AutomationProperties.GetName(button) == "Import supporting image").IsEnabled);
+
+        recovery.SelectedItem = Assert.Single(stale.ViewModel.DesignTool.RecoveryOfferings);
+        Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        var replace = window.FindControl<Button>("ConfirmConfigurationRecoveryButton")!;
+        var cancel = window.GetVisualDescendants().OfType<Button>().Single(button =>
+            AutomationProperties.GetName(button) == "Cancel replacement listing configuration");
+
+        Assert.Equal("Confirm replacement listing configuration", AutomationProperties.GetName(replace));
+        await HeadlessUiWait.UntilAsync(
+            () => replace.IsFocused,
+            "configuration recovery confirmation focus",
+            cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(replace.IsFocused);
+        Assert.True(cancel.IsVisible);
+        Assert.Contains("Archived shirt", stale.ViewModel.DesignTool.RecoveryConfirmationMessage);
+        Assert.Contains("Active shirt", stale.ViewModel.DesignTool.RecoveryConfirmationMessage);
+
+        HeadlessWindowExtensions.KeyPress(window, Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, string.Empty);
+        await HeadlessUiWait.UntilAsync(
+            () => recovery.IsFocused,
+            "configuration recovery selector focus after Escape",
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(stale.ViewModel.DesignTool.IsRecoveryConfirmationVisible);
+        Assert.True(recovery.IsFocused);
+        Assert.Contains(stale.Repository.Snapshot.ItemListingConfigurations,
+            configuration => configuration.ItemId == SampleWorkspace.DesignNodeId
+                && configuration.OfferingId != stale.Replacement.Id);
+    }
+
+    [AvaloniaFact]
+    public async Task StaleConfiguration_RoutedConfirmationRestoresNormalEditingAndFocus()
+    {
+        var stale = CreateStaleDesignFixture();
+        NavigateToDesign(stale.ViewModel);
+        using var windowScope = new DesignWindowScope(ShowDesignWindow(stale.ViewModel));
+        var window = windowScope.Window;
+        var recovery = window.FindControl<ComboBox>("RecoveryOfferingComboBox")!;
+        recovery.SelectedItem = Assert.Single(stale.ViewModel.DesignTool.RecoveryOfferings);
+        Dispatcher.UIThread.RunJobs();
+        window.FindControl<Button>("ConfirmConfigurationRecoveryButton")!.RaiseEvent(
+            new RoutedEventArgs(Button.ClickEvent));
+
+        await HeadlessUiWait.UntilAsync(
+            () => !stale.ViewModel.DesignTool.HasStaleConfiguration && !stale.ViewModel.DesignTool.IsBusy,
+            "stale listing configuration recovery",
+            cancellationToken: TestContext.Current.CancellationToken);
+        window.UpdateLayout();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(stale.ViewModel.DesignTool.IsReadOnly);
+        Assert.True(stale.ViewModel.DesignTool.ShowsConfiguredState);
+        Assert.Equal(stale.Replacement.Id, stale.ViewModel.DesignTool.SelectedOfferingId);
+        Assert.Empty(stale.ViewModel.DesignTool.SelectedColors);
+        Assert.Empty(stale.ViewModel.DesignTool.Rows);
+        Assert.True(window.FindControl<ComboBox>("DesignConfigurationComboBox")!.IsFocused);
+    }
+
+    [AvaloniaFact]
+    public void StaleConfiguration_WithoutCandidateShowsStoreEditorGuidance()
+    {
+        var stale = CreateStaleDesignFixture(withReplacement: false);
+        NavigateToDesign(stale.ViewModel);
+        using var windowScope = new DesignWindowScope(ShowDesignWindow(stale.ViewModel));
+        var window = windowScope.Window;
+
+        var recovery = window.FindControl<ComboBox>("RecoveryOfferingComboBox")!;
+        Assert.True(stale.ViewModel.DesignTool.HasStaleConfiguration);
+        Assert.False(stale.ViewModel.DesignTool.CanRecoverStaleConfiguration);
+        Assert.Empty(stale.ViewModel.DesignTool.RecoveryOfferings);
+        Assert.False(recovery.IsEnabled);
+        Assert.Contains("Store Editor", stale.ViewModel.DesignTool.RecoveryGuidance);
     }
 
     [AvaloniaFact]
@@ -697,5 +830,21 @@ public class DesignStageToolHeadlessTests
         Assert.Equal(2, target!.ItemCount);
         Assert.False(transparency!.IsEnabled);
         Assert.False(generate!.IsEnabled);
+    }
+}
+
+internal sealed record StaleDesignFixture(
+    MainWindowViewModel ViewModel,
+    InMemoryWorkspaceRepository Repository,
+    FulfillmentOffering Replacement);
+
+internal sealed class DesignWindowScope(MainWindow window) : IDisposable
+{
+    internal MainWindow Window { get; } = window;
+
+    public void Dispose()
+    {
+        Window.DataContext = null;
+        Window.Close();
     }
 }

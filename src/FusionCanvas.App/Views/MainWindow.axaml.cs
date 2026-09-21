@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -44,12 +45,14 @@ public partial class MainWindow : Window
     private bool _layoutReady;
     private bool _applyingLayout;
     private FusionCanvas.Application.Items.Import.IItemCsvCodec? _itemCsvImportCodec;
+    private DesignStageToolViewModel? _subscribedDesignTool;
 
     public MainWindow()
     {
         InitializeComponent();
         WorkspaceTreeControl.AddHandler(PointerPressedEvent, OnWorkspaceTreePointerPressed, RoutingStrategies.Tunnel);
         WorkspaceTreeControl.AddHandler(KeyDownEvent, OnWorkspaceTreeKeyDown, RoutingStrategies.Tunnel);
+        DataContextChanged += OnDesignToolDataContextChanged;
         InitializeWindowLayout(null);
     }
 
@@ -59,6 +62,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         WorkspaceTreeControl.AddHandler(PointerPressedEvent, OnWorkspaceTreePointerPressed, RoutingStrategies.Tunnel);
         WorkspaceTreeControl.AddHandler(KeyDownEvent, OnWorkspaceTreeKeyDown, RoutingStrategies.Tunnel);
+        DataContextChanged += OnDesignToolDataContextChanged;
         InitializeWindowLayout(services.Settings);
         var viewModel = MainWindowViewModel.CreateForDefaultWorkspace(
             services.Settings,
@@ -111,13 +115,6 @@ public partial class MainWindow : Window
                 Dispatcher.UIThread.Post(() => SyncIdeationWindow(viewModel.Ideation), DispatcherPriority.Background);
             }
         };
-        viewModel.DesignTool.PropertyChanged += (_, args) =>
-        {
-            if (args.PropertyName == nameof(DesignStageToolViewModel.ShowPreviewDialog))
-            {
-                Dispatcher.UIThread.Post(() => SyncDesignPreviewWindow(viewModel.DesignTool), DispatcherPriority.Background);
-            }
-        };
         viewModel.Settings.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(SettingsViewModel.IsOpen))
@@ -136,6 +133,38 @@ public partial class MainWindow : Window
         SyncStoreEditorWindow(viewModel.StoreManagement);
         SyncAssetsWindow(viewModel.AssetsManagement);
         SyncIdeationWindow(viewModel.Ideation);
+    }
+
+    private void OnDesignToolDataContextChanged(object? sender, EventArgs e)
+    {
+        if (_subscribedDesignTool is not null)
+        {
+            _subscribedDesignTool.PropertyChanged -= OnDesignToolPropertyChanged;
+        }
+
+        _subscribedDesignTool = (DataContext as MainWindowViewModel)?.DesignTool;
+        if (_subscribedDesignTool is not null)
+        {
+            _subscribedDesignTool.PropertyChanged += OnDesignToolPropertyChanged;
+        }
+    }
+
+    private void OnDesignToolPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (sender is not DesignStageToolViewModel designTool)
+        {
+            return;
+        }
+
+        if (args.PropertyName == nameof(DesignStageToolViewModel.ShowPreviewDialog))
+        {
+            Dispatcher.UIThread.Post(() => SyncDesignPreviewWindow(designTool), DispatcherPriority.Background);
+        }
+        else if (args.PropertyName == nameof(DesignStageToolViewModel.IsRecoveryConfirmationVisible)
+            && designTool.IsRecoveryConfirmationVisible)
+        {
+            Dispatcher.UIThread.Post(() => ConfirmConfigurationRecoveryButton.Focus(), DispatcherPriority.Background);
+        }
     }
 
     private void InitializeWindowLayout(SettingsViewModel? settings)
@@ -662,6 +691,44 @@ public partial class MainWindow : Window
     }
 
     // === Design Stage Tool event handlers ===
+
+    private async void OnConfirmConfigurationRecovery(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm)
+        {
+            return;
+        }
+
+        await vm.DesignTool.ConfirmStaleConfigurationRecoveryAsync();
+        Dispatcher.UIThread.Post(
+            () => (vm.DesignTool.HasStaleConfiguration ? RecoveryOfferingComboBox : DesignConfigurationComboBox).Focus(),
+            DispatcherPriority.Background);
+    }
+
+    private void OnCancelConfigurationRecovery(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm)
+        {
+            return;
+        }
+
+        vm.DesignTool.CancelStaleConfigurationRecovery();
+        Dispatcher.UIThread.Post(() => RecoveryOfferingComboBox.Focus(), DispatcherPriority.Background);
+    }
+
+    private void OnRecoveryConfirmationKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape
+            || DataContext is not MainWindowViewModel vm
+            || !vm.DesignTool.IsRecoveryConfirmationVisible)
+        {
+            return;
+        }
+
+        vm.DesignTool.CancelStaleConfigurationRecovery();
+        e.Handled = true;
+        Dispatcher.UIThread.Post(() => RecoveryOfferingComboBox.Focus(), DispatcherPriority.Background);
+    }
 
     private async void OnColorToggle(object? sender, RoutedEventArgs e)
     {
