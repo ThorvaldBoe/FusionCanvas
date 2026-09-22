@@ -790,7 +790,8 @@ public sealed class OpenRouterClient :
         CancellationToken cancellationToken,
         int maximumResponseBytes = MaximumResponseBytes)
     {
-        if (response.Content.Headers.ContentLength is > maximumResponseBytes)
+        if (response.Content.Headers.ContentLength is { } contentLength &&
+            contentLength > maximumResponseBytes)
         {
             throw new InvalidDataException("The OpenRouter response exceeds the size limit.");
         }
