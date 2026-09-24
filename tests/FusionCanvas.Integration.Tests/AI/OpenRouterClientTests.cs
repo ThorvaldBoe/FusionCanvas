@@ -3,7 +3,9 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using FusionCanvas.Application.AI;
+using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Integration.AI;
+using FusionCanvas.Integration.Persistence;
 
 namespace FusionCanvas.Integration.Tests.AI;
 
@@ -467,6 +469,29 @@ public class OpenRouterClientTests
         Assert.Equal(2, handler.Requests.Count);
     }
 
+    [Fact]
+    public async Task ValidateAsync_WithTelemetry_PreservesResponseAndStoresUsefulSanitizedBody()
+    {
+        using var temp = new TelemetryTestDirectory();
+        var workspaceId = Guid.NewGuid();
+        var context = new TestTelemetryWorkspaceContext(workspaceId);
+        using var telemetry = new WorkspaceTelemetryService(new SqliteTelemetryStore(temp.GetPath("telemetry.db")), context);
+        await telemetry.SaveSettingsAsync(workspaceId, WorkspaceTelemetrySettings.Default with { DebugModeEnabled = true });
+        await telemetry.GetSettingsAsync(workspaceId);
+        var responseBody = """{"data":{"is_management_key":true,"limit_remaining":12.5}}""";
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK, responseBody));
+        var client = new OpenRouterClient(
+            new HttpClient(handler) { BaseAddress = OpenRouterClient.DefaultBaseAddress }, telemetry);
+
+        var result = await client.ValidateAsync("sensitive-api-key", TestContext.Current.CancellationToken);
+        var entry = Assert.Single(await telemetry.ReadAllAsync(workspaceId));
+
+        Assert.Equal(AiCredentialValidationKind.ManagementKey, result.Kind);
+        Assert.Contains("is_management_key", entry.ResponseBody);
+        Assert.Contains("12.5", entry.ResponseBody);
+        Assert.DoesNotContain("sensitive-api-key", System.Text.Json.JsonSerializer.Serialize(entry));
+    }
+
     private static OpenRouterClient CreateClient(RecordingHandler handler) =>
         new(new HttpClient(handler) { BaseAddress = OpenRouterClient.DefaultBaseAddress });
 
@@ -508,4 +533,21 @@ public class OpenRouterClientTests
         string? Scheme,
         string? Parameter,
         string? Body);
+
+    private sealed class TestTelemetryWorkspaceContext(Guid? activeWorkspaceId) : ITelemetryWorkspaceContext
+    {
+        public Guid? ActiveWorkspaceId { get; private set; } = activeWorkspaceId;
+        public void SetActiveWorkspace(Guid? workspaceId) => ActiveWorkspaceId = workspaceId;
+    }
+
+    private sealed class TelemetryTestDirectory : IDisposable
+    {
+        private readonly string _path = Path.Combine(Path.GetTempPath(), "FusionCanvasOpenRouterTelemetryTests", Guid.NewGuid().ToString("N"));
+        public string GetPath(string name) => Path.Combine(_path, name);
+        public void Dispose()
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            if (Directory.Exists(_path)) Directory.Delete(_path, recursive: true);
+        }
+    }
 }

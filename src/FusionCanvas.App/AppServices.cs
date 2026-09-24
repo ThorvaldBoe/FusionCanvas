@@ -3,6 +3,7 @@ using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Items;
 using ImportItemCsvCodec = FusionCanvas.Application.Items.Import.IItemCsvCodec;
 using FusionCanvas.Application.Settings;
+using FusionCanvas.Application.Telemetry;
 
 namespace FusionCanvas.App;
 
@@ -12,6 +13,7 @@ public sealed class AppServices : IDisposable
     private bool _disposed;
     private HttpClient? _printifyHttpClient;
     private HttpClient? _printifyCatalogHttpClient;
+    private readonly IDisposable? _telemetryLifetime;
 
     public FusionCanvas.Application.Stores.Printify.IStorePrintifyCredentialStore? PrintifyCredentials { get; private set; }
     public FusionCanvas.Application.Stores.Printify.IPrintifyCredentialVerifier? PrintifyVerifier { get; private set; }
@@ -37,7 +39,8 @@ public sealed class AppServices : IDisposable
         IAiTextGenerationService aiTextGeneration,
         IAiImageGenerationProvider aiImageGeneration,
         IItemCsvCodec itemCsvExportCodec,
-        ImportItemCsvCodec itemCsvImportCodec)
+        ImportItemCsvCodec itemCsvImportCodec,
+        ITelemetryService? telemetry = null)
     {
         _httpClient = httpClient;
         SettingsStore = settingsStore;
@@ -46,6 +49,8 @@ public sealed class AppServices : IDisposable
         AiImageGeneration = aiImageGeneration;
         ItemCsvExportCodec = itemCsvExportCodec;
         ItemCsvImportCodec = itemCsvImportCodec;
+        Telemetry = telemetry;
+        _telemetryLifetime = telemetry as IDisposable;
     }
 
     public IApplicationSettingsStore SettingsStore { get; }
@@ -54,6 +59,7 @@ public sealed class AppServices : IDisposable
     public IAiImageGenerationProvider AiImageGeneration { get; }
     public IItemCsvCodec ItemCsvExportCodec { get; }
     public ImportItemCsvCodec ItemCsvImportCodec { get; }
+    public ITelemetryService? Telemetry { get; }
 
     public async Task FlushAsync()
     {
@@ -70,5 +76,6 @@ public sealed class AppServices : IDisposable
         _httpClient.Dispose();
         _printifyHttpClient?.Dispose();
         _printifyCatalogHttpClient?.Dispose();
+        _telemetryLifetime?.Dispose();
     }
 }

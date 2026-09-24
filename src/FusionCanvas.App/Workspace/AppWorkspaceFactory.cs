@@ -31,6 +31,8 @@ public static class AppWorkspaceFactory
     public const string WorkspaceDatabaseEnvironmentVariable = "FUSIONCANVAS_WORKSPACE_DB";
     public const string WorkspaceRootEnvironmentVariable = "FUSIONCANVAS_WORKSPACE_ROOT";
 
+    public static string ResolveDefaultDatabasePath() => DefaultDatabasePath();
+
     public static AppWorkspaceRuntime CreateDefault(IAiTextGenerationService ai, IAiImageGenerationProvider? artworkProvider = null)
         => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()), ai, artworkProvider);
 

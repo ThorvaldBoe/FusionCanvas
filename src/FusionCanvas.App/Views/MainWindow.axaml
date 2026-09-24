@@ -68,7 +68,8 @@
                   ToolTip.Tip="Settings"
                   Command="{Binding Settings.OpenCommand}"
                   Classes="iconButton"
-                  AutomationProperties.Name="Settings" />
+                  AutomationProperties.Name="Settings"
+                  AutomationProperties.AutomationId="Settings.Open" />
         </Grid>
 
         <StackPanel Grid.Row="1"
