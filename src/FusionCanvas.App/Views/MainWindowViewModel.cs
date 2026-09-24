@@ -517,11 +517,23 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         ArgumentNullException.ThrowIfNull(navigationContext);
 
+        _ = Settings.Telemetry.RecordAsync(new FusionCanvas.Application.Telemetry.TelemetryEventRequest(
+            "Workspace", "OpenNavigationContext", "Information", "Started",
+            $"Opening {navigationContext.Context.EntityKind} in the document window."));
         GuardActiveItemInspectorLeave(() => DocumentWindow.Open(navigationContext.Context));
     }
 
     public void SelectWorkflowStage(WorkflowStage stage)
     {
+        _ = Settings.Telemetry.RecordAsync(new FusionCanvas.Application.Telemetry.TelemetryEventRequest(
+            stage switch
+            {
+                WorkflowStage.Idea => "Ideation",
+                WorkflowStage.Concept => "Concept",
+                WorkflowStage.Design => "Design",
+                WorkflowStage.Listing => "Listing",
+                _ => "Workspace"
+            }, "SelectWorkflowStage", "Information", "Started", $"Selected workflow stage {stage}."));
         GuardActiveItemInspectorLeave(() => ApplyActiveViewStage(stage));
     }
 
@@ -729,6 +741,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         StoreManagement.SetActiveWorkspaceAsync(workspace?.Id).GetAwaiter().GetResult();
         GroupManagementServiceSetWorkspace(workspace?.Id);
         RefreshWorkspaceSnapshot();
+        _ = Settings.Telemetry.RecordAsync(new FusionCanvas.Application.Telemetry.TelemetryEventRequest(
+            "Workspace", "ActivateWorkspace", "Information", "Succeeded",
+            workspace is null ? "No active workspace." : "Activated workspace.",
+            MetadataJson: workspace is null ? null : System.Text.Json.JsonSerializer.Serialize(new { workspaceId = workspace.Id })));
     }
 
     private void SubscribeToWorkspacePromptState()
@@ -1185,7 +1201,24 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(GroupActionStatus));
     }
 
-    private static void Run(Task task) => _ = task;
+    private void Run(Task task) => _ = ObserveCommandAsync(task);
+
+    private async Task ObserveCommandAsync(Task task)
+    {
+        try
+        {
+            await task.ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            _ = Settings.Telemetry.RecordAsync(new FusionCanvas.Application.Telemetry.TelemetryEventRequest(
+                "Workspace", "CommandFailed", "Error", "Failed", exception.GetType().Name));
+        }
+    }
 
     private SettingsViewModel CreateSettings(SettingsViewModel? provided)
     {
@@ -1258,6 +1291,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         if (resolution.Scope is { } scope)
         {
             Ideation.Open(scope);
+            _ = Settings.Telemetry.RecordAsync(new FusionCanvas.Application.Telemetry.TelemetryEventRequest(
+                "Ideation", "OpenIdeation", "Information", "Succeeded", "Opened ideation for the active workspace context."));
             RaiseIdeationProperties();
         }
     }

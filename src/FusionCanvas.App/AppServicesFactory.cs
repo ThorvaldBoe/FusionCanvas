@@ -2,6 +2,9 @@ using FusionCanvas.App.Settings;
 using FusionCanvas.App.Versioning;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Integration.AI;
+using FusionCanvas.Application.Telemetry;
+using FusionCanvas.App.Workspace;
+using FusionCanvas.Integration.Persistence;
 
 namespace FusionCanvas.App;
 
@@ -22,13 +25,17 @@ public static class AppServicesFactory
             : Path.GetDirectoryName(settingsPath) ?? AppContext.BaseDirectory;
 
         var credentials = new NativeAiCredentialStore();
+        var telemetryContext = new TelemetryWorkspaceContext();
+        var telemetry = new WorkspaceTelemetryService(
+            new SqliteTelemetryStore(AppWorkspaceFactory.ResolveDefaultDatabasePath()),
+            telemetryContext);
         var catalogCache = new JsonAiModelCatalogCache(Path.Combine(settingsDirectory, "ai-cache"));
         var httpClient = new HttpClient
         {
             BaseAddress = OpenRouterClient.DefaultBaseAddress,
             Timeout = Timeout.InfiniteTimeSpan
         };
-        var openRouter = new OpenRouterClient(httpClient);
+        var openRouter = new OpenRouterClient(httpClient, telemetry);
         var aiSettings = new AiSettingsViewModel(
             load.Value.Ai,
             credentials,
@@ -42,7 +49,9 @@ public static class AppServicesFactory
             load.Warning,
             aiSettings,
             new AssemblyApplicationVersionProvider(),
-            AvaloniaClipboardService.Instance);
+            AvaloniaClipboardService.Instance,
+            telemetry,
+            telemetryContext);
         var textService = new AiTextGenerationService(aiSettings, credentials, catalogCache, openRouter);
         var services = new AppServices(
             httpClient,
@@ -51,13 +60,14 @@ public static class AppServicesFactory
             textService,
             openRouter,
             new FusionCanvas.Integration.Items.ItemCsvCodec(),
-            new FusionCanvas.Integration.Items.Import.ItemCsvCodec());
+            new FusionCanvas.Integration.Items.Import.ItemCsvCodec(),
+            telemetry);
         var printifyClient = FusionCanvas.Integration.Stores.Printify.PrintifyCredentialVerifier.CreateHttpClient();
         var printifyCatalogClient = FusionCanvas.Integration.Stores.Printify.PrintifyCatalogClient.CreateHttpClient();
         services.ConfigurePrintify(printifyClient,
             new FusionCanvas.Integration.Stores.Printify.NativeStorePrintifyCredentialStore(),
             new FusionCanvas.Integration.Stores.Printify.PrintifyCredentialVerifier(printifyClient),
-            new FusionCanvas.Integration.Stores.Printify.PrintifyCatalogClient(printifyCatalogClient),
+            new FusionCanvas.Integration.Stores.Printify.PrintifyCatalogClient(printifyCatalogClient, telemetry),
             printifyCatalogClient);
         return services;
     }

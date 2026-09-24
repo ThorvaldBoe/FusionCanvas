@@ -1,43 +1,52 @@
-# Verification Plan — Workspace Telemetry and Debug Monitor
+# Verification — Workspace Telemetry and Debug Monitor
 
-This plan maps every acceptance scenario to deterministic or supplemental evidence. Implementation completion must replace planned methods with actual test names/results and record command output.
+## Acceptance scenario results
 
-| Capability / scenario | Planned evidence |
+| Scenario | Result and evidence |
 |---|---|
-| Telemetry / Debug Mode has not been enabled | Application service test: no record is persisted by a disabled workspace runtime; Settings headless test asserts default toggle off. |
-| Telemetry / Event is recorded for the active workspace | Application service test plus SQLite integration insert/readback asserting workspace, UTC time, area, event, and context fields. |
-| Telemetry / Workspace switching keeps telemetry isolated | Workspace runtime/Application test plus SQLite query asserting records stay in their owning databases and do not cross workspaces. |
-| Telemetry / Workflow decision point is reached | Instrumentation test for representative event per major first-pass area; assert stable area/event/outcome identifiers. |
-| Telemetry / HTTP operation succeeds | Fake-handler tests for OpenRouter and Printify asserting method, sanitized endpoint, status, duration presence, and request/response body while preserving returned result. |
-| Telemetry / HTTP operation fails | Fake-handler tests for timeout, network failure, and unsuccessful response asserting sanitized failure event and unchanged existing error classification. |
-| Telemetry / Telemetry persistence is unavailable | Application test with failing telemetry store asserting the user operation result is preserved and no recursive telemetry calls occur. |
-| Telemetry / HTTP credentials are present | Redactor unit tests and persisted/exported/live-event readback tests assert known secret values are absent while non-secret body text remains. |
-| Telemetry / Search by time and area | Application and SQLite tests for start-inclusive/end-exclusive boundaries, workspace/area filters, newest-first stable order, and bounded paging. |
-| Telemetry / Search returns no matches | Settings view-model/headless test asserts normal empty state, not error state. |
-| Telemetry / User selects a retention period | Application and Settings tests for all three choices and saved workspace-specific selection; SQLite test verifies immediate expiry after shortening retention. |
-| Telemetry / Expired records are cleaned up | SQLite tests cover startup, post-write, periodic/manual scheduler trigger, each retention age, non-expired preservation, and cleanup while Debug Mode is off. |
-| Telemetry / Export retained telemetry | JSON codec and integration tests assert all retained workspace records, UTF-8 JSON, sanitized body content, and unchanged database. |
-| Telemetry / User cancels telemetry export | Application export workflow test asserts no file is written and source records remain unchanged. |
-| Telemetry / User confirms telemetry deletion | Application/SQLite test asserts all active-workspace telemetry is deleted while settings and other workspace records remain unchanged. |
-| Telemetry / User cancels telemetry deletion | Settings view-model/headless test asserts records remain unchanged after cancellation. |
-| Telemetry / User opens the debug window | Settings and Avalonia headless tests assert Show enables Debug Mode, opens modeless resizable state, and receives subsequent event updates. |
-| Telemetry / User turns off Debug Mode | Settings/window headless tests assert Show turns off, window closes, and later telemetry calls are not persisted. |
-| Telemetry / User hides the debug window | Settings/window headless test asserts closing hides the window while Debug Mode continues capture. |
-| Telemetry / Active workspace changes | Workspace-switch headless test asserts old buffer clears and only new workspace events appear; capture follows new workspace settings. |
-| Telemetry / User copies debug output | Clipboard fake and headless command test assert the entire displayed text in order is copied and SQLite is unchanged. |
-| Telemetry / User clears debug output | Headless command plus SQLite integration test asserts buffer clears, stored records remain searchable/exportable, and later events appear. |
-| Application Settings / Active workspace is available | Settings headless view test asserts Diagnostics controls bind to active workspace and availability follows state. |
-| Application Settings / No workspace is active | Settings headless view test asserts explanatory text and disabled workspace-specific controls. |
-| Application Settings / User searches telemetry | Settings view-model/headless test asserts filters reach query and results/empty/error states render. |
-| Application Settings / User confirms destructive deletion | Settings headless test asserts workspace-specific confirmation, cancel behavior, and confirmed delete command path. |
-| Workspace Transfer / Workspace package is exported | Transfer integration test inspects package contents for absence of telemetry and confirms source records remain. |
-| Workspace Transfer / Workspace package is imported | Transfer integration test asserts no telemetry rows are restored and Debug Mode/Show Debug Window start off. |
+| Debug Mode defaults off | **Pass.** `WorkspaceTelemetryServiceTests.RecordAsync_WhenCaptureIsDisabled_DoesNotWrite`. Migration test also verifies schema-18 workspaces resolve to the off/one-day defaults. |
+| Active-workspace event capture | **Pass.** Application service tests assert the event is written with the currently active workspace and redacted content. SQLite round-trip/search tests cover persisted rows. |
+| Workspace switching isolation | **Pass.** `RecordAsync_RedactsSecretsAndUsesActiveWorkspace` switches the active context before recording. `WorkspaceChange_ClearsOldWindowTextAndShowsOnlyNewWorkspaceEvents` verifies the view model clears and follows the new workspace. |
+| Workflow decision points | **Pass by code inspection.** `MainWindowViewModel` records navigation, workflow stage, workspace activation, ideation opening, and observed command failures using stable areas and event names. Stage mapping covers Ideation, Concept, Design, and Listing. |
+| HTTP success preserves client result and records useful body | **Pass.** `OpenRouterClientTests.ValidateAsync_WithTelemetry_PreservesResponseAndStoresUsefulSanitizedBody` asserts both the original validation result and retained response details. Printify success capture and body metadata were reviewed in `PrintifyCatalogClient.SendJsonAsync`. |
+| HTTP failure and timeout diagnostics | **Pass by code inspection.** OpenRouter records transport failures and unsuccessful status responses; Printify records cancellation, timeout, network/read failure, invalid JSON, unsuccessful status, and oversized-body outcomes. Existing client error mapping remains in place. A dedicated Printify fake-handler test was not added. |
+| Telemetry storage unavailable | **Pass.** `WorkspaceTelemetryServiceTests.RecordAsync_WhenStoreFails_DoesNotPropagateTelemetryFailure` asserts a persistence failure does not escape the telemetry call. |
+| Credential redaction | **Pass.** Application redactor tests cover object properties, URL-style query values, bearer strings, arrays, and scalar JSON; the OpenRouter integration test checks the serialized stored entry does not contain the supplied credential while preserving useful response fields. The same sanitized `TelemetryEntry` feeds persistence and live display; export reads only persisted entries. |
+| Search by time and area | **Pass.** `SqliteTelemetryStoreTests.Store_SearchesByWorkspaceTimeAndArea_AndDeletesExpiredRecords` covers inclusive start, exclusive end, workspace and area filters. `Store_UsesNewestFirstPagingAndWorkspaceScopedDeletion` covers sort order and paging. |
+| Search with no matches | **Pass.** `WorkspaceTelemetrySettingsTests.Search_FiltersByAreaAndShowsNormalEmptyResults` asserts the normal empty message and empty result text. |
+| Retention choices and workspace defaults | **Pass by implementation review.** Settings binds the three supported enum values; schema defaults and `WorkspaceTelemetrySettings.Default` select one day. Saving a changed period performs cleanup immediately. |
+| Automatic expiry while capture is off | **Pass by implementation review plus persistence evidence.** `SqliteTelemetryStoreTests` verifies cutoff deletion independent of Debug Mode. Service cleanup runs at workspace load, after settings changes and writes, and on its five-minute timer. Timer cadence itself was not waited out in a test. |
+| JSON export preserves records and sanitizes | **Pass.** `WorkspaceTelemetryServiceTests.ExportJsonAsync_ExportsSanitizedRecordsWithoutDeletingThem` checks useful content remains, a credential is absent, and source records remain. Settings writes UTF-8 without a BOM. |
+| Export destination is cancelled | **Pass by code inspection.** A null path from the file picker exits before export or file write. The save-dialog cancellation path was not automated. |
+| Confirmed telemetry deletion | **Pass.** `WorkspaceTelemetrySettingsTests.DeleteRequiresConfirmationAndCancelPreservesRecordsAndSettings` covers confirmation, cancellation, successful deletion, and retained settings. SQLite deletion is workspace-scoped. |
+| User hides the debug window | **Pass by code inspection.** Window close calls `CloseDebugWindow`, which clears only `ShowDebugWindow`; it does not disable Debug Mode. |
+| Show Debug Window enables capture | **Pass.** `WorkspaceTelemetrySettingsTests.DebugWindow_EnablesCaptureAndCopyClearOnlyAffectDisplayedText` constructs the actual Settings view headlessly, enables Show, observes `DebugWindowOpened` and a later event, and checks capture is enabled. |
+| Turning Debug Mode off closes the window | **Pass.** The same headless test turns Debug Mode off and waits until capture and open-window state are both false. |
+| Active workspace change clears displayed events | **Pass.** `WorkspaceChange_ClearsOldWindowTextAndShowsOnlyNewWorkspaceEvents` verifies previous text is cleared and only the second workspace event remains visible. |
+| Copy all displayed text | **Pass.** The Settings headless test uses a recording clipboard and checks the displayed event text was copied. The optional Appium journey also checks the native Windows clipboard. |
+| Clear displayed text only | **Pass.** The Settings headless test clears the view buffer and reads the persisted event back from SQLite. The optional Appium journey repeats the clear/readback on a disposable app database. |
+| Settings with active workspace | **Pass.** Headless view construction verifies the Diagnostics view binds in the active workspace context. Workspace-specific actions derive availability from `HasWorkspace`. |
+| Settings without active workspace | **Pass by code inspection.** The view displays the no-workspace prompt and disables workspace controls from `HasWorkspace`; no separate no-workspace headless assertion was added. |
+| Settings search and destructive confirmation states | **Pass.** Headless tests cover filtered results, no matches, cancel and confirm deletion, and workspace-specific confirmation text. |
+| Package export excludes telemetry | **Pass.** `WorkspacePackageIntegrationTests.ExportThenImport_ExcludesTelemetryAndResetsDiagnosticsPreferences` creates real telemetry before export, inspects the embedded database, and confirms records and enabled preferences are absent. |
+| Package import starts diagnostics safely | **Pass.** The same transfer test imports the package and confirms no telemetry rows and default off/one-day/hidden settings. Existing package round-trip tests continue to cover workspace data. |
+| Debug window resizes and stays modeless | **Pass by implementation/headless evidence.** XAML declares a modeless owned window with `CanResize`, dimensions and minimum bounds; `DebugWindow_IsNativeResizableWindow` checks its resize contract. Native reposition/resize is covered by the optional Appium scenario when a Windows automation server is available. |
 
-## Supplemental desktop journey
+## Optional Windows desktop scenario
 
-One optional Windows Appium journey is assigned to a `debug-window` scenario pack, with a fresh disposable workspace/database per pack. The journey enables Debug Mode, opens and resizes the modeless window, observes a deterministic event, copies and checks clipboard text, clears the window, then verifies the record remains in SQLite. This is supplemental evidence for native window placement/resizing and clipboard integration; it is not a required baseline gate.
+Added `TelemetryDebugWindowUiTests.DebugWindow_CapturesResizesCopiesAndClearsWithoutDeletingDatabaseRecords` with the `ScenarioPack=debug-window` trait. It starts a fresh disposable workspace/database, enables capture and the monitor, waits for a known event, resizes the window, copies and reads native clipboard text, clears the view, then confirms the database row remains. The Appium project builds successfully. The journey was not run because it requires a separately running Appium Windows driver and interactive desktop session; those are supplemental prerequisites, not part of the deterministic solution baseline.
 
-## Required completion commands
+## Validation evidence
 
-- `openspec validate --strict`
-- `dotnet test .\FusionCanvas.sln -m:1`
+- `dotnet build .\src\FusionCanvas.App\FusionCanvas.App.csproj --no-restore` — passed, 0 warnings and 0 errors.
+- `dotnet build .\tests\FusionCanvas.UITests\FusionCanvas.UITests.csproj --no-restore` — passed, 0 warnings and 0 errors after restoring the excluded Appium test project.
+- `dotnet test .\FusionCanvas.sln -m:1` — passed: Domain 255, Application 515, Integration 252, App 688, UiDescription 27; 1,737 total, 0 failed.
+- Focused reruns — Application telemetry 5 passed; Settings telemetry 5 passed.
+- `openspec validate workspace-telemetry-debug-monitor --strict` — passed.
+
+## Review notes
+
+- Telemetry tables are excluded from `WorkspaceSnapshot`; package transfer writes ordinary snapshots and therefore does not copy telemetry. The package integration test confirms this boundary.
+- Event redaction runs before persistence and the resulting entry is also the live-window payload. Export serializes already-sanitized stored entries.
+- HTTP response capture applies the size limit to telemetry only; OpenRouter restores the complete response bytes for the application client. Printify failure capture is bounded.
+- The optional Windows journey is compiled but not executed without its external Appium server. No test changed the normal user database; automated persistence and UI tests use temporary paths.

@@ -5,6 +5,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FusionCanvas.Application.AI;
+using FusionCanvas.Application.Telemetry;
+using System.Diagnostics;
 
 namespace FusionCanvas.Integration.AI;
 
@@ -25,10 +27,12 @@ public sealed class OpenRouterClient :
     private const int MaximumDisplayText = 4096;
 
     private readonly HttpClient _httpClient;
+    private readonly ITelemetryService? _telemetry;
 
-    public OpenRouterClient(HttpClient httpClient)
+    public OpenRouterClient(HttpClient httpClient, ITelemetryService? telemetry = null)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        _telemetry = telemetry;
         _httpClient.BaseAddress ??= DefaultBaseAddress;
     }
 
@@ -263,10 +267,12 @@ public sealed class OpenRouterClient :
             using var message = new HttpRequestMessage(HttpMethod.Post, "api/v1/chat/completions");
             message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", request.ApiKey);
             message.Content = new StringContent(BuildRequestJson(request), Encoding.UTF8, "application/json");
-            using var response = await _httpClient.SendAsync(
+            using var response = await SendWithTelemetryAsync(
                 message,
                 HttpCompletionOption.ResponseHeadersRead,
-                timeout.Token).ConfigureAwait(false);
+                timeout.Token,
+                GenerationTimeout,
+                MaximumResponseBytes).ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -370,7 +376,7 @@ public sealed class OpenRouterClient :
             using var message = new HttpRequestMessage(HttpMethod.Post, "api/v1/images");
             message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", request.ApiKey);
             message.Content = new StringContent(BuildImageRequestJson(request), Encoding.UTF8, "application/json");
-            using var response = await _httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
+            using var response = await SendWithTelemetryAsync(message, HttpCompletionOption.ResponseHeadersRead, timeout.Token, GenerationTimeout, MaximumImageResponseBytes).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
                 return (null, new(MapImageFailure(response.StatusCode), "OpenRouter could not complete the image request."));
 
@@ -450,10 +456,12 @@ public sealed class OpenRouterClient :
             {
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
             }
-            var response = await _httpClient.SendAsync(
+            var response = await SendWithTelemetryAsync(
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
-                timeout.Token).ConfigureAwait(false);
+                timeout.Token,
+                MetadataTimeout,
+                MaximumResponseBytes).ConfigureAwait(false);
             if (attempt > 0 || !IsRetryable(response.StatusCode))
             {
                 return response;
@@ -468,6 +476,120 @@ public sealed class OpenRouterClient :
 
             await Task.Delay(delay, timeout.Token).ConfigureAwait(false);
         }
+    }
+
+    private async Task<HttpResponseMessage> SendWithTelemetryAsync(
+        HttpRequestMessage request,
+        HttpCompletionOption completionOption,
+        CancellationToken cancellationToken,
+        TimeSpan timeout,
+        int maximumBodyBytes)
+    {
+        var capture = _telemetry?.IsCaptureEnabled == true;
+        var requestBody = capture && request.Content is not null
+            ? await request.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false)
+            : null;
+        var requestDetails = capture ? BuildRequestDetails(request) : null;
+        var stopwatch = Stopwatch.StartNew();
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.SendAsync(request, completionOption, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or OperationCanceledException)
+        {
+            if (capture)
+            {
+                await _telemetry!.RecordAsync(new TelemetryEventRequest(
+                    "Integration.OpenRouter", "HttpRequest", "Error", "Failed", exception.GetType().Name,
+                    RequestBody: requestBody,
+                    RequestDetailsJson: requestDetails,
+                    MetadataJson: JsonSerializer.Serialize(new { elapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds, timeoutSeconds = timeout.TotalSeconds })));
+            }
+            throw;
+        }
+
+        stopwatch.Stop();
+        if (!capture) return response;
+
+        string? responseBody = null;
+        var responseDetails = BuildResponseDetails(response, stopwatch.Elapsed);
+        var contentType = response.Content.Headers.ContentType?.MediaType;
+        if (IsTextContent(contentType))
+        {
+            // Buffer the complete response and put the same bytes back on the response.
+            // The diagnostic size limit applies only to persistence; it must not truncate
+            // a response that the caller still needs to parse.
+            var originalContent = response.Content;
+            var originalHeaders = originalContent.Headers
+                .SelectMany(header => header.Value.Select(value => (header.Key, Value: value)))
+                .ToArray();
+            var bytes = await originalContent.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+            if (bytes.Length <= maximumBodyBytes)
+            {
+                responseBody = Encoding.UTF8.GetString(bytes);
+            }
+            else
+            {
+                responseDetails = BuildResponseDetails(response, stopwatch.Elapsed, bytes.Length, truncated: true);
+            }
+
+            var replacement = new ByteArrayContent(bytes);
+            foreach (var header in originalHeaders) replacement.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            originalContent.Dispose();
+            response.Content = replacement;
+        }
+
+        await _telemetry!.RecordAsync(new TelemetryEventRequest(
+            "Integration.OpenRouter", "HttpResponse", response.IsSuccessStatusCode ? "Information" : "Warning",
+            response.IsSuccessStatusCode ? "Succeeded" : "HttpFailure",
+            $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}",
+            RequestBody: requestBody,
+            ResponseBody: responseBody,
+            RequestDetailsJson: requestDetails,
+            ResponseDetailsJson: responseDetails,
+            MetadataJson: JsonSerializer.Serialize(new { elapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds, timeoutSeconds = timeout.TotalSeconds })));
+        return response;
+    }
+
+    private static string BuildRequestDetails(HttpRequestMessage request) => JsonSerializer.Serialize(new
+    {
+        method = request.Method.Method,
+        uri = request.RequestUri?.ToString(),
+        contentType = request.Content?.Headers.ContentType?.ToString()
+    });
+
+    private static string BuildResponseDetails(HttpResponseMessage response, TimeSpan elapsed, long? bodyBytes = null, bool truncated = false) => JsonSerializer.Serialize(new
+    {
+        statusCode = (int)response.StatusCode,
+        reason = response.ReasonPhrase,
+        contentType = response.Content.Headers.ContentType?.ToString(),
+        contentLength = bodyBytes ?? response.Content.Headers.ContentLength,
+        elapsedMilliseconds = elapsed.TotalMilliseconds,
+        truncated
+    });
+
+    private static bool IsTextContent(string? mediaType) =>
+        mediaType is not null && (mediaType.StartsWith("text/", StringComparison.OrdinalIgnoreCase)
+            || mediaType.Contains("json", StringComparison.OrdinalIgnoreCase)
+            || mediaType.Contains("xml", StringComparison.OrdinalIgnoreCase)
+            || mediaType.Contains("x-www-form-urlencoded", StringComparison.OrdinalIgnoreCase));
+
+    private static async Task<(byte[] Bytes, bool Exceeded)> ReadContentBoundedAsync(HttpContent content, int maximumBytes, CancellationToken cancellationToken)
+    {
+        await using var stream = await content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using var buffer = new MemoryStream(Math.Min(maximumBytes, 81920));
+        var chunk = new byte[81920];
+        var exceeded = false;
+        while (buffer.Length <= maximumBytes)
+        {
+            var remaining = (int)Math.Min(chunk.Length, maximumBytes + 1L - buffer.Length);
+            var count = await stream.ReadAsync(chunk.AsMemory(0, remaining), cancellationToken).ConfigureAwait(false);
+            if (count == 0) break;
+            buffer.Write(chunk, 0, count);
+            exceeded = buffer.Length > maximumBytes;
+        }
+        return (buffer.ToArray(), exceeded);
     }
 
     private static string BuildRequestJson(AiProviderTextRequest request)

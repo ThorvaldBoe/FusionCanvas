@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text.Json;
 using FusionCanvas.Application.Workspaces.Transfer;
 using FusionCanvas.Application.Snowclones;
+using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Ideation;
@@ -68,6 +69,52 @@ public class WorkspacePackageIntegrationTests
         Assert.Equal(snapshot.MockupTemplateRevisions, restored.MockupTemplateRevisions);
         Assert.Equal(snapshot.MockupTemplateRevisionColors, restored.MockupTemplateRevisionColors);
         Assert.Equal([1, 2, 3, 4], await ReadBytesAsync(destinationFiles, "assets/design.png"));
+    }
+
+    [Fact]
+    public async Task ExportThenImport_ExcludesTelemetryAndResetsDiagnosticsPreferences()
+    {
+        using var temp = new TemporaryDirectory();
+        var sourcePath = temp.GetPath("source.db");
+        var snapshot = CreateSnapshot("Diagnostics excluded", "assets/design.png");
+        var sourceRepository = new SqliteWorkspaceRepository(sourcePath);
+        await sourceRepository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+        var context = new TestTelemetryWorkspaceContext(snapshot.Workspaces[0].Id);
+        using var sourceTelemetry = new WorkspaceTelemetryService(new SqliteTelemetryStore(sourcePath), context);
+        await sourceTelemetry.SaveSettingsAsync(snapshot.Workspaces[0].Id,
+            WorkspaceTelemetrySettings.Default with { DebugModeEnabled = true, ShowDebugWindow = true });
+        await sourceTelemetry.GetSettingsAsync(snapshot.Workspaces[0].Id);
+        await sourceTelemetry.RecordAsync(new TelemetryEventRequest(
+            "Integration.OpenRouter", "SensitiveBody", "Information", "Succeeded", "secret request",
+            RequestBody: "request body", ResponseBody: "response body"));
+
+        var packagePath = temp.GetPath("diagnostics.fcworkspace");
+        var exported = await NewService(sourceRepository, new LocalWorkspaceFileStore(temp.GetPath("source-files")))
+            .ExportWorkspaceAsync(new WorkspaceExportRequest(snapshot.Workspaces[0].Id, packagePath),
+                cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(exported.Succeeded, exported.Error);
+        var embeddedPath = temp.GetPath("embedded.db");
+        using (var archive = ZipFile.OpenRead(packagePath))
+        await using (var input = archive.GetEntry("workspace.db")!.Open())
+        await using (var output = File.Create(embeddedPath))
+        {
+            await input.CopyToAsync(output, TestContext.Current.CancellationToken);
+        }
+
+        var packagedTelemetry = new SqliteTelemetryStore(embeddedPath);
+        Assert.Empty(await packagedTelemetry.ReadAllAsync(snapshot.Workspaces[0].Id));
+        Assert.Equal(WorkspaceTelemetrySettings.Default, await packagedTelemetry.ReadSettingsAsync(snapshot.Workspaces[0].Id));
+
+        var destinationPath = temp.GetPath("destination.db");
+        var destinationRepository = new SqliteWorkspaceRepository(destinationPath);
+        var imported = await NewService(destinationRepository, new LocalWorkspaceFileStore(temp.GetPath("destination-files")))
+            .ImportWorkspaceAsync(new WorkspaceImportRequest(packagePath),
+                cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.True(imported.Succeeded, imported.Error);
+        var destinationTelemetry = new SqliteTelemetryStore(destinationPath);
+        Assert.Empty(await destinationTelemetry.ReadAllAsync(snapshot.Workspaces[0].Id));
+        Assert.Equal(WorkspaceTelemetrySettings.Default, await destinationTelemetry.ReadSettingsAsync(snapshot.Workspaces[0].Id));
     }
 
     [Fact]
@@ -342,6 +389,12 @@ public class WorkspacePackageIntegrationTests
         SqliteWorkspaceRepository repository,
         LocalWorkspaceFileStore files) =>
         new(repository, files, new ZipWorkspacePackageWriter(), new ZipWorkspacePackageReader(), () => Now);
+
+    private sealed class TestTelemetryWorkspaceContext(Guid? activeWorkspaceId) : ITelemetryWorkspaceContext
+    {
+        public Guid? ActiveWorkspaceId { get; private set; } = activeWorkspaceId;
+        public void SetActiveWorkspace(Guid? workspaceId) => ActiveWorkspaceId = workspaceId;
+    }
 
     private static async Task<string> CreatePackageAsync(
         TemporaryDirectory temp,

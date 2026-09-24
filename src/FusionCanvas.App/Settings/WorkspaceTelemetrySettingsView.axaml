@@ -1,0 +1,65 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:settings="clr-namespace:FusionCanvas.App.Settings"
+             x:Class="FusionCanvas.App.Settings.WorkspaceTelemetrySettingsView"
+             x:DataType="settings:WorkspaceTelemetrySettingsViewModel">
+  <Border Padding="14"
+          Background="{DynamicResource ElevatedSurfaceBrush}"
+          BorderBrush="{DynamicResource ControlBorderBrush}"
+          BorderThickness="1"
+          CornerRadius="6">
+    <StackPanel Spacing="10">
+      <StackPanel Spacing="3">
+        <TextBlock Text="Diagnostics" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
+        <TextBlock Text="Telemetry is stored locally for this workspace. Captured service bodies may include creative content. Recognized credentials are redacted, and records expire automatically."
+                   FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+      </StackPanel>
+      <TextBlock IsVisible="{Binding HasNoWorkspace}" Text="Select an active workspace to manage diagnostics." TextWrapping="Wrap" />
+      <StackPanel IsEnabled="{Binding HasWorkspace}" Spacing="9">
+        <ToggleSwitch Content="Debug Mode"
+                      IsChecked="{Binding DebugModeEnabled, Mode=TwoWay}"
+                      AutomationProperties.AutomationId="Telemetry.DebugMode"
+                      OffContent="Off" OnContent="On" />
+        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <TextBlock Text="Automatically delete telemetry after" VerticalAlignment="Center" />
+          <ComboBox Width="150" ItemsSource="{Binding RetentionPeriods}" SelectedItem="{Binding RetentionPeriod, Mode=TwoWay}" />
+        </StackPanel>
+        <ToggleSwitch Content="Show Debug Window"
+                      IsChecked="{Binding ShowDebugWindow, Mode=TwoWay}"
+                      AutomationProperties.AutomationId="Telemetry.ShowDebugWindow"
+                      OffContent="Hidden" OnContent="Shown" />
+      </StackPanel>
+
+      <Border IsEnabled="{Binding HasWorkspace}" Padding="10" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="4">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Search telemetry" FontWeight="SemiBold" />
+          <TextBlock Text="Enter optional UTC timestamps in ISO 8601 format. The end time is exclusive." FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <TextBox Grid.Column="0" PlaceholderText="From (UTC)" Text="{Binding FromText, Mode=TwoWay}" />
+            <TextBox Grid.Column="1" PlaceholderText="To (UTC)" Text="{Binding ToText, Mode=TwoWay}" />
+          </Grid>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <ComboBox Width="220" ItemsSource="{Binding Areas}" SelectedItem="{Binding SelectedArea, Mode=TwoWay}" />
+            <Button Content="Search" Command="{Binding SearchCommand}" />
+            <Button Content="Export telemetry" Command="{Binding ExportCommand}" />
+            <Button Content="Delete telemetry" Command="{Binding RequestDeleteCommand}" Classes="danger" />
+          </StackPanel>
+          <TextBox Text="{Binding ResultText, Mode=OneWay}"
+                   IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
+                   FontFamily="Cascadia Mono,Consolas,Menlo,monospace" FontSize="11" MinHeight="70" MaxHeight="200"
+                   ScrollViewer.VerticalScrollBarVisibility="Auto" />
+          <Border IsVisible="{Binding ConfirmDelete}" Padding="8" Background="{DynamicResource WarningBackgroundBrush}" BorderBrush="{DynamicResource WarningBorderBrush}" BorderThickness="1" CornerRadius="4">
+            <StackPanel Spacing="6">
+              <TextBlock Text="{Binding DeleteConfirmationText}" TextWrapping="Wrap" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Delete" Command="{Binding ConfirmDeleteCommand}" Classes="danger" />
+                <Button Content="Cancel" Command="{Binding CancelDeleteCommand}" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+          <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </Border>
+</UserControl>

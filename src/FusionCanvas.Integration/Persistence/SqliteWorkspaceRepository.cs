@@ -170,6 +170,10 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await InsertDesignSlotAssignmentAsync(connection, transaction, assignment, cancellationToken);
         }
 
+        await ExecuteAsync(connection, transaction,
+            "DELETE FROM telemetry_entries WHERE workspace_id NOT IN (SELECT id FROM workspaces);", cancellationToken);
+        await ExecuteAsync(connection, transaction,
+            "DELETE FROM workspace_telemetry_settings WHERE workspace_id NOT IN (SELECT id FROM workspaces);", cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
 
@@ -645,8 +649,43 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await MigrateToVersion18Async(connection, cancellationToken);
         }
 
+        if (schemaVersion < 19)
+        {
+            await MigrateToVersion19Async(connection, cancellationToken);
+        }
+
         await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
     }
+
+    private static Task MigrateToVersion19Async(SqliteConnection connection, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, null, """
+            CREATE TABLE IF NOT EXISTS workspace_telemetry_settings (
+                workspace_id TEXT PRIMARY KEY,
+                debug_mode_enabled INTEGER NOT NULL DEFAULT 0,
+                retention_period INTEGER NOT NULL DEFAULT 2,
+                show_debug_window INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS telemetry_entries (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                occurred_at TEXT NOT NULL,
+                area TEXT NOT NULL,
+                event_name TEXT NOT NULL,
+                severity TEXT NOT NULL,
+                outcome TEXT NOT NULL,
+                message TEXT NOT NULL,
+                metadata_json TEXT NULL,
+                request_body TEXT NULL,
+                response_body TEXT NULL,
+                request_details_json TEXT NULL,
+                response_details_json TEXT NULL,
+                correlation_id TEXT NULL
+            );
+            CREATE INDEX IF NOT EXISTS ix_telemetry_workspace_time
+                ON telemetry_entries(workspace_id, occurred_at DESC, id);
+            CREATE INDEX IF NOT EXISTS ix_telemetry_workspace_area_time
+                ON telemetry_entries(workspace_id, area, occurred_at DESC, id);
+            """, cancellationToken);
 
     private static async Task MigrateToVersion13Async(SqliteConnection connection, CancellationToken cancellationToken)
     {

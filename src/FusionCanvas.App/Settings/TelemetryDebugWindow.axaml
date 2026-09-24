@@ -1,0 +1,26 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:settings="clr-namespace:FusionCanvas.App.Settings"
+        x:Class="FusionCanvas.App.Settings.TelemetryDebugWindow"
+        x:DataType="settings:WorkspaceTelemetrySettingsViewModel"
+        Title="FusionCanvas Debug Monitor"
+        Width="700" Height="500" MinWidth="420" MinHeight="240"
+        CanResize="True" WindowStartupLocation="Manual"
+        Background="{DynamicResource ApplicationBackgroundBrush}">
+  <Grid RowDefinitions="Auto,*" Margin="10" RowSpacing="8">
+    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
+      <TextBlock Text="Debug monitor" FontWeight="SemiBold" VerticalAlignment="Center" />
+      <TextBlock Text="{Binding WorkspaceName}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" />
+      <Button Content="Copy" Command="{Binding CopyWindowCommand}" AutomationProperties.AutomationId="Telemetry.Copy" />
+      <Button Content="Clear" Command="{Binding ClearWindowCommand}" AutomationProperties.AutomationId="Telemetry.Clear" />
+      <Button Content="Hide" Command="{Binding CloseWindowCommand}" />
+    </StackPanel>
+    <TextBox Grid.Row="1" Text="{Binding WindowText, Mode=OneWay}"
+             AutomationProperties.AutomationId="Telemetry.DebugOutput"
+             IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+             FontFamily="Cascadia Mono,Consolas,Menlo,monospace" FontSize="11"
+             VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
+             ScrollViewer.VerticalScrollBarVisibility="Auto"
+             ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+  </Grid>
+</Window>

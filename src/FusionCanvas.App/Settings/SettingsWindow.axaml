@@ -24,6 +24,7 @@
                    Foreground="{DynamicResource StrongTextBrush}"
                    Margin="0,0,0,8" />
         <ListBox x:Name="SectionSelector"
+                 AutomationProperties.AutomationId="Settings.SectionSelector"
                  ItemsSource="{Binding Sections}"
                  SelectedItem="{Binding SelectedSection, Mode=TwoWay}"
                  Background="Transparent"
@@ -104,6 +105,7 @@
                       Classes="primary" />
             </StackPanel>
           </Border>
+          <settings:WorkspaceTelemetrySettingsView DataContext="{Binding Telemetry}" />
         </StackPanel>
 
         <Panel IsVisible="{Binding IsAiSection}">

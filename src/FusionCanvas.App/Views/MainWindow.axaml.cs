@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     private StoreEditorWindow? _storeEditorWindow;
     private WorkspaceManagementWindow? _workspaceManagementWindow;
     private SettingsWindow? _settingsWindow;
+    private TelemetryDebugWindow? _telemetryDebugWindow;
     private AssetsWindow? _assetsWindow;
     private IdeationWindow? _ideationWindow;
     private Window? _designPreviewWindow;
@@ -72,6 +73,7 @@ public partial class MainWindow : Window
         if (services.PrintifyCredentials is { } printifyCredentials && services.PrintifyVerifier is { } printifyVerifier && services.PrintifyCatalogClient is { } catalogClient)
             viewModel.StoreManagement.ConfigurePrintify(printifyCredentials, printifyVerifier, catalogClient);
         viewModel.WorkspaceManagement.PackagePicker = new AvaloniaWorkspacePackagePicker(StorageProvider);
+        viewModel.Settings.Telemetry.SetExportFilePicker(new AvaloniaTelemetryExportFilePicker(StorageProvider));
         viewModel.WorkspaceTree.FilePicker = new FusionCanvas.App.Items.AvaloniaItemCsvFilePicker(StorageProvider);
         viewModel.WorkspaceTree.CsvCodec = services.ItemCsvExportCodec;
         viewModel.StoreManagement.PropertyChanged += (_, args) =>
@@ -127,12 +129,20 @@ public partial class MainWindow : Window
                     DispatcherPriority.Background);
             }
         };
+        viewModel.Settings.Telemetry.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(WorkspaceTelemetrySettingsViewModel.IsDebugWindowOpen))
+            {
+                Dispatcher.UIThread.Post(() => SyncTelemetryDebugWindow(viewModel.Settings.Telemetry), DispatcherPriority.Background);
+            }
+        };
         DataContext = viewModel;
         SyncSettingsWindow(viewModel.Settings);
         SyncWorkspaceManagementWindow(viewModel.WorkspaceManagement);
         SyncStoreEditorWindow(viewModel.StoreManagement);
         SyncAssetsWindow(viewModel.AssetsManagement);
         SyncIdeationWindow(viewModel.Ideation);
+        SyncTelemetryDebugWindow(viewModel.Settings.Telemetry);
     }
 
     private void OnDesignToolDataContextChanged(object? sender, EventArgs e)
@@ -283,6 +293,45 @@ public partial class MainWindow : Window
         {
             _settingsWindow.Close();
         }
+    }
+
+    private void SyncTelemetryDebugWindow(WorkspaceTelemetrySettingsViewModel telemetry)
+    {
+        if (telemetry.IsDebugWindowOpen && _telemetryDebugWindow is null)
+        {
+            var window = new TelemetryDebugWindow { DataContext = telemetry };
+            _telemetryDebugWindow = window;
+            window.Opened += (_, _) => PositionTelemetryWindow(window);
+            window.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(_telemetryDebugWindow, window)) _telemetryDebugWindow = null;
+                telemetry.CloseDebugWindow();
+            };
+            window.Show(this);
+            return;
+        }
+
+        if (!telemetry.IsDebugWindowOpen && _telemetryDebugWindow is { } openWindow)
+        {
+            _telemetryDebugWindow = null;
+            openWindow.Close();
+        }
+    }
+
+    private void PositionTelemetryWindow(TelemetryDebugWindow window)
+    {
+        var scale = Screens.All.FirstOrDefault(screen => screen.WorkingArea.Contains(Position))?.Scaling ?? 1;
+        var screen = Screens.All.FirstOrDefault(value => value.WorkingArea.Contains(Position))
+            ?? Screens.Primary;
+        if (screen is null) return;
+        var width = (int)(window.Width * scale);
+        var height = (int)(window.Height * scale);
+        var x = Position.X + (int)(Width * scale) + 8;
+        var y = Position.Y;
+        if (x + width > screen.WorkingArea.Right) x = Position.X - width - 8;
+        x = Math.Clamp(x, screen.WorkingArea.X, Math.Max(screen.WorkingArea.X, screen.WorkingArea.Right - width));
+        y = Math.Clamp(y, screen.WorkingArea.Y, Math.Max(screen.WorkingArea.Y, screen.WorkingArea.Bottom - height));
+        window.Position = new PixelPoint(x, y);
     }
 
     private void SyncWorkspaceManagementWindow(WorkspaceManagementViewModel workspaceManagement)

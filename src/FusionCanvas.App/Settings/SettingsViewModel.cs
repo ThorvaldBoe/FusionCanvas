@@ -9,6 +9,7 @@ using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Settings;
 using FusionCanvas.Application.Versioning;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.Telemetry;
 
 namespace FusionCanvas.App.Settings;
 
@@ -37,12 +38,15 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         string? loadWarning,
         AiSettingsViewModel? ai = null,
         IApplicationVersionProvider? versionProvider = null,
-        IClipboardService? clipboard = null)
+        IClipboardService? clipboard = null,
+        ITelemetryService? telemetryService = null,
+        ITelemetryWorkspaceContext? telemetryWorkspaceContext = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _themeController = themeController ?? throw new ArgumentNullException(nameof(themeController));
         _versionProvider = versionProvider ?? UnknownApplicationVersionProvider.Instance;
         _clipboard = clipboard ?? NullClipboardService.Instance;
+        Telemetry = new WorkspaceTelemetrySettingsViewModel(telemetryService, telemetryWorkspaceContext, _clipboard);
         _syncContext = SynchronizationContext.Current;
         _currentSettings = initialSettings;
         _isDarkMode = initialSettings.DarkMode;
@@ -114,6 +118,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
 
     public AiSettingsViewModel Ai { get; }
 
+    public WorkspaceTelemetrySettingsViewModel Telemetry { get; }
+
     public WindowLayoutSettings? WindowLayout => _currentSettings.WindowLayout;
 
     public IReadOnlyDictionary<string, WindowGeometrySettings> WindowGeometry =>
@@ -184,6 +190,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         _workspaceManagement = workspaceManagement;
         _workspaceManagement.ActiveWorkspaceChanged += OnActiveWorkspaceChanged;
         UpdateWorkspaceName(_workspaceManagement.SelectedWorkspace);
+        Telemetry.SetWorkspace(_workspaceManagement.SelectedWorkspace?.Id, _workspaceManagement.SelectedWorkspace?.Name);
     }
 
     public async Task FlushAsync()
@@ -232,6 +239,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     {
         UpdateWorkspaceName(workspace);
         UpdateActiveWorkspace(workspace?.Id);
+        Telemetry.SetWorkspace(workspace?.Id, workspace?.Name);
     }
 
     public void UpdateActiveWorkspace(Guid? workspaceId)

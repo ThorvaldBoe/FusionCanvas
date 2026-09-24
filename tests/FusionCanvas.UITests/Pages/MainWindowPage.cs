@@ -9,4 +9,14 @@ internal sealed class MainWindowPage(WindowsDriver driver) : UiPage(driver)
         FindByAutomationId(AutomationIds.StoreManagementOpenEditor).Click();
         SwitchToWindowContainingAutomationId(AutomationIds.StoreEditorNewStore);
     }
+
+    public void OpenWorkspaceDiagnostics()
+    {
+        FindByAutomationId(AutomationIds.SettingsOpen).Click();
+        SwitchToWindowContainingAutomationId(AutomationIds.SettingsSectionSelector);
+        FindByAutomationId(AutomationIds.SettingsSectionSelector)
+            .FindElement(OpenQA.Selenium.By.Name("Workspace")).Click();
+        FindByAutomationId(AutomationIds.TelemetryShowDebugWindow).Click();
+        SwitchToWindowContainingAutomationId(AutomationIds.TelemetryDebugOutput);
+    }
 }
