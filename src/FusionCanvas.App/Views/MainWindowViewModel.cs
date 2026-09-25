@@ -85,7 +85,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             new DocumentWindowViewModel(),
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            workspace ?? AppWorkspaceFactory.CreateDefault(ai, artworkProvider, telemetry),
+            workspace ?? AppWorkspaceFactory.CreateDefault(
+                ai,
+                artworkProvider,
+                telemetry,
+                settings.ActiveWorkspaceId),
             settings,
             ai);
 
@@ -103,6 +107,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             toolContextResolver,
             stageToolHostService,
             runtime.Repository,
+            runtime.WorkspaceManagement,
             runtime.Snapshot,
             runtime.GroupManagement,
             runtime.ItemManagement,
@@ -136,6 +141,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IToolContextResolver toolContextResolver,
         IStageToolHostService stageToolHostService,
         IWorkspaceRepository workspaceRepository,
+        IWorkspaceManagementService workspaceManagementService,
         WorkspaceSnapshot workspaceSnapshot,
         IGroupManagementService? groupManagementService = null,
         IItemManagementService? itemManagementService = null,
@@ -169,9 +175,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         var fileStore = workspaceFileStore ?? NullWorkspaceFileStore.Instance;
         var metadataReader = rasterImageMetadataReader ?? NullRasterImageMetadataReader.Instance;
         WorkspaceManagement = new WorkspaceManagementViewModel(
-            new WorkspaceManagementService(
-                workspaceRepository,
-                initialActiveWorkspaceId: settings?.ActiveWorkspaceId),
+            workspaceManagementService,
             workspaceTransferService ?? NullWorkspaceTransferService.Instance);
         Settings = CreateSettings(settings);
         var productService = productSupplierSetupService ?? new ProductSupplierSetupService(workspaceRepository);

@@ -4,6 +4,7 @@ using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Views;
 using FusionCanvas.App.Workflow;
 using FusionCanvas.Application.Ideation;
+using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.StageTools;
 using FusionCanvas.Application.ToolContexts;
@@ -160,6 +161,7 @@ public sealed class IdeationViewModelTests
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
+            new WorkspaceManagementService(repository),
             snapshot,
             ideationService: service,
             ideationAccessStatus: access);
