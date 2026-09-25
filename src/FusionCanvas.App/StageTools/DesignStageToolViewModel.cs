@@ -851,7 +851,16 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
                 TransparentBackground, _aiSettings.RequireZeroDataRetention), _artworkCts.Token).ConfigureAwait(true);
             ErrorMessage = result.Error;
             if (result.Succeeded)
-                await LoadAsync(_itemId, !IsReadOnly, _artworkCts.Token).ConfigureAwait(true);
+            {
+                try
+                {
+                    await LoadAsync(_itemId, !IsReadOnly, _artworkCts.Token).ConfigureAwait(true);
+                }
+                catch (OperationCanceledException)
+                {
+                    ErrorMessage = "Artwork was generated and saved, but the Design view refresh was interrupted. Reopen the Item to see it.";
+                }
+            }
         }
         catch (OperationCanceledException)
         {
