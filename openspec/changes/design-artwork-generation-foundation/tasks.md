@@ -52,3 +52,10 @@
 - [x] 7.4 Run `dotnet test .\FusionCanvas.sln` and resolve every failure.
 - [x] 7.5 Complete scoped completion QA for architecture boundaries, migrations, secrets/prompt safety, ZDR enforcement, raster bounds, persistence atomicity, and headless UI coverage.
 - [x] 7.6 Record criterion-level evidence, residual limitations, and the deferred bounds-editor follow-up under issue #358 before approval for archive.
+
+## 8. User-reported artwork generation corrections
+
+- [x] 8.1 Merge duplicate text/image catalog descriptors by model ID, including cached catalogs, so image capability remains visible to saved Artwork profile resolution.
+- [x] 8.2 Reload Design with the caller's cancellation token after generation instead of the internally cancelled artwork-operation token.
+- [x] 8.3 Include current Item Niche context in the prompt and explicitly constrain output to flat printable artwork without product mockups.
+- [ ] 8.4 Add focused regression coverage for catalog merging, post-generation refresh, and niche prompt context; run the solution verification baseline.

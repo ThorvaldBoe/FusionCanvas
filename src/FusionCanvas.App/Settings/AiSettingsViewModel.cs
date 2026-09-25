@@ -502,7 +502,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
             var imageCatalog = _catalogProvider is IAiImageModelCatalogProvider imageProvider
                 ? await imageProvider.GetImageModelsAsync(credential.Secret, RequireZeroDataRetention).ConfigureAwait(true)
                 : new AiModelCatalog(RequireZeroDataRetention, catalog.RetrievedAt, []);
-            var combinedCatalog = catalog with { Models = catalog.Models.Concat(imageCatalog.Models).ToArray() };
+            var combinedCatalog = catalog with { Models = MergeModelDescriptors(catalog.Models.Concat(imageCatalog.Models)) };
             SetModels(combinedCatalog.Models);
             Message = null;
             await SaveCatalogCacheAsync(combinedCatalog).ConfigureAwait(true);
@@ -566,11 +566,40 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
 
     private void SetModels(IReadOnlyList<AiModelDescriptor> models)
     {
-        _allModels = models;
+        // Older cached catalogs may contain one descriptor per catalog. Merge by ID so a
+        // text descriptor cannot hide image capabilities for the saved Artwork selection.
+        _allModels = MergeModelDescriptors(models);
         ApplyModelFilter();
         NotifyReadiness();
         AvailabilityChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    private static AiModelDescriptor[] MergeModelDescriptors(IEnumerable<AiModelDescriptor> models) => models
+        .GroupBy(model => model.Id, StringComparer.Ordinal)
+        .Select(group =>
+        {
+            var entries = group.ToArray();
+            var preferred = entries[0];
+            return preferred with
+            {
+                Name = entries.Select(model => model.Name).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? preferred.Id,
+                Author = entries.Select(model => model.Author).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)),
+                Description = entries.Select(model => model.Description).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)),
+                InputModalities = MergeValues(entries.SelectMany(model => model.InputModalities)),
+                OutputModalities = MergeValues(entries.SelectMany(model => model.OutputModalities)),
+                SupportedParameters = MergeValues(entries.SelectMany(model => model.SupportedParameters)),
+                ContextLength = entries.Select(model => model.ContextLength).FirstOrDefault(value => value.HasValue),
+                MaxCompletionTokens = entries.Select(model => model.MaxCompletionTokens).FirstOrDefault(value => value.HasValue),
+                PromptPrice = entries.Select(model => model.PromptPrice).FirstOrDefault(value => value.HasValue),
+                CompletionPrice = entries.Select(model => model.CompletionPrice).FirstOrDefault(value => value.HasValue),
+                ZeroDataRetentionCompatible = entries.All(model => model.ZeroDataRetentionCompatible),
+                Reasoning = entries.Select(model => model.Reasoning).FirstOrDefault(value => value is not null)
+            };
+        })
+        .ToArray();
+
+    private static string[] MergeValues(IEnumerable<string> values) =>
+        values.Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
     private IReadOnlyList<AiModelDescriptor> _allModels = [];
     private bool _catalogLoading;
