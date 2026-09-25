@@ -65,7 +65,7 @@ internal sealed class UiApplicationSession : IDisposable
     private static void SeedWorkspace(DisposableUiTestRoot testRoot)
     {
         var repository = new SqliteWorkspaceRepository(testRoot.DatabasePath, useConnectionPooling: false);
-        var workspaces = new WorkspaceManagementService(repository);
+        var workspaces = new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper());
         var result = workspaces.CreateWorkspaceAsync(new WorkspaceManagementCreateRequest("UI Smoke Workspace"))
             .GetAwaiter()
             .GetResult();

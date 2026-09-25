@@ -70,7 +70,7 @@ public class WorkspaceManagementViewModelTests
         NewViewModel(new InMemoryWorkspaceRepository(snapshot));
 
     private static WorkspaceManagementViewModel NewViewModel(InMemoryWorkspaceRepository repository) =>
-        new(new WorkspaceManagementService(repository, () => Now));
+        new(new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper(), () => Now));
 
     private static FusionCanvas.Domain.Workspace.Workspace NewWorkspace(string name) =>
         new(Guid.NewGuid(), name, null, false, Now, Now, "{}");

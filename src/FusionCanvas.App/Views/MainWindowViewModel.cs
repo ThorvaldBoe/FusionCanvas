@@ -127,7 +127,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.SllDocumentCodec,
             mockupGenerationService: runtime.MockupGeneration,
             artworkGenerationService: runtime.ArtworkGeneration,
-            nichePopulationService: new NichePopulationService(aiTextGenerationService))
+            nichePopulationService: new NichePopulationService(aiTextGenerationService),
+            workspaceContextMapper: runtime.WorkspaceContextMapper)
     {
 }
     public MainWindowViewModel(
@@ -162,7 +163,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IMockupTemplateSetupService? mockupTemplateSetupService = null,
         IMockupGenerationService? mockupGenerationService = null,
         IArtworkGenerationService? artworkGenerationService = null,
-        INichePopulationService? nichePopulationService = null)
+        INichePopulationService? nichePopulationService = null,
+        IWorkspaceContextMapper? workspaceContextMapper = null)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
@@ -171,6 +173,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         WorkspaceManagement = new WorkspaceManagementViewModel(
             new WorkspaceManagementService(
                 workspaceRepository,
+                workspaceContextMapper ?? throw new ArgumentNullException(nameof(workspaceContextMapper)),
                 initialActiveWorkspaceId: settings?.ActiveWorkspaceId),
             workspaceTransferService ?? NullWorkspaceTransferService.Instance);
         Settings = CreateSettings(settings);

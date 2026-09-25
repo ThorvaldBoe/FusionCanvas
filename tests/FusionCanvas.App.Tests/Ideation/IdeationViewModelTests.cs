@@ -162,7 +162,8 @@ public sealed class IdeationViewModelTests
             repository,
             snapshot,
             ideationService: service,
-            ideationAccessStatus: access);
+            ideationAccessStatus: access,
+            workspaceContextMapper: new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper());
         var ideaContext = viewModel.NavigationContexts.Single(context => context.Context.Id == SampleWorkspace.IdeaNodeId);
 
         viewModel.OpenFromNavigation(ideaContext);

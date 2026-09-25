@@ -109,6 +109,7 @@ public static class AppWorkspaceFactory
             new ItemCsvImportService(repository),
             new SllDocumentCodec(),
             new MockupGenerationService(repository, fileStore, new MockupTemplateSetupService(repository), new ImageSharpMockupRasterCompositor()),
+            new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper(),
             artworkProvider is null ? null : new ArtworkGenerationService(repository, fileStore, artworkProvider, new ImageSharpArtworkNormalizer(), telemetry: telemetry));
     }
 

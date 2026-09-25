@@ -135,7 +135,8 @@ public sealed class AppWorkspaceIdeationCompositionTests
                     contexts,
                     new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), contexts),
                     new YieldingWorkspaceRepository(),
-                    WorkspaceSnapshot.Empty);
+                    WorkspaceSnapshot.Empty,
+                    workspaceContextMapper: new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper());
             }
             catch (Exception exception)
             {

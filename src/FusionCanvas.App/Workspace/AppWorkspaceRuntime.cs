@@ -43,4 +43,5 @@ public sealed record AppWorkspaceRuntime(
     IItemCsvImportService ItemCsvImport,
     ISllDocumentCodec SllDocumentCodec,
     IMockupGenerationService MockupGeneration,
+    IWorkspaceContextMapper WorkspaceContextMapper,
     IArtworkGenerationService? ArtworkGeneration = null);

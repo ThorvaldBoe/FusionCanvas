@@ -175,7 +175,8 @@ public class MainWindowViewModelTests
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
-            snapshot);
+            snapshot,
+            workspaceContextMapper: new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper());
 
         var clientWorkspace = viewModel.WorkspaceManagement.ActiveWorkspaces.Single(workspace => workspace.Id == client.Id);
         await viewModel.WorkspaceManagement.SelectWorkspaceAsync(clientWorkspace, TestContext.Current.CancellationToken);
@@ -213,7 +214,8 @@ public class MainWindowViewModelTests
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
-            snapshot);
+            snapshot,
+            workspaceContextMapper: new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper());
 
         viewModel.WorkspaceManagement.OpenWorkspaceManagementCommand.Execute(null);
         await viewModel.WorkspaceManagement.SelectWorkspaceAsync(viewModel.WorkspaceManagement.ActiveWorkspaces.Single(workspace => workspace.Id == client.Id), TestContext.Current.CancellationToken);
@@ -280,7 +282,8 @@ public class MainWindowViewModelTests
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
-            snapshot);
+            snapshot,
+            workspaceContextMapper: new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper());
         var nicheContext = Assert.Single(viewModel.NavigationContexts, context => context.Context.EntityKind == WorkspaceEntityKind.Niche);
         viewModel.OpenFromNavigation(nicheContext);
         await viewModel.WorkspaceTree.BeginCreateAsync();
@@ -422,7 +425,8 @@ public class MainWindowViewModelTests
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
-            snapshot);
+            snapshot,
+            workspaceContextMapper: new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper());
         var itemContext = viewModel.NavigationContexts.Single(context => context.Context.Id == item.Id);
         viewModel.OpenFromNavigation(itemContext);
         viewModel.ItemInspector.Idea = "pending idea";

@@ -514,7 +514,8 @@ public class StoreManagementViewModelTests
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
-            snapshot);
+            snapshot,
+            workspaceContextMapper: new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper());
 
         Assert.Contains(viewModel.NavigationContexts, context => context.Context.Id == firstItem.Id);
         Assert.DoesNotContain(viewModel.NavigationContexts, context => context.Context.Id == secondItem.Id);
@@ -541,7 +542,8 @@ public class StoreManagementViewModelTests
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
-            snapshot);
+            snapshot,
+            workspaceContextMapper: new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper());
         await viewModel.StoreManagement.SelectStoreAsync(viewModel.StoreManagement.ActiveStores.Single(), TestContext.Current.CancellationToken);
 
         Assert.Contains(viewModel.NavigationContexts, context =>
@@ -565,7 +567,8 @@ public class StoreManagementViewModelTests
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
-            snapshot);
+            snapshot,
+            workspaceContextMapper: new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper());
         await viewModel.StoreManagement.SelectStoreAsync(viewModel.StoreManagement.ActiveStores.Single(), TestContext.Current.CancellationToken);
 
         viewModel.StoreManagement.SelectNichesTabCommand.Execute(null);

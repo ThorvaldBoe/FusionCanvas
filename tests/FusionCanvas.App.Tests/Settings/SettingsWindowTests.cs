@@ -285,7 +285,7 @@ public class SettingsWindowTests
 
     private static WorkspaceManagementViewModel NewWorkspaceManagement(WorkspaceSnapshot snapshot)
     {
-        var management = new WorkspaceManagementViewModel(new WorkspaceManagementService(new InMemoryWorkspaceRepository(snapshot), () => Now));
+        var management = new WorkspaceManagementViewModel(new WorkspaceManagementService(new InMemoryWorkspaceRepository(snapshot), new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper(), () => Now));
         management.LoadAsync().GetAwaiter().GetResult();
         return management;
     }

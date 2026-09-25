@@ -1,24 +1,24 @@
-using System.Text.Json;
 using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.Application.Workspaces;
 
 public sealed class WorkspaceManagementService : IWorkspaceManagementService
 {
-    private const string NotesKey = "notes";
-
     private readonly IWorkspaceRepository _repository;
+    private readonly IWorkspaceContextMapper _contextMapper;
     private readonly Func<DateTimeOffset> _clock;
     private readonly Func<Guid> _newId;
     private Guid? _activeWorkspaceId;
 
     public WorkspaceManagementService(
         IWorkspaceRepository repository,
+        IWorkspaceContextMapper contextMapper,
         Func<DateTimeOffset>? clock = null,
         Func<Guid>? newId = null,
         Guid? initialActiveWorkspaceId = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+        _contextMapper = contextMapper ?? throw new ArgumentNullException(nameof(contextMapper));
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _newId = newId ?? Guid.NewGuid;
         _activeWorkspaceId = initialActiveWorkspaceId;
@@ -60,7 +60,8 @@ public sealed class WorkspaceManagementService : IWorkspaceManagementService
             false,
             now,
             now,
-            ToMetadataJson(context));
+            "{}");
+        workspace = _contextMapper.Apply(workspace, context with { Description = NormalizeOptional(context.Description) });
         var updated = snapshot with { Workspaces = [.. snapshot.Workspaces, workspace] };
         await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
 
@@ -87,14 +88,12 @@ public sealed class WorkspaceManagementService : IWorkspaceManagementService
             return WorkspaceManagementResult.Failure(validation, BuildState(snapshot));
         }
 
-        var context = request.Context ?? ToContext(existing);
-        var updatedWorkspace = existing with
+        var context = request.Context ?? _contextMapper.Read(existing);
+        var updatedWorkspace = _contextMapper.Apply(existing with
         {
             Name = normalizedName,
-            Description = NormalizeOptional(context.Description),
-            UpdatedAt = _clock(),
-            MetadataJson = ToMetadataJson(context, existing.MetadataJson)
-        };
+            UpdatedAt = _clock()
+        }, context with { Description = NormalizeOptional(context.Description) });
         var updated = snapshot with
         {
             Workspaces = snapshot.Workspaces.Select(workspace => workspace.Id == updatedWorkspace.Id ? updatedWorkspace : workspace).ToArray()
@@ -307,51 +306,8 @@ public sealed class WorkspaceManagementService : IWorkspaceManagementService
         return duplicate ? "An active workspace already uses this name." : null;
     }
 
-    private static WorkspaceSummary ToSummary(FusionCanvas.Domain.Workspace.Workspace workspace) =>
-        new(workspace.Id, workspace.Name, ToContext(workspace), workspace.IsArchived, workspace.CreatedAt, workspace.UpdatedAt);
-
-    private static WorkspaceContext ToContext(FusionCanvas.Domain.Workspace.Workspace workspace)
-    {
-        var metadata = ParseMetadata(workspace.MetadataJson);
-        return new WorkspaceContext(workspace.Description, metadata.GetValueOrDefault(NotesKey));
-    }
-
-    private static string ToMetadataJson(WorkspaceContext context, string existingMetadataJson = "{}")
-    {
-        var metadata = ParseMetadata(existingMetadataJson);
-        SetOptional(metadata, NotesKey, context.Notes);
-        return metadata.Count == 0 ? "{}" : JsonSerializer.Serialize(metadata);
-    }
-
-    private static Dictionary<string, string> ParseMetadata(string metadataJson)
-    {
-        if (string.IsNullOrWhiteSpace(metadataJson) || metadataJson.Trim() == "{}")
-        {
-            return new Dictionary<string, string>(StringComparer.Ordinal);
-        }
-
-        using var document = JsonDocument.Parse(metadataJson);
-        if (document.RootElement.ValueKind != JsonValueKind.Object)
-        {
-            return new Dictionary<string, string>(StringComparer.Ordinal);
-        }
-
-        return document.RootElement
-            .EnumerateObject()
-            .ToDictionary(property => property.Name, property => property.Value.ToString(), StringComparer.Ordinal);
-    }
-
-    private static void SetOptional(Dictionary<string, string> metadata, string key, string? value)
-    {
-        var normalized = NormalizeOptional(value);
-        if (normalized is null)
-        {
-            metadata.Remove(key);
-            return;
-        }
-
-        metadata[key] = normalized;
-    }
+    private WorkspaceSummary ToSummary(FusionCanvas.Domain.Workspace.Workspace workspace) =>
+        new(workspace.Id, workspace.Name, _contextMapper.Read(workspace), workspace.IsArchived, workspace.CreatedAt, workspace.UpdatedAt);
 
     private static string NormalizeName(string name) => name.Trim();
 

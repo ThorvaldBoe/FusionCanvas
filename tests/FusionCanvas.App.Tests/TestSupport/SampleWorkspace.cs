@@ -85,7 +85,8 @@ internal static class MainWindowViewModelFactory
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             new InMemoryWorkspaceRepository(SampleWorkspace.Create()),
             SampleWorkspace.Create(),
-            titleOptimizationService: titleOptimization);
+            titleOptimizationService: titleOptimization,
+            workspaceContextMapper: new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper());
 
     internal static MainWindowViewModel CreateFromSnapshot(
         WorkspaceSnapshot snapshot,
@@ -98,5 +99,6 @@ internal static class MainWindowViewModelFactory
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
             snapshot,
-            titleOptimizationService: titleOptimization);
+            titleOptimizationService: titleOptimization,
+            workspaceContextMapper: new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper());
 }

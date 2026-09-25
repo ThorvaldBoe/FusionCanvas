@@ -17,7 +17,7 @@ public class WorkspaceManagementServiceTests
     {
         var repository = new InMemoryWorkspaceRepository();
         var workspaceId = Guid.NewGuid();
-        var service = new WorkspaceManagementService(repository, () => Now, () => workspaceId);
+        var service = new WorkspaceManagementService(repository, new TestWorkspaceContextMapper(), () => Now, () => workspaceId);
 
         var result = await service.CreateWorkspaceAsync(new WorkspaceManagementCreateRequest(" Client Work ", new WorkspaceContext("Retainer", "Q4")), TestContext.Current.CancellationToken);
 
@@ -27,7 +27,7 @@ public class WorkspaceManagementServiceTests
         Assert.Equal(workspaceId, result.State.ActiveWorkspaceId);
         var workspace = Assert.Single((await repository.LoadAsync(TestContext.Current.CancellationToken)).Workspaces);
         Assert.Equal(workspaceId, workspace.Id);
-        Assert.Contains("\"notes\":\"Q4\"", workspace.MetadataJson);
+        Assert.Equal("Q4", result.Workspace?.Context.Notes);
     }
 
     [Fact]
@@ -37,7 +37,7 @@ public class WorkspaceManagementServiceTests
         var client = NewWorkspace("Client");
         var repository = new InMemoryWorkspaceRepository(
             new WorkspaceSnapshot([personal, client], [], [], [], [], [], [], [], [], []));
-        var service = new WorkspaceManagementService(repository, initialActiveWorkspaceId: client.Id);
+        var service = new WorkspaceManagementService(repository, new TestWorkspaceContextMapper(), initialActiveWorkspaceId: client.Id);
 
         var state = await service.LoadAsync(TestContext.Current.CancellationToken);
 
@@ -52,7 +52,7 @@ public class WorkspaceManagementServiceTests
         var archived = NewWorkspace("Personal") with { IsArchived = true };
         var store = new Store(Guid.NewGuid(), active.Id, "Client Store", null, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([active, archived], [store], [], [], [], [], [], [], [], []));
-        var service = new WorkspaceManagementService(repository, () => Now.AddMinutes(1));
+        var service = new WorkspaceManagementService(repository, new TestWorkspaceContextMapper(), () => Now.AddMinutes(1));
 
         var deleteWithStore = await service.DeleteWorkspaceAsync(new WorkspaceManagementDeleteRequest(active.Id, ConfirmPermanentDeletion: true), TestContext.Current.CancellationToken);
         var restored = await service.RestoreWorkspaceAsync(archived.Id, TestContext.Current.CancellationToken);
@@ -86,7 +86,7 @@ public class WorkspaceManagementServiceTests
             [tag],
             [new ItemTag(listing.Id, tag.Id)],
             []));
-        var service = new WorkspaceManagementService(repository, () => Now.AddMinutes(1));
+        var service = new WorkspaceManagementService(repository, new TestWorkspaceContextMapper(), () => Now.AddMinutes(1));
 
         var wrongName = await service.DeleteWorkspaceAsync(new WorkspaceManagementDeleteRequest(workspace.Id, true, "client"), TestContext.Current.CancellationToken);
         var deleted = await service.DeleteWorkspaceAsync(new WorkspaceManagementDeleteRequest(workspace.Id, true, workspace.Name), TestContext.Current.CancellationToken);
@@ -108,7 +108,7 @@ public class WorkspaceManagementServiceTests
     {
         var workspace = NewWorkspace("Personal");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([workspace], [], [], [], [], [], [], [], [], []));
-        var service = new WorkspaceManagementService(repository, () => Now.AddMinutes(1));
+        var service = new WorkspaceManagementService(repository, new TestWorkspaceContextMapper(), () => Now.AddMinutes(1));
 
         var result = await service.DeleteWorkspaceAsync(new WorkspaceManagementDeleteRequest(workspace.Id, true, workspace.Name), TestContext.Current.CancellationToken);
 
@@ -121,7 +121,7 @@ public class WorkspaceManagementServiceTests
     public async Task SelectWorkspaceAsync_RejectsArchivedWorkspace()
     {
         var archived = NewWorkspace("Archived") with { IsArchived = true };
-        var service = new WorkspaceManagementService(new InMemoryWorkspaceRepository(new WorkspaceSnapshot([archived], [], [], [], [], [], [], [], [], [])));
+        var service = new WorkspaceManagementService(new InMemoryWorkspaceRepository(new WorkspaceSnapshot([archived], [], [], [], [], [], [], [], [], [])), new TestWorkspaceContextMapper());
 
         var result = await service.SelectWorkspaceAsync(archived.Id, TestContext.Current.CancellationToken);
 
@@ -132,6 +132,20 @@ public class WorkspaceManagementServiceTests
 
     private static FusionCanvas.Domain.Workspace.Workspace NewWorkspace(string name) =>
         new(Guid.NewGuid(), name, null, false, Now, Now, "{}");
+
+    private sealed class TestWorkspaceContextMapper : IWorkspaceContextMapper
+    {
+        private readonly Dictionary<Guid, WorkspaceContext> _contexts = [];
+
+        public WorkspaceContext Read(FusionCanvas.Domain.Workspace.Workspace workspace) =>
+            _contexts.GetValueOrDefault(workspace.Id, new WorkspaceContext(workspace.Description));
+
+        public FusionCanvas.Domain.Workspace.Workspace Apply(FusionCanvas.Domain.Workspace.Workspace workspace, WorkspaceContext context)
+        {
+            _contexts[workspace.Id] = context;
+            return workspace with { Description = context.Description };
+        }
+    }
 
     private sealed class InMemoryWorkspaceRepository(WorkspaceSnapshot? snapshot = null) : IWorkspaceRepository
     {
