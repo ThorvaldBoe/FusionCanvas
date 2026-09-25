@@ -2,6 +2,7 @@ using System.Text.Json;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Workspace;
@@ -15,6 +16,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
     private readonly IWorkspaceFileStore _fileStore;
     private readonly IAiImageGenerationProvider _provider;
     private readonly IRasterArtworkNormalizer _normalizer;
+    private readonly ITelemetryService? _telemetry;
     private readonly Func<DateTimeOffset> _clock;
     private readonly Func<Guid> _newId;
 
@@ -24,12 +26,14 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         IAiImageGenerationProvider provider,
         IRasterArtworkNormalizer normalizer,
         Func<DateTimeOffset>? clock = null,
-        Func<Guid>? newId = null)
+        Func<Guid>? newId = null,
+        ITelemetryService? telemetry = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _fileStore = fileStore ?? throw new ArgumentNullException(nameof(fileStore));
         _provider = provider ?? throw new ArgumentNullException(nameof(provider));
         _normalizer = normalizer ?? throw new ArgumentNullException(nameof(normalizer));
+        _telemetry = telemetry;
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _newId = newId ?? Guid.NewGuid;
     }
@@ -37,6 +41,20 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
     public async Task<DesignStageResult> GenerateAsync(ArtworkGenerationRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var stage = "workspace_load";
+        try
+        {
+            return await GenerateCoreAsync(request, cancellationToken, value => stage = value).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            await RecordStageAsync(stage, "Cancelled", "The operation was cancelled at this artwork-generation stage.").ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private async Task<DesignStageResult> GenerateCoreAsync(ArtworkGenerationRequest request, CancellationToken cancellationToken, Action<string> setStage)
+    {
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
         var item = snapshot.Items.SingleOrDefault(value => value.Id == request.ItemId);
         if (item is null) return DesignStageResult.Failure("Item was not found.");
@@ -72,15 +90,18 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
             area.Name, area.Position, area.Size, area.DecorationMethod, area.Guidance is null ? null : $"Recommended format: {area.Guidance.FileFormat ?? "PNG"}; background: {area.Guidance.Background ?? "transparent when requested"}.",
             metadata.GetValueOrDefault(ItemMetadataCodec.NotesKey), sll, !string.IsNullOrWhiteSpace(sll) && !string.Equals(fingerprint, currentFingerprint, StringComparison.Ordinal)));
 
+        setStage("provider_dispatch");
         var dispatch = await _provider.GenerateAsync(new AiImageGenerationRequest(
             request.ArtworkProfile.ModelId!, prompt, selection.ProviderSize, request.TransparentBackground, request.ApiKey,
             request.RequireZeroDataRetention, selection.Endpoint.EndpointId, selection.Options), cancellationToken).ConfigureAwait(false);
         if (dispatch.Failure is not null || dispatch.Result is null)
             return DesignStageResult.Failure(dispatch.Failure?.Message ?? "The image provider returned no artwork.");
+        await RecordStageAsync("provider_dispatch", "Succeeded", "The image provider returned artwork.").ConfigureAwait(false);
 
         var result = dispatch.Result;
         await using var source = new MemoryStream(result.ImageBytes, writable: false);
         RasterArtworkNormalizationResult normalized;
+        setStage("image_normalization");
         try
         {
             normalized = await _normalizer.NormalizeAsync(source, new RasterArtworkNormalizationRequest(area.Size, request.TransparentBackground), cancellationToken).ConfigureAwait(false);
@@ -89,12 +110,15 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         {
             return DesignStageResult.Failure($"The generated artwork could not be normalized. {exception.Message}");
         }
+        await RecordStageAsync("image_normalization", "Succeeded", "Artwork normalization completed.").ConfigureAwait(false);
 
         var now = _clock();
         var provenance = new AiImageProvenance(result.Provider, result.SelectedModelId, result.ResolvedModelId, prompt,
             selection.ProviderSize, normalized.FinalSize, request.TransparentBackground, normalized.HasTransparency, now,
             result.ProviderRequestId, result.Usage, normalized.Warnings, request.DesignAreaId);
+        setStage("file_storage");
         var managed = await _fileStore.SaveAsync($"generated-artwork-{_newId():N}.png", AssetKind.ExportedImage, new MemoryStream(normalized.PngBytes, writable: false), cancellationToken).ConfigureAwait(false);
+        await RecordStageAsync("file_storage", "Succeeded", "The normalized artwork file was stored.").ConfigureAwait(false);
         var assetId = _newId();
         var asset = new Asset(assetId, item.StoreId, $"{GeneratedArtworkName} - {area.Name}", null, AssetKind.ExportedImage,
             managed.WorkspaceRelativePath, null, false, false, now, now, AiImageProvenanceCodec.Serialize(provenance));
@@ -107,6 +131,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         };
         try
         {
+            setStage("workspace_save");
             await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -115,8 +140,15 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
             return DesignStageResult.Failure($"The generated artwork could not be saved. {exception.Message}");
         }
 
+        await RecordStageAsync("workspace_save", "Succeeded", "The artwork asset and design assignment were saved.").ConfigureAwait(false);
         return DesignStageResult.Success(BuildStateAfterSave(updated, item.Id));
     }
+
+    private Task RecordStageAsync(string stage, string outcome, string message) => _telemetry?.IsCaptureEnabled == true
+        ? _telemetry.RecordAsync(new TelemetryEventRequest(
+            "Application.ArtworkGeneration", "GenerationStage", outcome == "Succeeded" ? "Information" : "Warning", outcome,
+            message, MetadataJson: JsonSerializer.Serialize(new { stage })))
+        : Task.CompletedTask;
 
     private static ResolvedArtworkArea? ResolveArea(WorkspaceSnapshot snapshot, Guid offeringId, Guid areaId)
     {

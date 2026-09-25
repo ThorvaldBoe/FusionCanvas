@@ -15,6 +15,7 @@ using FusionCanvas.Application.Snowclones;
 using FusionCanvas.Application.RejectedPhrases;
 using FusionCanvas.Integration.Snowclones;
 using FusionCanvas.Application.AI;
+using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Application.ConceptRefinement;
 using FusionCanvas.Application.SllGeneration;
 using FusionCanvas.Application.Products;
@@ -33,17 +34,18 @@ public static class AppWorkspaceFactory
 
     public static string ResolveDefaultDatabasePath() => DefaultDatabasePath();
 
-    public static AppWorkspaceRuntime CreateDefault(IAiTextGenerationService ai, IAiImageGenerationProvider? artworkProvider = null)
-        => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()), ai, artworkProvider);
+    public static AppWorkspaceRuntime CreateDefault(IAiTextGenerationService ai, IAiImageGenerationProvider? artworkProvider = null, ITelemetryService? telemetry = null)
+        => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()), ai, artworkProvider, telemetry);
 
-    public static AppWorkspaceRuntime Create(string databasePath, IAiTextGenerationService ai, IAiImageGenerationProvider? artworkProvider = null)
-        => Create(databasePath, DefaultWorkspaceRoot(databasePath), ai, artworkProvider);
+    public static AppWorkspaceRuntime Create(string databasePath, IAiTextGenerationService ai, IAiImageGenerationProvider? artworkProvider = null, ITelemetryService? telemetry = null)
+        => Create(databasePath, DefaultWorkspaceRoot(databasePath), ai, artworkProvider, telemetry);
 
     public static AppWorkspaceRuntime Create(
         string databasePath,
         string workspaceRootPath,
         IAiTextGenerationService ai,
-        IAiImageGenerationProvider? artworkProvider = null)
+        IAiImageGenerationProvider? artworkProvider = null,
+        ITelemetryService? telemetry = null)
     {
         ArgumentNullException.ThrowIfNull(ai);
         var repository = new SqliteWorkspaceRepository(databasePath);
@@ -107,7 +109,7 @@ public static class AppWorkspaceFactory
             new ItemCsvImportService(repository),
             new SllDocumentCodec(),
             new MockupGenerationService(repository, fileStore, new MockupTemplateSetupService(repository), new ImageSharpMockupRasterCompositor()),
-            artworkProvider is null ? null : new ArtworkGenerationService(repository, fileStore, artworkProvider, new ImageSharpArtworkNormalizer()));
+            artworkProvider is null ? null : new ArtworkGenerationService(repository, fileStore, artworkProvider, new ImageSharpArtworkNormalizer(), telemetry: telemetry));
     }
 
     private static string DefaultDatabasePath()
