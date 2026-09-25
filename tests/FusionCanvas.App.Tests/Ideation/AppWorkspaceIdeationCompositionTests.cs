@@ -129,12 +129,14 @@ public sealed class AppWorkspaceIdeationCompositionTests
             try
             {
                 var contexts = new ToolContextResolver();
+                var repository = new YieldingWorkspaceRepository();
                 viewModel = new MainWindowViewModel(
                     new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
                     new DocumentWindowViewModel(),
                     contexts,
                     new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), contexts),
-                    new YieldingWorkspaceRepository(),
+                    repository,
+                    new WorkspaceManagementService(repository),
                     WorkspaceSnapshot.Empty);
             }
             catch (Exception exception)

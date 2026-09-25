@@ -172,6 +172,7 @@ public class WorkspaceTransferViewTests
                     BuiltInStageTools.CreateDefaultRegistry(),
                     new ToolContextResolver()),
                 repository,
+                new WorkspaceManagementService(repository),
                 snapshot);
             Window = new MainWindow { DataContext = viewModel };
             Window.Show();

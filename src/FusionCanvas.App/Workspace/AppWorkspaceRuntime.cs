@@ -20,6 +20,7 @@ namespace FusionCanvas.App.Workspace;
 
 public sealed record AppWorkspaceRuntime(
     IWorkspaceRepository Repository,
+    IWorkspaceManagementService WorkspaceManagement,
     IWorkspaceFileStore FileStore,
     IWorkspaceTransferService WorkspaceTransfer,
     IRasterImageMetadataReader RasterImageMetadata,

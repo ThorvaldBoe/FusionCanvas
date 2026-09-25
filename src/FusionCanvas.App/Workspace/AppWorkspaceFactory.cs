@@ -34,18 +34,28 @@ public static class AppWorkspaceFactory
 
     public static string ResolveDefaultDatabasePath() => DefaultDatabasePath();
 
-    public static AppWorkspaceRuntime CreateDefault(IAiTextGenerationService ai, IAiImageGenerationProvider? artworkProvider = null, ITelemetryService? telemetry = null)
-        => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()), ai, artworkProvider, telemetry);
+    public static AppWorkspaceRuntime CreateDefault(
+        IAiTextGenerationService ai,
+        IAiImageGenerationProvider? artworkProvider = null,
+        ITelemetryService? telemetry = null,
+        Guid? initialActiveWorkspaceId = null)
+        => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()), ai, artworkProvider, telemetry, initialActiveWorkspaceId);
 
-    public static AppWorkspaceRuntime Create(string databasePath, IAiTextGenerationService ai, IAiImageGenerationProvider? artworkProvider = null, ITelemetryService? telemetry = null)
-        => Create(databasePath, DefaultWorkspaceRoot(databasePath), ai, artworkProvider, telemetry);
+    public static AppWorkspaceRuntime Create(
+        string databasePath,
+        IAiTextGenerationService ai,
+        IAiImageGenerationProvider? artworkProvider = null,
+        ITelemetryService? telemetry = null,
+        Guid? initialActiveWorkspaceId = null)
+        => Create(databasePath, DefaultWorkspaceRoot(databasePath), ai, artworkProvider, telemetry, initialActiveWorkspaceId);
 
     public static AppWorkspaceRuntime Create(
         string databasePath,
         string workspaceRootPath,
         IAiTextGenerationService ai,
         IAiImageGenerationProvider? artworkProvider = null,
-        ITelemetryService? telemetry = null)
+        ITelemetryService? telemetry = null,
+        Guid? initialActiveWorkspaceId = null)
     {
         ArgumentNullException.ThrowIfNull(ai);
         var repository = new SqliteWorkspaceRepository(databasePath);
@@ -81,6 +91,7 @@ public static class AppWorkspaceFactory
         var titleOptimization = new TitleOptimizationService(repository, ai);
         return new AppWorkspaceRuntime(
             repository,
+            new WorkspaceManagementService(repository, initialActiveWorkspaceId: initialActiveWorkspaceId),
             fileStore,
             workspaceTransfer,
             rasterImageMetadata,

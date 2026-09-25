@@ -77,15 +77,20 @@ internal sealed class InMemoryWorkspaceRepository(WorkspaceSnapshot snapshot) : 
 internal static class MainWindowViewModelFactory
 {
     internal static MainWindowViewModel CreateSample(
-        ITitleOptimizationService? titleOptimization = null) =>
-        new(
+        ITitleOptimizationService? titleOptimization = null)
+    {
+        var snapshot = SampleWorkspace.Create();
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+        return new(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
             new DocumentWindow.DocumentWindowViewModel(),
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            new InMemoryWorkspaceRepository(SampleWorkspace.Create()),
-            SampleWorkspace.Create(),
+            repository,
+            new WorkspaceManagementService(repository),
+            snapshot,
             titleOptimizationService: titleOptimization);
+    }
 
     internal static MainWindowViewModel CreateFromSnapshot(
         WorkspaceSnapshot snapshot,
@@ -97,6 +102,7 @@ internal static class MainWindowViewModelFactory
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
+            new WorkspaceManagementService(repository),
             snapshot,
             titleOptimizationService: titleOptimization);
 }
