@@ -7,6 +7,7 @@ public static class TelemetryAreas
         "Ideation",
         "Concept",
         "Design",
+        "Application.ArtworkGeneration",
         "Listing",
         "Workspace",
         "Catalog",

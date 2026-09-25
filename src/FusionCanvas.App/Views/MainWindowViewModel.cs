@@ -35,6 +35,7 @@ using FusionCanvas.Application.DesignFiles;
 using FusionCanvas.Application.Ideation;
 using FusionCanvas.Application.Workspaces.Transfer;
 using FusionCanvas.Application.AI;
+using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Application.ConceptRefinement;
 using FusionCanvas.Application.Products;
 using FusionCanvas.Application.Catalog;
@@ -77,13 +78,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         SettingsViewModel settings,
         IAiTextGenerationService ai,
         AppWorkspaceRuntime? workspace = null,
-        IAiImageGenerationProvider? artworkProvider = null) =>
+        IAiImageGenerationProvider? artworkProvider = null,
+        ITelemetryService? telemetry = null) =>
         new(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
             new DocumentWindowViewModel(),
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            workspace ?? AppWorkspaceFactory.CreateDefault(ai, artworkProvider),
+            workspace ?? AppWorkspaceFactory.CreateDefault(ai, artworkProvider, telemetry),
             settings,
             ai);
 
