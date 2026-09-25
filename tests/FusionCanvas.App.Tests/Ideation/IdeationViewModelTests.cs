@@ -161,7 +161,7 @@ public sealed class IdeationViewModelTests
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
-            new WorkspaceManagementService(repository),
+            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
             snapshot,
             ideationService: service,
             ideationAccessStatus: access);

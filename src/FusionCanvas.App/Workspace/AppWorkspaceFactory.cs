@@ -91,7 +91,10 @@ public static class AppWorkspaceFactory
         var titleOptimization = new TitleOptimizationService(repository, ai);
         return new AppWorkspaceRuntime(
             repository,
-            new WorkspaceManagementService(repository, initialActiveWorkspaceId: initialActiveWorkspaceId),
+            new WorkspaceManagementService(
+                repository,
+                new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper(),
+                initialActiveWorkspaceId: initialActiveWorkspaceId),
             fileStore,
             workspaceTransfer,
             rasterImageMetadata,

@@ -175,7 +175,7 @@ public class MainWindowViewModelTests
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
-            new WorkspaceManagementService(repository),
+            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
             snapshot);
 
         var clientWorkspace = viewModel.WorkspaceManagement.ActiveWorkspaces.Single(workspace => workspace.Id == client.Id);
@@ -214,7 +214,7 @@ public class MainWindowViewModelTests
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
-            new WorkspaceManagementService(repository),
+            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
             snapshot);
 
         viewModel.WorkspaceManagement.OpenWorkspaceManagementCommand.Execute(null);
@@ -282,7 +282,7 @@ public class MainWindowViewModelTests
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
-            new WorkspaceManagementService(repository),
+            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
             snapshot);
         var nicheContext = Assert.Single(viewModel.NavigationContexts, context => context.Context.EntityKind == WorkspaceEntityKind.Niche);
         viewModel.OpenFromNavigation(nicheContext);
@@ -425,7 +425,7 @@ public class MainWindowViewModelTests
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
-            new WorkspaceManagementService(repository),
+            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
             snapshot);
         var itemContext = viewModel.NavigationContexts.Single(context => context.Context.Id == item.Id);
         viewModel.OpenFromNavigation(itemContext);

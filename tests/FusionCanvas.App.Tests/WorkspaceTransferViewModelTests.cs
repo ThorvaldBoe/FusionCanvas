@@ -79,7 +79,7 @@ public class WorkspaceTransferViewModelTests
                 TestContext.Current.CancellationToken)
         };
         var viewModel = new WorkspaceManagementViewModel(
-            new WorkspaceManagementService(repository, () => Now),
+            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper(), () => Now),
             transfer,
             new FakePicker(importPath: "restored.fcworkspace"));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
@@ -98,7 +98,7 @@ public class WorkspaceTransferViewModelTests
         var repository = new InMemoryRepository(
             new WorkspaceSnapshot([active, archived], [], [], [], [], [], [], [], [], []));
         var viewModel = new WorkspaceManagementViewModel(
-            new WorkspaceManagementService(repository, () => Now),
+            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper(), () => Now),
             new FakeTransferService(),
             new FakePicker(exportPath: "archived.fcworkspace"));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
@@ -121,7 +121,7 @@ public class WorkspaceTransferViewModelTests
             : new WorkspaceSnapshot([workspace], [], [], [], [], [], [], [], [], []);
         var repository = new InMemoryRepository(snapshot);
         return new WorkspaceManagementViewModel(
-            new WorkspaceManagementService(repository, () => Now),
+            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper(), () => Now),
             transfer,
             picker);
     }

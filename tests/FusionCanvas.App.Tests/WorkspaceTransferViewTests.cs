@@ -133,7 +133,7 @@ public class WorkspaceTransferViewTests
         var repository = new InMemoryRepository(
             snapshot ?? new WorkspaceSnapshot([workspace], [], [], [], [], [], [], [], [], []));
         return new WorkspaceManagementViewModel(
-            new WorkspaceManagementService(repository, () => Now),
+            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper(), () => Now),
             transfer,
             picker ?? new NullWorkspacePackagePicker());
     }
@@ -172,7 +172,7 @@ public class WorkspaceTransferViewTests
                     BuiltInStageTools.CreateDefaultRegistry(),
                     new ToolContextResolver()),
                 repository,
-                new WorkspaceManagementService(repository),
+                new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
                 snapshot);
             Window = new MainWindow { DataContext = viewModel };
             Window.Show();

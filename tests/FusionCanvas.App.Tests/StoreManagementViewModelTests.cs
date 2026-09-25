@@ -514,7 +514,7 @@ public class StoreManagementViewModelTests
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
-            new WorkspaceManagementService(repository),
+            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
             snapshot);
 
         Assert.Contains(viewModel.NavigationContexts, context => context.Context.Id == firstItem.Id);
@@ -542,7 +542,7 @@ public class StoreManagementViewModelTests
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
-            new WorkspaceManagementService(repository),
+            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
             snapshot);
         await viewModel.StoreManagement.SelectStoreAsync(viewModel.StoreManagement.ActiveStores.Single(), TestContext.Current.CancellationToken);
 
@@ -567,7 +567,7 @@ public class StoreManagementViewModelTests
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
-            new WorkspaceManagementService(repository),
+            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
             snapshot);
         await viewModel.StoreManagement.SelectStoreAsync(viewModel.StoreManagement.ActiveStores.Single(), TestContext.Current.CancellationToken);
 

@@ -252,7 +252,7 @@ public class SettingsViewModelTests
         new(new RecordingStore(), new FakeThemeController(), ApplicationSettings.Default, loadWarning);
 
     private static WorkspaceManagementViewModel NewWorkspaceManagement(WorkspaceSnapshot snapshot) =>
-        new(new WorkspaceManagementService(new InMemoryWorkspaceRepository(snapshot), () => Now));
+        new(new WorkspaceManagementService(new InMemoryWorkspaceRepository(snapshot), new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper(), () => Now));
 
     private static FusionCanvas.Domain.Workspace.Workspace NewWorkspace(string name) =>
         new(Guid.NewGuid(), name, null, false, Now, Now, "{}");
