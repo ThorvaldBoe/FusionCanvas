@@ -74,7 +74,7 @@ FusionCanvas SHALL initialize Transparent Background from the selected Design Ar
 - **AND** opaque artwork generation remains available when all other prerequisites are satisfied
 
 ### Requirement: Artwork requests use current creative context safely
-FusionCanvas SHALL generate exactly one image per Generate action. The resolved prompt SHALL use the original Idea, current Concept idea, Phrase, Graphic direction, selected Design Area placement/dimensions/guidance, applicable user-authored creative context, and the current SLL when one exists and is not stale. The prompt SHALL require the supplied Phrase verbatim, SHALL omit a stale SLL, SHALL exclude credentials and operational data, and SHALL establish all workspace content as untrusted creative data rather than instructions. Existing Supporting Images SHALL NOT be uploaded automatically as references.
+FusionCanvas SHALL generate exactly one image per Generate action. The resolved prompt SHALL use the original Idea, current Concept idea, Phrase, Graphic direction, selected Design Area placement/dimensions/guidance, applicable Item and Niche creative context (including niche constraints), and the current SLL when one exists and is not stale. The prompt SHALL require the supplied Phrase verbatim, SHALL omit a stale SLL, SHALL exclude credentials and operational data, and SHALL establish all workspace content as untrusted creative data rather than instructions. Artwork SHALL be a flat printable design and SHALL NOT depict it applied to a product or as a product photograph/mockup. Existing Supporting Images SHALL NOT be uploaded automatically as references.
 
 #### Scenario: Current SLL is available
 - **WHEN** generation starts with a non-stale SLL
@@ -97,6 +97,12 @@ FusionCanvas SHALL generate exactly one image per Generate action. The resolved 
 #### Scenario: Supporting Images exist
 - **WHEN** one or more Supporting Images are linked to the Item
 - **THEN** none is uploaded or included as an image reference without a future explicit reference-selection feature
+
+#### Scenario: Niche constraints apply to artwork generation
+- **WHEN** the Item belongs to a Niche with creative context or constraints
+- **THEN** the resolved prompt includes the current Niche name, description, and non-empty creative context fields as untrusted creative data
+- **AND** an instruction to create a product mockup is not inferred from the target product or placement
+- **AND** the prompt explicitly requests flat printable artwork without a depicted product or mockup
 
 ### Requirement: Provider size selection minimizes ratio difference before maximizing useful resolution
 FusionCanvas SHALL derive the exact final width and height from the selected Design Area. It SHALL request that exact size when supported. Otherwise it SHALL choose the eligible supported size with the closest aspect ratio; among sizes with the same closest ratio it SHALL choose the largest pixel area that does not exceed the target, or the smallest such size when every eligible size exceeds the target. Capability decisions SHALL use one endpoint that simultaneously satisfies the selected model, active ZDR policy, requested transparency, and selected size/format parameters.

@@ -79,6 +79,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         if (selection is null) return DesignStageResult.Failure("No compatible image endpoint is available for this target and privacy policy.");
 
         var metadata = ItemMetadataCodec.ParseMetadata(item.MetadataJson);
+        var nicheContext = BuildNicheContext(snapshot, item.NicheId);
         var sll = metadata.GetValueOrDefault(ItemMetadataCodec.SllKey);
         var fingerprint = metadata.GetValueOrDefault(ItemMetadataCodec.SllSourceFingerprintKey);
         var currentFingerprint = ItemMetadataCodec.ComputeSllSourceFingerprint(
@@ -88,7 +89,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
             metadata.GetValueOrDefault(ItemMetadataCodec.IdeaKey) ?? "", metadata.GetValueOrDefault(ItemMetadataCodec.ConceptIdeaKey) ?? "",
             metadata.GetValueOrDefault(ItemMetadataCodec.PhraseKey) ?? "", metadata.GetValueOrDefault(ItemMetadataCodec.GraphicDirectionKey) ?? "",
             area.Name, area.Position, area.Size, area.DecorationMethod, area.Guidance is null ? null : $"Recommended format: {area.Guidance.FileFormat ?? "PNG"}; background: {area.Guidance.Background ?? "transparent when requested"}.",
-            metadata.GetValueOrDefault(ItemMetadataCodec.NotesKey), sll, !string.IsNullOrWhiteSpace(sll) && !string.Equals(fingerprint, currentFingerprint, StringComparison.Ordinal)));
+            metadata.GetValueOrDefault(ItemMetadataCodec.NotesKey), sll, !string.IsNullOrWhiteSpace(sll) && !string.Equals(fingerprint, currentFingerprint, StringComparison.Ordinal), nicheContext));
 
         setStage("provider_dispatch");
         var dispatch = await _provider.GenerateAsync(new AiImageGenerationRequest(
@@ -157,6 +158,47 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
             return new(areaId, placeholder.Name, placeholder.Position, placeholder.DecorationMethod, new AiImageSize(placeholder.Width, placeholder.Height), placeholder.ArtworkGuidance);
         var legacy = snapshot.DesignAreas.SingleOrDefault(value => value.Id == areaId && value.FulfillmentOfferingId == offeringId);
         return legacy is null ? null : new(areaId, legacy.Name, legacy.Position, legacy.DecorationMethod, new AiImageSize(legacy.Width, legacy.Height), null);
+    }
+
+    private static string? BuildNicheContext(WorkspaceSnapshot snapshot, Guid? nicheId)
+    {
+        if (nicheId is not Guid id || snapshot.Niches.SingleOrDefault(value => value.Id == id) is not { } niche)
+            return null;
+
+        var fields = new List<(string Label, string? Value)>
+        {
+            ("Name", niche.Name),
+            ("Description", niche.Description)
+        };
+        try
+        {
+            using var document = JsonDocument.Parse(niche.MetadataJson);
+            if (document.RootElement.ValueKind == JsonValueKind.Object)
+            {
+                AddMetadataField("Audience", "audience");
+                AddMetadataField("Humor style", "humorStyle");
+                AddMetadataField("Visual style guidance", "visualStyleGuidance");
+                AddMetadataField("Constraints", "constraints");
+                AddMetadataField("Risks", "risks");
+                AddMetadataField("Research notes", "researchNotes");
+                AddMetadataField("Notes", "notes");
+
+                void AddMetadataField(string label, string key)
+                {
+                    if (document.RootElement.TryGetProperty(key, out var property) && property.ValueKind == JsonValueKind.String)
+                        fields.Add((label, property.GetString()));
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // Keep usable name/description context if legacy or damaged metadata is malformed.
+        }
+
+        var included = fields.Where(field => !string.IsNullOrWhiteSpace(field.Value))
+            .Select(field => $"{field.Label}: {field.Value!.Trim()}")
+            .ToArray();
+        return included.Length == 0 ? null : string.Join(Environment.NewLine, included);
     }
 
     private static DesignStageState BuildStateAfterSave(WorkspaceSnapshot snapshot, Guid itemId)

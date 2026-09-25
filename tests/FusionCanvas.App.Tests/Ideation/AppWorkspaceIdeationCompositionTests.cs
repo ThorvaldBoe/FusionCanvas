@@ -129,14 +129,15 @@ public sealed class AppWorkspaceIdeationCompositionTests
             try
             {
                 var contexts = new ToolContextResolver();
+                var repository = new YieldingWorkspaceRepository();
                 viewModel = new MainWindowViewModel(
                     new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
                     new DocumentWindowViewModel(),
                     contexts,
                     new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), contexts),
-                    new YieldingWorkspaceRepository(),
-                    WorkspaceSnapshot.Empty,
-                    workspaceContextMapper: new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper());
+                    repository,
+                    new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
+                    WorkspaceSnapshot.Empty);
             }
             catch (Exception exception)
             {

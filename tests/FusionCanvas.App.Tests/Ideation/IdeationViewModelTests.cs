@@ -4,6 +4,7 @@ using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Views;
 using FusionCanvas.App.Workflow;
 using FusionCanvas.Application.Ideation;
+using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.StageTools;
 using FusionCanvas.Application.ToolContexts;
@@ -160,10 +161,10 @@ public sealed class IdeationViewModelTests
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
             repository,
+            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
             snapshot,
             ideationService: service,
-            ideationAccessStatus: access,
-            workspaceContextMapper: new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper());
+            ideationAccessStatus: access);
         var ideaContext = viewModel.NavigationContexts.Single(context => context.Context.Id == SampleWorkspace.IdeaNodeId);
 
         viewModel.OpenFromNavigation(ideaContext);

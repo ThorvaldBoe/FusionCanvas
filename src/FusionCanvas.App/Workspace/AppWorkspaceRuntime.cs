@@ -20,6 +20,7 @@ namespace FusionCanvas.App.Workspace;
 
 public sealed record AppWorkspaceRuntime(
     IWorkspaceRepository Repository,
+    IWorkspaceManagementService WorkspaceManagement,
     IWorkspaceFileStore FileStore,
     IWorkspaceTransferService WorkspaceTransfer,
     IRasterImageMetadataReader RasterImageMetadata,
@@ -43,5 +44,4 @@ public sealed record AppWorkspaceRuntime(
     IItemCsvImportService ItemCsvImport,
     ISllDocumentCodec SllDocumentCodec,
     IMockupGenerationService MockupGeneration,
-    IWorkspaceContextMapper WorkspaceContextMapper,
     IArtworkGenerationService? ArtworkGeneration = null);

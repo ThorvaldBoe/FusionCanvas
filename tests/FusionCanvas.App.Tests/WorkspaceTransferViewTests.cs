@@ -172,8 +172,8 @@ public class WorkspaceTransferViewTests
                     BuiltInStageTools.CreateDefaultRegistry(),
                     new ToolContextResolver()),
                 repository,
-                snapshot,
-                workspaceContextMapper: new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper());
+                new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
+                snapshot);
             Window = new MainWindow { DataContext = viewModel };
             Window.Show();
             Window.UpdateLayout();

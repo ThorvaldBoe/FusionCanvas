@@ -854,7 +854,9 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
             {
                 try
                 {
-                    await LoadAsync(_itemId, !IsReadOnly, _artworkCts.Token).ConfigureAwait(true);
+                    // LoadAsync cancels the previous artwork operation before starting its own load.
+                    // Do not pass that operation's token here or the successful refresh cancels itself.
+                    await LoadAsync(_itemId, !IsReadOnly, cancellationToken).ConfigureAwait(true);
                 }
                 catch (OperationCanceledException)
                 {

@@ -34,18 +34,28 @@ public static class AppWorkspaceFactory
 
     public static string ResolveDefaultDatabasePath() => DefaultDatabasePath();
 
-    public static AppWorkspaceRuntime CreateDefault(IAiTextGenerationService ai, IAiImageGenerationProvider? artworkProvider = null, ITelemetryService? telemetry = null)
-        => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()), ai, artworkProvider, telemetry);
+    public static AppWorkspaceRuntime CreateDefault(
+        IAiTextGenerationService ai,
+        IAiImageGenerationProvider? artworkProvider = null,
+        ITelemetryService? telemetry = null,
+        Guid? initialActiveWorkspaceId = null)
+        => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()), ai, artworkProvider, telemetry, initialActiveWorkspaceId);
 
-    public static AppWorkspaceRuntime Create(string databasePath, IAiTextGenerationService ai, IAiImageGenerationProvider? artworkProvider = null, ITelemetryService? telemetry = null)
-        => Create(databasePath, DefaultWorkspaceRoot(databasePath), ai, artworkProvider, telemetry);
+    public static AppWorkspaceRuntime Create(
+        string databasePath,
+        IAiTextGenerationService ai,
+        IAiImageGenerationProvider? artworkProvider = null,
+        ITelemetryService? telemetry = null,
+        Guid? initialActiveWorkspaceId = null)
+        => Create(databasePath, DefaultWorkspaceRoot(databasePath), ai, artworkProvider, telemetry, initialActiveWorkspaceId);
 
     public static AppWorkspaceRuntime Create(
         string databasePath,
         string workspaceRootPath,
         IAiTextGenerationService ai,
         IAiImageGenerationProvider? artworkProvider = null,
-        ITelemetryService? telemetry = null)
+        ITelemetryService? telemetry = null,
+        Guid? initialActiveWorkspaceId = null)
     {
         ArgumentNullException.ThrowIfNull(ai);
         var repository = new SqliteWorkspaceRepository(databasePath);
@@ -81,6 +91,10 @@ public static class AppWorkspaceFactory
         var titleOptimization = new TitleOptimizationService(repository, ai);
         return new AppWorkspaceRuntime(
             repository,
+            new WorkspaceManagementService(
+                repository,
+                new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper(),
+                initialActiveWorkspaceId: initialActiveWorkspaceId),
             fileStore,
             workspaceTransfer,
             rasterImageMetadata,
@@ -109,7 +123,6 @@ public static class AppWorkspaceFactory
             new ItemCsvImportService(repository),
             new SllDocumentCodec(),
             new MockupGenerationService(repository, fileStore, new MockupTemplateSetupService(repository), new ImageSharpMockupRasterCompositor()),
-            new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper(),
             artworkProvider is null ? null : new ArtworkGenerationService(repository, fileStore, artworkProvider, new ImageSharpArtworkNormalizer(), telemetry: telemetry));
     }
 

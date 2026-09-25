@@ -30,9 +30,21 @@ public sealed class CompositionRootTests
 
         Assert.Contains("new LocalWorkspaceFileStore", workspaceFactory, StringComparison.Ordinal);
         Assert.Contains("new WorkspaceTransferService", workspaceFactory, StringComparison.Ordinal);
+        Assert.Contains("new WorkspaceManagementService", workspaceFactory, StringComparison.Ordinal);
         Assert.Contains("new RasterImageMetadataReader", workspaceFactory, StringComparison.Ordinal);
         Assert.Contains("new FusionCanvas.Integration.Items.ItemCsvCodec", servicesFactory, StringComparison.Ordinal);
         Assert.Contains("new FusionCanvas.Integration.Items.Import.ItemCsvCodec", servicesFactory, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MainWindowViewModelReceivesWorkspaceManagementService()
+    {
+        var root = FindRepositoryRoot();
+        var viewModel = File.ReadAllText(Path.Combine(
+            root, "src", "FusionCanvas.App", "Views", "MainWindowViewModel.cs"));
+
+        Assert.Contains("IWorkspaceManagementService workspaceManagementService", viewModel, StringComparison.Ordinal);
+        Assert.DoesNotContain("new WorkspaceManagementService", viewModel, StringComparison.Ordinal);
     }
 
     private static string FindRepositoryRoot()
