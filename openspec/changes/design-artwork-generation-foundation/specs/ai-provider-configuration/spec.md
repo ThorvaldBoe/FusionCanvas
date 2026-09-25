@@ -17,6 +17,11 @@ FusionCanvas SHALL provide one dedicated Artwork profile backed by an image-gene
 - **THEN** Artwork is unavailable
 - **AND** FusionCanvas preserves the explicit saved model identity without silently selecting a replacement
 
+#### Scenario: A model appears in both catalogs
+- **WHEN** the same model ID is returned by both the text and image catalogs or appears in a cached catalog more than once
+- **THEN** FusionCanvas merges its declared capabilities by model ID before resolving the saved Artwork selection
+- **AND** a text-only duplicate does not make an image-capable saved model appear unavailable
+
 ### Requirement: Image catalog capabilities are endpoint-specific and privacy aware
 FusionCanvas SHALL discover image models separately from text models and SHALL obtain definitive per-endpoint capabilities for the selected image model. Capability data SHALL include provider identity, ZDR eligibility, output raster formats, supported sizes or aspect ratios/resolution tiers, and transparency support. Model-level union metadata SHALL NOT be treated as proof that one eligible endpoint supports every requested capability.
 

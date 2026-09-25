@@ -28,5 +28,7 @@
 
 ## Residual Limitations
 
+- User-reported model-catalog collision, post-generation reload cancellation, and omitted Niche context corrections are implemented. Focused regression tests and the solution test baseline remain outstanding for these follow-up corrections.
+
 - The bounds-editor follow-up remains explicitly deferred; this change supplies the target selector and consumes existing Design Area bounds.
 - Existing repository analyzer warnings remain outside this change's scope; they do not fail the baseline.

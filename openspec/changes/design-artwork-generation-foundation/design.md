@@ -164,6 +164,13 @@ Provider SDK or wire types do not cross into Application or Domain. UI view mode
 7. Add AI Settings Artwork configuration, Store primary checkbox, Concept stale-SLL handling, and Design generation/history UI with keyboard and headless coverage.
 8. Verify every named scenario, strict OpenSpec validation, full deterministic tests, and scoped completion QA before implementation is considered complete.
 
+### User-reported corrections
+
+- Normalize text and image catalog descriptors by model ID in `AiSettingsViewModel`, unioning declared modalities and supported parameters so a cached or live text-only duplicate cannot shadow image capabilities during Artwork readiness resolution. Keep ZDR compatibility conservative across duplicates.
+- In `DesignStageToolViewModel.GenerateArtworkAsync`, pass the caller token to the post-save `LoadAsync`; the loader cancels its previous artwork-operation token as part of starting a new load.
+- In `ArtworkGenerationService`, resolve the Item's Niche from the loaded snapshot and add its name, description, audience, humor style, visual guidance, constraints, risks, research notes, and notes to `ArtworkPromptContext`. `ArtworkPromptBuilder` labels those values as untrusted creative data and directs image generation to return flat artwork without a product, wearer, or mockup.
+- Focused regression tests for model duplicate merging, prompt fields and exclusions, and a successful post-save view reload remain outstanding.
+
 ## Acceptance-to-Verification Map
 
 | Delta scenarios | Verification |
