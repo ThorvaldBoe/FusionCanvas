@@ -61,6 +61,18 @@ public sealed class ImageSharpArtworkNormalizer : IRasterArtworkNormalizer
         await using var output = new MemoryStream();
         await canvas.SaveAsync(output, new PngEncoder(), cancellationToken).ConfigureAwait(false);
         if (output.Length > request.MaximumBytes)
+        {
+            output.SetLength(0);
+            output.Position = 0;
+            await canvas.SaveAsync(output, new PngEncoder { CompressionLevel = PngCompressionLevel.Level7 }, cancellationToken).ConfigureAwait(false);
+        }
+        if (output.Length > request.MaximumBytes)
+        {
+            output.SetLength(0);
+            output.Position = 0;
+            await canvas.SaveAsync(output, new PngEncoder { CompressionLevel = PngCompressionLevel.BestCompression }, cancellationToken).ConfigureAwait(false);
+        }
+        if (output.Length > request.MaximumBytes)
             throw new InvalidDataException("The normalized PNG exceeds the maximum encoded size.");
         return new RasterArtworkNormalizationResult(output.ToArray(), request.TargetSize, hasTransparency, warnings);
         }
