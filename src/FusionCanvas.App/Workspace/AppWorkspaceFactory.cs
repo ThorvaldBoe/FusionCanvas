@@ -5,6 +5,7 @@ using FusionCanvas.Integration.Packages;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Workspaces.Transfer;
 using FusionCanvas.Application.Mockups;
+using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.DesignFiles;
 using FusionCanvas.Application.Groups;
 using FusionCanvas.Application.Items;
@@ -21,6 +22,8 @@ using FusionCanvas.Application.SllGeneration;
 using FusionCanvas.Application.Products;
 using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Application.TitleOptimization;
+using FusionCanvas.Application.Niches;
+using FusionCanvas.Application.Stores;
 using FusionCanvas.Integration.AI;
 using FusionCanvas.Integration.SllGeneration;
 using FusionCanvas.Integration.Mockups;
@@ -38,16 +41,18 @@ public static class AppWorkspaceFactory
         IAiTextGenerationService ai,
         IAiImageGenerationProvider? artworkProvider = null,
         ITelemetryService? telemetry = null,
-        Guid? initialActiveWorkspaceId = null)
-        => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()), ai, artworkProvider, telemetry, initialActiveWorkspaceId);
+        Guid? initialActiveWorkspaceId = null,
+        Guid? initialActiveStoreId = null)
+        => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()), ai, artworkProvider, telemetry, initialActiveWorkspaceId, initialActiveStoreId);
 
     public static AppWorkspaceRuntime Create(
         string databasePath,
         IAiTextGenerationService ai,
         IAiImageGenerationProvider? artworkProvider = null,
         ITelemetryService? telemetry = null,
-        Guid? initialActiveWorkspaceId = null)
-        => Create(databasePath, DefaultWorkspaceRoot(databasePath), ai, artworkProvider, telemetry, initialActiveWorkspaceId);
+        Guid? initialActiveWorkspaceId = null,
+        Guid? initialActiveStoreId = null)
+        => Create(databasePath, DefaultWorkspaceRoot(databasePath), ai, artworkProvider, telemetry, initialActiveWorkspaceId, initialActiveStoreId);
 
     public static AppWorkspaceRuntime Create(
         string databasePath,
@@ -55,7 +60,8 @@ public static class AppWorkspaceFactory
         IAiTextGenerationService ai,
         IAiImageGenerationProvider? artworkProvider = null,
         ITelemetryService? telemetry = null,
-        Guid? initialActiveWorkspaceId = null)
+        Guid? initialActiveWorkspaceId = null,
+        Guid? initialActiveStoreId = null)
     {
         ArgumentNullException.ThrowIfNull(ai);
         var repository = new SqliteWorkspaceRepository(databasePath);
@@ -69,6 +75,25 @@ public static class AppWorkspaceFactory
         var rasterImageMetadata = new RasterImageMetadataReader();
         var snapshot = StartupTaskRunner.Run(() => repository.LoadAsync());
         var itemManagement = new ItemManagementService(repository);
+        var groupManagement = new GroupManagementService(repository);
+        var assetManagement = new AssetManagementService(repository, fileStore);
+        var tagManagement = new TagManagementService(repository);
+        var itemInspector = new ItemInspectorService(repository);
+        var storeManagement = new StoreManagementService(
+            repository,
+            initialActiveWorkspaceId: initialActiveWorkspaceId,
+            initialActiveStoreId: initialActiveStoreId);
+        var nicheManagement = new NicheManagementService(repository);
+        var productSupplierSetup = new ProductSupplierSetupService(repository);
+        var catalogSetup = new CatalogSetupService(repository);
+        var mockupTemplateSetup = new MockupTemplateSetupService(repository);
+        var providerCatalog = new UnavailableProviderCatalogCandidateSource();
+        var offeringManagement = new OfferingManagementService(repository, providerCatalog);
+        var mockupTemplateSourceImages = new MockupTemplateSourceImageService(repository, fileStore, rasterImageMetadata);
+        var itemCsvImport = new ItemCsvImportService(repository);
+        var designStage = new DesignStageService(repository, fileStore);
+        var sllDocumentCodec = new SllDocumentCodec();
+        var nichePopulation = new NichePopulationService(ai);
         var ideationAccess = new ConfiguredIdeationAccessStatus(ai);
         var snowcloneLibrary = new SnowcloneLibraryService(
             snowcloneRepository,
@@ -89,6 +114,31 @@ public static class AppWorkspaceFactory
             ai,
             guidanceSource);
         var titleOptimization = new TitleOptimizationService(repository, ai);
+        var ideation = new IdeationService(
+            repository,
+            itemManagement,
+            new AiIdeaGenerator(ai, guidanceSource),
+            new PersistedSnowcloneCatalog(snowcloneLibrary),
+            ideationAccess);
+        var mainWindowServices = new MainWindowApplicationServices(
+            storeManagement,
+            nicheManagement,
+            tagManagement,
+            productSupplierSetup,
+            catalogSetup,
+            mockupTemplateSetup,
+            offeringManagement,
+            providerCatalog,
+            mockupTemplateSourceImages,
+            groupManagement,
+            itemManagement,
+            itemCsvImport,
+            assetManagement,
+            itemInspector,
+            ideation,
+            designStage,
+            sllDocumentCodec,
+            nichePopulation);
         return new AppWorkspaceRuntime(
             repository,
             new WorkspaceManagementService(
@@ -99,17 +149,12 @@ public static class AppWorkspaceFactory
             workspaceTransfer,
             rasterImageMetadata,
             snapshot,
-            new GroupManagementService(repository),
+            groupManagement,
             itemManagement,
-            new AssetManagementService(repository, fileStore),
-            new TagManagementService(repository),
-            new ItemInspectorService(repository),
-            new IdeationService(
-                repository,
-                itemManagement,
-                new AiIdeaGenerator(ai, guidanceSource),
-                new PersistedSnowcloneCatalog(snowcloneLibrary),
-                ideationAccess),
+            assetManagement,
+            tagManagement,
+            itemInspector,
+            ideation,
             ideationAccess,
             snowcloneLibrary,
             rejectedPhrases,
@@ -119,10 +164,11 @@ public static class AppWorkspaceFactory
             sllGeneration,
             sllGenerationAccess,
             titleOptimization,
-            new ProductSupplierSetupService(repository),
-            new ItemCsvImportService(repository),
-            new SllDocumentCodec(),
-            new MockupGenerationService(repository, fileStore, new MockupTemplateSetupService(repository), new ImageSharpMockupRasterCompositor()),
+            productSupplierSetup,
+            itemCsvImport,
+            sllDocumentCodec,
+            new MockupGenerationService(repository, fileStore, mockupTemplateSetup, new ImageSharpMockupRasterCompositor()),
+            mainWindowServices,
             artworkProvider is null ? null : new ArtworkGenerationService(repository, fileStore, artworkProvider, new ImageSharpArtworkNormalizer(), telemetry: telemetry));
     }
 

@@ -155,16 +155,11 @@ public sealed class IdeationViewModelTests
         var repository = new InMemoryWorkspaceRepository(snapshot);
         var access = new StubAccess(accessAvailable);
         var service = new StubService();
-        var viewModel = new MainWindowViewModel(
-            new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
-            new DocumentWindowViewModel(),
-            new ToolContextResolver(),
-            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            repository,
-            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
-            snapshot,
-            ideationService: service,
-            ideationAccessStatus: access);
+        var viewModel = MainWindowViewModelFactory.CreateFromSnapshot(
+                    snapshot,
+                    repository,
+                    ideationService: service,
+                    ideationAccessStatus: access);
         var ideaContext = viewModel.NavigationContexts.Single(context => context.Context.Id == SampleWorkspace.IdeaNodeId);
 
         viewModel.OpenFromNavigation(ideaContext);
