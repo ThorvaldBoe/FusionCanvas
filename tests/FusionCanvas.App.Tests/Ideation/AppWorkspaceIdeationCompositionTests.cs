@@ -1,6 +1,16 @@
 using FusionCanvas.App.Workspace;
 using FusionCanvas.Application.AI;
+using FusionCanvas.Application.Assets;
+using FusionCanvas.Application.Catalog;
+using FusionCanvas.Application.DesignFiles;
+using FusionCanvas.Application.Groups;
 using FusionCanvas.Application.Ideation;
+using FusionCanvas.Application.Items;
+using FusionCanvas.Application.Items.Import;
+using FusionCanvas.Application.Mockups;
+using FusionCanvas.Application.Niches;
+using FusionCanvas.Application.Stores;
+using FusionCanvas.Application.Tags;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Workspace;
@@ -13,6 +23,8 @@ using FusionCanvas.Application.StageTools;
 using FusionCanvas.Application.ToolContexts;
 using FusionCanvas.Application.WorkflowNavigation;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Integration.SllGeneration;
+using FusionCanvas.App.Tests.TestSupport;
 
 namespace FusionCanvas.App.Tests.Ideation;
 
@@ -119,6 +131,48 @@ public sealed class AppWorkspaceIdeationCompositionTests
     }
 
     [Fact]
+    public void FactoryComposesApplicationServicesNeededByMainWindowViewModel()
+    {
+        using var directory = new TemporaryDirectory();
+        var runtime = AppWorkspaceFactory.Create(directory.DatabasePath, new StubAi());
+
+        var services = runtime.MainWindowServices;
+
+        Assert.IsType<StoreManagementService>(services.StoreManagement);
+        Assert.IsType<NicheManagementService>(services.NicheManagement);
+        Assert.IsType<TagManagementService>(services.TagManagement);
+        Assert.IsType<CatalogSetupService>(services.CatalogSetup);
+        Assert.IsType<MockupTemplateSetupService>(services.MockupTemplateSetup);
+        Assert.IsType<OfferingManagementService>(services.OfferingManagement);
+        Assert.IsType<GroupManagementService>(services.GroupManagement);
+        Assert.IsType<ItemManagementService>(services.ItemManagement);
+        Assert.IsType<ItemCsvImportService>(services.ItemCsvImport);
+        Assert.IsType<AssetManagementService>(services.AssetManagement);
+        Assert.IsType<ItemInspectorService>(services.ItemInspector);
+        Assert.IsType<DesignStageService>(services.DesignStage);
+        Assert.IsType<SllDocumentCodec>(services.SllDocumentCodec);
+        Assert.IsType<NichePopulationService>(services.NichePopulation);
+    }
+
+    [Fact]
+    public void FactoryPassesPersistedWorkspaceAndStoreSelectionToStoreManagementService()
+    {
+        using var directory = new TemporaryDirectory();
+        var activeWorkspaceId = Guid.NewGuid();
+        var activeStoreId = Guid.NewGuid();
+
+        var runtime = AppWorkspaceFactory.Create(
+            directory.DatabasePath,
+            new StubAi(),
+            initialActiveWorkspaceId: activeWorkspaceId,
+            initialActiveStoreId: activeStoreId);
+
+        var storeManagement = Assert.IsType<StoreManagementService>(runtime.MainWindowServices.StoreManagement);
+        Assert.Equal(activeWorkspaceId, storeManagement.ActiveWorkspaceId);
+        Assert.Equal(activeStoreId, storeManagement.ActiveStoreId);
+    }
+
+    [Fact]
     public void MainViewModelInitializationCompletesUnderANonPumpingUiSynchronizationContext()
     {
         MainWindowViewModel? viewModel = null;
@@ -128,16 +182,8 @@ public sealed class AppWorkspaceIdeationCompositionTests
             SynchronizationContext.SetSynchronizationContext(new NonPumpingSynchronizationContext());
             try
             {
-                var contexts = new ToolContextResolver();
                 var repository = new YieldingWorkspaceRepository();
-                viewModel = new MainWindowViewModel(
-                    new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
-                    new DocumentWindowViewModel(),
-                    contexts,
-                    new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), contexts),
-                    repository,
-                    new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
-                    WorkspaceSnapshot.Empty);
+                viewModel = MainWindowViewModelFactory.CreateFromSnapshot(WorkspaceSnapshot.Empty, repository);
             }
             catch (Exception exception)
             {

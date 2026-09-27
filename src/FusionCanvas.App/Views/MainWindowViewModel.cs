@@ -89,9 +89,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 ai,
                 artworkProvider,
                 telemetry,
-                settings.ActiveWorkspaceId),
-            settings,
-            ai);
+                settings.ActiveWorkspaceId,
+                settings.ActiveStoreId),
+            settings);
 
     private MainWindowViewModel(
         WorkflowStageNavigatorViewModel workflowNavigator,
@@ -99,8 +99,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IToolContextResolver toolContextResolver,
         IStageToolHostService stageToolHostService,
         AppWorkspaceRuntime runtime,
-        SettingsViewModel? settings,
-        IAiTextGenerationService aiTextGenerationService)
+        SettingsViewModel? settings)
         : this(
             workflowNavigator,
             documentWindow,
@@ -109,16 +108,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.Repository,
             runtime.WorkspaceManagement,
             runtime.Snapshot,
-            runtime.GroupManagement,
-            runtime.ItemManagement,
-            runtime.AssetManagement,
-            runtime.FileStore,
+            runtime.MainWindowServices,
             runtime.WorkspaceTransfer,
-            runtime.RasterImageMetadata,
-            runtime.ItemInspector,
-            runtime.TagManagement,
             settings,
-            runtime.Ideation,
             runtime.IdeationAccess,
             runtime.SnowcloneLibrary,
             runtime.RejectedPhrases,
@@ -127,12 +119,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.SllGeneration,
             runtime.SllGenerationAccess,
             runtime.TitleOptimization,
-            runtime.ProductSupplierSetup,
-            runtime.ItemCsvImport,
-            runtime.SllDocumentCodec,
             mockupGenerationService: runtime.MockupGeneration,
-            artworkGenerationService: runtime.ArtworkGeneration,
-            nichePopulationService: new NichePopulationService(aiTextGenerationService))
+            artworkGenerationService: runtime.ArtworkGeneration)
     {
 }
     public MainWindowViewModel(
@@ -143,16 +131,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IWorkspaceRepository workspaceRepository,
         IWorkspaceManagementService workspaceManagementService,
         WorkspaceSnapshot workspaceSnapshot,
-        IGroupManagementService? groupManagementService = null,
-        IItemManagementService? itemManagementService = null,
-        IAssetManagementService? assetManagementService = null,
-        IWorkspaceFileStore? workspaceFileStore = null,
+        MainWindowApplicationServices applicationServices,
         IWorkspaceTransferService? workspaceTransferService = null,
-        IRasterImageMetadataReader? rasterImageMetadataReader = null,
-        IItemInspectorService? itemInspectorService = null,
-        ITagManagementService? tagManagementService = null,
         SettingsViewModel? settings = null,
-        IIdeationService? ideationService = null,
         IIdeationAccessStatus? ideationAccessStatus = null,
         FusionCanvas.Application.Snowclones.ISnowcloneLibraryService? snowcloneLibrary = null,
         FusionCanvas.Application.RejectedPhrases.IRejectedPhraseManagementService? rejectedPhrases = null,
@@ -161,65 +142,48 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ISllGenerationService? sllGenerationService = null,
         ISllAccessStatus? sllAccessStatus = null,
         ITitleOptimizationService? titleOptimizationService = null,
-        IProductSupplierSetupService? productSupplierSetupService = null,
-        IItemCsvImportService? itemCsvImportService = null,
-        ISllDocumentCodec? sllDocumentCodec = null,
-        ICatalogSetupService? catalogSetupService = null,
-        IMockupTemplateSetupService? mockupTemplateSetupService = null,
         IMockupGenerationService? mockupGenerationService = null,
-        IArtworkGenerationService? artworkGenerationService = null,
-        INichePopulationService? nichePopulationService = null)
+        IArtworkGenerationService? artworkGenerationService = null)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
-        var fileStore = workspaceFileStore ?? NullWorkspaceFileStore.Instance;
-        var metadataReader = rasterImageMetadataReader ?? NullRasterImageMetadataReader.Instance;
+        ArgumentNullException.ThrowIfNull(applicationServices);
         WorkspaceManagement = new WorkspaceManagementViewModel(
             workspaceManagementService,
             workspaceTransferService ?? NullWorkspaceTransferService.Instance);
         Settings = CreateSettings(settings);
-        var productService = productSupplierSetupService ?? new ProductSupplierSetupService(workspaceRepository);
-        var providerCatalog = new UnavailableProviderCatalogCandidateSource();
         StoreManagement = new StoreManagementViewModel(
-            new StoreManagementService(
-                workspaceRepository,
-                initialActiveWorkspaceId: Settings.ActiveWorkspaceId,
-                initialActiveStoreId: Settings.ActiveStoreId),
-            new NicheManagementService(workspaceRepository),
-            new TagManagementService(workspaceRepository),
-            productService,
-            catalogSetupService ?? new CatalogSetupService(workspaceRepository),
-            mockupTemplateSetupService ?? new MockupTemplateSetupService(workspaceRepository),
-            new OfferingManagementService(workspaceRepository, providerCatalog),
-            providerCatalog,
-            new MockupTemplateSourceImageService(workspaceRepository, fileStore, metadataReader),
+            applicationServices.StoreManagement,
+            applicationServices.NicheManagement,
+            applicationServices.TagManagement,
+            applicationServices.ProductSupplierSetup,
+            applicationServices.CatalogSetup,
+            applicationServices.MockupTemplateSetup,
+            applicationServices.OfferingManagement,
+            applicationServices.ProviderCatalog,
+            applicationServices.MockupTemplateSourceImages,
             new NullAssetFilePicker(),
             workspaceRepository,
-            nichePopulationService);
+            applicationServices.NichePopulation);
         StoreManagement.ActiveStoreChanged += (_, store) => Settings.UpdateActiveStore(store?.Id);
-        _groupManagementService = groupManagementService ?? new GroupManagementService(workspaceRepository);
-        _itemManagementService = itemManagementService ?? new ItemManagementService(workspaceRepository);
-        _itemCsvImportService = itemCsvImportService ?? new ItemCsvImportService(workspaceRepository);
-        _tagManagementService = tagManagementService ?? new TagManagementService(workspaceRepository);
-        _assetManagementService = assetManagementService ?? new AssetManagementService(workspaceRepository, fileStore);
-        _itemInspectorService = itemInspectorService ?? new ItemInspectorService(workspaceRepository);
+        _groupManagementService = applicationServices.GroupManagement;
+        _itemManagementService = applicationServices.ItemManagement;
+        _itemCsvImportService = applicationServices.ItemCsvImport;
+        _tagManagementService = applicationServices.TagManagement;
+        _assetManagementService = applicationServices.AssetManagement;
+        _itemInspectorService = applicationServices.ItemInspector;
         _ideationAccessStatus = ideationAccessStatus ?? DisabledIdeationAccessStatus.Instance;
         _conceptRefinementService = conceptRefinementService ?? DisabledConceptRefinementService.Instance;
         _conceptRefinementAccessStatus = conceptRefinementAccessStatus ?? DisabledConceptRefinementAccessStatus.Instance;
         _sllGenerationService = sllGenerationService ?? DisabledSllGenerationService.Instance;
         _sllAccessStatus = sllAccessStatus ?? DisabledSllAccessStatus.Instance;
-        _sllDocumentCodec = sllDocumentCodec ?? new NullSllDocumentCodec();
-        _ideationService = ideationService ?? new IdeationService(
-            workspaceRepository,
-            _itemManagementService,
-            DisabledIdeaGenerator.Instance,
-            EmptySnowcloneCatalog.Instance,
-            _ideationAccessStatus);
+        _sllDocumentCodec = applicationServices.SllDocumentCodec;
+        _ideationService = applicationServices.Ideation;
         GroupDetails = new GroupDetailsViewModel(_groupManagementService);
         AssetsManagement = new AssetsViewModel(_assetManagementService);
         ItemInspector = new ItemInspectorViewModel(_itemInspectorService, _itemManagementService, _tagManagementService, titleOptimizationService);
         DesignTool = new DesignStageToolViewModel(
-            new DesignStageService(workspaceRepository, fileStore),
+            applicationServices.DesignStage,
             artworkGenerationService,
             Settings.Ai);
         ListingTool = new ListingStageToolViewModel(mockupGenerationService);
@@ -1381,28 +1345,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             SllAccessAvailability.Unavailable("AI services were not supplied.");
     }
 
-    private sealed class DisabledIdeaGenerator : IIdeaGenerator
-    {
-        public static DisabledIdeaGenerator Instance { get; } = new();
-
-        public Task<IdeaGenerationResult> GenerateAsync(
-            IdeationGenerationContext context,
-            int requestIndex,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(IdeaGenerationResult.Failure(
-                AiTextFailureKind.NotConfigured,
-                "AI services were not supplied."));
-    }
-
-    private sealed class EmptySnowcloneCatalog : ISnowcloneCatalog
-    {
-        public static EmptySnowcloneCatalog Instance { get; } = new();
-
-        public Task<SnowcloneCatalogResult> GetSelectionsAsync(
-            int count,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(SnowcloneCatalogResult.Failure("Snowclone services were not supplied."));
-    }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

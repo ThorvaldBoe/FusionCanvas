@@ -6,6 +6,7 @@ using FusionCanvas.App.Workspace;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Views;
 using FusionCanvas.App.Workflow;
+using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.Application.StageTools;
 using FusionCanvas.Application.ToolContexts;
 using FusionCanvas.Application.Workspaces;
@@ -164,16 +165,7 @@ public class WorkspaceTransferViewTests
         public TransferMainWindowFixture(WorkspaceSnapshot snapshot)
         {
             var repository = new InMemoryRepository(snapshot);
-            var viewModel = new MainWindowViewModel(
-                new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
-                new DocumentWindowViewModel(),
-                new ToolContextResolver(),
-                new StageToolHostService(
-                    BuiltInStageTools.CreateDefaultRegistry(),
-                    new ToolContextResolver()),
-                repository,
-                new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
-                snapshot);
+            var viewModel = MainWindowViewModelFactory.CreateFromSnapshot(snapshot, repository);
             Window = new MainWindow { DataContext = viewModel };
             Window.Show();
             Window.UpdateLayout();

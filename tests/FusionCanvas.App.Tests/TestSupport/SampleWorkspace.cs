@@ -1,4 +1,5 @@
 using FusionCanvas.App.Views;
+using FusionCanvas.App.Workspace;
 using FusionCanvas.App.Workflow;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
@@ -12,6 +13,23 @@ using FusionCanvas.Application.WorkflowNavigation;
 using FusionCanvas.Application.ToolContexts;
 using FusionCanvas.Application.StageTools;
 using FusionCanvas.Application.TitleOptimization;
+using FusionCanvas.Application.Assets;
+using FusionCanvas.Application.Catalog;
+using FusionCanvas.Application.DesignFiles;
+using FusionCanvas.Application.Groups;
+using FusionCanvas.Application.Ideation;
+using FusionCanvas.Application.Items;
+using FusionCanvas.Application.Items.Import;
+using FusionCanvas.Application.Mockups;
+using FusionCanvas.Application.Niches;
+using FusionCanvas.Application.Products;
+using FusionCanvas.Application.Stores;
+using FusionCanvas.Application.Tags;
+using FusionCanvas.Application.AI;
+using FusionCanvas.Domain.Assets;
+using FusionCanvas.Domain.Ideation;
+using FusionCanvas.Integration.Files;
+using FusionCanvas.Integration.SllGeneration;
 
 namespace FusionCanvas.App.Tests.TestSupport;
 
@@ -81,6 +99,45 @@ internal static class MainWindowViewModelFactory
     {
         var snapshot = SampleWorkspace.Create();
         var repository = new InMemoryWorkspaceRepository(snapshot);
+        return CreateFromSnapshot(snapshot, repository, titleOptimization);
+    }
+
+    internal static MainWindowViewModel CreateFromSnapshot(
+        WorkspaceSnapshot snapshot,
+        IWorkspaceRepository repository,
+        ITitleOptimizationService? titleOptimization = null,
+        IIdeationService? ideationService = null,
+        IIdeationAccessStatus? ideationAccessStatus = null)
+    {
+        var fileStore = new EmptyWorkspaceFileStore();
+        var itemManagement = new ItemManagementService(repository);
+        var providerCatalog = new UnavailableProviderCatalogCandidateSource();
+        var accessStatus = ideationAccessStatus ?? new DisabledIdeationAccessStatus();
+        var services = new MainWindowApplicationServices(
+            new StoreManagementService(repository),
+            new NicheManagementService(repository),
+            new TagManagementService(repository),
+            new ProductSupplierSetupService(repository),
+            new CatalogSetupService(repository),
+            new MockupTemplateSetupService(repository),
+            new OfferingManagementService(repository, providerCatalog),
+            providerCatalog,
+            new MockupTemplateSourceImageService(repository, fileStore, new RasterImageMetadataReader()),
+            new GroupManagementService(repository),
+            itemManagement,
+            new ItemCsvImportService(repository),
+            new AssetManagementService(repository, fileStore),
+            new ItemInspectorService(repository),
+            ideationService ?? new IdeationService(
+                repository,
+                itemManagement,
+                DisabledIdeaGenerator.Instance,
+                EmptySnowcloneCatalog.Instance,
+                accessStatus),
+            new DesignStageService(repository, fileStore),
+            new SllDocumentCodec(),
+            null);
+
         return new(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
             new DocumentWindow.DocumentWindowViewModel(),
@@ -89,20 +146,55 @@ internal static class MainWindowViewModelFactory
             repository,
             new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
             snapshot,
+            services,
+            ideationAccessStatus: accessStatus,
             titleOptimizationService: titleOptimization);
     }
 
-    internal static MainWindowViewModel CreateFromSnapshot(
-        WorkspaceSnapshot snapshot,
-        IWorkspaceRepository repository,
-        ITitleOptimizationService? titleOptimization = null) =>
-        new(
-            new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
-            new DocumentWindow.DocumentWindowViewModel(),
-            new ToolContextResolver(),
-            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            repository,
-            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
-            snapshot,
-            titleOptimizationService: titleOptimization);
+    private sealed class EmptyWorkspaceFileStore : IWorkspaceFileStore
+    {
+        public string WorkspaceRoot => string.Empty;
+
+        public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, AssetKind kind, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("The test workspace file store is not configured.");
+
+        public bool Exists(string workspaceRelativePath) => false;
+
+        public bool TryDelete(string workspaceRelativePath) => false;
+
+        public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("The test workspace file store is not configured.");
+
+        public Task ExportCopyAsync(string workspaceRelativePath, string destinationPath, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("The test workspace file store is not configured.");
+    }
+
+    private sealed class DisabledIdeationAccessStatus : IIdeationAccessStatus
+    {
+        public IdeationAccessAvailability GetAvailability() =>
+            IdeationAccessAvailability.Unavailable("AI services were not supplied.");
+    }
+
+    private sealed class DisabledIdeaGenerator : IIdeaGenerator
+    {
+        public static DisabledIdeaGenerator Instance { get; } = new();
+
+        public Task<IdeaGenerationResult> GenerateAsync(
+            IdeationGenerationContext context,
+            int requestIndex,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(IdeaGenerationResult.Failure(
+                AiTextFailureKind.NotConfigured,
+                "AI services were not supplied."));
+    }
+
+    private sealed class EmptySnowcloneCatalog : ISnowcloneCatalog
+    {
+        public static EmptySnowcloneCatalog Instance { get; } = new();
+
+        public Task<SnowcloneCatalogResult> GetSelectionsAsync(
+            int count,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(SnowcloneCatalogResult.Failure("Snowclone services were not supplied."));
+    }
 }

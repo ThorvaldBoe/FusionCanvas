@@ -169,14 +169,7 @@ public class MainWindowViewModelTests
         var clientItem = new Item(Guid.NewGuid(), clientStore.Id, clientNiche.Id, null, "Client Item", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var snapshot = new WorkspaceSnapshot([personal, client], [personalStore, clientStore], [clientNiche], [], [clientItem], [], [], [], [], []);
         var repository = new InMemoryWorkspaceRepository(snapshot);
-        var viewModel = new MainWindowViewModel(
-            new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
-            new FusionCanvas.App.DocumentWindow.DocumentWindowViewModel(),
-            new ToolContextResolver(),
-            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            repository,
-            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
-            snapshot);
+        var viewModel = MainWindowViewModelFactory.CreateFromSnapshot(snapshot, repository);
 
         var clientWorkspace = viewModel.WorkspaceManagement.ActiveWorkspaces.Single(workspace => workspace.Id == client.Id);
         await viewModel.WorkspaceManagement.SelectWorkspaceAsync(clientWorkspace, TestContext.Current.CancellationToken);
@@ -208,14 +201,7 @@ public class MainWindowViewModelTests
         var personalStore = new Store(Guid.NewGuid(), personal.Id, "Personal Store", null, false, now, now, "{}");
         var snapshot = new WorkspaceSnapshot([personal, client], [personalStore], [], [], [], [], [], [], [], []);
         var repository = new InMemoryWorkspaceRepository(snapshot);
-        var viewModel = new MainWindowViewModel(
-            new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
-            new FusionCanvas.App.DocumentWindow.DocumentWindowViewModel(),
-            new ToolContextResolver(),
-            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            repository,
-            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
-            snapshot);
+        var viewModel = MainWindowViewModelFactory.CreateFromSnapshot(snapshot, repository);
 
         viewModel.WorkspaceManagement.OpenWorkspaceManagementCommand.Execute(null);
         await viewModel.WorkspaceManagement.SelectWorkspaceAsync(viewModel.WorkspaceManagement.ActiveWorkspaces.Single(workspace => workspace.Id == client.Id), TestContext.Current.CancellationToken);
@@ -276,14 +262,7 @@ public class MainWindowViewModelTests
         var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, now, now, "{}");
         var snapshot = new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []);
         var repository = new InMemoryWorkspaceRepository(snapshot);
-        var viewModel = new MainWindowViewModel(
-            new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
-            new FusionCanvas.App.DocumentWindow.DocumentWindowViewModel(),
-            new ToolContextResolver(),
-            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            repository,
-            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
-            snapshot);
+        var viewModel = MainWindowViewModelFactory.CreateFromSnapshot(snapshot, repository);
         var nicheContext = Assert.Single(viewModel.NavigationContexts, context => context.Context.EntityKind == WorkspaceEntityKind.Niche);
         viewModel.OpenFromNavigation(nicheContext);
         await viewModel.WorkspaceTree.BeginCreateAsync();
@@ -419,14 +398,7 @@ public class MainWindowViewModelTests
             "{\"notes\":\"Notes\",\"idea\":\"idea-value\"}");
         var snapshot = new WorkspaceSnapshot([store], [niche], [], [item], [], [], [], [], []);
         var repository = new InMemoryWorkspaceRepository(snapshot) { FailSaves = true };
-        var viewModel = new MainWindowViewModel(
-            new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
-            new FusionCanvas.App.DocumentWindow.DocumentWindowViewModel(),
-            new ToolContextResolver(),
-            new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            repository,
-            new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
-            snapshot);
+        var viewModel = MainWindowViewModelFactory.CreateFromSnapshot(snapshot, repository);
         var itemContext = viewModel.NavigationContexts.Single(context => context.Context.Id == item.Id);
         viewModel.OpenFromNavigation(itemContext);
         viewModel.ItemInspector.Idea = "pending idea";
