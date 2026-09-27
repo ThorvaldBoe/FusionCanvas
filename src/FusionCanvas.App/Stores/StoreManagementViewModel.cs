@@ -21,7 +21,7 @@ namespace FusionCanvas.App.Stores;
 
 
 
-public sealed class StoreManagementViewModel : INotifyPropertyChanged
+public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDisposable
 {
     private enum PendingEditorAction
     {
@@ -91,6 +91,18 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         string ResearchNotes,
         string Notes);
 
+    private sealed class TrackedOperation
+    {
+        public TrackedOperation(CancellationTokenSource cancellation)
+        {
+            Cancellation = cancellation;
+        }
+
+        public TaskCompletionSource Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public CancellationTokenSource Cancellation { get; }
+    }
+
     private readonly IStoreManagementService _service;
     private readonly INicheManagementService? _nicheService;
     private readonly ITagManagementService? _tagService;
@@ -99,6 +111,13 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private readonly IOfferingManagementService? _offeringManagementService;
     private readonly IWorkspaceRepository? _workspaceRepository;
     private readonly INichePopulationService? _nichePopulationService;
+    private static readonly TimeSpan OperationShutdownTimeout = TimeSpan.FromSeconds(2);
+    private readonly object _operationGate = new();
+    private readonly HashSet<TrackedOperation> _inFlightOperations = [];
+    private readonly CancellationTokenSource _shutdownCts = new();
+    private Task? _disposeTask;
+    private bool _isDisposed;
+    private bool _isBusy;
     private bool _isSelectorExpanded;
     private bool _isStoreEditorOpen;
     private bool _firstStorePromptDismissed;
@@ -226,7 +245,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         SelectTagsTabCommand = new RelayCommand(_ => SelectTagsTab());
         StartCreateStoreCommand = new RelayCommand(_ => StartCreateStore());
         StartCreateNicheCommand = new RelayCommand(_ => StartCreateNiche());
-        PopulateNicheCommand = new RelayCommand(_ => Run(PopulateNicheAsync()));
+        PopulateNicheCommand = new RelayCommand(_ => Run(PopulateNicheAsync));
         CloseStoreEditorCommand = new RelayCommand(_ => TryCloseStoreEditor());
         AcceptFirstStorePromptCommand = new RelayCommand(_ =>
         {
@@ -244,16 +263,16 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             _firstStorePromptDismissed = true;
             RaisePromptProperties();
         });
-        CreateStoreCommand = new RelayCommand(_ => Run(CreateStoreAsync()));
+        CreateStoreCommand = new RelayCommand(_ => Run(CreateStoreAsync));
         SelectStoreCommand = new RelayCommand(parameter =>
         {
             if (parameter is StoreSummary store)
             {
-                Run(SelectStoreAsync(store));
+                Run(cancellationToken => SelectStoreAsync(store, cancellationToken));
             }
             else if (parameter is StoreSelectorEntry entry)
             {
-                Run(SelectStoreAsync(entry.Store));
+                Run(cancellationToken => SelectStoreAsync(entry.Store, cancellationToken));
             }
         });
         EditStoreCommand = new RelayCommand(parameter =>
@@ -263,23 +282,23 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 SelectStoreForEditing(store);
             }
         });
-        SaveSelectedStoreCommand = new RelayCommand(_ => Run(SaveSelectedStoreAsync()));
-        ArchiveSelectedStoreCommand = new RelayCommand(_ => Run(ArchiveSelectedStoreAsync()));
+        SaveSelectedStoreCommand = new RelayCommand(_ => Run(SaveSelectedStoreAsync));
+        ArchiveSelectedStoreCommand = new RelayCommand(_ => Run(ArchiveSelectedStoreAsync));
         RestoreStoreCommand = new RelayCommand(parameter =>
         {
             if (parameter is StoreSummary store)
             {
-                Run(RestoreStoreAsync(store));
+                Run(cancellationToken => RestoreStoreAsync(store, cancellationToken));
             }
         });
         RequestDeleteSelectedStoreCommand = new RelayCommand(_ => RequestDeleteSelectedStore());
-        ConfirmDeleteStoreCommand = new RelayCommand(_ => Run(ConfirmDeleteStoreAsync()));
+        ConfirmDeleteStoreCommand = new RelayCommand(_ => Run(ConfirmDeleteStoreAsync));
         CancelDeleteStoreCommand = new RelayCommand(_ => ClearDeleteWarning());
         SelectNicheCommand = new RelayCommand(parameter =>
         {
             if (parameter is NicheSummary niche)
             {
-                Run(SelectNicheAsync(niche));
+                Run(cancellationToken => SelectNicheAsync(niche, cancellationToken));
             }
         });
         EditNicheCommand = new RelayCommand(parameter =>
@@ -289,17 +308,17 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 SelectNicheForEditing(niche);
             }
         });
-        SaveSelectedNicheCommand = new RelayCommand(_ => Run(SaveSelectedNicheAsync()));
-        ArchiveSelectedNicheCommand = new RelayCommand(_ => Run(ArchiveSelectedNicheAsync()));
+        SaveSelectedNicheCommand = new RelayCommand(_ => Run(SaveSelectedNicheAsync));
+        ArchiveSelectedNicheCommand = new RelayCommand(_ => Run(ArchiveSelectedNicheAsync));
         RestoreNicheCommand = new RelayCommand(parameter =>
         {
             if (parameter is NicheSummary niche)
             {
-                Run(RestoreNicheAsync(niche));
+                Run(cancellationToken => RestoreNicheAsync(niche, cancellationToken));
             }
         });
         RequestDeleteSelectedNicheCommand = new RelayCommand(_ => RequestDeleteSelectedNiche());
-        ConfirmDeleteNicheCommand = new RelayCommand(_ => Run(ConfirmDeleteNicheAsync()));
+        ConfirmDeleteNicheCommand = new RelayCommand(_ => Run(ConfirmDeleteNicheAsync));
         CancelDeleteNicheCommand = new RelayCommand(_ => ClearNicheDeleteWarning());
         ConfirmDiscardChangesCommand = new RelayCommand(_ => ConfirmDiscardChanges());
         KeepEditingCommand = new RelayCommand(_ => ClearDiscardChangesPrompt());
@@ -310,17 +329,17 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 SelectTagForEditing(tag);
             }
         });
-        SaveSelectedTagCommand = new RelayCommand(_ => Run(SaveSelectedTagAsync()));
-        ArchiveSelectedTagCommand = new RelayCommand(_ => Run(ArchiveSelectedTagAsync()));
+        SaveSelectedTagCommand = new RelayCommand(_ => Run(SaveSelectedTagAsync));
+        ArchiveSelectedTagCommand = new RelayCommand(_ => Run(ArchiveSelectedTagAsync));
         RestoreTagCommand = new RelayCommand(parameter =>
         {
             if (parameter is TagSummary tag)
             {
-                Run(RestoreTagAsync(tag));
+                Run(cancellationToken => RestoreTagAsync(tag, cancellationToken));
             }
         });
         RequestDeleteSelectedTagCommand = new RelayCommand(_ => RequestDeleteSelectedTag());
-        ConfirmDeleteTagCommand = new RelayCommand(_ => Run(ConfirmDeleteTagAsync()));
+        ConfirmDeleteTagCommand = new RelayCommand(_ => Run(ConfirmDeleteTagAsync));
         CancelDeleteTagCommand = new RelayCommand(_ => ClearTagDeleteWarning());
         StartCreateTagCommand = new RelayCommand(_ => StartCreateTag());
         OpenProductsTabCommand = new RelayCommand(_ => OpenProductsTab());
@@ -335,14 +354,14 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         });
         SaveSelectedProductCommand = new RelayCommand(_ => StartSaveSelectedProduct());
         RequestDeleteSelectedProductCommand = new RelayCommand(_ => RequestDeleteSelectedProduct());
-        ConfirmDeleteProductCommand = new RelayCommand(_ => Run(ConfirmDeleteProductAsync()));
+        ConfirmDeleteProductCommand = new RelayCommand(_ => Run(ConfirmDeleteProductAsync));
         CancelDeleteProductCommand = new RelayCommand(_ => ClearProductDeleteWarning());
         RequestArchiveSelectedProductCommand = new RelayCommand(_ => RequestArchiveSelectedProduct());
-        ConfirmArchiveSelectedProductCommand = new RelayCommand(_ => Run(ConfirmArchiveSelectedProductAsync()));
+        ConfirmArchiveSelectedProductCommand = new RelayCommand(_ => Run(ConfirmArchiveSelectedProductAsync));
         CancelArchiveSelectedProductCommand = new RelayCommand(_ => ClearProductArchiveWarning());
          StartCreateOfferingCommand = new RelayCommand(_ => StartCreateOffering());
          CancelNewOfferingCommand = new RelayCommand(_ => CancelNewOffering());
-         BackToProductsCommand = new RelayCommand(_ => Run(BackToProductsAsync()));
+         BackToProductsCommand = new RelayCommand(_ => Run(BackToProductsAsync));
          BackToProductCommand = new RelayCommand(_ => BackToProduct());
          BackToOfferingOverviewCommand = new RelayCommand(_ => NavigateOfferingCatalog(CatalogEditorLevel.OfferingDetail));
          OpenVariantManagementCommand = new RelayCommand(_ => OpenOfferingManagement(CatalogEditorLevel.VariantManagement));
@@ -383,24 +402,24 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 SelectOfferingForEditing(offering);
             }
         });
-        SaveSelectedOfferingCommand = new RelayCommand(_ => Run(SaveSelectedOfferingAsync()));
+        SaveSelectedOfferingCommand = new RelayCommand(_ => Run(SaveSelectedOfferingAsync));
         RequestDeleteSelectedOfferingCommand = new RelayCommand(_ => RequestDeleteSelectedOffering());
-        ConfirmDeleteOfferingCommand = new RelayCommand(_ => Run(ConfirmDeleteOfferingAsync()));
+        ConfirmDeleteOfferingCommand = new RelayCommand(_ => Run(ConfirmDeleteOfferingAsync));
         CancelDeleteOfferingCommand = new RelayCommand(_ => ClearOfferingDeleteWarning());
-        AddVariantCommand = new RelayCommand(_ => Run(AddVariantAsync()));
+        AddVariantCommand = new RelayCommand(_ => Run(AddVariantAsync));
         RemoveSelectedVariantCommand = new RelayCommand(parameter =>
         {
             if (parameter is ProductVariantSummary variant)
             {
-                Run(RemoveVariantAsync(variant));
+                Run(cancellationToken => RemoveVariantAsync(variant, cancellationToken));
             }
         });
-        AddDesignAreaCommand = new RelayCommand(_ => Run(AddDesignAreaAsync()));
+        AddDesignAreaCommand = new RelayCommand(_ => Run(AddDesignAreaAsync));
         RemoveSelectedDesignAreaCommand = new RelayCommand(parameter =>
         {
             if (parameter is DesignAreaSummary area)
             {
-                Run(RemoveDesignAreaAsync(area));
+                Run(cancellationToken => RemoveDesignAreaAsync(area, cancellationToken));
             }
         });
     }
@@ -408,7 +427,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private void OnCatalogChanged(object? sender, EventArgs e)
     {
         if (CatalogEditorLevel == CatalogEditorLevel.ProductDetail)
-            Run(RefreshBlueprintOfferingCardsAsync());
+            Run(RefreshBlueprintOfferingCardsAsync);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -526,7 +545,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         if (!ShowStrategyWarning || SelectedStore is null) return;
         ShowStrategyWarning = false;
         _confirmedStrategyStore = SelectedStore.Id;
-        Run(SaveSelectedStoreAsync());
+        Run(SaveSelectedStoreAsync);
     });
 
     public ICommand CancelStrategyCommand => new RelayCommand(_ =>
@@ -610,6 +629,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public bool CanDeleteSelectedNiche => _nicheService is not null && SelectedNiche is not null && !_isCreatingNewNiche;
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
+
+    public bool IsBusy => _isBusy;
 
     public bool ShouldShowFirstStorePrompt => NeedsFirstStore && !_firstStorePromptDismissed && !IsStoreEditorOpen;
 
@@ -1059,7 +1080,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     public bool ShowArchivedOfferings
     {
         get => _showArchivedOfferings;
-        set { if (SetField(ref _showArchivedOfferings, value)) Run(RefreshBlueprintOfferingCardsAsync()); }
+        set { if (SetField(ref _showArchivedOfferings, value)) Run(RefreshBlueprintOfferingCardsAsync); }
     }
 
     public bool HasProducts => EditorProducts.Count > 0;
@@ -1565,7 +1586,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         await LoadNichesForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
         await LoadTagsForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
         if (CatalogSetup is not null && SelectedStore is not null)
-            Run(CatalogSetup.LoadForStoreAsync(SelectedStore.Id, cancellationToken));
+            Run(token => CatalogSetup.LoadForStoreAsync(SelectedStore.Id, token), cancellationToken);
     }
 
     public async Task CreateStoreAsync(CancellationToken cancellationToken = default)
@@ -1624,10 +1645,10 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanEditStoreConfiguration));
         OnPropertyChanged(nameof(CanRestoreSelectedStore));
         RaiseEditorActionProperties();
-        Run(LoadNichesForSelectedStoreAsync());
-        Run(LoadTagsForSelectedStoreAsync());
+        Run(LoadNichesForSelectedStoreAsync);
+        Run(LoadTagsForSelectedStoreAsync);
         if (CatalogSetup is not null)
-            Run(CatalogSetup.LoadForStoreAsync(store.Id));
+            Run(token => CatalogSetup.LoadForStoreAsync(store.Id, token));
     }
 
     public void StartCreateStore()
@@ -2172,7 +2193,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             BeginCreateNicheDraft();
         }
 
-        Run(LoadNichesForSelectedStoreAsync());
+        Run(LoadNichesForSelectedStoreAsync);
     }
 
     public bool TryCloseStoreEditor()
@@ -2469,20 +2490,16 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         _pendingDeleteTagItemCount = 0;
         TagDeleteWarningVisible = true;
         OnPropertyChanged(nameof(TagDeleteWarningMessage));
-        Run(RefreshTagDeleteItemCountAsync());
+        Run(RefreshTagDeleteItemCountAsync);
     }
 
-    private async Task RefreshTagDeleteItemCountAsync()
+    private async Task RefreshTagDeleteItemCountAsync(CancellationToken cancellationToken = default)
     {
         if (_tagService is null || _pendingDeleteTag is null) return;
-        try
-        {
-            _pendingDeleteTagItemCount = await _tagService.GetTagApplicationCountAsync(_pendingDeleteTag.Id, CancellationToken.None);
-            OnPropertyChanged(nameof(TagDeleteWarningMessage));
-        }
-        catch
-        {
-        }
+        _pendingDeleteTagItemCount = await _tagService
+            .GetTagApplicationCountAsync(_pendingDeleteTag.Id, cancellationToken)
+            .ConfigureAwait(true);
+        OnPropertyChanged(nameof(TagDeleteWarningMessage));
     }
 
     public async Task ConfirmDeleteTagAsync(CancellationToken cancellationToken = default)
@@ -2635,7 +2652,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             BeginCreateTagDraft();
         }
 
-        Run(LoadTagsForSelectedStoreAsync());
+        Run(LoadTagsForSelectedStoreAsync);
     }
 
     private void OpenProductsTab()
@@ -2658,7 +2675,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         IsAddingVariant = false;
         IsAddingDesignArea = false;
 
-        Run(LoadProductsForSelectedStoreAsync());
+        Run(LoadProductsForSelectedStoreAsync);
     }
 
     private async Task LoadProductsForSelectedStoreAsync(CancellationToken cancellationToken = default)
@@ -2757,10 +2774,10 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         {
             ClearOfferingEditingFields();
         }
-        Run(RefreshBlueprintOfferingCardsAsync());
+        Run(RefreshBlueprintOfferingCardsAsync);
     }
 
-    private async Task RefreshBlueprintOfferingCardsAsync()
+    private async Task RefreshBlueprintOfferingCardsAsync(CancellationToken cancellationToken = default)
     {
         var store = SelectedStore;
         var blueprint = SelectedProduct;
@@ -2773,11 +2790,15 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         {
             try
             {
-                cards = (await _offeringManagementService.LoadForBlueprintAsync(store.Id, blueprint.Id, ShowArchivedOfferings, CancellationToken.None).ConfigureAwait(true))
+                cards = (await _offeringManagementService.LoadForBlueprintAsync(store.Id, blueprint.Id, ShowArchivedOfferings, cancellationToken).ConfigureAwait(true))
                     .Select(BlueprintOfferingCardViewModel.From)
                     .ToArray();
                 if (SelectedStore?.Id != store.Id || SelectedProduct?.Id != blueprint.Id)
                     return;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
             }
             catch (Exception exception)
             {
@@ -2855,11 +2876,11 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         RaiseOfferingEditorStateProperties();
     }
 
-    private async Task BackToProductsAsync()
+    private async Task BackToProductsAsync(CancellationToken cancellationToken = default)
     {
         if (_productSaveTask is { IsCompleted: false })
         {
-            await _productSaveTask;
+            await _productSaveTask.WaitAsync(cancellationToken);
         }
 
         BackToProducts();
@@ -2885,7 +2906,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         }
 
         CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
-        Run(RefreshBlueprintOfferingCardsAsync());
+        Run(RefreshBlueprintOfferingCardsAsync);
     }
 
     private void OpenOfferingManagement(CatalogEditorLevel level)
@@ -2920,7 +2941,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
         }
         CatalogEditorLevel = level;
         if (level == CatalogEditorLevel.OfferingDetail)
-            Run(RefreshBlueprintOfferingCardsAsync());
+            Run(RefreshBlueprintOfferingCardsAsync);
     }
 
     private void StartAddVariant()
@@ -3041,14 +3062,22 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
             return;
         }
 
-        _productSaveTask = SaveSelectedProductAndReportFailureAsync();
+        Run(cancellationToken =>
+        {
+            _productSaveTask = SaveSelectedProductAndReportFailureAsync(cancellationToken);
+            return _productSaveTask;
+        });
     }
 
-    private async Task SaveSelectedProductAndReportFailureAsync()
+    private async Task SaveSelectedProductAndReportFailureAsync(CancellationToken cancellationToken)
     {
         try
         {
-            await SaveSelectedProductAsync();
+            await SaveSelectedProductAsync(cancellationToken).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
@@ -3875,7 +3904,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 break;
             case PendingEditorAction.SelectNichesTab:
                 SelectedEditorTab = StoreManagementEditorTab.Niches;
-                Run(LoadNichesForSelectedStoreAsync());
+                Run(LoadNichesForSelectedStoreAsync);
                 break;
             case PendingEditorAction.SelectTag when tag is not null:
                 PerformSelectTagForEditing(tag);
@@ -3885,11 +3914,11 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
                 break;
             case PendingEditorAction.SelectTagsTab:
                 SelectedEditorTab = StoreManagementEditorTab.Tags;
-                Run(LoadTagsForSelectedStoreAsync());
+                Run(LoadTagsForSelectedStoreAsync);
                 break;
             case PendingEditorAction.SelectProductsTab:
                 SelectedEditorTab = StoreManagementEditorTab.Products;
-                Run(LoadProductsForSelectedStoreAsync());
+                Run(LoadProductsForSelectedStoreAsync);
                 break;
             case PendingEditorAction.StartNewProduct:
                 BeginCreateProductDraft();
@@ -4105,7 +4134,123 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged
     private static string? EmptyToNull(string value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static void Run(Task task) => _ = task;
+    public ValueTask DisposeAsync()
+    {
+        Task disposalTask;
+        TaskCompletionSource cancellationCompleted;
+        lock (_operationGate)
+        {
+            if (_disposeTask is not null)
+            {
+                return new ValueTask(_disposeTask);
+            }
+
+            _isDisposed = true;
+            cancellationCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var operations = _inFlightOperations.Select(operation => operation.Completion.Task).ToArray();
+            _disposeTask = CompleteDisposalAsync(operations, cancellationCompleted.Task);
+            disposalTask = _disposeTask;
+        }
+
+        try
+        {
+            _shutdownCts.Cancel();
+            cancellationCompleted.TrySetResult();
+        }
+        catch (Exception exception)
+        {
+            cancellationCompleted.TrySetException(exception);
+        }
+
+        return new ValueTask(disposalTask);
+    }
+
+    private async Task CompleteDisposalAsync(IReadOnlyCollection<Task> operations, Task cancellationCompleted)
+    {
+        try
+        {
+            await cancellationCompleted.ConfigureAwait(false);
+            if (operations.Count == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                await Task.WhenAll(operations).WaitAsync(OperationShutdownTimeout).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+            }
+        }
+        finally
+        {
+            _shutdownCts.Dispose();
+        }
+    }
+
+    private void Run(Func<CancellationToken, Task> operation, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        TrackedOperation trackedOperation;
+        lock (_operationGate)
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            trackedOperation = new TrackedOperation(CancellationTokenSource.CreateLinkedTokenSource(
+                _shutdownCts.Token,
+                cancellationToken));
+            _inFlightOperations.Add(trackedOperation);
+            _isBusy = true;
+        }
+
+        try
+        {
+            OnPropertyChanged(nameof(IsBusy));
+        }
+        finally
+        {
+            _ = RunAndObserveAsync(trackedOperation, operation);
+        }
+    }
+
+    private async Task RunAndObserveAsync(
+        TrackedOperation trackedOperation,
+        Func<CancellationToken, Task> operation)
+    {
+        try
+        {
+            await operation(trackedOperation.Cancellation.Token).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException) when (trackedOperation.Cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            ErrorMessage = exception.Message;
+        }
+        finally
+        {
+            trackedOperation.Cancellation.Dispose();
+            lock (_operationGate)
+            {
+                _inFlightOperations.Remove(trackedOperation);
+                _isBusy = _inFlightOperations.Count > 0;
+            }
+
+            try
+            {
+                OnPropertyChanged(nameof(IsBusy));
+            }
+            finally
+            {
+                trackedOperation.Completion.TrySetResult();
+            }
+        }
+    }
 
     private void RaisePromptProperties()
     {

@@ -329,6 +329,172 @@ public class StoreManagementViewModelTests
     }
 
     [Fact]
+    public async Task SelectStoreCommand_TracksPendingTaskAndShowsTheFailure()
+    {
+        var failure = new InvalidOperationException("The store could not be selected.");
+        var serviceCalled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var serviceCompletion = new TaskCompletionSource<StoreManagementResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var service = new FaultingStoreManagementService
+        {
+            SelectStore = (_, _) =>
+            {
+                serviceCalled.TrySetResult();
+                return serviceCompletion.Task;
+            }
+        };
+        var viewModel = new StoreManagementViewModel(service);
+        var busyStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var busyStopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var errorChanged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(viewModel.IsBusy))
+            {
+                if (viewModel.IsBusy)
+                {
+                    busyStarted.TrySetResult();
+                }
+                else
+                {
+                    busyStopped.TrySetResult();
+                }
+            }
+
+            if (args.PropertyName == nameof(viewModel.ErrorMessage))
+            {
+                errorChanged.TrySetResult();
+            }
+        };
+
+        var store = NewStoreSummary("North Star Studio");
+        Assert.True(viewModel.SelectStoreCommand.CanExecute(store));
+        viewModel.SelectStoreCommand.Execute(store);
+        Assert.True(viewModel.IsBusy);
+
+        await serviceCalled.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await busyStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        serviceCompletion.SetException(failure);
+        await errorChanged.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await busyStopped.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.Contains(failure.Message, viewModel.ErrorMessage);
+        Assert.False(viewModel.IsBusy);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_CancelsAndWaitsForPendingCommandTasks()
+    {
+        var serviceCalled = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var service = new FaultingStoreManagementService
+        {
+            SelectStore = async (_, cancellationToken) =>
+            {
+                serviceCalled.TrySetResult(cancellationToken);
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                throw new InvalidOperationException("The cancelled selection unexpectedly completed.");
+            }
+        };
+        var viewModel = new StoreManagementViewModel(service);
+
+        var lifetime = Assert.IsAssignableFrom<IAsyncDisposable>(viewModel);
+        viewModel.SelectStoreCommand.Execute(NewStoreSummary("North Star Studio"));
+        var operationToken = await serviceCalled.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        await lifetime.DisposeAsync();
+
+        Assert.True(operationToken.IsCancellationRequested);
+        Assert.False(viewModel.IsBusy);
+    }
+
+    [Fact]
+    public async Task SelectStoreCommand_CompletesAndClearsBusyStateAfterSuccess()
+    {
+        var serviceCalled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var serviceCompletion = new TaskCompletionSource<StoreManagementResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var service = new FaultingStoreManagementService
+        {
+            SelectStore = (_, _) =>
+            {
+                serviceCalled.TrySetResult();
+                return serviceCompletion.Task;
+            }
+        };
+        var viewModel = new StoreManagementViewModel(service);
+        var busyStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var busyStopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(viewModel.IsBusy))
+            {
+                if (viewModel.IsBusy)
+                {
+                    busyStarted.TrySetResult();
+                }
+                else
+                {
+                    busyStopped.TrySetResult();
+                }
+            }
+        };
+
+        var store = NewStoreSummary("North Star Studio");
+        Assert.True(viewModel.SelectStoreCommand.CanExecute(store));
+        viewModel.SelectStoreCommand.Execute(store);
+        Assert.True(viewModel.IsBusy);
+
+        await serviceCalled.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await busyStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        serviceCompletion.SetResult(StoreManagementResult.Success(
+            null,
+            new StoreManagementState(null, [], [], null, null, NeedsFirstStore: true)));
+        await busyStopped.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.False(viewModel.IsBusy);
+        Assert.False(viewModel.HasError);
+        Assert.Null(viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_CancelsAndBoundsInFlightOperations()
+    {
+        var serviceCalled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var serviceCompletion = new TaskCompletionSource<StoreManagementResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken operationToken = default;
+        var service = new FaultingStoreManagementService
+        {
+            SelectStore = (_, cancellationToken) =>
+            {
+                operationToken = cancellationToken;
+                serviceCalled.TrySetResult();
+                return serviceCompletion.Task;
+            }
+        };
+        var viewModel = new StoreManagementViewModel(service);
+        var busyStopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(viewModel.IsBusy) && !viewModel.IsBusy)
+            {
+                busyStopped.TrySetResult();
+            }
+        };
+
+        viewModel.SelectStoreCommand.Execute(NewStoreSummary("North Star Studio"));
+        await serviceCalled.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        await viewModel.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(4), TestContext.Current.CancellationToken);
+
+        Assert.True(operationToken.IsCancellationRequested);
+        Assert.True(viewModel.IsBusy);
+
+        serviceCompletion.SetResult(StoreManagementResult.Success(
+            null,
+            new StoreManagementState(null, [], [], null, null, NeedsFirstStore: true)));
+        await busyStopped.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.False(viewModel.IsBusy);
+    }
+
+    [Fact]
     public async Task StoreEditor_DeleteConfirmedEmptyStoreAndBlocksConnectedStore()
     {
         var empty = NewStore("Empty Studio");
@@ -784,6 +950,20 @@ public class StoreManagementViewModelTests
         Assert.Null(viewModel.SelectedStore?.Context.Url);
     }
 
+    private static StoreSummary NewStoreSummary(string name)
+    {
+        var store = NewStore(name);
+        return new StoreSummary(
+            store.Id,
+            store.WorkspaceId,
+            store.Name,
+            new StoreContext(),
+            store.IsArchived,
+            store.CreatedAt,
+            store.UpdatedAt,
+            store.FulfillmentStrategy);
+    }
+
     private static Store NewStore(string name, bool isArchived = false) =>
         new(Guid.NewGuid(), name, null, isArchived, Now, Now, "{}");
 
@@ -818,6 +998,39 @@ public class StoreManagementViewModelTests
             Task.FromResult(AiTextResult.Failure(
                 AiTextFailureKind.NotConfigured,
                 "No test credential."));
+    }
+
+    private sealed class FaultingStoreManagementService : IStoreManagementService
+    {
+        public Func<Guid, CancellationToken, Task<StoreManagementResult>> SelectStore { get; init; } =
+            (_, _) => throw new NotSupportedException();
+
+        public Guid? ActiveWorkspaceId => null;
+
+        public Guid? ActiveStoreId => null;
+
+        public void SetActiveWorkspace(Guid? workspaceId) { }
+
+        public Task<StoreManagementState> LoadAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<StoreManagementResult> CreateStoreAsync(StoreManagementCreateRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<StoreManagementResult> UpdateStoreAsync(StoreManagementUpdateRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<StoreManagementResult> ArchiveStoreAsync(Guid storeId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<StoreManagementResult> RestoreStoreAsync(Guid storeId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<StoreManagementResult> DeleteStoreAsync(StoreManagementDeleteRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<StoreManagementResult> SelectStoreAsync(Guid storeId, CancellationToken cancellationToken = default) =>
+            SelectStore(storeId, cancellationToken);
     }
 
     private sealed class TemporaryDirectory : IDisposable
