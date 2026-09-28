@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
@@ -10,6 +12,8 @@ namespace FusionCanvas.App;
 public partial class App : Avalonia.Application
 {
     private AppServices? _services;
+    private bool _allowFinalClose;
+    private Task? _shutdownTask;
 
     public override void Initialize()
     {
@@ -46,22 +50,102 @@ public partial class App : Avalonia.Application
             {
                 DataContext = ((MainWindowViewModel)mainWindow.DataContext!).StoreManagement
             };
-            storeEditor.Closing += (_, _) => DisposeServices();
+            storeEditor.Closing += OnWindowClosing;
             desktop.MainWindow = storeEditor;
             storeEditor.Show();
             return;
         }
 
-        mainWindow.Closing += (_, _) =>
-            DisposeServices();
+        mainWindow.Closing += OnWindowClosing;
         desktop.MainWindow = mainWindow;
         mainWindow.Show();
     }
 
-    private void DisposeServices()
+    private async void OnWindowClosing(object? sender, WindowClosingEventArgs e)
     {
-        _services?.FlushAsync().GetAwaiter().GetResult();
-        _services?.Dispose();
+        if (_allowFinalClose || e.Cancel || sender is not Window window)
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        var storeManagement = window.DataContext switch
+        {
+            StoreManagementViewModel storeViewModel => storeViewModel,
+            MainWindowViewModel mainViewModel => mainViewModel.StoreManagement,
+            _ => null
+        };
+        _shutdownTask ??= CompleteWindowShutdownAsync(window, storeManagement);
+        try
+        {
+            await _shutdownTask;
+        }
+        catch (Exception exception)
+        {
+            Trace.TraceError("Application shutdown failed: {0}", exception);
+        }
+    }
+
+    private async Task CompleteWindowShutdownAsync(Window window, StoreManagementViewModel? storeManagement)
+    {
+        var storeManagementDrained = true;
+        try
+        {
+            if (storeManagement is not null)
+            {
+                try
+                {
+                    await storeManagement.DisposeAsync();
+                }
+                catch (Exception exception)
+                {
+                    storeManagementDrained = false;
+                    Trace.TraceError("Store management shutdown failed: {0}", exception);
+                }
+
+                storeManagementDrained &= !storeManagement.IsBusy;
+            }
+
+            if (_services is { } services)
+            {
+                if (storeManagementDrained)
+                {
+                    try
+                    {
+                        await services.FlushAsync();
+                    }
+                    catch (Exception exception)
+                    {
+                        Trace.TraceError("Application service flush failed: {0}", exception);
+                    }
+                    finally
+                    {
+                        try
+                        {
+                            services.Dispose();
+                        }
+                        catch (Exception exception)
+                        {
+                            Trace.TraceError("Application service disposal failed: {0}", exception);
+                        }
+                        finally
+                        {
+                            _services = null;
+                        }
+                    }
+                }
+                else
+                {
+                    Trace.TraceWarning(
+                        "Skipping service flush and disposal because StoreManagementViewModel still has in-flight operations.");
+                }
+            }
+        }
+        finally
+        {
+            _allowFinalClose = true;
+            window.Close();
+        }
     }
 
     private void InitializeMainWindow(
