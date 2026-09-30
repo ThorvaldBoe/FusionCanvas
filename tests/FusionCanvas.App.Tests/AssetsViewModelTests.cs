@@ -109,6 +109,30 @@ public class AssetsViewModelTests
     }
 
     [Fact]
+    public async Task ImportCommand_UnexpectedFailureIsObservedAndPreservesPendingImport()
+    {
+        var sample = Sample.Create();
+        var service = new ThrowingAssetManagementService(sample.Service(), new IOException("unexpected import failure"))
+        {
+            ThrowOnImport = true
+        };
+        var picker = new FakeFilePicker().WithFile(@"C:\imports\design.svg");
+        var viewModel = new AssetsViewModel(service, picker);
+
+        await viewModel.OpenForContextAsync(sample.ItemContext);
+        viewModel.ImportCommand.Execute(null);
+        await WaitForAsync(() => viewModel.HasImportPending);
+
+        viewModel.ConfirmImportCommand.Execute(null);
+        await WaitForAsync(() => viewModel.HasError);
+
+        Assert.Equal("unexpected import failure", viewModel.ErrorMessage);
+        Assert.False(viewModel.IsBusy);
+        Assert.True(viewModel.HasImportPending);
+        Assert.Single(viewModel.Assets);
+    }
+
+    [Fact]
     public async Task PickerCancel_LeavesListUnchanged()
     {
         var sample = Sample.Create();
@@ -153,6 +177,29 @@ public class AssetsViewModelTests
     }
 
     [Fact]
+    public async Task RelabelCommand_UnexpectedFailureIsObservedAndRevertsPurpose()
+    {
+        var sample = Sample.Create();
+        var service = new ThrowingAssetManagementService(sample.Service(), new IOException("unexpected relabel failure"))
+        {
+            ThrowOnRelabel = true
+        };
+        var viewModel = new AssetsViewModel(service, new FakeFilePicker());
+
+        await viewModel.OpenForContextAsync(sample.ItemContext);
+        var row = viewModel.Assets.Single();
+        var referenceOption = viewModel.AvailablePurposes.Single(option => option.Kind == AssetKind.ReferenceImage);
+
+        row.SelectedPurpose = referenceOption;
+        await WaitForAsync(() => viewModel.HasError);
+
+        Assert.Equal("unexpected relabel failure", viewModel.ErrorMessage);
+        Assert.False(viewModel.IsBusy);
+        Assert.Equal(AssetKind.ExportedImage, row.Purpose);
+        Assert.Equal(AssetKind.ExportedImage, row.SelectedPurpose.Kind);
+    }
+
+    [Fact]
     public async Task Removal_RequiresConfirmationCancelsAndDeletesOnConfirm()
     {
         var sample = Sample.Create();
@@ -177,6 +224,27 @@ public class AssetsViewModelTests
         Assert.False(viewModel.RemovalConfirmationVisible);
         Assert.Single(repository.Snapshot.Assets);
         Assert.Empty(viewModel.Assets);
+    }
+
+    [Fact]
+    public async Task RemoveCommand_UnexpectedFailureIsObservedAndKeepsAsset()
+    {
+        var sample = Sample.Create();
+        var service = new ThrowingAssetManagementService(sample.Service(), new IOException("unexpected remove failure"))
+        {
+            ThrowOnRemove = true
+        };
+        var viewModel = new AssetsViewModel(service, new FakeFilePicker());
+
+        await viewModel.OpenForContextAsync(sample.ItemContext);
+        var row = viewModel.Assets.Single();
+        viewModel.RequestRemoveCommand.Execute(row);
+        viewModel.ConfirmRemoveCommand.Execute(null);
+        await WaitForAsync(() => viewModel.HasError);
+
+        Assert.Equal("unexpected remove failure", viewModel.ErrorMessage);
+        Assert.False(viewModel.IsBusy);
+        Assert.Contains(row, viewModel.Assets);
     }
 
     [Fact]
@@ -237,6 +305,31 @@ public class AssetsViewModelTests
             inner.RemoveAssetAsync(request, cancellationToken);
 
         public void ReleaseLoad() => _loadRelease.TrySetResult();
+    }
+
+    private sealed class ThrowingAssetManagementService(
+        IAssetManagementService inner,
+        Exception failure) : IAssetManagementService
+    {
+        public bool ThrowOnImport { get; set; }
+        public bool ThrowOnRelabel { get; set; }
+        public bool ThrowOnRemove { get; set; }
+
+        public Guid? ActiveWorkspaceId => inner.ActiveWorkspaceId;
+
+        public void SetActiveWorkspace(Guid? workspaceId) => inner.SetActiveWorkspace(workspaceId);
+
+        public Task<AssetManagementState> LoadAsync(AssetContextReference context, CancellationToken cancellationToken = default) =>
+            inner.LoadAsync(context, cancellationToken);
+
+        public Task<AssetManagementResult> ImportAssetAsync(AssetManagementImportRequest request, CancellationToken cancellationToken = default) =>
+            ThrowOnImport ? Task.FromException<AssetManagementResult>(failure) : inner.ImportAssetAsync(request, cancellationToken);
+
+        public Task<AssetManagementResult> RelabelAssetAsync(AssetManagementRelabelRequest request, CancellationToken cancellationToken = default) =>
+            ThrowOnRelabel ? Task.FromException<AssetManagementResult>(failure) : inner.RelabelAssetAsync(request, cancellationToken);
+
+        public Task<AssetManagementResult> RemoveAssetAsync(AssetManagementRemoveRequest request, CancellationToken cancellationToken = default) =>
+            ThrowOnRemove ? Task.FromException<AssetManagementResult>(failure) : inner.RemoveAssetAsync(request, cancellationToken);
     }
 
     private sealed class Repository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
