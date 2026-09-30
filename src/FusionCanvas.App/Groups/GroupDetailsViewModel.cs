@@ -181,7 +181,7 @@ public sealed class GroupDetailsViewModel : INotifyPropertyChanged
     {
         _storeId = storeId;
         _nicheId = nicheId;
-        var state = await _service.LoadAsync(storeId, nicheId, cancellationToken).ConfigureAwait(false);
+        var state = await _service.LoadAsync(storeId, nicheId, cancellationToken);
         ApplyState(state);
         var group = _activeGroups.Concat(state.ArchivedGroups).SingleOrDefault(candidate => candidate.Id == groupId);
         if (group is null)
@@ -242,7 +242,7 @@ public sealed class GroupDetailsViewModel : INotifyPropertyChanged
         IsBusy = true;
         var result = await _service.UpdateGroupAsync(
             new GroupManagementUpdateRequest(group.Id, Name, CurrentContext()),
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken);
         IsBusy = false;
 
         if (!result.Succeeded)
@@ -268,7 +268,7 @@ public sealed class GroupDetailsViewModel : INotifyPropertyChanged
             return;
         }
 
-        await CommitEditsAsync().ConfigureAwait(false);
+        await CommitEditsAsync();
         if (HasError)
         {
             return;
@@ -276,7 +276,7 @@ public sealed class GroupDetailsViewModel : INotifyPropertyChanged
 
         IsBusy = true;
         var result = await _service.MoveGroupAsync(
-            new GroupManagementMoveRequest(group.Id, destination.Parent)).ConfigureAwait(false);
+            new GroupManagementMoveRequest(group.Id, destination.Parent));
         IsBusy = false;
         ApplyMutationResult(result);
     }
@@ -290,7 +290,7 @@ public sealed class GroupDetailsViewModel : INotifyPropertyChanged
 
         ArchiveConfirmationVisible = false;
         IsBusy = true;
-        var result = await _service.ArchiveGroupAsync(group.Id).ConfigureAwait(false);
+        var result = await _service.ArchiveGroupAsync(group.Id);
         IsBusy = false;
         ApplyMutationResult(result);
     }
@@ -303,7 +303,7 @@ public sealed class GroupDetailsViewModel : INotifyPropertyChanged
         }
 
         IsBusy = true;
-        var result = await _service.RestoreGroupAsync(group.Id).ConfigureAwait(false);
+        var result = await _service.RestoreGroupAsync(group.Id);
         IsBusy = false;
         ApplyMutationResult(result);
     }
