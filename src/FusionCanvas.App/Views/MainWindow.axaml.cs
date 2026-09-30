@@ -864,12 +864,6 @@ public partial class MainWindow : Window
         DesignSlotViewModel slotVm,
         string path)
     {
-        if (!Path.GetExtension(path).Equals(".png", StringComparison.OrdinalIgnoreCase))
-        {
-            vm.DesignTool.ErrorMessage = "Only PNG files can be assigned to final design artwork slots. The selected file was not imported.";
-            return;
-        }
-
         var rowVM = vm.DesignTool.Rows.FirstOrDefault(r => r.Slots.Contains(slotVm));
         if (rowVM is null)
             return;

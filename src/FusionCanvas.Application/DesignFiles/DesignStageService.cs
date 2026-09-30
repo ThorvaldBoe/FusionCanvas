@@ -424,7 +424,7 @@ public sealed class DesignStageService : IDesignStageService
 
         if (!IsPng(sourcePath))
         {
-            return DesignStageResult.Failure("Final design slot images must be PNG.");
+            return DesignStageResult.Failure("Only PNG files can be assigned to final design artwork slots. The selected file was not imported.");
         }
 
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
