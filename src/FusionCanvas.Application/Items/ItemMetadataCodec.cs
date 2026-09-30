@@ -51,6 +51,44 @@ internal static class ItemMetadataCodec
             : new(StringComparer.Ordinal);
     }
 
+    public static IReadOnlyDictionary<string, string> SanitizeCreativeContextMetadata(string? metadataJson)
+    {
+        if (string.IsNullOrWhiteSpace(metadataJson) || metadataJson.Trim() == "{}")
+        {
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+
+        try
+        {
+            return SanitizeCreativeContextMetadata(ParseMetadata(metadataJson));
+        }
+        catch (JsonException)
+        {
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+    }
+
+    public static IReadOnlyDictionary<string, string> SanitizeCreativeContextMetadata(
+        IReadOnlyDictionary<string, string> metadata) =>
+        metadata
+            .Where(pair => !IsOperationalCreativeContextKey(pair.Key))
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+
+    private static bool IsOperationalCreativeContextKey(string key)
+    {
+        var normalized = key.Trim().ToLowerInvariant();
+        var compact = new string(normalized.Where(char.IsLetterOrDigit).ToArray());
+        return normalized.StartsWith(InheritedFromPrefix.ToLowerInvariant(), StringComparison.Ordinal) ||
+               compact is "id" or "createdat" or "updatedat" or "isarchived" or "status" ||
+               compact.Contains("inherited", StringComparison.Ordinal) ||
+               compact.Contains("path", StringComparison.Ordinal) ||
+               compact.Contains("apikey", StringComparison.Ordinal) ||
+               compact.Contains("credential", StringComparison.Ordinal) ||
+               compact.Contains("password", StringComparison.Ordinal) ||
+               compact.Contains("secret", StringComparison.Ordinal) ||
+               compact.Contains("token", StringComparison.Ordinal);
+    }
+
     public static string SerializeMetadata(IReadOnlyDictionary<string, string> metadata) =>
         metadata.Count == 0 ? "{}" : JsonSerializer.Serialize(metadata);
 

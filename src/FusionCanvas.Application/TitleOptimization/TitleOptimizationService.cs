@@ -155,25 +155,17 @@ public sealed class TitleOptimizationService : ITitleOptimizationService
             : null;
 
         return new TitleContext(
-            new CreativeEntity(store.Name, store.Description, ParseMetadata(store.MetadataJson)),
-            new CreativeEntity(niche.Name, niche.Description, ParseMetadata(niche.MetadataJson)),
+            new CreativeEntity(store.Name, store.Description, ItemMetadataCodec.SanitizeCreativeContextMetadata(store.MetadataJson)),
+            new CreativeEntity(niche.Name, niche.Description, ItemMetadataCodec.SanitizeCreativeContextMetadata(niche.MetadataJson)),
             group is null
                 ? null
-                : new CreativeEntity(group.Name, group.Description, ParseMetadata(group.MetadataJson)),
+                : new CreativeEntity(group.Name, group.Description, ItemMetadataCodec.SanitizeCreativeContextMetadata(group.MetadataJson)),
             Trim(metadata.GetValueOrDefault(ItemMetadataCodec.IdeaKey)),
             Trim(metadata.GetValueOrDefault(ItemMetadataCodec.ConceptIdeaKey)),
             Trim(metadata.GetValueOrDefault(ItemMetadataCodec.PhraseKey)),
             Trim(metadata.GetValueOrDefault(ItemMetadataCodec.GraphicDirectionKey)),
             item.Name?.Trim(),
             TitleUniquenessPolicy.DistinctTitles(snapshot.Items, item.StoreId, item.Id));
-    }
-
-    private static IReadOnlyDictionary<string, string> ParseMetadata(string metadataJson)
-    {
-        var parsed = ItemMetadataCodec.ParseMetadata(metadataJson);
-        return parsed
-            .Where(pair => !IsOperationalKey(pair.Key))
-            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
     }
 
     private static object Creative(CreativeEntity entity) => new
@@ -185,19 +177,6 @@ public sealed class TitleOptimizationService : ITitleOptimizationService
 
     private static string? Trim(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    private static bool IsOperationalKey(string key)
-    {
-        var normalized = key.Trim().ToLowerInvariant();
-        var compact = new string(normalized.Where(char.IsLetterOrDigit).ToArray());
-        return normalized.StartsWith(ItemMetadataCodec.InheritedFromPrefix.ToLowerInvariant(), StringComparison.Ordinal) ||
-               compact is "id" or "createdat" or "updatedat" or "isarchived" or "status" ||
-               compact.Contains("path", StringComparison.Ordinal) ||
-               compact.Contains("apikey", StringComparison.Ordinal) ||
-               compact.Contains("credential", StringComparison.Ordinal) ||
-               compact.Contains("secret", StringComparison.Ordinal) ||
-               compact.Contains("token", StringComparison.Ordinal);
-    }
 
     private sealed record TitleContext(
         CreativeEntity Store,

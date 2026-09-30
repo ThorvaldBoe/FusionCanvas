@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.ConceptRefinement;
+using FusionCanvas.Application.Items;
 
 namespace FusionCanvas.Application.Ideation;
 
@@ -84,19 +85,6 @@ public sealed class AiIdeaGenerator(
     {
         context.Name,
         context.Description,
-        Metadata = context.Metadata
-            .Where(pair => !IsOperationalKey(pair.Key))
-            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal)
+        Metadata = ItemMetadataCodec.SanitizeCreativeContextMetadata(context.Metadata)
     };
-
-    private static bool IsOperationalKey(string key)
-    {
-        var compact = new string(key.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
-        return compact is "id" or "createdat" or "updatedat" or "isarchived" or "path" or "filepath"
-            || compact.Contains("apikey", StringComparison.Ordinal)
-            || compact.Contains("credential", StringComparison.Ordinal)
-            || compact.Contains("password", StringComparison.Ordinal)
-            || compact.Contains("secret", StringComparison.Ordinal)
-            || compact.Contains("token", StringComparison.Ordinal);
-    }
 }
