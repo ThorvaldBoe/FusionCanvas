@@ -5,6 +5,7 @@ using IItemCsvCodec = FusionCanvas.Application.Items.Import.IItemCsvCodec;
 using ItemCsvRow = FusionCanvas.Application.Items.Import.ItemCsvRow;
 using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.App.Tests.TestSupport;
 
 namespace FusionCanvas.App.Tests.Items.Import;
 
@@ -70,6 +71,43 @@ public sealed class ItemImportViewModelTests
     }
 
     [Fact]
+    public void PickFile_PublishesStateChangesOnCapturedSynchronizationContext()
+    {
+        var originalContext = SynchronizationContext.Current;
+        using var uiContext = new PumpingSynchronizationContext();
+        SynchronizationContext.SetSynchronizationContext(uiContext);
+        try
+        {
+            var picker = new FakeFilePicker();
+            var importReady = new TaskCompletionSource<Stream?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            picker.ImportTask = importReady.Task;
+            var vm = Create(picker: picker, codec: new FakeCodec(ValidResult(["Alpha"])));
+            var uiThreadId = Environment.CurrentManagedThreadId;
+            var rawSourceThreadId = 0;
+            var previewThreadId = 0;
+            vm.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(ItemImportViewModel.RawSource))
+                {
+                    rawSourceThreadId = Environment.CurrentManagedThreadId;
+                }
+            };
+            vm.PreviewRows.CollectionChanged += (_, _) => previewThreadId = Environment.CurrentManagedThreadId;
+
+            vm.PickFileCommand.Execute(null);
+            importReady.SetResult(Stream("row"));
+            uiContext.PumpUntil(vm.WhenIdleAsync(), TimeSpan.FromSeconds(5));
+
+            Assert.Equal(uiThreadId, rawSourceThreadId);
+            Assert.Equal(uiThreadId, previewThreadId);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(originalContext);
+        }
+    }
+
+    [Fact]
     public async Task PickFile_DecoderFailure_SurfacesLoadError()
     {
         var picker = new FakeFilePicker { ImportStream = new MemoryStream([0xC3, 0x28]) };
@@ -99,6 +137,45 @@ public sealed class ItemImportViewModelTests
         Assert.Equal(1, service.LastRequest!.Rows.Count);
         Assert.True(vm.HasImportCompleted);
         Assert.True(closed);
+    }
+
+    [Fact]
+    public void Import_PublishesCompletionAndCloseOnCapturedSynchronizationContext()
+    {
+        var originalContext = SynchronizationContext.Current;
+        using var uiContext = new PumpingSynchronizationContext();
+        SynchronizationContext.SetSynchronizationContext(uiContext);
+        try
+        {
+            var service = new FakeImportService();
+            var importReady = new TaskCompletionSource<ItemCsvImportResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            service.ResultTask = importReady.Task;
+            var vm = Create(service: service, codec: new FakeCodec(ValidResult(["Alpha"])));
+            vm.RawSource = "row";
+            vm.RunPreview();
+            var uiThreadId = Environment.CurrentManagedThreadId;
+            var completionThreadId = 0;
+            var closeThreadId = 0;
+            vm.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(ItemImportViewModel.HasImportCompleted) && vm.HasImportCompleted)
+                {
+                    completionThreadId = Environment.CurrentManagedThreadId;
+                }
+            };
+            vm.CloseRequested += (_, _) => closeThreadId = Environment.CurrentManagedThreadId;
+
+            vm.ImportCommand.Execute(null);
+            importReady.SetResult(ItemCsvImportResult.Success(1));
+            uiContext.PumpUntil(vm.WhenIdleAsync(), TimeSpan.FromSeconds(5));
+
+            Assert.Equal(uiThreadId, completionThreadId);
+            Assert.Equal(uiThreadId, closeThreadId);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(originalContext);
+        }
     }
 
     [Fact]
@@ -195,6 +272,7 @@ public sealed class ItemImportViewModelTests
     private sealed class FakeImportService : IItemCsvImportService
     {
         public ItemCsvImportResult Result { get; set; } = ItemCsvImportResult.Success(0);
+        public Task<ItemCsvImportResult>? ResultTask { get; set; }
         public bool Called { get; private set; }
         public ItemCsvImportRequest? LastRequest { get; private set; }
 
@@ -202,17 +280,18 @@ public sealed class ItemImportViewModelTests
         {
             Called = true;
             LastRequest = request;
-            return Task.FromResult(Result);
+            return ResultTask ?? Task.FromResult(Result);
         }
     }
 
     private sealed class FakeFilePicker : IItemCsvFilePicker
     {
         public Stream? ImportStream { get; set; }
+        public Task<Stream?>? ImportTask { get; set; }
         public MemoryStream? ExportStream { get; set; }
 
         public Task<Stream?> OpenImportAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(ImportStream);
+            ImportTask ?? Task.FromResult(ImportStream);
 
         public Task<Stream?> OpenExportAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<Stream?>(ExportStream);
