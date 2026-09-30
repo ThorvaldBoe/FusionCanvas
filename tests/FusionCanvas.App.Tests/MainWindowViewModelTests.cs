@@ -1,3 +1,4 @@
+using FusionCanvas.App.Stores;
 using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Views;
 using FusionCanvas.App.Workflow;
@@ -155,6 +156,202 @@ public class MainWindowViewModelTests
 
         Assert.False(viewModel.DocumentWindow.CanRunActiveTool);
         Assert.Contains("requires a selected item", viewModel.DocumentWindow.ActiveStageToolUnavailableMessage);
+    }
+
+    [Fact]
+    public void StartupStoreManagementLoadsOnCapturedSynchronizationContext()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var workspace = new FusionCanvas.Domain.Workspace.Workspace(Guid.NewGuid(), "Personal", null, false, now, now, "{}");
+        var store = new Store(Guid.NewGuid(), workspace.Id, "Personal Store", null, false, now, now, "{}");
+        var snapshot = new WorkspaceSnapshot([workspace], [store], [], [], [], [], [], [], [], []);
+        var repository = new GateableWorkspaceRepository(snapshot);
+        var delayedStoreLoad = repository.DelayAfterAdditionalLoads(2);
+        var originalSynchronizationContext = SynchronizationContext.Current;
+        using var uiContext = new PumpingSynchronizationContext();
+        var uiThreadId = Environment.CurrentManagedThreadId;
+        var storeLoadThreadId = 0;
+        var storeLoaded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        SynchronizationContext.SetSynchronizationContext(uiContext);
+        try
+        {
+            var viewModel = MainWindowViewModelFactory.CreateFromSnapshot(snapshot, repository);
+            viewModel.StoreManagement.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(StoreManagementViewModel.ActiveStores) &&
+                    viewModel.StoreManagement.ActiveStores.Any(candidate => candidate.Id == store.Id))
+                {
+                    Interlocked.CompareExchange(ref storeLoadThreadId, Environment.CurrentManagedThreadId, 0);
+                    storeLoaded.TrySetResult();
+                }
+            };
+
+            Assert.True(delayedStoreLoad.Started.IsCompleted);
+            delayedStoreLoad.Release();
+            uiContext.PumpUntil(storeLoaded.Task, TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            delayedStoreLoad.Release();
+            SynchronizationContext.SetSynchronizationContext(originalSynchronizationContext);
+        }
+
+        Assert.Equal(uiThreadId, storeLoadThreadId);
+    }
+
+    [Fact]
+    public async Task SelectingWorkspaceDoesNotWaitForStoreRefreshToComplete()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var personal = new FusionCanvas.Domain.Workspace.Workspace(Guid.NewGuid(), "Personal", null, false, now, now, "{}");
+        var client = new FusionCanvas.Domain.Workspace.Workspace(Guid.NewGuid(), "Client", null, false, now, now, "{}");
+        var personalStore = new Store(Guid.NewGuid(), personal.Id, "Personal Store", null, false, now, now, "{}");
+        var clientStore = new Store(Guid.NewGuid(), client.Id, "Client Store", null, false, now, now, "{}");
+        var snapshot = new WorkspaceSnapshot([personal, client], [personalStore, clientStore], [], [], [], [], [], [], [], []);
+        var repository = new GateableWorkspaceRepository(snapshot);
+        var viewModel = MainWindowViewModelFactory.CreateFromSnapshot(snapshot, repository);
+        var delayedStoreLoad = repository.DelayAfterAdditionalLoads(2);
+        var clientWorkspace = viewModel.WorkspaceManagement.ActiveWorkspaces.Single(workspace => workspace.Id == client.Id);
+        var clientStoreApplied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        viewModel.StoreManagement.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(StoreManagementViewModel.ActiveStores) &&
+                viewModel.StoreManagement.ActiveStores.Any(store => store.Id == clientStore.Id))
+            {
+                clientStoreApplied.TrySetResult();
+            }
+        };
+
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var selectionTask = Task.Run(
+            () => viewModel.WorkspaceManagement.SelectWorkspaceAsync(clientWorkspace, cancellationToken),
+            cancellationToken);
+        var selectionReturnedBeforeStoreLoad = false;
+        try
+        {
+            await delayedStoreLoad.Started.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            selectionReturnedBeforeStoreLoad = await Task.WhenAny(
+                selectionTask,
+                Task.Delay(TimeSpan.FromSeconds(2), cancellationToken)) == selectionTask;
+        }
+        finally
+        {
+            delayedStoreLoad.Release();
+        }
+
+        await selectionTask.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        await clientStoreApplied.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+
+        Assert.True(selectionReturnedBeforeStoreLoad);
+    }
+
+    [Fact]
+    public async Task StaleWorkspaceSwitchSnapshotDoesNotReplaceLatestNavigationContexts()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var personal = new FusionCanvas.Domain.Workspace.Workspace(
+            FusionCanvas.Domain.Workspace.WorkspaceDefaults.DefaultWorkspaceId,
+            "Personal",
+            null,
+            false,
+            now,
+            now,
+            "{}");
+        var client = new FusionCanvas.Domain.Workspace.Workspace(Guid.NewGuid(), "Client", null, false, now, now, "{}");
+        var personalStore = new Store(Guid.NewGuid(), personal.Id, "Personal Store", null, false, now, now, "{}");
+        var clientStore = new Store(Guid.NewGuid(), client.Id, "Client Store", null, false, now, now, "{}");
+        var personalNiche = new Niche(Guid.NewGuid(), personalStore.Id, "Personal Niche", null, false, now, now, "{}");
+        var clientNiche = new Niche(Guid.NewGuid(), clientStore.Id, "Client Niche", null, false, now, now, "{}");
+        var personalItem = new Item(Guid.NewGuid(), personalStore.Id, personalNiche.Id, null, "Initial Personal Item", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var clientItem = new Item(Guid.NewGuid(), clientStore.Id, clientNiche.Id, null, "Client Item", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
+        var latestPersonalItem = personalItem with { Id = Guid.NewGuid(), Name = "Latest Personal Item" };
+        var initialSnapshot = new WorkspaceSnapshot(
+            [personal, client],
+            [personalStore, clientStore],
+            [personalNiche, clientNiche],
+            [],
+            [personalItem, clientItem],
+            [],
+            [],
+            [],
+            [],
+            []);
+        var staleSnapshot = new WorkspaceSnapshot(
+            [personal, client],
+            [personalStore, clientStore],
+            [clientNiche],
+            [],
+            [clientItem],
+            [],
+            [],
+            [],
+            [],
+            []);
+        var latestSnapshot = new WorkspaceSnapshot(
+            [personal, client],
+            [personalStore, clientStore],
+            [personalNiche],
+            [],
+            [latestPersonalItem],
+            [],
+            [],
+            [],
+            [],
+            []);
+        var serviceRepository = new InMemoryWorkspaceRepository(initialSnapshot);
+        var snapshotRepository = new GateableWorkspaceRepository(initialSnapshot);
+        var viewModel = MainWindowViewModelFactory.CreateFromSnapshot(
+            initialSnapshot,
+            serviceRepository,
+            workspaceSnapshotRepository: snapshotRepository);
+        var clientWorkspace = viewModel.WorkspaceManagement.ActiveWorkspaces.Single(workspace => workspace.Id == client.Id);
+        var personalWorkspace = viewModel.WorkspaceManagement.ActiveWorkspaces.Single(workspace => workspace.Id == personal.Id);
+        var staleLoad = snapshotRepository.DelayAfterAdditionalLoads(1);
+        var generationField = typeof(MainWindowViewModel).GetField(
+            "_workspaceSwitchGeneration",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        var switchMethod = typeof(MainWindowViewModel).GetMethod(
+            "SwitchWorkspaceAsync",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+            binder: null,
+            types: [typeof(FusionCanvas.Application.Workspaces.WorkspaceSummary), typeof(long)],
+            modifiers: null);
+        Assert.NotNull(generationField);
+        Assert.NotNull(switchMethod);
+
+        Task? staleSwitch = null;
+        Task? latestSwitch = null;
+        try
+        {
+            snapshotRepository.SetSnapshot(staleSnapshot);
+            generationField.SetValue(viewModel, 1L);
+            staleSwitch = Assert.IsAssignableFrom<Task>(switchMethod.Invoke(viewModel, [clientWorkspace, 1L]));
+            await staleLoad.Started.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            snapshotRepository.SetSnapshot(latestSnapshot);
+            generationField.SetValue(viewModel, 2L);
+            latestSwitch = Assert.IsAssignableFrom<Task>(switchMethod.Invoke(viewModel, [personalWorkspace, 2L]));
+            await latestSwitch.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.Contains(viewModel.NavigationContexts, context => context.Context.Title == "Latest Personal Item");
+
+            staleLoad.Release();
+            await staleSwitch.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            Assert.Contains(viewModel.NavigationContexts, context => context.Context.Title == "Latest Personal Item");
+        }
+        finally
+        {
+            staleLoad.Release();
+            if (latestSwitch is not null)
+            {
+                await latestSwitch.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            }
+
+            if (staleSwitch is not null)
+            {
+                await staleSwitch.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            }
+        }
     }
 
     [Fact]
@@ -533,6 +730,62 @@ public class MainWindowViewModelTests
 
         Assert.False(viewModel.CanMoveStageForward);
         Assert.False(viewModel.CanMoveStageBack);
+    }
+
+    private sealed class GateableWorkspaceRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
+    {
+        private int _loadCount;
+        private int _delayedLoadNumber = int.MaxValue;
+        private TaskCompletionSource? _delayedLoadStarted;
+        private TaskCompletionSource? _releaseDelayedLoad;
+        private WorkspaceSnapshot _snapshot = snapshot;
+
+        public DelayedLoad DelayAfterAdditionalLoads(int additionalLoads)
+        {
+            if (additionalLoads < 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(additionalLoads));
+            }
+
+            var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _delayedLoadStarted = started;
+            _releaseDelayedLoad = release;
+            Volatile.Write(ref _delayedLoadNumber, Volatile.Read(ref _loadCount) + additionalLoads);
+            return new DelayedLoad(started.Task, () => release.TrySetResult());
+        }
+
+        public void SetSnapshot(WorkspaceSnapshot snapshot) =>
+            Volatile.Write(ref _snapshot, snapshot);
+
+        public Task SaveAsync(WorkspaceSnapshot updated, CancellationToken cancellationToken = default)
+        {
+            SetSnapshot(updated);
+            return Task.CompletedTask;
+        }
+
+        public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default)
+        {
+            var snapshot = Volatile.Read(ref _snapshot);
+            if (Interlocked.Increment(ref _loadCount) != Volatile.Read(ref _delayedLoadNumber))
+            {
+                return Task.FromResult(snapshot);
+            }
+
+            return WaitForDelayedLoadAsync(snapshot, cancellationToken);
+        }
+
+        private async Task<WorkspaceSnapshot> WaitForDelayedLoadAsync(
+            WorkspaceSnapshot snapshot,
+            CancellationToken cancellationToken)
+        {
+            _delayedLoadStarted?.TrySetResult();
+            await (_releaseDelayedLoad?.Task ?? throw new InvalidOperationException("A delayed load was not configured."))
+                .WaitAsync(cancellationToken).ConfigureAwait(false);
+            return snapshot;
+        }
+
+        public sealed record DelayedLoad(Task Started, Action Release);
     }
 
     private sealed class InMemoryWorkspaceRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository

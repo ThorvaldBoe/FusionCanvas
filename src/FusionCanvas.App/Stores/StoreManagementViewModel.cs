@@ -513,8 +513,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
     {
         if (SelectedStore is null || SelectedStore.Id != scope.StoreId || SelectedStore.WorkspaceId != scope.WorkspaceId)
             return;
-        await LoadAsync(cancellationToken).ConfigureAwait(false);
-        await LoadProductsForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
+        await LoadAsync(cancellationToken);
+        await LoadProductsForSelectedStoreAsync(cancellationToken);
     }
 
     private bool _showStrategyWarning;
@@ -1144,9 +1144,9 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
     {
         await _storeConfiguration.LoadStoresAsync(cancellationToken);
         await _storeConfiguration.LoadNichesAsync(cancellationToken);
-        await LoadTagsForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
+        await LoadTagsForSelectedStoreAsync(cancellationToken);
         if (CatalogSetup is not null && SelectedStore is not null)
-            await CatalogSetup.LoadForStoreAsync(SelectedStore.Id, cancellationToken).ConfigureAwait(false);
+            await CatalogSetup.LoadForStoreAsync(SelectedStore.Id, cancellationToken);
     }
 
     public async Task SetActiveWorkspaceAsync(Guid? workspaceId, CancellationToken cancellationToken = default)
@@ -1164,7 +1164,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         _productCatalogEditor.Scope = new StoreManagementScope(workspaceId, null);
         await _storeConfiguration.LoadStoresAsync(cancellationToken);
         await _storeConfiguration.LoadNichesAsync(cancellationToken);
-        await LoadTagsForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
+        await LoadTagsForSelectedStoreAsync(cancellationToken);
         if (CatalogSetup is not null && SelectedStore is not null)
             Run(token => CatalogSetup.LoadForStoreAsync(SelectedStore.Id, token), cancellationToken);
     }
