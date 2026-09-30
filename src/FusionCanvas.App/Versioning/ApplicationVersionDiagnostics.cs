@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
+using FusionCanvas.Application.Versioning;
 
-namespace FusionCanvas.Application.Versioning;
+namespace FusionCanvas.App.Versioning;
 
 public static class ApplicationVersionDiagnostics
 {
