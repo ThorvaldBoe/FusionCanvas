@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Groups;
 using FusionCanvas.App.Items;
@@ -135,6 +136,34 @@ public class WorkspaceTreeViewModelTests
         await operation.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.False(viewModel.IsBusy);
         Assert.Contains(false, busyNotifications);
+    }
+
+    [Fact]
+    public void ReloadAsyncUpdatesObservableTreeOnCapturedSynchronizationContext()
+    {
+        var sample = Sample.Create();
+        var repository = new DeferredLoadRepository(sample.Snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+        var notificationThreadId = 0;
+        viewModel.Roots.CollectionChanged += (_, _) => notificationThreadId = Environment.CurrentManagedThreadId;
+
+        var previousContext = SynchronizationContext.Current;
+        using var uiContext = new PumpingSynchronizationContext();
+        var uiThreadId = Environment.CurrentManagedThreadId;
+        SynchronizationContext.SetSynchronizationContext(uiContext);
+        try
+        {
+            var reload = viewModel.ExecuteTrackedCommandAsync(viewModel.ReloadAsync);
+            repository.CompleteLoad();
+            uiContext.PumpUntil(reload, TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previousContext);
+        }
+
+        Assert.Equal(uiThreadId, notificationThreadId);
     }
 
     [Fact]
@@ -1403,6 +1432,50 @@ public class WorkspaceTreeViewModelTests
             secondSaveStarted.TrySetResult();
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
         }
+    }
+
+    private sealed class DeferredLoadRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
+    {
+        private readonly TaskCompletionSource<WorkspaceSnapshot> _loadCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return _loadCompletion.Task.WaitAsync(cancellationToken);
+        }
+
+        public void CompleteLoad() => _loadCompletion.TrySetResult(snapshot);
+    }
+
+    private sealed class PumpingSynchronizationContext : SynchronizationContext, IDisposable
+    {
+        private readonly BlockingCollection<(SendOrPostCallback Callback, object? State)> _callbacks = new();
+
+        public override void Post(SendOrPostCallback callback, object? state) => _callbacks.Add((callback, state));
+
+        public void PumpUntil(Task task, TimeSpan timeout)
+        {
+            var deadline = DateTime.UtcNow + timeout;
+            while (!task.IsCompleted)
+            {
+                var remaining = deadline - DateTime.UtcNow;
+                if (remaining <= TimeSpan.Zero)
+                {
+                    throw new TimeoutException("The synchronization-context operation did not complete.");
+                }
+
+                if (_callbacks.TryTake(out var callback, remaining > TimeSpan.FromMilliseconds(50) ? TimeSpan.FromMilliseconds(50) : remaining))
+                {
+                    callback.Callback(callback.State);
+                }
+            }
+
+            task.GetAwaiter().GetResult();
+        }
+
+        public void Dispose() => _callbacks.Dispose();
     }
 
     private sealed class TestRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
