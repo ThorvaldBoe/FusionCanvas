@@ -107,7 +107,8 @@ internal static class MainWindowViewModelFactory
         IWorkspaceRepository repository,
         ITitleOptimizationService? titleOptimization = null,
         IIdeationService? ideationService = null,
-        IIdeationAccessStatus? ideationAccessStatus = null)
+        IIdeationAccessStatus? ideationAccessStatus = null,
+        IWorkspaceRepository? workspaceSnapshotRepository = null)
     {
         var fileStore = new EmptyWorkspaceFileStore();
         var itemManagement = new ItemManagementService(repository);
@@ -143,7 +144,7 @@ internal static class MainWindowViewModelFactory
             new DocumentWindow.DocumentWindowViewModel(),
             new ToolContextResolver(),
             new StageToolHostService(BuiltInStageTools.CreateDefaultRegistry(), new ToolContextResolver()),
-            repository,
+            workspaceSnapshotRepository ?? repository,
             new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper()),
             snapshot,
             services,

@@ -73,6 +73,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private bool _isStatusConfirmationVisible;
     private WorkspaceSnapshot _workspaceSnapshot;
     private IReadOnlyList<NavigationDocumentContext> _navigationContexts = [];
+    private int _isInitializingWorkspace = 1;
+    private long _workspaceSwitchGeneration;
 
     public static MainWindowViewModel CreateForDefaultWorkspace(
         SettingsViewModel settings,
@@ -256,8 +258,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         StoreManagement.WorkspaceStructureChanged += (_, _) => RefreshWorkspaceSnapshot();
         WorkspaceManagement.ActiveWorkspaceChanged += (_, workspace) => SwitchWorkspace(workspace);
         SubscribeToWorkspacePromptState();
-        InitializeWorkspaces();
-        InitializeStores();
+        // Load workspace selection before binding; initialize store presentation on the UI context below.
+        StartupTaskRunner.Run(() => WorkspaceManagement.LoadAsync());
+        Run(InitializeStoreManagementAsync());
         AssetsManagement.WorkspaceStructureChanged += (_, _) => RefreshWorkspaceSnapshot();
         WorkspaceTree.ManageAssetsRequested += (_, selection) => Run(OpenManageAssetsAsync(selection));
         DocumentWindow.ActiveContextChanged += (_, context) => CoordinateActiveContext(context);
@@ -687,32 +690,63 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    private void InitializeWorkspaces()
+    private async Task InitializeStoreManagementAsync()
     {
-        StartupTaskRunner.Run(() => WorkspaceManagement.LoadAsync());
-        StartupTaskRunner.Run(() =>
-            StoreManagement.SetActiveWorkspaceAsync(WorkspaceManagement.SelectedWorkspace?.Id));
-        GroupManagementServiceSetWorkspace(WorkspaceManagement.SelectedWorkspace?.Id);
-    }
-
-    private void InitializeStores()
-    {
-        StartupTaskRunner.Run(() => StoreManagement.LoadAsync());
-        if (StoreManagement.SelectedStore is null && StoreManagement.ActiveStores.Count > 0)
+        var activeWorkspaceId = WorkspaceManagement.SelectedWorkspace?.Id;
+        try
         {
-            StartupTaskRunner.Run(() =>
-                StoreManagement.SelectStoreAsync(StoreManagement.ActiveStores[0]));
-            return;
-        }
+            await StoreManagement.SetActiveWorkspaceAsync(activeWorkspaceId).ConfigureAwait(true);
+            GroupManagementServiceSetWorkspace(activeWorkspaceId);
+            await StoreManagement.LoadAsync().ConfigureAwait(true);
+            if (StoreManagement.SelectedStore is null && StoreManagement.ActiveStores.Count > 0)
+            {
+                await StoreManagement.SelectStoreAsync(StoreManagement.ActiveStores[0]).ConfigureAwait(true);
+                return;
+            }
 
-        RebuildNavigationContexts(StoreManagement.SelectedStore);
+            RebuildNavigationContexts(StoreManagement.SelectedStore);
+        }
+        finally
+        {
+            Volatile.Write(ref _isInitializingWorkspace, 0);
+            var selectedWorkspace = WorkspaceManagement.SelectedWorkspace;
+            if (selectedWorkspace?.Id != activeWorkspaceId)
+            {
+                SwitchWorkspace(selectedWorkspace);
+            }
+        }
     }
 
     private void SwitchWorkspace(WorkspaceSummary? workspace)
     {
-        StoreManagement.SetActiveWorkspaceAsync(workspace?.Id).GetAwaiter().GetResult();
+        if (Volatile.Read(ref _isInitializingWorkspace) != 0)
+        {
+            return;
+        }
+
+        var generation = Interlocked.Increment(ref _workspaceSwitchGeneration);
+        Run(SwitchWorkspaceAsync(workspace, generation));
+    }
+
+    private async Task SwitchWorkspaceAsync(WorkspaceSummary? workspace, long generation)
+    {
+        await StoreManagement.SetActiveWorkspaceAsync(workspace?.Id).ConfigureAwait(true);
+        if (generation != Interlocked.Read(ref _workspaceSwitchGeneration))
+        {
+            return;
+        }
+
         GroupManagementServiceSetWorkspace(workspace?.Id);
-        RefreshWorkspaceSnapshot();
+        if (!await RefreshWorkspaceSnapshotAsync(generation).ConfigureAwait(true))
+        {
+            return;
+        }
+
+        if (generation != Interlocked.Read(ref _workspaceSwitchGeneration))
+        {
+            return;
+        }
+
         _ = Settings.Telemetry.RecordAsync(new FusionCanvas.Application.Telemetry.TelemetryEventRequest(
             "Workspace", "ActivateWorkspace", "Information", "Succeeded",
             workspace is null ? "No active workspace." : "Activated workspace.",
@@ -754,6 +788,22 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         RebuildNavigationContexts(StoreManagement.SelectedStore);
         RaiseLifecycleProperties();
+    }
+
+    private async Task<bool> RefreshWorkspaceSnapshotAsync(long generation)
+    {
+        var snapshot = _workspaceRepository is not null
+            ? await _workspaceRepository.LoadAsync().ConfigureAwait(true)
+            : _workspaceSnapshot;
+        if (generation != Interlocked.Read(ref _workspaceSwitchGeneration))
+        {
+            return false;
+        }
+
+        _workspaceSnapshot = snapshot;
+        RebuildNavigationContexts(StoreManagement.SelectedStore);
+        RaiseLifecycleProperties();
+        return true;
     }
 
     private void RefreshWorkspaceSnapshotAndInspector()

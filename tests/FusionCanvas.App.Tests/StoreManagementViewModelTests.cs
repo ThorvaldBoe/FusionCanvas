@@ -18,12 +18,110 @@ using FusionCanvas.Application.ToolContexts;
 using FusionCanvas.Application.StageTools;
 using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.AI;
+using FusionCanvas.Application.Catalog;
+using FusionCanvas.Application.Mockups;
 
 namespace FusionCanvas.App.Tests;
 
 public class StoreManagementViewModelTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 4, 12, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public void LoadAsyncStartsCatalogChildOnCapturedSynchronizationContext()
+    {
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var repository = new DelayedFirstLoadWorkspaceRepository(snapshot);
+        var delayedTagLoadStarted = repository.DelayNextLoad();
+        var viewModel = new StoreManagementViewModel(
+            new StoreManagementService(
+                repository,
+                initialActiveWorkspaceId: store.WorkspaceId,
+                initialActiveStoreId: store.Id),
+            tagService: new TagManagementService(repository),
+            catalogService: new CatalogSetupService(repository),
+            mockupService: new MockupTemplateSetupService(repository));
+
+        var catalogBusyThreadId = 0;
+        viewModel.CatalogSetup!.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(CatalogSetupViewModel.IsBusy) && viewModel.CatalogSetup.IsBusy)
+            {
+                Interlocked.CompareExchange(ref catalogBusyThreadId, Environment.CurrentManagedThreadId, 0);
+            }
+        };
+
+        var uiThreadId = Environment.CurrentManagedThreadId;
+        var originalSynchronizationContext = SynchronizationContext.Current;
+        using var uiContext = new PumpingSynchronizationContext();
+        SynchronizationContext.SetSynchronizationContext(uiContext);
+        try
+        {
+            var loadTask = viewModel.LoadAsync(TestContext.Current.CancellationToken);
+            repository.ReleaseFirstLoad();
+            uiContext.PumpUntil(delayedTagLoadStarted.Task, TimeSpan.FromSeconds(5));
+            repository.ReleaseNextLoad();
+            uiContext.PumpUntil(loadTask, TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            repository.ReleaseFirstLoad();
+            repository.ReleaseNextLoad();
+            SynchronizationContext.SetSynchronizationContext(originalSynchronizationContext);
+        }
+
+        Assert.Equal(store.Id, viewModel.SelectedStore?.Id);
+        Assert.Equal(uiThreadId, catalogBusyThreadId);
+    }
+
+    [Fact]
+    public void SetActiveWorkspaceAsyncStartsCatalogCommandOnCapturedSynchronizationContext()
+    {
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var repository = new DelayedFirstLoadWorkspaceRepository(snapshot);
+        var delayedTagLoadStarted = repository.DelayNextLoad();
+        var viewModel = new StoreManagementViewModel(
+            new StoreManagementService(
+                repository,
+                initialActiveWorkspaceId: store.WorkspaceId,
+                initialActiveStoreId: store.Id),
+            tagService: new TagManagementService(repository),
+            catalogService: new CatalogSetupService(repository),
+            mockupService: new MockupTemplateSetupService(repository));
+
+        var busyThreadId = 0;
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(StoreManagementViewModel.IsBusy) && viewModel.IsBusy)
+            {
+                Interlocked.CompareExchange(ref busyThreadId, Environment.CurrentManagedThreadId, 0);
+            }
+        };
+
+        var uiThreadId = Environment.CurrentManagedThreadId;
+        var originalSynchronizationContext = SynchronizationContext.Current;
+        using var uiContext = new PumpingSynchronizationContext();
+        SynchronizationContext.SetSynchronizationContext(uiContext);
+        try
+        {
+            var switchTask = viewModel.SetActiveWorkspaceAsync(store.WorkspaceId, TestContext.Current.CancellationToken);
+            repository.ReleaseFirstLoad();
+            uiContext.PumpUntil(delayedTagLoadStarted.Task, TimeSpan.FromSeconds(5));
+            repository.ReleaseNextLoad();
+            uiContext.PumpUntil(switchTask, TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            repository.ReleaseFirstLoad();
+            repository.ReleaseNextLoad();
+            SynchronizationContext.SetSynchronizationContext(originalSynchronizationContext);
+        }
+
+        Assert.Equal(store.Id, viewModel.SelectedStore?.Id);
+        Assert.Equal(uiThreadId, busyThreadId);
+    }
 
     [Fact]
     public async Task StoreNicheConfiguration_OwnsStoreSaveWorkflowAndAppliesResult()
