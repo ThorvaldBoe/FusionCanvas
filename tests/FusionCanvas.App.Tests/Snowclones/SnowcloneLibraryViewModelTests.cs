@@ -1,4 +1,5 @@
 using FusionCanvas.App.Snowclones;
+using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.Application.Snowclones;
 using FusionCanvas.Domain.Snowclones;
 
@@ -21,6 +22,39 @@ public sealed class SnowcloneLibraryViewModelTests
         Assert.Equal([alpha.Id, beta.Id], fixture.ViewModel.Snowclones.Select(item => item.Id));
         Assert.Equal(alpha.Id, fixture.ViewModel.SelectedSnowclone!.Id);
         Assert.Equal(alpha.Phrase, fixture.ViewModel.Phrase);
+    }
+
+    [Fact]
+    public void OpenAsync_UpdatesObservableLibraryOnCapturedSynchronizationContext()
+    {
+        var snowclone = Snowclone("Alpha {X}", "First");
+        var repository = new DeferredRepository(new SnowcloneLibrarySnapshot([snowclone], true));
+        var service = new SnowcloneLibraryService(
+            repository,
+            new StubCodec(),
+            new StubBundledSource(),
+            () => Now.AddHours(1),
+            Guid.NewGuid);
+        var viewModel = new SnowcloneLibraryViewModel(service);
+        var notificationThreadId = 0;
+        viewModel.Snowclones.CollectionChanged += (_, _) => notificationThreadId = Environment.CurrentManagedThreadId;
+
+        var previousContext = SynchronizationContext.Current;
+        using var uiContext = new PumpingSynchronizationContext();
+        var uiThreadId = Environment.CurrentManagedThreadId;
+        SynchronizationContext.SetSynchronizationContext(uiContext);
+        try
+        {
+            var open = viewModel.OpenAsync(TestContext.Current.CancellationToken);
+            repository.CompleteLoad();
+            uiContext.PumpUntil(open, TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previousContext);
+        }
+
+        Assert.Equal(uiThreadId, notificationThreadId);
     }
 
     [Fact]
@@ -338,6 +372,20 @@ public sealed class SnowcloneLibraryViewModelTests
             Snapshot = snapshot;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class DeferredRepository(SnowcloneLibrarySnapshot snapshot) : ISnowcloneRepository
+    {
+        private readonly TaskCompletionSource<SnowcloneLibrarySnapshot> _loadCompletion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<SnowcloneLibrarySnapshot> LoadAsync(CancellationToken cancellationToken = default) =>
+            _loadCompletion.Task.WaitAsync(cancellationToken);
+
+        public Task SaveAsync(SnowcloneLibrarySnapshot snapshot, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public void CompleteLoad() => _loadCompletion.TrySetResult(snapshot);
     }
 
     private sealed class StubCodec : ISnowcloneCsvCodec
