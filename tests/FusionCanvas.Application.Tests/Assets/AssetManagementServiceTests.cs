@@ -96,6 +96,22 @@ public class AssetManagementServiceTests
     }
 
     [Fact]
+    public async Task ImportAsync_ReportsCopiedFileWhenCleanupFailsAfterSaveFailure()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot) { FailSaves = true };
+        var fileStore = new FakeFileStore { FailDelete = true };
+        var service = sample.Service(repository, fileStore);
+
+        var result = await service.ImportAssetAsync(new(sample.ItemContext, @"C:\imports\design.svg", AssetKind.Svg));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("managed file", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("assets/design.svg", result.Error, StringComparison.Ordinal);
+        Assert.Contains("assets/design.svg", fileStore.ExistingReferences);
+    }
+
+    [Fact]
     public async Task ImportAsync_RejectsArchivedOrUnavailableContext()
     {
         var sample = Sample.Create();
@@ -162,6 +178,24 @@ public class AssetManagementServiceTests
     }
 
     [Fact]
+    public async Task RemoveAssetAsync_ReportsFileWhenCleanupFailsAfterRecordRemoval()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot);
+        var fileStore = new FakeFileStore { FailDelete = true }.Seed(sample.LinkedAsset.WorkspaceRelativePath);
+        var service = sample.Service(repository, fileStore);
+
+        var result = await service.RemoveAssetAsync(new(sample.LinkedAsset.Id, ConfirmPermanentRemoval: true));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("record was removed", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(sample.LinkedAsset.WorkspaceRelativePath, result.Error, StringComparison.Ordinal);
+        Assert.DoesNotContain(repository.Snapshot.Assets, asset => asset.Id == sample.LinkedAsset.Id);
+        Assert.Contains(fileStore.ExistingReferences, path => path == sample.LinkedAsset.WorkspaceRelativePath);
+        Assert.DoesNotContain(result.State.Assets, asset => asset.Id == sample.LinkedAsset.Id);
+    }
+
+    [Fact]
     public async Task ExtensionPolicy_SuggestsKnownKindsAndFallsBackToUnknown()
     {
         Assert.Equal(AssetKind.SourceDesign, AssetPurposePolicy.SuggestKind("file.afdesign"));
@@ -195,6 +229,7 @@ public class AssetManagementServiceTests
         private bool _sourceMissing;
 
         public string WorkspaceRoot => @"C:\workspace";
+        public bool FailDelete { get; init; }
         public IReadOnlyList<string> Imports { get; } = new List<string>();
         public IReadOnlyCollection<string> ExistingReferences => _existing;
 
@@ -235,7 +270,7 @@ public class AssetManagementServiceTests
 
         public bool Exists(string workspaceRelativePath) => _existing.Contains(workspaceRelativePath.Replace('\\', '/'));
 
-        public bool TryDelete(string workspaceRelativePath) => _existing.Remove(workspaceRelativePath.Replace('\\', '/'));
+        public bool TryDelete(string workspaceRelativePath) => !FailDelete && _existing.Remove(workspaceRelativePath.Replace('\\', '/'));
 
         public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default) =>
             Task.FromResult<Stream>(new MemoryStream());
