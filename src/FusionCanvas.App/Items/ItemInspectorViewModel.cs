@@ -39,10 +39,16 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
     private string _tagInput = string.Empty;
     private string? _errorMessage;
     private bool _isBusy;
+    private bool _isLoadingItem;
     private bool _archiveConfirmationVisible;
     private bool _deleteConfirmationVisible;
     private Task? _inFlightCommit;
+    private int _inFlightCommitLoadSequence;
+    private Task? _deferredCommit;
+    private int _deferredCommitLoadSequence;
+    private CancellationToken _deferredCommitCancellationToken;
     private bool _commitAgainRequested;
+    private int _loadSequence;
 
     private string _originalTitle = string.Empty;
     private string _originalDescription = string.Empty;
@@ -136,17 +142,40 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         private set => SetField(ref _loadedItemId, value);
     }
 
+    public bool IsLoadingItem
+    {
+        get => _isLoadingItem;
+        private set
+        {
+            if (SetField(ref _isLoadingItem, value))
+            {
+                if (value)
+                {
+                    ArchiveConfirmationVisible = false;
+                    DeleteConfirmationVisible = false;
+                }
+
+                OnPropertyChanged(nameof(CanEdit));
+                OnPropertyChanged(nameof(CanEditShared));
+                OnPropertyChanged(nameof(CanEditStage));
+                RaiseDirty();
+                RaiseActionProperties();
+            }
+        }
+    }
+
     public bool HasState => _state is not null;
 
     public bool IsReadOnly => _state is { IsReadOnly: true };
 
     public bool CanEdit => CanEditShared;
 
-    public bool CanEditShared => _state is { IsEffectivelyActive: true } && !IsBusy && !_isOptimizing;
+    public bool CanEditShared => _state is { IsEffectivelyActive: true } && !IsBusy && !IsLoadingItem && !_isOptimizing;
 
     public bool CanEditStage =>
         _state is { IsEffectivelyActive: true } state
         && !IsBusy
+        && !IsLoadingItem
         && ItemWorkflowPolicy.CanEditStage(ToPolicyItem(state), _currentStage).IsAllowed;
 
     public string StageReadOnlyReason
@@ -458,11 +487,11 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
             _ => false
         };
 
-    public bool CanArchive => _state is { IsArchived: false, IsEffectivelyActive: true } && !IsBusy;
+    public bool CanArchive => _state is { IsArchived: false, IsEffectivelyActive: true } && !IsBusy && !IsLoadingItem;
 
-    public bool CanRestore => _state is { IsArchived: true } && !IsBusy;
+    public bool CanRestore => _state is { IsArchived: true } && !IsBusy && !IsLoadingItem;
 
-    public bool CanDelete => _state is not null && !IsBusy;
+    public bool CanDelete => _state is not null && !IsBusy && !IsLoadingItem;
 
     public bool EmphasizesIdea => _currentStage == WorkflowStage.Idea;
     public bool EmphasizesConcept => _currentStage == WorkflowStage.Concept;
@@ -483,17 +512,34 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
 
     public async Task LoadAsync(Guid itemId, CancellationToken cancellationToken = default)
     {
-        CancelOptimization();
-        var state = await _service.LoadAsync(itemId, cancellationToken).ConfigureAwait(true);
-        if (state is null)
+        var loadSequence = Interlocked.Increment(ref _loadSequence);
+        try
         {
-            Clear();
-            return;
-        }
+            IsLoadingItem = true;
+            CancelOptimization();
+            var state = await _service.LoadAsync(itemId, cancellationToken).ConfigureAwait(true);
+            if (loadSequence != Volatile.Read(ref _loadSequence))
+            {
+                return;
+            }
 
-        ApplyState(state);
-        LoadedItemId = itemId;
-        _ = RefreshTitleOptimizationAvailabilityAsync(cancellationToken);
+            if (state is null)
+            {
+                Clear();
+                return;
+            }
+
+            ApplyState(state);
+            LoadedItemId = itemId;
+            _ = RefreshTitleOptimizationAvailabilityAsync(cancellationToken);
+        }
+        finally
+        {
+            if (loadSequence == Volatile.Read(ref _loadSequence))
+            {
+                IsLoadingItem = false;
+            }
+        }
     }
 
     public void ApplyStage(WorkflowStage stage)
@@ -509,6 +555,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
 
     public void Clear()
     {
+        Interlocked.Increment(ref _loadSequence);
         CancelOptimization();
         State = null;
         LoadedItemId = null;
@@ -529,6 +576,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         ArchiveConfirmationVisible = false;
         DeleteConfirmationVisible = false;
         ResetBaselines();
+        IsLoadingItem = false;
         RaiseStageProperties();
     }
 
@@ -626,49 +674,139 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
             return Task.CompletedTask;
         }
 
+        var loadSequence = Volatile.Read(ref _loadSequence);
         if (_inFlightCommit is not null)
         {
-            _commitAgainRequested = true;
-            return _inFlightCommit;
+            if (_inFlightCommitLoadSequence == loadSequence)
+            {
+                if (!IsLoadingItem && HasUnsavedChanges)
+                {
+                    _commitAgainRequested = true;
+                }
+
+                return _inFlightCommit;
+            }
+
+            if (IsLoadingItem || !HasUnsavedChanges)
+            {
+                return _inFlightCommit;
+            }
+
+            return QueueCommitAfterInFlight(_inFlightCommit, loadSequence, cancellationToken);
         }
 
-        if (!HasUnsavedChanges || !CanEditShared)
+        if (IsLoadingItem || !HasUnsavedChanges || !CanEditShared)
         {
             return Task.CompletedTask;
         }
 
         var completion = new TaskCompletionSource();
         _inFlightCommit = completion.Task;
+        _inFlightCommitLoadSequence = loadSequence;
         _commitAgainRequested = false;
-        _ = RunCommitDrainAsync(cancellationToken, completion);
+        _ = RunCommitDrainAsync(cancellationToken, completion, loadSequence);
         return completion.Task;
     }
 
-    private async Task RunCommitDrainAsync(CancellationToken cancellationToken, TaskCompletionSource completion)
+    private Task QueueCommitAfterInFlight(Task inFlightCommit, int loadSequence, CancellationToken cancellationToken)
+    {
+        if (_deferredCommit is not null
+            && _deferredCommitLoadSequence == loadSequence
+            && !_deferredCommitCancellationToken.IsCancellationRequested)
+        {
+            return _deferredCommit;
+        }
+
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _deferredCommit = completion.Task;
+        _deferredCommitLoadSequence = loadSequence;
+        _deferredCommitCancellationToken = cancellationToken;
+        _ = RunDeferredCommitAsync(inFlightCommit, loadSequence, cancellationToken, completion);
+        return completion.Task;
+    }
+
+    private async Task RunDeferredCommitAsync(
+        Task inFlightCommit,
+        int loadSequence,
+        CancellationToken cancellationToken,
+        TaskCompletionSource completion)
+    {
+        try
+        {
+            await inFlightCommit.ConfigureAwait(true);
+            if (loadSequence != Volatile.Read(ref _loadSequence)
+                || IsLoadingItem
+                || cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            await CommitEditsAsync(cancellationToken).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            if (loadSequence == Volatile.Read(ref _loadSequence))
+            {
+                ErrorMessage = exception.Message;
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_deferredCommit, completion.Task))
+            {
+                _deferredCommit = null;
+                _deferredCommitLoadSequence = 0;
+                _deferredCommitCancellationToken = default;
+            }
+
+            completion.TrySetResult();
+        }
+    }
+
+    private async Task RunCommitDrainAsync(
+        CancellationToken cancellationToken,
+        TaskCompletionSource completion,
+        int loadSequence)
     {
         try
         {
             do
             {
                 _commitAgainRequested = false;
-                await CommitOnceAsync(cancellationToken).ConfigureAwait(true);
+                await CommitOnceAsync(cancellationToken, loadSequence).ConfigureAwait(true);
             }
-            while (_commitAgainRequested && _state is not null && CanEditShared && HasUnsavedChanges);
+            while (_commitAgainRequested
+                && loadSequence == Volatile.Read(ref _loadSequence)
+                && _state is not null
+                && CanEditShared
+                && HasUnsavedChanges);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            ErrorMessage = exception.Message;
+            if (loadSequence == Volatile.Read(ref _loadSequence))
+            {
+                ErrorMessage = exception.Message;
+            }
         }
         finally
         {
             _inFlightCommit = null;
+            _inFlightCommitLoadSequence = 0;
             completion.SetResult();
         }
     }
 
-    private async Task CommitOnceAsync(CancellationToken cancellationToken)
+    private async Task CommitOnceAsync(CancellationToken cancellationToken, int loadSequence)
     {
-        if (_state is not { } state || IsBusy || !CanEditShared || !HasUnsavedChanges)
+        if (loadSequence != Volatile.Read(ref _loadSequence)
+            || _state is not { } state
+            || IsBusy
+            || !CanEditShared
+            || !HasUnsavedChanges)
         {
             return;
         }
@@ -691,14 +829,29 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         }
 
         IsBusy = true;
-        var result = await _service.SaveStageAsync(new ItemStageAwareSaveRequest(
-            state.Id,
-            state.Stage,
-            titleToSend,
-            Notes,
-            CreateStagePayload(state.Stage),
-            [.. TagDraft]), cancellationToken).ConfigureAwait(true);
-        IsBusy = false;
+        ItemInspectorSaveResult result;
+        try
+        {
+            result = await _service.SaveStageAsync(new ItemStageAwareSaveRequest(
+                state.Id,
+                state.Stage,
+                titleToSend,
+                Notes,
+                CreateStagePayload(state.Stage),
+                [.. TagDraft]), cancellationToken).ConfigureAwait(true);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (loadSequence != Volatile.Read(ref _loadSequence)
+            || _state?.Id != state.Id
+            || LoadedItemId != state.Id)
+        {
+            return;
+        }
 
         if (!result.Succeeded)
         {
@@ -918,7 +1071,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
 
     private async Task ConfirmArchiveAsync()
     {
-        if (_state is not { } state || IsBusy)
+        if (_state is not { } state || IsBusy || IsLoadingItem)
         {
             return;
         }
@@ -932,7 +1085,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
 
     private async Task RestoreAsync()
     {
-        if (_state is not { } state || IsBusy)
+        if (_state is not { } state || IsBusy || IsLoadingItem)
         {
             return;
         }
@@ -945,7 +1098,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
 
     private async Task ConfirmDeleteAsync()
     {
-        if (_state is not { } state || IsBusy)
+        if (_state is not { } state || IsBusy || IsLoadingItem)
         {
             return;
         }

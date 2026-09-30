@@ -246,6 +246,362 @@ public sealed class SllGenerationSessionViewModelTests
     }
 
     [Fact]
+    public async Task ResetFailure_SurfacesErrorAndRunsBusyLifecycle()
+    {
+        var inspector = CreateInspector();
+        var vm = CreateSessionViewModel(inspector);
+        await SetupLoadedInspectorAsync(
+            inspector,
+            conceptIdea: "A substantive concept idea",
+            phrase: "A substantive phrase",
+            graphicDirection: "A substantive graphic",
+            sll: Codec.Serialize(SampleDocument("CURRENT VERSION")),
+            failSaves: true);
+        Assert.True(vm.HasCurrentSll);
+
+        var busyNotifications = new List<bool>();
+        vm.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(vm.IsBusy))
+            {
+                busyNotifications.Add(vm.IsBusy);
+            }
+        };
+
+        vm.ResetSllCommand.Execute(null);
+
+        Assert.Equal("SaveStage failed", vm.ErrorMessage);
+        Assert.Contains(true, busyNotifications);
+        Assert.Contains(false, busyNotifications);
+        Assert.True(inspector.HasError);
+        Assert.Empty(inspector.Sll);
+        Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
+    public async Task ResetFailureAfterItemSwitchDoesNotUpdateNewSession()
+    {
+        var inspector = CreateInspector();
+        var vm = CreateSessionViewModel(inspector);
+        await SetupLoadedInspectorAsync(
+            inspector,
+            conceptIdea: "A substantive concept idea",
+            phrase: "A substantive phrase",
+            graphicDirection: "A substantive graphic",
+            sll: Codec.Serialize(SampleDocument("CURRENT VERSION")));
+        var service = GetInspectorService(inspector);
+        var saveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allowSaveToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        service.SaveStageHandler = async (_, _) =>
+        {
+            saveStarted.TrySetResult();
+            await allowSaveToFinish.Task;
+            return ItemInspectorSaveResult.Failure("Old session reset failed.");
+        };
+
+        var resetStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resetFinished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        vm.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(vm.IsBusy))
+            {
+                if (vm.IsBusy)
+                {
+                    resetStarted.TrySetResult();
+                }
+                else if (resetStarted.Task.IsCompleted)
+                {
+                    resetFinished.TrySetResult();
+                }
+            }
+        };
+
+        vm.ResetSllCommand.Execute(null);
+        await saveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var nextState = CreateValidState(id: Guid.NewGuid());
+        service.StateToReturn = nextState;
+        try
+        {
+            await inspector.LoadAsync(nextState.Id, TestContext.Current.CancellationToken);
+            Assert.Equal(nextState.Id, inspector.State?.Id);
+        }
+        finally
+        {
+            allowSaveToFinish.TrySetResult();
+        }
+
+        await resetFinished.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(nextState.Id, inspector.State?.Id);
+        Assert.Null(inspector.ErrorMessage);
+        Assert.Null(vm.ErrorMessage);
+        Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
+    public async Task UnexpectedResetFailureFromPriorSessionDoesNotOverwriteNewSessionError()
+    {
+        var inspector = CreateInspector();
+        var vm = CreateSessionViewModel(inspector);
+        await SetupLoadedInspectorAsync(
+            inspector,
+            conceptIdea: "A substantive concept idea",
+            phrase: "A substantive phrase",
+            graphicDirection: "A substantive graphic",
+            sll: Codec.Serialize(SampleDocument("CURRENT VERSION")));
+        var service = GetInspectorService(inspector);
+        var nextState = CreateValidState(id: Guid.NewGuid());
+        service.StateToReturn = nextState;
+        var switchedSession = false;
+        inspector.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(inspector.Sll) && !switchedSession)
+            {
+                switchedSession = true;
+                inspector.LoadAsync(nextState.Id, TestContext.Current.CancellationToken).GetAwaiter().GetResult();
+                throw new InvalidOperationException("Stale reset failure.");
+            }
+        };
+
+        vm.ResetSllCommand.Execute(null);
+
+        Assert.True(switchedSession);
+        Assert.Equal(nextState.Id, inspector.State?.Id);
+        Assert.Null(vm.ErrorMessage);
+        Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
+    public async Task GenerateFailureAfterItemSwitchDoesNotSetErrorOnNewSession()
+    {
+        var inspector = CreateInspector();
+        var service = new StubSllService();
+        var vm = CreateSessionViewModel(inspector, service);
+        await SetupLoadedInspectorAsync(
+            inspector,
+            conceptIdea: "A substantive concept idea",
+            phrase: "A substantive phrase",
+            graphicDirection: "A substantive graphic");
+        var generationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allowGenerationToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        service.Func = async _ =>
+        {
+            generationStarted.TrySetResult();
+            await allowGenerationToFinish.Task;
+            throw new InvalidOperationException("Old generation failed.");
+        };
+
+        var generationStartedBusy = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var generationFinished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        vm.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(vm.IsBusy))
+            {
+                if (vm.IsBusy)
+                {
+                    generationStartedBusy.TrySetResult();
+                }
+                else if (generationStartedBusy.Task.IsCompleted)
+                {
+                    generationFinished.TrySetResult();
+                }
+            }
+        };
+
+        vm.GenerateCommand.Execute(null);
+        await generationStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var nextState = CreateValidState(id: Guid.NewGuid());
+        var inspectorService = GetInspectorService(inspector);
+        inspectorService.StateToReturn = nextState;
+        try
+        {
+            await inspector.LoadAsync(nextState.Id, TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            allowGenerationToFinish.TrySetResult();
+        }
+
+        await generationFinished.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(nextState.Id, inspector.State?.Id);
+        Assert.Null(vm.ErrorMessage);
+        Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
+    public async Task GenerateCompletionWhileNextItemLoadsDoesNotCommitOldSession()
+    {
+        var inspector = CreateInspector();
+        var service = new StubSllService();
+        var vm = CreateSessionViewModel(inspector, service);
+        await SetupLoadedInspectorAsync(
+            inspector,
+            conceptIdea: "A substantive concept idea",
+            phrase: "A substantive phrase",
+            graphicDirection: "A substantive graphic");
+        var inspectorService = GetInspectorService(inspector);
+        var nextState = CreateValidState(id: Guid.NewGuid());
+        var loadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allowLoadToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        inspectorService.LoadHandler = async (_, _) =>
+        {
+            loadStarted.TrySetResult();
+            await allowLoadToFinish.Task;
+            return nextState;
+        };
+
+        var generationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allowGenerationToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        service.Func = async _ =>
+        {
+            generationStarted.TrySetResult();
+            await allowGenerationToFinish.Task;
+            return SllGenerationResult.Success(SampleDocument("GENERATED VERSION"));
+        };
+
+        var saveStageCalls = 0;
+        inspectorService.SaveStageHandler = (request, _) =>
+        {
+            saveStageCalls++;
+            var state = inspectorService.StateToReturn!;
+            return Task.FromResult(ItemInspectorSaveResult.Success(state with
+            {
+                Sll = request.StagePayload.Sll ?? state.Sll
+            }));
+        };
+
+        var generationStartedBusy = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var generationFinished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        vm.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(vm.IsBusy))
+            {
+                if (vm.IsBusy)
+                {
+                    generationStartedBusy.TrySetResult();
+                }
+                else if (generationStartedBusy.Task.IsCompleted)
+                {
+                    generationFinished.TrySetResult();
+                }
+            }
+        };
+
+        vm.GenerateCommand.Execute(null);
+        await generationStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var itemLoad = inspector.LoadAsync(nextState.Id, TestContext.Current.CancellationToken);
+        await loadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.True(inspector.IsLoadingItem);
+        Assert.False(inspector.CanEditShared);
+        Assert.False(inspector.CanEditStage);
+        Assert.False(inspector.CanArchive);
+        Assert.False(inspector.CanDelete);
+        try
+        {
+            allowGenerationToFinish.TrySetResult();
+            await generationFinished.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.Equal(0, saveStageCalls);
+            Assert.Equal(inspector.LoadedItemId, inspector.State?.Id);
+        }
+        finally
+        {
+            allowLoadToFinish.TrySetResult();
+        }
+
+        await itemLoad.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.False(inspector.IsLoadingItem);
+        Assert.Equal(nextState.Id, inspector.LoadedItemId);
+        Assert.Equal(nextState.Id, inspector.State?.Id);
+        Assert.Null(vm.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task ResetCompletionWhileNextItemLoadsCancelsOldCommit()
+    {
+        var inspector = CreateInspector();
+        var vm = CreateSessionViewModel(inspector);
+        await SetupLoadedInspectorAsync(
+            inspector,
+            conceptIdea: "A substantive concept idea",
+            phrase: "A substantive phrase",
+            graphicDirection: "A substantive graphic",
+            sll: Codec.Serialize(SampleDocument("CURRENT VERSION")));
+        var inspectorService = GetInspectorService(inspector);
+        var nextState = CreateValidState(id: Guid.NewGuid());
+        var loadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allowLoadToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        inspectorService.LoadHandler = async (_, _) =>
+        {
+            loadStarted.TrySetResult();
+            await allowLoadToFinish.Task;
+            return nextState;
+        };
+
+        var saveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var saveCancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allowSaveToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var saveCompleted = false;
+        inspectorService.SaveStageHandler = async (request, cancellationToken) =>
+        {
+            saveStarted.TrySetResult();
+            try
+            {
+                await allowSaveToFinish.Task.WaitAsync(cancellationToken);
+                saveCompleted = true;
+                return ItemInspectorSaveResult.Success(inspectorService.StateToReturn! with
+                {
+                    Sll = request.StagePayload.Sll
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                saveCancelled.TrySetResult();
+                throw;
+            }
+        };
+
+        var resetStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resetFinished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        vm.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(vm.IsBusy))
+            {
+                if (vm.IsBusy)
+                {
+                    resetStarted.TrySetResult();
+                }
+                else if (resetStarted.Task.IsCompleted)
+                {
+                    resetFinished.TrySetResult();
+                }
+            }
+        };
+
+        vm.ResetSllCommand.Execute(null);
+        await saveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var itemLoad = inspector.LoadAsync(nextState.Id, TestContext.Current.CancellationToken);
+        await loadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.True(inspector.IsLoadingItem);
+        try
+        {
+            allowSaveToFinish.TrySetResult();
+            await resetFinished.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.True(saveCancelled.Task.IsCompleted);
+            Assert.False(saveCompleted);
+            Assert.Null(vm.ErrorMessage);
+            Assert.False(vm.IsBusy);
+        }
+        finally
+        {
+            allowSaveToFinish.TrySetResult();
+            allowLoadToFinish.TrySetResult();
+        }
+
+        await itemLoad.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.False(inspector.IsLoadingItem);
+        Assert.Equal(nextState.Id, inspector.LoadedItemId);
+    }
+
+    [Fact]
     public async Task ReadOnlyReview_DisablesGenerateWithStageReason()
     {
         var inspector = CreateInspector();
@@ -281,12 +637,21 @@ public sealed class SllGenerationSessionViewModelTests
         return new ItemInspectorViewModel(svc, new StubItemManagementService());
     }
 
+    private static StubItemInspectorService GetInspectorService(ItemInspectorViewModel inspector)
+    {
+        var svcField = typeof(ItemInspectorViewModel).GetField(
+            "_service",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        return Assert.IsType<StubItemInspectorService>(svcField?.GetValue(inspector));
+    }
+
     private static SllGenerationSessionViewModel CreateSessionViewModel(
-        ItemInspectorViewModel? inspector = null)
+        ItemInspectorViewModel? inspector = null,
+        StubSllService? service = null)
     {
         inspector ??= CreateInspector();
         return new SllGenerationSessionViewModel(
-            new StubSllService(),
+            service ?? new StubSllService(),
             new StubSllAccess(true),
             Codec,
             inspector);
@@ -369,9 +734,11 @@ public sealed class SllGenerationSessionViewModelTests
     {
         public ItemInspectorState? StateToReturn { get; set; }
         public bool FailSaves { get; set; }
+        public Func<Guid, CancellationToken, Task<ItemInspectorState?>>? LoadHandler { get; set; }
+        public Func<ItemStageAwareSaveRequest, CancellationToken, Task<ItemInspectorSaveResult>>? SaveStageHandler { get; set; }
 
         public Task<ItemInspectorState?> LoadAsync(Guid itemId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(StateToReturn);
+            LoadHandler?.Invoke(itemId, cancellationToken) ?? Task.FromResult(StateToReturn);
 
         public Task<ItemInspectorSaveResult> SaveAsync(ItemInspectorSaveRequest request, CancellationToken cancellationToken = default) =>
             Task.FromResult(StateToReturn is { } s
@@ -380,6 +747,11 @@ public sealed class SllGenerationSessionViewModelTests
 
         public Task<ItemInspectorSaveResult> SaveStageAsync(ItemStageAwareSaveRequest request, CancellationToken cancellationToken = default)
         {
+            if (SaveStageHandler is not null)
+            {
+                return SaveStageHandler(request, cancellationToken);
+            }
+
             if (FailSaves)
             {
                 return Task.FromResult(ItemInspectorSaveResult.Failure("SaveStage failed"));

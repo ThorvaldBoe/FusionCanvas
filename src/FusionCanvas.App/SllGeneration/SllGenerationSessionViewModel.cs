@@ -36,9 +36,9 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
         _codec = codec ?? throw new ArgumentNullException(nameof(codec));
         _inspector = inspector ?? throw new ArgumentNullException(nameof(inspector));
 
-        GenerateCommand = new RelayCommand(_ => Run(ExecuteGenerateAsync()), () => CanGenerate);
-        RegenerateCommand = new RelayCommand(_ => Run(ExecuteGenerateAsync()), () => CanRegenerate);
-        ResetSllCommand = new RelayCommand(_ => Run(ResetSllAsync()), () => HasCurrentSll && !IsBusy && _inspector.CanEditStage);
+        GenerateCommand = new RelayCommand(_ => Run(ExecuteGenerateAsync), () => CanGenerate);
+        RegenerateCommand = new RelayCommand(_ => Run(ExecuteGenerateAsync), () => CanRegenerate);
+        ResetSllCommand = new RelayCommand(_ => Run(ResetSllAsync), () => HasCurrentSll && !IsBusy && _inspector.CanEditStage);
         KeepSllReferenceCommand = new RelayCommand(_ => KeepSllAsReference(), () => IsStale && !IsBusy);
 
         _inspector.PropertyChanged += OnInspectorPropertyChanged;
@@ -167,6 +167,12 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
 
     public void ResetSession()
     {
+        if (_inspector.IsLoadingItem)
+        {
+            InvalidateSessionForItemLoad();
+            return;
+        }
+
         CancelInFlight();
         ErrorMessage = null;
         _sessionItemId = _inspector.LoadedItemId;
@@ -177,6 +183,18 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
             _sessionCts = new CancellationTokenSource();
         }
 
+        RaiseCommandStates();
+    }
+
+    private void InvalidateSessionForItemLoad()
+    {
+        CancelInFlight();
+        ErrorMessage = null;
+        _sessionItemId = null;
+        _current = null;
+        _localSourceChanged = false;
+        _keepAsReference = false;
+        RaiseCurrentChanged();
         RaiseCommandStates();
     }
 
@@ -195,15 +213,14 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
             return;
         }
 
+        var captured = new CapturedOperation(Interlocked.Increment(ref _operationSequence), EnsureSessionItemId());
+        var sessionCts = _sessionCts;
+        var cancellationToken = sessionCts?.Token ?? CancellationToken.None;
         IsBusy = true;
         ErrorMessage = null;
 
-        var sequence = Interlocked.Increment(ref _operationSequence);
-        var captured = new CapturedOperation(sequence, EnsureSessionItemId());
-
         try
         {
-            var ct = _sessionCts?.Token ?? CancellationToken.None;
             var triangle = new ConceptRefinementTriangle(
                 _inspector.ConceptIdea,
                 _inspector.Phrase,
@@ -212,18 +229,17 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
                 captured.ItemId,
                 triangle,
                 _inspector.Idea,
-                ct).ConfigureAwait(true);
+                cancellationToken).ConfigureAwait(true);
 
-            ct.ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IsCurrentOperation(captured, sessionCts))
+            {
+                return;
+            }
 
             if (!result.Succeeded)
             {
                 ErrorMessage = result.Error ?? "The SLL generation failed.";
-                return;
-            }
-
-            if (_sessionItemId != captured.ItemId || _operationSequence != captured.Sequence)
-            {
                 return;
             }
 
@@ -232,16 +248,25 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
             _keepAsReference = false;
             _inspector.Sll = _codec.Serialize(result.Document!);
 
-            await _inspector.CommitEditsAsync(ct).ConfigureAwait(true);
+            await _inspector.CommitEditsAsync(cancellationToken).ConfigureAwait(true);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IsCurrentOperation(captured, sessionCts))
+            {
+                return;
+            }
+
             RaiseCurrentChanged();
         }
         catch (OperationCanceledException)
         {
             // unchanged
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            ErrorMessage = ex.Message;
+            if (IsCurrentOperation(captured, sessionCts))
+            {
+                ErrorMessage = exception.Message;
+            }
         }
         finally
         {
@@ -279,6 +304,12 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
 
         return id;
     }
+
+    private bool IsCurrentOperation(CapturedOperation captured, CancellationTokenSource? sessionCts) =>
+        _sessionItemId == captured.ItemId
+        && _operationSequence == captured.Sequence
+        && ReferenceEquals(_sessionCts, sessionCts)
+        && sessionCts?.IsCancellationRequested != true;
 
     private void CancelInFlight()
     {
@@ -321,16 +352,46 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
 
     private async Task ResetSllAsync()
     {
-        if (!HasCurrentSll || !_inspector.CanEditStage)
+        if (!HasCurrentSll || !_inspector.CanEditStage || IsBusy)
+        {
             return;
+        }
 
-        _inspector.Sll = string.Empty;
-        _current = null;
-        _localSourceChanged = false;
-        _keepAsReference = false;
-        await _inspector.CommitEditsAsync(_sessionCts?.Token ?? CancellationToken.None).ConfigureAwait(true);
-        RaiseCurrentChanged();
-        RaiseCommandStates();
+        IsBusy = true;
+        ErrorMessage = null;
+        var cancellationToken = _sessionCts?.Token ?? CancellationToken.None;
+
+        try
+        {
+            var captured = new CapturedOperation(Interlocked.Increment(ref _operationSequence), EnsureSessionItemId());
+            _inspector.Sll = string.Empty;
+            _current = null;
+            _localSourceChanged = false;
+            _keepAsReference = false;
+            await _inspector.CommitEditsAsync(cancellationToken).ConfigureAwait(true);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (_sessionItemId != captured.ItemId || _operationSequence != captured.Sequence)
+            {
+                return;
+            }
+
+            if (_inspector.ErrorMessage is { } commitError)
+            {
+                ErrorMessage = commitError;
+            }
+
+            RaiseCurrentChanged();
+            RaiseCommandStates();
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private void KeepSllAsReference()
@@ -347,9 +408,23 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
 
     private void OnInspectorPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
-        if (args.PropertyName is nameof(ItemInspectorViewModel.LoadedItemId))
+        if (args.PropertyName is nameof(ItemInspectorViewModel.IsLoadingItem))
         {
-            ResetSession();
+            if (_inspector.IsLoadingItem)
+            {
+                InvalidateSessionForItemLoad();
+            }
+            else
+            {
+                ResetSession();
+            }
+        }
+        else if (args.PropertyName is nameof(ItemInspectorViewModel.LoadedItemId))
+        {
+            if (!_inspector.IsLoadingItem)
+            {
+                ResetSession();
+            }
         }
         else if (args.PropertyName is nameof(ItemInspectorViewModel.ConceptIdea)
             or nameof(ItemInspectorViewModel.Phrase)
@@ -398,5 +473,32 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-    private static void Run(Task task) => _ = task;
+    private void Run(Func<Task> operation)
+    {
+        var sessionItemId = _sessionItemId;
+        var sessionCts = _sessionCts;
+        _ = ObserveAsync(operation, sessionItemId, sessionCts);
+    }
+
+    private async Task ObserveAsync(
+        Func<Task> operation,
+        Guid? sessionItemId,
+        CancellationTokenSource? sessionCts)
+    {
+        try
+        {
+            await operation().ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            if (_sessionItemId == sessionItemId && ReferenceEquals(_sessionCts, sessionCts))
+            {
+                ErrorMessage = exception.Message;
+            }
+        }
+    }
 }
