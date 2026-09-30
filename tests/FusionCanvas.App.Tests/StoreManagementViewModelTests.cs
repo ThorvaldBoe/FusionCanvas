@@ -26,6 +26,45 @@ public class StoreManagementViewModelTests
     private static readonly DateTimeOffset Now = new(2026, 7, 4, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public async Task StoreNicheConfiguration_OwnsStoreSaveWorkflowAndAppliesResult()
+    {
+        var repository = new InMemoryWorkspaceRepository();
+        var service = new StoreManagementService(repository, () => Now, Guid.NewGuid);
+        StoreManagementState? applied = null;
+        var editor = new StoreNicheConfigurationViewModel(
+            service, null, null, state => applied = state, result => applied = result.State, _ => { });
+        await editor.LoadStoresAsync(TestContext.Current.CancellationToken);
+        var workspaceId = applied?.ActiveWorkspaceId;
+        editor.SetScope(new StoreManagementScope(workspaceId, null, IsCreatingNewStore: true));
+        editor.NewStoreName = "Owned by child";
+
+        await editor.SaveSelectedStoreAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(applied);
+        Assert.Contains(applied!.ActiveStores, store => store.Name == "Owned by child");
+        Assert.False(editor.IsCreatingNewStore);
+    }
+
+    [Fact]
+    public void StoreNicheConfiguration_OwnsStoreAndNicheDirtyBaselines()
+    {
+        var service = new StoreManagementService(new InMemoryWorkspaceRepository());
+        var editor = new StoreNicheConfigurationViewModel(service, null, null, _ => { }, _ => { }, _ => { });
+        editor.CaptureStoreDraft();
+        editor.CaptureNicheDraft();
+
+        editor.NewStoreName = "Unsaved store";
+        editor.NicheNotes = "Unsaved niche";
+
+        Assert.True(editor.HasUnsavedStoreChanges);
+        Assert.True(editor.HasUnsavedNicheChanges);
+        editor.CaptureStoreDraft();
+        editor.CaptureNicheDraft();
+        Assert.False(editor.HasUnsavedStoreChanges);
+        Assert.False(editor.HasUnsavedNicheChanges);
+    }
+
+    [Fact]
     public async Task LoadAsync_ShowsFirstStoreEmptyState()
     {
         var viewModel = new StoreManagementViewModel(new StoreManagementService(new InMemoryWorkspaceRepository()));
@@ -105,6 +144,8 @@ public class StoreManagementViewModelTests
         viewModel.SelectStoreForEditing(viewModel.EditorActiveStores.Single());
         await viewModel.SaveSelectedStoreAsync(TestContext.Current.CancellationToken);
 
+        Assert.True(viewModel.ActiveStores.Count > 0, viewModel.ErrorMessage);
+        Assert.Equal(storeId, Assert.Single(viewModel.ActiveStores).Id);
         Assert.Equal(storeId, viewModel.SelectedStore?.Id);
         Assert.Equal("North Star Studio", Assert.Single(viewModel.ActiveStores).Name);
         Assert.Equal("Soft humor", viewModel.SelectedStore?.Context.Notes);
@@ -498,7 +539,7 @@ public class StoreManagementViewModelTests
     public async Task StoreEditor_DeleteConfirmedEmptyStoreAndBlocksConnectedStore()
     {
         var empty = NewStore("Empty Studio");
-        var connected = NewStore("Connected Studio");
+        var connected = NewStore("Zulu Connected Studio");
         var niche = new Niche(Guid.NewGuid(), connected.Id, "Coffee", null, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([empty, connected], [niche], [], [], [], [], [], [], []));
         var viewModel = new StoreManagementViewModel(new StoreManagementService(repository));
@@ -510,12 +551,34 @@ public class StoreManagementViewModelTests
 
         Assert.Contains("connected data", viewModel.ErrorMessage);
         Assert.Contains((await repository.LoadAsync(TestContext.Current.CancellationToken)).Stores, store => store.Id == connected.Id);
+        Assert.Equal(connected.Id, viewModel.SelectedStore?.Id);
 
         await viewModel.SelectStoreAsync(viewModel.ActiveStores.Single(store => store.Id == empty.Id), TestContext.Current.CancellationToken);
         viewModel.RequestDeleteSelectedStoreCommand.Execute(null);
         await viewModel.ConfirmDeleteStoreAsync(TestContext.Current.CancellationToken);
 
         Assert.DoesNotContain((await repository.LoadAsync(TestContext.Current.CancellationToken)).Stores, store => store.Id == empty.Id);
+    }
+
+    [Fact]
+    public async Task NicheEditor_DeleteFailureKeepsSelectedNiche()
+    {
+        var store = NewStore("North Star Studio");
+        var first = new Niche(Guid.NewGuid(), store.Id, "Alpha Niche", null, false, Now, Now, "{}");
+        var selected = new Niche(Guid.NewGuid(), store.Id, "Zulu Niche", null, false, Now, Now, "{}");
+        var listing = new Item(Guid.NewGuid(), store.Id, selected.Id, null, "Espresso", null, ItemStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [first, selected], [], [listing], [], [], [], [], []));
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(repository), new NicheManagementService(repository));
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        await viewModel.SelectStoreAsync(viewModel.ActiveStores.Single(), TestContext.Current.CancellationToken);
+        await viewModel.SelectNicheAsync(viewModel.ActiveNiches.Single(niche => niche.Id == selected.Id), TestContext.Current.CancellationToken);
+
+        viewModel.RequestDeleteSelectedNiche();
+        await viewModel.ConfirmDeleteNicheAsync(TestContext.Current.CancellationToken);
+
+        Assert.Contains("connected data", viewModel.ErrorMessage);
+        Assert.Contains((await repository.LoadAsync(TestContext.Current.CancellationToken)).Niches, niche => niche.Id == selected.Id);
+        Assert.Equal(selected.Id, viewModel.SelectedNiche?.Id);
     }
 
     [Fact]
@@ -838,6 +901,74 @@ public class StoreManagementViewModelTests
     }
 
     [Fact]
+    public async Task TagEditor_IgnoresLoadResultFromPreviousStoreScope()
+    {
+        var firstStore = NewStore("First studio");
+        var secondStore = NewStore("Second studio");
+        var firstStoreId = firstStore.Id;
+        var secondStoreId = secondStore.Id;
+        var firstTag = new Tag(Guid.NewGuid(), firstStoreId, "First store tag", null, false, Now, Now, "{}", null);
+        var secondTag = new Tag(Guid.NewGuid(), secondStoreId, "Second store tag", null, false, Now, Now, "{}", null);
+        var repository = new DelayedFirstLoadWorkspaceRepository(new WorkspaceSnapshot(
+            [firstStore, secondStore], [], [], [], [], [], [firstTag, secondTag], [], []));
+        var service = new TagManagementService(repository);
+        var editor = new TagEditorViewModel(service);
+
+        editor.SetScope(new StoreManagementScope(firstStore.WorkspaceId, firstStoreId));
+        var firstLoad = editor.LoadAsync(TestContext.Current.CancellationToken);
+        await repository.FirstLoadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        editor.SetScope(new StoreManagementScope(secondStore.WorkspaceId, secondStoreId));
+        await editor.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.Equal("Second store tag", Assert.Single(editor.ActiveTags).Name);
+
+        repository.ReleaseFirstLoad();
+        await firstLoad;
+
+        Assert.Equal(secondStoreId, editor.Scope.StoreId);
+        Assert.Equal(secondStoreId, service.ActiveStoreId);
+        Assert.Equal("Second store tag", Assert.Single(editor.ActiveTags).Name);
+    }
+
+    [Fact]
+    public async Task TagEditor_IgnoresDeleteCountFromPreviousStoreScope()
+    {
+        var firstStore = NewStore("First studio");
+        var secondStore = NewStore("Second studio");
+        var niche = new Niche(Guid.NewGuid(), firstStore.Id, "Coffee", null, false, Now, Now, "{}");
+        var item = new Item(Guid.NewGuid(), firstStore.Id, niche.Id, null, "Mug", null, ItemStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
+        var firstTag = new Tag(Guid.NewGuid(), firstStore.Id, "Old tag", null, false, Now, Now, "{}", null);
+        var secondTag = new Tag(Guid.NewGuid(), secondStore.Id, "Current tag", null, false, Now, Now, "{}", null);
+        var repository = new DelayedFirstLoadWorkspaceRepository(new WorkspaceSnapshot(
+            [firstStore, secondStore], [niche], [], [item], [], [], [firstTag, secondTag], [new ItemTag(item.Id, firstTag.Id)], []));
+        Func<CancellationToken, Task>? queuedOperation = null;
+        var editor = new TagEditorViewModel(new TagManagementService(repository), operation => queuedOperation = operation);
+        editor.SetScope(new StoreManagementScope(firstStore.WorkspaceId, firstStore.Id));
+        var initialLoad = editor.LoadAsync(TestContext.Current.CancellationToken);
+        await repository.FirstLoadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        repository.ReleaseFirstLoad();
+        await initialLoad;
+        editor.SelectTagForEditing(Assert.Single(editor.ActiveTags));
+
+        var delayedCountStarted = repository.DelayNextLoad();
+        editor.RequestDeleteSelectedTag();
+        var oldCountTask = queuedOperation!(TestContext.Current.CancellationToken);
+        await delayedCountStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        editor.SetScope(new StoreManagementScope(secondStore.WorkspaceId, secondStore.Id));
+        await editor.LoadAsync(TestContext.Current.CancellationToken);
+        editor.SelectTagForEditing(Assert.Single(editor.ActiveTags));
+        editor.RequestDeleteSelectedTag();
+        await queuedOperation!(TestContext.Current.CancellationToken);
+        repository.ReleaseNextLoad();
+        await oldCountTask;
+
+        Assert.True(editor.DeleteWarningVisible);
+        Assert.Contains("Current tag", editor.DeleteWarningMessage);
+        Assert.DoesNotContain("1 Item", editor.DeleteWarningMessage);
+    }
+
+    [Fact]
     public async Task StoreEditor_UrlFieldIsBoundAndEditingMarksUnsavedChanges()
     {
         var store = NewStore("North Star Studio");
@@ -950,6 +1081,63 @@ public class StoreManagementViewModelTests
         Assert.Null(viewModel.SelectedStore?.Context.Url);
     }
 
+    [Fact]
+    public async Task EditorClusters_PreserveFacadeDraftsAndShareCanonicalStoreScope()
+    {
+        var store = NewStore("North Star Studio");
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single());
+
+        viewModel.NewStoreName = "North Star Gifts";
+        viewModel.TagName = "Seasonal";
+        viewModel.ProductName = "Coffee mug";
+
+        Assert.Equal(viewModel.NewStoreName, viewModel.StoreConfiguration.NewStoreName);
+        Assert.Equal(viewModel.TagName, viewModel.TagEditor.TagName);
+        Assert.Equal(viewModel.ProductName, viewModel.ProductCatalogEditor.ProductName);
+        Assert.Equal(store.Id, viewModel.StoreConfiguration.Scope.StoreId);
+        Assert.Equal(store.Id, viewModel.TagEditor.Scope.StoreId);
+        Assert.Equal(store.Id, viewModel.ProductCatalogEditor.Scope.StoreId);
+
+        viewModel.StoreConfiguration.NewStoreName = "Owner-edited name";
+        viewModel.TagEditor.TagName = "Owner-edited tag";
+        viewModel.ProductCatalogEditor.ProductName = "Owner-edited product";
+
+        Assert.Equal("Owner-edited name", viewModel.NewStoreName);
+        Assert.Equal("Owner-edited tag", viewModel.TagName);
+        Assert.Equal("Owner-edited product", viewModel.ProductName);
+        Assert.True(viewModel.TagEditor.HasUnsavedChanges);
+        Assert.True(viewModel.ProductCatalogEditor.HasUnsavedProductDraft);
+        Assert.True(viewModel.HasUnsavedChanges);
+    }
+
+    [Fact]
+    public async Task TagEditorScope_TracksArchivedStoreAndNewStoreDraftContext()
+    {
+        var active = NewStore("Active studio");
+        var archived = NewStore("Archived studio", isArchived: true);
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([active, archived], [], [], [], [], [], [], [], []))));
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(active.Id, viewModel.TagEditor.Scope.StoreId);
+        Assert.False(viewModel.TagEditor.Scope.IsStoreArchived);
+        Assert.False(viewModel.TagEditor.Scope.IsCreatingNewStore);
+
+        viewModel.StartCreateStore();
+
+        Assert.True(viewModel.TagEditor.Scope.IsCreatingNewStore);
+        Assert.NotEqual(active.Id, viewModel.TagEditor.Scope.StoreId);
+
+        viewModel.SelectStoreForEditing(viewModel.ArchivedStores.Single());
+
+        Assert.Equal(archived.Id, viewModel.TagEditor.Scope.StoreId);
+        Assert.True(viewModel.TagEditor.Scope.IsStoreArchived);
+        Assert.False(viewModel.TagEditor.Scope.IsCreatingNewStore);
+    }
+
     private static StoreSummary NewStoreSummary(string name)
     {
         var store = NewStore(name);
@@ -1043,6 +1231,44 @@ public class StoreManagementViewModelTests
         {
             Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             _directory.Delete(recursive: true);
+        }
+    }
+
+    private sealed class DelayedFirstLoadWorkspaceRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
+    {
+        private int _loadCount;
+        private readonly TaskCompletionSource _releaseFirstLoad = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private TaskCompletionSource? _nextLoadStarted;
+        private TaskCompletionSource? _releaseNextLoad;
+        public TaskCompletionSource FirstLoadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void ReleaseFirstLoad() => _releaseFirstLoad.TrySetResult();
+
+        public TaskCompletionSource DelayNextLoad()
+        {
+            _releaseNextLoad = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            return _nextLoadStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        public void ReleaseNextLoad() => _releaseNextLoad?.TrySetResult();
+
+        public Task SaveAsync(WorkspaceSnapshot updated, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public async Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Increment(ref _loadCount) == 1)
+            {
+                FirstLoadStarted.TrySetResult();
+                await _releaseFirstLoad.Task.WaitAsync(cancellationToken);
+            }
+            else if (Interlocked.Exchange(ref _nextLoadStarted, null) is { } started)
+            {
+                started.TrySetResult();
+                await _releaseNextLoad!.Task.WaitAsync(cancellationToken);
+                _releaseNextLoad = null;
+            }
+
+            return snapshot;
         }
     }
 }

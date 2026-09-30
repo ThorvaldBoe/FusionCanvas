@@ -10,7 +10,10 @@ using FusionCanvas.Application.Stores;
 using FusionCanvas.Application.Niches;
 using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.Products;
+using FusionCanvas.Application.Catalog;
+using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.DesignFiles;
+using FusionCanvas.Domain.Catalog;
 
 namespace FusionCanvas.App.Tests;
 
@@ -36,6 +39,162 @@ public class ProductCatalogViewModelTests
     }
 
     [Fact]
+    public async Task ProductCatalogEditor_OwnsStoreScopedLoadDraftAndSaveWorkflow()
+    {
+        var store = NewStore("North Star");
+        var repository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: false));
+        var editor = new ProductCatalogEditorViewModel(new ProductSupplierSetupService(repository));
+        editor.SetScope(new StoreManagementScope(store.WorkspaceId, store.Id));
+
+        await editor.LoadAsync(TestContext.Current.CancellationToken);
+        editor.StartCreateProduct();
+        editor.ProductName = "Bella Canvas 3001";
+        editor.ProductDescription = "Soft tee";
+        await editor.SaveSelectedProductAsync(TestContext.Current.CancellationToken);
+
+        var saved = await repository.LoadAsync(TestContext.Current.CancellationToken);
+        var product = Assert.Single(saved.StoreProducts);
+        Assert.Equal(store.Id, product.StoreId);
+        Assert.Equal("Bella Canvas 3001", product.Name);
+        Assert.Equal("Soft tee", product.Description);
+        Assert.Equal(product.Id, editor.SelectedProduct?.Id);
+        Assert.Single(editor.Products);
+        Assert.False(editor.HasUnsavedProductChanges);
+    }
+
+    [Fact]
+    public async Task LateProductCreateDoesNotClobberReplacementDraftInSameScope()
+    {
+        var store = NewStore("North Star");
+        var repository = new SaveGatedWorkspaceRepository(SnapshotWithCatalog(store, addProduct: false));
+        var workspaceChanged = false;
+        var editor = new ProductCatalogEditorViewModel(new ProductSupplierSetupService(repository), workspaceChanged: () => workspaceChanged = true);
+        editor.SetScope(new StoreManagementScope(store.WorkspaceId, store.Id));
+        await editor.LoadAsync(TestContext.Current.CancellationToken);
+        editor.StartCreateProduct();
+        editor.ProductName = "Old draft";
+
+        var save = editor.SaveSelectedProductAsync(TestContext.Current.CancellationToken);
+        await repository.SaveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        editor.DiscardUnsavedChanges();
+        editor.StartCreateProduct();
+        editor.ProductName = "Replacement draft";
+        repository.ReleaseSave();
+        await save;
+
+        Assert.True(editor.IsCreatingNewProduct);
+        Assert.Equal("Replacement draft", editor.ProductName);
+        Assert.True(workspaceChanged);
+    }
+
+    [Fact]
+    public async Task LateOfferingCreateDoesNotClobberReplacementDraftInSameScope()
+    {
+        var store = NewStore("North Star");
+        var repository = new SaveGatedWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true));
+        var workspaceChanged = false;
+        var editor = new ProductCatalogEditorViewModel(new ProductSupplierSetupService(repository), workspaceChanged: () => workspaceChanged = true);
+        editor.SetScope(new StoreManagementScope(store.WorkspaceId, store.Id));
+        await editor.LoadAsync(TestContext.Current.CancellationToken);
+        editor.SelectProductForEditing(Assert.Single(editor.Products));
+        editor.StartCreateOffering();
+        editor.OfferingName = "Old draft";
+        editor.OfferingProviderName = "Local provider";
+
+        var save = editor.SaveSelectedOfferingAsync(TestContext.Current.CancellationToken);
+        await repository.SaveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        editor.DiscardUnsavedChanges();
+        editor.StartCreateOffering();
+        editor.OfferingName = "Replacement draft";
+        repository.ReleaseSave();
+        await save;
+
+        Assert.True(editor.IsCreatingNewOffering);
+        Assert.Equal("Replacement draft", editor.OfferingName);
+        Assert.True(workspaceChanged);
+    }
+
+    [Fact]
+    public void ProductCatalogEditor_NavigationRequestsDiscardForUnsavedProduct()
+    {
+        var editor = new ProductCatalogEditorViewModel(new ProductSupplierSetupService(new InMemoryWorkspaceRepository()));
+        editor.SetScope(new StoreManagementScope(Guid.NewGuid(), Guid.NewGuid()));
+        editor.StartCreateProduct();
+        editor.ProductName = "Unsaved product";
+        Action? discard = null;
+        var navigationRequested = false;
+        editor.DiscardRequested += action => discard = action;
+        editor.NavigationRequested += _ => navigationRequested = true;
+
+        editor.NavigateCatalog(CatalogEditorLevel.Overview);
+
+        Assert.NotNull(discard);
+        Assert.False(navigationRequested);
+    }
+
+    [Fact]
+    public void ChangingProductEditorScopeRaisesAvailabilityPropertyNotifications()
+    {
+        var editor = new ProductCatalogEditorViewModel(new ProductSupplierSetupService(new InMemoryWorkspaceRepository()));
+        var workspaceId = Guid.NewGuid();
+        var storeId = Guid.NewGuid();
+        editor.SetScope(new StoreManagementScope(workspaceId, storeId, IsStoreArchived: true));
+        Assert.False(editor.CanCreateCatalogItem);
+        var changed = new HashSet<string?>();
+        editor.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
+
+        editor.SetScope(new StoreManagementScope(workspaceId, storeId, IsStoreArchived: false));
+
+        Assert.True(editor.CanCreateCatalogItem);
+        Assert.Contains(nameof(ProductCatalogEditorViewModel.CanCreateCatalogItem), changed);
+        Assert.Contains(nameof(ProductCatalogEditorViewModel.CanSaveSelectedProduct), changed);
+        Assert.Contains(nameof(ProductCatalogEditorViewModel.CanSaveSelectedOffering), changed);
+        Assert.Contains(nameof(ProductCatalogEditorViewModel.CanDeleteSelectedProduct), changed);
+        Assert.Contains(nameof(ProductCatalogEditorViewModel.CanArchiveSelectedProduct), changed);
+        Assert.Contains(nameof(ProductCatalogEditorViewModel.CanDeleteSelectedOffering), changed);
+    }
+
+    [Fact]
+    public async Task ChangingWorkspaceUpdatesProductEditorScopeBeforeLoadingNewWorkspace()
+    {
+        var firstStore = NewStore("First store");
+        var repository = new DelayedFirstLoadWorkspaceRepository(SnapshotWithCatalog(firstStore, addProduct: true));
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(repository));
+        var newWorkspaceId = Guid.NewGuid();
+        viewModel.ProductCatalogEditor.SetScope(new StoreManagementScope(firstStore.WorkspaceId, firstStore.Id));
+
+        var switchWorkspace = viewModel.SetActiveWorkspaceAsync(newWorkspaceId, TestContext.Current.CancellationToken);
+        await repository.FirstLoadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var scopeDuringLoad = viewModel.ProductCatalogEditor.Scope;
+        repository.ReleaseFirstLoad();
+        await switchWorkspace;
+
+        Assert.Equal(new StoreManagementScope(newWorkspaceId, null), scopeDuringLoad);
+    }
+
+    [Fact]
+    public async Task ProductCatalogEditor_IgnoresProductLoadFromPreviousStoreScope()
+    {
+        var firstStore = NewStore("First store");
+        var secondStore = NewStore("Second store");
+        var repository = new DelayedFirstLoadWorkspaceRepository(SnapshotWithCatalog(firstStore, addProduct: true));
+        var editor = new ProductCatalogEditorViewModel(new ProductSupplierSetupService(repository));
+        editor.SetScope(new StoreManagementScope(firstStore.WorkspaceId, firstStore.Id));
+        var oldLoad = editor.LoadAsync(TestContext.Current.CancellationToken);
+        await repository.FirstLoadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        editor.SetScope(new StoreManagementScope(secondStore.WorkspaceId, secondStore.Id));
+        await editor.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.Empty(editor.Products);
+
+        repository.ReleaseFirstLoad();
+        await oldLoad;
+
+        Assert.Equal(secondStore.Id, editor.Scope.StoreId);
+        Assert.Empty(editor.Products);
+    }
+
+    [Fact]
     public async Task ProductAndOfferingNavigation_ExposesProgressiveDisclosureSummaries()
     {
         var store = NewStore("North Star");
@@ -58,6 +217,231 @@ public class ProductCatalogViewModelTests
         Assert.Equal(1, viewModel.SelectedOfferingVariantCount);
         Assert.Equal(1, viewModel.SelectedOfferingDesignAreaCount);
         Assert.Contains("1 variant", viewModel.SelectedOfferingSummary);
+    }
+
+    [Fact]
+    public async Task SwitchingProductWhileOfferingDraftIsActiveRequestsDiscard()
+    {
+        var store = NewStore("North Star");
+        var repository = new InMemoryWorkspaceRepository(SnapshotWithTwoProducts(store));
+        var viewModel = NewStoreManagementViewModel(repository);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.OpenProductsTabCommand.Execute(null);
+
+        var firstProduct = viewModel.Products.Single(value => value.Name == "Gildan 64000");
+        var secondProduct = viewModel.Products.Single(value => value.Name == "Alternate product");
+        viewModel.OpenProductDetailCommand.Execute(firstProduct);
+        viewModel.StartCreateOfferingCommand.Execute(null);
+        viewModel.OfferingName = "Unsaved offering";
+
+        viewModel.OpenProductDetailCommand.Execute(secondProduct);
+
+        Assert.True(viewModel.DiscardChangesPromptVisible);
+        Assert.Equal(firstProduct.Id, viewModel.SelectedProduct!.Id);
+        Assert.True(viewModel.IsCreatingNewOffering);
+    }
+
+    [Fact]
+    public async Task StartingProductCreationWhileOfferingDraftIsActiveRequestsDiscard()
+    {
+        var store = NewStore("North Star");
+        var repository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true));
+        var viewModel = NewStoreManagementViewModel(repository);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.OpenProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.StartCreateOfferingCommand.Execute(null);
+        viewModel.OfferingName = "Unsaved offering";
+
+        viewModel.StartCreateProductCommand.Execute(null);
+
+        Assert.True(viewModel.DiscardChangesPromptVisible);
+        Assert.True(viewModel.IsCreatingNewOffering);
+        Assert.False(viewModel.ProductCatalogEditor.IsCreatingNewProduct);
+    }
+
+    [Fact]
+    public async Task SwitchingOfferingAfterDiscardingVariantDraftClearsItsFields()
+    {
+        var store = NewStore("North Star");
+        var repository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true));
+        var viewModel = NewStoreManagementViewModel(repository);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.OpenProductsTabCommand.Execute(null);
+        var product = Assert.Single(viewModel.Products);
+        viewModel.OpenProductDetailCommand.Execute(product);
+        var offerings = product.Offerings.ToArray();
+        var firstOffering = offerings[0];
+        var secondOffering = offerings[1];
+        viewModel.OpenOfferingDetailCommand.Execute(firstOffering);
+        viewModel.ProductCatalogEditor.StartAddVariant();
+        viewModel.ProductCatalogEditor.VariantColor = "Indigo";
+
+        viewModel.OpenOfferingDetailCommand.Execute(secondOffering);
+
+        Assert.True(viewModel.DiscardChangesPromptVisible);
+        Assert.Equal(firstOffering.Id, viewModel.SelectedOffering?.Id);
+        viewModel.ConfirmDiscardChangesCommand.Execute(null);
+
+        Assert.Equal(secondOffering.Id, viewModel.SelectedOffering?.Id);
+        Assert.False(viewModel.ProductCatalogEditor.IsAddingVariant);
+        Assert.Equal(string.Empty, viewModel.ProductCatalogEditor.VariantColor);
+        Assert.Equal(string.Empty, viewModel.ProductCatalogEditor.VariantSize);
+    }
+
+    [Fact]
+    public async Task SwitchingOfferingAfterDiscardingDesignAreaDraftClearsItsFields()
+    {
+        var store = NewStore("North Star");
+        var repository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true));
+        var viewModel = NewStoreManagementViewModel(repository);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.OpenProductsTabCommand.Execute(null);
+        var product = Assert.Single(viewModel.Products);
+        viewModel.OpenProductDetailCommand.Execute(product);
+        var offerings = product.Offerings.ToArray();
+        var firstOffering = offerings[0];
+        var secondOffering = offerings[1];
+        viewModel.OpenOfferingDetailCommand.Execute(firstOffering);
+        viewModel.ProductCatalogEditor.StartAddDesignArea();
+        viewModel.ProductCatalogEditor.AreaName = "Front print";
+        viewModel.ProductCatalogEditor.AreaPosition = "front";
+
+        viewModel.OpenOfferingDetailCommand.Execute(secondOffering);
+
+        Assert.True(viewModel.DiscardChangesPromptVisible);
+        Assert.Equal(firstOffering.Id, viewModel.SelectedOffering?.Id);
+        viewModel.ConfirmDiscardChangesCommand.Execute(null);
+
+        Assert.Equal(secondOffering.Id, viewModel.SelectedOffering?.Id);
+        Assert.False(viewModel.ProductCatalogEditor.IsAddingDesignArea);
+        Assert.Equal(string.Empty, viewModel.ProductCatalogEditor.AreaName);
+        Assert.Equal(string.Empty, viewModel.ProductCatalogEditor.AreaPosition);
+    }
+
+    [Fact]
+    public async Task SelectingOfferingWhileProductDraftIsDirtyRequestsDiscard()
+    {
+        var store = NewStore("North Star");
+        var repository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true));
+        var viewModel = NewStoreManagementViewModel(repository);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.OpenProductsTabCommand.Execute(null);
+        var product = Assert.Single(viewModel.Products);
+        viewModel.OpenProductDetailCommand.Execute(product);
+        var firstOffering = product.Offerings[0];
+        var secondOffering = product.Offerings[1];
+        viewModel.OpenOfferingDetailCommand.Execute(firstOffering);
+        viewModel.ProductName = "Unsaved product name";
+
+        viewModel.OpenOfferingDetailCommand.Execute(secondOffering);
+
+        Assert.True(viewModel.DiscardChangesPromptVisible);
+        Assert.Equal(firstOffering.Id, viewModel.SelectedOffering?.Id);
+        Assert.Equal("Unsaved product name", viewModel.ProductName);
+        viewModel.ConfirmDiscardChangesCommand.Execute(null);
+        Assert.Equal(secondOffering.Id, viewModel.SelectedOffering?.Id);
+        Assert.Equal(product.Name, viewModel.ProductName);
+    }
+
+    [Fact]
+    public async Task StartingOfferingWhileProductDraftIsDirtyRequestsDiscard()
+    {
+        var store = NewStore("North Star");
+        var repository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true));
+        var viewModel = NewStoreManagementViewModel(repository);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.OpenProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.ProductName = "Unsaved product edit";
+
+        viewModel.StartCreateOfferingCommand.Execute(null);
+
+        Assert.True(viewModel.DiscardChangesPromptVisible);
+        Assert.False(viewModel.ProductCatalogEditor.IsCreatingNewOffering);
+        Assert.Equal("Unsaved product edit", viewModel.ProductName);
+    }
+
+    [Fact]
+    public async Task SelectingAnotherOfferingPromptsForActiveCatalogSetupDraft()
+    {
+        var store = NewStore("North Star");
+        var productRepository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true));
+        var catalogRepository = new InMemoryWorkspaceRepository(SnapshotForCatalogSetup(store, productRepository.Snapshot.FulfillmentOfferings));
+        var viewModel = NewStoreManagementViewModelWithCatalog(productRepository, catalogRepository);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        await viewModel.CatalogSetup!.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+        viewModel.OpenProductsTabCommand.Execute(null);
+        var product = Assert.Single(viewModel.Products);
+        viewModel.OpenProductDetailCommand.Execute(product);
+        var fixedOffering = product.Offerings.Single(value => value.Kind == FulfillmentKind.FixedProvider);
+        var networkOffering = product.Offerings.Single(value => value.Kind == FulfillmentKind.PrintifyChoiceNetwork);
+        viewModel.OpenOfferingDetailCommand.Execute(fixedOffering);
+        Assert.True(viewModel.CatalogSetup!.IsAvailable, viewModel.CatalogSetup.ErrorMessage);
+        Assert.True(viewModel.CatalogSetup.CanEdit);
+        Assert.Equal(fixedOffering.Id, viewModel.CatalogSetup.SelectedOfferingId);
+        Assert.True(viewModel.CatalogSetup.StartAddTemplateCommand.CanExecute(null));
+        viewModel.CatalogSetup.StartAddTemplateCommand.Execute(null);
+        Assert.True(viewModel.CatalogSetup.IsAddingTemplate);
+
+        viewModel.OpenOfferingDetailCommand.Execute(networkOffering);
+
+        Assert.True(viewModel.DiscardChangesPromptVisible);
+        Assert.Equal(fixedOffering.Id, viewModel.SelectedOffering!.Id);
+        Assert.True(viewModel.CatalogSetup.IsAddingTemplate);
+    }
+
+    [Fact]
+    public async Task CatalogSetupOnlyDraftCountsAsDirtyWhenClosingEditor()
+    {
+        var store = NewStore("North Star");
+        var productRepository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true));
+        var catalogRepository = new InMemoryWorkspaceRepository(SnapshotForCatalogSetup(store, productRepository.Snapshot.FulfillmentOfferings));
+        var viewModel = NewStoreManagementViewModelWithCatalog(productRepository, catalogRepository);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.OpenProductsTabCommand.Execute(null);
+        var product = Assert.Single(viewModel.Products);
+        viewModel.OpenProductDetailCommand.Execute(product);
+        var fixedOffering = product.Offerings.Single(value => value.Kind == FulfillmentKind.FixedProvider);
+        viewModel.OpenOfferingDetailCommand.Execute(fixedOffering);
+        var dirtyNotifications = 0;
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(StoreManagementViewModel.HasAnyUnsavedChanges)) dirtyNotifications++;
+        };
+
+        viewModel.CatalogSetup!.StartAddPrintProviderCommand.Execute(null);
+
+        Assert.True(viewModel.CatalogSetup.HasActiveDraft);
+        Assert.True(viewModel.HasAnyCatalogUnsavedChanges);
+        Assert.True(viewModel.HasAnyUnsavedChanges);
+        Assert.True(dirtyNotifications > 0);
+        viewModel.CloseStoreEditorCommand.Execute(null);
+        Assert.True(viewModel.DiscardChangesPromptVisible);
+        Assert.True(viewModel.IsStoreEditorOpen);
+    }
+
+    [Fact]
+    public async Task ChangingProductEditorScopeCancelsCatalogSetupDrafts()
+    {
+        var store = NewStore("North Star");
+        var productRepository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true));
+        var catalogRepository = new InMemoryWorkspaceRepository(SnapshotForCatalogSetup(store, productRepository.Snapshot.FulfillmentOfferings));
+        var viewModel = NewStoreManagementViewModelWithCatalog(productRepository, catalogRepository);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.OpenProductsTabCommand.Execute(null);
+        var product = Assert.Single(viewModel.Products);
+        viewModel.OpenProductDetailCommand.Execute(product);
+        var fixedOffering = product.Offerings.Single(value => value.Kind == FulfillmentKind.FixedProvider);
+        viewModel.OpenOfferingDetailCommand.Execute(fixedOffering);
+        viewModel.CatalogSetup!.StartAddOptionCommand.Execute(null);
+        Assert.True(viewModel.CatalogSetup.IsAddingOption);
+        Assert.True(viewModel.CatalogSetup.HasActiveDraft);
+
+        viewModel.ProductCatalogEditor.SetScope(viewModel.ProductCatalogEditor.Scope with { StoreId = Guid.NewGuid() });
+
+        Assert.False(viewModel.CatalogSetup.HasActiveDraft);
+        Assert.False(viewModel.CatalogSetup.IsAddingOption);
     }
 
     [Fact]
@@ -255,6 +639,15 @@ public class ProductCatalogViewModelTests
         Assert.False(viewModel.HasConfiguration);
     }
 
+    private static StoreManagementViewModel NewStoreManagementViewModelWithCatalog(InMemoryWorkspaceRepository productRepository, InMemoryWorkspaceRepository catalogRepository) =>
+        new(
+            new StoreManagementService(productRepository),
+            new NicheManagementService(productRepository),
+            new TagManagementService(productRepository),
+            new ProductSupplierSetupService(productRepository),
+            new CatalogSetupService(catalogRepository),
+            new MockupTemplateSetupService(catalogRepository));
+
     private static StoreManagementViewModel NewStoreManagementViewModel(InMemoryWorkspaceRepository repository) =>
         new(
             new StoreManagementService(repository),
@@ -265,6 +658,46 @@ public class ProductCatalogViewModelTests
     private static DesignStageToolViewModel NewDesignToolViewModel(InMemoryWorkspaceRepository repository) =>
         new(
             new EmptyDesignStageService());
+
+    private static WorkspaceSnapshot SnapshotForCatalogSetup(Store store, IReadOnlyList<FulfillmentOffering> productOfferings)
+    {
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, Now, Now);
+        var provider = new PrintProvider(Guid.NewGuid(), store.Id, "Printful", "printful", false, Now, Now);
+        var blueprintOfferings = productOfferings.Select(offering => new BlueprintOffering(
+            offering.Id,
+            blueprint.Id,
+            store.Id,
+            offering.Name,
+            offering.Description,
+            offering.Kind == FulfillmentKind.PrintifyChoiceNetwork ? BlueprintOfferingKind.ProviderNetwork : BlueprintOfferingKind.FixedPrintProvider,
+            offering.Kind == FulfillmentKind.FixedProvider ? provider.Id : null,
+            offering.Kind == FulfillmentKind.PrintifyChoiceNetwork ? "printify-choice" : null,
+            null,
+            null,
+            false,
+            Now,
+            Now)).ToArray();
+        return WorkspaceSnapshot.Empty with
+        {
+            Workspaces = [WorkspaceSnapshot.DefaultWorkspace(Now)],
+            Stores = [store],
+            Blueprints = [blueprint],
+            BlueprintOfferings = blueprintOfferings,
+            PrintProviders = [provider]
+        };
+    }
+
+    private static WorkspaceSnapshot SnapshotWithTwoProducts(Store store)
+    {
+        var snapshot = SnapshotWithCatalog(store, addProduct: true);
+        var product = new StoreProduct(Guid.NewGuid(), store.Id, "Alternate product", null, null, Now, Now, "{}");
+        var offering = new FulfillmentOffering(Guid.NewGuid(), product.Id, "Alternate offering", null, FulfillmentKind.FixedProvider, "Printful", null, Now, Now, "{}");
+        return snapshot with
+        {
+            StoreProducts = [.. snapshot.StoreProducts, product],
+            FulfillmentOfferings = [.. snapshot.FulfillmentOfferings, offering]
+        };
+    }
 
     private static WorkspaceSnapshot SnapshotWithCatalog(Store store, bool addProduct, bool addItem = false, bool choiceArea = false)
     {
@@ -386,6 +819,41 @@ public class ProductCatalogViewModelTests
 
         public Task<DesignStageResult> RemoveSupportingImageAsync(Guid itemId, Guid assetId, CancellationToken cancellationToken = default) =>
             Task.FromResult(DesignStageResult.Failure("Not implemented in tests."));
+    }
+
+    private sealed class DelayedFirstLoadWorkspaceRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
+    {
+        private int _loadCount;
+        private readonly TaskCompletionSource _releaseFirstLoad = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource FirstLoadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public void ReleaseFirstLoad() => _releaseFirstLoad.TrySetResult();
+        public Task SaveAsync(WorkspaceSnapshot updated, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public async Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Increment(ref _loadCount) == 1)
+            {
+                FirstLoadStarted.TrySetResult();
+                await _releaseFirstLoad.Task.WaitAsync(cancellationToken);
+            }
+            return snapshot;
+        }
+    }
+
+    private sealed class SaveGatedWorkspaceRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
+    {
+        private WorkspaceSnapshot _snapshot = snapshot;
+        private readonly TaskCompletionSource _releaseSave = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource SaveStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public void ReleaseSave() => _releaseSave.TrySetResult();
+
+        public async Task SaveAsync(WorkspaceSnapshot updated, CancellationToken cancellationToken = default)
+        {
+            SaveStarted.TrySetResult();
+            await _releaseSave.Task.WaitAsync(cancellationToken);
+            _snapshot = updated;
+        }
+
+        public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(_snapshot);
     }
 
     private sealed class InMemoryWorkspaceRepository(WorkspaceSnapshot? snapshot = null) : IWorkspaceRepository

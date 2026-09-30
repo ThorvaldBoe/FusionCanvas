@@ -13,7 +13,6 @@ using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.Workspaces;
-using FusionCanvas.Application.AI;
 
 namespace FusionCanvas.App.Stores;
 
@@ -33,63 +32,13 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         StartNewNiche,
         SelectBasicInfoTab,
         SelectNichesTab,
-        SelectTag,
-        StartNewTag,
         SelectTagsTab,
         SelectProductsTab,
-        StartNewProduct,
-        SelectProduct,
-        SelectOffering,
-        StartNewOffering,
-        BackToProducts,
-        BackToProduct,
         SelectArea,
-        SelectVariant,
-        NavigateCatalog
+        SelectVariant
     }
 
-    private sealed record ProductDraft(
-        string Name,
-        string Description,
-        string ExternalProductId);
 
-    private sealed record OfferingDraft(
-        string Name,
-        string Description,
-        string ExternalOfferingId,
-        int KindIndex,
-        string ProviderName,
-        string AreaName,
-        string AreaPosition,
-        string AreaDecorationMethod,
-        string AreaWidth,
-        string AreaHeight,
-        string VariantColor,
-        string VariantSize);
-
-    private sealed record EditorState(
-        string Name,
-        string Description,
-        string Notes,
-        string TargetMarket,
-        string BrandDirection,
-        string PlanningContext,
-        string Url,
-        FulfillmentStrategy FulfillmentStrategy,
-        int? PrintifyShopId,
-        string? PrintifyShopTitle,
-        bool PrintifyShopSelectionChanged);
-
-    private sealed record NicheEditorState(
-        string Name,
-        string Description,
-        string Audience,
-        string HumorStyle,
-        string VisualStyleGuidance,
-        string Constraints,
-        string Risks,
-        string ResearchNotes,
-        string Notes);
 
     private sealed class TrackedOperation
     {
@@ -105,12 +54,11 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
     private readonly IStoreManagementService _service;
     private readonly INicheManagementService? _nicheService;
-    private readonly ITagManagementService? _tagService;
-    private readonly IProductSupplierSetupService? _productService;
-    private readonly ICatalogSetupService? _catalogService;
-    private readonly IOfferingManagementService? _offeringManagementService;
     private readonly IWorkspaceRepository? _workspaceRepository;
     private readonly INichePopulationService? _nichePopulationService;
+    private readonly StoreNicheConfigurationViewModel _storeConfiguration;
+    private readonly TagEditorViewModel _tagEditor;
+    private readonly ProductCatalogEditorViewModel _productCatalogEditor;
     private static readonly TimeSpan OperationShutdownTimeout = TimeSpan.FromSeconds(2);
     private readonly object _operationGate = new();
     private readonly HashSet<TrackedOperation> _inFlightOperations = [];
@@ -123,112 +71,155 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
     private bool _firstStorePromptDismissed;
     private bool _deleteWarningVisible;
     private bool _nicheDeleteWarningVisible;
-    private bool _tagDeleteWarningVisible;
     private bool _discardChangesPromptVisible;
     private bool _isCreatingNewStore;
     private bool _isCreatingNewNiche;
-    private bool _isCreatingNewTag;
     private Guid? _draftStoreId;
     private Guid? _draftNicheId;
-    private Guid? _draftTagId;
     private StoreSummary? _pendingDeleteStore;
     private NicheSummary? _pendingDeleteNiche;
     private StoreSummary? _pendingEditorStore;
     private NicheSummary? _pendingEditorNiche;
-    private TagSummary? _pendingEditorTag;
-    private TagSummary? _pendingDeleteTag;
-    private StoreProductSummary? _pendingEditorProduct;
-    private FulfillmentOfferingSummary? _pendingEditorOffering;
-    private int _pendingDeleteTagItemCount;
+    private Action? _pendingDiscardContinuation;
     private PendingEditorAction _pendingEditorAction;
-    private EditorState _originalEditorState = EmptyEditorState();
-    private NicheEditorState _originalNicheEditorState = EmptyNicheEditorState();
-    private sealed record TagEditorState(string Name, string? Color, string? Description);
-    private TagEditorState _originalTagEditorState = new(string.Empty, null, null);
+
+
     private StoreManagementEditorTab _selectedEditorTab;
     private CatalogEditorLevel _catalogEditorLevel;
-    private CatalogEditorLevel _pendingCatalogLevel;
     private bool _isBasicsSectionExpanded = true;
-    private bool _isBlueprintBasicsExpanded;
     private bool _isVariantsSectionExpanded = true;
     private bool _isDesignAreasSectionExpanded = true;
     private bool _isAdvancedSectionExpanded;
-    private bool _isAddingVariant;
-    private bool _isAddingDesignArea;
-    private string _newStoreName = string.Empty;
-    private string _description = string.Empty;
+    private StoreSummary? _selectedStore;
+    private NicheSummary? _selectedNiche;
     private bool _printifyShopSelectionChanged;
-    private string _notes = string.Empty;
-    private string _targetMarket = string.Empty;
-    private string _brandDirection = string.Empty;
-    private string _planningContext = string.Empty;
-    private string _url = string.Empty;
     private int? _printifyShopId;
     private string? _printifyShopTitle;
-    private FulfillmentStrategy _fulfillmentStrategy = FulfillmentStrategy.Manual;
-    private string _nicheName = string.Empty;
-    private string _nicheDescription = string.Empty;
-    private string _nicheAudience = string.Empty;
-    private string _nicheHumorStyle = string.Empty;
-    private string _nicheVisualStyleGuidance = string.Empty;
-    private string _nicheConstraints = string.Empty;
-    private string _nicheRisks = string.Empty;
-    private string _nicheResearchNotes = string.Empty;
-    private string _nicheNotes = string.Empty;
-    private string _tagName = string.Empty;
-    private string? _tagColor;
-    private string _tagDescription = string.Empty;
-    private string? _errorMessage;
-    private AiAvailabilityResult _nichePopulationAvailability =
-        new(AiAvailabilityKind.MissingModel, "Configure General AI settings before populating niche fields.");
-    private bool _isNichePopulationBusy;
-    private string? _nichePopulationMessage;
-    private Guid _nichePopulationOperationId;
 
-    private bool _productDeleteWarningVisible;
-    private bool _productArchiveWarningVisible;
-    private bool _showArchivedProducts;
-    private bool _showArchivedOfferings;
-    private bool _offeringDeleteWarningVisible;
-    private bool _isCreatingNewProduct;
-    private bool _isCreatingNewOffering;
-    private Guid? _draftProductId;
-    private Guid? _draftOfferingId;
+    private string? _errorMessage;
+
     private Task? _productSaveTask;
-    private StoreProductSummary? _pendingDeleteProduct;
-    private StoreProductSummary? _pendingArchiveProduct;
-    private FulfillmentOfferingSummary? _pendingDeleteOffering;
-    private StoreProductSummary? _selectedProduct;
-    private FulfillmentOfferingSummary? _selectedOffering;
-    private ProductDraft _originalProductState = new(string.Empty, string.Empty, string.Empty);
-    private OfferingDraft _originalOfferingState = new(string.Empty, string.Empty, string.Empty, 0, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
-    private string _productName = string.Empty;
-    private string _productDescription = string.Empty;
-    private string _externalProductId = string.Empty;
-    private string _offeringName = string.Empty;
-    private string _offeringDescription = string.Empty;
-    private string _offeringExternalOfferingId = string.Empty;
-    private int _offeringKindIndex;
-    private string _offeringProviderName = string.Empty;
-    private string _areaName = string.Empty;
-    private string _areaPosition = string.Empty;
-    private string _areaDecorationMethod = string.Empty;
-    private string _areaWidth = string.Empty;
-    private string _areaHeight = string.Empty;
-    private string _variantColor = string.Empty;
-    private string _variantSize = string.Empty;
+
+
+
 
     public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null, ITagManagementService? tagService = null, IProductSupplierSetupService? productService = null, ICatalogSetupService? catalogService = null, IMockupTemplateSetupService? mockupService = null, IOfferingManagementService? offeringManagementService = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, FusionCanvas.App.Assets.IAssetFilePicker? filePicker = null, IWorkspaceRepository? workspaceRepository = null, INichePopulationService? nichePopulationService = null)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _nicheService = nicheService;
-        _tagService = tagService;
-        _productService = productService;
-        _catalogService = catalogService;
-        _offeringManagementService = offeringManagementService;
         _workspaceRepository = workspaceRepository;
         _nichePopulationService = nichePopulationService;
-        CatalogSetup = catalogService is not null && mockupService is not null ? new CatalogSetupViewModel(catalogService, mockupService, offeringManagementService, providerCatalog, sourceImages, filePicker) : null;
+        _storeConfiguration = new StoreNicheConfigurationViewModel(
+            _service,
+            _nicheService,
+            _nichePopulationService,
+            ApplyState,
+            ApplyResult,
+            ApplyNicheState,
+            ApplyNicheResult,
+            message => ErrorMessage = message,
+            () => WorkspaceStructureChanged?.Invoke(this, EventArgs.Empty));
+        _productCatalogEditor = new ProductCatalogEditorViewModel(
+            productService,
+            catalogService,
+            offeringManagementService,
+            operation => Run(operation),
+            message => ErrorMessage = message,
+            () => WorkspaceStructureChanged?.Invoke(this, EventArgs.Empty));
+        _tagEditor = new TagEditorViewModel(
+            tagService,
+            (operation) => Run(operation),
+            message => ErrorMessage = message,
+            () => WorkspaceStructureChanged?.Invoke(this, EventArgs.Empty));
+        _storeConfiguration.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName is nameof(StoreConfigurationViewModel.NewStoreName)
+                or nameof(StoreConfigurationViewModel.Description)
+                or nameof(StoreConfigurationViewModel.Notes)
+                or nameof(StoreConfigurationViewModel.TargetMarket)
+                or nameof(StoreConfigurationViewModel.BrandDirection)
+                or nameof(StoreConfigurationViewModel.PlanningContext)
+                or nameof(StoreConfigurationViewModel.Url)
+                or nameof(StoreNicheConfigurationViewModel.SelectedFulfillmentStrategy))
+            {
+                OnPropertyChanged(args.PropertyName);
+                RaiseEditorStateProperties();
+            }
+            if (args.PropertyName is nameof(StoreConfigurationViewModel.NewStoreName))
+                OnPropertyChanged(nameof(EditorActiveStores));
+            if (args.PropertyName is nameof(StoreConfigurationViewModel.NicheName)
+                or nameof(StoreConfigurationViewModel.NicheDescription)
+                or nameof(StoreConfigurationViewModel.NicheAudience)
+                or nameof(StoreConfigurationViewModel.NicheHumorStyle)
+                or nameof(StoreConfigurationViewModel.NicheVisualStyleGuidance)
+                or nameof(StoreConfigurationViewModel.NicheConstraints)
+                or nameof(StoreConfigurationViewModel.NicheRisks)
+                or nameof(StoreConfigurationViewModel.NicheResearchNotes)
+                or nameof(StoreConfigurationViewModel.NicheNotes))
+            {
+                OnPropertyChanged(args.PropertyName);
+                RaiseNicheEditorStateProperties();
+            }
+            if (args.PropertyName is nameof(StoreConfigurationViewModel.NicheName))
+                OnPropertyChanged(nameof(EditorActiveNiches));
+            if (args.PropertyName is nameof(StoreNicheConfigurationViewModel.HasUnsavedStoreChanges))
+                OnPropertyChanged(nameof(HasUnsavedChanges));
+            if (args.PropertyName is nameof(StoreNicheConfigurationViewModel.HasUnsavedNicheChanges))
+                OnPropertyChanged(nameof(HasUnsavedNicheChanges));
+            if (args.PropertyName is nameof(StoreNicheConfigurationViewModel.CanPopulateNiche)
+                or nameof(StoreNicheConfigurationViewModel.IsNichePopulationBusy)
+                or nameof(StoreNicheConfigurationViewModel.NichePopulationStatusMessage)
+                or nameof(StoreNicheConfigurationViewModel.HasNichePopulationStatus))
+            {
+                OnPropertyChanged(nameof(CanPopulateNiche));
+                OnPropertyChanged(nameof(IsNichePopulationBusy));
+                OnPropertyChanged(nameof(NichePopulationButtonText));
+                OnPropertyChanged(nameof(NichePopulationStatusMessage));
+                OnPropertyChanged(nameof(HasNichePopulationStatus));
+            }
+        };
+        _tagEditor.PropertyChanged += (_, args) =>
+        {
+            var propertyName = args.PropertyName switch
+            {
+                nameof(TagEditorViewModel.Scope) => null,
+                nameof(TagEditorViewModel.DeleteWarningVisible) => nameof(TagDeleteWarningVisible),
+                nameof(TagEditorViewModel.DeleteWarningMessage) => nameof(TagDeleteWarningMessage),
+                nameof(TagEditorViewModel.HasUnsavedChanges) => null,
+                _ => args.PropertyName
+            };
+            if (propertyName is not null)
+                OnPropertyChanged(propertyName);
+            if (args.PropertyName is nameof(TagEditorViewModel.TagName)
+                or nameof(TagEditorViewModel.TagColor)
+                or nameof(TagEditorViewModel.TagDescription)
+                or nameof(TagEditorViewModel.HasUnsavedChanges)
+                or nameof(TagEditorViewModel.CanSaveSelectedTag)
+                or nameof(TagEditorViewModel.CanArchiveSelectedTag)
+                or nameof(TagEditorViewModel.CanDeleteSelectedTag))
+                RaiseTagEditorActionProperties();
+        };
+        _tagEditor.DiscardRequested += continuation => RequestDiscardBefore(PendingEditorAction.None, discardContinuation: continuation);
+        _productCatalogEditor.DiscardRequested += continuation => RequestDiscardBefore(PendingEditorAction.None, discardContinuation: continuation);
+        _productCatalogEditor.ProductNameFocusRequested += (_, args) => ProductNameFocusRequested?.Invoke(this, args);
+        _productCatalogEditor.OfferingNameFocusRequested += (_, args) => OfferingNameFocusRequested?.Invoke(this, args);
+        _productCatalogEditor.NavigationRequested += level => CatalogEditorLevel = level;
+        _productCatalogEditor.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(ProductCatalogEditorViewModel.Scope)) return;
+            OnPropertyChanged(args.PropertyName);
+            if (args.PropertyName is nameof(ProductCatalogEditorViewModel.ProductName)
+                or nameof(ProductCatalogEditorViewModel.ProductDescription)
+                or nameof(ProductCatalogEditorViewModel.ExternalProductId))
+                RaiseProductEditorStateProperties();
+            else
+                RaiseOfferingEditorStateProperties();
+            if (args.PropertyName == nameof(ProductCatalogEditorViewModel.ProductName))
+                OnPropertyChanged(nameof(EditorProducts));
+            if (args.PropertyName == nameof(ProductCatalogEditorViewModel.OfferingKindIndex))
+                OnPropertyChanged(nameof(IsChoiceNetworkOffering));
+        };
+        _productCatalogEditor.CatalogSetup = catalogService is not null && mockupService is not null ? new CatalogSetupViewModel(catalogService, mockupService, offeringManagementService, providerCatalog, sourceImages, filePicker) : null;
         if (CatalogSetup is not null)
             CatalogSetup.CatalogChanged += OnCatalogChanged;
         ToggleStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = !IsSelectorExpanded);
@@ -322,26 +313,14 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         CancelDeleteNicheCommand = new RelayCommand(_ => ClearNicheDeleteWarning());
         ConfirmDiscardChangesCommand = new RelayCommand(_ => ConfirmDiscardChanges());
         KeepEditingCommand = new RelayCommand(_ => ClearDiscardChangesPrompt());
-        EditTagCommand = new RelayCommand(parameter =>
-        {
-            if (parameter is TagSummary tag)
-            {
-                SelectTagForEditing(tag);
-            }
-        });
-        SaveSelectedTagCommand = new RelayCommand(_ => Run(SaveSelectedTagAsync));
-        ArchiveSelectedTagCommand = new RelayCommand(_ => Run(ArchiveSelectedTagAsync));
-        RestoreTagCommand = new RelayCommand(parameter =>
-        {
-            if (parameter is TagSummary tag)
-            {
-                Run(cancellationToken => RestoreTagAsync(tag, cancellationToken));
-            }
-        });
-        RequestDeleteSelectedTagCommand = new RelayCommand(_ => RequestDeleteSelectedTag());
-        ConfirmDeleteTagCommand = new RelayCommand(_ => Run(ConfirmDeleteTagAsync));
-        CancelDeleteTagCommand = new RelayCommand(_ => ClearTagDeleteWarning());
-        StartCreateTagCommand = new RelayCommand(_ => StartCreateTag());
+        EditTagCommand = _tagEditor.EditTagCommand;
+        SaveSelectedTagCommand = _tagEditor.SaveSelectedTagCommand;
+        ArchiveSelectedTagCommand = _tagEditor.ArchiveSelectedTagCommand;
+        RestoreTagCommand = _tagEditor.RestoreTagCommand;
+        RequestDeleteSelectedTagCommand = _tagEditor.RequestDeleteSelectedTagCommand;
+        ConfirmDeleteTagCommand = _tagEditor.ConfirmDeleteTagCommand;
+        CancelDeleteTagCommand = _tagEditor.CancelDeleteTagCommand;
+        StartCreateTagCommand = _tagEditor.StartCreateTagCommand;
         OpenProductsTabCommand = new RelayCommand(_ => OpenProductsTab());
         SelectProductsTabCommand = new RelayCommand(_ => SelectProductsTab());
         StartCreateProductCommand = new RelayCommand(_ => StartCreateProduct());
@@ -359,39 +338,37 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         RequestArchiveSelectedProductCommand = new RelayCommand(_ => RequestArchiveSelectedProduct());
         ConfirmArchiveSelectedProductCommand = new RelayCommand(_ => Run(ConfirmArchiveSelectedProductAsync));
         CancelArchiveSelectedProductCommand = new RelayCommand(_ => ClearProductArchiveWarning());
-         StartCreateOfferingCommand = new RelayCommand(_ => StartCreateOffering());
-         CancelNewOfferingCommand = new RelayCommand(_ => CancelNewOffering());
-         BackToProductsCommand = new RelayCommand(_ => Run(BackToProductsAsync));
-         BackToProductCommand = new RelayCommand(_ => BackToProduct());
-         BackToOfferingOverviewCommand = new RelayCommand(_ => NavigateOfferingCatalog(CatalogEditorLevel.OfferingDetail));
-         OpenVariantManagementCommand = new RelayCommand(_ => OpenOfferingManagement(CatalogEditorLevel.VariantManagement));
-         OpenDesignAreaManagementCommand = new RelayCommand(_ => OpenOfferingManagement(CatalogEditorLevel.DesignAreaManagement));
-         OpenMockupTemplateManagementCommand = new RelayCommand(_ => OpenOfferingManagement(CatalogEditorLevel.MockupTemplateManagement));
-         OpenProductDetailCommand = new RelayCommand(parameter =>
-         {
-             if (parameter is StoreProductSummary product)
-             {
-                 SelectProductForEditing(product);
-             }
-         });
-         OpenOfferingDetailCommand = new RelayCommand(parameter =>
-         {
-             if (parameter is FulfillmentOfferingSummary offering)
-             {
-                 SelectOfferingForEditing(offering);
-             }
-         });
-         StartAddVariantCommand = new RelayCommand(_ => StartAddVariant());
-         CancelAddVariantCommand = new RelayCommand(_ => IsAddingVariant = false);
-         StartAddDesignAreaCommand = new RelayCommand(_ => StartAddDesignArea());
-         CancelAddDesignAreaCommand = new RelayCommand(_ => IsAddingDesignArea = false);
+        StartCreateOfferingCommand = new RelayCommand(_ => StartCreateOffering());
+        CancelNewOfferingCommand = new RelayCommand(_ => CancelNewOffering());
+        BackToProductsCommand = new RelayCommand(_ => Run(BackToProductsAsync));
+        BackToProductCommand = new RelayCommand(_ => BackToProduct());
+        BackToOfferingOverviewCommand = new RelayCommand(_ => NavigateOfferingCatalog(CatalogEditorLevel.OfferingDetail));
+        OpenVariantManagementCommand = new RelayCommand(_ => OpenOfferingManagement(CatalogEditorLevel.VariantManagement));
+        OpenDesignAreaManagementCommand = new RelayCommand(_ => OpenOfferingManagement(CatalogEditorLevel.DesignAreaManagement));
+        OpenMockupTemplateManagementCommand = new RelayCommand(_ => OpenOfferingManagement(CatalogEditorLevel.MockupTemplateManagement));
+        OpenProductDetailCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is StoreProductSummary product)
+            {
+                SelectProductForEditing(product);
+            }
+        });
+        OpenOfferingDetailCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is FulfillmentOfferingSummary offering)
+            {
+                SelectOfferingForEditing(offering);
+            }
+        });
+        StartAddVariantCommand = new RelayCommand(_ => StartAddVariant());
+        CancelAddVariantCommand = new RelayCommand(_ => IsAddingVariant = false);
+        StartAddDesignAreaCommand = new RelayCommand(_ => StartAddDesignArea());
+        CancelAddDesignAreaCommand = new RelayCommand(_ => IsAddingDesignArea = false);
         SelectOfferingCommand = new RelayCommand(parameter =>
         {
             if (parameter is BlueprintOfferingCardViewModel card && card.Status == "Archived")
             {
-                CatalogSetup?.SelectOffering(card.Id);
-                SelectedOffering = null;
-                CatalogEditorLevel = CatalogEditorLevel.OfferingDetail;
+                _productCatalogEditor.SelectArchivedOfferingForCatalog(card.Id);
             }
             else if (parameter is BlueprintOfferingCardViewModel activeCard && SelectedProduct?.Offerings.FirstOrDefault(value => value.Id == activeCard.Id) is { } cardOffering)
             {
@@ -451,34 +428,19 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
     public IReadOnlyList<NicheSummary> ArchivedNiches { get; private set; } = [];
 
-    public IReadOnlyList<TagSummary> ActiveTags { get; private set; } = [];
-
-    public IReadOnlyList<TagSummary> ArchivedTags { get; private set; } = [];
-
-    public IReadOnlyList<TagSummary> EditorActiveTags =>
-        _isCreatingNewTag && DraftTag() is { } draft
-            ? ActiveTags.Concat([draft]).ToArray()
-            : ActiveTags;
-
-    public TagSummary? SelectedTag { get; private set; }
-
-    public bool NeedsFirstTag { get; private set; }
-
-    public bool HasActiveTags => ActiveTags.Count > 0;
-
-    public bool HasArchivedTags => ArchivedTags.Count > 0;
-
-    public bool HasSelectedTag => SelectedTag is not null;
-
-    public bool CanRestoreSelectedTag => SelectedTag is { IsArchived: true };
-
-    public bool HasUnsavedTagChanges => CurrentTagEditorState() != _originalTagEditorState;
-
-    public bool CanSaveSelectedTag => _tagService is not null && (_isCreatingNewTag || (SelectedTag is not null && HasUnsavedTagChanges));
-
-    public bool CanArchiveSelectedTag => _tagService is not null && SelectedTag is { IsArchived: false } && !_isCreatingNewTag;
-
-    public bool CanDeleteSelectedTag => _tagService is not null && SelectedTag is not null && !_isCreatingNewTag;
+    public IReadOnlyList<TagSummary> ActiveTags => _tagEditor.ActiveTags;
+    public IReadOnlyList<TagSummary> ArchivedTags => _tagEditor.ArchivedTags;
+    public IReadOnlyList<TagSummary> EditorActiveTags => _tagEditor.EditorActiveTags;
+    public TagSummary? SelectedTag => _tagEditor.SelectedTag;
+    public bool NeedsFirstTag => _tagEditor.NeedsFirstTag;
+    public bool HasActiveTags => _tagEditor.HasActiveTags;
+    public bool HasArchivedTags => _tagEditor.HasArchivedTags;
+    public bool HasSelectedTag => _tagEditor.HasSelectedTag;
+    public bool CanRestoreSelectedTag => _tagEditor.CanRestoreSelectedTag;
+    public bool HasUnsavedTagChanges => _tagEditor.HasUnsavedChanges;
+    public bool CanSaveSelectedTag => _tagEditor.CanSaveSelectedTag;
+    public bool CanArchiveSelectedTag => _tagEditor.CanArchiveSelectedTag;
+    public bool CanDeleteSelectedTag => _tagEditor.CanDeleteSelectedTag;
 
     public IReadOnlyList<NicheSummary> EditorActiveNiches =>
         _isCreatingNewNiche && DraftNiche() is { } draft
@@ -490,9 +452,31 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
             ? ActiveStores.Concat([draft]).ToArray()
             : ActiveStores;
 
-    public StoreSummary? SelectedStore { get; private set; }
+    public StoreSummary? SelectedStore
+    {
+        get => _selectedStore;
+        private set
+        {
+            SetField(ref _selectedStore, value);
+            var scope = value is null
+                ? new StoreManagementScope(_service.ActiveWorkspaceId, null)
+                : new StoreManagementScope(value.WorkspaceId, value.Id, value.IsArchived, _isCreatingNewStore);
+            _tagEditor.SetScope(scope);
+            _storeConfiguration.SetScope(scope);
+            _storeConfiguration.SetCanonicalSelection(value, SelectedNiche);
+            _productCatalogEditor.Scope = scope;
+        }
+    }
 
-    public CatalogSetupViewModel? CatalogSetup { get; }
+    public StoreConfigurationViewModel StoreConfiguration => _storeConfiguration;
+
+    public StoreNicheConfigurationViewModel StoreNicheConfiguration => _storeConfiguration;
+
+    public TagEditorViewModel TagEditor => _tagEditor;
+
+    public ProductCatalogEditorViewModel ProductCatalogEditor => _productCatalogEditor;
+
+    public CatalogSetupViewModel? CatalogSetup => _productCatalogEditor.CatalogSetup;
 
     public StorePrintifyCredentialsViewModel? PrintifyCredentials { get; private set; }
     public FusionCanvas.Application.Stores.Printify.IPrintifyCatalogImportService? PrintifyCatalogImport { get; private set; }
@@ -562,10 +546,21 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         _printifyShopId = shopId;
         _printifyShopTitle = (sender as StorePrintifyCredentialsViewModel)?.SelectedShop?.Title;
         _printifyShopSelectionChanged = true;
+        _storeConfiguration.PrintifyShopId = _printifyShopId;
+        _storeConfiguration.PrintifyShopTitle = _printifyShopTitle;
+        _storeConfiguration.PrintifyShopSelectionChanged = true;
         RaiseEditorStateProperties();
     }
 
-    public NicheSummary? SelectedNiche { get; private set; }
+    public NicheSummary? SelectedNiche
+    {
+        get => _selectedNiche;
+        private set
+        {
+            if (SetField(ref _selectedNiche, value))
+                _storeConfiguration.SetCanonicalSelection(SelectedStore, value);
+        }
+    }
 
     public bool NeedsFirstStore { get; private set; }
 
@@ -587,9 +582,9 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
     public bool CanRestoreSelectedNiche => SelectedNiche is { IsArchived: true };
 
-    public bool HasUnsavedChanges => CurrentEditorState() != _originalEditorState;
+    public bool HasUnsavedChanges => _storeConfiguration.HasUnsavedStoreChanges;
 
-    public bool HasUnsavedNicheChanges => CurrentNicheEditorState() != _originalNicheEditorState;
+    public bool HasUnsavedNicheChanges => _storeConfiguration.HasUnsavedNicheChanges;
 
     public bool HasAnyUnsavedChanges => HasUnsavedChanges || HasUnsavedNicheChanges || HasUnsavedTagChanges || HasAnyCatalogUnsavedChanges;
 
@@ -603,26 +598,15 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
     public bool CanSaveSelectedNiche => _nicheService is not null && (_isCreatingNewNiche || (SelectedNiche is not null && HasUnsavedNicheChanges));
 
-    public bool CanPopulateNiche =>
-        _nichePopulationService is not null &&
-        !_isNichePopulationBusy &&
-        _nichePopulationAvailability.IsReady &&
-        SelectedStore is { IsArchived: false } &&
-        SelectedNiche is { IsArchived: false } &&
-        !string.IsNullOrWhiteSpace(NicheName);
+    public bool CanPopulateNiche => _storeConfiguration.CanPopulateNiche;
 
-    public bool IsNichePopulationBusy => _isNichePopulationBusy;
+    public bool IsNichePopulationBusy => _storeConfiguration.IsNichePopulationBusy;
 
-    public string NichePopulationButtonText => _isNichePopulationBusy ? "Populating…" : "Populate";
+    public string NichePopulationButtonText => IsNichePopulationBusy ? "Populating…" : "Populate";
 
-    public string NichePopulationStatusMessage =>
-        _isNichePopulationBusy
-            ? "Generating suggestions…"
-            : _nichePopulationAvailability.IsReady
-                ? _nichePopulationMessage ?? string.Empty
-                : _nichePopulationAvailability.Message;
+    public string NichePopulationStatusMessage => _storeConfiguration.NichePopulationStatusMessage;
 
-    public bool HasNichePopulationStatus => !string.IsNullOrWhiteSpace(NichePopulationStatusMessage);
+    public bool HasNichePopulationStatus => _storeConfiguration.HasNichePopulationStatus;
 
     public bool CanArchiveSelectedNiche => _nicheService is not null && SelectedNiche is { IsArchived: false } && !_isCreatingNewNiche;
 
@@ -658,6 +642,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
                 OnPropertyChanged(nameof(IsMockupTemplateManagement));
                 OnPropertyChanged(nameof(CatalogBreadcrumb));
             }
+            _productCatalogEditor.SynchronizeNavigationLevel(value);
         }
     }
 
@@ -696,8 +681,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
     public bool IsBlueprintBasicsExpanded
     {
-        get => _isBlueprintBasicsExpanded;
-        set => SetField(ref _isBlueprintBasicsExpanded, value);
+        get => _productCatalogEditor.IsBlueprintBasicsExpanded;
+        set => _productCatalogEditor.IsBlueprintBasicsExpanded = value;
     }
 
     public bool IsVariantsSectionExpanded
@@ -720,14 +705,14 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
     public bool IsAddingVariant
     {
-        get => _isAddingVariant;
-        private set => SetField(ref _isAddingVariant, value);
+        get => _productCatalogEditor.IsAddingVariant;
+        private set => _productCatalogEditor.IsAddingVariant = value;
     }
 
     public bool IsAddingDesignArea
     {
-        get => _isAddingDesignArea;
-        private set => SetField(ref _isAddingDesignArea, value);
+        get => _productCatalogEditor.IsAddingDesignArea;
+        private set => _productCatalogEditor.IsAddingDesignArea = value;
     }
 
     public StoreManagementEditorTab SelectedEditorTab
@@ -790,11 +775,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         private set => SetField(ref _nicheDeleteWarningVisible, value);
     }
 
-    public bool TagDeleteWarningVisible
-    {
-        get => _tagDeleteWarningVisible;
-        private set => SetField(ref _tagDeleteWarningVisible, value);
-    }
+    public bool TagDeleteWarningVisible => _tagEditor.DeleteWarningVisible;
 
     public bool DiscardChangesPromptVisible
     {
@@ -810,11 +791,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         ? "Permanent deletion cannot be undone."
         : $"Delete niche '{_pendingDeleteNiche.Name}' permanently? This cannot be undone.";
 
-    public string TagDeleteWarningMessage => _pendingDeleteTag is null
-        ? "Permanent deletion cannot be undone."
-        : _pendingDeleteTagItemCount == 0
-            ? $"Delete tag '{_pendingDeleteTag.Name}' permanently? This cannot be undone."
-            : $"Delete tag '{_pendingDeleteTag.Name}' permanently? It will be removed from {_pendingDeleteTagItemCount} Item(s). This cannot be undone.";
+    public string TagDeleteWarningMessage => _tagEditor.DeleteWarningMessage;
 
     public string DiscardChangesMessage =>
         HasUnsavedTagChanges && !HasUnsavedChanges && !HasUnsavedNicheChanges && !HasAnyCatalogUnsavedChanges
@@ -827,15 +804,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
     public string NewStoreName
     {
-        get => _newStoreName;
-        set
-        {
-            if (SetField(ref _newStoreName, value))
-            {
-                RaiseEditorStateProperties();
-                OnPropertyChanged(nameof(EditorActiveStores));
-            }
-        }
+        get => _storeConfiguration.NewStoreName;
+        set => _storeConfiguration.NewStoreName = value;
     }
 
     public IReadOnlyList<FulfillmentStrategy> AvailableFulfillmentStrategies => FulfillmentStrategyPolicy.AvailableStrategies;
@@ -844,568 +814,179 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
     public FulfillmentStrategy SelectedFulfillmentStrategy
     {
-        get => _fulfillmentStrategy;
+        get => _storeConfiguration.SelectedFulfillmentStrategy;
         set
         {
-            if (SetField(ref _fulfillmentStrategy, value))
-            {
-                RaiseEditorStateProperties();
-            }
+            _storeConfiguration.SelectedFulfillmentStrategy = value;
+            RaiseEditorStateProperties();
         }
     }
 
     public string Description
     {
-        get => _description;
-        set
-        {
-            if (SetField(ref _description, value))
-            {
-                RaiseEditorStateProperties();
-            }
-        }
+        get => _storeConfiguration.Description;
+        set => _storeConfiguration.Description = value;
     }
 
     public string Notes
     {
-        get => _notes;
-        set
-        {
-            if (SetField(ref _notes, value))
-            {
-                RaiseEditorStateProperties();
-            }
-        }
+        get => _storeConfiguration.Notes;
+        set => _storeConfiguration.Notes = value;
     }
 
     public string TargetMarket
     {
-        get => _targetMarket;
-        set
-        {
-            if (SetField(ref _targetMarket, value))
-            {
-                RaiseEditorStateProperties();
-            }
-        }
+        get => _storeConfiguration.TargetMarket;
+        set => _storeConfiguration.TargetMarket = value;
     }
 
     public string BrandDirection
     {
-        get => _brandDirection;
-        set
-        {
-            if (SetField(ref _brandDirection, value))
-            {
-                RaiseEditorStateProperties();
-            }
-        }
+        get => _storeConfiguration.BrandDirection;
+        set => _storeConfiguration.BrandDirection = value;
     }
 
     public string PlanningContext
     {
-        get => _planningContext;
-        set
-        {
-            if (SetField(ref _planningContext, value))
-            {
-                RaiseEditorStateProperties();
-            }
-        }
+        get => _storeConfiguration.PlanningContext;
+        set => _storeConfiguration.PlanningContext = value;
     }
 
     public string Url
     {
-        get => _url;
-        set
-        {
-            if (SetField(ref _url, value))
-            {
-                RaiseEditorStateProperties();
-            }
-        }
+        get => _storeConfiguration.Url;
+        set => _storeConfiguration.Url = value;
     }
 
     public string NicheName
     {
-        get => _nicheName;
-        set
-        {
-            if (SetField(ref _nicheName, value))
-            {
-                RaiseNicheEditorStateProperties();
-                OnPropertyChanged(nameof(EditorActiveNiches));
-            }
-        }
+        get => _storeConfiguration.NicheName;
+        set => _storeConfiguration.NicheName = value;
     }
 
     public string NicheDescription
     {
-        get => _nicheDescription;
-        set
-        {
-            if (SetField(ref _nicheDescription, value))
-            {
-                RaiseNicheEditorStateProperties();
-            }
-        }
+        get => _storeConfiguration.NicheDescription;
+        set => _storeConfiguration.NicheDescription = value;
     }
 
     public string NicheAudience
     {
-        get => _nicheAudience;
-        set
-        {
-            if (SetField(ref _nicheAudience, value))
-            {
-                RaiseNicheEditorStateProperties();
-            }
-        }
+        get => _storeConfiguration.NicheAudience;
+        set => _storeConfiguration.NicheAudience = value;
     }
 
     public string NicheHumorStyle
     {
-        get => _nicheHumorStyle;
-        set
-        {
-            if (SetField(ref _nicheHumorStyle, value))
-            {
-                RaiseNicheEditorStateProperties();
-            }
-        }
+        get => _storeConfiguration.NicheHumorStyle;
+        set => _storeConfiguration.NicheHumorStyle = value;
     }
 
     public string NicheVisualStyleGuidance
     {
-        get => _nicheVisualStyleGuidance;
-        set
-        {
-            if (SetField(ref _nicheVisualStyleGuidance, value))
-            {
-                RaiseNicheEditorStateProperties();
-            }
-        }
+        get => _storeConfiguration.NicheVisualStyleGuidance;
+        set => _storeConfiguration.NicheVisualStyleGuidance = value;
     }
 
     public string NicheConstraints
     {
-        get => _nicheConstraints;
-        set
-        {
-            if (SetField(ref _nicheConstraints, value))
-            {
-                RaiseNicheEditorStateProperties();
-            }
-        }
+        get => _storeConfiguration.NicheConstraints;
+        set => _storeConfiguration.NicheConstraints = value;
     }
 
     public string NicheRisks
     {
-        get => _nicheRisks;
-        set
-        {
-            if (SetField(ref _nicheRisks, value))
-            {
-                RaiseNicheEditorStateProperties();
-            }
-        }
+        get => _storeConfiguration.NicheRisks;
+        set => _storeConfiguration.NicheRisks = value;
     }
 
     public string NicheResearchNotes
     {
-        get => _nicheResearchNotes;
-        set
-        {
-            if (SetField(ref _nicheResearchNotes, value))
-            {
-                RaiseNicheEditorStateProperties();
-            }
-        }
+        get => _storeConfiguration.NicheResearchNotes;
+        set => _storeConfiguration.NicheResearchNotes = value;
     }
 
     public string NicheNotes
     {
-        get => _nicheNotes;
-        set
-        {
-            if (SetField(ref _nicheNotes, value))
-            {
-                RaiseNicheEditorStateProperties();
-            }
-        }
+        get => _storeConfiguration.NicheNotes;
+        set => _storeConfiguration.NicheNotes = value;
     }
 
     public string TagName
     {
-        get => _tagName;
-        set
-        {
-            if (SetField(ref _tagName, value))
-            {
-                RaiseTagEditorStateProperties();
-                OnPropertyChanged(nameof(EditorActiveTags));
-            }
-        }
+        get => _tagEditor.TagName;
+        set => _tagEditor.TagName = value;
     }
 
     public string? TagColor
     {
-        get => _tagColor;
-        set
-        {
-            if (SetField(ref _tagColor, value))
-            {
-                RaiseTagEditorStateProperties();
-            }
-        }
+        get => _tagEditor.TagColor;
+        set => _tagEditor.TagColor = value;
     }
 
     public string TagDescription
     {
-        get => _tagDescription;
-        set
-        {
-            if (SetField(ref _tagDescription, value))
-            {
-                RaiseTagEditorStateProperties();
-            }
-        }
+        get => _tagEditor.TagDescription;
+        set => _tagEditor.TagDescription = value;
     }
 
-    public IReadOnlyList<StoreProductSummary> Products { get; private set; } = [];
-    public IReadOnlyList<StoreProductSummary> ArchivedProducts { get; private set; } = [];
-    public ObservableCollection<BlueprintOfferingCardViewModel> BlueprintOfferingCards { get; } = [];
-    public bool HasBlueprintOfferingCards => BlueprintOfferingCards.Count > 0;
-
-    public bool ShowArchivedOfferings
-    {
-        get => _showArchivedOfferings;
-        set { if (SetField(ref _showArchivedOfferings, value)) Run(RefreshBlueprintOfferingCardsAsync); }
-    }
-
-    public bool HasProducts => EditorProducts.Count > 0;
-
-    public bool ShowArchivedProducts
-    {
-        get => _showArchivedProducts;
-        set
-        {
-            if (SetField(ref _showArchivedProducts, value))
-            {
-                OnPropertyChanged(nameof(EditorProducts));
-                OnPropertyChanged(nameof(HasProducts));
-            }
-        }
-    }
-
-    public IReadOnlyList<StoreProductSummary> EditorProducts =>
-        (ShowArchivedProducts ? Products.Concat(ArchivedProducts) : Products)
-            .Concat(_isCreatingNewProduct && _draftProductId is not null ? [DraftProduct()!] : [])
-            .ToArray();
-
-    public StoreProductSummary? SelectedProduct
-    {
-        get => _selectedProduct;
-        private set
-        {
-            if (SetField(ref _selectedProduct, value))
-            {
-                OnPropertyChanged(nameof(HasSelectedProduct));
-                OnPropertyChanged(nameof(CanDeleteSelectedProduct));
-                OnPropertyChanged(nameof(CanArchiveSelectedProduct));
-            }
-        }
-    }
-
-    public FulfillmentOfferingSummary? SelectedOffering
-    {
-        get => _selectedOffering;
-        private set
-        {
-            if (SetField(ref _selectedOffering, value))
-            {
-                OnPropertyChanged(nameof(OfferingVariants));
-                OnPropertyChanged(nameof(OfferingDesignAreas));
-                OnPropertyChanged(nameof(HasOfferingVariants));
-                OnPropertyChanged(nameof(HasOfferingDesignAreas));
-                OnPropertyChanged(nameof(HasSelectedProductOfferings));
-                RefreshApplicableVariants();
-                OnPropertyChanged(nameof(HasSelectedOffering));
-                OnPropertyChanged(nameof(CanDeleteSelectedOffering));
-                OnPropertyChanged(nameof(SelectedOfferingVariantCount));
-                OnPropertyChanged(nameof(SelectedOfferingDesignAreaCount));
-                OnPropertyChanged(nameof(SelectedOfferingSummary));
-            }
-        }
-    }
-
-    public IReadOnlyList<ProductVariantSummary> OfferingVariants =>
-        SelectedOffering?.Variants ?? [];
-
-    public bool HasOfferingVariants => OfferingVariants.Count > 0;
-
-    public IReadOnlyList<DesignAreaSummary> OfferingDesignAreas =>
-        SelectedOffering?.DesignAreas ?? [];
-
-    public bool HasOfferingDesignAreas => OfferingDesignAreas.Count > 0;
-
-    public bool HasSelectedProductOfferings => SelectedProduct?.Offerings.Count > 0;
-
-    public int SelectedProductOfferingCount => SelectedProduct?.Offerings.Count ?? 0;
-
-    public int SelectedOfferingVariantCount => SelectedOffering?.Variants.Count ?? 0;
-
-    public int SelectedOfferingDesignAreaCount => SelectedOffering?.DesignAreas.Count ?? 0;
-
-    public string SelectedProductSummary =>
-        $"{SelectedProductOfferingCount} fulfillment offering{(SelectedProductOfferingCount == 1 ? string.Empty : "s")}";
-
-    public string SelectedOfferingSummary =>
-        $"{SelectedOfferingVariantCount} variant{(SelectedOfferingVariantCount == 1 ? string.Empty : "s")}  ·  {SelectedOfferingDesignAreaCount} printable area{(SelectedOfferingDesignAreaCount == 1 ? string.Empty : "s")}";
-
-    public ObservableCollection<ApplicableVariantViewModel> ApplicableVariants { get; } = [];
-
-    public bool HasSelectedProduct => _selectedProduct is not null;
-
-    public bool HasSelectedOffering => SelectedOffering is not null;
-
-    public bool IsCreatingNewOffering => _isCreatingNewOffering;
-
-    public bool HasSelectedVariant => SelectedOffering?.Variants.Any() == true;
-
-    public bool HasSelectedDesignArea => SelectedOffering?.DesignAreas.Any() == true;
-
-    public bool HasAnyCatalogUnsavedChanges => HasUnsavedProductChanges || HasUnsavedOfferingChanges;
-
-    public bool HasUnsavedProductChanges => _isCreatingNewProduct || (SelectedProduct is not null && _draftProductId is null && CurrentProductEditorState() != _originalProductState);
-
-    public bool HasUnsavedOfferingChanges => _isCreatingNewOffering || (SelectedOffering is not null && _draftOfferingId is null && CurrentOfferingEditorState() != _originalOfferingState);
-
-    public bool CanSaveSelectedProduct => _productService is not null && SelectedStore is not null && !SelectedStore.IsArchived && HasUnsavedProductChanges;
-
-    public bool CanSaveSelectedOffering => _productService is not null && SelectedProduct is not null && SelectedStore is { IsArchived: false } && HasUnsavedOfferingChanges;
-
-    public bool CanDeleteSelectedProduct => _catalogService is not null && SelectedProduct is { IsArchived: true } && !_isCreatingNewProduct && SelectedStore is { IsArchived: false };
-
-    public bool CanArchiveSelectedProduct => _catalogService is not null && SelectedProduct is { IsArchived: false } && !_isCreatingNewProduct && !HasUnsavedProductChanges && SelectedStore is { IsArchived: false };
-
-    public bool ProductArchiveWarningVisible
-    {
-        get => _productArchiveWarningVisible;
-        private set => SetField(ref _productArchiveWarningVisible, value);
-    }
-
-    public string ProductArchiveWarningMessage => _pendingArchiveProduct is null
-        ? "Archiving this Blueprint will affect its connected catalog configuration."
-        : $"This is a high-impact action. Archiving Blueprint '{_pendingArchiveProduct.Name}' will also archive its fulfillment offerings, variants, design areas, and mockup configuration. Existing listing and design relationships will be preserved, but this Blueprint will leave active use.";
-
-    public bool CanDeleteSelectedOffering => _productService is not null && SelectedOffering is not null && !_isCreatingNewOffering && SelectedStore is { IsArchived: false };
-
-    public bool CanCreateCatalogItem => _productService is not null && SelectedStore is { IsArchived: false } && !_isCreatingNewStore;
-
-    public bool ProductDeleteWarningVisible
-    {
-        get => _productDeleteWarningVisible;
-        private set => SetField(ref _productDeleteWarningVisible, value);
-    }
-
-    public bool OfferingDeleteWarningVisible
-    {
-        get => _offeringDeleteWarningVisible;
-        private set => SetField(ref _offeringDeleteWarningVisible, value);
-    }
-
-    public string ProductDeleteWarningMessage => _pendingDeleteProduct is null
-        ? "Permanent deletion cannot be undone."
-        : $"Delete archived Blueprint '{_pendingDeleteProduct.Name}' and its catalog records permanently? This cannot be undone.";
-
-    public string OfferingDeleteWarningMessage => _pendingDeleteOffering is null
-        ? "Permanent deletion cannot be undone."
-        : $"Delete offering '{_pendingDeleteOffering.Name}' permanently? This cannot be undone.";
-
-    public string ProductName
-    {
-        get => _productName;
-        set
-        {
-            if (SetField(ref _productName, value))
-            {
-                RaiseProductEditorStateProperties();
-                OnPropertyChanged(nameof(EditorProducts));
-            }
-        }
-    }
-
-    public string ProductDescription
-    {
-        get => _productDescription;
-        set
-        {
-            if (SetField(ref _productDescription, value))
-            {
-                RaiseProductEditorStateProperties();
-            }
-        }
-    }
-
-    public string ExternalProductId
-    {
-        get => _externalProductId;
-        set
-        {
-            if (SetField(ref _externalProductId, value))
-            {
-                RaiseProductEditorStateProperties();
-            }
-        }
-    }
-
-    public string OfferingName
-    {
-        get => _offeringName;
-        set
-        {
-            if (SetField(ref _offeringName, value))
-            {
-                RaiseOfferingEditorStateProperties();
-            }
-        }
-    }
-
-    public string OfferingDescription
-    {
-        get => _offeringDescription;
-        set
-        {
-            if (SetField(ref _offeringDescription, value))
-            {
-                RaiseOfferingEditorStateProperties();
-            }
-        }
-    }
-
-    public string OfferingExternalOfferingId
-    {
-        get => _offeringExternalOfferingId;
-        set
-        {
-            if (SetField(ref _offeringExternalOfferingId, value))
-            {
-                RaiseOfferingEditorStateProperties();
-            }
-        }
-    }
-
+    public IReadOnlyList<StoreProductSummary> Products => _productCatalogEditor.Products;
+    public IReadOnlyList<StoreProductSummary> ArchivedProducts => _productCatalogEditor.ArchivedProducts;
+    public ObservableCollection<BlueprintOfferingCardViewModel> BlueprintOfferingCards => _productCatalogEditor.BlueprintOfferingCards;
+    public bool HasBlueprintOfferingCards => _productCatalogEditor.HasBlueprintOfferingCards;
+    public bool ShowArchivedOfferings { get => _productCatalogEditor.ShowArchivedOfferings; set => _productCatalogEditor.ShowArchivedOfferings = value; }
+    public bool HasProducts => _productCatalogEditor.HasProducts;
+    public bool ShowArchivedProducts { get => _productCatalogEditor.ShowArchivedProducts; set => _productCatalogEditor.ShowArchivedProducts = value; }
+    public IReadOnlyList<StoreProductSummary> EditorProducts => _productCatalogEditor.EditorProducts;
+    public StoreProductSummary? SelectedProduct => _productCatalogEditor.SelectedProduct;
+    public FulfillmentOfferingSummary? SelectedOffering => _productCatalogEditor.SelectedOffering;
+    public IReadOnlyList<ProductVariantSummary> OfferingVariants => _productCatalogEditor.OfferingVariants;
+    public bool HasOfferingVariants => _productCatalogEditor.HasOfferingVariants;
+    public IReadOnlyList<DesignAreaSummary> OfferingDesignAreas => _productCatalogEditor.OfferingDesignAreas;
+    public bool HasOfferingDesignAreas => _productCatalogEditor.HasOfferingDesignAreas;
+    public bool HasSelectedProductOfferings => _productCatalogEditor.HasSelectedProductOfferings;
+    public int SelectedProductOfferingCount => _productCatalogEditor.SelectedProductOfferingCount;
+    public int SelectedOfferingVariantCount => _productCatalogEditor.SelectedOfferingVariantCount;
+    public int SelectedOfferingDesignAreaCount => _productCatalogEditor.SelectedOfferingDesignAreaCount;
+    public string SelectedProductSummary => _productCatalogEditor.SelectedProductSummary;
+    public string SelectedOfferingSummary => _productCatalogEditor.SelectedOfferingSummary;
+    public ObservableCollection<ApplicableVariantViewModel> ApplicableVariants => _productCatalogEditor.ApplicableVariants;
+    public bool HasSelectedProduct => _productCatalogEditor.HasSelectedProduct;
+    public bool HasSelectedOffering => _productCatalogEditor.HasSelectedOffering;
+    public bool IsCreatingNewOffering => _productCatalogEditor.IsCreatingNewOffering;
+    public bool HasSelectedVariant => _productCatalogEditor.HasSelectedVariant;
+    public bool HasSelectedDesignArea => _productCatalogEditor.HasSelectedDesignArea;
+    public bool HasAnyCatalogUnsavedChanges => _productCatalogEditor.HasAnyCatalogUnsavedChanges;
+    public bool HasUnsavedProductChanges => _productCatalogEditor.HasUnsavedProductChanges;
+    public bool HasUnsavedOfferingChanges => _productCatalogEditor.HasUnsavedOfferingChanges;
+    public bool CanSaveSelectedProduct => _productCatalogEditor.CanSaveSelectedProduct;
+    public bool CanSaveSelectedOffering => _productCatalogEditor.CanSaveSelectedOffering;
+    public bool CanDeleteSelectedProduct => _productCatalogEditor.CanDeleteSelectedProduct;
+    public bool CanArchiveSelectedProduct => _productCatalogEditor.CanArchiveSelectedProduct;
+    public bool ProductArchiveWarningVisible => _productCatalogEditor.ProductArchiveWarningVisible;
+    public string ProductArchiveWarningMessage => _productCatalogEditor.ProductArchiveWarningMessage;
+    public bool CanDeleteSelectedOffering => _productCatalogEditor.CanDeleteSelectedOffering;
+    public bool CanCreateCatalogItem => _productCatalogEditor.CanCreateCatalogItem;
+    public bool ProductDeleteWarningVisible => _productCatalogEditor.ProductDeleteWarningVisible;
+    public bool OfferingDeleteWarningVisible => _productCatalogEditor.OfferingDeleteWarningVisible;
+    public string ProductDeleteWarningMessage => _productCatalogEditor.ProductDeleteWarningMessage;
+    public string OfferingDeleteWarningMessage => _productCatalogEditor.OfferingDeleteWarningMessage;
+    public string ProductName { get => _productCatalogEditor.ProductName; set => _productCatalogEditor.ProductName = value; }
+    public string ProductDescription { get => _productCatalogEditor.ProductDescription; set => _productCatalogEditor.ProductDescription = value; }
+    public string ExternalProductId { get => _productCatalogEditor.ExternalProductId; set => _productCatalogEditor.ExternalProductId = value; }
+    public string OfferingName { get => _productCatalogEditor.OfferingName; set => _productCatalogEditor.OfferingName = value; }
+    public string OfferingDescription { get => _productCatalogEditor.OfferingDescription; set => _productCatalogEditor.OfferingDescription = value; }
+    public string OfferingExternalOfferingId { get => _productCatalogEditor.OfferingExternalOfferingId; set => _productCatalogEditor.OfferingExternalOfferingId = value; }
     public bool IsChoiceNetworkOffering => OfferingKindIndex == 1;
-
-    public int OfferingKindIndex
-    {
-        get => _offeringKindIndex;
-        set
-        {
-            if (SetField(ref _offeringKindIndex, value))
-            {
-                OnPropertyChanged(nameof(IsChoiceNetworkOffering));
-                RaiseOfferingEditorStateProperties();
-            }
-        }
-    }
-
-    public string OfferingProviderName
-    {
-        get => _offeringProviderName;
-        set
-        {
-            if (SetField(ref _offeringProviderName, value))
-            {
-                RaiseOfferingEditorStateProperties();
-            }
-        }
-    }
-
-    public string AreaName
-    {
-        get => _areaName;
-        set
-        {
-            if (SetField(ref _areaName, value))
-            {
-                RaiseOfferingEditorStateProperties();
-            }
-        }
-    }
-
-    public string AreaPosition
-    {
-        get => _areaPosition;
-        set
-        {
-            if (SetField(ref _areaPosition, value))
-            {
-                RaiseOfferingEditorStateProperties();
-            }
-        }
-    }
-
-    public string AreaDecorationMethod
-    {
-        get => _areaDecorationMethod;
-        set
-        {
-            if (SetField(ref _areaDecorationMethod, value))
-            {
-                RaiseOfferingEditorStateProperties();
-            }
-        }
-    }
-
-    public string AreaWidth
-    {
-        get => _areaWidth;
-        set
-        {
-            if (SetField(ref _areaWidth, value))
-            {
-                RaiseOfferingEditorStateProperties();
-            }
-        }
-    }
-
-    public string AreaHeight
-    {
-        get => _areaHeight;
-        set
-        {
-            if (SetField(ref _areaHeight, value))
-            {
-                RaiseOfferingEditorStateProperties();
-            }
-        }
-    }
-
-    public string VariantColor
-    {
-        get => _variantColor;
-        set
-        {
-            if (SetField(ref _variantColor, value))
-            {
-                RaiseOfferingEditorStateProperties();
-            }
-        }
-    }
-
-    public string VariantSize
-    {
-        get => _variantSize;
-        set
-        {
-            if (SetField(ref _variantSize, value))
-            {
-                RaiseOfferingEditorStateProperties();
-            }
-        }
-    }
+    public int OfferingKindIndex { get => _productCatalogEditor.OfferingKindIndex; set => _productCatalogEditor.OfferingKindIndex = value; }
+    public string OfferingProviderName { get => _productCatalogEditor.OfferingProviderName; set => _productCatalogEditor.OfferingProviderName = value; }
+    public string AreaName { get => _productCatalogEditor.AreaName; set => _productCatalogEditor.AreaName = value; }
+    public string AreaPosition { get => _productCatalogEditor.AreaPosition; set => _productCatalogEditor.AreaPosition = value; }
+    public string AreaDecorationMethod { get => _productCatalogEditor.AreaDecorationMethod; set => _productCatalogEditor.AreaDecorationMethod = value; }
+    public string AreaWidth { get => _productCatalogEditor.AreaWidth; set => _productCatalogEditor.AreaWidth = value; }
+    public string AreaHeight { get => _productCatalogEditor.AreaHeight; set => _productCatalogEditor.AreaHeight = value; }
+    public string VariantColor { get => _productCatalogEditor.VariantColor; set => _productCatalogEditor.VariantColor = value; }
+    public string VariantSize { get => _productCatalogEditor.VariantSize; set => _productCatalogEditor.VariantSize = value; }
 
     public string? ErrorMessage
     {
@@ -1560,9 +1141,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
-        var state = await _service.LoadAsync(cancellationToken).ConfigureAwait(false);
-        ApplyState(state);
-        await LoadNichesForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
+        await _storeConfiguration.LoadStoresAsync(cancellationToken);
+        await _storeConfiguration.LoadNichesAsync(cancellationToken);
         await LoadTagsForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
         if (CatalogSetup is not null && SelectedStore is not null)
             await CatalogSetup.LoadForStoreAsync(SelectedStore.Id, cancellationToken).ConfigureAwait(false);
@@ -1574,16 +1154,15 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         ShowStrategyWarning = false;
         _service.SetActiveWorkspace(workspaceId);
         _nicheService?.SetActiveWorkspace(workspaceId);
-        _tagService?.SetActiveStore(null);
+        _tagEditor.SetScope(new StoreManagementScope(workspaceId, null));
         _isCreatingNewStore = false;
         _isCreatingNewNiche = false;
-        _isCreatingNewTag = false;
         _draftStoreId = null;
         _draftNicheId = null;
-        _draftTagId = null;
-        var state = await _service.LoadAsync(cancellationToken).ConfigureAwait(false);
-        ApplyState(state);
-        await LoadNichesForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
+        _storeConfiguration.SetScope(new StoreManagementScope(workspaceId, null));
+        _productCatalogEditor.Scope = new StoreManagementScope(workspaceId, null);
+        await _storeConfiguration.LoadStoresAsync(cancellationToken);
+        await _storeConfiguration.LoadNichesAsync(cancellationToken);
         await LoadTagsForSelectedStoreAsync(cancellationToken).ConfigureAwait(false);
         if (CatalogSetup is not null && SelectedStore is not null)
             Run(token => CatalogSetup.LoadForStoreAsync(SelectedStore.Id, token), cancellationToken);
@@ -1591,11 +1170,8 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
     public async Task CreateStoreAsync(CancellationToken cancellationToken = default)
     {
-        var result = await _service.CreateStoreAsync(
-            new StoreManagementCreateRequest(NewStoreName, CurrentContext()),
-            cancellationToken).ConfigureAwait(false);
-        ApplyResult(result);
-        if (result.Succeeded)
+        await _storeConfiguration.CreateStoreAsync(cancellationToken);
+        if (SelectedStore is not null)
         {
             _firstStorePromptDismissed = true;
             ClearDeleteWarning();
@@ -1606,8 +1182,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
     public async Task SelectStoreAsync(StoreSummary store, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(store);
-        var result = await _service.SelectStoreAsync(store.Id, cancellationToken).ConfigureAwait(false);
-        ApplyResult(result);
+        await _storeConfiguration.SelectStoreAsync(store, cancellationToken);
     }
 
     public void SelectStoreForEditing(StoreSummary store)
@@ -1672,6 +1247,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         ClearDeleteWarning();
         ClearDiscardChangesPrompt();
         ClearEditorFields();
+        _storeConfiguration.StartCreateStoreDraft(_draftStoreId);
         CaptureOriginalEditorState();
         OnPropertyChanged(nameof(SelectedStore));
         OnPropertyChanged(nameof(EditorActiveStores));
@@ -1704,7 +1280,6 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
     {
         _isCreatingNewNiche = false;
         _draftNicheId = null;
-        _nichePopulationMessage = null;
         SelectedNiche = niche;
         ApplySelectedNicheFields(niche);
         CaptureOriginalNicheEditorState();
@@ -1738,12 +1313,12 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
     {
         _isCreatingNewNiche = true;
         _draftNicheId = Guid.NewGuid();
-        _nichePopulationMessage = null;
         SelectedNiche = DraftNiche();
         ErrorMessage = null;
         ClearNicheDeleteWarning();
         ClearDiscardChangesPrompt();
         ClearNicheEditorFields();
+        _storeConfiguration.StartCreateNicheDraft(_draftNicheId);
         CaptureOriginalNicheEditorState();
         OnPropertyChanged(nameof(SelectedNiche));
         OnPropertyChanged(nameof(EditorActiveNiches));
@@ -1754,149 +1329,17 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
     public async Task RefreshNichePopulationAvailabilityAsync(CancellationToken cancellationToken = default)
     {
-        if (_nichePopulationService is null)
-        {
-            return;
-        }
-
-        try
-        {
-            _nichePopulationAvailability = await _nichePopulationService
-                .GetAvailabilityAsync(cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch
-        {
-            _nichePopulationAvailability = new(
-                AiAvailabilityKind.InvalidConfiguration,
-                "AI settings could not be checked. Open AI settings and try again.");
-        }
-
-        OnPropertyChanged(nameof(CanPopulateNiche));
-        OnPropertyChanged(nameof(NichePopulationStatusMessage));
-        OnPropertyChanged(nameof(HasNichePopulationStatus));
+        await _storeConfiguration.RefreshNichePopulationAvailabilityAsync(cancellationToken);
     }
 
     public async Task PopulateNicheAsync(CancellationToken cancellationToken = default)
     {
-        if (!CanPopulateNiche || _nichePopulationService is null)
-        {
-            return;
-        }
-
-        var fields = GetBlankNichePopulationFields();
-        if (fields.Count == 0)
-        {
-            _nichePopulationMessage = "All eligible niche fields already contain values.";
-            RaiseNichePopulationProperties();
-            return;
-        }
-
-        var operationId = Guid.NewGuid();
-        _nichePopulationOperationId = operationId;
-        var nicheId = SelectedNiche!.Id;
-        var isDraft = _isCreatingNewNiche;
-        _isNichePopulationBusy = true;
-        _nichePopulationMessage = null;
-        RaiseNichePopulationProperties();
-
-        try
-        {
-            var result = await _nichePopulationService.PopulateAsync(
-                new NichePopulationRequest(NicheName, fields),
-                cancellationToken).ConfigureAwait(false);
-
-            if (operationId != _nichePopulationOperationId ||
-                SelectedNiche?.Id != nicheId ||
-                _isCreatingNewNiche != isDraft)
-            {
-                return;
-            }
-
-            if (!result.Succeeded)
-            {
-                _nichePopulationMessage = result.Message ?? "No usable niche suggestions were returned. Try again.";
-                return;
-            }
-
-            var applied = 0;
-            foreach (var suggestion in result.Suggestions)
-            {
-                if (ApplyNichePopulationSuggestion(suggestion.Key, suggestion.Value))
-                {
-                    applied++;
-                }
-            }
-
-            _nichePopulationMessage = applied > 0
-                ? "Suggestions were added to the draft. Review them before saving."
-                : "No new suggestions were applied because the fields were edited while the request was running.";
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            _nichePopulationMessage = "Population was canceled. Your existing niche values were preserved.";
-        }
-        catch
-        {
-            _nichePopulationMessage = "AI could not populate the niche fields. Check AI settings or try again.";
-        }
-        finally
-        {
-            if (operationId == _nichePopulationOperationId)
-            {
-                _isNichePopulationBusy = false;
-                RaiseNichePopulationProperties();
-            }
-        }
+        await _storeConfiguration.PopulateNicheAsync(cancellationToken);
     }
 
-    private IReadOnlyList<NichePopulationField> GetBlankNichePopulationFields()
-    {
-        var fields = new List<NichePopulationField>();
-        if (string.IsNullOrWhiteSpace(NicheDescription)) fields.Add(NichePopulationField.Description);
-        if (string.IsNullOrWhiteSpace(NicheAudience)) fields.Add(NichePopulationField.Audience);
-        if (string.IsNullOrWhiteSpace(NicheHumorStyle)) fields.Add(NichePopulationField.HumorStyle);
-        if (string.IsNullOrWhiteSpace(NicheVisualStyleGuidance)) fields.Add(NichePopulationField.VisualStyleGuidance);
-        if (string.IsNullOrWhiteSpace(NicheConstraints)) fields.Add(NichePopulationField.Constraints);
-        if (string.IsNullOrWhiteSpace(NicheNotes)) fields.Add(NichePopulationField.Notes);
-        return fields;
-    }
 
-    private bool ApplyNichePopulationSuggestion(NichePopulationField field, string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return false;
-        }
 
-        switch (field)
-        {
-            case NichePopulationField.Description when string.IsNullOrWhiteSpace(NicheDescription):
-                NicheDescription = value;
-                return true;
-            case NichePopulationField.Audience when string.IsNullOrWhiteSpace(NicheAudience):
-                NicheAudience = value;
-                return true;
-            case NichePopulationField.HumorStyle when string.IsNullOrWhiteSpace(NicheHumorStyle):
-                NicheHumorStyle = value;
-                return true;
-            case NichePopulationField.VisualStyleGuidance when string.IsNullOrWhiteSpace(NicheVisualStyleGuidance):
-                NicheVisualStyleGuidance = value;
-                return true;
-            case NichePopulationField.Constraints when string.IsNullOrWhiteSpace(NicheConstraints):
-                NicheConstraints = value;
-                return true;
-            case NichePopulationField.Notes when string.IsNullOrWhiteSpace(NicheNotes):
-                NicheNotes = value;
-                return true;
-            default:
-                return false;
-        }
-    }
+
 
     public async Task SaveSelectedStoreAsync(CancellationToken cancellationToken = default)
     {
@@ -1907,144 +1350,32 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
             return;
         }
         _confirmedStrategyStore = null;
-        if (_isCreatingNewStore)
-        {
-            var createResult = await _service.CreateStoreAsync(
-                new StoreManagementCreateRequest(NewStoreName, CurrentContext(), SelectedFulfillmentStrategy),
-                cancellationToken).ConfigureAwait(false);
-
-            if (createResult.Succeeded)
-            {
-                _isCreatingNewStore = false;
-                _draftStoreId = null;
-                _firstStorePromptDismissed = true;
-            }
-
-            ApplyResult(createResult);
-            if (createResult.Succeeded)
-            {
-                ClearDeleteWarning();
-                ClearDiscardChangesPrompt();
-                RaisePromptProperties();
-            }
-
-            return;
-        }
-
-        if (SelectedStore is null)
-        {
-            ErrorMessage = "Select a store before saving.";
-            return;
-        }
-
-        var result = await _service.UpdateStoreAsync(
-            new StoreManagementUpdateRequest(SelectedStore.Id, NewStoreName, CurrentContext(), SelectedFulfillmentStrategy),
-            cancellationToken);
-        ApplyResult(result);
+        await _storeConfiguration.SaveSelectedStoreAsync(cancellationToken);
     }
 
     public async Task SaveSelectedNicheAsync(CancellationToken cancellationToken = default)
     {
-        if (_nicheService is null)
-        {
-            ErrorMessage = "Niche management is not available.";
-            return;
-        }
-
-        if (SelectedStore is null)
-        {
-            ErrorMessage = "Select a store before saving a niche.";
-            return;
-        }
-
-        if (_isCreatingNewNiche)
-        {
-            var createResult = await _nicheService.CreateNicheAsync(
-                new NicheManagementCreateRequest(SelectedStore.Id, NicheName, CurrentNicheContext()),
-                cancellationToken).ConfigureAwait(false);
-
-            if (createResult.Succeeded)
-            {
-                _isCreatingNewNiche = false;
-                _draftNicheId = null;
-            }
-
-            ApplyNicheResult(createResult);
-            return;
-        }
-
-        if (SelectedNiche is null)
-        {
-            ErrorMessage = "Select a niche before saving.";
-            return;
-        }
-
-        var result = await _nicheService.UpdateNicheAsync(
-            new NicheManagementUpdateRequest(SelectedNiche.Id, NicheName, CurrentNicheContext()),
-            cancellationToken).ConfigureAwait(false);
-        ApplyNicheResult(result);
+        await _storeConfiguration.SaveSelectedNicheAsync(cancellationToken);
     }
 
     public async Task ArchiveSelectedStoreAsync(CancellationToken cancellationToken = default)
     {
-        if (_isCreatingNewStore)
-        {
-            ErrorMessage = "Save the new store before archiving it.";
-            return;
-        }
-
-        if (SelectedStore is null)
-        {
-            ErrorMessage = "Select a store before archiving.";
-            return;
-        }
-
-        var result = await _service.ArchiveStoreAsync(SelectedStore.Id, cancellationToken).ConfigureAwait(false);
-        ApplyResult(result);
+        await _storeConfiguration.ArchiveSelectedStoreAsync(cancellationToken);
     }
 
     public async Task ArchiveSelectedNicheAsync(CancellationToken cancellationToken = default)
     {
-        if (_nicheService is null)
-        {
-            ErrorMessage = "Niche management is not available.";
-            return;
-        }
-
-        if (_isCreatingNewNiche)
-        {
-            ErrorMessage = "Save the new niche before archiving it.";
-            return;
-        }
-
-        if (SelectedNiche is null)
-        {
-            ErrorMessage = "Select a niche before archiving.";
-            return;
-        }
-
-        var result = await _nicheService.ArchiveNicheAsync(SelectedNiche.Id, cancellationToken).ConfigureAwait(false);
-        ApplyNicheResult(result);
+        await _storeConfiguration.ArchiveSelectedNicheAsync(cancellationToken);
     }
 
     public async Task RestoreStoreAsync(StoreSummary store, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(store);
-        var result = await _service.RestoreStoreAsync(store.Id, cancellationToken).ConfigureAwait(false);
-        ApplyResult(result);
+        await _storeConfiguration.RestoreStoreAsync(store, cancellationToken);
     }
 
     public async Task RestoreNicheAsync(NicheSummary niche, CancellationToken cancellationToken = default)
     {
-        if (_nicheService is null)
-        {
-            ErrorMessage = "Niche management is not available.";
-            return;
-        }
-
-        ArgumentNullException.ThrowIfNull(niche);
-        var result = await _nicheService.RestoreNicheAsync(niche.Id, cancellationToken).ConfigureAwait(false);
-        ApplyNicheResult(result);
+        await _storeConfiguration.RestoreNicheAsync(niche, cancellationToken);
     }
 
     public void RequestDeleteSelectedStore()
@@ -2092,58 +1423,30 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
             ErrorMessage = "Select a store before deleting.";
             return;
         }
-
-        var result = await _service.DeleteStoreAsync(
-            new StoreManagementDeleteRequest(_pendingDeleteStore.Id, ConfirmPermanentDeletion: true),
-            cancellationToken).ConfigureAwait(false);
-        ErrorMessage = result.Error;
-        ApplyState(result.State);
-        if (result.Succeeded)
+        if (await _storeConfiguration.DeleteStoreAsync(_pendingDeleteStore, cancellationToken))
         {
             SelectDefaultStoreForEditing();
         }
-
         ClearDeleteWarning();
     }
 
     public async Task ConfirmDeleteNicheAsync(CancellationToken cancellationToken = default)
     {
-        if (_nicheService is null)
-        {
-            ErrorMessage = "Niche management is not available.";
-            return;
-        }
-
         if (_pendingDeleteNiche is null)
         {
             ErrorMessage = "Select a niche before deleting.";
             return;
         }
-
-        var result = await _nicheService.DeleteNicheAsync(
-            new NicheManagementDeleteRequest(_pendingDeleteNiche.Id, ConfirmPermanentDeletion: true),
-            cancellationToken).ConfigureAwait(false);
-        ErrorMessage = result.Error;
-        ApplyNicheState(result.State);
-        if (result.Succeeded)
+        if (await _storeConfiguration.DeleteNicheAsync(_pendingDeleteNiche, cancellationToken))
         {
             SelectDefaultNicheForEditing();
         }
-
         ClearNicheDeleteWarning();
     }
 
     public async Task SelectNicheAsync(NicheSummary niche, CancellationToken cancellationToken = default)
     {
-        if (_nicheService is null)
-        {
-            ErrorMessage = "Niche management is not available.";
-            return;
-        }
-
-        ArgumentNullException.ThrowIfNull(niche);
-        var result = await _nicheService.SelectNicheAsync(niche.Id, cancellationToken).ConfigureAwait(false);
-        ApplyNicheResult(result);
+        await _storeConfiguration.SelectNicheAsync(niche, cancellationToken);
     }
 
     private void OpenStoreEditor()
@@ -2170,7 +1473,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
     private void SelectBasicInfoTab()
     {
-        if (HasUnsavedNicheChanges || HasAnyCatalogUnsavedChanges)
+        if (HasUnsavedNicheChanges || HasUnsavedTagChanges || HasAnyCatalogUnsavedChanges)
         {
             RequestDiscardBefore(PendingEditorAction.SelectBasicInfoTab);
             return;
@@ -2181,7 +1484,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
     private void SelectNichesTab()
     {
-        if (HasUnsavedChanges || HasAnyCatalogUnsavedChanges)
+        if (HasUnsavedChanges || HasUnsavedTagChanges || HasAnyCatalogUnsavedChanges)
         {
             RequestDiscardBefore(PendingEditorAction.SelectNichesTab);
             return;
@@ -2275,345 +1578,36 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
     private async Task LoadNichesForSelectedStoreAsync(CancellationToken cancellationToken = default)
     {
-        if (_nicheService is null)
-        {
-            return;
-        }
-
-        var state = await _nicheService.LoadAsync(SelectedStore is { IsArchived: false } ? SelectedStore.Id : null, cancellationToken).ConfigureAwait(false);
-        ApplyNicheState(state);
+        await _storeConfiguration.LoadNichesAsync(cancellationToken);
     }
 
     private async Task LoadTagsForSelectedStoreAsync(CancellationToken cancellationToken = default)
     {
-        if (_tagService is null)
-        {
-            return;
-        }
-
-        var state = await _tagService.LoadAsync(SelectedStore is { IsArchived: false } ? SelectedStore.Id : null, cancellationToken).ConfigureAwait(false);
-        ApplyTagState(state);
+        await _tagEditor.LoadAsync(cancellationToken);
+        if (IsTagsTabSelected)
+            _tagEditor.OnTabSelected();
     }
 
-    private void ApplyTagState(TagManagementState state)
-    {
-        ActiveTags = state.ActiveTags;
-        ArchivedTags = state.ArchivedTags;
-        SelectedTag = _isCreatingNewTag
-            ? DraftTag()
-            : ActiveTags.FirstOrDefault(tag => tag.Id == SelectedTag?.Id)
-                ?? ArchivedTags.FirstOrDefault(tag => tag.Id == SelectedTag?.Id)
-                ?? ActiveTags.FirstOrDefault()
-                ?? ArchivedTags.FirstOrDefault();
-        NeedsFirstTag = state.NeedsFirstTag;
-        if (!_isCreatingNewTag)
-        {
-            ApplySelectedTagFields(SelectedTag);
-            CaptureOriginalTagEditorState();
-        }
+    public void SelectTagForEditing(TagSummary tag) => _tagEditor.SelectTagForEditing(tag);
 
-        OnPropertyChanged(nameof(ActiveTags));
-        OnPropertyChanged(nameof(EditorActiveTags));
-        OnPropertyChanged(nameof(ArchivedTags));
-        OnPropertyChanged(nameof(SelectedTag));
-        OnPropertyChanged(nameof(NeedsFirstTag));
-        OnPropertyChanged(nameof(HasActiveTags));
-        OnPropertyChanged(nameof(HasArchivedTags));
-        OnPropertyChanged(nameof(HasSelectedTag));
-        OnPropertyChanged(nameof(CanRestoreSelectedTag));
-        RaiseTagEditorActionProperties();
-    }
+    public void StartCreateTag() => _tagEditor.StartCreateTag();
 
-    public void SelectTagForEditing(TagSummary tag)
-    {
-        ArgumentNullException.ThrowIfNull(tag);
-        if (_isCreatingNewTag && tag.Id == _draftTagId)
-        {
-            SelectedTag = DraftTag();
-            OnPropertyChanged(nameof(SelectedTag));
-            return;
-        }
 
-        if (HasUnsavedTagChanges && SelectedTag?.Id != tag.Id)
-        {
-            RequestDiscardBefore(PendingEditorAction.SelectTag, tag: tag);
-            return;
-        }
+    public Task SaveSelectedTagAsync(CancellationToken cancellationToken = default) =>
+        _tagEditor.SaveSelectedTagAsync(cancellationToken);
 
-        PerformSelectTagForEditing(tag);
-    }
+    public Task ArchiveSelectedTagAsync(CancellationToken cancellationToken = default) =>
+        _tagEditor.ArchiveSelectedTagAsync(cancellationToken);
 
-    private void PerformSelectTagForEditing(TagSummary tag)
-    {
-        _isCreatingNewTag = false;
-        _draftTagId = null;
-        SelectedTag = tag;
-        ApplySelectedTagFields(tag);
-        CaptureOriginalTagEditorState();
-        ClearTagDeleteWarning();
-        ClearDiscardChangesPrompt();
-        OnPropertyChanged(nameof(SelectedTag));
-        OnPropertyChanged(nameof(EditorActiveTags));
-        OnPropertyChanged(nameof(HasSelectedTag));
-        OnPropertyChanged(nameof(CanRestoreSelectedTag));
-        RaiseTagEditorActionProperties();
-    }
+    public Task RestoreTagAsync(TagSummary tag, CancellationToken cancellationToken = default) =>
+        _tagEditor.RestoreTagAsync(tag, cancellationToken);
 
-    public void StartCreateTag()
-    {
-        if (SelectedStore is null || SelectedStore.IsArchived || _isCreatingNewStore)
-        {
-            ErrorMessage = "Select an active saved store before creating a tag.";
-            return;
-        }
+    public void RequestDeleteSelectedTag() => _tagEditor.RequestDeleteSelectedTag();
 
-        if (HasUnsavedTagChanges)
-        {
-            RequestDiscardBefore(PendingEditorAction.StartNewTag);
-            return;
-        }
+    public Task ConfirmDeleteTagAsync(CancellationToken cancellationToken = default) =>
+        _tagEditor.ConfirmDeleteTagAsync(cancellationToken);
 
-        BeginCreateTagDraft();
-    }
-
-    private void BeginCreateTagDraft()
-    {
-        _isCreatingNewTag = true;
-        _draftTagId = Guid.NewGuid();
-        SelectedTag = DraftTag();
-        ErrorMessage = null;
-        ClearTagDeleteWarning();
-        ClearDiscardChangesPrompt();
-        ClearTagEditorFields();
-        CaptureOriginalTagEditorState();
-        OnPropertyChanged(nameof(SelectedTag));
-        OnPropertyChanged(nameof(EditorActiveTags));
-        OnPropertyChanged(nameof(HasSelectedTag));
-        OnPropertyChanged(nameof(CanRestoreSelectedTag));
-        RaiseTagEditorActionProperties();
-    }
-
-    public async Task SaveSelectedTagAsync(CancellationToken cancellationToken = default)
-    {
-        if (_tagService is null)
-        {
-            ErrorMessage = "Tag management is not available.";
-            return;
-        }
-
-        if (SelectedStore is null)
-        {
-            ErrorMessage = "Select a store before saving a tag.";
-            return;
-        }
-
-        if (_isCreatingNewTag)
-        {
-            var createResult = await _tagService.CreateTagAsync(
-                new TagManagementCreateRequest(SelectedStore.Id, TagName, EmptyToNull(TagDescription), TagColor),
-                cancellationToken).ConfigureAwait(false);
-
-            if (createResult.Succeeded)
-            {
-                _isCreatingNewTag = false;
-                _draftTagId = null;
-            }
-
-            ApplyTagResult(createResult);
-            return;
-        }
-
-        if (SelectedTag is null)
-        {
-            ErrorMessage = "Select a tag before saving.";
-            return;
-        }
-
-        var result = await _tagService.UpdateTagAsync(
-            new TagManagementUpdateRequest(SelectedTag.Id, TagName, EmptyToNull(TagDescription), TagColor),
-            cancellationToken).ConfigureAwait(false);
-        ApplyTagResult(result);
-    }
-
-    public async Task ArchiveSelectedTagAsync(CancellationToken cancellationToken = default)
-    {
-        if (_tagService is null)
-        {
-            ErrorMessage = "Tag management is not available.";
-            return;
-        }
-
-        if (_isCreatingNewTag)
-        {
-            ErrorMessage = "Save the new tag before archiving it.";
-            return;
-        }
-
-        if (SelectedTag is null)
-        {
-            ErrorMessage = "Select a tag before archiving.";
-            return;
-        }
-
-        var result = await _tagService.ArchiveTagAsync(SelectedTag.Id, cancellationToken).ConfigureAwait(false);
-        ApplyTagResult(result);
-    }
-
-    public async Task RestoreTagAsync(TagSummary tag, CancellationToken cancellationToken = default)
-    {
-        if (_tagService is null)
-        {
-            ErrorMessage = "Tag management is not available.";
-            return;
-        }
-
-        ArgumentNullException.ThrowIfNull(tag);
-        var result = await _tagService.RestoreTagAsync(tag.Id, cancellationToken).ConfigureAwait(false);
-        ApplyTagResult(result);
-    }
-
-    public void RequestDeleteSelectedTag()
-    {
-        if (_isCreatingNewTag)
-        {
-            ErrorMessage = "Save the new tag before deleting it.";
-            return;
-        }
-
-        if (SelectedTag is null)
-        {
-            ErrorMessage = "Select a tag before deleting.";
-            return;
-        }
-
-        _pendingDeleteTag = SelectedTag;
-        _pendingDeleteTagItemCount = 0;
-        TagDeleteWarningVisible = true;
-        OnPropertyChanged(nameof(TagDeleteWarningMessage));
-        Run(RefreshTagDeleteItemCountAsync);
-    }
-
-    private async Task RefreshTagDeleteItemCountAsync(CancellationToken cancellationToken = default)
-    {
-        if (_tagService is null || _pendingDeleteTag is null) return;
-        _pendingDeleteTagItemCount = await _tagService
-            .GetTagApplicationCountAsync(_pendingDeleteTag.Id, cancellationToken)
-            .ConfigureAwait(true);
-        OnPropertyChanged(nameof(TagDeleteWarningMessage));
-    }
-
-    public async Task ConfirmDeleteTagAsync(CancellationToken cancellationToken = default)
-    {
-        if (_tagService is null)
-        {
-            ErrorMessage = "Tag management is not available.";
-            return;
-        }
-
-        if (_pendingDeleteTag is null)
-        {
-            ErrorMessage = "Select a tag before deleting.";
-            return;
-        }
-
-        var result = await _tagService.DeleteTagAsync(
-            new TagManagementDeleteRequest(_pendingDeleteTag.Id, ConfirmPermanentDeletion: true),
-            cancellationToken).ConfigureAwait(false);
-        ErrorMessage = result.Error;
-        ApplyTagState(result.State);
-        if (result.Succeeded)
-        {
-            SelectDefaultTagForEditing();
-        }
-
-        ClearTagDeleteWarning();
-    }
-
-    private void SelectDefaultTagForEditing()
-    {
-        var defaultTag = ActiveTags.FirstOrDefault() ?? ArchivedTags.FirstOrDefault();
-        if (defaultTag is not null)
-        {
-            PerformSelectTagForEditing(defaultTag);
-            return;
-        }
-
-        ClearTagSelection();
-    }
-
-    private void ClearTagSelection()
-    {
-        _isCreatingNewTag = false;
-        _draftTagId = null;
-        ActiveTags = [];
-        ArchivedTags = [];
-        SelectedTag = null;
-        ClearTagEditorFields();
-        CaptureOriginalTagEditorState();
-        OnPropertyChanged(nameof(ActiveTags));
-        OnPropertyChanged(nameof(EditorActiveTags));
-        OnPropertyChanged(nameof(ArchivedTags));
-        OnPropertyChanged(nameof(SelectedTag));
-        OnPropertyChanged(nameof(HasSelectedTag));
-        OnPropertyChanged(nameof(HasActiveTags));
-        OnPropertyChanged(nameof(HasArchivedTags));
-        OnPropertyChanged(nameof(CanRestoreSelectedTag));
-        RaiseTagEditorActionProperties();
-    }
-
-    private void ApplySelectedTagFields(TagSummary? tag)
-    {
-        if (tag is null)
-        {
-            ClearTagEditorFields();
-            return;
-        }
-
-        TagName = tag.Name;
-        TagColor = tag.Color;
-        TagDescription = tag.Description ?? string.Empty;
-    }
-
-    private void ClearTagEditorFields()
-    {
-        TagName = string.Empty;
-        TagColor = null;
-        TagDescription = string.Empty;
-    }
-
-    private TagSummary? DraftTag()
-    {
-        if (!_isCreatingNewTag || _draftTagId is not { } id || SelectedStore is null)
-        {
-            return null;
-        }
-
-        var now = DateTimeOffset.Now;
-        var name = string.IsNullOrWhiteSpace(TagName) ? "New tag" : TagName.Trim();
-        return new TagSummary(id, SelectedStore.Id, name, EmptyToNull(TagDescription), TagColor, false, now, now);
-    }
-
-    private void ApplyTagResult(TagManagementResult result)
-    {
-        ErrorMessage = result.Error;
-        ApplyTagState(result.State);
-        if (result.Tag is not null && result.Succeeded)
-        {
-            PerformSelectTagForEditing(result.Tag);
-            WorkspaceStructureChanged?.Invoke(this, EventArgs.Empty);
-        }
-    }
-
-    private TagEditorState CurrentTagEditorState() =>
-        new(TagName, TagColor, EmptyToNull(TagDescription));
-
-    private void CaptureOriginalTagEditorState()
-    {
-        _originalTagEditorState = CurrentTagEditorState();
-        RaiseTagEditorActionProperties();
-    }
-
-    private void RaiseTagEditorStateProperties() => RaiseTagEditorActionProperties();
+    private void ClearTagDeleteWarning() => _tagEditor.ClearDeleteWarning();
 
     private void RaiseTagEditorActionProperties()
     {
@@ -2622,14 +1616,6 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         OnPropertyChanged(nameof(CanSaveSelectedTag));
         OnPropertyChanged(nameof(CanArchiveSelectedTag));
         OnPropertyChanged(nameof(CanDeleteSelectedTag));
-    }
-
-    private void ClearTagDeleteWarning()
-    {
-        _pendingDeleteTag = null;
-        _pendingDeleteTagItemCount = 0;
-        TagDeleteWarningVisible = false;
-        OnPropertyChanged(nameof(TagDeleteWarningMessage));
     }
 
     private void OpenTagsTab()
@@ -2647,10 +1633,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         }
 
         SelectedEditorTab = StoreManagementEditorTab.Tags;
-        if (NeedsFirstTag && SelectedStore is { IsArchived: false } && !_isCreatingNewStore)
-        {
-            BeginCreateTagDraft();
-        }
+        _tagEditor.OnTabSelected();
 
         Run(LoadTagsForSelectedStoreAsync);
     }
@@ -2668,1021 +1651,66 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
             RequestDiscardBefore(PendingEditorAction.SelectProductsTab);
             return;
         }
-
         SelectedEditorTab = StoreManagementEditorTab.Products;
         CatalogEditorLevel = CatalogEditorLevel.Overview;
         ShowArchivedProducts = false;
         IsAddingVariant = false;
         IsAddingDesignArea = false;
-
         Run(LoadProductsForSelectedStoreAsync);
     }
 
-    private async Task LoadProductsForSelectedStoreAsync(CancellationToken cancellationToken = default)
-    {
-        if (_productService is null)
-        {
-            return;
-        }
-
-        var state = await _productService.LoadForStoreAsync(SelectedStore is { IsArchived: false } ? SelectedStore.Id : Guid.Empty, cancellationToken).ConfigureAwait(false);
-        ApplyProductState(state);
-    }
-
-    private void ApplyProductState(ProductSupplierSetupState state)
-    {
-        Products = state.Products;
-        ArchivedProducts = state.Archived;
-        var visibleProducts = ShowArchivedProducts ? Products.Concat(ArchivedProducts) : Products;
-        SelectedProduct = _isCreatingNewProduct
-            ? DraftProduct()
-            : visibleProducts.FirstOrDefault(product => product.Id == SelectedProduct?.Id)
-                ?? visibleProducts.FirstOrDefault();
-        if (!_isCreatingNewProduct)
-        {
-            ApplySelectedProductFields(SelectedProduct);
-        }
-
-        OnPropertyChanged(nameof(Products));
-        OnPropertyChanged(nameof(ArchivedProducts));
-        OnPropertyChanged(nameof(HasProducts));
-        OnPropertyChanged(nameof(EditorProducts));
-        OnPropertyChanged(nameof(SelectedProduct));
-        OnPropertyChanged(nameof(HasSelectedProduct));
-        OnPropertyChanged(nameof(CanDeleteSelectedProduct));
-        OnPropertyChanged(nameof(CanCreateCatalogItem));
-        OnPropertyChanged(nameof(SelectedProductOfferingCount));
-        OnPropertyChanged(nameof(SelectedProductSummary));
-        if (SelectedProduct is not null)
-        {
-            ApplySelectedOfferingAfterProductChange();
-        }
-        else
-        {
-            ClearOfferingSelection();
-        }
-    }
-
-    public void SelectProductForEditing(StoreProductSummary product)
-    {
-        ArgumentNullException.ThrowIfNull(product);
-        if (_isCreatingNewProduct && product.Id == _draftProductId)
-        {
-            SelectedProduct = DraftProduct();
-            OnPropertyChanged(nameof(SelectedProduct));
-            return;
-        }
-
-        if (HasUnsavedProductChanges && SelectedProduct?.Id != product.Id)
-        {
-            RequestDiscardBefore(PendingEditorAction.SelectProduct, product: product);
-            return;
-        }
-
-        PerformSelectProductForEditing(product);
-    }
-
-    private void PerformSelectProductForEditing(StoreProductSummary product)
-    {
-        _isCreatingNewProduct = false;
-        _draftProductId = null;
-        SelectedProduct = product;
-        ApplySelectedProductFields(product);
-        ApplySelectedOfferingAfterProductChange();
-        ClearProductDeleteWarning();
-        ClearDiscardChangesPrompt();
-        OnPropertyChanged(nameof(SelectedProduct));
-        OnPropertyChanged(nameof(EditorProducts));
-        OnPropertyChanged(nameof(HasSelectedProduct));
-        OnPropertyChanged(nameof(CanDeleteSelectedProduct));
-        CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
-        OnPropertyChanged(nameof(SelectedProductOfferingCount));
-        OnPropertyChanged(nameof(SelectedProductSummary));
-        RaiseProductEditorStateProperties();
-    }
-
-    private void ApplySelectedOfferingAfterProductChange()
-    {
-        var offerings = SelectedProduct?.Offerings ?? [];
-        SelectedOffering = offerings.FirstOrDefault(offering => offering.Id == SelectedOffering?.Id) ?? offerings.FirstOrDefault();
-        CatalogSetup?.SelectOffering(SelectedOffering?.Id);
-        if (SelectedOffering is not null)
-        {
-            ApplySelectedOfferingFields(SelectedOffering);
-        }
-        else
-        {
-            ClearOfferingEditingFields();
-        }
-        Run(RefreshBlueprintOfferingCardsAsync);
-    }
-
-    private async Task RefreshBlueprintOfferingCardsAsync(CancellationToken cancellationToken = default)
-    {
-        var store = SelectedStore;
-        var blueprint = SelectedProduct;
-        IReadOnlyList<BlueprintOfferingCardViewModel> cards;
-        if (store is null || blueprint is null || _isCreatingNewProduct)
-        {
-            cards = [];
-        }
-        else if (_offeringManagementService is not null)
-        {
-            try
-            {
-                cards = (await _offeringManagementService.LoadForBlueprintAsync(store.Id, blueprint.Id, ShowArchivedOfferings, cancellationToken).ConfigureAwait(true))
-                    .Select(BlueprintOfferingCardViewModel.From)
-                    .ToArray();
-                if (SelectedStore?.Id != store.Id || SelectedProduct?.Id != blueprint.Id)
-                    return;
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                return;
-            }
-            catch (Exception exception)
-            {
-                if (SelectedStore?.Id != store.Id || SelectedProduct?.Id != blueprint.Id)
-                    return;
-                ErrorMessage = exception.Message;
-                return;
-            }
-        }
-        else
-        {
-            cards = blueprint.Offerings.Select(offering => new BlueprintOfferingCardViewModel(
-                offering.Id,
-                offering.Name,
-                offering.ProviderName ?? "Provider not configured",
-                offering.Kind != FulfillmentKind.FixedProvider,
-                "Setup incomplete",
-                offering.Variants.Count,
-                offering.DesignAreas.Count,
-                0)).ToArray();
-        }
-
-        BlueprintOfferingCards.Clear();
-        foreach (var card in cards) BlueprintOfferingCards.Add(card);
-        OnPropertyChanged(nameof(HasBlueprintOfferingCards));
-    }
-
-    private void ApplySelectedOfferingFields(FulfillmentOfferingSummary offering)
-    {
-        _offeringName = offering.Name;
-        _offeringDescription = offering.Description ?? string.Empty;
-        _offeringExternalOfferingId = offering.ExternalOfferingId ?? string.Empty;
-        _offeringKindIndex = offering.Kind == FulfillmentKind.FixedProvider ? 0 : 1;
-        _offeringProviderName = offering.ProviderName ?? string.Empty;
-        CaptureOriginalOfferingState();
-    }
-
-    public void SelectOfferingForEditing(FulfillmentOfferingSummary offering)
-    {
-        ArgumentNullException.ThrowIfNull(offering);
-        if (_isCreatingNewOffering && offering.Id == _draftOfferingId)
-        {
-            SelectedOffering = DraftOffering();
-            OnPropertyChanged(nameof(SelectedOffering));
-            return;
-        }
-
-        if (HasUnsavedOfferingChanges && SelectedOffering?.Id != offering.Id)
-        {
-            RequestDiscardBefore(PendingEditorAction.SelectOffering, offering: offering);
-            return;
-        }
-
-        PerformSelectOfferingForEditing(offering);
-    }
-
-    private void PerformSelectOfferingForEditing(FulfillmentOfferingSummary offering)
-    {
-        _isCreatingNewOffering = false;
-        _draftOfferingId = null;
-        SelectedOffering = offering;
-        CatalogSetup?.SelectOffering(offering.Id);
-        ApplySelectedOfferingFields(offering);
-        ClearOfferingDeleteWarning();
-        ClearDiscardChangesPrompt();
-        OnPropertyChanged(nameof(SelectedOffering));
-        OnPropertyChanged(nameof(HasSelectedOffering));
-        OnPropertyChanged(nameof(CanDeleteSelectedOffering));
-        OnPropertyChanged(nameof(OfferingVariants));
-        OnPropertyChanged(nameof(OfferingDesignAreas));
-        CatalogEditorLevel = CatalogEditorLevel.OfferingDetail;
-        OnPropertyChanged(nameof(SelectedOfferingVariantCount));
-        OnPropertyChanged(nameof(SelectedOfferingDesignAreaCount));
-        OnPropertyChanged(nameof(SelectedOfferingSummary));
-        RaiseOfferingEditorStateProperties();
-    }
+    private Task LoadProductsForSelectedStoreAsync(CancellationToken cancellationToken = default) => _productCatalogEditor.LoadAsync(cancellationToken);
+    public void SelectProductForEditing(StoreProductSummary product) => _productCatalogEditor.SelectProductForEditing(product);
+    private Task RefreshBlueprintOfferingCardsAsync(CancellationToken cancellationToken = default) => _productCatalogEditor.RefreshBlueprintOfferingCardsAsync(cancellationToken);
+    public void SelectOfferingForEditing(FulfillmentOfferingSummary offering) => _productCatalogEditor.SelectOfferingForEditing(offering);
 
     private async Task BackToProductsAsync(CancellationToken cancellationToken = default)
     {
-        if (_productSaveTask is { IsCompleted: false })
-        {
-            await _productSaveTask.WaitAsync(cancellationToken);
-        }
-
-        BackToProducts();
+        if (_productSaveTask is { IsCompleted: false }) await _productSaveTask.WaitAsync(cancellationToken);
+        _productCatalogEditor.NavigateCatalog(CatalogEditorLevel.Overview);
     }
-
-    private void BackToProducts()
-    {
-        if (HasAnyCatalogUnsavedChanges)
-        {
-            RequestDiscardBefore(PendingEditorAction.BackToProducts);
-            return;
-        }
-
-        CatalogEditorLevel = CatalogEditorLevel.Overview;
-    }
-
-    private void BackToProduct()
-    {
-        if (HasAnyCatalogUnsavedChanges)
-        {
-            RequestDiscardBefore(PendingEditorAction.BackToProduct);
-            return;
-        }
-
-        CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
-        Run(RefreshBlueprintOfferingCardsAsync);
-    }
-
-    private void OpenOfferingManagement(CatalogEditorLevel level)
-    {
-        if (SelectedOffering is null || _isCreatingNewOffering)
-        {
-            ErrorMessage = "Save the Blueprint Offering before managing its catalog setup.";
-            return;
-        }
-
-        if (HasUnsavedOfferingChanges || CatalogSetup?.HasActiveDraft == true)
-        {
-            _pendingCatalogLevel = level;
-            RequestDiscardBefore(PendingEditorAction.NavigateCatalog);
-            return;
-        }
-
-        // The offering cards are loaded independently from the focused catalog
-        // state. Reassert the context here so a card selected while that load
-        // was still in flight cannot open an empty management surface.
-        CatalogSetup?.SelectOffering(SelectedOffering.Id);
-        CatalogEditorLevel = level;
-    }
-
-    private void NavigateOfferingCatalog(CatalogEditorLevel level)
-    {
-        if (HasUnsavedOfferingChanges || CatalogSetup?.HasActiveDraft == true)
-        {
-            _pendingCatalogLevel = level;
-            RequestDiscardBefore(PendingEditorAction.NavigateCatalog);
-            return;
-        }
-        CatalogEditorLevel = level;
-        if (level == CatalogEditorLevel.OfferingDetail)
-            Run(RefreshBlueprintOfferingCardsAsync);
-    }
-
-    private void StartAddVariant()
-    {
-        if (SelectedOffering is null)
-        {
-            ErrorMessage = "Select an offering before adding a variant.";
-            return;
-        }
-
-        IsVariantsSectionExpanded = true;
-        IsAddingVariant = true;
-        VariantColor = string.Empty;
-        VariantSize = string.Empty;
-    }
-
-    private void StartAddDesignArea()
-    {
-        if (SelectedOffering is null)
-        {
-            ErrorMessage = "Select an offering before adding a printable area.";
-            return;
-        }
-
-        IsDesignAreasSectionExpanded = true;
-        IsAddingDesignArea = true;
-        AreaName = string.Empty;
-        AreaPosition = string.Empty;
-        AreaDecorationMethod = string.Empty;
-        AreaWidth = string.Empty;
-        AreaHeight = string.Empty;
-        RefreshApplicableVariants();
-    }
-
-    public void StartCreateProduct()
-    {
-        if (!CanCreateCatalogItem)
-        {
-            ErrorMessage = "Select an active saved store before creating a product.";
-            return;
-        }
-
-        if (HasUnsavedProductChanges)
-        {
-            RequestDiscardBefore(PendingEditorAction.StartNewProduct);
-            return;
-        }
-
-        BeginCreateProductDraft();
-    }
-
-    private void BeginCreateProductDraft()
-    {
-        _isCreatingNewProduct = true;
-        _draftProductId = Guid.NewGuid();
-        ClearProductEditorFields();
-        SelectedProduct = DraftProduct();
-        ClearProductDeleteWarning();
-        ClearDiscardChangesPrompt();
-        ErrorMessage = null;
-        OnPropertyChanged(nameof(SelectedProduct));
-        OnPropertyChanged(nameof(EditorProducts));
-        OnPropertyChanged(nameof(HasSelectedProduct));
-        OnPropertyChanged(nameof(CanDeleteSelectedProduct));
-        IsBlueprintBasicsExpanded = true;
-        CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
-        OnPropertyChanged(nameof(SelectedProductOfferingCount));
-        OnPropertyChanged(nameof(SelectedProductSummary));
-        RaiseProductEditorStateProperties();
-        ProductNameFocusRequested?.Invoke(this, EventArgs.Empty);
-    }
-
-    public async Task SaveSelectedProductAsync(CancellationToken cancellationToken = default)
-    {
-        if (_productService is null)
-        {
-            ErrorMessage = "Product and fulfillment setup is not available.";
-            return;
-        }
-
-        if (SelectedStore is null)
-        {
-            ErrorMessage = "Select a store before saving a product.";
-            return;
-        }
-
-        if (_isCreatingNewProduct)
-        {
-            var result = await _productService.CreateProductAsync(
-                new CreateProductRequest(SelectedStore.Id, ProductName, EmptyToNull(ProductDescription), EmptyToNull(ExternalProductId)),
-                cancellationToken);
-            if (result.Succeeded)
-            {
-                _isCreatingNewProduct = false;
-                _draftProductId = null;
-            }
-
-            ApplyProductResult(result);
-            return;
-        }
-
-        if (SelectedProduct is null)
-        {
-            ErrorMessage = "Select a product before saving.";
-            return;
-        }
-
-        var updateResult = await _productService.UpdateProductAsync(
-            new UpdateProductRequest(SelectedProduct.Id, ProductName, EmptyToNull(ProductDescription), EmptyToNull(ExternalProductId)),
-            cancellationToken);
-        ApplyProductResult(updateResult);
-    }
+    private void BackToProducts() => _productCatalogEditor.NavigateCatalog(CatalogEditorLevel.Overview);
+    private void BackToProduct() => _productCatalogEditor.NavigateCatalog(CatalogEditorLevel.ProductDetail);
+    private void OpenOfferingManagement(CatalogEditorLevel level) => _productCatalogEditor.NavigateCatalog(level);
+    private void NavigateOfferingCatalog(CatalogEditorLevel level) => _productCatalogEditor.NavigateCatalog(level);
+    private void StartAddVariant() => _productCatalogEditor.StartAddVariant();
+    private void StartAddDesignArea() => _productCatalogEditor.StartAddDesignArea();
+    public void StartCreateProduct() => _productCatalogEditor.StartCreateProduct();
+    public Task SaveSelectedProductAsync(CancellationToken cancellationToken = default) => _productCatalogEditor.SaveSelectedProductAsync(cancellationToken);
 
     private void StartSaveSelectedProduct()
     {
-        if (_productSaveTask is { IsCompleted: false })
-        {
-            return;
-        }
-
+        if (_productSaveTask is { IsCompleted: false }) return;
         Run(cancellationToken =>
         {
             _productSaveTask = SaveSelectedProductAndReportFailureAsync(cancellationToken);
             return _productSaveTask;
         });
     }
-
     private async Task SaveSelectedProductAndReportFailureAsync(CancellationToken cancellationToken)
     {
-        try
-        {
-            await SaveSelectedProductAsync(cancellationToken).ConfigureAwait(true);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            ErrorMessage = $"Blueprint could not be saved: {exception.Message}";
-        }
+        try { await SaveSelectedProductAsync(cancellationToken).ConfigureAwait(true); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception exception) { ErrorMessage = $"Blueprint could not be saved: {exception.Message}"; }
     }
-
-    private void ApplyProductResult(ProductSupplierSetupResult result)
-    {
-        ErrorMessage = result.Error;
-        ApplyProductState(result.State);
-        if (result.Succeeded)
-        {
-            // The product service returns the refreshed state rather than the
-            // saved product. Establish the clean editor baseline explicitly so
-            // navigation immediately after Save does not treat the saved input
-            // as an unsaved draft.
-            CaptureOriginalProductState();
-        }
-
-        if (result.Product is not null && result.Succeeded)
-        {
-            PerformSelectProductForEditing(result.Product);
-            WorkspaceStructureChanged?.Invoke(this, EventArgs.Empty);
-        }
-    }
-
-    public void RequestDeleteSelectedProduct()
-    {
-        if (_isCreatingNewProduct)
-        {
-            ErrorMessage = "Save the new product before deleting it.";
-            return;
-        }
-
-        if (SelectedProduct is null)
-        {
-            ErrorMessage = "Select a product before deleting.";
-            return;
-        }
-
-        if (!SelectedProduct.IsArchived)
-        {
-            ErrorMessage = "Archive the Blueprint before permanently deleting it.";
-            return;
-        }
-
-        _pendingDeleteProduct = SelectedProduct;
-        ProductDeleteWarningVisible = true;
-        OnPropertyChanged(nameof(ProductDeleteWarningMessage));
-    }
-
-    public void RequestArchiveSelectedProduct()
-    {
-        if (!CanArchiveSelectedProduct)
-        {
-            ErrorMessage = "Select an active Blueprint before archiving it.";
-            return;
-        }
-
-        _pendingArchiveProduct = SelectedProduct;
-        ProductArchiveWarningVisible = true;
-        OnPropertyChanged(nameof(ProductArchiveWarningMessage));
-    }
-
-    public async Task ConfirmArchiveSelectedProductAsync(CancellationToken cancellationToken = default)
-    {
-        if (_catalogService is null || _pendingArchiveProduct is null || SelectedStore is null)
-        {
-            ErrorMessage = "Select a Blueprint before archiving it.";
-            return;
-        }
-
-        try
-        {
-            var result = await _catalogService.ArchiveBlueprintWithDependentsAsync(
-                new ArchiveBlueprintWithDependentsRequest(SelectedStore.Id, _pendingArchiveProduct.Id), cancellationToken).ConfigureAwait(true);
-            ErrorMessage = result.Error;
-            if (result.Succeeded)
-            {
-                ClearProductArchiveWarning();
-                await LoadProductsForSelectedStoreAsync(cancellationToken).ConfigureAwait(true);
-                if (SelectedProduct is null)
-                {
-                    CatalogEditorLevel = CatalogEditorLevel.Overview;
-                }
-            }
-        }
-        catch (Exception exception)
-        {
-            ErrorMessage = $"The Blueprint could not be archived. {exception.Message}";
-        }
-    }
-
-    private void ClearProductArchiveWarning()
-    {
-        _pendingArchiveProduct = null;
-        ProductArchiveWarningVisible = false;
-        OnPropertyChanged(nameof(ProductArchiveWarningMessage));
-    }
-
-    public async Task ConfirmDeleteProductAsync(CancellationToken cancellationToken = default)
-    {
-        if (_catalogService is not null && SelectedStore is not null && _pendingDeleteProduct is not null)
-        {
-            var deleteResult = await _catalogService.DeleteBlueprintPermanentlyAsync(
-                new DeleteBlueprintPermanentlyRequest(SelectedStore.Id, _pendingDeleteProduct.Id, Confirm: true),
-                cancellationToken).ConfigureAwait(true);
-            ErrorMessage = deleteResult.Error;
-            if (deleteResult.Succeeded)
-            {
-                ClearProductDeleteWarning();
-                await LoadProductsForSelectedStoreAsync(cancellationToken).ConfigureAwait(true);
-                if (SelectedProduct is null)
-                {
-                    CatalogEditorLevel = CatalogEditorLevel.Overview;
-                }
-            }
-
-            return;
-        }
-
-        if (_pendingDeleteProduct is { IsArchived: false })
-        {
-            ErrorMessage = "Archive the Blueprint before permanently deleting it.";
-            return;
-        }
-
-        if (_catalogService is null || _productService is null)
-        {
-            ErrorMessage = "Catalog permanent deletion is not available.";
-            return;
-        }
-
-        if (_pendingDeleteProduct is null)
-        {
-            ErrorMessage = "Select a product before deleting.";
-            return;
-        }
-
-        var result = await _productService.DeleteProductAsync(
-            new DeleteProductRequest(_pendingDeleteProduct.Id, Confirm: true),
-            cancellationToken).ConfigureAwait(false);
-        ErrorMessage = result.Error;
-        ApplyProductState(result.State);
-        if (_isCreatingNewProduct)
-        {
-            _isCreatingNewProduct = false;
-            _draftProductId = null;
-            OnPropertyChanged(nameof(EditorProducts));
-        }
-
-        if (result.Succeeded && SelectedProduct is null)
-        {
-            CatalogEditorLevel = CatalogEditorLevel.Overview;
-        }
-
-        ClearProductDeleteWarning();
-    }
-
-    private void ClearProductDeleteWarning()
-    {
-        _pendingDeleteProduct = null;
-        ProductDeleteWarningVisible = false;
-        OnPropertyChanged(nameof(ProductDeleteWarningMessage));
-    }
-
-    public void StartCreateOffering()
-    {
-        if (_productService is null || SelectedProduct is null || SelectedStore is null || SelectedStore.IsArchived)
-        {
-            ErrorMessage = "Select an active product before creating an offering.";
-            return;
-        }
-
-        if (HasUnsavedOfferingChanges)
-        {
-            RequestDiscardBefore(PendingEditorAction.StartNewOffering);
-            return;
-        }
-
-        BeginCreateOfferingDraft();
-    }
-
-    private void BeginCreateOfferingDraft()
-    {
-        _isCreatingNewOffering = true;
-        OnPropertyChanged(nameof(IsCreatingNewOffering));
-        _draftOfferingId = Guid.NewGuid();
-        ClearOfferingEditingFields();
-        SelectedOffering = DraftOffering();
-        ClearOfferingDeleteWarning();
-        ClearDiscardChangesPrompt();
-        ErrorMessage = null;
-        OnPropertyChanged(nameof(SelectedOffering));
-        OnPropertyChanged(nameof(HasSelectedOffering));
-        OnPropertyChanged(nameof(CanDeleteSelectedOffering));
-        OnPropertyChanged(nameof(OfferingVariants));
-        OnPropertyChanged(nameof(OfferingDesignAreas));
-        CatalogEditorLevel = CatalogEditorLevel.OfferingDetail;
-        RaiseOfferingEditorStateProperties();
-        OfferingNameFocusRequested?.Invoke(this, EventArgs.Empty);
-    }
-
-    private void CancelNewOffering()
-    {
-        if (!_isCreatingNewOffering)
-        {
-            return;
-        }
-
-        _isCreatingNewOffering = false;
-        _draftOfferingId = null;
-        SelectedOffering = SelectedProduct?.Offerings.FirstOrDefault();
-        CatalogSetup?.SelectOffering(SelectedOffering?.Id);
-        if (SelectedOffering is not null)
-        {
-            ApplySelectedOfferingFields(SelectedOffering);
-        }
-        else
-        {
-            ClearOfferingEditingFields();
-        }
-
-        CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
-        OnPropertyChanged(nameof(IsCreatingNewOffering));
-        RaiseOfferingEditorStateProperties();
-    }
-
-    public async Task SaveSelectedOfferingAsync(CancellationToken cancellationToken = default)
-    {
-        if (_productService is null)
-        {
-            ErrorMessage = "Product and fulfillment setup is not available.";
-            return;
-        }
-
-        if (SelectedProduct is null)
-        {
-            ErrorMessage = "Select a product before saving an offering.";
-            return;
-        }
-
-        var kind = OfferingKindIndex == 0 ? FulfillmentKind.FixedProvider : FulfillmentKind.PrintifyChoiceNetwork;
-        if (_isCreatingNewOffering)
-        {
-            var result = await _productService.CreateOfferingAsync(
-                new FusionCanvas.Application.Products.CreateOfferingRequest(
-                    SelectedProduct.Id,
-                    OfferingName,
-                    kind,
-                    kind == FulfillmentKind.FixedProvider ? EmptyToNull(OfferingProviderName) : null,
-                    EmptyToNull(OfferingDescription),
-                    EmptyToNull(OfferingExternalOfferingId)),
-                cancellationToken).ConfigureAwait(false);
-            if (result.Succeeded)
-            {
-                _isCreatingNewOffering = false;
-                _draftOfferingId = null;
-                OnPropertyChanged(nameof(IsCreatingNewOffering));
-            }
-
-            ApplyOfferingResult(result);
-            if (result.Succeeded && CatalogSetup is not null && SelectedStore is not null)
-            {
-                await CatalogSetup.LoadForStoreAsync(SelectedStore.Id, cancellationToken).ConfigureAwait(false);
-                CatalogSetup.SelectOffering(result.Offering?.Id);
-            }
-            return;
-        }
-
-        if (SelectedOffering is null)
-        {
-            ErrorMessage = "Select an offering before saving.";
-            return;
-        }
-
-        var updateResult = await _productService.UpdateOfferingAsync(
-            new UpdateOfferingRequest(
-                SelectedOffering.Id,
-                OfferingName,
-                kind,
-                kind == FulfillmentKind.FixedProvider ? EmptyToNull(OfferingProviderName) : null,
-                EmptyToNull(OfferingDescription),
-                EmptyToNull(OfferingExternalOfferingId)),
-            cancellationToken).ConfigureAwait(false);
-        ApplyOfferingResult(updateResult);
-    }
-
-    private void ApplyOfferingResult(ProductSupplierSetupResult result)
-    {
-        ErrorMessage = result.Error;
-        ApplyProductState(result.State);
-        if (result.Offering is not null && result.Succeeded)
-        {
-            PerformSelectOfferingForEditing(result.Offering);
-            WorkspaceStructureChanged?.Invoke(this, EventArgs.Empty);
-        }
-    }
-
-    public void RequestDeleteSelectedOffering()
-    {
-        if (_isCreatingNewOffering)
-        {
-            ErrorMessage = "Save the new offering before deleting it.";
-            return;
-        }
-
-        if (SelectedOffering is null)
-        {
-            ErrorMessage = "Select an offering before deleting.";
-            return;
-        }
-
-        _pendingDeleteOffering = SelectedOffering;
-        OfferingDeleteWarningVisible = true;
-        OnPropertyChanged(nameof(OfferingDeleteWarningMessage));
-    }
-
-    public async Task ConfirmDeleteOfferingAsync(CancellationToken cancellationToken = default)
-    {
-        if (_productService is null)
-        {
-            ErrorMessage = "Product and fulfillment setup is not available.";
-            return;
-        }
-
-        if (_pendingDeleteOffering is null)
-        {
-            ErrorMessage = "Select an offering before deleting.";
-            return;
-        }
-
-        var result = await _productService.DeleteOfferingAsync(
-            new DeleteOfferingRequest(_pendingDeleteOffering.Id, Confirm: true),
-            cancellationToken).ConfigureAwait(false);
-        ErrorMessage = result.Error;
-        ApplyProductState(result.State);
-        if (_isCreatingNewOffering)
-        {
-            _isCreatingNewOffering = false;
-            _draftOfferingId = null;
-            OnPropertyChanged(nameof(OfferingVariants));
-            OnPropertyChanged(nameof(OfferingDesignAreas));
-        }
-
-        if (result.Succeeded && SelectedOffering is null)
-        {
-            CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
-        }
-
-        ClearOfferingDeleteWarning();
-    }
-
-    private void ClearOfferingDeleteWarning()
-    {
-        _pendingDeleteOffering = null;
-        OfferingDeleteWarningVisible = false;
-        OnPropertyChanged(nameof(OfferingDeleteWarningMessage));
-    }
-
-    public async Task AddVariantAsync(CancellationToken cancellationToken = default)
-    {
-        if (_productService is null || SelectedOffering is null)
-        {
-            ErrorMessage = "Select an offering before adding a variant.";
-            return;
-        }
-
-        var options = new List<VariantOptionDraft>();
-        if (!string.IsNullOrWhiteSpace(VariantColor))
-        {
-            options.Add(new VariantOptionDraft("Color", VariantColor.Trim()));
-        }
-
-        if (!string.IsNullOrWhiteSpace(VariantSize))
-        {
-            options.Add(new VariantOptionDraft("Size", VariantSize.Trim()));
-        }
-
-        if (options.Count == 0)
-        {
-            ErrorMessage = "Enter at least a color or size for the variant.";
-            return;
-        }
-
-        var result = await _productService.CreateVariantAsync(
-            new CreateVariantRequest(SelectedOffering.Id, options),
-            cancellationToken).ConfigureAwait(false);
-        ApplyProductResult(result);
-        if (result.Succeeded)
-        {
-            IsAddingVariant = false;
-            VariantColor = string.Empty;
-            VariantSize = string.Empty;
-        }
-    }
-
-    public async Task RemoveVariantAsync(ProductVariantSummary variant, CancellationToken cancellationToken = default)
-    {
-        if (_productService is null)
-        {
-            return;
-        }
-
-        var result = await _productService.DeleteVariantAsync(
-            new DeleteVariantRequest(variant.Id, Confirm: true),
-            cancellationToken).ConfigureAwait(false);
-        ApplyProductResult(result);
-    }
-
-    public async Task AddDesignAreaAsync(CancellationToken cancellationToken = default)
-    {
-        if (_productService is null || SelectedOffering is null)
-        {
-            ErrorMessage = "Select an offering before adding a printable area.";
-            return;
-        }
-
-        if (!int.TryParse(AreaWidth, out var width) || width <= 0 || !int.TryParse(AreaHeight, out var height) || height <= 0)
-        {
-            ErrorMessage = "Design area width and height must be positive whole numbers.";
-            return;
-        }
-
-        var result = await _productService.CreateDesignAreaAsync(
-            new CreateDesignAreaRequest(
-                SelectedOffering.Id,
-                AreaName,
-                string.IsNullOrWhiteSpace(AreaPosition) ? "front" : AreaPosition.Trim(),
-                string.IsNullOrWhiteSpace(AreaDecorationMethod) ? "DTG" : AreaDecorationMethod.Trim(),
-                width,
-                height,
-                ApplicableVariants.Where(variant => variant.IsSelected).Select(variant => variant.Id).ToArray()),
-            cancellationToken).ConfigureAwait(false);
-        ApplyProductResult(result);
-        if (result.Succeeded)
-        {
-            IsAddingDesignArea = false;
-            AreaName = string.Empty;
-            AreaPosition = string.Empty;
-            AreaDecorationMethod = string.Empty;
-            AreaWidth = string.Empty;
-            AreaHeight = string.Empty;
-        }
-    }
-
-    public async Task RemoveDesignAreaAsync(DesignAreaSummary area, CancellationToken cancellationToken = default)
-    {
-        if (_productService is null)
-        {
-            return;
-        }
-
-        var result = await _productService.DeleteDesignAreaAsync(
-            new DeleteDesignAreaRequest(area.Id, Confirm: true),
-            cancellationToken).ConfigureAwait(false);
-        ApplyProductResult(result);
-    }
-
-    private void ClearOfferingSelection()
-    {
-        _isCreatingNewOffering = false;
-        OnPropertyChanged(nameof(IsCreatingNewOffering));
-        _draftOfferingId = null;
-        SelectedOffering = null;
-        CatalogSetup?.SelectOffering(null);
-        ClearOfferingEditingFields();
-        OnPropertyChanged(nameof(SelectedOffering));
-        OnPropertyChanged(nameof(HasSelectedOffering));
-        OnPropertyChanged(nameof(OfferingVariants));
-        OnPropertyChanged(nameof(OfferingDesignAreas));
-        RefreshApplicableVariants();
-    }
-
-    private void RefreshApplicableVariants()
-    {
-        ApplicableVariants.Clear();
-        if (SelectedOffering is null)
-        {
-            return;
-        }
-
-        foreach (var variant in SelectedOffering.Variants)
-        {
-            ApplicableVariants.Add(new ApplicableVariantViewModel(variant));
-        }
-    }
-
-    private StoreProductSummary? DraftProduct()
-    {
-        if (!_isCreatingNewProduct || _draftProductId is not { } id || SelectedStore is null)
-        {
-            return null;
-        }
-
-        var now = DateTimeOffset.Now;
-        var name = string.IsNullOrWhiteSpace(ProductName) ? "New product" : ProductName.Trim();
-        return new StoreProductSummary(id, SelectedStore.Id, name, EmptyToNull(ProductDescription), EmptyToNull(ExternalProductId), []);
-    }
-
-    private FulfillmentOfferingSummary? DraftOffering()
-    {
-        if (!_isCreatingNewOffering || _draftOfferingId is not { } id || SelectedProduct is null)
-        {
-            return null;
-        }
-
-        var kind = OfferingKindIndex == 0 ? FulfillmentKind.FixedProvider : FulfillmentKind.PrintifyChoiceNetwork;
-        var name = string.IsNullOrWhiteSpace(OfferingName) ? "New offering" : OfferingName.Trim();
-        return new FulfillmentOfferingSummary(
-            id, SelectedProduct.Id, name, EmptyToNull(OfferingDescription), kind,
-            kind == FulfillmentKind.FixedProvider ? EmptyToNull(OfferingProviderName) : null,
-            EmptyToNull(OfferingExternalOfferingId), [], []);
-    }
-
-    private ProductDraft CurrentProductEditorState() =>
-        new(ProductName, ProductDescription, ExternalProductId);
-
-    private OfferingDraft CurrentOfferingEditorState() =>
-        new(
-            OfferingName,
-            OfferingDescription,
-            OfferingExternalOfferingId,
-            OfferingKindIndex,
-            OfferingProviderName,
-            AreaName,
-            AreaPosition,
-            AreaDecorationMethod,
-            AreaWidth,
-            AreaHeight,
-            VariantColor,
-            VariantSize);
-
-    private void ApplySelectedProductFields(StoreProductSummary? product)
-    {
-        if (product is null)
-        {
-            ClearProductEditorFields();
-            CaptureOriginalProductState();
-            return;
-        }
-
-        ProductName = product.Name;
-        ProductDescription = product.Description ?? string.Empty;
-        ExternalProductId = product.ExternalProductId ?? string.Empty;
-        CaptureOriginalProductState();
-    }
-
-    private void ClearProductEditorFields()
-    {
-        ProductName = string.Empty;
-        ProductDescription = string.Empty;
-        ExternalProductId = string.Empty;
-    }
-
-    private void ClearOfferingEditingFields()
-    {
-        OfferingName = string.Empty;
-        OfferingDescription = string.Empty;
-        OfferingExternalOfferingId = string.Empty;
-        OfferingKindIndex = 0;
-        OfferingProviderName = string.Empty;
-        AreaName = string.Empty;
-        AreaPosition = string.Empty;
-        AreaDecorationMethod = string.Empty;
-        AreaWidth = string.Empty;
-        AreaHeight = string.Empty;
-        VariantColor = string.Empty;
-        VariantSize = string.Empty;
-        CaptureOriginalOfferingState();
-    }
-
-    private void CaptureOriginalProductState()
-    {
-        _originalProductState = CurrentProductEditorState();
-        RaiseProductEditorStateProperties();
-    }
-
-    private void CaptureOriginalOfferingState()
-    {
-        _originalOfferingState = CurrentOfferingEditorState();
-        RaiseOfferingEditorStateProperties();
-    }
-
-    private void RaiseProductEditorStateProperties()
-    {
-        OnPropertyChanged(nameof(HasUnsavedProductChanges));
-        OnPropertyChanged(nameof(HasAnyUnsavedChanges));
-        OnPropertyChanged(nameof(HasAnyCatalogUnsavedChanges));
-        OnPropertyChanged(nameof(CanSaveSelectedProduct));
-        OnPropertyChanged(nameof(CanDeleteSelectedProduct));
-        OnPropertyChanged(nameof(EditorProducts));
-    }
-
-    private void RaiseOfferingEditorStateProperties()
-    {
-        OnPropertyChanged(nameof(HasUnsavedOfferingChanges));
-        OnPropertyChanged(nameof(HasAnyUnsavedChanges));
-        OnPropertyChanged(nameof(HasAnyCatalogUnsavedChanges));
-        OnPropertyChanged(nameof(CanSaveSelectedOffering));
-        OnPropertyChanged(nameof(CanDeleteSelectedOffering));
-        OnPropertyChanged(nameof(IsChoiceNetworkOffering));
-    }
-
+    public void RequestDeleteSelectedProduct() => _productCatalogEditor.RequestDeleteSelectedProduct();
+    public void RequestArchiveSelectedProduct() => _productCatalogEditor.RequestArchiveSelectedProduct();
+    public Task ConfirmArchiveSelectedProductAsync(CancellationToken cancellationToken = default) => _productCatalogEditor.ConfirmArchiveSelectedProductAsync(cancellationToken);
+    private void ClearProductArchiveWarning() => _productCatalogEditor.ClearProductArchiveWarning();
+    public Task ConfirmDeleteProductAsync(CancellationToken cancellationToken = default) => _productCatalogEditor.ConfirmDeleteProductAsync(cancellationToken);
+    private void ClearProductDeleteWarning() => _productCatalogEditor.ClearProductDeleteWarning();
+    public void StartCreateOffering() => _productCatalogEditor.StartCreateOffering();
+    private void CancelNewOffering() => _productCatalogEditor.CancelNewOffering();
+    public Task SaveSelectedOfferingAsync(CancellationToken cancellationToken = default) => _productCatalogEditor.SaveSelectedOfferingAsync(cancellationToken);
+    public void RequestDeleteSelectedOffering() => _productCatalogEditor.RequestDeleteSelectedOffering();
+    public Task ConfirmDeleteOfferingAsync(CancellationToken cancellationToken = default) => _productCatalogEditor.ConfirmDeleteOfferingAsync(cancellationToken);
+    private void ClearOfferingDeleteWarning() => _productCatalogEditor.ClearOfferingDeleteWarning();
+    public Task AddVariantAsync(CancellationToken cancellationToken = default) => _productCatalogEditor.AddVariantAsync(cancellationToken);
+    public Task RemoveVariantAsync(ProductVariantSummary variant, CancellationToken cancellationToken = default) => _productCatalogEditor.RemoveVariantAsync(variant, cancellationToken);
+    public Task AddDesignAreaAsync(CancellationToken cancellationToken = default) => _productCatalogEditor.AddDesignAreaAsync(cancellationToken);
+    public Task RemoveDesignAreaAsync(DesignAreaSummary area, CancellationToken cancellationToken = default) => _productCatalogEditor.RemoveDesignAreaAsync(area, cancellationToken);
+    private void RaiseProductEditorStateProperties() { OnPropertyChanged(nameof(HasUnsavedProductChanges)); OnPropertyChanged(nameof(HasAnyUnsavedChanges)); OnPropertyChanged(nameof(HasAnyCatalogUnsavedChanges)); OnPropertyChanged(nameof(CanSaveSelectedProduct)); OnPropertyChanged(nameof(EditorProducts)); }
+    private void RaiseOfferingEditorStateProperties() { OnPropertyChanged(nameof(HasUnsavedOfferingChanges)); OnPropertyChanged(nameof(HasAnyUnsavedChanges)); OnPropertyChanged(nameof(HasAnyCatalogUnsavedChanges)); OnPropertyChanged(nameof(CanSaveSelectedOffering)); OnPropertyChanged(nameof(CanDeleteSelectedOffering)); OnPropertyChanged(nameof(IsChoiceNetworkOffering)); }
 
     private void ApplyNicheState(NicheManagementState state)
     {
@@ -3749,7 +1777,6 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
     {
         _isCreatingNewNiche = false;
         _draftNicheId = null;
-        _nichePopulationMessage = null;
         ActiveNiches = [];
         ArchivedNiches = [];
         SelectedNiche = null;
@@ -3769,66 +1796,25 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
     private void ApplySelectedStoreFields(StoreSummary? store)
     {
         if (store is null)
-        {
-            return;
-        }
-
-        NewStoreName = store.Name;
-        Description = store.Context.Description ?? string.Empty;
-        Notes = store.Context.Notes ?? string.Empty;
-        TargetMarket = store.Context.TargetMarket ?? string.Empty;
-        BrandDirection = store.Context.BrandDirection ?? string.Empty;
-        PlanningContext = store.Context.PlanningContext ?? string.Empty;
-        Url = store.Context.Url ?? string.Empty;
-        _printifyShopId = store.Context.PrintifyShopId;
-        _printifyShopTitle = store.Context.PrintifyShopTitle;
+            _storeConfiguration.DiscardStoreDraft();
+        else
+            _storeConfiguration.SelectStoreForEditing(store);
+        _printifyShopId = store?.Context.PrintifyShopId;
+        _printifyShopTitle = store?.Context.PrintifyShopTitle;
         _printifyShopSelectionChanged = false;
-        SelectedFulfillmentStrategy = store.FulfillmentStrategy;
     }
 
     private void ApplySelectedNicheFields(NicheSummary? niche)
     {
         if (niche is null)
-        {
-            ClearNicheEditorFields();
-            return;
-        }
-
-        NicheName = niche.Name;
-        NicheDescription = niche.Context.Description ?? string.Empty;
-        NicheAudience = niche.Context.Audience ?? string.Empty;
-        NicheHumorStyle = niche.Context.HumorStyle ?? string.Empty;
-        NicheVisualStyleGuidance = niche.Context.VisualStyleGuidance ?? string.Empty;
-        NicheConstraints = niche.Context.Constraints ?? string.Empty;
-        NicheRisks = niche.Context.Risks ?? string.Empty;
-        NicheResearchNotes = niche.Context.ResearchNotes ?? string.Empty;
-        NicheNotes = niche.Context.Notes ?? string.Empty;
+            _storeConfiguration.DiscardNicheDraft();
+        else
+            _storeConfiguration.SelectNicheForEditing(niche);
     }
 
-    private void ClearEditorFields()
-    {
-        NewStoreName = string.Empty;
-        Description = string.Empty;
-        Notes = string.Empty;
-        TargetMarket = string.Empty;
-        BrandDirection = string.Empty;
-        PlanningContext = string.Empty;
-        Url = string.Empty;
-        SelectedFulfillmentStrategy = FulfillmentStrategy.Manual;
-    }
+    private void ClearEditorFields() => _storeConfiguration.DiscardStoreDraft();
 
-    private void ClearNicheEditorFields()
-    {
-        NicheName = string.Empty;
-        NicheDescription = string.Empty;
-        NicheAudience = string.Empty;
-        NicheHumorStyle = string.Empty;
-        NicheVisualStyleGuidance = string.Empty;
-        NicheConstraints = string.Empty;
-        NicheRisks = string.Empty;
-        NicheResearchNotes = string.Empty;
-        NicheNotes = string.Empty;
-    }
+    private void ClearNicheEditorFields() => _storeConfiguration.DiscardNicheDraft();
 
     private StoreSummary? DraftStore()
     {
@@ -3854,14 +1840,12 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         return new NicheSummary(id, SelectedStore.Id, name, CurrentNicheContext(), IsArchived: false, now, now);
     }
 
-    private void RequestDiscardBefore(PendingEditorAction action, StoreSummary? store = null, NicheSummary? niche = null, TagSummary? tag = null, StoreProductSummary? product = null, FulfillmentOfferingSummary? offering = null)
+    private void RequestDiscardBefore(PendingEditorAction action, StoreSummary? store = null, NicheSummary? niche = null, Action? discardContinuation = null)
     {
         _pendingEditorAction = action;
         _pendingEditorStore = store;
         _pendingEditorNiche = niche;
-        _pendingEditorTag = tag;
-        _pendingEditorProduct = product;
-        _pendingEditorOffering = offering;
+        _pendingDiscardContinuation = discardContinuation;
         ClearDeleteWarning();
         ClearNicheDeleteWarning();
         ClearTagDeleteWarning();
@@ -3876,9 +1860,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         var action = _pendingEditorAction;
         var store = _pendingEditorStore;
         var niche = _pendingEditorNiche;
-        var tag = _pendingEditorTag;
-        var product = _pendingEditorProduct;
-        var offering = _pendingEditorOffering;
+        var discardContinuation = _pendingDiscardContinuation;
         DiscardCurrentEditorChanges();
         ClearDiscardChangesPrompt();
 
@@ -3906,43 +1888,18 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
                 SelectedEditorTab = StoreManagementEditorTab.Niches;
                 Run(LoadNichesForSelectedStoreAsync);
                 break;
-            case PendingEditorAction.SelectTag when tag is not null:
-                PerformSelectTagForEditing(tag);
-                break;
-            case PendingEditorAction.StartNewTag:
-                BeginCreateTagDraft();
-                break;
             case PendingEditorAction.SelectTagsTab:
                 SelectedEditorTab = StoreManagementEditorTab.Tags;
+                _tagEditor.OnTabSelected();
                 Run(LoadTagsForSelectedStoreAsync);
                 break;
             case PendingEditorAction.SelectProductsTab:
                 SelectedEditorTab = StoreManagementEditorTab.Products;
                 Run(LoadProductsForSelectedStoreAsync);
                 break;
-            case PendingEditorAction.StartNewProduct:
-                BeginCreateProductDraft();
-                break;
-            case PendingEditorAction.SelectProduct when product is not null:
-                PerformSelectProductForEditing(product);
-                break;
-            case PendingEditorAction.SelectOffering when offering is not null:
-                PerformSelectOfferingForEditing(offering);
-                break;
-            case PendingEditorAction.StartNewOffering:
-                BeginCreateOfferingDraft();
-                break;
-            case PendingEditorAction.BackToProducts:
-                CatalogEditorLevel = CatalogEditorLevel.Overview;
-                break;
-            case PendingEditorAction.BackToProduct:
-                CatalogEditorLevel = CatalogEditorLevel.ProductDetail;
-                break;
-            case PendingEditorAction.NavigateCatalog:
-                CatalogSetup?.CancelActiveDrafts();
-                CatalogEditorLevel = _pendingCatalogLevel;
-                break;
         }
+
+        discardContinuation?.Invoke();
     }
 
     private void DiscardCurrentEditorChanges()
@@ -3969,38 +1926,12 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
         ApplySelectedNicheFields(SelectedNiche);
         CaptureOriginalNicheEditorState();
-        if (_isCreatingNewTag)
-        {
-            _isCreatingNewTag = false;
-            _draftTagId = null;
-            SelectedTag = ActiveTags.FirstOrDefault(tag => tag.Id == SelectedTag?.Id) ?? ActiveTags.FirstOrDefault();
-        }
-
-        ApplySelectedTagFields(SelectedTag);
-        CaptureOriginalTagEditorState();
-        if (_isCreatingNewProduct)
-        {
-            _isCreatingNewProduct = false;
-            _draftProductId = null;
-            SelectedProduct = Products.FirstOrDefault(product => product.Id == SelectedProduct?.Id) ?? Products.FirstOrDefault();
-        }
-
-        ApplySelectedProductFields(SelectedProduct);
-        ApplySelectedOfferingAfterProductChange();
-        CaptureOriginalProductState();
-        if (_isCreatingNewOffering)
-        {
-            _isCreatingNewOffering = false;
-            _draftOfferingId = null;
-        }
-
-        ApplySelectedOfferingFieldsForDiscard();
+        _tagEditor.DiscardUnsavedChanges();
+        _productCatalogEditor.DiscardUnsavedChanges();
         OnPropertyChanged(nameof(SelectedStore));
         OnPropertyChanged(nameof(EditorActiveStores));
         OnPropertyChanged(nameof(SelectedNiche));
         OnPropertyChanged(nameof(EditorActiveNiches));
-        OnPropertyChanged(nameof(SelectedTag));
-        OnPropertyChanged(nameof(EditorActiveTags));
         OnPropertyChanged(nameof(SelectedProduct));
         OnPropertyChanged(nameof(EditorProducts));
         OnPropertyChanged(nameof(SelectedOffering));
@@ -4013,28 +1944,12 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         RaiseOfferingEditorStateProperties();
     }
 
-    private void ApplySelectedOfferingFieldsForDiscard()
-    {
-        var offerings = SelectedProduct?.Offerings ?? [];
-        SelectedOffering = offerings.FirstOrDefault(offering => offering.Id == SelectedOffering?.Id) ?? offerings.FirstOrDefault();
-        if (SelectedOffering is not null)
-        {
-            ApplySelectedOfferingFields(SelectedOffering);
-        }
-        else
-        {
-            ClearOfferingEditingFields();
-        }
-    }
-
     private void ClearDiscardChangesPrompt()
     {
         _pendingEditorAction = PendingEditorAction.None;
         _pendingEditorStore = null;
         _pendingEditorNiche = null;
-        _pendingEditorTag = null;
-        _pendingEditorProduct = null;
-        _pendingEditorOffering = null;
+        _pendingDiscardContinuation = null;
         DiscardChangesPromptVisible = false;
     }
 
@@ -4074,21 +1989,18 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
             EmptyToNull(NicheResearchNotes),
             EmptyToNull(NicheNotes));
 
-    private EditorState CurrentEditorState() =>
-        new(NewStoreName, Description, Notes, TargetMarket, BrandDirection, PlanningContext, Url, SelectedFulfillmentStrategy, _printifyShopId, _printifyShopTitle, _printifyShopSelectionChanged);
-
-    private NicheEditorState CurrentNicheEditorState() =>
-        new(NicheName, NicheDescription, NicheAudience, NicheHumorStyle, NicheVisualStyleGuidance, NicheConstraints, NicheRisks, NicheResearchNotes, NicheNotes);
-
     private void CaptureOriginalEditorState()
     {
-        _originalEditorState = CurrentEditorState();
+        _storeConfiguration.PrintifyShopId = _printifyShopId;
+        _storeConfiguration.PrintifyShopTitle = _printifyShopTitle;
+        _storeConfiguration.PrintifyShopSelectionChanged = _printifyShopSelectionChanged;
+        _storeConfiguration.CaptureStoreDraft();
         RaiseEditorStateProperties();
     }
 
     private void CaptureOriginalNicheEditorState()
     {
-        _originalNicheEditorState = CurrentNicheEditorState();
+        _storeConfiguration.CaptureNicheDraft();
         RaiseNicheEditorStateProperties();
     }
 
@@ -4127,9 +2039,6 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         OnPropertyChanged(nameof(HasNichePopulationStatus));
     }
 
-    private static EditorState EmptyEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, FulfillmentStrategy.Manual, null, null, false);
-
-    private static NicheEditorState EmptyNicheEditorState() => new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
 
     private static string? EmptyToNull(string value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
