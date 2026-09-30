@@ -72,7 +72,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         });
         CancelDiscardCommand = new RelayCommand(_ => ConfirmDiscardCredentialDraft = false);
         ManageWorkspacesCommand = new RelayCommand(_ => ManageWorkspaces(), () => _workspaceManagement is not null);
-        CopyDiagnosticsCommand = new RelayCommand(_ => _ = CopyDiagnosticsAsync());
+        CopyDiagnosticsCommand = new RelayCommand(_ => Run(CopyDiagnosticsAsync));
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -90,7 +90,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
                 OnPropertyChanged(nameof(IsAboutSection));
                 if (value == SettingsSection.AI)
                 {
-                    _ = Ai.EnsureLoadedAsync();
+                    Ai.EnsureLoaded();
                 }
             }
         }
@@ -296,9 +296,20 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
 
     private async Task CopyDiagnosticsAsync()
     {
+        await _clipboard.SetTextAsync(DiagnosticsText).ConfigureAwait(true);
+    }
+
+    private void Run(Func<Task> operation) => _ = ObserveAsync(operation);
+
+    private async Task ObserveAsync(Func<Task> operation)
+    {
         try
         {
-            await _clipboard.SetTextAsync(DiagnosticsText).ConfigureAwait(false);
+            await operation().ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
         }
         catch (Exception)
         {

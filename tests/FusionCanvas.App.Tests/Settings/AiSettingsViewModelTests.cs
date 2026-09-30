@@ -193,6 +193,31 @@ public class AiSettingsViewModelTests
     }
 
     [Fact]
+    public async Task EnsureLoaded_UnexpectedFailureIsObservedAndReported()
+    {
+        var credentials = new CredentialStore
+        {
+            ReadFailure = new IOException("credential store unavailable")
+        };
+        var vm = Create(credentials);
+        var message = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        vm.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(vm.Message))
+            {
+                message.TrySetResult(vm.Message);
+            }
+        };
+
+        vm.EnsureLoaded();
+
+        Assert.Equal(
+            "AI settings could not be loaded. Review the saved credential and model catalog.",
+            await message.Task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken));
+        Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
     public async Task CatalogLoad_DoesNotDuplicateWhileBusy()
     {
         var credentials = new CredentialStore { Result = AiCredentialReadResult.Available("secret") };
@@ -301,9 +326,15 @@ public class AiSettingsViewModelTests
     {
         public int Reads { get; private set; }
         public AiCredentialReadResult Result { get; set; } = AiCredentialReadResult.NotFound;
+        public Exception? ReadFailure { get; init; }
         public Task<AiCredentialReadResult> ReadAsync(CancellationToken cancellationToken = default)
         {
             Reads++;
+            if (ReadFailure is not null)
+            {
+                return Task.FromException<AiCredentialReadResult>(ReadFailure);
+            }
+
             return Task.FromResult(Result);
         }
         public Task<AiCredentialOperationResult> SaveAsync(string apiKey, CancellationToken cancellationToken = default) =>
