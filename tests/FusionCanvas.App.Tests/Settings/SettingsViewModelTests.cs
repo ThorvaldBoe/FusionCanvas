@@ -24,6 +24,18 @@ public class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task OfflineAiCredentialStore_ReportsUnavailableStorageInsteadOfMissingCredential()
+    {
+        var vm = NewViewModel();
+
+        await vm.Ai.EnsureLoadedAsync();
+
+        Assert.Equal(
+            "Native credential storage is unavailable in this session.",
+            vm.Ai.CredentialStatus);
+    }
+
+    [Fact]
     public void Open_ResetsToGeneralSectionAndShowsWindow()
     {
         var vm = NewViewModel();
