@@ -332,6 +332,43 @@ public class ItemInspectorViewModelTests
     }
 
     [Fact]
+    public async Task Commit_UnexpectedFailureKeepsDraftAndReportsError()
+    {
+        var sample = Sample.Create();
+        var viewModel = sample.CreateViewModel(
+            inspectorService: new ThrowingItemInspectorService(
+                new ItemInspectorService(sample.Repository),
+                new IOException("unexpected save failure")));
+        await viewModel.LoadAsync(sample.Item.Id);
+
+        viewModel.Notes = "changed notes";
+        await viewModel.CommitEditsAsync();
+
+        Assert.Equal("unexpected save failure", viewModel.ErrorMessage);
+        Assert.True(viewModel.HasUnsavedChanges);
+        Assert.False(viewModel.IsBusy);
+    }
+
+    [Fact]
+    public async Task Command_UnexpectedFailureIsObservedAndReportsError()
+    {
+        var sample = Sample.Create();
+        var viewModel = sample.CreateViewModel(
+            inspectorService: new ThrowingItemInspectorService(
+                new ItemInspectorService(sample.Repository),
+                new IOException("unexpected command failure")));
+        await viewModel.LoadAsync(sample.Item.Id);
+
+        viewModel.TagInput = "New Tag";
+        viewModel.AddTagCommand.Execute(null);
+
+        await WaitUntilAsync(() => viewModel.HasError);
+
+        Assert.Equal("unexpected command failure", viewModel.ErrorMessage);
+        Assert.False(viewModel.IsBusy);
+    }
+
+    [Fact]
     public async Task TagChange_PersistsImmediatelyWithoutReplacingTextDraft()
     {
         var sample = Sample.Create();
@@ -772,13 +809,32 @@ public class ItemInspectorViewModelTests
         }
     }
 
+    private sealed class ThrowingItemInspectorService(
+        IItemInspectorService inner,
+        Exception failure) : IItemInspectorService
+    {
+        public Task<ItemInspectorState?> LoadAsync(Guid itemId, CancellationToken cancellationToken = default) =>
+            inner.LoadAsync(itemId, cancellationToken);
+
+        public Task<ItemInspectorSaveResult> SaveAsync(
+            ItemInspectorSaveRequest request,
+            CancellationToken cancellationToken = default) =>
+            Task.FromException<ItemInspectorSaveResult>(failure);
+
+        public Task<ItemInspectorSaveResult> SaveStageAsync(
+            ItemStageAwareSaveRequest request,
+            CancellationToken cancellationToken = default) =>
+            Task.FromException<ItemInspectorSaveResult>(failure);
+    }
+
     private sealed record Sample(WorkspaceSnapshot Snapshot, DateTimeOffset Now, Store Store, Niche Niche, TopicGroup Root, TopicGroup Child, Item Item, Tag Tag, TestRepository Repository)
     {
         public ItemInspectorViewModel CreateViewModel(
             Func<DateTimeOffset>? clock = null,
-            ITitleOptimizationService? optimization = null) =>
+            ITitleOptimizationService? optimization = null,
+            IItemInspectorService? inspectorService = null) =>
             new(
-                new ItemInspectorService(Repository, clock: clock, newId: Guid.NewGuid),
+                inspectorService ?? new ItemInspectorService(Repository, clock: clock, newId: Guid.NewGuid),
                 new ItemManagementService(Repository, clock: clock, newId: Guid.NewGuid),
                 optimization: optimization);
 
