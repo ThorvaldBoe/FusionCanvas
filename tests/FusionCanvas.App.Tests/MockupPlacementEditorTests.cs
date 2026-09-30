@@ -5,6 +5,7 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Layout;
+using Avalonia.Media.Imaging;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Stores;
 
@@ -95,6 +96,72 @@ public sealed class MockupPlacementEditorTests
         Assert.Equal(251, editor.PlacementX);
         Assert.Equal(501, editor.PlacementHeight);
         window.Close();
+    }
+
+    [AvaloniaFact]
+    public void CorruptPreview_RendersFallbackAndExposesAccessibleDiagnostic()
+    {
+        var temporaryRoot = Environment.GetEnvironmentVariable("TMPDIR") ?? Path.GetTempPath();
+        var temporaryDirectory = Path.Combine(temporaryRoot, $"fusioncanvas-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryDirectory);
+
+        try
+        {
+            var imagePath = Path.Combine(temporaryDirectory, "corrupt-preview.png");
+            var corruptImageBytes = new byte[] { 0x00, 0x01, 0x02, 0x03 };
+            File.WriteAllBytes(imagePath, corruptImageBytes);
+            var editor = NewEditor();
+            editor.ImagePath = imagePath;
+            var loadAttempts = 0;
+            editor.PreviewBitmapFactory = path =>
+            {
+                loadAttempts++;
+                Assert.Equal(imagePath, path);
+                Assert.Equal(corruptImageBytes, File.ReadAllBytes(path));
+                throw new InvalidDataException("The corrupt preview could not be decoded.");
+            };
+            editor.Measure(new Size(400, 400));
+            editor.Arrange(new Rect(0, 0, 400, 400));
+            using var unavailableFrame = new RenderTargetBitmap(new PixelSize(400, 400));
+            using (var context = unavailableFrame.CreateDrawingContext())
+            {
+                editor.Render(context);
+            }
+
+            Assert.Equal(1, loadAttempts);
+            Assert.Equal(
+                "Preview unavailable: the selected image could not be loaded.",
+                AutomationProperties.GetHelpText(editor));
+
+            editor.ImagePath = null;
+            using var emptyPreviewFrame = new RenderTargetBitmap(new PixelSize(400, 400));
+            using (var context = emptyPreviewFrame.CreateDrawingContext())
+            {
+                editor.Render(context);
+            }
+
+            Assert.Null(AutomationProperties.GetHelpText(editor));
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
+    [AvaloniaFact]
+    public void UnexpectedPreviewFailure_IsPropagated()
+    {
+        var editor = NewEditor();
+        editor.ImagePath = "preview.png";
+        editor.PreviewBitmapFactory = _ => throw new InvalidOperationException("Unexpected preview failure.");
+        editor.Measure(new Size(400, 400));
+        editor.Arrange(new Rect(0, 0, 400, 400));
+        using var bitmap = new RenderTargetBitmap(new PixelSize(400, 400));
+        using var context = bitmap.CreateDrawingContext();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => editor.Render(context));
+
+        Assert.Equal("Unexpected preview failure.", exception.Message);
     }
 
     [AvaloniaFact]
