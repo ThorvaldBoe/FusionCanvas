@@ -1,5 +1,6 @@
 using System.Text.Json;
 using FusionCanvas.Application.AI;
+using FusionCanvas.Application.Telemetry;
 
 namespace FusionCanvas.Integration.AI;
 
@@ -68,6 +69,7 @@ public sealed class JsonAiModelCatalogCache : IAiModelCatalogCache
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or JsonException)
         {
+            TechnicalDiagnostics.RecordFailure("AI model catalog cache load", exception);
             return null;
         }
     }
@@ -111,7 +113,10 @@ public sealed class JsonAiModelCatalogCache : IAiModelCatalogCache
     private static void TryDelete(string path)
     {
         try { File.Delete(path); }
-        catch { }
+        catch (Exception cleanupException)
+        {
+            TechnicalDiagnostics.RecordFailure("AI model catalog cache temporary-file cleanup", cleanupException);
+        }
     }
 
     private sealed record CacheDocument(int Version, AiModelCatalog Catalog);
