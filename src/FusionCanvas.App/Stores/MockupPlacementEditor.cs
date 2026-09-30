@@ -11,6 +11,7 @@ namespace FusionCanvas.App.Stores;
 /// <summary>Accessible image-space rectangle editor. It scales the provider image to fit the viewport (letterboxed) and performs no artwork rendering or composition.</summary>
 public sealed class MockupPlacementEditor : Control
 {
+    private const string PreviewUnavailableMessage = "Preview unavailable: the selected image could not be loaded.";
     public static readonly StyledProperty<double> PlacementXProperty = AvaloniaProperty.Register<MockupPlacementEditor, double>(nameof(PlacementX), defaultBindingMode: BindingMode.TwoWay);
     public static readonly StyledProperty<double> PlacementYProperty = AvaloniaProperty.Register<MockupPlacementEditor, double>(nameof(PlacementY), defaultBindingMode: BindingMode.TwoWay);
     public static readonly StyledProperty<double> PlacementWidthProperty = AvaloniaProperty.Register<MockupPlacementEditor, double>(nameof(PlacementWidth), 100, defaultBindingMode: BindingMode.TwoWay);
@@ -44,6 +45,8 @@ public sealed class MockupPlacementEditor : Control
     public double AspectRatio { get => GetValue(AspectRatioProperty); set => SetValue(AspectRatioProperty, value); }
     public bool KeepAspectRatio { get => GetValue(KeepAspectRatioProperty); set => SetValue(KeepAspectRatioProperty, value); }
 
+    internal Func<string, Bitmap> PreviewBitmapFactory { get; set; } = static imagePath => new Bitmap(imagePath);
+
     public Rect ImageDisplayBounds => ImageRect();
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -67,16 +70,42 @@ public sealed class MockupPlacementEditor : Control
         base.Render(context);
         var imageRect = ImageRect();
         context.DrawRectangle(new SolidColorBrush(Color.FromRgb(35, 43, 55)), new Pen(Brushes.SlateGray, 1), imageRect);
-        if (!HasImage()) return;
-        try
+        var previewUnavailable = false;
+        if (string.IsNullOrWhiteSpace(ImagePath))
         {
-            if (!string.IsNullOrWhiteSpace(ImagePath) && File.Exists(ImagePath))
-                using (var bitmap = new Bitmap(ImagePath)) context.DrawImage(bitmap, new Rect(0, 0, bitmap.PixelSize.Width, bitmap.PixelSize.Height), imageRect);
+            AutomationProperties.SetHelpText(this, null);
         }
-        catch { }
-        var rectangle = DisplayRectangle(imageRect);
-        context.DrawRectangle(new SolidColorBrush(Color.FromArgb(45, 70, 150, 230)), new Pen(Brushes.DodgerBlue, 2), rectangle);
-        context.DrawRectangle(Brushes.DodgerBlue, null, new Rect(rectangle.Right - HandleSize, rectangle.Bottom - HandleSize, HandleSize, HandleSize));
+        else
+        {
+            Bitmap? bitmap = null;
+            try
+            {
+                bitmap = PreviewBitmapFactory(ImagePath);
+            }
+            catch (Exception exception) when (IsExpectedPreviewLoadFailure(exception))
+            {
+                previewUnavailable = true;
+            }
+
+            if (!previewUnavailable)
+            {
+                using var loadedBitmap = bitmap ?? throw new InvalidOperationException("The preview bitmap factory returned no bitmap.");
+                context.DrawImage(loadedBitmap, new Rect(0, 0, loadedBitmap.PixelSize.Width, loadedBitmap.PixelSize.Height), imageRect);
+                AutomationProperties.SetHelpText(this, null);
+            }
+        }
+
+        if (HasImage())
+        {
+            var rectangle = DisplayRectangle(imageRect);
+            context.DrawRectangle(new SolidColorBrush(Color.FromArgb(45, 70, 150, 230)), new Pen(Brushes.DodgerBlue, 2), rectangle);
+            context.DrawRectangle(Brushes.DodgerBlue, null, new Rect(rectangle.Right - HandleSize, rectangle.Bottom - HandleSize, HandleSize, HandleSize));
+        }
+
+        if (previewUnavailable)
+        {
+            DrawUnavailablePreview(context, imageRect);
+        }
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -152,6 +181,35 @@ public sealed class MockupPlacementEditor : Control
     }
 
     private bool HasImage() => ImageWidth > 0 && ImageHeight > 0;
+
+    private static bool IsExpectedPreviewLoadFailure(Exception exception)
+    {
+        return exception is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or InvalidDataException
+            or NotSupportedException;
+    }
+
+    private void DrawUnavailablePreview(DrawingContext context, Rect imageRect)
+    {
+        AutomationProperties.SetHelpText(this, PreviewUnavailableMessage);
+        var text = new FormattedText(
+            "Preview unavailable",
+            System.Globalization.CultureInfo.CurrentCulture,
+            FlowDirection.LeftToRight,
+            new Typeface("Arial"),
+            14,
+            Brushes.LightCoral);
+        var origin = new Point(
+            imageRect.X + Math.Max(0, (imageRect.Width - text.Width) / 2),
+            imageRect.Y + Math.Max(0, (imageRect.Height - text.Height) / 2));
+
+        using (context.PushClip(imageRect))
+        {
+            context.DrawText(text, origin);
+        }
+    }
 
     private bool HasAspectRatio => KeepAspectRatio && double.IsFinite(AspectRatio) && AspectRatio > 0;
 
