@@ -219,6 +219,102 @@ public class ItemInspectorViewModelTests
     }
 
     [Fact]
+    public async Task CommitCompletingAfterItemSwitchDoesNotOverwriteNewItemState()
+    {
+        var sample = Sample.Create();
+        var nextItem = sample.Item with { Id = Guid.NewGuid(), Name = "Next item" };
+        sample.Repository.Set(sample.Snapshot with { Items = [sample.Item, nextItem] });
+        var viewModel = sample.CreateViewModel();
+        await viewModel.LoadAsync(sample.Item.Id, TestContext.Current.CancellationToken);
+
+        var saveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allowSaveToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        sample.Repository.SaveStarted = saveStarted;
+        sample.Repository.AllowSaveToFinish = allowSaveToFinish;
+        viewModel.Notes = "old-item pending edit";
+        var commit = viewModel.CommitEditsAsync(TestContext.Current.CancellationToken);
+        await saveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        try
+        {
+            await viewModel.LoadAsync(nextItem.Id, TestContext.Current.CancellationToken);
+            Assert.Equal(nextItem.Id, viewModel.State?.Id);
+        }
+        finally
+        {
+            allowSaveToFinish.TrySetResult();
+        }
+
+        await commit.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(nextItem.Id, viewModel.LoadedItemId);
+        Assert.Equal(nextItem.Id, viewModel.State?.Id);
+        Assert.Equal(nextItem.Name, viewModel.Title);
+    }
+
+    [Fact]
+    public async Task CommitRequestedForNewItemWhilePreviousCommitIsInFlightIsNotLost()
+    {
+        var sample = Sample.Create();
+        var nextItem = sample.Item with { Id = Guid.NewGuid(), Name = "Next item" };
+        sample.Repository.Set(sample.Snapshot with { Items = [sample.Item, nextItem] });
+        var viewModel = sample.CreateViewModel();
+        await viewModel.LoadAsync(sample.Item.Id, TestContext.Current.CancellationToken);
+
+        var saveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allowSaveToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        sample.Repository.SaveStarted = saveStarted;
+        sample.Repository.AllowSaveToFinish = allowSaveToFinish;
+        viewModel.Notes = "old-item pending edit";
+        var previousCommit = viewModel.CommitEditsAsync(TestContext.Current.CancellationToken);
+        await saveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        await viewModel.LoadAsync(nextItem.Id, TestContext.Current.CancellationToken);
+        viewModel.Notes = "new-item pending edit";
+        var newItemCommit = viewModel.CommitEditsAsync(TestContext.Current.CancellationToken);
+
+        allowSaveToFinish.TrySetResult();
+        await Task.WhenAll(previousCommit, newItemCommit).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, sample.Repository.SaveCount);
+        Assert.Equal(nextItem.Id, viewModel.State?.Id);
+        Assert.Equal("new-item pending edit", viewModel.Notes);
+        Assert.False(viewModel.HasUnsavedChanges);
+    }
+
+    [Fact]
+    public async Task CommitFailureAfterItemSwitchDoesNotSetErrorOnNewItem()
+    {
+        var sample = Sample.Create();
+        var nextItem = sample.Item with { Id = Guid.NewGuid(), Name = "Next item" };
+        sample.Repository.Set(sample.Snapshot with { Items = [sample.Item, nextItem] });
+        sample.Repository.FailSaves = true;
+        var viewModel = sample.CreateViewModel();
+        await viewModel.LoadAsync(sample.Item.Id, TestContext.Current.CancellationToken);
+
+        var saveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allowSaveToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        sample.Repository.SaveStarted = saveStarted;
+        sample.Repository.AllowSaveToFinish = allowSaveToFinish;
+        viewModel.Notes = "old-item pending edit";
+        var commit = viewModel.CommitEditsAsync(TestContext.Current.CancellationToken);
+        await saveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        try
+        {
+            await viewModel.LoadAsync(nextItem.Id, TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            allowSaveToFinish.TrySetResult();
+        }
+
+        await commit.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(nextItem.Id, viewModel.LoadedItemId);
+        Assert.Equal(nextItem.Id, viewModel.State?.Id);
+        Assert.Null(viewModel.ErrorMessage);
+    }
+
+    [Fact]
     public async Task Commit_PersistenceFailureKeepsDraftAndReportsError()
     {
         var sample = Sample.Create();
@@ -650,11 +746,18 @@ public class ItemInspectorViewModelTests
         public int SaveCount { get; private set; }
         public bool FailSaves { get; set; }
         public TimeSpan? SaveDelay { get; set; }
+        public TaskCompletionSource? SaveStarted { get; set; }
+        public TaskCompletionSource? AllowSaveToFinish { get; set; }
         public void Set(WorkspaceSnapshot value) => Snapshot = value;
         public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(Snapshot);
         public async Task SaveAsync(WorkspaceSnapshot value, CancellationToken cancellationToken = default)
         {
-            if (SaveDelay is { } delay)
+            if (SaveStarted is not null && AllowSaveToFinish is not null)
+            {
+                SaveStarted.TrySetResult();
+                await AllowSaveToFinish.Task;
+            }
+            else if (SaveDelay is { } delay)
             {
                 await Task.Delay(delay, cancellationToken);
             }
