@@ -189,6 +189,7 @@ public class StorePrintifyTests
         Assert.Equal(FulfillmentStrategy.ShopifyPrintify, model.SelectedFulfillmentStrategy);
         Assert.Equal(FulfillmentStrategy.ShopifyPrintify, (await stores.LoadAsync(Ct)).ActiveStore!.FulfillmentStrategy);
         selector.SelectedItem = FulfillmentStrategy.ShopifyManual;
+        Assert.Equal(FulfillmentStrategy.ShopifyManual, model.SelectedFulfillmentStrategy);
         await model.SaveSelectedStoreAsync(Ct);
         model.ConfirmStrategyCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();

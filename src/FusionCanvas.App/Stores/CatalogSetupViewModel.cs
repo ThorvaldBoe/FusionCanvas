@@ -2010,7 +2010,22 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static string MessageSuffix(string message) => string.IsNullOrWhiteSpace(message) ? "." : $": {message}";
     private static void Replace<T>(ObservableCollection<T> target, IEnumerable<T> values) { target.Clear(); foreach (var value in values) target.Add(value); }
-    private bool SetField<T>(ref T field, T value, [CallerMemberName] string? name = null) { if (EqualityComparer<T>.Default.Equals(field, value)) return false; field = value; OnPropertyChanged(name); return true; }
+    private bool SetField<T>(ref T field, T value, [CallerMemberName] string? name = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
+        field = value;
+        OnPropertyChanged(name);
+        if (name is nameof(IsAddingPrintProvider)
+            or nameof(IsAddingOption)
+            or nameof(IsAddingOptionValue)
+            or nameof(IsEditingOptionValue)
+            or nameof(IsAddingVariant)
+            or nameof(IsAddingBulkVariants)
+            or nameof(IsAddingPlaceholder)
+            or nameof(IsAddingTemplate))
+            OnPropertyChanged(nameof(HasActiveDraft));
+        return true;
+    }
     private void OnPropertyChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
     private sealed record MockupTemplateDraftState(
