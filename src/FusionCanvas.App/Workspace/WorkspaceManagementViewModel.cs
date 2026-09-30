@@ -309,6 +309,12 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
         }
     }
 
+    internal void ApplyInitialState(WorkspaceManagementState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ApplyState(state);
+    }
+
     public async Task CreateWorkspaceAsync(CancellationToken cancellationToken = default)
     {
         if (IsTransferRunning) return;
