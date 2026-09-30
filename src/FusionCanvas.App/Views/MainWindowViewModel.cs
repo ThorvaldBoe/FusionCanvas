@@ -203,8 +203,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             ItemInspector);
         _ideationAccessStatus.AvailabilityChanged += (_, _) =>
             Avalonia.Threading.Dispatcher.UIThread.Post(RaiseIdeationProperties);
-        Settings.Ai.SettingsChanged += (_, _) => _ = _ideationAccessStatus.RefreshAsync();
-        Settings.Ai.AvailabilityChanged += (_, _) => _ = _ideationAccessStatus.RefreshAsync();
+        Settings.Ai.SettingsChanged += (_, _) => Run(_ideationAccessStatus.RefreshAsync());
+        Settings.Ai.AvailabilityChanged += (_, _) => Run(_ideationAccessStatus.RefreshAsync());
         Settings.Ai.SettingsChanged += (_, _) => _ = ConceptRefinement.RefreshAvailabilityAsync();
         Settings.Ai.AvailabilityChanged += (_, _) => _ = ConceptRefinement.RefreshAvailabilityAsync();
         Settings.Ai.SettingsChanged += (_, _) => _ = SllGeneration.RefreshAvailabilityAsync();
@@ -215,7 +215,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         Settings.Ai.AvailabilityChanged += (_, _) => _ = DesignTool.RefreshArtworkAvailabilityAsync();
         Settings.Ai.SettingsChanged += (_, _) => _ = StoreManagement.RefreshNichePopulationAvailabilityAsync();
         Settings.Ai.AvailabilityChanged += (_, _) => _ = StoreManagement.RefreshNichePopulationAvailabilityAsync();
-        _ = _ideationAccessStatus.RefreshAsync();
+        Run(_ideationAccessStatus.RefreshAsync());
         _ = StoreManagement.RefreshNichePopulationAvailabilityAsync();
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
