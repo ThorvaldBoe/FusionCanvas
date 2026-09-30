@@ -401,7 +401,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     private sealed class OfflineCredentialStore : IAiCredentialStore
     {
         public Task<AiCredentialReadResult> ReadAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(AiCredentialReadResult.NotFound);
+            Task.FromResult(AiCredentialReadResult.Failure(
+                AiCredentialStateKind.Unavailable,
+                "Native credential storage is unavailable in this session."));
         public Task<AiCredentialOperationResult> SaveAsync(string apiKey, CancellationToken cancellationToken = default) =>
             Task.FromResult(AiCredentialOperationResult.Failed("Native credential storage is unavailable in this session."));
         public Task<AiCredentialOperationResult> RemoveAsync(CancellationToken cancellationToken = default) =>
