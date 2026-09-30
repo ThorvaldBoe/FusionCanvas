@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
+using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Settings;
 using FusionCanvas.App.Stores;
 using FusionCanvas.App.Views;
@@ -75,7 +76,8 @@ public partial class App : Avalonia.Application
             MainWindowViewModel mainViewModel => mainViewModel.StoreManagement,
             _ => null
         };
-        _shutdownTask ??= CompleteWindowShutdownAsync(window, storeManagement);
+        var workspaceTree = (window.DataContext as MainWindowViewModel)?.WorkspaceTree;
+        _shutdownTask ??= CompleteWindowShutdownAsync(window, storeManagement, workspaceTree);
         try
         {
             await _shutdownTask;
@@ -86,9 +88,14 @@ public partial class App : Avalonia.Application
         }
     }
 
-    private async Task CompleteWindowShutdownAsync(Window window, StoreManagementViewModel? storeManagement)
+    private async Task CompleteWindowShutdownAsync(
+        Window window,
+        StoreManagementViewModel? storeManagement,
+        WorkspaceTreeViewModel? workspaceTree)
     {
         var storeManagementDrained = true;
+        var workspaceTreeDrained = true;
+        var shouldCloseWindow = true;
         try
         {
             if (storeManagement is not null)
@@ -106,9 +113,37 @@ public partial class App : Avalonia.Application
                 storeManagementDrained &= !storeManagement.IsBusy;
             }
 
+            if (workspaceTree is not null)
+            {
+                try
+                {
+                    await workspaceTree.DisposeAsync();
+                }
+                catch (Exception exception)
+                {
+                    Trace.TraceError("Workspace tree shutdown failed: {0}", exception);
+                    try
+                    {
+                        await workspaceTree.WaitForCommandTasksAsync();
+                    }
+                    catch (Exception drainException)
+                    {
+                        workspaceTreeDrained = false;
+                        Trace.TraceError("Workspace tree command drain failed: {0}", drainException);
+                    }
+                }
+
+                workspaceTreeDrained &= workspaceTree.PendingCommandCount == 0;
+                if (!workspaceTreeDrained)
+                {
+                    shouldCloseWindow = false;
+                    Trace.TraceWarning("Keeping the window open because workspace-tree commands are still running.");
+                }
+            }
+
             if (_services is { } services)
             {
-                if (storeManagementDrained)
+                if (storeManagementDrained && workspaceTreeDrained)
                 {
                     try
                     {
@@ -137,14 +172,21 @@ public partial class App : Avalonia.Application
                 else
                 {
                     Trace.TraceWarning(
-                        "Skipping service flush and disposal because StoreManagementViewModel still has in-flight operations.");
+                        "Skipping service flush and disposal because a view model still has in-flight operations.");
                 }
             }
         }
         finally
         {
-            _allowFinalClose = true;
-            window.Close();
+            if (shouldCloseWindow)
+            {
+                _allowFinalClose = true;
+                window.Close();
+            }
+            else
+            {
+                _shutdownTask = null;
+            }
         }
     }
 

@@ -19,6 +19,178 @@ namespace FusionCanvas.App.Tests;
 public class WorkspaceTreeViewModelTests
 {
     [Fact]
+    public async Task BeginCreateCommand_ReportsUnexpectedFailureAndTracksCompletion()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot) { FailLoads = true };
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+
+        viewModel.BeginCreateCommand.Execute(null);
+        await viewModel.WaitForCommandTasksAsync().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.Equal("Injected workspace read failure.", viewModel.ErrorMessage);
+        Assert.Equal(0, viewModel.PendingCommandCount);
+        Assert.False(viewModel.IsBusy);
+    }
+
+    [Fact]
+    public async Task ExecuteTrackedDirectOperationSurfacesUnexpectedFailureAndDrains()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot) { FailLoads = true };
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+
+        await viewModel.ExecuteTrackedCommandAsync(viewModel.ReloadAsync, TestContext.Current.CancellationToken);
+
+        Assert.Equal("Injected workspace read failure.", viewModel.ErrorMessage);
+        Assert.Equal(0, viewModel.PendingCommandCount);
+        Assert.False(viewModel.IsBusy);
+    }
+
+    [Fact]
+    public async Task DisposeAsyncWaitsForCommandsBeforeReportingCancellationCallbackFailure()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+        var commandStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCommand = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var command = viewModel.ExecuteTrackedCommandAsync(async cancellationToken =>
+        {
+            using var registration = cancellationToken.Register(
+                () => throw new InvalidOperationException("Injected cancellation callback failure."));
+            commandStarted.TrySetResult();
+            await releaseCommand.Task;
+        }, TestContext.Current.CancellationToken);
+        await commandStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        var disposal = viewModel.DisposeAsync().AsTask();
+        try
+        {
+            await Task.Yield();
+            Assert.False(disposal.IsCompleted);
+            Assert.Equal(1, viewModel.PendingCommandCount);
+        }
+        finally
+        {
+            releaseCommand.TrySetResult();
+        }
+
+        await command.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await Assert.ThrowsAnyAsync<Exception>(
+            () => disposal.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        Assert.Equal(0, viewModel.PendingCommandCount);
+    }
+
+    [Fact]
+    public async Task DisposeAsyncCancelsAndDrainsPendingCommandTasks()
+    {
+        var sample = Sample.Create();
+        var repository = new BlockingLoadRepository(sample.Snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+
+        viewModel.BeginCreateCommand.Execute(null);
+        await repository.LoadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(1, viewModel.PendingCommandCount);
+        Assert.True(viewModel.IsBusy);
+
+        await viewModel.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.True(repository.LoadCancelled.Task.IsCompletedSuccessfully);
+        Assert.Equal(0, viewModel.PendingCommandCount);
+    }
+
+    [Fact]
+    public async Task ExecuteTrackedOperationNotifiesBusyWhenItStartsAndFinishes()
+    {
+        var sample = Sample.Create();
+        var repository = new NonCancellableLoadRepository(sample.Snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+        var busyNotifications = new List<bool>();
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(viewModel.IsBusy))
+            {
+                busyNotifications.Add(viewModel.IsBusy);
+            }
+        };
+
+        var operation = viewModel.ExecuteTrackedCommandAsync(viewModel.ReloadAsync, TestContext.Current.CancellationToken);
+        try
+        {
+            await repository.LoadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.True(viewModel.IsBusy);
+            Assert.Contains(true, busyNotifications);
+        }
+        finally
+        {
+            repository.ReleaseLoad.TrySetResult();
+        }
+
+        await operation.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.False(viewModel.IsBusy);
+        Assert.Contains(false, busyNotifications);
+    }
+
+    [Fact]
+    public async Task DisposeAsyncWaitsForDirectTrackedOperationToFinish()
+    {
+        var sample = Sample.Create();
+        var repository = new NonCancellableLoadRepository(sample.Snapshot);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        viewModel.SetStore(sample.Store.Id, sample.Snapshot);
+        var operation = viewModel.ExecuteTrackedCommandAsync(viewModel.ReloadAsync, TestContext.Current.CancellationToken);
+
+        await repository.LoadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(1, viewModel.PendingCommandCount);
+        Assert.True(viewModel.IsBusy);
+
+        var disposal = viewModel.DisposeAsync().AsTask();
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2.1), TestContext.Current.CancellationToken);
+            Assert.False(disposal.IsCompleted);
+        }
+        finally
+        {
+            repository.ReleaseLoad.TrySetResult();
+        }
+        await operation.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await disposal.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, viewModel.PendingCommandCount);
+    }
+
+    [Fact]
+    public async Task DisposeAsyncCancelsDuplicateReloadAndDrainsTrackedOperation()
+    {
+        var sample = Sample.Create();
+        var item = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Item", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Items = [item] };
+        var repository = new BlockingLoadRepository(snapshot, blockOnLoadNumber: 2);
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot, items: new ItemManagementService(repository));
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        var node = viewModel.Roots.Single().Children.Single(candidate => candidate.EntityId == item.Id);
+        viewModel.SelectNodeWithModifiers(node, toggle: false, range: false);
+
+        var operation = viewModel.ExecuteTrackedCommandAsync(viewModel.DuplicateAsync, TestContext.Current.CancellationToken);
+        await repository.LoadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(1, viewModel.PendingCommandCount);
+        Assert.True(viewModel.IsBusy);
+
+        await viewModel.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await operation.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.True(repository.LoadCancelled.Task.IsCompletedSuccessfully);
+        Assert.Equal(0, viewModel.PendingCommandCount);
+    }
+
+    [Fact]
     public void MultiSelection_DoesNotCrossTopLevelNicheBoundaries()
     {
         var now = DateTimeOffset.UtcNow;
@@ -95,7 +267,7 @@ public class WorkspaceTreeViewModelTests
 
         repository.Snapshot = snapshot with { Items = [visible, otherStage, archived, otherStoreDesign, new Item(Guid.NewGuid(), secondStore.Id, secondNiche.Id, null, "Reloaded", null, ItemStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}")] };
         viewModel.ClearAllFilters();
-        await viewModel.ReloadAsync();
+        await viewModel.ReloadAsync(TestContext.Current.CancellationToken);
         Assert.Equal("0/2 designs showing.", viewModel.DesignCountLabel);
     }
 
@@ -161,7 +333,7 @@ public class WorkspaceTreeViewModelTests
 
         repository.Snapshot = snapshot with { Items = [] };
         viewModel.SelectEntity(null);
-        await viewModel.ReloadAsync();
+        await viewModel.ReloadAsync(TestContext.Current.CancellationToken);
         Assert.Equal("0/0 designs showing.", viewModel.DesignCountLabel);
     }
 
@@ -179,11 +351,11 @@ public class WorkspaceTreeViewModelTests
         viewModel.SelectNodeCommand.Execute(Assert.Single(viewModel.Roots));
 
         Assert.False(viewModel.HasEditingNode);
-        await viewModel.BeginCreateAsync();
+        await viewModel.BeginCreateAsync(TestContext.Current.CancellationToken);
         Assert.True(viewModel.HasEditingNode);
         var draft = viewModel.SelectedNode!;
         draft.DraftName = "Campaign";
-        await viewModel.CommitEditAsync(addAnotherSibling: true);
+        await viewModel.CommitEditAsync(addAnotherSibling: true, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Contains(repository.Snapshot.Groups, group => group.Name == "Campaign");
         Assert.True(viewModel.HasEditingNode);
@@ -249,7 +421,7 @@ public class WorkspaceTreeViewModelTests
         viewModel.CutCommand.Execute(null);
         Assert.True(source.IsCut);
         viewModel.SelectNodeCommand.Execute(destination);
-        await viewModel.PasteAsync();
+        await viewModel.PasteAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(otherNiche.Id, repository.Snapshot.Groups.Single().NicheId);
         Assert.False(viewModel.SelectedNode!.IsCut);
@@ -310,7 +482,7 @@ public class WorkspaceTreeViewModelTests
         viewModel.SelectNodeCommand.Execute(childNode);
         viewModel.Cut();
 
-        await viewModel.DeleteGroupAsync(child.Id, ConfirmPermanentDeletion: true);
+        await viewModel.DeleteGroupAsync(child.Id, ConfirmPermanentDeletion: true, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(root.Id, viewModel.SelectedNode!.EntityId);
         Assert.Contains(child.Id, deletedIds!);
@@ -403,7 +575,7 @@ public class WorkspaceTreeViewModelTests
 
         var destinationNode = viewModel.Roots.Single().Children.Single(node => node.EntityId == destination.Id);
 
-        await viewModel.MoveAsync(root.Id, destinationNode, new GroupPlacement());
+        await viewModel.MoveAsync(root.Id, destinationNode, new GroupPlacement(), TestContext.Current.CancellationToken);
 
         var moved = repository.Snapshot.Groups.Single(group => group.Id == root.Id);
         Assert.Null(moved.NicheId);
@@ -438,9 +610,45 @@ public class WorkspaceTreeViewModelTests
         viewModel.SelectNodeWithModifiers(itemNodes[1], toggle: false, range: false);
 
         Assert.Equal(2, sources.Count);
-        await viewModel.MoveSelectionAsync(sources, destination, new GroupPlacement());
+        await viewModel.MoveSelectionAsync(sources, destination, new GroupPlacement(), TestContext.Current.CancellationToken);
 
         Assert.All(repository.Snapshot.Items, item => Assert.Equal(group.Id, item.GroupId));
+    }
+
+    [Fact]
+    public async Task CancellingTrackedMultiSelectionMoveRestoresOriginalSnapshot()
+    {
+        var sample = Sample.Create();
+        var destinationGroup = new TopicGroup(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Destination", null, false, sample.Now, sample.Now, "{}");
+        var first = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "First", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var second = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Second", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
+        var snapshot = sample.Snapshot with { Groups = [destinationGroup], Items = [first, second] };
+        var secondSaveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var repository = new TestRepository(snapshot)
+        {
+            SaveInterceptor = (saveNumber, cancellationToken) =>
+                BlockSecondSaveAsync(saveNumber, cancellationToken, secondSaveStarted)
+        };
+        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot, items: new ItemManagementService(repository));
+        viewModel.SetStore(sample.Store.Id, snapshot);
+        var destination = viewModel.Roots.Single().Children.Single(node => node.EntityId == destinationGroup.Id);
+        var sources = new[]
+        {
+            new WorkspaceTreeSelection(WorkspaceEntityKind.Item, first.Id),
+            new WorkspaceTreeSelection(WorkspaceEntityKind.Item, second.Id)
+        };
+        using var cancellation = new CancellationTokenSource();
+        var operation = viewModel.ExecuteTrackedCommandAsync(
+            token => viewModel.MoveSelectionAsync(sources, destination, new GroupPlacement(), token),
+            cancellation.Token);
+
+        await secondSaveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        cancellation.Cancel();
+        await operation.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.Equal(snapshot, repository.Snapshot);
+        Assert.Equal(0, viewModel.PendingCommandCount);
+        Assert.False(viewModel.IsBusy);
     }
 
     [Fact]
@@ -456,7 +664,7 @@ public class WorkspaceTreeViewModelTests
         var destination = viewModel.Roots.Single(root => root.EntityId == otherNiche.Id);
         viewModel.SelectNodeCommand.Execute(source);
 
-        await viewModel.MoveAsync(source.EntityId, destination, new GroupPlacement());
+        await viewModel.MoveAsync(source.EntityId, destination, new GroupPlacement(), TestContext.Current.CancellationToken);
 
         Assert.Equal(source.EntityId, viewModel.SelectedNode!.EntityId);
         Assert.Single(viewModel.Roots.Single(root => root.EntityId == sample.Niche.Id).Children);
@@ -476,19 +684,19 @@ public class WorkspaceTreeViewModelTests
         viewModel.OpenInTabRequested += (_, _) => openedTabs++;
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
 
-        await viewModel.BeginCreateItemAsync();
+        await viewModel.BeginCreateItemAsync(TestContext.Current.CancellationToken);
         Assert.True(viewModel.HasEditingNode);
         Assert.True(viewModel.SelectedNode!.IsDraft);
         Assert.Equal(WorkspaceEntityKind.Item, viewModel.SelectedNode.EntityKind);
         viewModel.SelectedNode.DraftName = " Zebra idea ";
-        await viewModel.CommitEditAsync();
+        await viewModel.CommitEditAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.False(viewModel.HasEditingNode);
         Assert.Equal("Zebra idea", viewModel.SelectedNode!.Name);
         Assert.Equal(0, openedTabs);
 
         viewModel.BeginRename();
         viewModel.SelectedNode.DraftName = "Alpha idea";
-        await viewModel.CommitEditAsync();
+        await viewModel.CommitEditAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal("Alpha idea", viewModel.SelectedNode!.Name);
         viewModel.OpenInTabCommand.Execute(viewModel.SelectedNode);
         Assert.Equal(1, openedTabs);
@@ -512,12 +720,12 @@ public class WorkspaceTreeViewModelTests
         var target = viewModel.Roots.Single(root => root.EntityId == other.Id);
 
         Assert.True(viewModel.CanDrop(WorkspaceEntityKind.Item, first.Id, target, new GroupPlacement(GroupPlacementKind.Before, second.Id), out _));
-        await viewModel.MoveAsync(WorkspaceEntityKind.Item, first.Id, target, new GroupPlacement(GroupPlacementKind.Before, second.Id));
+        await viewModel.MoveAsync(WorkspaceEntityKind.Item, first.Id, target, new GroupPlacement(GroupPlacementKind.Before, second.Id), TestContext.Current.CancellationToken);
         Assert.Equal(other.Id, repository.Snapshot.Items.Single(item => item.Id == first.Id).NicheId);
 
         viewModel.Copy();
         viewModel.SelectNodeCommand.Execute(target);
-        await viewModel.PasteAsync();
+        await viewModel.PasteAsync(TestContext.Current.CancellationToken);
         Assert.Equal(3, repository.Snapshot.Items.Count);
     }
 
@@ -951,7 +1159,7 @@ public class WorkspaceTreeViewModelTests
         viewModel.ToggleExpandCollapseAllCommand.Execute(null);
 
         // Reload (rebuilds projection)
-        await viewModel.ReloadAsync();
+        await viewModel.ReloadAsync(TestContext.Current.CancellationToken);
 
         var allNodes = FlattenNodes(viewModel.Roots).ToArray();
         foreach (var node in allNodes.Where(n => n.HasChildren))
@@ -1013,7 +1221,7 @@ public class WorkspaceTreeViewModelTests
         // Begin create on the subgroup to set up a draft
         var subGroupNode = FlattenNodes(viewModel.Roots).First(n => n.EntityId == subGroup.Id);
         viewModel.SelectNodeCommand.Execute(subGroupNode);
-        await viewModel.BeginCreateAsync();
+        await viewModel.BeginCreateAsync(TestContext.Current.CancellationToken);
 
         // Verify draft is in editing state
         Assert.NotNull(viewModel.SelectedNode);
@@ -1107,7 +1315,7 @@ public class WorkspaceTreeViewModelTests
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
         var group = Assert.Single(Assert.Single(viewModel.Roots).Children);
 
-        await viewModel.ExportCsvAsync(group);
+        await viewModel.ExportCsvAsync(group, TestContext.Current.CancellationToken);
 
         Assert.Empty(codec.Writes);
         Assert.Null(viewModel.ErrorMessage);
@@ -1128,7 +1336,7 @@ public class WorkspaceTreeViewModelTests
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
         var group = Assert.Single(Assert.Single(viewModel.Roots).Children);
 
-        await viewModel.ExportCsvAsync(group);
+        await viewModel.ExportCsvAsync(group, TestContext.Current.CancellationToken);
 
         Assert.Single(codec.Writes);
         Assert.Null(viewModel.ErrorMessage);
@@ -1148,7 +1356,7 @@ public class WorkspaceTreeViewModelTests
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
         var group = Assert.Single(Assert.Single(viewModel.Roots).Children);
 
-        await viewModel.ExportCsvAsync(group);
+        await viewModel.ExportCsvAsync(group, TestContext.Current.CancellationToken);
 
         Assert.NotNull(viewModel.ErrorMessage);
         Assert.Contains("could not be exported", viewModel.ErrorMessage);
@@ -1185,23 +1393,93 @@ public class WorkspaceTreeViewModelTests
             throw new IOException("write failed");
     }
 
+    private static async Task BlockSecondSaveAsync(
+        int saveNumber,
+        CancellationToken cancellationToken,
+        TaskCompletionSource secondSaveStarted)
+    {
+        if (saveNumber == 2)
+        {
+            secondSaveStarted.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+    }
+
     private sealed class TestRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
     {
         public WorkspaceSnapshot Snapshot { get; set; } = snapshot;
         public bool FailSaves { get; init; }
+        public bool FailLoads { get; init; }
+        public Func<int, CancellationToken, Task>? SaveInterceptor { get; init; }
+        private int _saveCount;
 
-        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
+        public async Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
         {
             if (FailSaves)
             {
                 throw new IOException("Test failure.");
             }
 
+            var saveNumber = Interlocked.Increment(ref _saveCount);
+            if (SaveInterceptor is not null)
+            {
+                await SaveInterceptor(saveNumber, cancellationToken);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
             Snapshot = snapshot;
-            return Task.CompletedTask;
         }
 
-        public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(Snapshot);
+        public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) =>
+            FailLoads
+                ? Task.FromException<WorkspaceSnapshot>(new IOException("Injected workspace read failure."))
+                : Task.FromResult(Snapshot);
+    }
+
+    private sealed class BlockingLoadRepository : IWorkspaceRepository
+    {
+        private readonly WorkspaceSnapshot _snapshot;
+        private readonly int _blockOnLoadNumber;
+        private int _loadCount;
+
+        public BlockingLoadRepository(WorkspaceSnapshot snapshot, int blockOnLoadNumber = 1)
+        {
+            _snapshot = snapshot;
+            _blockOnLoadNumber = blockOnLoadNumber;
+        }
+
+        public TaskCompletionSource LoadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource LoadCancelled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public async Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Increment(ref _loadCount) != _blockOnLoadNumber)
+            {
+                return _snapshot;
+            }
+
+            LoadStarted.TrySetResult();
+            using var registration = cancellationToken.Register(() => LoadCancelled.TrySetResult());
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return _snapshot;
+        }
+    }
+
+    private sealed class NonCancellableLoadRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
+    {
+        public TaskCompletionSource LoadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReleaseLoad { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public async Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default)
+        {
+            LoadStarted.TrySetResult();
+            await ReleaseLoad.Task;
+            return snapshot;
+        }
     }
 
     private sealed record Sample(WorkspaceSnapshot Snapshot, Store Store, Niche Niche, DateTimeOffset Now)
