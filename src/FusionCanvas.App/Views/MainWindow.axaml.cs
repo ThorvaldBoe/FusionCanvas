@@ -654,15 +654,22 @@ public partial class MainWindow : Window
 
         if (sources.Count == 1)
         {
-            await viewModel.WorkspaceTree.MoveAsync(sources[0].Kind, sources[0].Id, target, placement);
+            await ExecuteWorkspaceTreeCommandAsync(viewModel, cancellationToken =>
+                viewModel.WorkspaceTree.MoveAsync(sources[0].Kind, sources[0].Id, target, placement, cancellationToken));
         }
         else
         {
-            await viewModel.WorkspaceTree.MoveSelectionAsync(sources, target, placement);
+            await ExecuteWorkspaceTreeCommandAsync(viewModel, cancellationToken =>
+                viewModel.WorkspaceTree.MoveSelectionAsync(sources, target, placement, cancellationToken));
         }
         ClearDropTarget();
         e.Handled = true;
     }
+
+    private static Task ExecuteWorkspaceTreeCommandAsync(
+        MainWindowViewModel viewModel,
+        Func<CancellationToken, Task> operation) =>
+        viewModel.WorkspaceTree.ExecuteTrackedCommandAsync(operation);
 
     private void ClearDropTarget()
     {
@@ -1062,7 +1069,8 @@ public partial class MainWindow : Window
 
         if (e.Key == Key.Enter)
         {
-            await viewModel.WorkspaceTree.CommitEditAsync(e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+            await ExecuteWorkspaceTreeCommandAsync(viewModel, cancellationToken =>
+                viewModel.WorkspaceTree.CommitEditAsync(e.KeyModifiers.HasFlag(KeyModifiers.Shift), cancellationToken));
             e.Handled = true;
         }
         else if (e.Key == Key.Escape)
@@ -1076,7 +1084,8 @@ public partial class MainWindow : Window
     {
         if (DataContext is MainWindowViewModel viewModel && viewModel.WorkspaceTree.HasEditingNode)
         {
-            await viewModel.WorkspaceTree.CommitEditAsync();
+            await ExecuteWorkspaceTreeCommandAsync(viewModel, cancellationToken =>
+                viewModel.WorkspaceTree.CommitEditAsync(cancellationToken: cancellationToken));
         }
     }
 
@@ -1149,7 +1158,7 @@ public partial class MainWindow : Window
     {
         if (TrySelectContextTopic(sender, out var viewModel, out _))
         {
-            await viewModel.WorkspaceTree.BeginCreateAsync();
+            await ExecuteWorkspaceTreeCommandAsync(viewModel, viewModel.WorkspaceTree.BeginCreateAsync);
             FocusVisibleTreeEditor();
         }
     }
@@ -1176,7 +1185,7 @@ public partial class MainWindow : Window
     {
         if (TrySelectContextNode(sender, out var viewModel, out _))
         {
-            await viewModel.WorkspaceTree.BeginCreateItemAsync();
+            await ExecuteWorkspaceTreeCommandAsync(viewModel, viewModel.WorkspaceTree.BeginCreateItemAsync);
             FocusVisibleTreeEditor();
         }
     }
@@ -1210,7 +1219,7 @@ public partial class MainWindow : Window
     {
         if (TrySelectContextNode(sender, out var viewModel, out _))
         {
-            await viewModel.WorkspaceTree.PasteAsync();
+            await ExecuteWorkspaceTreeCommandAsync(viewModel, viewModel.WorkspaceTree.PasteAsync);
         }
     }
 
@@ -1218,7 +1227,7 @@ public partial class MainWindow : Window
     {
         if (TrySelectContextNode(sender, out var viewModel, out var node) && node.IsItem)
         {
-            await viewModel.WorkspaceTree.DuplicateAsync();
+            await ExecuteWorkspaceTreeCommandAsync(viewModel, viewModel.WorkspaceTree.DuplicateAsync);
         }
     }
 
@@ -1228,7 +1237,7 @@ public partial class MainWindow : Window
             DataContext is MainWindowViewModel viewModel &&
             node.HasMultiSelectionContext)
         {
-            await viewModel.WorkspaceTree.DuplicateSelectedAsync();
+            await ExecuteWorkspaceTreeCommandAsync(viewModel, viewModel.WorkspaceTree.DuplicateSelectedAsync);
         }
     }
 
@@ -1238,7 +1247,7 @@ public partial class MainWindow : Window
             DataContext is MainWindowViewModel viewModel &&
             node.HasMultiSelectionContext)
         {
-            await viewModel.WorkspaceTree.ExportSelectedAsync();
+            await ExecuteWorkspaceTreeCommandAsync(viewModel, viewModel.WorkspaceTree.ExportSelectedAsync);
         }
     }
 
@@ -1257,7 +1266,8 @@ public partial class MainWindow : Window
             viewModel.WorkspaceTree.GetDefaultGroupDestination(destinations));
         if (await dialog.ShowDialog<bool>(this) && dialog.DataContext is GroupSelectionViewModel selection && selection.SelectedDestination is { } destination)
         {
-            await viewModel.WorkspaceTree.GroupSelectedAsync(selection.Name, destination);
+            await ExecuteWorkspaceTreeCommandAsync(viewModel, cancellationToken =>
+                viewModel.WorkspaceTree.GroupSelectedAsync(selection.Name, destination, cancellationToken));
         }
     }
 
@@ -1275,7 +1285,7 @@ public partial class MainWindow : Window
             $"Archive {node.SelectionCount} selected entities? They can be restored later.");
         if (await dialog.ShowDialog<bool>(this))
         {
-            await viewModel.WorkspaceTree.ArchiveSelectedAsync();
+            await ExecuteWorkspaceTreeCommandAsync(viewModel, viewModel.WorkspaceTree.ArchiveSelectedAsync);
         }
     }
 
@@ -1293,7 +1303,7 @@ public partial class MainWindow : Window
             $"Permanently delete {node.SelectionCount} selected entities and any contained descendants? This cannot be undone.");
         if (await dialog.ShowDialog<bool>(this))
         {
-            await viewModel.WorkspaceTree.DeleteSelectedAsync();
+            await ExecuteWorkspaceTreeCommandAsync(viewModel, viewModel.WorkspaceTree.DeleteSelectedAsync);
         }
     }
 
@@ -1313,7 +1323,8 @@ public partial class MainWindow : Window
         if (TrySelectContextNode(sender, out var viewModel, out var node) &&
             node.EntityKind is WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group)
         {
-            await viewModel.WorkspaceTree.ExportCsvAsync(node);
+            await ExecuteWorkspaceTreeCommandAsync(viewModel, cancellationToken =>
+                viewModel.WorkspaceTree.ExportCsvAsync(node, cancellationToken));
         }
     }
 
@@ -1335,7 +1346,8 @@ public partial class MainWindow : Window
         var dialog = new GroupDeleteConfirmationWindow(viewModel.WorkspaceTree.GetDeleteImpact(node.EntityId));
         if (await dialog.ShowDialog<bool>(this))
         {
-            await viewModel.WorkspaceTree.DeleteGroupAsync(node.EntityId, ConfirmPermanentDeletion: true);
+            await ExecuteWorkspaceTreeCommandAsync(viewModel, cancellationToken =>
+                viewModel.WorkspaceTree.DeleteGroupAsync(node.EntityId, ConfirmPermanentDeletion: true, cancellationToken));
         }
     }
 

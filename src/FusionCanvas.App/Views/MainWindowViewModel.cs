@@ -122,7 +122,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             mockupGenerationService: runtime.MockupGeneration,
             artworkGenerationService: runtime.ArtworkGeneration)
     {
-}
+    }
+
     public MainWindowViewModel(
         WorkflowStageNavigatorViewModel workflowNavigator,
         DocumentWindowViewModel documentWindow,
@@ -760,10 +761,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         RefreshActiveItemInspector();
     }
 
-    public async Task RefreshWorkspaceAfterImportAsync()
+    public async Task RefreshWorkspaceAfterImportAsync(CancellationToken cancellationToken = default)
     {
         RefreshWorkspaceSnapshot();
-        await WorkspaceTree.ReloadAsync().ConfigureAwait(true);
+        await WorkspaceTree.ExecuteTrackedCommandAsync(WorkspaceTree.ReloadAsync, cancellationToken).ConfigureAwait(true);
         RefreshActiveItemInspector();
     }
 
@@ -864,7 +865,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     private void InitializeGroupIntegration()
     {
-        CreateGroupCommand = new RelayCommand(_ => Run(WorkspaceTree.BeginCreateAsync()));
+        CreateGroupCommand = new RelayCommand(_ => WorkspaceTree.BeginCreateCommand.Execute(null));
         WorkspaceTree.OpenInTabRequested += (_, selection) => OpenTreeSelectionInTab(selection);
         WorkspaceTree.OpenSelectedInTabsRequested += (_, selections) =>
         {

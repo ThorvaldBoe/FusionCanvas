@@ -18,8 +18,15 @@ using FusionCanvas.Application.Workspaces;
 namespace FusionCanvas.App.Navigation;
 
 
-public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
+public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged, IAsyncDisposable
 {
+    private sealed class TrackedCommand(CancellationTokenSource cancellation)
+    {
+        public TaskCompletionSource Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public CancellationTokenSource Cancellation { get; } = cancellation;
+    }
+
     private readonly IWorkspaceRepository _repository;
     private readonly IGroupManagementService _groups;
     private readonly IItemManagementService _items;
@@ -48,6 +55,11 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     private bool _nextToggleExpands = true;
     private string? _errorMessage;
     private bool _isBusy;
+    private readonly object _commandGate = new();
+    private readonly HashSet<TrackedCommand> _pendingCommands = [];
+    private readonly CancellationTokenSource _shutdownCts = new();
+    private Task? _disposeTask;
+    private bool _isDisposed;
 
     public WorkspaceTreeViewModel(
         IWorkspaceRepository repository,
@@ -72,14 +84,14 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         SelectNodeCommand = new RelayCommand(parameter => Select(parameter as WorkspaceTreeNodeViewModel));
         OpenInTabCommand = new RelayCommand(parameter => OpenInTab(parameter as WorkspaceTreeNodeViewModel));
         OpenSelectedInTabsCommand = new RelayCommand(_ => OpenSelectedInTabs());
-        ExportSelectedCommand = new RelayCommand(_ => Run(ExportSelectedAsync()));
-        BeginCreateCommand = new RelayCommand(_ => Run(BeginCreateAsync()));
-        BeginCreateItemCommand = new RelayCommand(_ => Run(BeginCreateItemAsync()));
+        ExportSelectedCommand = new RelayCommand(_ => Run(ExportSelectedAsync));
+        BeginCreateCommand = new RelayCommand(_ => Run(BeginCreateAsync));
+        BeginCreateItemCommand = new RelayCommand(_ => Run(BeginCreateItemAsync));
         BeginRenameCommand = new RelayCommand(_ => BeginRename());
         CopyCommand = new RelayCommand(_ => Copy());
         CutCommand = new RelayCommand(_ => Cut());
-        PasteCommand = new RelayCommand(_ => Run(PasteAsync()));
-        DuplicateCommand = new RelayCommand(_ => Run(DuplicateAsync()));
+        PasteCommand = new RelayCommand(_ => Run(PasteAsync));
+        DuplicateCommand = new RelayCommand(_ => Run(DuplicateAsync));
         ToggleTagFilterCommand = new RelayCommand(parameter =>
         {
             if (parameter is TagSummary tag) ToggleTagFilter(tag.Id);
@@ -180,7 +192,29 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
     public IItemCsvFilePicker FilePicker { get; set; }
 
     public IItemCsvCodec CsvCodec { get => _csvCodec; set => _csvCodec = value; }
-    public bool IsBusy { get => _isBusy; private set => SetField(ref _isBusy, value); }
+    public bool IsBusy { get => _isBusy || PendingCommandCount > 0; private set => SetField(ref _isBusy, value); }
+    public int PendingCommandCount
+    {
+        get
+        {
+            lock (_commandGate)
+            {
+                return _pendingCommands.Count;
+            }
+        }
+    }
+
+    public Task WaitForCommandTasksAsync()
+    {
+        Task[] completions;
+        lock (_commandGate)
+        {
+            completions = _pendingCommands.Select(command => command.Completion.Task).ToArray();
+        }
+
+        return Task.WhenAll(completions);
+    }
+
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
     public string? ErrorMessage { get => _errorMessage; private set { SetField(ref _errorMessage, value); OnPropertyChanged(nameof(HasError)); } }
     public string InspectorTitle => SelectedNode?.Name ?? "No selection";
@@ -636,9 +670,9 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         RefreshProjection();
     }
 
-    public async Task ReloadAsync()
+    public async Task ReloadAsync(CancellationToken cancellationToken = default)
     {
-        _snapshot = await _repository.LoadAsync().ConfigureAwait(false);
+        _snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
         RebuildAvailableTags();
         RefreshProjection();
     }
@@ -651,7 +685,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         Select(entityId is Guid id ? FindNode(id) : null, notifySelectionChanged, replaceMultiSelection);
     }
 
-    public async Task BeginCreateAsync()
+    public async Task BeginCreateAsync(CancellationToken cancellationToken = default)
     {
         if (_storeId is not Guid storeId || IsBusy)
         {
@@ -659,19 +693,27 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             return;
         }
 
-        var selected = SelectedNode is null ? null : new WorkspaceTreeSelection(SelectedNode.EntityKind, SelectedNode.EntityId);
-        var destination = await _groups.ResolveCreateParentAsync(storeId, selected).ConfigureAwait(false);
-        if (!destination.Succeeded)
+        IsBusy = true;
+        try
         {
-            ErrorMessage = destination.Error;
-            return;
-        }
+            var selected = SelectedNode is null ? null : new WorkspaceTreeSelection(SelectedNode.EntityKind, SelectedNode.EntityId);
+            var destination = await _groups.ResolveCreateParentAsync(storeId, selected, cancellationToken).ConfigureAwait(false);
+            if (!destination.Succeeded)
+            {
+                ErrorMessage = destination.Error;
+                return;
+            }
 
-        _creationAnchor = destination.Parent;
-        InsertDraft(destination.Parent!);
+            _creationAnchor = destination.Parent;
+            InsertDraft(destination.Parent!);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
-    public async Task BeginCreateItemAsync()
+    public async Task BeginCreateItemAsync(CancellationToken cancellationToken = default)
     {
         if (_storeId is not Guid storeId || IsBusy)
         {
@@ -679,16 +721,24 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             return;
         }
 
-        var selected = SelectedNode is null ? _selection.Selected : new WorkspaceTreeSelection(SelectedNode.EntityKind, SelectedNode.EntityId);
-        var destination = await _items.ResolveCreateTopicAsync(storeId, selected).ConfigureAwait(false);
-        if (!destination.Succeeded)
+        IsBusy = true;
+        try
         {
-            ErrorMessage = destination.Error;
-            return;
-        }
+            var selected = SelectedNode is null ? _selection.Selected : new WorkspaceTreeSelection(SelectedNode.EntityKind, SelectedNode.EntityId);
+            var destination = await _items.ResolveCreateTopicAsync(storeId, selected, cancellationToken).ConfigureAwait(false);
+            if (!destination.Succeeded)
+            {
+                ErrorMessage = destination.Error;
+                return;
+            }
 
-        _itemCreationAnchor = destination.Topic;
-        InsertItemDraft(destination.Topic!);
+            _itemCreationAnchor = destination.Topic;
+            InsertItemDraft(destination.Topic!);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     public void BeginRename()
@@ -704,7 +754,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         node.IsEditing = true;
     }
 
-    public async Task CommitEditAsync(bool addAnotherSibling = false)
+    public async Task CommitEditAsync(bool addAnotherSibling = false, CancellationToken cancellationToken = default)
     {
         if (_editingNode is null || IsBusy)
         {
@@ -714,15 +764,40 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         var editing = _editingNode;
         IsBusy = true;
         ErrorMessage = null;
-        Guid selectedId;
-        if (editing.IsDraft)
+        try
         {
-            if (editing.EntityKind == WorkspaceEntityKind.Item)
+            Guid selectedId;
+            if (editing.IsDraft)
             {
-                var result = await _items.CreateItemAsync(new ItemManagementCreateRequest(_itemCreationAnchor!, editing.DraftName)).ConfigureAwait(false);
+                if (editing.EntityKind == WorkspaceEntityKind.Item)
+                {
+                    var result = await _items.CreateItemAsync(new ItemManagementCreateRequest(_itemCreationAnchor!, editing.DraftName), cancellationToken).ConfigureAwait(false);
+                    if (!result.Succeeded)
+                    {
+                        ErrorMessage = result.Error;
+                        editing.IsEditing = true;
+                        return;
+                    }
+                    selectedId = result.Item!.Id;
+                }
+                else
+                {
+                    var result = await _groups.CreateGroupAsync(new GroupManagementCreateRequest(_creationAnchor!, editing.DraftName), cancellationToken).ConfigureAwait(false);
+                    if (!result.Succeeded)
+                    {
+                        ErrorMessage = result.Error;
+                        editing.IsEditing = true;
+                        return;
+                    }
+                    selectedId = result.Group!.Id;
+                }
+            }
+            else if (editing.EntityKind == WorkspaceEntityKind.Item)
+            {
+                var item = _snapshot.Items.Single(candidate => candidate.Id == editing.EntityId);
+                var result = await _items.UpdateItemAsync(new ItemManagementUpdateRequest(item.Id, editing.DraftName), cancellationToken).ConfigureAwait(false);
                 if (!result.Succeeded)
                 {
-                    IsBusy = false;
                     ErrorMessage = result.Error;
                     editing.IsEditing = true;
                     return;
@@ -731,56 +806,33 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             }
             else
             {
-                var result = await _groups.CreateGroupAsync(new GroupManagementCreateRequest(_creationAnchor!, editing.DraftName)).ConfigureAwait(false);
+                var group = _snapshot.Groups.Single(candidate => candidate.Id == editing.EntityId);
+                var result = await _groups.UpdateGroupAsync(new GroupManagementUpdateRequest(group.Id, editing.DraftName), cancellationToken).ConfigureAwait(false);
                 if (!result.Succeeded)
                 {
-                    IsBusy = false;
                     ErrorMessage = result.Error;
                     editing.IsEditing = true;
                     return;
                 }
                 selectedId = result.Group!.Id;
             }
-        }
-        else if (editing.EntityKind == WorkspaceEntityKind.Item)
-        {
-            var item = _snapshot.Items.Single(candidate => candidate.Id == editing.EntityId);
-            var result = await _items.UpdateItemAsync(new ItemManagementUpdateRequest(item.Id, editing.DraftName)).ConfigureAwait(false);
-            if (!result.Succeeded)
-            {
-                IsBusy = false;
-                ErrorMessage = result.Error;
-                editing.IsEditing = true;
-                return;
-            }
-            selectedId = result.Item!.Id;
-        }
-        else
-        {
-            var group = _snapshot.Groups.Single(candidate => candidate.Id == editing.EntityId);
-            var result = await _groups.UpdateGroupAsync(new GroupManagementUpdateRequest(group.Id, editing.DraftName)).ConfigureAwait(false);
-            if (!result.Succeeded)
-            {
-                IsBusy = false;
-                ErrorMessage = result.Error;
-                editing.IsEditing = true;
-                return;
-            }
-            selectedId = result.Group!.Id;
-        }
 
-        IsBusy = false;
-        _editingNode = null;
-        await ReloadAsync().ConfigureAwait(false);
-        Select(FindNode(selectedId));
-        StructureChanged?.Invoke(this, EventArgs.Empty);
-        if (addAnotherSibling && editing.EntityKind == WorkspaceEntityKind.Item && _itemCreationAnchor is not null)
-        {
-            InsertItemDraft(_itemCreationAnchor);
+            _editingNode = null;
+            await ReloadAsync(cancellationToken).ConfigureAwait(false);
+            Select(FindNode(selectedId));
+            StructureChanged?.Invoke(this, EventArgs.Empty);
+            if (addAnotherSibling && editing.EntityKind == WorkspaceEntityKind.Item && _itemCreationAnchor is not null)
+            {
+                InsertItemDraft(_itemCreationAnchor);
+            }
+            else if (addAnotherSibling && _creationAnchor is not null)
+            {
+                InsertDraft(_creationAnchor);
+            }
         }
-        else if (addAnotherSibling && _creationAnchor is not null)
+        finally
         {
-            InsertDraft(_creationAnchor);
+            IsBusy = false;
         }
     }
 
@@ -814,8 +866,13 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
     }
 
-    public async Task PasteAsync()
+    public async Task PasteAsync(CancellationToken cancellationToken = default)
     {
+        if (IsBusy)
+        {
+            return;
+        }
+
         if (_clipboard.Payload is not { Kind: WorkspaceEntityKind.Group or WorkspaceEntityKind.Item } payload ||
             SelectedNode is not { EntityKind: WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group } destination)
         {
@@ -824,47 +881,53 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
 
         IsBusy = true;
-        Guid selectedId;
-        bool succeeded;
-        string? error;
-        if (payload.Kind == WorkspaceEntityKind.Item)
+        try
         {
-            var topic = new ItemTopicReference(destination.EntityKind, destination.EntityId);
-            var result = payload.Mode == WorkspaceTreeClipboardMode.Copy
-                ? await _items.DuplicateItemAsync(new ItemManagementDuplicateRequest(payload.EntityId, topic)).ConfigureAwait(false)
-                : await _items.MoveItemAsync(new ItemManagementMoveRequest(payload.EntityId, topic)).ConfigureAwait(false);
-            succeeded = result.Succeeded;
-            error = result.Error;
-            selectedId = result.Item?.Id ?? payload.EntityId;
-        }
-        else
-        {
-            var parent = new GroupParentReference(destination.EntityKind, destination.EntityId);
-            var result = payload.Mode == WorkspaceTreeClipboardMode.Copy
-                ? await _groups.CopyGroupAsync(new GroupManagementCopyRequest(payload.EntityId, parent)).ConfigureAwait(false)
-                : await _groups.MoveGroupAsync(new GroupManagementMoveRequest(payload.EntityId, parent)).ConfigureAwait(false);
-            succeeded = result.Succeeded;
-            error = result.Error;
-            selectedId = result.Group?.Id ?? payload.EntityId;
-        }
-        IsBusy = false;
-        if (!succeeded)
-        {
-            ErrorMessage = error;
-            return;
-        }
+            Guid selectedId;
+            bool succeeded;
+            string? error;
+            if (payload.Kind == WorkspaceEntityKind.Item)
+            {
+                var topic = new ItemTopicReference(destination.EntityKind, destination.EntityId);
+                var result = payload.Mode == WorkspaceTreeClipboardMode.Copy
+                    ? await _items.DuplicateItemAsync(new ItemManagementDuplicateRequest(payload.EntityId, topic), cancellationToken).ConfigureAwait(false)
+                    : await _items.MoveItemAsync(new ItemManagementMoveRequest(payload.EntityId, topic), cancellationToken).ConfigureAwait(false);
+                succeeded = result.Succeeded;
+                error = result.Error;
+                selectedId = result.Item?.Id ?? payload.EntityId;
+            }
+            else
+            {
+                var parent = new GroupParentReference(destination.EntityKind, destination.EntityId);
+                var result = payload.Mode == WorkspaceTreeClipboardMode.Copy
+                    ? await _groups.CopyGroupAsync(new GroupManagementCopyRequest(payload.EntityId, parent), cancellationToken).ConfigureAwait(false)
+                    : await _groups.MoveGroupAsync(new GroupManagementMoveRequest(payload.EntityId, parent), cancellationToken).ConfigureAwait(false);
+                succeeded = result.Succeeded;
+                error = result.Error;
+                selectedId = result.Group?.Id ?? payload.EntityId;
+            }
+            if (!succeeded)
+            {
+                ErrorMessage = error;
+                return;
+            }
 
-        if (payload.Mode == WorkspaceTreeClipboardMode.Cut)
-        {
-            _clipboard.Clear();
-        }
+            if (payload.Mode == WorkspaceTreeClipboardMode.Cut)
+            {
+                _clipboard.Clear();
+            }
 
-        await ReloadAsync().ConfigureAwait(false);
-        Select(FindNode(selectedId));
-        StructureChanged?.Invoke(this, EventArgs.Empty);
+            await ReloadAsync(cancellationToken).ConfigureAwait(false);
+            Select(FindNode(selectedId));
+            StructureChanged?.Invoke(this, EventArgs.Empty);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
-    public async Task DuplicateAsync()
+    public async Task DuplicateAsync(CancellationToken cancellationToken = default)
     {
         if (SelectedNode is not { EntityKind: WorkspaceEntityKind.Item } node || IsBusy)
         {
@@ -872,20 +935,26 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
 
         IsBusy = true;
-        var result = await _items.DuplicateItemAsync(new ItemManagementDuplicateRequest(node.EntityId)).ConfigureAwait(false);
-        IsBusy = false;
-        if (!result.Succeeded)
+        try
         {
-            ErrorMessage = result.Error;
-            return;
-        }
+            var result = await _items.DuplicateItemAsync(new ItemManagementDuplicateRequest(node.EntityId), cancellationToken).ConfigureAwait(false);
+            if (!result.Succeeded)
+            {
+                ErrorMessage = result.Error;
+                return;
+            }
 
-        await ReloadAsync().ConfigureAwait(false);
-        Select(FindNode(result.Item!.Id));
-        StructureChanged?.Invoke(this, EventArgs.Empty);
+            await ReloadAsync(cancellationToken).ConfigureAwait(false);
+            Select(FindNode(result.Item!.Id));
+            StructureChanged?.Invoke(this, EventArgs.Empty);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
-    public async Task DuplicateSelectedAsync()
+    public async Task DuplicateSelectedAsync(CancellationToken cancellationToken = default)
     {
         if (IsBusy || !HasMultiSelection)
         {
@@ -904,33 +973,50 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         IsBusy = true;
         ErrorMessage = null;
 
-        foreach (var source in sources)
+        try
         {
-            if (source.Kind == WorkspaceEntityKind.Item)
+            foreach (var source in sources)
             {
-                var result = await _items.DuplicateItemAsync(new ItemManagementDuplicateRequest(source.Id)).ConfigureAwait(false);
-                if (!result.Succeeded)
+                if (source.Kind == WorkspaceEntityKind.Item)
                 {
-                    await RestoreBatchFailureAsync(originalSnapshot, originalSelectedIds, originalActiveId, originalAnchorId, result.Error).ConfigureAwait(false);
-                    return;
+                    var result = await _items.DuplicateItemAsync(new ItemManagementDuplicateRequest(source.Id), cancellationToken).ConfigureAwait(false);
+                    if (!result.Succeeded)
+                    {
+                        await RestoreBatchFailureAsync(originalSnapshot, originalSelectedIds, originalActiveId, originalAnchorId, result.Error, cancellationToken).ConfigureAwait(false);
+                        return;
+                    }
+                }
+                else if (source.Kind == WorkspaceEntityKind.Group && FindNode(source.Id) is { } node)
+                {
+                    var result = await _groups.CopyGroupAsync(new GroupManagementCopyRequest(source.Id, ParentOf(node)), cancellationToken).ConfigureAwait(false);
+                    if (!result.Succeeded)
+                    {
+                        await RestoreBatchFailureAsync(originalSnapshot, originalSelectedIds, originalActiveId, originalAnchorId, result.Error, cancellationToken).ConfigureAwait(false);
+                        return;
+                    }
                 }
             }
-            else if (source.Kind == WorkspaceEntityKind.Group && FindNode(source.Id) is { } node)
-            {
-                var result = await _groups.CopyGroupAsync(new GroupManagementCopyRequest(source.Id, ParentOf(node))).ConfigureAwait(false);
-                if (!result.Succeeded)
-                {
-                    await RestoreBatchFailureAsync(originalSnapshot, originalSelectedIds, originalActiveId, originalAnchorId, result.Error).ConfigureAwait(false);
-                    return;
-                }
-            }
-        }
 
-        IsBusy = false;
-        await ReloadAsync().ConfigureAwait(false);
-        _multiSelection.Restore(originalSelectedIds, originalActiveId, originalAnchorId);
-        ApplyMultiSelectionVisualState();
-        StructureChanged?.Invoke(this, EventArgs.Empty);
+            await ReloadAsync(cancellationToken).ConfigureAwait(false);
+            _multiSelection.Restore(originalSelectedIds, originalActiveId, originalAnchorId);
+            ApplyMultiSelectionVisualState();
+            StructureChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            await RestoreBatchFailureAsync(
+                originalSnapshot,
+                originalSelectedIds,
+                originalActiveId,
+                originalAnchorId,
+                "The duplicate operation was canceled; the original workspace was restored.",
+                CancellationToken.None).ConfigureAwait(false);
+            throw;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private async Task RestoreBatchFailureAsync(
@@ -938,21 +1024,21 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         IReadOnlyList<Guid> selectedIds,
         Guid? activeId,
         Guid? anchorId,
-        string? error)
+        string? error,
+        CancellationToken cancellationToken)
     {
+        var rollbackToken = cancellationToken.IsCancellationRequested ? CancellationToken.None : cancellationToken;
         try
         {
-            await _repository.SaveAsync(originalSnapshot).ConfigureAwait(false);
+            await _repository.SaveAsync(originalSnapshot, rollbackToken).ConfigureAwait(false);
             _snapshot = originalSnapshot;
-            IsBusy = false;
-            await ReloadAsync().ConfigureAwait(false);
+            await ReloadAsync(rollbackToken).ConfigureAwait(false);
             _multiSelection.Restore(selectedIds, activeId, anchorId);
             ApplyMultiSelectionVisualState();
             ErrorMessage = error ?? "The group action failed; the confirmed workspace was restored.";
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException)
         {
-            IsBusy = false;
             ErrorMessage = $"The group action failed and could not be restored: {ex.Message}";
         }
     }
@@ -977,7 +1063,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         return new GroupDeleteImpact(group.Id, group.Name, groupIds.Count - 1, itemIds.Count, entityIds);
     }
 
-    public async Task ExportCsvAsync(WorkspaceTreeNodeViewModel node)
+    public async Task ExportCsvAsync(WorkspaceTreeNodeViewModel node, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(node);
         if (node.EntityKind is not (WorkspaceEntityKind.Group or WorkspaceEntityKind.Niche) || IsBusy)
@@ -986,27 +1072,32 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
 
         ErrorMessage = null;
-        var rows = _csvExport.Project(_snapshot, node.EntityKind, node.EntityId);
-        var stream = await FilePicker.OpenExportAsync().ConfigureAwait(false);
-        if (stream is null)
-        {
-            return;
-        }
-
+        IsBusy = true;
         try
         {
+            var rows = _csvExport.Project(_snapshot, node.EntityKind, node.EntityId);
+            var stream = await FilePicker.OpenExportAsync(cancellationToken).ConfigureAwait(false);
+            if (stream is null)
+            {
+                return;
+            }
+
             await using (stream)
             {
-                await CsvCodec.WriteAsync(stream, rows).ConfigureAwait(false);
+                await CsvCodec.WriteAsync(stream, rows, cancellationToken).ConfigureAwait(false);
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             ErrorMessage = "The items could not be exported to CSV.";
         }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
-    public async Task DeleteGroupAsync(Guid groupId, bool ConfirmPermanentDeletion)
+    public async Task DeleteGroupAsync(Guid groupId, bool ConfirmPermanentDeletion, CancellationToken cancellationToken = default)
     {
         if (IsBusy || _snapshot.Groups.All(group => group.Id != groupId))
         {
@@ -1016,33 +1107,44 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         var impact = GetDeleteImpact(groupId);
         IsBusy = true;
         ErrorMessage = null;
-        var result = await _groups.DeleteGroupAsync(new GroupManagementDeleteRequest(groupId, ConfirmPermanentDeletion)).ConfigureAwait(false);
-        IsBusy = false;
-        if (!result.Succeeded)
+        try
         {
-            ErrorMessage = result.Error;
-            return;
-        }
+            var result = await _groups.DeleteGroupAsync(new GroupManagementDeleteRequest(groupId, ConfirmPermanentDeletion), cancellationToken).ConfigureAwait(false);
+            if (!result.Succeeded)
+            {
+                ErrorMessage = result.Error;
+                return;
+            }
 
-        if (_clipboard.Payload is { } payload && impact.DeletedEntityIds.Contains(payload.EntityId))
+            if (_clipboard.Payload is { } payload && impact.DeletedEntityIds.Contains(payload.EntityId))
+            {
+                _clipboard.Clear();
+            }
+
+            await ReloadAsync(cancellationToken).ConfigureAwait(false);
+            var fallbackId = result.State.ActiveGroupId ?? result.State.ActiveNicheId;
+            Select(fallbackId is Guid id ? FindNode(id) : null);
+            EntitiesDeleted?.Invoke(this, impact.DeletedEntityIds);
+            StructureChanged?.Invoke(this, EventArgs.Empty);
+        }
+        finally
         {
-            _clipboard.Clear();
+            IsBusy = false;
         }
-
-        await ReloadAsync().ConfigureAwait(false);
-        var fallbackId = result.State.ActiveGroupId ?? result.State.ActiveNicheId;
-        Select(fallbackId is Guid id ? FindNode(id) : null);
-        EntitiesDeleted?.Invoke(this, impact.DeletedEntityIds);
-        StructureChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    public async Task MoveAsync(Guid sourceGroupId, WorkspaceTreeNodeViewModel target, GroupPlacement placement)
-        => await MoveAsync(WorkspaceEntityKind.Group, sourceGroupId, target, placement).ConfigureAwait(false);
+    public async Task MoveAsync(
+        Guid sourceGroupId,
+        WorkspaceTreeNodeViewModel target,
+        GroupPlacement placement,
+        CancellationToken cancellationToken = default)
+        => await MoveAsync(WorkspaceEntityKind.Group, sourceGroupId, target, placement, cancellationToken).ConfigureAwait(false);
 
     public async Task MoveSelectionAsync(
         IReadOnlyList<WorkspaceTreeSelection> sources,
         WorkspaceTreeNodeViewModel target,
-        GroupPlacement placement)
+        GroupPlacement placement,
+        CancellationToken cancellationToken = default)
     {
         string? validationError = null;
         if (IsBusy || !CanDrop(sources, target, placement, out validationError))
@@ -1057,61 +1159,81 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         var originalAnchorId = _multiSelection.AnchorId;
         ErrorMessage = null;
         var effectiveSources = WorkspaceTreeSelectionNormalizer.Normalize(_snapshot, sources);
-        foreach (var source in effectiveSources)
+        try
         {
-            await MoveAsync(source.Kind, source.Id, target, placement).ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(ErrorMessage))
+            foreach (var source in effectiveSources)
             {
-                try
+                await MoveAsync(source.Kind, source.Id, target, placement, cancellationToken).ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(ErrorMessage))
                 {
-                    await _repository.SaveAsync(originalSnapshot).ConfigureAwait(false);
-                    _snapshot = originalSnapshot;
-                    await ReloadAsync().ConfigureAwait(false);
-                    _multiSelection.Restore(originalSelectedIds, originalActiveId, originalAnchorId);
-                    ApplyMultiSelectionVisualState();
-                    ErrorMessage = "The multi-entity move could not be saved; the confirmed hierarchy was restored.";
+                    await RestoreBatchFailureAsync(
+                        originalSnapshot,
+                        originalSelectedIds,
+                        originalActiveId,
+                        originalAnchorId,
+                        "The multi-entity move could not be saved; the confirmed hierarchy was restored.",
+                        cancellationToken).ConfigureAwait(false);
+                    return;
                 }
-                catch (Exception ex) when (ex is IOException or InvalidOperationException)
-                {
-                    ErrorMessage = $"The multi-entity move failed and could not be restored: {ex.Message}";
-                }
-
-                return;
             }
-        }
 
-        var storeId = target.EntityKind == WorkspaceEntityKind.Niche
-            ? _snapshot.Niches.Single(niche => niche.Id == target.EntityId).StoreId
-            : _snapshot.Groups.Single(group => group.Id == target.EntityId).StoreId;
-        _multiSelection.Restore(originalSelectedIds, originalActiveId, originalAnchorId);
-        _multiSelection.Reconcile(SelectableEntityIdsForStore(storeId));
-        ConstrainSelectionToOneNiche();
-        ApplyMultiSelectionVisualState();
+            var storeId = target.EntityKind == WorkspaceEntityKind.Niche
+                ? _snapshot.Niches.Single(niche => niche.Id == target.EntityId).StoreId
+                : _snapshot.Groups.Single(group => group.Id == target.EntityId).StoreId;
+            _multiSelection.Restore(originalSelectedIds, originalActiveId, originalAnchorId);
+            _multiSelection.Reconcile(SelectableEntityIdsForStore(storeId));
+            ConstrainSelectionToOneNiche();
+            ApplyMultiSelectionVisualState();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            await RestoreBatchFailureAsync(
+                originalSnapshot,
+                originalSelectedIds,
+                originalActiveId,
+                originalAnchorId,
+                "The multi-entity move was canceled; the original hierarchy was restored.",
+                CancellationToken.None).ConfigureAwait(false);
+            throw;
+        }
     }
 
-    public async Task MoveAsync(WorkspaceEntityKind sourceKind, Guid sourceId, WorkspaceTreeNodeViewModel target, GroupPlacement placement)
+    public async Task MoveAsync(
+        WorkspaceEntityKind sourceKind,
+        Guid sourceId,
+        WorkspaceTreeNodeViewModel target,
+        GroupPlacement placement,
+        CancellationToken cancellationToken = default)
     {
-        if (target.EntityKind is not (WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group) || IsBusy)
+        if (target.EntityKind is not (WorkspaceEntityKind.Niche or WorkspaceEntityKind.Group) || _isBusy)
         {
             return;
         }
 
+        ErrorMessage = null;
         if (sourceKind == WorkspaceEntityKind.Item)
         {
             IsBusy = true;
-            var itemResult = await _items.MoveItemAsync(new ItemManagementMoveRequest(
-                sourceId,
-                new ItemTopicReference(target.EntityKind, target.EntityId))).ConfigureAwait(false);
-            IsBusy = false;
-            if (!itemResult.Succeeded)
+            try
             {
-                ErrorMessage = itemResult.Error;
-                return;
+                var itemResult = await _items.MoveItemAsync(new ItemManagementMoveRequest(
+                    sourceId,
+                    new ItemTopicReference(target.EntityKind, target.EntityId)), cancellationToken).ConfigureAwait(false);
+                if (!itemResult.Succeeded)
+                {
+                    ErrorMessage = itemResult.Error;
+                    return;
+                }
+
+                await ReloadAsync(cancellationToken).ConfigureAwait(false);
+                Select(FindNode(sourceId));
+                StructureChanged?.Invoke(this, EventArgs.Empty);
+            }
+            finally
+            {
+                IsBusy = false;
             }
 
-            await ReloadAsync().ConfigureAwait(false);
-            Select(FindNode(sourceId));
-            StructureChanged?.Invoke(this, EventArgs.Empty);
             return;
         }
 
@@ -1125,17 +1247,23 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
             ? new GroupParentReference(target.EntityKind, target.EntityId)
             : ParentOf(target);
         IsBusy = true;
-        var result = await _groups.MoveGroupAsync(new GroupManagementMoveRequest(sourceId, destination, placement)).ConfigureAwait(false);
-        IsBusy = false;
-        if (!result.Succeeded)
+        try
         {
-            ErrorMessage = result.Error;
-            return;
-        }
+            var result = await _groups.MoveGroupAsync(new GroupManagementMoveRequest(sourceId, destination, placement), cancellationToken).ConfigureAwait(false);
+            if (!result.Succeeded)
+            {
+                ErrorMessage = result.Error;
+                return;
+            }
 
-        await ReloadAsync().ConfigureAwait(false);
-        Select(FindNode(sourceId));
-        StructureChanged?.Invoke(this, EventArgs.Empty);
+            await ReloadAsync(cancellationToken).ConfigureAwait(false);
+            Select(FindNode(sourceId));
+            StructureChanged?.Invoke(this, EventArgs.Empty);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     public bool CanDrop(
@@ -1275,56 +1403,64 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
     }
 
-    public async Task ExportSelectedAsync()
+    public async Task ExportSelectedAsync(CancellationToken cancellationToken = default)
     {
         if (IsBusy || !HasMultiSelection)
         {
             return;
         }
 
-        var itemIds = new HashSet<Guid>();
-        var sources = WorkspaceTreeSelectionNormalizer.Normalize(
-            _snapshot,
-            _multiSelection.SelectedIds.Select(id => FindNode(id))
-                .Where(node => node is { IsDraft: false })
-                .Select(node => new WorkspaceTreeSelection(node!.EntityKind, node.EntityId)));
-        foreach (var source in sources)
-        {
-            if (source.Kind == WorkspaceEntityKind.Item)
-            {
-                itemIds.Add(source.Id);
-                continue;
-            }
-
-            if (_snapshot.Groups.SingleOrDefault(group => group.Id == source.Id) is { } group)
-            {
-                var groupIds = GroupHierarchy.GetDescendants(_snapshot, group)
-                    .Append(group)
-                    .Select(candidate => candidate.Id)
-                    .ToHashSet();
-                foreach (var item in _snapshot.Items.Where(item => item.GroupId is Guid groupId && groupIds.Contains(groupId)))
-                {
-                    itemIds.Add(item.Id);
-                }
-            }
-        }
-
-        var stream = await FilePicker.OpenExportAsync().ConfigureAwait(false);
-        if (stream is null)
-        {
-            return;
-        }
-
+        IsBusy = true;
         try
         {
-            await using (stream)
+            var itemIds = new HashSet<Guid>();
+            var sources = WorkspaceTreeSelectionNormalizer.Normalize(
+                _snapshot,
+                _multiSelection.SelectedIds.Select(id => FindNode(id))
+                    .Where(node => node is { IsDraft: false })
+                    .Select(node => new WorkspaceTreeSelection(node!.EntityKind, node.EntityId)));
+            foreach (var source in sources)
             {
-                await CsvCodec.WriteAsync(stream, _csvExport.ProjectSelected(_snapshot, [.. itemIds])).ConfigureAwait(false);
+                if (source.Kind == WorkspaceEntityKind.Item)
+                {
+                    itemIds.Add(source.Id);
+                    continue;
+                }
+
+                if (_snapshot.Groups.SingleOrDefault(group => group.Id == source.Id) is { } group)
+                {
+                    var groupIds = GroupHierarchy.GetDescendants(_snapshot, group)
+                        .Append(group)
+                        .Select(candidate => candidate.Id)
+                        .ToHashSet();
+                    foreach (var item in _snapshot.Items.Where(item => item.GroupId is Guid groupId && groupIds.Contains(groupId)))
+                    {
+                        itemIds.Add(item.Id);
+                    }
+                }
+            }
+
+            var stream = await FilePicker.OpenExportAsync(cancellationToken).ConfigureAwait(false);
+            if (stream is null)
+            {
+                return;
+            }
+
+            try
+            {
+                await using (stream)
+                {
+                    await CsvCodec.WriteAsync(stream, _csvExport.ProjectSelected(_snapshot, [.. itemIds]), cancellationToken).ConfigureAwait(false);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                ErrorMessage = "The selected items could not be exported to CSV.";
             }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        finally
         {
-            ErrorMessage = "The selected items could not be exported to CSV.";
+            IsBusy = false;
         }
     }
 
@@ -1348,7 +1484,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         return WorkspaceTreeMovePlanner.ResolveDefaultGroupDestination(_snapshot, selections, destinations);
     }
 
-    public async Task GroupSelectedAsync(string name, GroupDestination destination)
+    public async Task GroupSelectedAsync(string name, GroupDestination destination, CancellationToken cancellationToken = default)
     {
         if (IsBusy || !HasMultiSelection || string.IsNullOrWhiteSpace(name))
         {
@@ -1372,35 +1508,51 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         var originalAnchorId = _multiSelection.AnchorId;
         IsBusy = true;
         ErrorMessage = null;
-        var created = await _groups.CreateGroupAsync(new GroupManagementCreateRequest(destination.Parent, name.Trim())).ConfigureAwait(false);
-        if (!created.Succeeded || created.Group is null)
+        try
         {
-            IsBusy = false;
-            ErrorMessage = created.Error ?? "The group could not be created.";
-            return;
-        }
-
-        var parent = new GroupParentReference(WorkspaceEntityKind.Group, created.Group.Id);
-        foreach (var source in sources)
-        {
-            var error = source.Kind == WorkspaceEntityKind.Item
-                ? (await _items.MoveItemAsync(new ItemManagementMoveRequest(source.Id, new ItemTopicReference(WorkspaceEntityKind.Group, created.Group.Id))).ConfigureAwait(false)).Error
-                : (await _groups.MoveGroupAsync(new GroupManagementMoveRequest(source.Id, parent)).ConfigureAwait(false)).Error;
-            if (!string.IsNullOrWhiteSpace(error))
+            var created = await _groups.CreateGroupAsync(new GroupManagementCreateRequest(destination.Parent, name.Trim()), cancellationToken).ConfigureAwait(false);
+            if (!created.Succeeded || created.Group is null)
             {
-                await RestoreBatchFailureAsync(originalSnapshot, originalSelectedIds, originalActiveId, originalAnchorId, error).ConfigureAwait(false);
+                ErrorMessage = created.Error ?? "The group could not be created.";
                 return;
             }
-        }
 
-        IsBusy = false;
-        await ReloadAsync().ConfigureAwait(false);
-        _multiSelection.Restore(originalSelectedIds, originalActiveId, originalAnchorId);
-        ApplyMultiSelectionVisualState();
-        StructureChanged?.Invoke(this, EventArgs.Empty);
+            var parent = new GroupParentReference(WorkspaceEntityKind.Group, created.Group.Id);
+            foreach (var source in sources)
+            {
+                var error = source.Kind == WorkspaceEntityKind.Item
+                    ? (await _items.MoveItemAsync(new ItemManagementMoveRequest(source.Id, new ItemTopicReference(WorkspaceEntityKind.Group, created.Group.Id)), cancellationToken).ConfigureAwait(false)).Error
+                    : (await _groups.MoveGroupAsync(new GroupManagementMoveRequest(source.Id, parent), cancellationToken).ConfigureAwait(false)).Error;
+                if (!string.IsNullOrWhiteSpace(error))
+                {
+                    await RestoreBatchFailureAsync(originalSnapshot, originalSelectedIds, originalActiveId, originalAnchorId, error, cancellationToken).ConfigureAwait(false);
+                    return;
+                }
+            }
+
+            await ReloadAsync(cancellationToken).ConfigureAwait(false);
+            _multiSelection.Restore(originalSelectedIds, originalActiveId, originalAnchorId);
+            ApplyMultiSelectionVisualState();
+            StructureChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            await RestoreBatchFailureAsync(
+                originalSnapshot,
+                originalSelectedIds,
+                originalActiveId,
+                originalAnchorId,
+                "Grouping was canceled; the original workspace was restored.",
+                CancellationToken.None).ConfigureAwait(false);
+            throw;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
-    public async Task ArchiveSelectedAsync()
+    public async Task ArchiveSelectedAsync(CancellationToken cancellationToken = default)
     {
         if (IsBusy || !HasMultiSelection)
         {
@@ -1414,28 +1566,45 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         var originalAnchorId = _multiSelection.AnchorId;
         IsBusy = true;
         ErrorMessage = null;
-        foreach (var source in sources)
+        try
         {
-            var error = source.Kind == WorkspaceEntityKind.Item
-                ? (await _items.ArchiveItemAsync(source.Id).ConfigureAwait(false)).Error
-                : (await _groups.ArchiveGroupAsync(source.Id).ConfigureAwait(false)).Error;
-            if (!string.IsNullOrWhiteSpace(error))
+            foreach (var source in sources)
             {
-                await RestoreBatchFailureAsync(originalSnapshot, originalSelectedIds, originalActiveId, originalAnchorId, error).ConfigureAwait(false);
-                return;
+                var error = source.Kind == WorkspaceEntityKind.Item
+                    ? (await _items.ArchiveItemAsync(source.Id, cancellationToken).ConfigureAwait(false)).Error
+                    : (await _groups.ArchiveGroupAsync(source.Id, cancellationToken).ConfigureAwait(false)).Error;
+                if (!string.IsNullOrWhiteSpace(error))
+                {
+                    await RestoreBatchFailureAsync(originalSnapshot, originalSelectedIds, originalActiveId, originalAnchorId, error, cancellationToken).ConfigureAwait(false);
+                    return;
+                }
             }
-        }
 
-        IsBusy = false;
-        await ReloadAsync().ConfigureAwait(false);
-        _multiSelection.Restore(originalSelectedIds, originalActiveId, originalAnchorId);
-        _multiSelection.Reconcile(SelectableEntityIdsForStore(_storeId!.Value));
-        ConstrainSelectionToOneNiche();
-        ApplyMultiSelectionVisualState();
-        StructureChanged?.Invoke(this, EventArgs.Empty);
+            await ReloadAsync(cancellationToken).ConfigureAwait(false);
+            _multiSelection.Restore(originalSelectedIds, originalActiveId, originalAnchorId);
+            _multiSelection.Reconcile(SelectableEntityIdsForStore(_storeId!.Value));
+            ConstrainSelectionToOneNiche();
+            ApplyMultiSelectionVisualState();
+            StructureChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            await RestoreBatchFailureAsync(
+                originalSnapshot,
+                originalSelectedIds,
+                originalActiveId,
+                originalAnchorId,
+                "Archiving was canceled; the original workspace was restored.",
+                CancellationToken.None).ConfigureAwait(false);
+            throw;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
-    public async Task DeleteSelectedAsync()
+    public async Task DeleteSelectedAsync(CancellationToken cancellationToken = default)
     {
         if (IsBusy || !HasMultiSelection)
         {
@@ -1450,40 +1619,57 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         var originalAnchorId = _multiSelection.AnchorId;
         IsBusy = true;
         ErrorMessage = null;
-        foreach (var source in sources)
+        try
         {
-            if (source.Kind == WorkspaceEntityKind.Item)
+            foreach (var source in sources)
             {
-                var result = await _items.DeleteItemAsync(new ItemManagementDeleteRequest(source.Id, true)).ConfigureAwait(false);
-                if (!result.Succeeded)
+                if (source.Kind == WorkspaceEntityKind.Item)
                 {
-                    await RestoreBatchFailureAsync(originalSnapshot, originalSelectedIds, originalActiveId, originalAnchorId, result.Error).ConfigureAwait(false);
-                    return;
-                }
+                    var result = await _items.DeleteItemAsync(new ItemManagementDeleteRequest(source.Id, true), cancellationToken).ConfigureAwait(false);
+                    if (!result.Succeeded)
+                    {
+                        await RestoreBatchFailureAsync(originalSnapshot, originalSelectedIds, originalActiveId, originalAnchorId, result.Error, cancellationToken).ConfigureAwait(false);
+                        return;
+                    }
 
-                deletedIds.Add(source.Id);
-            }
-            else
-            {
-                var impact = GetDeleteImpact(source.Id);
-                var result = await _groups.DeleteGroupAsync(new GroupManagementDeleteRequest(source.Id, true)).ConfigureAwait(false);
-                if (!result.Succeeded)
+                    deletedIds.Add(source.Id);
+                }
+                else
                 {
-                    await RestoreBatchFailureAsync(originalSnapshot, originalSelectedIds, originalActiveId, originalAnchorId, result.Error).ConfigureAwait(false);
-                    return;
-                }
+                    var impact = GetDeleteImpact(source.Id);
+                    var result = await _groups.DeleteGroupAsync(new GroupManagementDeleteRequest(source.Id, true), cancellationToken).ConfigureAwait(false);
+                    if (!result.Succeeded)
+                    {
+                        await RestoreBatchFailureAsync(originalSnapshot, originalSelectedIds, originalActiveId, originalAnchorId, result.Error, cancellationToken).ConfigureAwait(false);
+                        return;
+                    }
 
-                deletedIds.UnionWith(impact.DeletedEntityIds);
+                    deletedIds.UnionWith(impact.DeletedEntityIds);
+                }
             }
+
+            await ReloadAsync(cancellationToken).ConfigureAwait(false);
+            _multiSelection.Reconcile(SelectableEntityIdsForStore(_storeId!.Value));
+            ConstrainSelectionToOneNiche();
+            ApplyMultiSelectionVisualState();
+            EntitiesDeleted?.Invoke(this, deletedIds);
+            StructureChanged?.Invoke(this, EventArgs.Empty);
         }
-
-        IsBusy = false;
-        await ReloadAsync().ConfigureAwait(false);
-        _multiSelection.Reconcile(SelectableEntityIdsForStore(_storeId!.Value));
-        ConstrainSelectionToOneNiche();
-        ApplyMultiSelectionVisualState();
-        EntitiesDeleted?.Invoke(this, deletedIds);
-        StructureChanged?.Invoke(this, EventArgs.Empty);
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            await RestoreBatchFailureAsync(
+                originalSnapshot,
+                originalSelectedIds,
+                originalActiveId,
+                originalAnchorId,
+                "Deletion was canceled; the original workspace was restored.",
+                CancellationToken.None).ConfigureAwait(false);
+            throw;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private IReadOnlyList<WorkspaceTreeSelection> GetEffectiveSelectedSources() =>
@@ -1904,7 +2090,119 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged
         }
     }
 
-    private static void Run(Task task) => _ = task;
+    public ValueTask DisposeAsync()
+    {
+        Task disposalTask;
+        TaskCompletionSource cancellationCompleted;
+        lock (_commandGate)
+        {
+            if (_disposeTask is not null)
+            {
+                return new ValueTask(_disposeTask);
+            }
+
+            _isDisposed = true;
+            cancellationCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var commands = _pendingCommands.Select(command => command.Completion.Task).ToArray();
+            _disposeTask = CompleteCommandDisposalAsync(commands, cancellationCompleted.Task);
+            disposalTask = _disposeTask;
+        }
+
+        try
+        {
+            _shutdownCts.Cancel();
+            cancellationCompleted.TrySetResult();
+        }
+        catch (Exception exception)
+        {
+            cancellationCompleted.TrySetException(exception);
+        }
+
+        return new ValueTask(disposalTask);
+    }
+
+    private async Task CompleteCommandDisposalAsync(IReadOnlyCollection<Task> commands, Task cancellationCompleted)
+    {
+        try
+        {
+            await Task.WhenAll(commands).ConfigureAwait(false);
+            await cancellationCompleted.ConfigureAwait(false);
+        }
+        finally
+        {
+            _shutdownCts.Dispose();
+        }
+    }
+
+    private void Run(Func<CancellationToken, Task> operation, CancellationToken cancellationToken = default) =>
+        _ = ExecuteTrackedCommandAsync(operation, cancellationToken);
+
+    public Task ExecuteTrackedCommandAsync(
+        Func<CancellationToken, Task> operation,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        TrackedCommand tracked;
+        Task commandTask;
+        lock (_commandGate)
+        {
+            if (_isDisposed || _pendingCommands.Count > 0 || _isBusy)
+            {
+                return Task.CompletedTask;
+            }
+
+            tracked = new TrackedCommand(CancellationTokenSource.CreateLinkedTokenSource(
+                _shutdownCts.Token,
+                cancellationToken));
+            try
+            {
+                commandTask = operation(tracked.Cancellation.Token);
+            }
+            catch (Exception exception)
+            {
+                commandTask = Task.FromException(exception);
+            }
+
+            _pendingCommands.Add(tracked);
+        }
+
+        OnPropertyChanged(nameof(PendingCommandCount));
+        OnPropertyChanged(nameof(IsBusy));
+        return RunAndObserveAsync(tracked, commandTask);
+    }
+
+    private async Task RunAndObserveAsync(TrackedCommand tracked, Task commandTask)
+    {
+        try
+        {
+            await commandTask.ConfigureAwait(true);
+        }
+        catch (OperationCanceledException) when (tracked.Cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            ErrorMessage = exception.Message;
+        }
+        finally
+        {
+            tracked.Cancellation.Dispose();
+            lock (_commandGate)
+            {
+                _pendingCommands.Remove(tracked);
+            }
+
+            try
+            {
+                OnPropertyChanged(nameof(PendingCommandCount));
+                OnPropertyChanged(nameof(IsBusy));
+            }
+            finally
+            {
+                tracked.Completion.TrySetResult();
+            }
+        }
+    }
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
