@@ -58,6 +58,9 @@ public class GroupManagementServiceTests
         var renameDuplicate = await service.UpdateGroupAsync(new GroupManagementUpdateRequest(
             sample.ChildGroup!.Id,
             "Seasonal"));
+        var multiline = await service.UpdateGroupAsync(new GroupManagementUpdateRequest(sample.RootGroup!.Id, "Seasonal\nwork"));
+        Assert.False(multiline.Succeeded);
+        Assert.Contains("single line", multiline.Error, StringComparison.OrdinalIgnoreCase);
 
         Assert.False(duplicate.Succeeded);
         Assert.True(separateBranch.Succeeded);
