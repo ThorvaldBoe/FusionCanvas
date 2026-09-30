@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO.Compression;
 using System.Text.Json;
 using FusionCanvas.Application.Workspaces.Transfer;
@@ -385,6 +386,39 @@ public class WorkspacePackageIntegrationTests
         Assert.Equal("original", await File.ReadAllTextAsync(destination, TestContext.Current.CancellationToken));
     }
 
+    [Fact]
+    public void PackageTempCleanup_ReportsFailedFileAndDirectoryCleanup()
+    {
+        using var temp = new TemporaryDirectory();
+        var temporaryPackagePath = temp.GetPath("package.tmp");
+        File.WriteAllText(temporaryPackagePath, "temporary package");
+        var temporaryDirectory = new DirectoryInfo(temp.GetPath("export-temp"));
+        temporaryDirectory.Create();
+        var messages = new List<string>();
+        using var listener = new RecordingTraceListener(messages);
+        Trace.Listeners.Add(listener);
+
+        try
+        {
+            WorkspacePackageTempCleanup.Cleanup(
+                temporaryPackagePath,
+                temporaryDirectory,
+                _ => throw new IOException("file cleanup failed"),
+                _ => throw new UnauthorizedAccessException("directory cleanup failed"));
+        }
+        finally
+        {
+            Trace.Listeners.Remove(listener);
+        }
+
+        Assert.Contains(messages, message =>
+            message.Contains("temporary file cleanup failed", StringComparison.Ordinal)
+            && message.Contains(temporaryPackagePath, StringComparison.Ordinal));
+        Assert.Contains(messages, message =>
+            message.Contains("temporary directory cleanup failed", StringComparison.Ordinal)
+            && message.Contains(temporaryDirectory.FullName, StringComparison.Ordinal));
+    }
+
     private static WorkspaceTransferService NewService(
         SqliteWorkspaceRepository repository,
         LocalWorkspaceFileStore files) =>
@@ -530,6 +564,25 @@ public class WorkspacePackageIntegrationTests
     private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
     {
         public void Report(T value) => report(value);
+    }
+
+    private sealed class RecordingTraceListener(List<string> messages) : TraceListener
+    {
+        public override void Write(string? message)
+        {
+            if (message is not null)
+            {
+                messages.Add(message);
+            }
+        }
+
+        public override void WriteLine(string? message)
+        {
+            if (message is not null)
+            {
+                messages.Add(message);
+            }
+        }
     }
 
     private sealed class TemporaryDirectory : IDisposable
