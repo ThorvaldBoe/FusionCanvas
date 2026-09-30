@@ -142,6 +142,38 @@ public sealed class WorkspaceTelemetrySettingsTests
     }
 
     [AvaloniaFact]
+    public async Task Export_ChangesBusyStateOnTheUiContext()
+    {
+        using var temp = new TemporaryDirectory();
+        Directory.CreateDirectory(temp.GetPath("exports"));
+        var uiContext = SynchronizationContext.Current;
+        Assert.NotNull(uiContext);
+        var service = new ExportTelemetryService();
+        var picker = new DelayedExportFilePicker();
+        var viewModel = new WorkspaceTelemetrySettingsViewModel(service, null, NullClipboardService.Instance);
+        viewModel.SetWorkspace(Guid.NewGuid(), "Export test");
+        viewModel.SetExportFilePicker(picker);
+        var busyOnUiContext = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(WorkspaceTelemetrySettingsViewModel.IsBusy)
+                && viewModel.IsBusy)
+            {
+                busyOnUiContext.TrySetResult(ReferenceEquals(SynchronizationContext.Current, uiContext));
+            }
+        };
+
+        viewModel.ExportCommand.Execute(null);
+        var exportPath = temp.GetPath(Path.Combine("exports", "telemetry.json"));
+        picker.Complete(exportPath);
+
+        Assert.True(await busyOnUiContext.Task.WaitAsync(TimeSpan.FromSeconds(3)));
+        service.CompleteExport("{}\n");
+        await WaitUntilAsync(() => !viewModel.IsBusy);
+        Assert.Equal("{}\n", await File.ReadAllTextAsync(exportPath));
+    }
+
+    [AvaloniaFact]
     public void DebugWindow_IsNativeResizableWindow()
     {
         var window = new TelemetryDebugWindow();
@@ -179,6 +211,35 @@ public sealed class WorkspaceTelemetrySettingsTests
             Text = text;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class DelayedExportFilePicker : ITelemetryExportFilePicker
+    {
+        private readonly TaskCompletionSource<string?> _path = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<string?> PickPathAsync(CancellationToken cancellationToken = default) => _path.Task;
+
+        public void Complete(string path) => _path.TrySetResult(path);
+    }
+
+    private sealed class ExportTelemetryService : ITelemetryService
+    {
+        private readonly TaskCompletionSource<string> _export = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public event EventHandler<TelemetryEntry>? EntryRecorded;
+        public bool IsCaptureEnabled => false;
+        public Task<WorkspaceTelemetrySettings> GetSettingsAsync(Guid workspaceId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(WorkspaceTelemetrySettings.Default);
+        public Task SaveSettingsAsync(Guid workspaceId, WorkspaceTelemetrySettings settings, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task RecordAsync(TelemetryEventRequest request, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<IReadOnlyList<TelemetryEntry>> SearchAsync(Guid workspaceId, TelemetryQuery query, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<TelemetryEntry>>([]);
+        public Task<IReadOnlyList<TelemetryEntry>> ReadAllAsync(Guid workspaceId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<TelemetryEntry>>([]);
+        public Task<int> DeleteAllAsync(Guid workspaceId, CancellationToken cancellationToken = default) => Task.FromResult(0);
+        public Task<string> ExportJsonAsync(Guid workspaceId, CancellationToken cancellationToken = default) => _export.Task;
+        public Task<int> CleanupExpiredAsync(Guid workspaceId, CancellationToken cancellationToken = default) => Task.FromResult(0);
+        public void CompleteExport(string json) => _export.TrySetResult(json);
     }
 
     private sealed class TemporaryDirectory : IDisposable
