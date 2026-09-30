@@ -110,7 +110,8 @@ internal static class MainWindowViewModelFactory
         IIdeationService? ideationService = null,
         IIdeationAccessStatus? ideationAccessStatus = null,
         IWorkspaceRepository? workspaceSnapshotRepository = null,
-        SettingsViewModel? settings = null)
+        SettingsViewModel? settings = null,
+        CancellationToken cancellationToken = default)
     {
         var fileStore = new EmptyWorkspaceFileStore();
         var itemManagement = new ItemManagementService(repository);
@@ -152,7 +153,8 @@ internal static class MainWindowViewModelFactory
             services,
             ideationAccessStatus: accessStatus,
             titleOptimizationService: titleOptimization,
-            settings: settings);
+            settings: settings,
+            cancellationToken: cancellationToken);
     }
 
     private sealed class EmptyWorkspaceFileStore : IWorkspaceFileStore

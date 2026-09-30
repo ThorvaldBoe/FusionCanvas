@@ -42,8 +42,9 @@ public static class AppWorkspaceFactory
         IAiImageGenerationProvider? artworkProvider = null,
         ITelemetryService? telemetry = null,
         Guid? initialActiveWorkspaceId = null,
-        Guid? initialActiveStoreId = null)
-        => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()), ai, artworkProvider, telemetry, initialActiveWorkspaceId, initialActiveStoreId);
+        Guid? initialActiveStoreId = null,
+        CancellationToken cancellationToken = default)
+        => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()), ai, artworkProvider, telemetry, initialActiveWorkspaceId, initialActiveStoreId, cancellationToken);
 
     public static AppWorkspaceRuntime Create(
         string databasePath,
@@ -51,8 +52,9 @@ public static class AppWorkspaceFactory
         IAiImageGenerationProvider? artworkProvider = null,
         ITelemetryService? telemetry = null,
         Guid? initialActiveWorkspaceId = null,
-        Guid? initialActiveStoreId = null)
-        => Create(databasePath, DefaultWorkspaceRoot(databasePath), ai, artworkProvider, telemetry, initialActiveWorkspaceId, initialActiveStoreId);
+        Guid? initialActiveStoreId = null,
+        CancellationToken cancellationToken = default)
+        => Create(databasePath, DefaultWorkspaceRoot(databasePath), ai, artworkProvider, telemetry, initialActiveWorkspaceId, initialActiveStoreId, cancellationToken);
 
     public static AppWorkspaceRuntime Create(
         string databasePath,
@@ -61,7 +63,8 @@ public static class AppWorkspaceFactory
         IAiImageGenerationProvider? artworkProvider = null,
         ITelemetryService? telemetry = null,
         Guid? initialActiveWorkspaceId = null,
-        Guid? initialActiveStoreId = null)
+        Guid? initialActiveStoreId = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(ai);
         var repository = new SqliteWorkspaceRepository(databasePath);
@@ -73,7 +76,9 @@ public static class AppWorkspaceFactory
             new ZipWorkspacePackageWriter(),
             new ZipWorkspacePackageReader());
         var rasterImageMetadata = new RasterImageMetadataReader();
-        var snapshot = StartupTaskRunner.Run(() => repository.LoadAsync());
+        var snapshot = StartupTaskRunner.Run(
+            token => repository.LoadAsync(token),
+            cancellationToken);
         var itemManagement = new ItemManagementService(repository);
         var groupManagement = new GroupManagementService(repository);
         var assetManagement = new AssetManagementService(repository, fileStore);
@@ -101,7 +106,8 @@ public static class AppWorkspaceFactory
             new SnowcloneCsvCodec(),
             new EmbeddedBundledSnowcloneSource());
         var snowcloneLibraryInitialization = StartupTaskRunner.Run(
-            () => snowcloneLibrary.InitializeAsync());
+            token => snowcloneLibrary.InitializeAsync(cancellationToken: token),
+            cancellationToken);
         var rejectedPhrases = new RejectedPhraseManagementService(repository);
         var conceptRefinementAccess = new ConfiguredConceptRefinementAccessStatus(ai);
         var guidanceSource = new EmbeddedDesignTriangleGuidanceSource();

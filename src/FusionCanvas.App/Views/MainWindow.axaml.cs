@@ -57,7 +57,7 @@ public partial class MainWindow : Window
         InitializeWindowLayout(null);
     }
 
-    public MainWindow(AppServices services)
+    public MainWindow(AppServices services, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(services);
         InitializeComponent();
@@ -69,7 +69,8 @@ public partial class MainWindow : Window
             services.Settings,
             services.AiTextGeneration,
             artworkProvider: services.AiImageGeneration,
-            telemetry: services.Telemetry);
+            telemetry: services.Telemetry,
+            cancellationToken: cancellationToken);
         _itemCsvImportCodec = services.ItemCsvImportCodec;
         if (services.PrintifyCredentials is { } printifyCredentials && services.PrintifyVerifier is { } printifyVerifier && services.PrintifyCatalogClient is { } catalogClient)
             viewModel.StoreManagement.ConfigurePrintify(printifyCredentials, printifyVerifier, catalogClient);

@@ -131,6 +131,27 @@ public sealed class AppWorkspaceIdeationCompositionTests
     }
 
     [Fact]
+    public void AppServicesFactory_StopsBeforeSettingsLoadWhenStartupIsCancelled()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.ThrowsAny<OperationCanceledException>(() =>
+            AppServicesFactory.Create(new YieldingSettingsStore(), cancellation.Token));
+    }
+
+    [Fact]
+    public void AppWorkspaceFactory_StopsBeforeWorkspaceLoadWhenStartupIsCancelled()
+    {
+        using var directory = new TemporaryDirectory();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.ThrowsAny<OperationCanceledException>(() =>
+            AppWorkspaceFactory.Create(directory.DatabasePath, new StubAi(), cancellationToken: cancellation.Token));
+    }
+
+    [Fact]
     public void FactoryComposesApplicationServicesNeededByMainWindowViewModel()
     {
         using var directory = new TemporaryDirectory();
@@ -199,6 +220,19 @@ public sealed class AppWorkspaceIdeationCompositionTests
         Assert.True(thread.Join(TimeSpan.FromSeconds(10)), "Main-window view-model startup deadlocked on the UI synchronization context.");
         Assert.Null(failure);
         Assert.NotNull(viewModel);
+    }
+
+    [Fact]
+    public void MainViewModel_StopsBeforeBaselineLoadWhenStartupIsCancelled()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.ThrowsAny<OperationCanceledException>(() =>
+            MainWindowViewModelFactory.CreateFromSnapshot(
+                WorkspaceSnapshot.Empty,
+                new YieldingWorkspaceRepository(),
+                cancellationToken: cancellation.Token));
     }
 
     private sealed class StubAi : IAiTextGenerationService

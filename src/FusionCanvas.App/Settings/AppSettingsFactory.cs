@@ -10,10 +10,12 @@ public static class AppSettingsFactory
     public static IApplicationSettingsStore CreateStore()
         => new JsonApplicationSettingsStore(DefaultSettingsPath());
 
-    public static SettingsViewModel LoadInitialState()
+    public static SettingsViewModel LoadInitialState(CancellationToken cancellationToken = default)
     {
         var store = CreateStore();
-        var load = StartupTaskRunner.Run(() => store.LoadAsync());
+        var load = StartupTaskRunner.Run(
+            token => store.LoadAsync(token),
+            cancellationToken);
         var themeController = new AvaloniaApplicationThemeController();
         return new SettingsViewModel(store, themeController, load.Value, load.Warning);
     }

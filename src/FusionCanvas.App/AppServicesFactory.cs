@@ -13,11 +13,17 @@ public static class AppServicesFactory
     public static AppServices Create()
         => Create(AppSettingsFactory.CreateStore());
 
+    public static AppServices Create(CancellationToken cancellationToken) =>
+        Create(AppSettingsFactory.CreateStore(), cancellationToken);
+
     public static AppServices Create(
-        FusionCanvas.Application.Settings.IApplicationSettingsStore settingsStore)
+        FusionCanvas.Application.Settings.IApplicationSettingsStore settingsStore,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settingsStore);
-        var load = StartupTaskRunner.Run(() => settingsStore.LoadAsync());
+        var load = StartupTaskRunner.Run(
+            token => settingsStore.LoadAsync(token),
+            cancellationToken);
         var settingsPath =
             (settingsStore as FusionCanvas.Integration.Settings.JsonApplicationSettingsStore)?.SettingsPath;
         var settingsDirectory = settingsPath is null
