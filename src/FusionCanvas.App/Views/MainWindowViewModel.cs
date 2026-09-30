@@ -264,10 +264,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         StoreManagement.WorkspaceStructureChanged += (_, _) => RefreshWorkspaceSnapshot();
         WorkspaceManagement.ActiveWorkspaceChanged += (_, workspace) => SwitchWorkspace(workspace);
         SubscribeToWorkspacePromptState();
-        // Load workspace selection before binding; initialize store presentation on the UI context below.
-        StartupTaskRunner.Run(
-            token => WorkspaceManagement.LoadAsync(token),
+        // Load through the application service so the startup bridge waits for
+        // the data operation only. WorkspaceManagementViewModel.LoadAsync also
+        // marshals back to the UI thread, which would deadlock this constructor
+        // because it already runs on that thread.
+        var workspaceState = StartupTaskRunner.Run(
+            token => workspaceManagementService.LoadAsync(token),
             cancellationToken);
+        WorkspaceManagement.ApplyInitialState(workspaceState);
         Run(InitializeStoreManagementAsync());
         AssetsManagement.WorkspaceStructureChanged += (_, _) => RefreshWorkspaceSnapshot();
         WorkspaceTree.ManageAssetsRequested += (_, selection) => Run(OpenManageAssetsAsync(selection));

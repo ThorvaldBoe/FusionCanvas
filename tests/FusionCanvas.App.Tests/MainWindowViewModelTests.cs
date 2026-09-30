@@ -232,6 +232,32 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task WorkspaceManagementStartupAppliesLoadedStateBeforeWindowConstructionCompletes()
+    {
+        var repository = new GateableWorkspaceRepository(SampleWorkspace.Create());
+        var delayedLoad = repository.DelayAfterAdditionalLoads(1);
+
+        Task<MainWindowViewModel> creation = Task.Run(
+            () => MainWindowViewModelFactory.CreateFromSnapshot(
+                SampleWorkspace.Create(),
+                repository),
+            TestContext.Current.CancellationToken);
+
+        try
+        {
+            await delayedLoad.Started.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            delayedLoad.Release();
+            var viewModel = await creation.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            Assert.NotEmpty(viewModel.WorkspaceManagement.ActiveWorkspaces);
+        }
+        finally
+        {
+            delayedLoad.Release();
+        }
+    }
+
+    [Fact]
     public async Task SelectingWorkspaceDoesNotWaitForStoreRefreshToComplete()
     {
         var now = DateTimeOffset.UtcNow;
