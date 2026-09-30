@@ -521,7 +521,10 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
                 {
                     TransferSummary = FormatSummary(summary);
                 }
-                else if (!result.Cancelled)
+                else if (!result.Cancelled || !string.Equals(
+                    result.Error,
+                    "The workspace transfer was cancelled.",
+                    StringComparison.Ordinal))
                 {
                     ErrorMessage = result.Error ?? "Workspace transfer failed.";
                     if (openManagementOnFailure)
