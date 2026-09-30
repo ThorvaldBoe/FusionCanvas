@@ -471,6 +471,7 @@
                           Spacing="8">
                 <Button Content="Delete permanently"
                         Command="{Binding ConfirmDeleteTagCommand}"
+                        IsEnabled="{Binding CanConfirmDeleteTag}"
                         Classes="danger fixedDanger" />
                 <Button Content="Cancel"
                         Command="{Binding CancelDeleteTagCommand}"

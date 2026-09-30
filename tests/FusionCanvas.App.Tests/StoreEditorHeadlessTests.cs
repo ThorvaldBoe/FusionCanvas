@@ -12,6 +12,7 @@ using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Stores;
+using FusionCanvas.Domain.Tags;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.AI;
@@ -121,6 +122,57 @@ public class StoreEditorHeadlessTests
         Assert.True(newProductButton!.IsVisible);
 
         window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task TagDeleteButtonWaitsForImpactCountAndShowsUnknownAfterLookupFailure()
+    {
+        var storeId = Guid.NewGuid();
+        var store = new Store(storeId, "Studio", null, false, Now, Now, "{}");
+        var tag = new Tag(Guid.NewGuid(), storeId, "Evergreen", null, false, Now, Now, "{}", null);
+        var snapshot = new WorkspaceSnapshot([store], [], [], [], [], [], [tag], [], []);
+        var repository = new GatedFailingWorkspaceRepository(snapshot);
+        var viewModel = new StoreManagementViewModel(
+            new StoreManagementService(repository),
+            nicheService: null,
+            new TagManagementService(repository));
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        var window = new StoreEditorWindow { DataContext = viewModel };
+        window.Show();
+        window.UpdateLayout();
+
+        try
+        {
+            viewModel.OpenTagsTabCommand.Execute(null);
+            viewModel.EditTagCommand.Execute(viewModel.EditorActiveTags.Single());
+            repository.FailNextLoadAfterGate();
+            viewModel.RequestDeleteSelectedTagCommand.Execute(null);
+
+            await repository.LoadStarted.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            window.UpdateLayout();
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+            var deleteButton = FindButton(window, "Delete permanently")!;
+            Assert.False(deleteButton.IsEnabled);
+            Assert.Contains("Checking", viewModel.TagDeleteWarningMessage, StringComparison.OrdinalIgnoreCase);
+
+            repository.ReleaseBlockedLoad();
+            await WaitForAsync(() => viewModel.ErrorMessage is not null);
+            window.UpdateLayout();
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+            Assert.Contains("unknown", viewModel.TagDeleteWarningMessage, StringComparison.OrdinalIgnoreCase);
+            Assert.True(deleteButton.IsEnabled);
+            Assert.Contains("Injected tag impact-count read failure", viewModel.ErrorMessage, StringComparison.Ordinal);
+            Assert.Contains(
+                window.GetVisualDescendants().OfType<TextBlock>(),
+                text => string.Equals(text.Text, viewModel.TagDeleteWarningMessage, StringComparison.Ordinal));
+        }
+        finally
+        {
+            repository.ReleaseBlockedLoad();
+            window.Close();
+        }
     }
 
     [AvaloniaFact]
@@ -2879,6 +2931,39 @@ public class StoreEditorHeadlessTests
 
         public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(_snapshot);
+    }
+
+    private sealed class GatedFailingWorkspaceRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
+    {
+        private WorkspaceSnapshot _snapshot = snapshot;
+        private bool _failNextLoad;
+        private readonly TaskCompletionSource<bool> _loadStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> _releaseLoad = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task LoadStarted => _loadStarted.Task;
+
+        public void FailNextLoadAfterGate() => _failNextLoad = true;
+
+        public void ReleaseBlockedLoad() => _releaseLoad.TrySetResult(true);
+
+        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
+        {
+            _snapshot = snapshot;
+            return Task.CompletedTask;
+        }
+
+        public async Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default)
+        {
+            if (!_failNextLoad)
+            {
+                return _snapshot;
+            }
+
+            _failNextLoad = false;
+            _loadStarted.TrySetResult(true);
+            await _releaseLoad.Task.WaitAsync(cancellationToken);
+            throw new IOException("Injected tag impact-count read failure.");
+        }
     }
 
     private sealed class FixedProviderCatalog(ProviderCatalogCandidateDescriptor descriptor) : IProviderCatalogCandidateSource

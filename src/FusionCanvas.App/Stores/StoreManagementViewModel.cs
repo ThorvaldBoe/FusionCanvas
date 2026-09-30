@@ -441,6 +441,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
     public bool CanSaveSelectedTag => _tagEditor.CanSaveSelectedTag;
     public bool CanArchiveSelectedTag => _tagEditor.CanArchiveSelectedTag;
     public bool CanDeleteSelectedTag => _tagEditor.CanDeleteSelectedTag;
+    public bool CanConfirmDeleteTag => _tagEditor.CanConfirmDeleteTag;
 
     public IReadOnlyList<NicheSummary> EditorActiveNiches =>
         _isCreatingNewNiche && DraftNiche() is { } draft

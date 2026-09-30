@@ -26,7 +26,8 @@ public sealed class TagEditorViewModel : INotifyPropertyChanged
     private bool _needsFirstTag;
     private bool _isCreatingDraft;
     private bool _deleteWarningVisible;
-    private int _pendingDeleteItemCount;
+    private int? _pendingDeleteItemCount;
+    private bool _isRefreshingDeleteItemCount;
     private Guid? _draftTagId;
     private long _loadVersion;
     private long _draftGeneration;
@@ -76,11 +77,16 @@ public sealed class TagEditorViewModel : INotifyPropertyChanged
     public bool CanArchiveSelectedTag => _service is not null && _selectedTag is { IsArchived: false } && !_isCreatingDraft && CanManageScope;
     public bool CanDeleteSelectedTag => _service is not null && _selectedTag is not null && !_isCreatingDraft && CanManageScope;
     public bool DeleteWarningVisible => _deleteWarningVisible;
+    public bool CanConfirmDeleteTag => _deleteWarningVisible && _pendingDeleteTag is not null && !_isRefreshingDeleteItemCount;
     public string DeleteWarningMessage => _pendingDeleteTag is null
         ? "Permanent deletion cannot be undone."
-        : _pendingDeleteItemCount == 0
-            ? $"Delete tag '{_pendingDeleteTag.Name}' permanently? This cannot be undone."
-            : $"Delete tag '{_pendingDeleteTag.Name}' permanently? It will be removed from {_pendingDeleteItemCount} Item(s). This cannot be undone.";
+        : _pendingDeleteItemCount is not { } itemCount
+            ? _isRefreshingDeleteItemCount
+                ? $"Checking how many items use tag '{_pendingDeleteTag.Name}'."
+                : $"The number of items that use tag '{_pendingDeleteTag.Name}' is unknown. This cannot be undone."
+            : itemCount == 0
+                ? $"Delete tag '{_pendingDeleteTag.Name}' permanently? It is applied to 0 items. This cannot be undone."
+                : $"Delete tag '{_pendingDeleteTag.Name}' permanently? It will be removed from {itemCount} item{(itemCount == 1 ? string.Empty : "s")}. This cannot be undone.";
 
     public ICommand EditTagCommand { get; }
     public ICommand StartCreateTagCommand { get; }
@@ -237,10 +243,12 @@ public sealed class TagEditorViewModel : INotifyPropertyChanged
 
     public void RequestDeleteSelectedTag()
     {
+        if (_service is null) { _reportError("Tag management is not available."); return; }
         if (_isCreatingDraft) { _reportError("Save the new tag before deleting it."); return; }
         if (!CanManageScope || _selectedTag is null) { _reportError("Select a tag before deleting."); return; }
         _pendingDeleteTag = _selectedTag;
-        _pendingDeleteItemCount = 0;
+        _pendingDeleteItemCount = null;
+        _isRefreshingDeleteItemCount = true;
         _deleteWarningVisible = true;
         _deleteCountVersion++;
         RaiseDeleteWarningProperties();
@@ -252,6 +260,7 @@ public sealed class TagEditorViewModel : INotifyPropertyChanged
         if (_service is null) { _reportError("Tag management is not available."); return; }
         var pendingDeleteTag = _pendingDeleteTag;
         if (pendingDeleteTag is null || !CanManageScope) { _reportError("Select a tag before deleting."); return; }
+        if (_isRefreshingDeleteItemCount) { _reportError("Wait for the tag usage count to finish loading."); return; }
         var scope = _scope;
         var result = await _service.DeleteTagAsync(new TagManagementDeleteRequest(pendingDeleteTag.Id, ConfirmPermanentDeletion: true), cancellationToken);
         if (scope != _scope)
@@ -273,16 +282,27 @@ public sealed class TagEditorViewModel : INotifyPropertyChanged
         var scope = _scope;
         var tagId = pendingDeleteTag.Id;
         var version = _deleteCountVersion;
-        var count = await _service.GetTagApplicationCountAsync(tagId, cancellationToken);
-        if (scope != _scope || version != _deleteCountVersion || _pendingDeleteTag?.Id != tagId || !_deleteWarningVisible) return;
-        _pendingDeleteItemCount = count;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DeleteWarningMessage)));
+        try
+        {
+            var count = await _service.GetTagApplicationCountAsync(tagId, cancellationToken);
+            if (scope != _scope || version != _deleteCountVersion || _pendingDeleteTag?.Id != tagId || !_deleteWarningVisible) return;
+            _pendingDeleteItemCount = count;
+        }
+        finally
+        {
+            if (scope == _scope && version == _deleteCountVersion && _pendingDeleteTag?.Id == tagId && _deleteWarningVisible)
+            {
+                _isRefreshingDeleteItemCount = false;
+                RaiseDeleteWarningProperties();
+            }
+        }
     }
 
     public void ClearDeleteWarning()
     {
         _pendingDeleteTag = null;
-        _pendingDeleteItemCount = 0;
+        _pendingDeleteItemCount = null;
+        _isRefreshingDeleteItemCount = false;
         _deleteWarningVisible = false;
         _deleteCountVersion++;
         RaiseDeleteWarningProperties();
@@ -385,6 +405,7 @@ public sealed class TagEditorViewModel : INotifyPropertyChanged
     private void RaiseDeleteWarningProperties()
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DeleteWarningVisible)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanConfirmDeleteTag)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DeleteWarningMessage)));
     }
 

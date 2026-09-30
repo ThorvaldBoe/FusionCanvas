@@ -2,6 +2,7 @@ using FusionCanvas.App.Stores;
 using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Stores;
+using FusionCanvas.Domain.Tags;
 using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.App.Tests;
@@ -63,6 +64,37 @@ public class TagEditorScopeTests
         Assert.True(workspaceChanged);
     }
 
+    [Fact]
+    public async Task FailedDeleteCountIsShownAsUnknownInsteadOfZero()
+    {
+        var store = NewStore("Current store");
+        var tag = new Tag(Guid.NewGuid(), store.Id, "Evergreen", null, false, Now, Now, "{}", null);
+        var repository = new FailsSecondLoadWorkspaceRepository(
+            new WorkspaceSnapshot([store], [], [], [], [], [], [tag], [], []));
+        Func<CancellationToken, Task>? pendingOperation = null;
+        string? errorMessage = null;
+        var editor = new TagEditorViewModel(
+            new TagManagementService(repository, () => Now, Guid.NewGuid),
+            operation => pendingOperation = operation,
+            reportError: message => errorMessage = message);
+
+        editor.SetScope(new StoreManagementScope(store.WorkspaceId, store.Id));
+        await editor.LoadAsync(TestContext.Current.CancellationToken);
+        editor.SelectTagForEditing(Assert.Single(editor.ActiveTags));
+
+        editor.RequestDeleteSelectedTag();
+        Assert.Contains("Checking", editor.DeleteWarningMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.False(editor.CanConfirmDeleteTag);
+        await editor.ConfirmDeleteTagAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("Wait", errorMessage, StringComparison.OrdinalIgnoreCase);
+        var countOperation = Assert.IsType<Func<CancellationToken, Task>>(pendingOperation);
+        await Assert.ThrowsAsync<IOException>(() => countOperation(TestContext.Current.CancellationToken));
+
+        Assert.Contains("unknown", editor.DeleteWarningMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("0 item", editor.DeleteWarningMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.True(editor.CanConfirmDeleteTag);
+    }
+
     private static FusionCanvas.Domain.Stores.Store NewStore(string name) =>
         new(Guid.NewGuid(), name, null, false, Now, Now, "{}");
 
@@ -83,5 +115,25 @@ public class TagEditorScopeTests
 
         public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(_snapshot);
+    }
+
+    private sealed class FailsSecondLoadWorkspaceRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
+    {
+        private WorkspaceSnapshot _snapshot = snapshot;
+        private int _loadCount;
+
+        public Task SaveAsync(WorkspaceSnapshot updated, CancellationToken cancellationToken = default)
+        {
+            _snapshot = updated;
+            return Task.CompletedTask;
+        }
+
+        public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Increment(ref _loadCount) == 2)
+                throw new IOException("Unable to load the workspace snapshot.");
+
+            return Task.FromResult(_snapshot);
+        }
     }
 }
