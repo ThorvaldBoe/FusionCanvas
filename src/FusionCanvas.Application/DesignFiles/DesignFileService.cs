@@ -9,11 +9,19 @@ public sealed class DesignFileService : IDesignFileService
 {
     private readonly IWorkspaceRepository _repository;
     private readonly IWorkspaceFileStore _fileStore;
+    private readonly Func<DateTimeOffset> _clock;
+    private readonly Func<Guid> _newId;
 
-    public DesignFileService(IWorkspaceRepository repository, IWorkspaceFileStore fileStore)
+    public DesignFileService(
+        IWorkspaceRepository repository,
+        IWorkspaceFileStore fileStore,
+        Func<DateTimeOffset>? clock = null,
+        Func<Guid>? newId = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _fileStore = fileStore ?? throw new ArgumentNullException(nameof(fileStore));
+        _clock = clock ?? (() => DateTimeOffset.UtcNow);
+        _newId = newId ?? Guid.NewGuid;
     }
 
     public async Task<IReadOnlyList<DesignFileSummary>> ListForItemAsync(Guid itemId, CancellationToken cancellationToken = default)
@@ -61,8 +69,8 @@ public sealed class DesignFileService : IDesignFileService
             return DesignFileImportResult.Failure($"The Design file could not be imported. {exception.Message}");
         }
 
-        var assetId = Guid.NewGuid();
-        var now = DateTimeOffset.UtcNow;
+        var assetId = _newId();
+        var now = _clock();
         var asset = new Asset(
             assetId,
             item.StoreId,
