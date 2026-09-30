@@ -13,18 +13,9 @@ public sealed class AvaloniaClipboardService : IClipboardService
             ?.MainWindow?.Clipboard;
         if (clipboard is null)
         {
-            return;
+            throw new InvalidOperationException("The application clipboard is unavailable.");
         }
 
-        try
-        {
-            await clipboard.SetTextAsync(text).ConfigureAwait(false);
-        }
-        catch (InvalidOperationException)
-        {
-        }
-        catch (PlatformNotSupportedException)
-        {
-        }
+        await clipboard.SetTextAsync(text).ConfigureAwait(false);
     }
 }
