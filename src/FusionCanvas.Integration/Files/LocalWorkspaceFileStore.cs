@@ -65,20 +65,28 @@ public sealed class LocalWorkspaceFileStore : IWorkspaceFileStore
 
         var fileName = $"{Path.GetFileNameWithoutExtension(sourcePath)}-{Guid.NewGuid():N}{extension}";
         var destinationPath = Path.Combine(assetDirectory, fileName);
-
-        await using (var source = File.OpenRead(sourcePath))
-        await using (var destination = File.Create(destinationPath))
-        {
-            await source.CopyToAsync(destination, cancellationToken);
-        }
-
         var relativePath = WorkspaceFileReference.Normalize(Path.GetRelativePath(WorkspaceRoot, destinationPath));
-        return new ManagedWorkspaceFile(
-            Path.GetFileName(sourcePath),
-            kind,
-            relativePath,
-            destinationPath,
-            Path.GetFullPath(sourcePath));
+
+        try
+        {
+            await using (var source = File.OpenRead(sourcePath))
+            await using (var destination = File.Create(destinationPath))
+            {
+                await source.CopyToAsync(destination, cancellationToken);
+            }
+
+            return new ManagedWorkspaceFile(
+                Path.GetFileName(sourcePath),
+                kind,
+                relativePath,
+                destinationPath,
+                Path.GetFullPath(sourcePath));
+        }
+        catch
+        {
+            TryDelete(relativePath);
+            throw;
+        }
     }
 
     public async Task<ManagedWorkspaceFile> SaveAsync(string fileName, AssetKind kind, Stream content, CancellationToken cancellationToken = default)
@@ -91,9 +99,19 @@ public sealed class LocalWorkspaceFileStore : IWorkspaceFileStore
         var extension = Path.GetExtension(safeName);
         if (string.IsNullOrWhiteSpace(extension)) safeName += ".png";
         var destination = Path.Combine(directory, $"{Path.GetFileNameWithoutExtension(safeName)}-{Guid.NewGuid():N}{Path.GetExtension(safeName)}");
-        await using var target = File.Create(destination);
-        await content.CopyToAsync(target, cancellationToken);
-        return new(Path.GetFileName(safeName), kind, WorkspaceFileReference.Normalize(Path.GetRelativePath(WorkspaceRoot, destination)), destination, string.Empty);
+        var relativePath = WorkspaceFileReference.Normalize(Path.GetRelativePath(WorkspaceRoot, destination));
+
+        try
+        {
+            await using var target = File.Create(destination);
+            await content.CopyToAsync(target, cancellationToken);
+            return new(Path.GetFileName(safeName), kind, relativePath, destination, string.Empty);
+        }
+        catch
+        {
+            TryDelete(relativePath);
+            throw;
+        }
     }
 
     public bool Exists(string workspaceRelativePath)
