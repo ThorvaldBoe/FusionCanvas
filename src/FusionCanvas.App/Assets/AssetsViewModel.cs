@@ -9,9 +9,10 @@ using FusionCanvas.Application.Assets;
 namespace FusionCanvas.App.Assets;
 
 // Async operations update bindable state after I/O and must preserve the captured UI synchronization context.
-public sealed class AssetsViewModel : INotifyPropertyChanged
+public sealed class AssetsViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly IAssetManagementService _service;
+    private bool _isDisposed;
     private IAssetFilePicker _filePicker;
     private AssetContextReference? _context;
     private AssetContextDescriptor? _contextDescriptor;
@@ -98,6 +99,11 @@ public sealed class AssetsViewModel : INotifyPropertyChanged
 
     public async Task OpenForContextAsync(AssetContextReference context, CancellationToken cancellationToken = default)
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
         _context = context;
         IsOpen = true;
         HasImportPending = false;
@@ -127,6 +133,11 @@ public sealed class AssetsViewModel : INotifyPropertyChanged
 
     private void ApplyState(AssetManagementState state)
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
         if (state.Context is AssetContextDescriptor descriptor)
         {
             _contextDescriptor = descriptor;
@@ -284,6 +295,28 @@ public sealed class AssetsViewModel : INotifyPropertyChanged
         CancelRemove();
         ErrorMessage = null;
         IsOpen = false;
+    }
+
+    public void Dispose()
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        _isDisposed = true;
+        foreach (var asset in Assets)
+        {
+            asset.RelabelRequested -= OnRelabelRequested;
+            asset.Dispose();
+        }
+
+        Assets.Clear();
+        SelectedAsset = null;
+        _removalCandidate = null;
+        RemovalConfirmationVisible = false;
+        IsOpen = false;
+        RaiseActionState();
     }
 
     private static IReadOnlyList<AssetPurposeOption> BuildPurposeOptions() =>

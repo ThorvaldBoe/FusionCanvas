@@ -184,6 +184,7 @@ public partial class MainWindow : Window
         _settings = settings;
         Opened += OnWindowOpened;
         Closing += OnWindowClosing;
+        Closed += OnWindowClosed;
         SizeChanged += (_, _) => CaptureNormalLayout();
         PositionChanged += (_, _) => CaptureNormalLayout();
     }
@@ -219,6 +220,14 @@ public partial class MainWindow : Window
         if (_settings is not null && _normalLayout is not null)
         {
             _settings.UpdateWindowLayout(_normalLayout);
+        }
+    }
+
+    private void OnWindowClosed(object? sender, EventArgs e)
+    {
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.Dispose();
         }
     }
 

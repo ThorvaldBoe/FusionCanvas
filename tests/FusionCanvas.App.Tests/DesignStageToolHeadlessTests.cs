@@ -5,9 +5,13 @@ using Avalonia.Input;
 using Avalonia.Automation;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using FusionCanvas.App.Assets;
 using FusionCanvas.App.StageTools;
+using FusionCanvas.Application.Assets;
+using FusionCanvas.Application.DesignFiles;
 using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Views;
 using FusionCanvas.Domain.Assets;
@@ -830,6 +834,45 @@ public class DesignStageToolHeadlessTests
         Assert.Equal(2, target!.ItemCount);
         Assert.False(transparency!.IsEnabled);
         Assert.False(generate!.IsEnabled);
+    }
+
+    [AvaloniaFact]
+    public void ClosingMainWindowDisposesActiveAssetAndDesignThumbnails()
+    {
+        using var fixture = new MainWindowFixture();
+        var thumbnailPath = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "../../../../../src/FusionCanvas.App/Assets/FusionCanvasLogo_Square.png"));
+        var now = DateTimeOffset.UtcNow;
+        var assets = fixture.ViewModel.AssetsManagement;
+        var assetRow = new AssetRowViewModel(
+            new AssetSummary(
+                Guid.NewGuid(), Guid.NewGuid(), "Logo", AssetKind.ExportedImage,
+                "assets/logo.png", null, "logo.png", false, null, now, now, thumbnailPath),
+            assets.AvailablePurposes,
+            assets);
+        Assert.IsType<Bitmap>(assetRow.Thumbnail);
+        assets.Assets.Add(assetRow);
+
+        var slotSummary = new DesignSlotSummary(Guid.NewGuid(), "Front", Guid.NewGuid(), thumbnailPath, false, true, true);
+        var designRow = new DesignRowViewModel(
+            new DesignRowSummary(Guid.NewGuid(), true, 0, [], [slotSummary]),
+            isReadOnly: false);
+        var rowSlot = Assert.Single(designRow.Slots);
+        var supportingImage = new DesignSlotViewModel(slotSummary with { DesignAreaId = Guid.NewGuid() }, isReadOnly: false);
+        Assert.IsType<Bitmap>(rowSlot.Thumbnail);
+        Assert.IsType<Bitmap>(supportingImage.Thumbnail);
+        fixture.ViewModel.DesignTool.Rows.Add(designRow);
+        fixture.ViewModel.DesignTool.SupportingImages.Add(supportingImage);
+
+        fixture.Window.Close();
+
+        Assert.Empty(assets.Assets);
+        Assert.Empty(fixture.ViewModel.DesignTool.Rows);
+        Assert.Empty(fixture.ViewModel.DesignTool.SupportingImages);
+        Assert.Null(assetRow.Thumbnail);
+        Assert.Null(rowSlot.Thumbnail);
+        Assert.Null(supportingImage.Thumbnail);
     }
 }
 
