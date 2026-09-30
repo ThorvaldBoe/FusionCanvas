@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using FusionCanvas.App.DocumentWindow;
+using FusionCanvas.App.Mockups;
 using FusionCanvas.App.Settings;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
@@ -523,7 +524,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public bool IsArchiveOfferingConfirmationVisible { get => _isArchiveOfferingConfirmationVisible; private set { if (SetField(ref _isArchiveOfferingConfirmationVisible, value)) NotifyCommands(); } }
     public bool HasMeaningfulMockupTemplateDraft => IsAddingTemplate && _mockupTemplateDraftBaseline is not null && CurrentMockupTemplateDraftState() != _mockupTemplateDraftBaseline;
     public string MockupTemplateLifecycleLabel => CurrentMockupTemplateReadiness().Lifecycle == MockupTemplateLifecycle.ReadyForUse ? "Ready for use" : "Draft";
-    public IReadOnlyList<string> MockupTemplateReadinessMessages => CurrentMockupTemplateReadiness().Blockers.Select(ReadinessMessage).ToArray();
+    public IReadOnlyList<string> MockupTemplateReadinessMessages => CurrentMockupTemplateReadiness().Blockers.Select(MockupTemplateReadinessMessageTranslator.Translate).ToArray();
     public string MockupTemplateSaveValidationMessage => string.IsNullOrWhiteSpace(TemplateName)
         ? "Enter a template name to save."
         : SelectedProviderMockup is not null && !TryCreateMapping(out _)
@@ -1877,25 +1878,6 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).ToArray(),
             Options, OptionValues, Variants, Placeholders, SelectedProviderMockup?.SupportedColorOptionValueIds.ToHashSet()));
     }
-
-    private static string ReadinessMessage(MockupTemplateReadinessBlocker blocker) => blocker switch
-    {
-        MockupTemplateReadinessBlocker.Archived => "Restore the template before use.",
-        MockupTemplateReadinessBlocker.MissingTargetDesignArea => "Choose a Design Area.",
-        MockupTemplateReadinessBlocker.InvalidTargetDesignArea => "Choose an active Design Area from this Offering.",
-        MockupTemplateReadinessBlocker.MissingColors => "Choose at least one applicable Color.",
-        MockupTemplateReadinessBlocker.InvalidColors => "Remove unavailable Colors.",
-        MockupTemplateReadinessBlocker.MissingCompatibleVariants => "Add an active Variant that uses the selected Colors.",
-        MockupTemplateReadinessBlocker.IncompatibleVariants => "Choose a Design Area compatible with every implied Variant.",
-        MockupTemplateReadinessBlocker.MissingImage => "Choose a mockup image.",
-        MockupTemplateReadinessBlocker.MissingMapping => "Add a valid design-area placement mapping.",
-        MockupTemplateReadinessBlocker.KnownImageColorIncompatibility => "Choose Colors supported by the selected image.",
-        MockupTemplateReadinessBlocker.MissingSourceApplicability => "Choose applicability options for each source image.",
-        MockupTemplateReadinessBlocker.InvalidSourceApplicability => "Remove unavailable applicability options from source images.",
-        MockupTemplateReadinessBlocker.MissingVariantSourceImage => "Configure a matching source image for every compatible Variant.",
-        MockupTemplateReadinessBlocker.AmbiguousVariantSourceImages => "Adjust source-image applicability so each compatible Variant matches exactly one image.",
-        _ => blocker.ToString()
-    };
 
     private bool TryCreateMapping(out MockupImageSpaceMapping? mapping)
     {
