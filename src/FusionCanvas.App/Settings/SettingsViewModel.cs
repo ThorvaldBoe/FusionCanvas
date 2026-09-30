@@ -72,7 +72,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         });
         CancelDiscardCommand = new RelayCommand(_ => ConfirmDiscardCredentialDraft = false);
         ManageWorkspacesCommand = new RelayCommand(_ => ManageWorkspaces(), () => _workspaceManagement is not null);
-        CopyDiagnosticsCommand = new RelayCommand(_ => CopyDiagnostics());
+        CopyDiagnosticsCommand = new RelayCommand(_ => _ = CopyDiagnosticsAsync());
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -294,10 +294,16 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         }
     }
 
-    private void CopyDiagnostics()
+    private async Task CopyDiagnosticsAsync()
     {
-        var text = DiagnosticsText;
-        _ = _clipboard.SetTextAsync(text);
+        try
+        {
+            await _clipboard.SetTextAsync(DiagnosticsText).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            SetMessage("Diagnostics could not be copied to the clipboard.");
+        }
     }
 
     private void QueueSave(ApplicationSettings settings)

@@ -77,6 +77,32 @@ public class SettingsAboutTests
         Assert.Contains("Commit: unknown", clipboard.Copied[0]);
     }
 
+    [Fact]
+    public async Task CopyDiagnostics_ReportsClipboardFailure()
+    {
+        var clipboard = new FailingClipboard();
+        var vm = new SettingsViewModel(
+            new InMemorySettingsStore(),
+            new FakeThemeController(),
+            ApplicationSettings.Default,
+            loadWarning: null,
+            clipboard: clipboard);
+        var errorMessage = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        vm.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(vm.ErrorMessage))
+            {
+                errorMessage.TrySetResult(vm.ErrorMessage);
+            }
+        };
+
+        vm.CopyDiagnosticsCommand.Execute(null);
+
+        Assert.Equal(
+            "Diagnostics could not be copied to the clipboard.",
+            await errorMessage.Task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken));
+    }
+
     private static SettingsViewModel NewViewModel() =>
         new(
             new InMemorySettingsStore(),
@@ -113,6 +139,12 @@ public class SettingsAboutTests
                 _completion.Task.Wait(TimeSpan.FromSeconds(2));
             }
         }
+    }
+
+    private sealed class FailingClipboard : IClipboardService
+    {
+        public Task SetTextAsync(string text) =>
+            Task.FromException(new InvalidOperationException("Clipboard unavailable."));
     }
 
     private sealed class FakeThemeController : IApplicationThemeController
