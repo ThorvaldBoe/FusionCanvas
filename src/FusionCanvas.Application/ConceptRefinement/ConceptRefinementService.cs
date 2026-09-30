@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Workspaces;
@@ -336,46 +335,10 @@ public sealed class ConceptRefinementService : IConceptRefinementService
             niche?.Name ?? "",
             niche?.Description ?? "",
             group?.Name,
-            SanitizeMetadata(store?.MetadataJson),
-            SanitizeMetadata(niche?.MetadataJson),
-            group is not null ? SanitizeMetadata(group.MetadataJson) : new Dictionary<string, string>(),
+            ItemMetadataCodec.SanitizeCreativeContextMetadata(store?.MetadataJson),
+            ItemMetadataCodec.SanitizeCreativeContextMetadata(niche?.MetadataJson),
+            group is not null ? ItemMetadataCodec.SanitizeCreativeContextMetadata(group.MetadataJson) : new Dictionary<string, string>(),
             tags);
-    }
-
-    private static IReadOnlyDictionary<string, string> SanitizeMetadata(string? metadataJson)
-    {
-        if (string.IsNullOrWhiteSpace(metadataJson) || metadataJson.Trim() == "{}")
-        {
-            return new Dictionary<string, string>();
-        }
-
-        Dictionary<string, string> parsed;
-        try
-        {
-            parsed = ItemMetadataCodec.ParseMetadata(metadataJson);
-        }
-        catch (JsonException)
-        {
-            return new Dictionary<string, string>();
-        }
-
-        return parsed
-            .Where(pair => !IsOperationalKey(pair.Key))
-            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
-    }
-
-    private static bool IsOperationalKey(string key)
-    {
-        var normalized = key.Trim().ToLowerInvariant();
-        var compact = new string(normalized.Where(char.IsLetterOrDigit).ToArray());
-        return normalized.StartsWith(ItemMetadataCodec.InheritedFromPrefix.ToLowerInvariant(), StringComparison.Ordinal) ||
-               compact is "id" or "createdat" or "updatedat" or "isarchived" or "status" ||
-               compact.Contains("inherited", StringComparison.Ordinal) ||
-               compact.Contains("path", StringComparison.Ordinal) ||
-               compact.Contains("apikey", StringComparison.Ordinal) ||
-               compact.Contains("credential", StringComparison.Ordinal) ||
-               compact.Contains("secret", StringComparison.Ordinal) ||
-               compact.Contains("token", StringComparison.Ordinal);
     }
 
     private static string FormatMetadata(string label, IReadOnlyDictionary<string, string> metadata)

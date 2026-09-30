@@ -339,37 +339,7 @@ public sealed class IdeationService : IIdeationService
     }
 
     private static IdeationCreativeContext CreativeContext(string name, string? description, string metadataJson) =>
-        new(name, string.IsNullOrWhiteSpace(description) ? null : description.Trim(), SanitizeMetadata(metadataJson));
-
-    private static IReadOnlyDictionary<string, string> SanitizeMetadata(string metadataJson)
-    {
-        Dictionary<string, string> parsed;
-        try
-        {
-            parsed = ItemMetadataCodec.ParseMetadata(metadataJson);
-        }
-        catch (JsonException)
-        {
-            return new Dictionary<string, string>();
-        }
-
-        return parsed
-            .Where(pair => !IsOperationalKey(pair.Key))
-            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
-    }
-
-    private static bool IsOperationalKey(string key)
-    {
-        var normalized = key.Trim().ToLowerInvariant();
-        var compact = new string(normalized.Where(char.IsLetterOrDigit).ToArray());
-        return normalized.StartsWith(ItemMetadataCodec.InheritedFromPrefix.ToLowerInvariant(), StringComparison.Ordinal) ||
-               compact is "id" or "createdat" or "updatedat" or "isarchived" or "status" ||
-               compact.Contains("path", StringComparison.Ordinal) ||
-               compact.Contains("apikey", StringComparison.Ordinal) ||
-               compact.Contains("credential", StringComparison.Ordinal) ||
-               compact.Contains("secret", StringComparison.Ordinal) ||
-               compact.Contains("token", StringComparison.Ordinal);
-    }
+        new(name, string.IsNullOrWhiteSpace(description) ? null : description.Trim(), ItemMetadataCodec.SanitizeCreativeContextMetadata(metadataJson));
 
     private static string? TryGetIdea(Item item)
     {
