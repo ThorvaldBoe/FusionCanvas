@@ -16,7 +16,7 @@ using FusionCanvas.Integration.Packages;
 using FusionCanvas.Integration.Persistence;
 using Microsoft.Data.Sqlite;
 
-namespace FusionCanvas.Integration.Tests;
+namespace FusionCanvas.Integration.Tests.Workspaces;
 
 public class WorkspacePackageIntegrationTests
 {

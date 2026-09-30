@@ -3,7 +3,7 @@ using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Settings;
 using FusionCanvas.Integration.Settings;
 
-namespace FusionCanvas.Integration.Tests;
+namespace FusionCanvas.Integration.Tests.Settings;
 
 public class JsonApplicationSettingsStoreTests
 {

@@ -8,7 +8,7 @@ using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.WorkspaceTree;
 
-namespace FusionCanvas.Application.Tests;
+namespace FusionCanvas.Application.Tests.WorkspaceTree;
 
 public class WorkspaceTreeTests
 {

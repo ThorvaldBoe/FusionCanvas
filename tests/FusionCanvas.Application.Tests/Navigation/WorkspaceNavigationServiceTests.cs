@@ -7,7 +7,7 @@ using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Navigation;
 
-namespace FusionCanvas.Application.Tests;
+namespace FusionCanvas.Application.Tests.Navigation;
 
 public class WorkspaceNavigationServiceTests
 {

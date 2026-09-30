@@ -1,6 +1,6 @@
 ﻿using FusionCanvas.Domain.Workflow;
 
-namespace FusionCanvas.Domain.Tests;
+namespace FusionCanvas.Domain.Tests.Workflow;
 
 public class WorkflowStageTests
 {

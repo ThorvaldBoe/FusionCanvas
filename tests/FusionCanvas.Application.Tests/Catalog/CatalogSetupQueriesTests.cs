@@ -2,7 +2,7 @@ using FusionCanvas.Application.Catalog;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
 
-namespace FusionCanvas.Application.Tests;
+namespace FusionCanvas.Application.Tests.Catalog;
 
 public sealed class CatalogSetupQueriesTests
 {

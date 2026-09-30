@@ -7,7 +7,7 @@ using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.DesignFiles;
 
-namespace FusionCanvas.Application.Tests;
+namespace FusionCanvas.Application.Tests.DesignFiles;
 
 public class DesignFileServiceTests
 {

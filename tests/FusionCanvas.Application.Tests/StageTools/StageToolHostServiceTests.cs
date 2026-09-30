@@ -7,7 +7,7 @@ using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.StageTools;
 using FusionCanvas.Application.ToolContexts;
 
-namespace FusionCanvas.Application.Tests;
+namespace FusionCanvas.Application.Tests.StageTools;
 
 public class StageToolHostServiceTests
 {

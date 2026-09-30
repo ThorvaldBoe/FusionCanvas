@@ -11,7 +11,7 @@ using Microsoft.Data.Sqlite;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Assets;
 
-namespace FusionCanvas.Integration.Tests;
+namespace FusionCanvas.Integration.Tests.Persistence;
 
 public class AssetManagementPersistenceTests
 {

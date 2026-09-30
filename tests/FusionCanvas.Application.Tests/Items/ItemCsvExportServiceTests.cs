@@ -7,7 +7,7 @@ using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Items;
 
-namespace FusionCanvas.Application.Tests;
+namespace FusionCanvas.Application.Tests.Items;
 
 public class ItemCsvExportServiceTests
 {

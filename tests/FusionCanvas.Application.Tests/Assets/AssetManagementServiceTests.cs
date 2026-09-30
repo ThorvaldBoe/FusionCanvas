@@ -8,7 +8,7 @@ using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Assets;
 
-namespace FusionCanvas.Application.Tests;
+namespace FusionCanvas.Application.Tests.Assets;
 
 public class AssetManagementServiceTests
 {

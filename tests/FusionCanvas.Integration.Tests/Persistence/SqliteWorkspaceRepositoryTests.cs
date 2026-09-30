@@ -12,7 +12,7 @@ using Microsoft.Data.Sqlite;
 using FusionCanvas.Application.Groups;
 using FusionCanvas.Domain.Catalog;
 
-namespace FusionCanvas.Integration.Tests;
+namespace FusionCanvas.Integration.Tests.Persistence;
 
 public class SqliteWorkspaceRepositoryTests
 {

@@ -2,7 +2,7 @@ using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Workspaces;
 
-namespace FusionCanvas.Application.Tests;
+namespace FusionCanvas.Application.Tests.Workspaces;
 
 public class WorkspaceRepositoryContractTests
 {

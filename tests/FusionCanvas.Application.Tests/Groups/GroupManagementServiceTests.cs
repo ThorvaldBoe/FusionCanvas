@@ -12,7 +12,7 @@ using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Groups;
 using FusionCanvas.Application.WorkspaceTree;
 
-namespace FusionCanvas.Application.Tests;
+namespace FusionCanvas.Application.Tests.Groups;
 
 public class GroupManagementServiceTests
 {

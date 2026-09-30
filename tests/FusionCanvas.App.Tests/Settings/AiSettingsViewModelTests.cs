@@ -2,7 +2,7 @@ using FusionCanvas.App.Settings;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Settings;
 
-namespace FusionCanvas.App.Tests;
+namespace FusionCanvas.App.Tests.Settings;
 
 public class AiSettingsViewModelTests
 {

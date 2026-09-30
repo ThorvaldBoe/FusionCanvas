@@ -6,7 +6,7 @@ using FusionCanvas.Domain.Products;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Products;
 
-namespace FusionCanvas.Application.Tests;
+namespace FusionCanvas.Application.Tests.Products;
 
 public class ProductSupplierSetupServiceTests
 {
