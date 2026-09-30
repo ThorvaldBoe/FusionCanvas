@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
-using Avalonia.Media.Imaging;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Settings;
 using FusionCanvas.Application.Catalog;
@@ -15,21 +14,8 @@ namespace FusionCanvas.App.Stores;
 
 public sealed class LocalMockupSourceDraftViewModel(string path, IReadOnlyList<Guid> optionValueIds, bool isManaged = false, MockupImageSpaceMapping? mapping = null, int imageWidth = 0, int imageHeight = 0, Guid? sourceImageId = null, string? previewPath = null) : INotifyPropertyChanged
 {
-    private static (int Width, int Height) ReadPreviewDimensions(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-            {
-                using var bitmap = new Bitmap(path);
-                return (bitmap.PixelSize.Width, bitmap.PixelSize.Height);
-            }
-        }
-        catch { }
-        return (0, 0);
-    }
 
-    private readonly (int Width, int Height) _previewDimensions = imageWidth > 0 && imageHeight > 0 ? (imageWidth, imageHeight) : mapping is not null ? (mapping.ImageWidth, mapping.ImageHeight) : ReadPreviewDimensions(previewPath ?? path);
+    private readonly (int Width, int Height) _previewDimensions = imageWidth > 0 && imageHeight > 0 ? (imageWidth, imageHeight) : mapping is not null ? (mapping.ImageWidth, mapping.ImageHeight) : (0, 0);
     public event PropertyChangedEventHandler? PropertyChanged;
     public string Path { get; } = path;
     public string DisplayName => System.IO.Path.GetFileName(Path);

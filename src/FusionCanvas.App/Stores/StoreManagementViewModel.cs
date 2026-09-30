@@ -103,7 +103,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
 
 
-    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null, ITagManagementService? tagService = null, IProductSupplierSetupService? productService = null, ICatalogSetupService? catalogService = null, IMockupTemplateSetupService? mockupService = null, IOfferingManagementService? offeringManagementService = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, FusionCanvas.App.Assets.IAssetFilePicker? filePicker = null, IWorkspaceRepository? workspaceRepository = null, INichePopulationService? nichePopulationService = null)
+    public StoreManagementViewModel(IStoreManagementService service, INicheManagementService? nicheService = null, ITagManagementService? tagService = null, IProductSupplierSetupService? productService = null, ICatalogSetupService? catalogService = null, IMockupTemplateSetupService? mockupService = null, IOfferingManagementService? offeringManagementService = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, FusionCanvas.App.Assets.IAssetFilePicker? filePicker = null, IWorkspaceRepository? workspaceRepository = null, INichePopulationService? nichePopulationService = null, IRasterImageMetadataReader? rasterImageMetadataReader = null)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _nicheService = nicheService;
@@ -219,7 +219,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
             if (args.PropertyName == nameof(ProductCatalogEditorViewModel.OfferingKindIndex))
                 OnPropertyChanged(nameof(IsChoiceNetworkOffering));
         };
-        _productCatalogEditor.CatalogSetup = catalogService is not null && mockupService is not null ? new CatalogSetupViewModel(catalogService, mockupService, offeringManagementService, providerCatalog, sourceImages, filePicker) : null;
+        _productCatalogEditor.CatalogSetup = catalogService is not null && mockupService is not null ? new CatalogSetupViewModel(catalogService, mockupService, offeringManagementService, providerCatalog, sourceImages, filePicker, rasterImageMetadataReader) : null;
         if (CatalogSetup is not null)
             CatalogSetup.CatalogChanged += OnCatalogChanged;
         ToggleStoreSelectorCommand = new RelayCommand(_ => IsSelectorExpanded = !IsSelectorExpanded);

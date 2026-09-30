@@ -1,3 +1,4 @@
+using FusionCanvas.App.Assets;
 using FusionCanvas.App.Stores;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
@@ -10,6 +11,36 @@ namespace FusionCanvas.App.Tests;
 
 public sealed class CatalogSetupViewModelTests
 {
+    [Fact]
+    public async Task BrowseLocalSourceGetsDimensionsFromMetadataService()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Manual tee", null, BlueprintOfferingKind.ProviderNetwork, null, "manual", null, null, false, now, now);
+        var repository = new InMemoryWorkspaceRepository(snapshot with { Blueprints = [blueprint], BlueprintOfferings = [offering] });
+        var metadata = new FixedRasterImageMetadataReader(new RasterImageInfo(1600, 1200));
+        var sourceImages = new RecordingSourceImageService();
+        const string selectedPath = "mockup-source.png";
+        var viewModel = new CatalogSetupViewModel(
+            new CatalogSetupService(repository),
+            new MockupTemplateSetupService(repository),
+            sourceImages: sourceImages,
+            filePicker: new FixedLocalSourceFilePicker(selectedPath),
+            rasterImageMetadataReader: metadata);
+        await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+        viewModel.SelectOffering(offering.Id);
+        viewModel.StartAddTemplateCommand.Execute(null);
+
+        viewModel.BrowseLocalSourceCommand.Execute(null);
+
+        var draft = Assert.Single(viewModel.LocalSourceDrafts);
+        Assert.Equal(selectedPath, Assert.Single(metadata.ReadPaths));
+        Assert.Equal(1600, draft.ImageWidth);
+        Assert.Equal(1200, draft.ImageHeight);
+    }
+
     [Fact]
     public async Task SavingAfterArchivingLastLocalSourceSubmitsArchiveUpdate()
     {
@@ -97,7 +128,9 @@ public sealed class CatalogSetupViewModelTests
         var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Tee", null, BlueprintOfferingKind.FixedPrintProvider, duplicate.Id, null, null, null, false, now, now);
         var repository = new InMemoryWorkspaceRepository(snapshot with
         {
-            Blueprints = [blueprint], PrintProviders = [survivor, duplicate], BlueprintOfferings = [offering]
+            Blueprints = [blueprint],
+            PrintProviders = [survivor, duplicate],
+            BlueprintOfferings = [offering]
         });
         var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository));
 
@@ -182,8 +215,12 @@ public sealed class CatalogSetupViewModelTests
         var area = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 4500, 5400, [variant.Id], false, now, now);
         var populated = snapshot with
         {
-            Blueprints = [blueprint], BlueprintOfferings = [offering], OfferingOptions = [colorOption, sizeOption],
-            OfferingOptionValues = [black, medium], OfferingVariants = [variant], OfferingPlaceholders = [area]
+            Blueprints = [blueprint],
+            BlueprintOfferings = [offering],
+            OfferingOptions = [colorOption, sizeOption],
+            OfferingOptionValues = [black, medium],
+            OfferingVariants = [variant],
+            OfferingPlaceholders = [area]
         };
         var repository = new InMemoryWorkspaceRepository(populated);
         var context = new OfferingContext(store.Id, blueprint.Id, offering.Id);
@@ -1019,7 +1056,8 @@ public sealed class CatalogSetupViewModelTests
                 populated = populated with
                 {
                     MockupTemplateRevisions = [new(Guid.NewGuid(), template.Id, 1, area.Id, now)],
-                    MockupTemplateSourceImages = [image], MockupTemplateSourceImageOptionValues = [new(image.Id, black.Id)]
+                    MockupTemplateSourceImages = [image],
+                    MockupTemplateSourceImageOptionValues = [new(image.Id, black.Id)]
                 };
             }
         }
@@ -1034,6 +1072,23 @@ public sealed class CatalogSetupViewModelTests
     {
         public Task<ProviderCatalogCandidateDescriptor> LoadAsync(OfferingContext context, CancellationToken cancellationToken = default) =>
             Task.FromResult(descriptor);
+    }
+
+    private sealed class FixedRasterImageMetadataReader(RasterImageInfo dimensions) : IRasterImageMetadataReader
+    {
+        public List<string> ReadPaths { get; } = [];
+
+        public Task<RasterImageInfo> ReadAsync(string sourcePath, CancellationToken cancellationToken = default)
+        {
+            ReadPaths.Add(sourcePath);
+            return Task.FromResult(dimensions);
+        }
+    }
+
+    private sealed class FixedLocalSourceFilePicker(string path) : IAssetFilePicker
+    {
+        public Task<string?> PickImportFileAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<string?>(path);
     }
 
     private sealed class FixedMockupTemplateSourceImageService(MockupTemplateSourceState state) : IMockupTemplateSourceImageService

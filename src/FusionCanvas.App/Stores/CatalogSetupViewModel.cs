@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
-using Avalonia.Media.Imaging;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Settings;
 using FusionCanvas.Application.Catalog;
@@ -23,6 +22,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private readonly IOfferingManagementService? _offeringManagement;
     private readonly IProviderCatalogCandidateSource? _providerCatalog;
     private readonly IMockupTemplateSourceImageService? _sourceImages;
+    private readonly IRasterImageMetadataReader? _rasterImageMetadataReader;
     private IReadOnlyList<MockupTemplateSourceImage> _templateSourceImages = [];
     private IReadOnlyList<MockupTemplateSourceImageOptionValue> _templateSourceConditions = [];
     private IAssetFilePicker _filePicker;
@@ -99,7 +99,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private bool _isDesignAreaDiscardConfirmationVisible;
     private DesignAreaDraftState? _designAreaDraftBaseline;
 
-    public CatalogSetupViewModel(ICatalogSetupService catalog, IMockupTemplateSetupService mockups, IOfferingManagementService? offeringManagement = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, IAssetFilePicker? filePicker = null)
+    public CatalogSetupViewModel(ICatalogSetupService catalog, IMockupTemplateSetupService mockups, IOfferingManagementService? offeringManagement = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, IAssetFilePicker? filePicker = null, IRasterImageMetadataReader? rasterImageMetadataReader = null)
     {
         _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         _mockups = mockups ?? throw new ArgumentNullException(nameof(mockups));
@@ -107,6 +107,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         _providerCatalog = providerCatalog;
         _sourceImages = sourceImages;
         _filePicker = filePicker ?? new NullAssetFilePicker();
+        _rasterImageMetadataReader = rasterImageMetadataReader;
 
         SaveOfferingCommand = new AsyncRelayCommand(SaveOfferingAsync, CanSaveOffering);
         StartAddPrintProviderCommand = new RelayCommand(_ => IsAddingPrintProvider = true, () => CanEdit && SelectedOffering is not null && !IsProviderNetworkOffering);
@@ -987,7 +988,22 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         var path = await _filePicker.PickImportFileAsync().ConfigureAwait(true);
         if (!string.IsNullOrWhiteSpace(path))
         {
-            var draft = new LocalMockupSourceDraftViewModel(path, []);
+            var dimensions = (Width: 0, Height: 0);
+            if (_rasterImageMetadataReader is not null)
+            {
+                try
+                {
+                    var image = await _rasterImageMetadataReader.ReadAsync(path).ConfigureAwait(true);
+                    dimensions = (image.Width, image.Height);
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    // Preserve the existing zero-dimension fallback for unreadable local previews.
+                    dimensions = (0, 0);
+                }
+            }
+
+            var draft = new LocalMockupSourceDraftViewModel(path, [], imageWidth: dimensions.Width, imageHeight: dimensions.Height);
             LocalSourceDrafts.Add(draft);
             SelectLocalSource(draft);
             foreach (var color in TemplateColorChoices) color.IsSelected = false;

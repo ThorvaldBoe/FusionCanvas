@@ -32,4 +32,5 @@ public sealed record MainWindowApplicationServices(
     IIdeationService Ideation,
     IDesignStageService DesignStage,
     ISllDocumentCodec SllDocumentCodec,
-    INichePopulationService? NichePopulation);
+    INichePopulationService? NichePopulation,
+    IRasterImageMetadataReader? RasterImageMetadataReader = null);

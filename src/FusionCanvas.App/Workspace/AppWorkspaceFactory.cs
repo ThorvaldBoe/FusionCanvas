@@ -138,7 +138,8 @@ public static class AppWorkspaceFactory
             ideation,
             designStage,
             sllDocumentCodec,
-            nichePopulation);
+            nichePopulation,
+            rasterImageMetadata);
         return new AppWorkspaceRuntime(
             repository,
             new WorkspaceManagementService(
