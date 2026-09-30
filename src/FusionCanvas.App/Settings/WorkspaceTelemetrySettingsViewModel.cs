@@ -251,13 +251,13 @@ public sealed class WorkspaceTelemetrySettingsViewModel : INotifyPropertyChanged
     private async Task ExportAsync()
     {
         if (_workspaceId is not { } id || _service is null || _filePicker is null) return;
-        var path = await _filePicker.PickPathAsync().ConfigureAwait(false);
+        var path = await _filePicker.PickPathAsync();
         if (string.IsNullOrWhiteSpace(path)) return;
         IsBusy = true;
         try
         {
-            var json = await _service.ExportJsonAsync(id).ConfigureAwait(false);
-            await File.WriteAllTextAsync(path, json, new System.Text.UTF8Encoding(false)).ConfigureAwait(false);
+            var json = await _service.ExportJsonAsync(id);
+            await File.WriteAllTextAsync(path, json, new System.Text.UTF8Encoding(false));
             Dispatch(() => StatusMessage = "Telemetry export completed.");
         }
         catch (Exception)
