@@ -12,7 +12,7 @@ using FusionCanvas.Domain.Mockups;
 
 namespace FusionCanvas.App.Stores;
 
-public sealed class LocalMockupSourceDraftViewModel(string path, IReadOnlyList<Guid> optionValueIds, bool isManaged = false, MockupImageSpaceMapping? mapping = null, int imageWidth = 0, int imageHeight = 0, Guid? sourceImageId = null, string? previewPath = null) : INotifyPropertyChanged
+public sealed class LocalMockupSourceDraftViewModel(string path, IReadOnlyList<Guid> optionValueIds, bool isManaged = false, MockupImageSpaceMapping? mapping = null, int imageWidth = 0, int imageHeight = 0, Guid? sourceImageId = null, string? previewPath = null, string? previewReadError = null) : INotifyPropertyChanged
 {
 
     private readonly (int Width, int Height) _previewDimensions = imageWidth > 0 && imageHeight > 0 ? (imageWidth, imageHeight) : mapping is not null ? (mapping.ImageWidth, mapping.ImageHeight) : (0, 0);
@@ -26,6 +26,9 @@ public sealed class LocalMockupSourceDraftViewModel(string path, IReadOnlyList<G
     public MockupImageSpaceMapping? Mapping { get; private set; } = mapping;
     public int ImageWidth => _previewDimensions.Width;
     public int ImageHeight => _previewDimensions.Height;
+    public bool HasPreviewDimensions => ImageWidth > 0 && ImageHeight > 0;
+    public string? PreviewReadError { get; } = previewReadError;
+    public bool HasPreviewReadError => !string.IsNullOrWhiteSpace(PreviewReadError);
     public string ApplicabilitySummary { get; set; } = string.Empty;
     public bool IsComplete => OptionValueIds.Count > 0 && Mapping is not null;
     public string StatusLabel => IsComplete ? "Complete" : "Needs setup";
