@@ -152,9 +152,61 @@ public class StageToolViewModelsTests
         Assert.True(vm.CanApply);
     }
 
+    [Fact]
+    public async Task ListingTool_CancelsPriorLoadAndIgnoresItsLateResult()
+    {
+        var firstItemId = Guid.NewGuid();
+        var secondItemId = Guid.NewGuid();
+        var firstTemplateId = Guid.NewGuid();
+        var secondTemplateId = Guid.NewGuid();
+        var service = new DeferredMockupGenerationService();
+        service.Add(firstItemId, CreateState(firstItemId, firstTemplateId, "First item template"));
+        service.Add(secondItemId, CreateState(secondItemId, secondTemplateId, "Second item template"));
+        var vm = new ListingStageToolViewModel(service);
+
+        var firstLoad = vm.LoadAsync(firstItemId, ItemStatus.Draft, canEdit: true, TestContext.Current.CancellationToken);
+        var secondLoad = vm.LoadAsync(secondItemId, ItemStatus.Draft, canEdit: true, TestContext.Current.CancellationToken);
+
+        Assert.Contains(firstItemId, service.CancelledItemIds);
+
+        service.Complete(firstItemId);
+        service.Complete(secondItemId);
+        await Task.WhenAll(firstLoad, secondLoad);
+
+        var template = Assert.Single(vm.Templates);
+        Assert.Equal(secondTemplateId, template.Id);
+        Assert.Equal("Second item template", template.Name);
+    }
+
+    private static MockupGenerationState CreateState(Guid itemId, Guid templateId, string templateName) =>
+        new(itemId, Guid.NewGuid(), false, string.Empty,
+            [new MockupTemplate(templateId, Guid.NewGuid(), null, templateName, null, 1, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)],
+            templateId, [], [], null, null, []);
+
     private sealed class StubMockupGenerationService(MockupGenerationState state) : IMockupGenerationService
     {
         public Task<MockupGenerationState> LoadAsync(Guid itemId, bool isReadOnly, string readOnlyReason, CancellationToken cancellationToken = default) => Task.FromResult(state);
+
+        public Task<MockupGenerationResult> ApplyAsync(MockupGenerationRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(MockupGenerationResult.Failure("Not used in this test."));
+    }
+
+    private sealed class DeferredMockupGenerationService : IMockupGenerationService
+    {
+        private readonly Dictionary<Guid, (TaskCompletionSource<MockupGenerationState> Completion, MockupGenerationState State)> _loads = [];
+
+        public List<Guid> CancelledItemIds { get; } = [];
+
+        public void Add(Guid itemId, MockupGenerationState state) =>
+            _loads[itemId] = (new(TaskCreationOptions.RunContinuationsAsynchronously), state);
+
+        public void Complete(Guid itemId) => _loads[itemId].Completion.TrySetResult(_loads[itemId].State);
+
+        public Task<MockupGenerationState> LoadAsync(Guid itemId, bool isReadOnly, string readOnlyReason, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.Register(() => CancelledItemIds.Add(itemId));
+            return _loads[itemId].Completion.Task;
+        }
 
         public Task<MockupGenerationResult> ApplyAsync(MockupGenerationRequest request, CancellationToken cancellationToken = default) =>
             Task.FromResult(MockupGenerationResult.Failure("Not used in this test."));
