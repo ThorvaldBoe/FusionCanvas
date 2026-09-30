@@ -11,8 +11,13 @@ public sealed class PrintifyCatalogImportService(
     IStoreManagementService stores,
     IStorePrintifyCredentialStore credentials,
     IPrintifyCatalogClient client,
-    IWorkspaceRepository? repository = null) : IPrintifyCatalogImportService
+    IWorkspaceRepository? repository = null,
+    Func<DateTimeOffset>? clock = null,
+    Func<Guid>? newId = null) : IPrintifyCatalogImportService
 {
+    private readonly Func<DateTimeOffset> _clock = clock ?? (() => DateTimeOffset.UtcNow);
+    private readonly Func<Guid> _newId = newId ?? Guid.NewGuid;
+
     private static readonly PrintifyCatalogResult InvalidContext =
         new(PrintifyCatalogResultKind.InvalidRequest, "Save an active Printify Store with a selected Printify shop first.");
 
@@ -57,13 +62,13 @@ public sealed class PrintifyCatalogImportService(
                 || currentStore.Context.PrintifyShopId != store.Context.PrintifyShopId)
                 return InvalidContext;
             var snapshot = await repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-            var updated = ImportSelected(snapshot, scope.StoreId, result.SelectedProducts);
+            var updated = ImportSelected(snapshot, scope.StoreId, result.SelectedProducts, _clock, _newId);
             // The Products editor still reads the legacy projection while the
             // catalog editor reads the normalized records written above. Keep
             // both views aligned so imported variants and design areas are
             // visible from either route.
             var synchronized = CatalogCompatibilitySynchronizer
-                .SynchronizeStore(updated, scope.StoreId, () => DateTimeOffset.UtcNow, Guid.NewGuid)
+                .SynchronizeStore(updated, scope.StoreId, _clock, _newId)
                 .Snapshot;
             await repository.SaveAsync(synchronized, cancellationToken).ConfigureAwait(false);
             return result with { Message = "Selected Printify catalog imported." };
@@ -85,10 +90,12 @@ public sealed class PrintifyCatalogImportService(
     private static WorkspaceSnapshot ImportSelected(
         WorkspaceSnapshot snapshot,
         Guid storeId,
-        IReadOnlyList<PrintifyCatalogBlueprint> catalog)
+        IReadOnlyList<PrintifyCatalogBlueprint> catalog,
+        Func<DateTimeOffset> clock,
+        Func<Guid> newId)
     {
         ValidateCatalog(catalog);
-        var now = DateTimeOffset.UtcNow;
+        var now = clock();
         var normalized = PrintProviderIdentityNormalizer.NormalizeStore(snapshot, storeId, now).Snapshot;
         var blueprints = normalized.Blueprints.ToList();
         var providers = normalized.PrintProviders.ToList();
@@ -112,7 +119,7 @@ public sealed class PrintifyCatalogImportService(
                     && MetadataHasId(value.MetadataJson, importedBlueprint.Summary.Id));
             if (blueprint is null)
             {
-                blueprint = new Blueprint(Guid.NewGuid(), storeId, BlueprintName(importedBlueprint.Summary), importedBlueprint.Summary.Description, false, now, now,
+                blueprint = new Blueprint(newId(), storeId, BlueprintName(importedBlueprint.Summary), importedBlueprint.Summary.Description, false, now, now,
                     productId is not null ? Metadata("product", importedBlueprint.Summary.Id, productId) : Metadata("blueprint", importedBlueprint.Summary.Id));
                 blueprints.Add(blueprint);
             }
@@ -130,7 +137,7 @@ public sealed class PrintifyCatalogImportService(
                         || string.Equals(PrintProviderIdentityNormalizer.NormalizeName(value.Name), PrintProviderIdentityNormalizer.NormalizeName(importedProvider.Title), StringComparison.OrdinalIgnoreCase)));
                 if (provider is null)
                 {
-                    provider = new PrintProvider(Guid.NewGuid(), storeId, importedProvider.Title, importedProvider.Id.ToString(), false, now, now, Metadata("provider", importedProvider.Id));
+                    provider = new PrintProvider(newId(), storeId, importedProvider.Title, importedProvider.Id.ToString(), false, now, now, Metadata("provider", importedProvider.Id));
                     provider = provider with { MetadataJson = PrintProviderIdentityNormalizer.MergeExternalProviderMetadata(provider, [importedProvider.Id.ToString()]) };
                     providers.Add(provider);
                 }
@@ -159,7 +166,7 @@ public sealed class PrintifyCatalogImportService(
                         && value.ExternalOfferingId == $"{importedBlueprint.Summary.Id}:{importedProvider.Id}");
                 if (offering is null)
                 {
-                    offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, storeId, $"{importedBlueprint.Summary.Title} · {importedProvider.Title}", importedBlueprint.Summary.Description, BlueprintOfferingKind.FixedPrintProvider, provider.Id, null, null, externalOfferingId, false, now, now, Metadata("offering", importedBlueprint.Summary.Id, importedProvider.Id));
+                    offering = new BlueprintOffering(newId(), blueprint.Id, storeId, $"{importedBlueprint.Summary.Title} · {importedProvider.Title}", importedBlueprint.Summary.Description, BlueprintOfferingKind.FixedPrintProvider, provider.Id, null, null, externalOfferingId, false, now, now, Metadata("offering", importedBlueprint.Summary.Id, importedProvider.Id));
                     offerings.Add(offering);
                 }
                 else
@@ -169,13 +176,13 @@ public sealed class PrintifyCatalogImportService(
                 }
 
                 var optionIds = importedProvider.Variants.SelectMany(value => value.OptionValueIds).Distinct().ToArray();
-                var optionValuesBySourceId = EnsureOptions(options, values, offering.Id, importedProvider.Options, optionIds, now);
+                var optionValuesBySourceId = EnsureOptions(options, values, offering.Id, importedProvider.Options, optionIds, now, newId);
                 var localVariantIds = new Dictionary<int, Guid>();
                 foreach (var importedVariant in importedProvider.Variants)
                 {
                     var optionValueIds = importedVariant.OptionValueIds.Where(optionValuesBySourceId.ContainsKey).Select(id => optionValuesBySourceId[id]).ToArray();
                     var variant = variants.SingleOrDefault(value => value.OfferingId == offering.Id && MetadataHasId(value.MetadataJson, importedVariant.Id));
-                    var variantId = variant?.Id ?? Guid.NewGuid();
+                    var variantId = variant?.Id ?? newId();
                     var replacement = new OfferingVariant(variantId, offering.Id, importedVariant.Title, optionValueIds, !importedVariant.IsEnabled || !importedVariant.IsAvailable, variant?.CreatedAt ?? now, now, Metadata("variant", importedVariant.Id));
                     if (variant is null) variants.Add(replacement); else Replace(variants, value => value.Id == variant.Id, replacement);
                     localVariantIds[importedVariant.Id] = variantId;
@@ -215,7 +222,7 @@ public sealed class PrintifyCatalogImportService(
                             .FirstOrDefault();
                     var presentVariantIds = group.Select(value => localVariantIds[value.Id]).Distinct().ToArray();
                     var variantIds = (placeholder?.VariantIds ?? []).Concat(presentVariantIds).Distinct().ToArray();
-                    var replacement = new OfferingPlaceholder(placeholder?.Id ?? Guid.NewGuid(), offering.Id, sample.Position, null, sample.Position, sample.DecorationMethod,
+                    var replacement = new OfferingPlaceholder(placeholder?.Id ?? newId(), offering.Id, sample.Position, null, sample.Position, sample.DecorationMethod,
                         group.Max(value => value.Placeholder.Width), group.Max(value => value.Placeholder.Height), variantIds, false,
                         placeholder?.CreatedAt ?? now, now, Metadata("placeholder", importedBlueprint.Summary.Id, importedProvider.Id), sample.Position);
                     if (placeholder is null) placeholders.Add(replacement); else Replace(placeholders, value => value.Id == placeholder.Id, replacement);
@@ -242,7 +249,7 @@ public sealed class PrintifyCatalogImportService(
         }, placeholderReplacements);
         var repaired = PrintProviderIdentityNormalizer.NormalizeStore(imported, storeId, now).Snapshot;
         return CatalogCompatibilitySynchronizer
-            .SynchronizeStore(repaired, storeId, () => now, Guid.NewGuid)
+            .SynchronizeStore(repaired, storeId, () => now, newId)
             .Snapshot;
     }
 
@@ -348,7 +355,8 @@ public sealed class PrintifyCatalogImportService(
         Guid offeringId,
         IReadOnlyList<PrintifyCatalogOption> importedOptions,
         IReadOnlyList<int> variantValueIds,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Func<Guid> newId)
     {
         var result = new Dictionary<int, Guid>();
         foreach (var importedOption in importedOptions)
@@ -360,7 +368,7 @@ public sealed class PrintifyCatalogImportService(
                 ?? options.FirstOrDefault(value => value.OfferingId == offeringId && value.OptionKind == kind);
             if (option is null)
             {
-                option = new OfferingOption(Guid.NewGuid(), offeringId, kind, importedOption.Name.Trim(), options.Count(value => value.OfferingId == offeringId), metadataJson: Metadata("option", declaredValues.Select(value => value.Id).ToArray()));
+                option = new OfferingOption(newId(), offeringId, kind, importedOption.Name.Trim(), options.Count(value => value.OfferingId == offeringId), metadataJson: Metadata("option", declaredValues.Select(value => value.Id).ToArray()));
                 options.Add(option);
             }
             else
@@ -378,7 +386,7 @@ public sealed class PrintifyCatalogImportService(
                         && MetadataHasId(value.MetadataJson, declaredValue.Id));
                 if (optionValue is null)
                 {
-                    optionValue = new OfferingOptionValue(Guid.NewGuid(), option.Id, offeringId, declaredValue.Title.Trim(), values.Count(value => value.OptionId == option.Id), metadataJson: Metadata("option-value", declaredValue.Id));
+                    optionValue = new OfferingOptionValue(newId(), option.Id, offeringId, declaredValue.Title.Trim(), values.Count(value => value.OptionId == option.Id), metadataJson: Metadata("option-value", declaredValue.Id));
                     values.Add(optionValue);
                 }
                 else

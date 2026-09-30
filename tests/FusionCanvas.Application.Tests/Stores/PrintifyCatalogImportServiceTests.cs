@@ -97,6 +97,60 @@ public sealed class PrintifyCatalogImportServiceTests
     }
 
     [Fact]
+    public async Task UsesInjectedClockAndIdSourcesForImportedRecords()
+    {
+        var store = TestStore();
+        var repository = TestRepository(store);
+        var expectedNow = new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero);
+        var expectedIds = Enumerable.Range(1, 7)
+            .Select(index => Guid.Parse($"{index:D8}-0000-0000-0000-000000000000"))
+            .ToArray();
+        var generatedIds = new List<Guid>();
+        var client = new ClientStub
+        {
+            SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [new(
+                new(68, "Tee", null, "Brand", "Model"),
+                [new(9, "Provider", [new("Color", "color", [new(1, "Black")])],
+                    [new(33719, "Black", true, true, [1], [new("front", "dtg", 100, 200)])])])
+                { ProductId = "product-a" }])
+        };
+        var service = new PrintifyCatalogImportService(
+            new StoresStub(store),
+            new CredentialsStub { Result = new(new(PrintifyConfigurationKind.Available, "available"), "key") },
+            client,
+            repository,
+            clock: () => expectedNow,
+            newId: () =>
+            {
+                var id = expectedIds[generatedIds.Count];
+                generatedIds.Add(id);
+                return id;
+            });
+
+        var result = await service.LoadSelectedAsync(new(store.WorkspaceId, store.Id), [68], TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal(expectedIds, generatedIds);
+        Assert.Equal(expectedIds[0], Assert.Single(repository.Snapshot.Blueprints).Id);
+        Assert.Equal(expectedIds[1], Assert.Single(repository.Snapshot.PrintProviders).Id);
+        Assert.Equal(expectedIds[2], Assert.Single(repository.Snapshot.BlueprintOfferings).Id);
+        Assert.Equal(expectedIds[3], Assert.Single(repository.Snapshot.OfferingOptions).Id);
+        Assert.Equal(expectedIds[4], Assert.Single(repository.Snapshot.OfferingOptionValues).Id);
+        Assert.Equal(expectedIds[5], Assert.Single(repository.Snapshot.OfferingVariants).Id);
+        Assert.Equal(expectedIds[6], Assert.Single(repository.Snapshot.OfferingPlaceholders).Id);
+        Assert.All(repository.Snapshot.Blueprints, value => Assert.Equal(expectedNow, value.CreatedAt));
+        Assert.All(repository.Snapshot.Blueprints, value => Assert.Equal(expectedNow, value.UpdatedAt));
+        Assert.All(repository.Snapshot.PrintProviders, value => Assert.Equal(expectedNow, value.CreatedAt));
+        Assert.All(repository.Snapshot.PrintProviders, value => Assert.Equal(expectedNow, value.UpdatedAt));
+        Assert.All(repository.Snapshot.BlueprintOfferings, value => Assert.Equal(expectedNow, value.CreatedAt));
+        Assert.All(repository.Snapshot.BlueprintOfferings, value => Assert.Equal(expectedNow, value.UpdatedAt));
+        Assert.All(repository.Snapshot.OfferingVariants, value => Assert.Equal(expectedNow, value.CreatedAt));
+        Assert.All(repository.Snapshot.OfferingVariants, value => Assert.Equal(expectedNow, value.UpdatedAt));
+        Assert.All(repository.Snapshot.OfferingPlaceholders, value => Assert.Equal(expectedNow, value.CreatedAt));
+        Assert.All(repository.Snapshot.OfferingPlaceholders, value => Assert.Equal(expectedNow, value.UpdatedAt));
+    }
+
+    [Fact]
     public async Task ImportsPrintifyOptionDefinitionsAndAllDeclaredValues()
     {
         var store = new StoreSummary(Guid.NewGuid(), Guid.NewGuid(), "Store", new(PrintifyShopId: 42), false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, FulfillmentStrategy.Printify);
