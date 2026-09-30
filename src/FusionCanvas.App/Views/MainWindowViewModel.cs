@@ -81,7 +81,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IAiTextGenerationService ai,
         AppWorkspaceRuntime? workspace = null,
         IAiImageGenerationProvider? artworkProvider = null,
-        ITelemetryService? telemetry = null) =>
+        ITelemetryService? telemetry = null,
+        CancellationToken cancellationToken = default) =>
         new(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
             new DocumentWindowViewModel(),
@@ -92,8 +93,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 artworkProvider,
                 telemetry,
                 settings.ActiveWorkspaceId,
-                settings.ActiveStoreId),
-            settings);
+                settings.ActiveStoreId,
+                cancellationToken),
+            settings,
+            cancellationToken: cancellationToken);
 
     private MainWindowViewModel(
         WorkflowStageNavigatorViewModel workflowNavigator,
@@ -101,7 +104,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IToolContextResolver toolContextResolver,
         IStageToolHostService stageToolHostService,
         AppWorkspaceRuntime runtime,
-        SettingsViewModel? settings)
+        SettingsViewModel? settings,
+        CancellationToken cancellationToken = default)
         : this(
             workflowNavigator,
             documentWindow,
@@ -122,7 +126,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.SllGenerationAccess,
             runtime.TitleOptimization,
             mockupGenerationService: runtime.MockupGeneration,
-            artworkGenerationService: runtime.ArtworkGeneration)
+            artworkGenerationService: runtime.ArtworkGeneration,
+            cancellationToken: cancellationToken)
     {
     }
 
@@ -146,7 +151,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ISllAccessStatus? sllAccessStatus = null,
         ITitleOptimizationService? titleOptimizationService = null,
         IMockupGenerationService? mockupGenerationService = null,
-        IArtworkGenerationService? artworkGenerationService = null)
+        IArtworkGenerationService? artworkGenerationService = null,
+        CancellationToken cancellationToken = default)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
@@ -259,7 +265,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         WorkspaceManagement.ActiveWorkspaceChanged += (_, workspace) => SwitchWorkspace(workspace);
         SubscribeToWorkspacePromptState();
         // Load workspace selection before binding; initialize store presentation on the UI context below.
-        StartupTaskRunner.Run(() => WorkspaceManagement.LoadAsync());
+        StartupTaskRunner.Run(
+            token => WorkspaceManagement.LoadAsync(token),
+            cancellationToken);
         Run(InitializeStoreManagementAsync());
         AssetsManagement.WorkspaceStructureChanged += (_, _) => RefreshWorkspaceSnapshot();
         WorkspaceTree.ManageAssetsRequested += (_, selection) => Run(OpenManageAssetsAsync(selection));

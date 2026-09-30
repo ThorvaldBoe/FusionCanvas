@@ -15,6 +15,7 @@ public partial class App : Avalonia.Application
     private AppServices? _services;
     private bool _allowFinalClose;
     private Task? _shutdownTask;
+    private CancellationTokenSource? _startupCancellation;
 
     public override void Initialize()
     {
@@ -33,6 +34,8 @@ public partial class App : Avalonia.Application
             }
 
             var splash = new SplashWindow();
+            _startupCancellation = new CancellationTokenSource();
+            desktop.ShutdownRequested += OnShutdownRequested;
             desktop.MainWindow = splash;
             splash.Show();
             Dispatcher.UIThread.Post(() => InitializeMainWindow(desktop, splash));
@@ -43,24 +46,46 @@ public partial class App : Avalonia.Application
 
     private void InitializeMainWindow(IClassicDesktopStyleApplicationLifetime desktop)
     {
-        _services = AppServicesFactory.Create();
-        var mainWindow = new MainWindow(_services);
-        if (IsUiTestMode())
+        var startupCancellation = _startupCancellation;
+        try
         {
-            var storeEditor = new StoreEditorWindow
+            _services = AppServicesFactory.Create(startupCancellation?.Token ?? default);
+            var mainWindow = new MainWindow(_services, startupCancellation?.Token ?? default);
+            if (IsUiTestMode())
             {
-                DataContext = ((MainWindowViewModel)mainWindow.DataContext!).StoreManagement
-            };
-            storeEditor.Closing += OnWindowClosing;
-            desktop.MainWindow = storeEditor;
-            storeEditor.Show();
+                var storeEditor = new StoreEditorWindow
+                {
+                    DataContext = ((MainWindowViewModel)mainWindow.DataContext!).StoreManagement
+                };
+                storeEditor.Closing += OnWindowClosing;
+                desktop.MainWindow = storeEditor;
+                storeEditor.Show();
+                return;
+            }
+
+            mainWindow.Closing += OnWindowClosing;
+            desktop.MainWindow = mainWindow;
+            mainWindow.Show();
+        }
+        catch (OperationCanceledException) when (startupCancellation?.IsCancellationRequested == true)
+        {
+            _services?.Dispose();
+            _services = null;
             return;
         }
-
-        mainWindow.Closing += OnWindowClosing;
-        desktop.MainWindow = mainWindow;
-        mainWindow.Show();
+        finally
+        {
+            if (ReferenceEquals(_startupCancellation, startupCancellation))
+            {
+                _startupCancellation = null;
+                desktop.ShutdownRequested -= OnShutdownRequested;
+                startupCancellation?.Dispose();
+            }
+        }
     }
+
+    private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e) =>
+        _startupCancellation?.Cancel();
 
     private async void OnWindowClosing(object? sender, WindowClosingEventArgs e)
     {
