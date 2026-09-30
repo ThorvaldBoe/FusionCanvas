@@ -9,7 +9,7 @@ using FusionCanvas.Domain.Assets;
 using FusionCanvas.Integration.Persistence;
 using Microsoft.Data.Sqlite;
 
-namespace FusionCanvas.Integration.Tests;
+namespace FusionCanvas.Integration.Tests.Persistence;
 
 public class ProductCatalogPersistenceTests
 {

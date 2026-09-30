@@ -5,7 +5,7 @@ using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Workspace;
 
-namespace FusionCanvas.Application.Tests;
+namespace FusionCanvas.Application.Tests.Workspaces;
 
 public class WorkspaceTransferServiceTests
 {

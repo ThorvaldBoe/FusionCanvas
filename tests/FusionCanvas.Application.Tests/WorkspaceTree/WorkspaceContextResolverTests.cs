@@ -6,7 +6,7 @@ using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Workspace;
 
-namespace FusionCanvas.Application.Tests;
+namespace FusionCanvas.Application.Tests.WorkspaceTree;
 
 public sealed class WorkspaceContextResolverTests
 {

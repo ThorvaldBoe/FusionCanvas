@@ -6,7 +6,7 @@ using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
 
-namespace FusionCanvas.Domain.Tests;
+namespace FusionCanvas.Domain.Tests.Navigation;
 
 public class NavigationTreeTests
 {

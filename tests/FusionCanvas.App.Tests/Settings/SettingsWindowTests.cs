@@ -11,7 +11,7 @@ using FusionCanvas.Application.Versioning;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Application.Workspaces;
 
-namespace FusionCanvas.App.Tests;
+namespace FusionCanvas.App.Tests.Settings;
 
 public class SettingsWindowTests
 {

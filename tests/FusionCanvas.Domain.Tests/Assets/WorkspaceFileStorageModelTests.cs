@@ -1,7 +1,7 @@
 ﻿using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Assets;
 
-namespace FusionCanvas.Domain.Tests;
+namespace FusionCanvas.Domain.Tests.Assets;
 
 public class WorkspaceFileStorageModelTests
 {

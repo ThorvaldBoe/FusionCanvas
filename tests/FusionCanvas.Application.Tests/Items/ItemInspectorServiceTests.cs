@@ -9,7 +9,7 @@ using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Items;
 
-namespace FusionCanvas.Application.Tests;
+namespace FusionCanvas.Application.Tests.Items;
 
 public class ItemInspectorServiceTests
 {

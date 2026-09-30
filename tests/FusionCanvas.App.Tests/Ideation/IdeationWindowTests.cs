@@ -10,7 +10,7 @@ using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Application.Snowclones;
 
-namespace FusionCanvas.App.Tests;
+namespace FusionCanvas.App.Tests.Ideation;
 
 public sealed class IdeationWindowTests
 {

@@ -7,7 +7,7 @@ using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Tags;
 
-namespace FusionCanvas.Application.Tests;
+namespace FusionCanvas.Application.Tests.Tags;
 
 public class TagManagementServiceTests
 {

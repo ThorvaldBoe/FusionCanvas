@@ -5,7 +5,7 @@ using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Workspace;
 
-namespace FusionCanvas.App.Tests;
+namespace FusionCanvas.App.Tests.Ideation;
 
 public sealed class IdeationCountStepperTests
 {

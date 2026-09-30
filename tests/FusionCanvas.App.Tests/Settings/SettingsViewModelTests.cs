@@ -4,7 +4,7 @@ using FusionCanvas.Application.Settings;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Application.Workspaces;
 
-namespace FusionCanvas.App.Tests;
+namespace FusionCanvas.App.Tests.Settings;
 
 public class SettingsViewModelTests
 {

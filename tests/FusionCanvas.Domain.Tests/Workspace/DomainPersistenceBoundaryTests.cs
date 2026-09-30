@@ -1,4 +1,4 @@
-namespace FusionCanvas.Domain.Tests;
+namespace FusionCanvas.Domain.Tests.Workspace;
 
 public class DomainPersistenceBoundaryTests
 {

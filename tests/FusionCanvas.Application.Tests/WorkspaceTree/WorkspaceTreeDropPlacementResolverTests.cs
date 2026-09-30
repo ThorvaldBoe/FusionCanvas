@@ -2,7 +2,7 @@ using FusionCanvas.Application.Groups;
 using FusionCanvas.Application.WorkspaceTree;
 using FusionCanvas.Domain.Workspace;
 
-namespace FusionCanvas.Application.Tests;
+namespace FusionCanvas.Application.Tests.WorkspaceTree;
 
 public sealed class WorkspaceTreeDropPlacementResolverTests
 {

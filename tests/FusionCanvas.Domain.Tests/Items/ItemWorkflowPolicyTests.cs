@@ -2,7 +2,7 @@
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Items;
 
-namespace FusionCanvas.Domain.Tests;
+namespace FusionCanvas.Domain.Tests.Items;
 
 public class ItemWorkflowPolicyTests
 {

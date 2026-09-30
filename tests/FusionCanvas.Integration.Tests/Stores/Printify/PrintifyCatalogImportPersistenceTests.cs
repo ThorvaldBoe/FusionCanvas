@@ -8,7 +8,7 @@ using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Integration.Persistence;
 
-namespace FusionCanvas.Integration.Tests;
+namespace FusionCanvas.Integration.Tests.Stores.Printify;
 
 public sealed class PrintifyCatalogImportPersistenceTests
 {

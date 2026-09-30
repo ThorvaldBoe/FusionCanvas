@@ -2,7 +2,7 @@ using FusionCanvas.Domain.Assets;
 using FusionCanvas.Integration.Files;
 using FusionCanvas.Application.Workspaces;
 
-namespace FusionCanvas.Integration.Tests;
+namespace FusionCanvas.Integration.Tests.Files;
 
 public class LocalWorkspaceFileStoreTests
 {

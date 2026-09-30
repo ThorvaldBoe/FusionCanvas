@@ -1,7 +1,7 @@
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Application.WorkflowNavigation;
 
-namespace FusionCanvas.Application.Tests;
+namespace FusionCanvas.Application.Tests.WorkflowNavigation;
 
 public class WorkflowStageNavigatorServiceTests
 {
