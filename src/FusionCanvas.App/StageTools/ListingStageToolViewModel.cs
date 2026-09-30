@@ -21,6 +21,8 @@ public sealed class ListingStageToolViewModel : INotifyPropertyChanged
     private Guid _itemId;
     private Guid? _selectedTemplateId;
     private MockupTemplateOptionViewModel? _selectedTemplate;
+    private CancellationTokenSource? _loadCancellation;
+    private int _loadGeneration;
     private readonly RelayCommand _applyCommand;
 
     public ListingStageToolViewModel(IMockupGenerationService? service = null)
@@ -65,26 +67,50 @@ public sealed class ListingStageToolViewModel : INotifyPropertyChanged
 
     public async Task LoadAsync(Guid itemId, ItemStatus status, bool canEdit, CancellationToken cancellationToken = default)
     {
+        var loadCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var previousLoadCancellation = Interlocked.Exchange(ref _loadCancellation, loadCancellation);
+        previousLoadCancellation?.Cancel();
+        var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         _itemId = itemId;
         Load(status, canEdit);
-        if (_service is null) { BlockedReason = "Mockup generation is unavailable in this runtime."; return; }
-        var state = await _service.LoadAsync(itemId, !canEdit, ReadOnlyReason, cancellationToken).ConfigureAwait(true);
-        Templates.Clear();
-        foreach (var template in state.Templates) Templates.Add(new(template.Id, template.Name));
-        TemplateDiagnostics.Clear();
-        foreach (var diagnostic in state.CandidateDiagnostics)
+        try
         {
-            var guidance = string.Join(" ", diagnostic.Blockers.Select(ReadinessMessage));
-            TemplateDiagnostics.Add(new(diagnostic.TemplateName, guidance));
+            if (_service is null)
+            {
+                BlockedReason = "Mockup generation is unavailable in this runtime.";
+                return;
+            }
+
+            var state = await _service.LoadAsync(itemId, !canEdit, ReadOnlyReason, loadCancellation.Token).ConfigureAwait(true);
+            if (loadGeneration != Volatile.Read(ref _loadGeneration)
+                || !ReferenceEquals(Volatile.Read(ref _loadCancellation), loadCancellation)
+                || loadCancellation.IsCancellationRequested)
+            {
+                return;
+            }
+
+            Templates.Clear();
+            foreach (var template in state.Templates) Templates.Add(new(template.Id, template.Name));
+            TemplateDiagnostics.Clear();
+            foreach (var diagnostic in state.CandidateDiagnostics)
+            {
+                var guidance = string.Join(" ", diagnostic.Blockers.Select(ReadinessMessage));
+                TemplateDiagnostics.Add(new(diagnostic.TemplateName, guidance));
+            }
+            OnPropertyChanged(nameof(HasTemplateDiagnostics));
+            SelectedTemplate = state.SelectedTemplateId is Guid selectedId
+                ? Templates.SingleOrDefault(value => value.Id == selectedId)
+                : null;
+            Outputs.Clear();
+            foreach (var output in state.Outputs) Outputs.Add(output);
+            BlockedReason = state.BlockedReason;
+            ErrorMessage = state.Error;
         }
-        OnPropertyChanged(nameof(HasTemplateDiagnostics));
-        SelectedTemplate = state.SelectedTemplateId is Guid selectedId
-            ? Templates.SingleOrDefault(value => value.Id == selectedId)
-            : null;
-        Outputs.Clear();
-        foreach (var output in state.Outputs) Outputs.Add(output);
-        BlockedReason = state.BlockedReason;
-        ErrorMessage = state.Error;
+        finally
+        {
+            Interlocked.CompareExchange(ref _loadCancellation, null, loadCancellation);
+            loadCancellation.Dispose();
+        }
     }
 
     private static string ReadinessMessage(MockupTemplateReadinessBlocker blocker) => blocker switch
