@@ -386,5 +386,21 @@ public sealed class GroupDetailsViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new(name));
 
-    private static void Run(Task task) => _ = task;
+    private void Run(Task task) => _ = ObserveAsync(task);
+
+    private async Task ObserveAsync(Task task)
+    {
+        try
+        {
+            await task.ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            ErrorMessage = exception.Message;
+            IsBusy = false;
+        }
+    }
 }
