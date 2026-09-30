@@ -12,8 +12,10 @@ namespace FusionCanvas.Application.Tests.DesignFiles;
 
 public sealed class ArtworkGenerationServiceTests
 {
-    [Fact]
-    public async Task GenerateAsync_PersistsOneFinalAssetAndAssignsDefaultRow()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GenerateAsync_DisposesArtworkStreamWhenFileStoreSaveSucceedsOrFails(bool failSave)
     {
         var now = DateTimeOffset.UtcNow;
         var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
@@ -25,25 +27,39 @@ public sealed class ArtworkGenerationServiceTests
         var row = new DesignVariantRow(Guid.NewGuid(), item.Id, true, 0);
         var repo = new Repo(new WorkspaceSnapshot([store], [], [], [item], [], [], [], [], [])
         {
-            StoreProducts = [product], FulfillmentOfferings = [offering], DesignAreas = [area],
-            ItemListingConfigurations = [new(item.Id, offering.Id)], DesignVariantRows = [row],
-            DesignVariantRowColors = [new(row.Id, "Black")], DesignSlotAssignments = [new(row.Id, area.Id, null)]
+            StoreProducts = [product],
+            FulfillmentOfferings = [offering],
+            DesignAreas = [area],
+            ItemListingConfigurations = [new(item.Id, offering.Id)],
+            DesignVariantRows = [row],
+            DesignVariantRowColors = [new(row.Id, "Black")],
+            DesignSlotAssignments = [new(row.Id, area.Id, null)]
         });
         var provider = new Provider();
-        var files = new Files();
+        var files = new Files { SaveFailure = failSave ? new IOException("File store failed.") : null };
         var service = new ArtworkGenerationService(repo, files, provider, new Normalizer(), () => now, Guid.NewGuid);
         var model = new AiModelDescriptor("image/model", "Image", null, null, ["text"], ["image"], [], null, null, null, null, true, null);
+        var request = new ArtworkGenerationRequest(item.Id, area.Id, "secret", AiProfileSettings.Empty with { ModelId = model.Id }, [model],
+            [new AiImageEndpointCapabilities("endpoint", model.Id, true, true, ["png"], [new(1200, 1400)], true)], false);
 
-        var result = await service.GenerateAsync(new(item.Id, area.Id, "secret", AiProfileSettings.Empty with { ModelId = model.Id }, [model],
-            [new AiImageEndpointCapabilities("endpoint", model.Id, true, true, ["png"], [new(1200, 1400)], true)], false), TestContext.Current.CancellationToken);
+        if (failSave)
+        {
+            await Assert.ThrowsAsync<IOException>(() => service.GenerateAsync(request, TestContext.Current.CancellationToken));
+        }
+        else
+        {
+            var result = await service.GenerateAsync(request, TestContext.Current.CancellationToken);
 
-        Assert.True(result.Succeeded, result.Error);
-        Assert.Single(repo.Snapshot.Assets);
-        Assert.Equal(repo.Snapshot.Assets[0].Id, repo.Snapshot.DesignSlotAssignments.Single().AssetId);
-        Assert.Single(repo.Snapshot.AssetLinks);
-        Assert.Contains("RUN", repo.Snapshot.Assets[0].MetadataJson);
-        Assert.Equal(1, provider.Calls);
-        Assert.Equal(new AiImageSize(1200, 1400), provider.LastRequest!.Options!.Size);
+            Assert.True(result.Succeeded, result.Error);
+            Assert.Single(repo.Snapshot.Assets);
+            Assert.Equal(repo.Snapshot.Assets[0].Id, repo.Snapshot.DesignSlotAssignments.Single().AssetId);
+            Assert.Single(repo.Snapshot.AssetLinks);
+            Assert.Contains("RUN", repo.Snapshot.Assets[0].MetadataJson);
+            Assert.Equal(1, provider.Calls);
+            Assert.Equal(new AiImageSize(1200, 1400), provider.LastRequest!.Options!.Size);
+        }
+
+        Assert.False(Assert.IsType<MemoryStream>(files.SavedContent).CanRead);
     }
 
     private sealed class Repo(WorkspaceSnapshot snapshot) : IWorkspaceRepository
@@ -73,9 +89,16 @@ public sealed class ArtworkGenerationServiceTests
 
     private sealed class Files : IWorkspaceFileStore
     {
+        public Stream? SavedContent { get; private set; }
+        public Exception? SaveFailure { get; init; }
         public string WorkspaceRoot => "workspace";
         public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, AssetKind kind, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<ManagedWorkspaceFile> SaveAsync(string fileName, AssetKind kind, Stream content, CancellationToken cancellationToken = default) => Task.FromResult(new ManagedWorkspaceFile(fileName, kind, "assets/generated.png", "workspace/assets/generated.png", ""));
+        public Task<ManagedWorkspaceFile> SaveAsync(string fileName, AssetKind kind, Stream content, CancellationToken cancellationToken = default)
+        {
+            SavedContent = content;
+            if (SaveFailure is not null) return Task.FromException<ManagedWorkspaceFile>(SaveFailure);
+            return Task.FromResult(new ManagedWorkspaceFile(fileName, kind, "assets/generated.png", "workspace/assets/generated.png", ""));
+        }
         public bool Exists(string workspaceRelativePath) => true;
         public bool TryDelete(string workspaceRelativePath) => true;
         public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default) => Task.FromResult<Stream>(new MemoryStream());
