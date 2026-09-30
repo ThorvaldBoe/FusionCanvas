@@ -115,7 +115,7 @@ internal static class MainWindowViewModelFactory
         var providerCatalog = new UnavailableProviderCatalogCandidateSource();
         var accessStatus = ideationAccessStatus ?? new DisabledIdeationAccessStatus();
         var services = new MainWindowApplicationServices(
-            new StoreManagementService(repository),
+            new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(repository),
             new TagManagementService(repository),
             new ProductSupplierSetupService(repository),

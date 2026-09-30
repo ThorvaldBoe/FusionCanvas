@@ -1,4 +1,4 @@
-﻿using FusionCanvas.App.StageTools;
+using FusionCanvas.App.StageTools;
 using FusionCanvas.App.Stores;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
@@ -159,7 +159,7 @@ public class ProductCatalogViewModelTests
     {
         var firstStore = NewStore("First store");
         var repository = new DelayedFirstLoadWorkspaceRepository(SnapshotWithCatalog(firstStore, addProduct: true));
-        var viewModel = new StoreManagementViewModel(new StoreManagementService(repository));
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()));
         var newWorkspaceId = Guid.NewGuid();
         viewModel.ProductCatalogEditor.SetScope(new StoreManagementScope(firstStore.WorkspaceId, firstStore.Id));
 
@@ -641,7 +641,7 @@ public class ProductCatalogViewModelTests
 
     private static StoreManagementViewModel NewStoreManagementViewModelWithCatalog(InMemoryWorkspaceRepository productRepository, InMemoryWorkspaceRepository catalogRepository) =>
         new(
-            new StoreManagementService(productRepository),
+            new StoreManagementService(productRepository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(productRepository),
             new TagManagementService(productRepository),
             new ProductSupplierSetupService(productRepository),
@@ -650,7 +650,7 @@ public class ProductCatalogViewModelTests
 
     private static StoreManagementViewModel NewStoreManagementViewModel(InMemoryWorkspaceRepository repository) =>
         new(
-            new StoreManagementService(repository),
+            new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(repository),
             new TagManagementService(repository),
             new ProductSupplierSetupService(repository));

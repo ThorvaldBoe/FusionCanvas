@@ -18,7 +18,7 @@ public class StorePrintifyConfigurationServiceTests
     public async Task Strategies_SaveAndReloadWithoutKeys(FulfillmentStrategy strategy)
     {
         var repository = new Repository();
-        var stores = new StoreManagementService(repository);
+        var stores = new StoreManagementService(repository, new TestStoreContextMapper());
         var created = await stores.CreateStoreAsync(new("Store", FulfillmentStrategy: strategy), Ct);
         Assert.True(created.Succeeded);
         Assert.Equal(strategy, (await stores.LoadAsync(Ct)).ActiveStore!.FulfillmentStrategy);
@@ -29,7 +29,7 @@ public class StorePrintifyConfigurationServiceTests
     public async Task PrintifyShopSelection_SurvivesStoreReload()
     {
         var repository = new Repository();
-        var stores = new StoreManagementService(repository);
+        var stores = new StoreManagementService(repository, new TestStoreContextMapper());
         var created = (await stores.CreateStoreAsync(new("Store", new StoreContext(PrintifyShopId: 123, PrintifyShopTitle: "DevTest shop"), FulfillmentStrategy.ShopifyPrintify), Ct)).Store!;
 
         var loaded = await stores.LoadAsync(Ct);
@@ -43,7 +43,7 @@ public class StorePrintifyConfigurationServiceTests
     public async Task Keys_AreIsolatedAndDoNotEnterWorkspaceData()
     {
         var repository = new Repository();
-        var stores = new StoreManagementService(repository);
+        var stores = new StoreManagementService(repository, new TestStoreContextMapper());
         var first = (await stores.CreateStoreAsync(new("A", FulfillmentStrategy: FulfillmentStrategy.ShopifyPrintify), Ct)).Store!;
         var second = (await stores.CreateStoreAsync(new("B", FulfillmentStrategy: FulfillmentStrategy.ShopifyPrintify), Ct)).Store!;
         var native = new Native();
@@ -68,7 +68,7 @@ public class StorePrintifyConfigurationServiceTests
     public async Task WrongDeletedAndArchivedScopes_NeverAccessNativeStore()
     {
         var repository = new Repository();
-        var stores = new StoreManagementService(repository);
+        var stores = new StoreManagementService(repository, new TestStoreContextMapper());
         var store = (await stores.CreateStoreAsync(new("Store"), Ct)).Store!;
         var native = new Native();
         var service = new StorePrintifyConfigurationService(stores, native, new Verifier());
@@ -93,7 +93,7 @@ public class StorePrintifyConfigurationServiceTests
     [InlineData(FulfillmentStrategy.ShopifyManual)]
     public async Task NonPrintifyVerification_IsRefusedBeforeKeyLookup(FulfillmentStrategy strategy)
     {
-        var stores = new StoreManagementService(new Repository());
+        var stores = new StoreManagementService(new Repository(), new TestStoreContextMapper());
         var store = (await stores.CreateStoreAsync(new("Store", FulfillmentStrategy: strategy), Ct)).Store!;
         var native = new Native();
         var verifier = new Verifier();
@@ -107,7 +107,7 @@ public class StorePrintifyConfigurationServiceTests
     [Fact]
     public async Task MissingOrUnreadableKey_DoesNotVerifyOrOverwrite()
     {
-        var stores = new StoreManagementService(new Repository());
+        var stores = new StoreManagementService(new Repository(), new TestStoreContextMapper());
         var store = (await stores.CreateStoreAsync(new("Store", FulfillmentStrategy: FulfillmentStrategy.ShopifyPrintify), Ct)).Store!;
         var native = new Native();
         var verifier = new Verifier();

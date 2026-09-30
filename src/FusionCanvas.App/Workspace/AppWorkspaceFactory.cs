@@ -81,6 +81,7 @@ public static class AppWorkspaceFactory
         var itemInspector = new ItemInspectorService(repository);
         var storeManagement = new StoreManagementService(
             repository,
+            new FusionCanvas.Integration.Stores.StoreContextMapper(),
             initialActiveWorkspaceId: initialActiveWorkspaceId,
             initialActiveStoreId: initialActiveStoreId);
         var nicheManagement = new NicheManagementService(repository);

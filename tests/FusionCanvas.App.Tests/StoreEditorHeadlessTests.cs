@@ -133,7 +133,7 @@ public class StoreEditorHeadlessTests
         var snapshot = new WorkspaceSnapshot([store], [], [], [], [], [], [tag], [], []);
         var repository = new GatedFailingWorkspaceRepository(snapshot);
         var viewModel = new StoreManagementViewModel(
-            new StoreManagementService(repository),
+            new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             nicheService: null,
             new TagManagementService(repository));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
@@ -484,7 +484,7 @@ public class StoreEditorHeadlessTests
         await repository.SaveAsync(Snapshot(store, includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true), TestContext.Current.CancellationToken);
 
         static StoreManagementViewModel Compose(IWorkspaceRepository repo) => new(
-            new StoreManagementService(repo),
+            new StoreManagementService(repo, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(repo),
             new TagManagementService(repo),
             new ProductSupplierSetupService(repo),
@@ -2699,7 +2699,7 @@ public class StoreEditorHeadlessTests
         var store = customStore ?? new Store(Guid.NewGuid(), "North Star", null, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog, useFixedProviderOffering, includeOfferingOptions, primaryArtworkDesignArea, customNiche));
         var viewModel = new StoreManagementViewModel(
-            new StoreManagementService(repository),
+            new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(repository),
             new TagManagementService(repository),
             new ProductSupplierSetupService(repository),
@@ -2759,7 +2759,7 @@ public class StoreEditorHeadlessTests
         };
         var repository = new InMemoryWorkspaceRepository(snapshot);
         var viewModel = new StoreManagementViewModel(
-            new StoreManagementService(repository),
+            new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(repository),
             new TagManagementService(repository),
             new ProductSupplierSetupService(repository),

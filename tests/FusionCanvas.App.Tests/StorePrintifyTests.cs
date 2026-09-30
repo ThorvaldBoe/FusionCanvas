@@ -158,7 +158,7 @@ public class StorePrintifyTests
     public async Task StoreEditor_BindsThreeStrategiesAndCredentialControls()
     {
         var repository = new Repository();
-        var stores = new StoreManagementService(repository);
+        var stores = new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper());
         var created = await stores.CreateStoreAsync(new("Store", FulfillmentStrategy: FulfillmentStrategy.ShopifyPrintify), Ct);
         var native = new Native();
         var model = new StoreManagementViewModel(stores);
@@ -203,7 +203,7 @@ public class StorePrintifyTests
     {
         using var workspace = new DisposableHeadlessWorkspace();
         var repository = workspace.CreateRepository();
-        var stores = new StoreManagementService(repository);
+        var stores = new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper());
         await stores.CreateStoreAsync(new("Store", FulfillmentStrategy: FulfillmentStrategy.ShopifyPrintify), Ct);
         var model = new StoreManagementViewModel(stores);
         model.ConfigurePrintify(new Native { Kind = PrintifyConfigurationKind.Available, Secret = "synthetic-key" }, new Verifier

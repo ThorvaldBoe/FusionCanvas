@@ -1,4 +1,4 @@
-﻿using Avalonia.Controls;
+using Avalonia.Controls;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Views;
