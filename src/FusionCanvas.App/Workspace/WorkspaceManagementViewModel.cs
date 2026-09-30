@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using Avalonia;
+using Avalonia.Threading;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Workspaces.Transfer;
@@ -293,7 +295,7 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         var state = await _service.LoadAsync(cancellationToken).ConfigureAwait(false);
-        ApplyState(state);
+        await OnUiThreadAsync(() => ApplyState(state));
     }
 
     public async Task CreateWorkspaceAsync(CancellationToken cancellationToken = default)
@@ -301,12 +303,15 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
         if (IsTransferRunning) return;
         var name = string.IsNullOrWhiteSpace(WorkspaceName) ? "New workspace" : WorkspaceName;
         var result = await _service.CreateWorkspaceAsync(new WorkspaceManagementCreateRequest(name, CurrentContext()), cancellationToken).ConfigureAwait(false);
-        ApplyResult(result);
-        if (result.Succeeded)
+        await OnUiThreadAsync(() =>
         {
-            IsCreatingNewWorkspace = false;
-            ClearDeleteWarning();
-        }
+            ApplyResult(result);
+            if (result.Succeeded)
+            {
+                IsCreatingNewWorkspace = false;
+                ClearDeleteWarning();
+            }
+        });
     }
 
     public async Task SaveSelectedWorkspaceAsync(CancellationToken cancellationToken = default)
@@ -319,11 +324,14 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
         }
 
         var result = await _service.UpdateWorkspaceAsync(new WorkspaceManagementUpdateRequest(SelectedWorkspace.Id, WorkspaceName, CurrentContext()), cancellationToken).ConfigureAwait(false);
-        ApplyResult(result);
-        if (result.Succeeded)
+        await OnUiThreadAsync(() =>
         {
-            ClearDeleteWarning();
-        }
+            ApplyResult(result);
+            if (result.Succeeded)
+            {
+                ClearDeleteWarning();
+            }
+        });
     }
 
     public async Task ArchiveSelectedWorkspaceAsync(CancellationToken cancellationToken = default)
@@ -336,22 +344,28 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
         }
 
         var result = await _service.ArchiveWorkspaceAsync(SelectedWorkspace.Id, cancellationToken).ConfigureAwait(false);
-        ApplyResult(result);
-        if (result.Succeeded)
+        await OnUiThreadAsync(() =>
         {
-            ClearDeleteWarning();
-        }
+            ApplyResult(result);
+            if (result.Succeeded)
+            {
+                ClearDeleteWarning();
+            }
+        });
     }
 
     public async Task RestoreWorkspaceAsync(WorkspaceSummary workspace, CancellationToken cancellationToken = default)
     {
         if (IsTransferRunning) return;
         var result = await _service.RestoreWorkspaceAsync(workspace.Id, cancellationToken).ConfigureAwait(false);
-        ApplyResult(result);
-        if (result.Succeeded)
+        await OnUiThreadAsync(() =>
         {
-            ClearDeleteWarning();
-        }
+            ApplyResult(result);
+            if (result.Succeeded)
+            {
+                ClearDeleteWarning();
+            }
+        });
     }
 
     public void StartCreateWorkspace()
@@ -401,24 +415,28 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
                 ConfirmPermanentDeletion: true,
                 DeleteConfirmationName),
             cancellationToken).ConfigureAwait(false);
-        ApplyResult(result);
-        if (result.Succeeded)
+        await OnUiThreadAsync(() =>
         {
-            ClearDeleteWarning();
-        }
+            ApplyResult(result);
+            if (result.Succeeded)
+            {
+                ClearDeleteWarning();
+            }
+        });
     }
 
     public async Task SelectWorkspaceAsync(WorkspaceSummary workspace, CancellationToken cancellationToken = default)
     {
-        // ApplyState raises bound property and workspace-change notifications, so resume on
-        // Avalonia's UI context when this operation originates from a workspace button.
-        var result = await _service.SelectWorkspaceAsync(workspace.Id, cancellationToken).ConfigureAwait(true);
-        ApplyResult(result);
-        if (result.Succeeded)
+        var result = await _service.SelectWorkspaceAsync(workspace.Id, cancellationToken).ConfigureAwait(false);
+        await OnUiThreadAsync(() =>
         {
-            IsCreatingNewWorkspace = false;
-            ClearDeleteWarning();
-        }
+            ApplyResult(result);
+            if (result.Succeeded)
+            {
+                IsCreatingNewWorkspace = false;
+                ClearDeleteWarning();
+            }
+        });
     }
 
     public async Task ExportSelectedWorkspaceAsync(CancellationToken cancellationToken = default)
@@ -441,7 +459,7 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
                 progress,
                 token),
             openManagementOnFailure: false,
-            cancellationToken).ConfigureAwait(true);
+            cancellationToken).ConfigureAwait(false);
     }
 
     public async Task ImportWorkspaceAsync(CancellationToken cancellationToken = default)
@@ -463,10 +481,11 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
                 progress,
                 token),
             openManagementOnFailure: true,
-            cancellationToken).ConfigureAwait(true);
+            cancellationToken).ConfigureAwait(false);
         if (result?.Succeeded == true && result.WorkspaceId is Guid workspaceId)
         {
-            ApplyResult(await _service.SelectWorkspaceAsync(workspaceId, cancellationToken).ConfigureAwait(true));
+            var selectionResult = await _service.SelectWorkspaceAsync(workspaceId, cancellationToken).ConfigureAwait(false);
+            await OnUiThreadAsync(() => ApplyResult(selectionResult));
         }
     }
 
@@ -475,33 +494,42 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
         bool openManagementOnFailure,
         CancellationToken cancellationToken)
     {
-        ErrorMessage = null;
-        TransferSummary = null;
-        TransferProgress = 0;
-        TransferPhase = "Preparing";
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _transferCancellation = linked;
-        IsTransferRunning = true;
+        await OnUiThreadAsync(() =>
+        {
+            ErrorMessage = null;
+            TransferSummary = null;
+            TransferProgress = 0;
+            TransferPhase = "Preparing";
+            _transferCancellation = linked;
+            IsTransferRunning = true;
+        });
         try
         {
             var progress = new Progress<WorkspaceTransferProgress>(value =>
             {
-                TransferPhase = value.Phase;
-                TransferProgress = value.Total <= 0 ? 0 : Math.Clamp((double)value.Completed / value.Total, 0, 1);
-            });
-            var result = await operation(progress, linked.Token).ConfigureAwait(true);
-            if (result.Succeeded && result.Summary is { } summary)
-            {
-                TransferSummary = FormatSummary(summary);
-            }
-            else if (!result.Cancelled)
-            {
-                ErrorMessage = result.Error ?? "Workspace transfer failed.";
-                if (openManagementOnFailure)
+                PostToUiThread(() =>
                 {
-                    IsWorkspaceManagementOpen = true;
+                    TransferPhase = value.Phase;
+                    TransferProgress = value.Total <= 0 ? 0 : Math.Clamp((double)value.Completed / value.Total, 0, 1);
+                });
+            });
+            var result = await operation(progress, linked.Token).ConfigureAwait(false);
+            await OnUiThreadAsync(() =>
+            {
+                if (result.Succeeded && result.Summary is { } summary)
+                {
+                    TransferSummary = FormatSummary(summary);
                 }
-            }
+                else if (!result.Cancelled)
+                {
+                    ErrorMessage = result.Error ?? "Workspace transfer failed.";
+                    if (openManagementOnFailure)
+                    {
+                        IsWorkspaceManagementOpen = true;
+                    }
+                }
+            });
 
             return result;
         }
@@ -511,8 +539,11 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
         }
         finally
         {
-            _transferCancellation = null;
-            IsTransferRunning = false;
+            await OnUiThreadAsync(() =>
+            {
+                _transferCancellation = null;
+                IsTransferRunning = false;
+            });
         }
     }
 
@@ -598,6 +629,28 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static void Run(Task task) => _ = task;
+
+    private static async Task OnUiThreadAsync(Action action)
+    {
+        if (global::Avalonia.Application.Current is null || Dispatcher.UIThread.CheckAccess())
+        {
+            action();
+            return;
+        }
+
+        await Dispatcher.UIThread.InvokeAsync(action);
+    }
+
+    private static void PostToUiThread(Action action)
+    {
+        if (global::Avalonia.Application.Current is null || Dispatcher.UIThread.CheckAccess())
+        {
+            action();
+            return;
+        }
+
+        Dispatcher.UIThread.Post(action);
+    }
 
     private void RaiseTransferActionState()
     {
