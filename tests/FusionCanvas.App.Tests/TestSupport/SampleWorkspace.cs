@@ -1,4 +1,5 @@
 using FusionCanvas.App.Views;
+using FusionCanvas.App.Settings;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.App.Workflow;
 using FusionCanvas.Domain.Workspace;
@@ -108,7 +109,8 @@ internal static class MainWindowViewModelFactory
         ITitleOptimizationService? titleOptimization = null,
         IIdeationService? ideationService = null,
         IIdeationAccessStatus? ideationAccessStatus = null,
-        IWorkspaceRepository? workspaceSnapshotRepository = null)
+        IWorkspaceRepository? workspaceSnapshotRepository = null,
+        SettingsViewModel? settings = null)
     {
         var fileStore = new EmptyWorkspaceFileStore();
         var itemManagement = new ItemManagementService(repository);
@@ -149,7 +151,8 @@ internal static class MainWindowViewModelFactory
             snapshot,
             services,
             ideationAccessStatus: accessStatus,
-            titleOptimizationService: titleOptimization);
+            titleOptimizationService: titleOptimization,
+            settings: settings);
     }
 
     private sealed class EmptyWorkspaceFileStore : IWorkspaceFileStore

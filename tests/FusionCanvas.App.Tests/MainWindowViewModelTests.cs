@@ -1,4 +1,5 @@
 using FusionCanvas.App.Stores;
+using FusionCanvas.App.Settings;
 using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Views;
 using FusionCanvas.App.Workflow;
@@ -11,11 +12,42 @@ using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.ToolContexts;
 using FusionCanvas.Application.WorkflowNavigation;
 using FusionCanvas.Application.StageTools;
+using FusionCanvas.Application.Settings;
+using FusionCanvas.Application.Telemetry;
+using FusionCanvas.Application.Ideation;
 
 namespace FusionCanvas.App.Tests;
 
 public class MainWindowViewModelTests
 {
+    [Fact]
+    public async Task StartupAccessStatusRefresh_ObservesFailures()
+    {
+        var telemetry = new RecordingTelemetryService();
+        var settings = new SettingsViewModel(
+            new InMemoryApplicationSettingsStore(),
+            new AvaloniaApplicationThemeController(),
+            ApplicationSettings.Default,
+            loadWarning: null,
+            telemetryService: telemetry);
+        var snapshot = SampleWorkspace.Create();
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+
+        _ = MainWindowViewModelFactory.CreateFromSnapshot(
+            snapshot,
+            repository,
+            ideationAccessStatus: new FailingIdeationAccessStatus(),
+            settings: settings);
+
+        var entry = await telemetry.Recorded.WaitAsync(
+            TimeSpan.FromSeconds(3),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal("Workspace", entry.Area);
+        Assert.Equal("CommandFailed", entry.Name);
+        Assert.Equal(nameof(InvalidOperationException), entry.Message);
+    }
+
     [Fact]
     public void OpenFromNavigation_OpensTabAndCoordinatesNavigationAndWorkflow()
     {
@@ -730,6 +762,94 @@ public class MainWindowViewModelTests
 
         Assert.False(viewModel.CanMoveStageForward);
         Assert.False(viewModel.CanMoveStageBack);
+    }
+
+    private sealed class FailingIdeationAccessStatus : IIdeationAccessStatus
+    {
+        public IdeationAccessAvailability GetAvailability() =>
+            IdeationAccessAvailability.Unavailable("AI services are unavailable.");
+
+        public Task RefreshAsync(CancellationToken cancellationToken = default) =>
+            Task.FromException(new InvalidOperationException("refresh failed"));
+    }
+
+    private sealed class RecordingTelemetryService : ITelemetryService
+    {
+        private readonly TaskCompletionSource<TelemetryEntry> _recorded =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public event EventHandler<TelemetryEntry>? EntryRecorded;
+
+        public Task<TelemetryEntry> Recorded => _recorded.Task;
+
+        public bool IsCaptureEnabled => true;
+
+        public Task<WorkspaceTelemetrySettings> GetSettingsAsync(
+            Guid workspaceId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(WorkspaceTelemetrySettings.Default);
+
+        public Task SaveSettingsAsync(
+            Guid workspaceId,
+            WorkspaceTelemetrySettings settings,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task RecordAsync(
+            TelemetryEventRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            var entry = new TelemetryEntry(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                DateTimeOffset.UtcNow,
+                request.Area,
+                request.Name,
+                request.Severity,
+                request.Outcome,
+                request.Message,
+                request.MetadataJson,
+                request.RequestBody,
+                request.ResponseBody,
+                request.RequestDetailsJson,
+                request.ResponseDetailsJson,
+                request.CorrelationId);
+            _recorded.TrySetResult(entry);
+            EntryRecorded?.Invoke(this, entry);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<TelemetryEntry>> SearchAsync(
+            Guid workspaceId,
+            TelemetryQuery query,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<TelemetryEntry>>([]);
+
+        public Task<IReadOnlyList<TelemetryEntry>> ReadAllAsync(
+            Guid workspaceId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<TelemetryEntry>>([]);
+
+        public Task<int> DeleteAllAsync(
+            Guid workspaceId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(0);
+
+        public Task<string> ExportJsonAsync(
+            Guid workspaceId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult("[]");
+
+        public Task ExportAsync(
+            Guid workspaceId,
+            Stream destination,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<int> CleanupExpiredAsync(
+            Guid workspaceId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(0);
     }
 
     private sealed class GateableWorkspaceRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
