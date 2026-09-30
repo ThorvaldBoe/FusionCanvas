@@ -640,7 +640,7 @@
                              FontSize="14"
                              FontWeight="SemiBold"
                              Foreground="{DynamicResource StrongTextBrush}" />
-                  <TextBlock Text="{Binding DocumentWindow.ActiveDetailViewKey}"
+                  <TextBlock Text="{Binding ActiveStageToolContentKey}"
                              FontSize="13"
                              Foreground="{DynamicResource SecondaryTextBrush}" />
                 <Border Margin="0,10,0,0"
@@ -662,6 +662,10 @@
                                Foreground="{DynamicResource DangerTextBrush}" />
                     <TextBlock IsVisible="{Binding !DocumentWindow.CanRunActiveTool}"
                                Text="{Binding DocumentWindow.ActiveStageToolUnavailableMessage}"
+                               FontSize="12"
+                               Foreground="{DynamicResource DangerTextBrush}" />
+                    <TextBlock IsVisible="{Binding HasActiveStageToolContentUnavailableMessage}"
+                               Text="{Binding ActiveStageToolContentUnavailableMessage}"
                                FontSize="12"
                                Foreground="{DynamicResource DangerTextBrush}" />
                   </StackPanel>

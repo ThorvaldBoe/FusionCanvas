@@ -104,6 +104,8 @@ public class MainWindowViewModelTests
 
         Assert.Equal(WorkflowStage.Listing, viewModel.DocumentWindow.ActiveContext?.WorkflowStage);
         Assert.Equal("listing-stage-tool", viewModel.DocumentWindow.ActiveDetailViewKey);
+        Assert.Equal("listing-stage-tool", viewModel.ActiveStageToolContentKey);
+        Assert.Equal(StageToolContentKind.Listing, viewModel.ActiveStageToolContent?.Kind);
         Assert.Equal(WorkflowStage.Listing, viewModel.WorkflowNavigator.ActiveViewStage);
     }
 
