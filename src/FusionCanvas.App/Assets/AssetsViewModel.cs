@@ -33,14 +33,14 @@ public sealed class AssetsViewModel : INotifyPropertyChanged
         _service = service ?? throw new ArgumentNullException(nameof(service));
         _filePicker = filePicker ?? new NullAssetFilePicker();
         AvailablePurposes = BuildPurposeOptions();
-        ImportCommand = new RelayCommand(_ => Run(BeginImportAsync()));
-        ConfirmImportCommand = new RelayCommand(_ => Run(ConfirmImportAsync()));
+        ImportCommand = new RelayCommand(_ => Run(BeginImportAsync));
+        ConfirmImportCommand = new RelayCommand(_ => Run(ConfirmImportAsync));
         CancelImportCommand = new RelayCommand(_ => CancelImport());
         RequestRemoveCommand = new RelayCommand(parameter =>
         {
             if (parameter is AssetRowViewModel row) RequestRemove(row);
         });
-        ConfirmRemoveCommand = new RelayCommand(_ => Run(ConfirmRemoveAsync()));
+        ConfirmRemoveCommand = new RelayCommand(_ => Run(ConfirmRemoveAsync));
         CancelRemoveCommand = new RelayCommand(_ => CancelRemove());
         CloseCommand = new RelayCommand(_ => RequestClose());
     }
@@ -209,7 +209,7 @@ public sealed class AssetsViewModel : INotifyPropertyChanged
 
     private void OnRelabelRequested(AssetRowViewModel row, AssetKind kind)
     {
-        Run(RelabelAsync(row, kind));
+        Run(() => RelabelAsync(row, kind));
     }
 
     private async Task RelabelAsync(AssetRowViewModel row, AssetKind kind)
@@ -217,7 +217,16 @@ public sealed class AssetsViewModel : INotifyPropertyChanged
         if (IsBusy) return;
         IsBusy = true;
         ErrorMessage = null;
-        var result = await _service.RelabelAssetAsync(new AssetManagementRelabelRequest(row.Id, kind));
+        AssetManagementResult result;
+        try
+        {
+            result = await _service.RelabelAssetAsync(new AssetManagementRelabelRequest(row.Id, kind));
+        }
+        catch
+        {
+            row.RevertPurpose(AvailablePurposes.SingleOrDefault(option => option.Kind == row.Purpose) ?? AvailablePurposes[0]);
+            throw;
+        }
         IsBusy = false;
         if (!result.Succeeded)
         {
@@ -315,5 +324,21 @@ public sealed class AssetsViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-    private static void Run(Task task) => _ = task;
+    private void Run(Func<Task> operation) => _ = ObserveAsync(operation);
+
+    private async Task ObserveAsync(Func<Task> operation)
+    {
+        try
+        {
+            await operation().ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            ErrorMessage = exception.Message;
+            IsBusy = false;
+        }
+    }
 }
