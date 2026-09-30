@@ -1,5 +1,6 @@
 using FusionCanvas.App.Stores;
 using FusionCanvas.App.Settings;
+using FusionCanvas.App.StageTools;
 using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Views;
 using FusionCanvas.App.Workflow;
