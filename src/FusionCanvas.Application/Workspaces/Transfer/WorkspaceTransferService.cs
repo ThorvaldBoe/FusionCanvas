@@ -162,22 +162,64 @@ public sealed class WorkspaceTransferService(
         }
         catch (OperationCanceledException)
         {
-            return WorkspaceTransferResult.CancelledResult();
+            return AddRollbackFailures(
+                WorkspaceTransferResult.CancelledResult(),
+                CleanupCreatedFiles(createdFiles, saved));
         }
         catch (Exception exception)
         {
-            return WorkspaceTransferResult.Failure($"Workspace import failed: {exception.Message}");
+            return AddRollbackFailures(
+                WorkspaceTransferResult.Failure($"Workspace import failed: {exception.Message}"),
+                CleanupCreatedFiles(createdFiles, saved));
         }
-        finally
+    }
+
+    private IReadOnlyList<string> CleanupCreatedFiles(IReadOnlyList<string> createdFiles, bool saved)
+    {
+        if (saved || createdFiles.Count == 0)
         {
-            if (!saved)
+            return [];
+        }
+
+        var failures = new List<string>();
+        foreach (var path in createdFiles)
+        {
+            try
             {
-                foreach (var path in createdFiles)
+                if (fileStore.TryDelete(path))
                 {
-                    fileStore.TryDelete(path);
+                    continue;
+                }
+
+                if (fileStore.Exists(path))
+                {
+                    failures.Add(path);
                 }
             }
+            catch (Exception)
+            {
+                failures.Add(path);
+            }
         }
+
+        return failures;
+    }
+
+    private static WorkspaceTransferResult AddRollbackFailures(
+        WorkspaceTransferResult result,
+        IReadOnlyList<string> rollbackFailures)
+    {
+        if (rollbackFailures.Count == 0)
+        {
+            return result;
+        }
+
+        var files = string.Join(", ", rollbackFailures);
+        var rollbackError = $"Rollback could not remove {rollbackFailures.Count} managed file(s): {files}.";
+        var error = string.IsNullOrWhiteSpace(result.Error)
+            ? rollbackError
+            : $"{result.Error} {rollbackError}";
+        return result with { Error = error };
     }
 
     private static WorkspaceSnapshot PrepareImportedSnapshot(

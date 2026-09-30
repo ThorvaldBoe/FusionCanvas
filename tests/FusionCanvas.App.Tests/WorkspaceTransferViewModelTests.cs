@@ -67,6 +67,28 @@ public class WorkspaceTransferViewModelTests
     }
 
     [Fact]
+    public async Task ImportCancellationWithRollbackFailure_OpensManagementSurfaceAndKeepsError()
+    {
+        var transfer = new FakeTransferService
+        {
+            ImportResult = new WorkspaceTransferResult(
+                false,
+                true,
+                null,
+                null,
+                "The workspace transfer was cancelled. Rollback could not remove assets/new.png.")
+        };
+        var viewModel = NewViewModel(null, transfer, new FakePicker(importPath: "package.fcworkspace"));
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+
+        await viewModel.ImportWorkspaceAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(viewModel.IsWorkspaceManagementOpen);
+        Assert.Contains("Rollback could not remove", viewModel.ErrorMessage, StringComparison.Ordinal);
+        Assert.True(viewModel.ShouldShowNoWorkspaceState);
+    }
+
+    [Fact]
     public async Task ImportSuccess_ReloadsAndSelectsRestoredWorkspace()
     {
         var imported = NewWorkspace("Restored");

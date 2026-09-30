@@ -214,6 +214,30 @@ public class WorkspaceTransferServiceTests
     }
 
     [Fact]
+    public async Task ImportWorkspaceAsync_ReportsFilesThatRollbackCouldNotRemove()
+    {
+        var workspace = NewWorkspace("Package");
+        var package = new WorkspaceSnapshot([workspace], [], [], [], [], [], [], [], [], []);
+        var fileStore = new FakeFileStore { FailDelete = true };
+        var repository = new FakeRepository { FailSave = true };
+        var service = NewService(
+            repository,
+            fileStore,
+            reader: new FakeReader(NewSession(package, [
+                new WorkspacePackageReadEntry("assets/new.png", 1, _ => Task.FromResult<Stream>(new MemoryStream([1])))
+            ])));
+
+        var result = await service.ImportWorkspaceAsync(
+            new WorkspaceImportRequest("package.fcworkspace"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("Rollback could not remove", result.Error, StringComparison.Ordinal);
+        Assert.Contains("assets/new.png", result.Error, StringComparison.Ordinal);
+        Assert.True(fileStore.Exists("assets/new.png"));
+    }
+
+    [Fact]
     public async Task ImportWorkspaceAsync_CancellationCleansFilesAndDoesNotSave()
     {
         var workspace = NewWorkspace("Package");
@@ -348,12 +372,14 @@ public class WorkspaceTransferServiceTests
 
         public string WorkspaceRoot => "memory";
 
+        public bool FailDelete { get; init; }
+
         public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, FusionCanvas.Domain.Assets.AssetKind kind, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public bool Exists(string workspaceRelativePath) => _files.ContainsKey(workspaceRelativePath);
 
-        public bool TryDelete(string workspaceRelativePath) => _files.Remove(workspaceRelativePath);
+        public bool TryDelete(string workspaceRelativePath) => !FailDelete && _files.Remove(workspaceRelativePath);
 
         public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default) =>
             Task.FromResult<Stream>(new MemoryStream(_files[workspaceRelativePath], writable: false));
