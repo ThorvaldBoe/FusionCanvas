@@ -109,17 +109,7 @@ public sealed class ZipWorkspacePackageWriter : IWorkspacePackageWriter
         }
         finally
         {
-            TryDeleteFile(temporaryPackagePath);
-            try
-            {
-                temporaryDirectory.Delete(recursive: true);
-            }
-            catch (IOException)
-            {
-            }
-            catch (UnauthorizedAccessException)
-            {
-            }
+            WorkspacePackageTempCleanup.Cleanup(temporaryPackagePath, temporaryDirectory);
         }
     }
 
@@ -146,21 +136,4 @@ public sealed class ZipWorkspacePackageWriter : IWorkspacePackageWriter
             .InformationalVersion
         ?? typeof(ZipWorkspacePackageWriter).Assembly.GetName().Version?.ToString()
         ?? "unknown";
-
-    private static void TryDeleteFile(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
-        }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
-        }
-    }
 }
