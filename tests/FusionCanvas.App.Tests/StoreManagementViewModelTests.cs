@@ -870,6 +870,7 @@ public class StoreManagementViewModelTests
         await Task.Yield();
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         Assert.Contains("1 item", viewModel.TagDeleteWarningMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.True(viewModel.CanConfirmDeleteTag);
     }
 
     [Fact]
