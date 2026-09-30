@@ -119,6 +119,26 @@ public class LocalWorkspaceFileStoreTests
     }
 
     [Fact]
+    public async Task SaveAsync_RemovesPartialFileWhenContentCopyFails()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var workspaceRoot = tempDirectory.GetPath("workspace");
+        var store = new LocalWorkspaceFileStore(workspaceRoot);
+        using var content = new FailingReadStream([1, 2, 3]);
+
+        await Assert.ThrowsAsync<IOException>(() => store.SaveAsync(
+            "generated.png",
+            AssetKind.ExportedImage,
+            content,
+            TestContext.Current.CancellationToken));
+
+        Assert.Empty(Directory.EnumerateFiles(
+            Path.Combine(workspaceRoot, "assets"),
+            "*",
+            SearchOption.AllDirectories));
+    }
+
+    [Fact]
     public async Task OpenReadAsync_ReturnsReadableStreamWithinWorkspaceBoundary()
     {
         using var tempDirectory = new TemporaryDirectory();
@@ -211,5 +231,55 @@ public class LocalWorkspaceFileStoreTests
         public string GetPath(string path) => Path.Combine(_directory.FullName, path);
 
         public void Dispose() => _directory.Delete(recursive: true);
+    }
+
+    private sealed class FailingReadStream(byte[] initialBytes) : Stream
+    {
+        private bool _hasReturnedInitialBytes;
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => initialBytes.Length;
+        public override long Position { get; set; }
+
+        public override void Flush() => throw new NotSupportedException();
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (_hasReturnedInitialBytes)
+            {
+                throw new IOException("Simulated content read failure.");
+            }
+
+            _hasReturnedInitialBytes = true;
+            var bytesToCopy = Math.Min(count, initialBytes.Length);
+            initialBytes.AsSpan().CopyTo(buffer.AsSpan(offset, bytesToCopy));
+            Position += bytesToCopy;
+            return bytesToCopy;
+        }
+
+        public override ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_hasReturnedInitialBytes)
+            {
+                return ValueTask.FromException<int>(new IOException("Simulated content read failure."));
+            }
+
+            _hasReturnedInitialBytes = true;
+            var bytesToCopy = Math.Min(buffer.Length, initialBytes.Length);
+            initialBytes.AsMemory(0, bytesToCopy).CopyTo(buffer);
+            Position += bytesToCopy;
+            return ValueTask.FromResult(bytesToCopy);
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 }
