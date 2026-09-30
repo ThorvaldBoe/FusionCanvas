@@ -569,90 +569,49 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await ExecuteAsync(connection, null, "ALTER TABLE stores ADD COLUMN fulfillment_strategy INTEGER NOT NULL DEFAULT 0;", cancellationToken);
         }
 
-        if (!isFreshDatabase && schemaVersion < 2)
+        async Task ApplyMigrationAsync(int targetVersion, Func<Task> migration)
         {
-            await MigrateToVersion2Async(connection, cancellationToken);
+            if (schemaVersion >= targetVersion)
+            {
+                return;
+            }
+
+            await migration();
+            await SetPragmaUserVersionAsync(connection, targetVersion, cancellationToken);
+            schemaVersion = targetVersion;
         }
 
-        if (!isFreshDatabase && schemaVersion < 3)
+        if (!isFreshDatabase)
         {
-            await MigrateToVersion3Async(connection, cancellationToken);
+            await ApplyMigrationAsync(2, () => MigrateToVersion2Async(connection, cancellationToken));
+            await ApplyMigrationAsync(3, () => MigrateToVersion3Async(connection, cancellationToken));
+            await ApplyMigrationAsync(4, () => MigrateToVersion4Async(connection, cancellationToken));
+            await ApplyMigrationAsync(5, () => MigrateToVersion5Async(connection, cancellationToken));
         }
 
-        if (!isFreshDatabase && schemaVersion < 4)
+        await ApplyMigrationAsync(7, () => MigrateToVersion7Async(connection, cancellationToken));
+        await ApplyMigrationAsync(8, () => MigrateToVersion8Async(connection, cancellationToken));
+        await ApplyMigrationAsync(9, () => MigrateToVersion9Async(connection, cancellationToken));
+        await ApplyMigrationAsync(10, () => MigrateToVersion10Async(connection, cancellationToken));
+
+        if (!isFreshDatabase)
         {
-            await MigrateToVersion4Async(connection, cancellationToken);
+            await ApplyMigrationAsync(11, () => MigrateToVersion11Async(connection, cancellationToken));
         }
 
-        if (!isFreshDatabase && schemaVersion < 5)
+        await ApplyMigrationAsync(12, () => MigrateToVersion12Async(connection, cancellationToken));
+
+        if (!isFreshDatabase)
         {
-            await MigrateToVersion5Async(connection, cancellationToken);
+            await ApplyMigrationAsync(13, () => MigrateToVersion13Async(connection, cancellationToken));
+            await ApplyMigrationAsync(14, () => MigrateToVersion14Async(connection, cancellationToken));
+            await ApplyMigrationAsync(15, () => MigrateToVersion15Async(connection, cancellationToken));
         }
 
-        if (schemaVersion < 7)
-        {
-            await MigrateToVersion7Async(connection, cancellationToken);
-        }
-
-        if (schemaVersion < 8)
-        {
-            await MigrateToVersion8Async(connection, cancellationToken);
-        }
-
-        if (schemaVersion < 9)
-        {
-            await MigrateToVersion9Async(connection, cancellationToken);
-        }
-
-        if (schemaVersion < 10)
-        {
-            await MigrateToVersion10Async(connection, cancellationToken);
-        }
-
-        if (!isFreshDatabase && schemaVersion < 11)
-        {
-            await MigrateToVersion11Async(connection, cancellationToken);
-        }
-
-        if (schemaVersion < 12)
-        {
-            await MigrateToVersion12Async(connection, cancellationToken);
-        }
-
-        if (!isFreshDatabase && schemaVersion < 13)
-        {
-            await MigrateToVersion13Async(connection, cancellationToken);
-        }
-
-        if (!isFreshDatabase && schemaVersion < 14)
-        {
-            await MigrateToVersion14Async(connection, cancellationToken);
-        }
-
-        if (!isFreshDatabase && schemaVersion < 15)
-        {
-            await MigrateToVersion15Async(connection, cancellationToken);
-        }
-
-        if (schemaVersion < 16)
-        {
-            await MigrateToVersion16Async(connection, cancellationToken);
-        }
-
-        if (schemaVersion < 17)
-        {
-            await MigrateToVersion17Async(connection, cancellationToken);
-        }
-
-        if (schemaVersion < 18)
-        {
-            await MigrateToVersion18Async(connection, cancellationToken);
-        }
-
-        if (schemaVersion < 19)
-        {
-            await MigrateToVersion19Async(connection, cancellationToken);
-        }
+        await ApplyMigrationAsync(16, () => MigrateToVersion16Async(connection, cancellationToken));
+        await ApplyMigrationAsync(17, () => MigrateToVersion17Async(connection, cancellationToken));
+        await ApplyMigrationAsync(18, () => MigrateToVersion18Async(connection, cancellationToken));
+        await ApplyMigrationAsync(19, () => MigrateToVersion19Async(connection, cancellationToken));
 
         await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
     }

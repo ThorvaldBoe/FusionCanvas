@@ -694,6 +694,55 @@ public class SqliteWorkspaceRepositoryTests
         }
     }
 
+    [Fact]
+    public async Task LoadAsync_CheckpointsSuccessfulMigrationsSoLaterFailureCanResume()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("restartable-migration.db");
+        var snapshot = CreateCompleteSnapshot();
+        await new SqliteWorkspaceRepository(databasePath).SaveAsync(snapshot, TestContext.Current.CancellationToken);
+
+        var firstProviderId = Guid.NewGuid();
+        var secondProviderId = Guid.NewGuid();
+        await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                DROP INDEX idx_print_providers_printify_identity;
+                INSERT INTO print_providers (id, store_id, name, external_provider_id, is_archived, created_at, updated_at, metadata_json)
+                VALUES ($first_id, $store_id, 'Provider One', 'duplicate-provider', 0, $now, $now, '{}');
+                INSERT INTO print_providers (id, store_id, name, external_provider_id, is_archived, created_at, updated_at, metadata_json)
+                VALUES ($second_id, $store_id, 'Provider Two', 'duplicate-provider', 0, $now, $now, '{}');
+                PRAGMA user_version = 14;
+                """;
+            command.Parameters.AddWithValue("$first_id", firstProviderId.ToString());
+            command.Parameters.AddWithValue("$second_id", secondProviderId.ToString());
+            command.Parameters.AddWithValue("$store_id", snapshot.Stores[0].Id.ToString());
+            command.Parameters.AddWithValue("$now", snapshot.Stores[0].CreatedAt.ToString("O"));
+            await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+
+        await Assert.ThrowsAsync<SqliteException>(() =>
+            new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken));
+
+        Assert.Equal(15, await ReadUserVersionAsync(databasePath));
+
+        await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM print_providers WHERE id = $id;";
+            command.Parameters.AddWithValue("$id", secondProviderId.ToString());
+            await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+
+        var loaded = await new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(SqliteWorkspaceRepository.CurrentSchemaVersion, await ReadUserVersionAsync(databasePath));
+        Assert.Contains(loaded.PrintProviders, provider => provider.Id == firstProviderId);
+    }
+
     // Fault point: a v4 listings row referencing a non-existent store triggers PRAGMA foreign_key_check
     // failure inside the transactional v5 migration. Deeper SQLite I/O faults (disk full, locked file)
     // are not injectable in-process and are covered by desktop/manual evidence rather than faked here.
