@@ -35,8 +35,7 @@ public class StoreManagementViewModelTests
         var repository = new DelayedFirstLoadWorkspaceRepository(snapshot);
         var delayedTagLoadStarted = repository.DelayNextLoad();
         var viewModel = new StoreManagementViewModel(
-            new StoreManagementService(
-                repository,
+            new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper(),
                 initialActiveWorkspaceId: store.WorkspaceId,
                 initialActiveStoreId: store.Id),
             tagService: new TagManagementService(repository),
@@ -83,8 +82,7 @@ public class StoreManagementViewModelTests
         var repository = new DelayedFirstLoadWorkspaceRepository(snapshot);
         var delayedTagLoadStarted = repository.DelayNextLoad();
         var viewModel = new StoreManagementViewModel(
-            new StoreManagementService(
-                repository,
+            new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper(),
                 initialActiveWorkspaceId: store.WorkspaceId,
                 initialActiveStoreId: store.Id),
             tagService: new TagManagementService(repository),
@@ -127,7 +125,7 @@ public class StoreManagementViewModelTests
     public async Task StoreNicheConfiguration_OwnsStoreSaveWorkflowAndAppliesResult()
     {
         var repository = new InMemoryWorkspaceRepository();
-        var service = new StoreManagementService(repository, () => Now, Guid.NewGuid);
+        var service = new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper(), () => Now, Guid.NewGuid);
         StoreManagementState? applied = null;
         var editor = new StoreNicheConfigurationViewModel(
             service, null, null, state => applied = state, result => applied = result.State, _ => { });
@@ -146,7 +144,7 @@ public class StoreManagementViewModelTests
     [Fact]
     public void StoreNicheConfiguration_OwnsStoreAndNicheDirtyBaselines()
     {
-        var service = new StoreManagementService(new InMemoryWorkspaceRepository());
+        var service = new StoreManagementService(new InMemoryWorkspaceRepository(), new FusionCanvas.Integration.Stores.StoreContextMapper());
         var editor = new StoreNicheConfigurationViewModel(service, null, null, _ => { }, _ => { }, _ => { });
         editor.CaptureStoreDraft();
         editor.CaptureNicheDraft();
@@ -165,7 +163,7 @@ public class StoreManagementViewModelTests
     [Fact]
     public async Task LoadAsync_ShowsFirstStoreEmptyState()
     {
-        var viewModel = new StoreManagementViewModel(new StoreManagementService(new InMemoryWorkspaceRepository()));
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(new InMemoryWorkspaceRepository(), new FusionCanvas.Integration.Stores.StoreContextMapper()));
 
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
@@ -178,14 +176,14 @@ public class StoreManagementViewModelTests
     [Fact]
     public async Task FirstStorePrompt_CanOpenEditorOrBeDismissed()
     {
-        var viewModel = new StoreManagementViewModel(new StoreManagementService(new InMemoryWorkspaceRepository()));
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(new InMemoryWorkspaceRepository(), new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
         viewModel.DeclineFirstStorePromptCommand.Execute(null);
 
         Assert.False(viewModel.ShouldShowFirstStorePrompt);
 
-        var secondViewModel = new StoreManagementViewModel(new StoreManagementService(new InMemoryWorkspaceRepository()));
+        var secondViewModel = new StoreManagementViewModel(new StoreManagementService(new InMemoryWorkspaceRepository(), new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await secondViewModel.LoadAsync(TestContext.Current.CancellationToken);
 
         secondViewModel.AcceptFirstStorePromptCommand.Execute(null);
@@ -200,6 +198,7 @@ public class StoreManagementViewModelTests
         var storeId = Guid.NewGuid();
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
             new InMemoryWorkspaceRepository(),
+            new FusionCanvas.Integration.Stores.StoreContextMapper(),
             () => Now,
             () => storeId))
         {
@@ -227,6 +226,7 @@ public class StoreManagementViewModelTests
         var storeId = Guid.NewGuid();
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
             new InMemoryWorkspaceRepository(),
+            new FusionCanvas.Integration.Stores.StoreContextMapper(),
             () => Now,
             () => storeId));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
@@ -253,7 +253,7 @@ public class StoreManagementViewModelTests
     [Fact]
     public async Task NewStoreDraft_RequestsStoreNameFocus()
     {
-        var viewModel = new StoreManagementViewModel(new StoreManagementService(new InMemoryWorkspaceRepository()));
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(new InMemoryWorkspaceRepository(), new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         var focusRequests = 0;
         viewModel.StoreNameFocusRequested += (_, _) => focusRequests++;
@@ -269,7 +269,7 @@ public class StoreManagementViewModelTests
         var active = NewStore("North Star Studio");
         var archived = NewStore("Archived Studio", isArchived: true);
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([active, archived], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([active, archived], [], [], [], [], [], [], [], [])), new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
         viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single(store => store.Id == active.Id));
@@ -304,7 +304,7 @@ public class StoreManagementViewModelTests
     {
         var store = NewStore("North Star Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], [])), new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         await viewModel.SelectStoreAsync(viewModel.ActiveStores[0], TestContext.Current.CancellationToken);
         viewModel.NewStoreName = "North Star Gifts";
@@ -322,7 +322,7 @@ public class StoreManagementViewModelTests
         var first = NewStore("North Star Studio");
         var second = NewStore("Second Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [], [], [], [], [], [], [], [])), new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single(store => store.Id == first.Id));
         viewModel.NewStoreName = "Unsaved name";
@@ -352,7 +352,7 @@ public class StoreManagementViewModelTests
     {
         var store = NewStore("North Star Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], [])), new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         viewModel.OpenStoreEditorCommand.Execute(null);
         viewModel.NewStoreName = "Unsaved name";
@@ -375,7 +375,7 @@ public class StoreManagementViewModelTests
         var first = NewStore("North Star Studio");
         var second = NewStore("Second Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [], [], [], [], [], [], [], [])), new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         await viewModel.SelectStoreAsync(viewModel.ActiveStores.Single(store => store.Id == second.Id), TestContext.Current.CancellationToken);
 
@@ -394,7 +394,7 @@ public class StoreManagementViewModelTests
         var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []));
         var viewModel = new StoreManagementViewModel(
-            new StoreManagementService(repository),
+            new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(repository));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
@@ -410,7 +410,7 @@ public class StoreManagementViewModelTests
     {
         var store = NewStore("North Star Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], [])), new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         await viewModel.SelectStoreAsync(viewModel.ActiveStores[0], TestContext.Current.CancellationToken);
 
@@ -428,7 +428,7 @@ public class StoreManagementViewModelTests
         var first = NewStore("North Star Studio");
         var second = NewStore("Second Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [], [], [], [], [], [], [], [])), new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         await viewModel.SelectStoreAsync(viewModel.ActiveStores.Single(store => store.Id == first.Id), TestContext.Current.CancellationToken);
 
@@ -456,7 +456,7 @@ public class StoreManagementViewModelTests
     {
         var store = NewStore("Empty Studio");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
-        var viewModel = new StoreManagementViewModel(new StoreManagementService(repository));
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         await viewModel.SelectStoreAsync(viewModel.ActiveStores[0], TestContext.Current.CancellationToken);
 
@@ -640,7 +640,7 @@ public class StoreManagementViewModelTests
         var connected = NewStore("Zulu Connected Studio");
         var niche = new Niche(Guid.NewGuid(), connected.Id, "Coffee", null, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([empty, connected], [niche], [], [], [], [], [], [], []));
-        var viewModel = new StoreManagementViewModel(new StoreManagementService(repository));
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
         await viewModel.SelectStoreAsync(viewModel.ActiveStores.Single(store => store.Id == connected.Id), TestContext.Current.CancellationToken);
@@ -666,7 +666,7 @@ public class StoreManagementViewModelTests
         var selected = new Niche(Guid.NewGuid(), store.Id, "Zulu Niche", null, false, Now, Now, "{}");
         var listing = new Item(Guid.NewGuid(), store.Id, selected.Id, null, "Espresso", null, ItemStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [first, selected], [], [listing], [], [], [], [], []));
-        var viewModel = new StoreManagementViewModel(new StoreManagementService(repository), new NicheManagementService(repository));
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()), new NicheManagementService(repository));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         await viewModel.SelectStoreAsync(viewModel.ActiveStores.Single(), TestContext.Current.CancellationToken);
         await viewModel.SelectNicheAsync(viewModel.ActiveNiches.Single(niche => niche.Id == selected.Id), TestContext.Current.CancellationToken);
@@ -685,7 +685,7 @@ public class StoreManagementViewModelTests
         var first = NewStore("First Studio");
         var second = NewStore("Second Studio");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([first, second], [], [], [], [], [], [], [], []));
-        var viewModel = new StoreManagementViewModel(new StoreManagementService(repository));
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single(store => store.Id == first.Id));
 
@@ -705,7 +705,7 @@ public class StoreManagementViewModelTests
         var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee", null, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [niche], [], [], [], [], [], [], []));
         var viewModel = new StoreManagementViewModel(
-            new StoreManagementService(repository),
+            new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(repository));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
@@ -730,7 +730,7 @@ public class StoreManagementViewModelTests
         var nicheId = Guid.NewGuid();
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
         var viewModel = new StoreManagementViewModel(
-            new StoreManagementService(repository),
+            new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(repository, () => Now, () => nicheId));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         viewModel.SelectNichesTabCommand.Execute(null);
@@ -777,7 +777,7 @@ public class StoreManagementViewModelTests
         var second = new Niche(Guid.NewGuid(), store.Id, "Cats", null, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [first, second], [], [], [], [], [], [], []));
         var viewModel = new StoreManagementViewModel(
-            new StoreManagementService(repository),
+            new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(repository));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         viewModel.SelectNichesTabCommand.Execute(null);
@@ -798,7 +798,7 @@ public class StoreManagementViewModelTests
     [Fact]
     public void OpenStoreEditorCommand_ProvidesMenuFriendlyManagementEntry()
     {
-        var viewModel = new StoreManagementViewModel(new StoreManagementService(new InMemoryWorkspaceRepository()));
+        var viewModel = new StoreManagementViewModel(new StoreManagementService(new InMemoryWorkspaceRepository(), new FusionCanvas.Integration.Stores.StoreContextMapper()));
 
         viewModel.OpenStoreEditorCommand.Execute(null);
 
@@ -810,7 +810,7 @@ public class StoreManagementViewModelTests
     {
         using var tempDirectory = new TemporaryDirectory();
         var runtime = AppWorkspaceFactory.Create(tempDirectory.GetPath("workspace.db"), new UnavailableAi());
-        var service = new StoreManagementService(runtime.Repository, () => Now, () => Guid.NewGuid());
+        var service = new StoreManagementService(runtime.Repository, new FusionCanvas.Integration.Stores.StoreContextMapper(), () => Now, () => Guid.NewGuid());
 
         var created = await service.CreateStoreAsync(new StoreManagementCreateRequest(
             "North Star Studio",
@@ -896,7 +896,7 @@ public class StoreManagementViewModelTests
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []));
         var tagId = Guid.NewGuid();
         var viewModel = new StoreManagementViewModel(
-            new StoreManagementService(repository),
+            new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             nicheService: null,
             new TagManagementService(repository, () => Now.AddMinutes(1), () => tagId));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
@@ -956,7 +956,7 @@ public class StoreManagementViewModelTests
         var snapshot = new WorkspaceSnapshot([store], [niche], [], [item], [], [], [tag], [link], []);
         var repository = new InMemoryWorkspaceRepository(snapshot);
         var viewModel = new StoreManagementViewModel(
-            new StoreManagementService(repository),
+            new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             nicheService: null,
             new TagManagementService(repository));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
@@ -981,7 +981,7 @@ public class StoreManagementViewModelTests
         var snapshot = new WorkspaceSnapshot([store], [], [], [], [], [], [first, second], [], []);
         var repository = new InMemoryWorkspaceRepository(snapshot);
         var viewModel = new StoreManagementViewModel(
-            new StoreManagementService(repository),
+            new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             nicheService: null,
             new TagManagementService(repository));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
@@ -1072,7 +1072,7 @@ public class StoreManagementViewModelTests
     {
         var store = NewStore("North Star Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], [])), new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single(store => store.Id == store.Id));
 
@@ -1092,6 +1092,7 @@ public class StoreManagementViewModelTests
         var storeId = Guid.NewGuid();
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
             new InMemoryWorkspaceRepository(),
+            new FusionCanvas.Integration.Stores.StoreContextMapper(),
             () => Now,
             () => storeId));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
@@ -1110,7 +1111,7 @@ public class StoreManagementViewModelTests
     {
         var store = NewStore("North Star Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], [])), new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         await viewModel.SelectStoreAsync(viewModel.ActiveStores[0], TestContext.Current.CancellationToken);
         viewModel.Url = "https://updated.example.com";
@@ -1126,7 +1127,7 @@ public class StoreManagementViewModelTests
         var storeId = Guid.NewGuid();
         var store = new Store(storeId, "North Star Studio", null, false, Now, Now, """{"url":"https://mystore.example.com"}""");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], [])), new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
         viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single(s => s.Id == storeId));
@@ -1139,7 +1140,7 @@ public class StoreManagementViewModelTests
     {
         var store = NewStore("North Star Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], [])), new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single(s => s.Id == store.Id));
 
@@ -1153,7 +1154,7 @@ public class StoreManagementViewModelTests
     {
         var store = NewStore("North Star Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], [])), new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single(s => s.Id == store.Id));
 
@@ -1168,6 +1169,7 @@ public class StoreManagementViewModelTests
         var storeId = Guid.NewGuid();
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
             new InMemoryWorkspaceRepository(),
+            new FusionCanvas.Integration.Stores.StoreContextMapper(),
             () => Now,
             () => storeId));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
@@ -1185,7 +1187,7 @@ public class StoreManagementViewModelTests
     {
         var store = NewStore("North Star Studio");
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [], [], [])), new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
         viewModel.SelectStoreForEditing(viewModel.ActiveStores.Single());
 
@@ -1218,7 +1220,7 @@ public class StoreManagementViewModelTests
         var active = NewStore("Active studio");
         var archived = NewStore("Archived studio", isArchived: true);
         var viewModel = new StoreManagementViewModel(new StoreManagementService(
-            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([active, archived], [], [], [], [], [], [], [], []))));
+            new InMemoryWorkspaceRepository(new WorkspaceSnapshot([active, archived], [], [], [], [], [], [], [], [])), new FusionCanvas.Integration.Stores.StoreContextMapper()));
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(active.Id, viewModel.TagEditor.Scope.StoreId);

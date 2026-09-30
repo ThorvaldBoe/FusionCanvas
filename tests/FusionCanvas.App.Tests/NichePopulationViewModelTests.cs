@@ -163,7 +163,7 @@ public sealed class NichePopulationViewModelTests
         var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot(
             [store], niches, [], [], [], [], [], [], []));
         var viewModel = new StoreManagementViewModel(
-            new StoreManagementService(repository),
+            new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(repository),
             nichePopulationService: population);
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);

@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Stores;
@@ -8,15 +7,8 @@ namespace FusionCanvas.Application.Stores;
 
 public sealed class StoreManagementService : IStoreManagementService
 {
-    private const string NotesKey = "notes";
-    private const string TargetMarketKey = "targetMarket";
-    private const string BrandDirectionKey = "brandDirection";
-    private const string PlanningContextKey = "planningContext";
-    private const string UrlKey = "url";
-    private const string PrintifyShopIdKey = "printifyShopId";
-    private const string PrintifyShopTitleKey = "printifyShopTitle";
-
     private readonly IWorkspaceRepository _repository;
+    private readonly IStoreContextMapper _contextMapper;
     private readonly Func<DateTimeOffset> _clock;
     private readonly Func<Guid> _newId;
     private Guid? _activeWorkspaceId;
@@ -24,12 +16,14 @@ public sealed class StoreManagementService : IStoreManagementService
 
     public StoreManagementService(
         IWorkspaceRepository repository,
+        IStoreContextMapper contextMapper,
         Func<DateTimeOffset>? clock = null,
         Func<Guid>? newId = null,
         Guid? initialActiveWorkspaceId = null,
         Guid? initialActiveStoreId = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+        _contextMapper = contextMapper ?? throw new ArgumentNullException(nameof(contextMapper));
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _newId = newId ?? Guid.NewGuid;
         _activeWorkspaceId = initialActiveWorkspaceId;
@@ -82,7 +76,8 @@ public sealed class StoreManagementService : IStoreManagementService
 
         var now = _clock();
         var context = request.Context ?? new StoreContext();
-        var store = new Store(_newId(), _activeWorkspaceId!.Value, normalizedName, NormalizeOptional(context.Description), false, now, now, ToMetadataJson(context), null, request.FulfillmentStrategy);
+        var store = new Store(_newId(), _activeWorkspaceId!.Value, normalizedName, null, false, now, now, "{}", null, request.FulfillmentStrategy);
+        store = _contextMapper.Apply(store, context with { Description = NormalizeOptional(context.Description) });
         var workspaces = snapshot.Workspaces.Any(workspace => workspace.Id == store.WorkspaceId)
             ? snapshot.Workspaces
             : [.. snapshot.Workspaces, WorkspaceSnapshot.DefaultWorkspace(now)];
@@ -118,21 +113,19 @@ public sealed class StoreManagementService : IStoreManagementService
             return StoreManagementResult.Failure(validation, BuildState(snapshot));
         }
 
-        var context = request.Context ?? ToContext(existing);
+        var context = request.Context ?? _contextMapper.Read(existing);
         var fulfillmentStrategy = request.FulfillmentStrategy ?? existing.FulfillmentStrategy;
         if (!Enum.IsDefined(fulfillmentStrategy) || !FulfillmentStrategyPolicy.IsAvailable(fulfillmentStrategy))
         {
             return StoreManagementResult.Failure("That fulfillment strategy is not supported.", BuildState(snapshot));
         }
 
-        var updatedStore = existing with
+        var updatedStore = _contextMapper.Apply(existing with
         {
             Name = normalizedName,
-            Description = NormalizeOptional(context.Description),
             FulfillmentStrategy = fulfillmentStrategy,
-            UpdatedAt = _clock(),
-            MetadataJson = ToMetadataJson(context, existing.MetadataJson)
-        };
+            UpdatedAt = _clock()
+        }, context with { Description = NormalizeOptional(context.Description) });
 
         var updated = snapshot with
         {
@@ -370,66 +363,8 @@ public sealed class StoreManagementService : IStoreManagementService
             _ => false
         };
 
-    private static StoreSummary ToSummary(Store store) =>
-        new(store.Id, store.WorkspaceId, store.Name, ToContext(store), store.IsArchived, store.CreatedAt, store.UpdatedAt, store.FulfillmentStrategy);
-
-    private static StoreContext ToContext(Store store)
-    {
-        var metadata = ParseMetadata(store.MetadataJson);
-        return new StoreContext(
-            store.Description,
-            metadata.GetValueOrDefault(NotesKey),
-            metadata.GetValueOrDefault(TargetMarketKey),
-            metadata.GetValueOrDefault(BrandDirectionKey),
-            metadata.GetValueOrDefault(PlanningContextKey),
-            metadata.GetValueOrDefault(UrlKey),
-            int.TryParse(metadata.GetValueOrDefault(PrintifyShopIdKey), out var shopId) ? shopId : null,
-            metadata.GetValueOrDefault(PrintifyShopTitleKey));
-    }
-
-    private static string ToMetadataJson(StoreContext context, string existingMetadataJson = "{}")
-    {
-        var metadata = ParseMetadata(existingMetadataJson);
-        SetOptional(metadata, NotesKey, context.Notes);
-        SetOptional(metadata, TargetMarketKey, context.TargetMarket);
-        SetOptional(metadata, BrandDirectionKey, context.BrandDirection);
-        SetOptional(metadata, PlanningContextKey, context.PlanningContext);
-        SetOptional(metadata, UrlKey, context.Url);
-        SetOptional(metadata, PrintifyShopIdKey, context.PrintifyShopId?.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        SetOptional(metadata, PrintifyShopTitleKey, context.PrintifyShopTitle);
-
-        return metadata.Count == 0 ? "{}" : JsonSerializer.Serialize(metadata);
-    }
-
-    private static Dictionary<string, string> ParseMetadata(string metadataJson)
-    {
-        if (string.IsNullOrWhiteSpace(metadataJson) || metadataJson.Trim() == "{}")
-        {
-            return new Dictionary<string, string>(StringComparer.Ordinal);
-        }
-
-        using var document = JsonDocument.Parse(metadataJson);
-        if (document.RootElement.ValueKind != JsonValueKind.Object)
-        {
-            return new Dictionary<string, string>(StringComparer.Ordinal);
-        }
-
-        return document.RootElement
-            .EnumerateObject()
-            .ToDictionary(property => property.Name, property => property.Value.ToString(), StringComparer.Ordinal);
-    }
-
-    private static void SetOptional(Dictionary<string, string> metadata, string key, string? value)
-    {
-        var normalized = NormalizeOptional(value);
-        if (normalized is null)
-        {
-            metadata.Remove(key);
-            return;
-        }
-
-        metadata[key] = normalized;
-    }
+    private StoreSummary ToSummary(Store store) =>
+        new(store.Id, store.WorkspaceId, store.Name, _contextMapper.Read(store), store.IsArchived, store.CreatedAt, store.UpdatedAt, store.FulfillmentStrategy);
 
     private static string NormalizeName(string name) => name.Trim();
 
