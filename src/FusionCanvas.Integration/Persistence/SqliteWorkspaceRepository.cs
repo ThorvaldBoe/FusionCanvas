@@ -650,6 +650,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     {
         await ExecuteAsync(connection, null, "PRAGMA foreign_keys = OFF;", cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var transactionCommitted = false;
         try
         {
             await ExecuteAsync(connection, transaction, """
@@ -675,13 +676,26 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 ALTER TABLE mockup_template_revisions_v13 RENAME TO mockup_template_revisions;
                 """, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            transactionCommitted = true;
             await ExecuteAsync(connection, null, "PRAGMA foreign_keys = ON;", cancellationToken);
             await VerifyForeignKeyIntegrityAsync(connection, null, cancellationToken);
         }
+        catch (OperationCanceledException)
+        {
+            if (!transactionCommitted)
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+            }
+            await ExecuteAsync(connection, null, "PRAGMA foreign_keys = ON;", CancellationToken.None);
+            throw;
+        }
         catch (Exception exception)
         {
-            await transaction.RollbackAsync(cancellationToken);
-            await ExecuteAsync(connection, null, "PRAGMA foreign_keys = ON;", cancellationToken);
+            if (!transactionCommitted)
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+            }
+            await ExecuteAsync(connection, null, "PRAGMA foreign_keys = ON;", CancellationToken.None);
             throw new InvalidOperationException("The workspace database could not be upgraded from schema version 12 to 13. Restore a backup or use an older FusionCanvas version.", exception);
         }
     }
@@ -690,6 +704,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     {
         await ExecuteAsync(connection, null, "PRAGMA foreign_keys = OFF;", cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var transactionCommitted = false;
         try
         {
             await ExecuteAsync(connection, transaction, """
@@ -714,13 +729,26 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 ALTER TABLE mockup_template_revision_source_images_v14 RENAME TO mockup_template_revision_source_images;
                 """, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            transactionCommitted = true;
             await ExecuteAsync(connection, null, "PRAGMA foreign_keys = ON;", cancellationToken);
             await VerifyForeignKeyIntegrityAsync(connection, null, cancellationToken);
         }
+        catch (OperationCanceledException)
+        {
+            if (!transactionCommitted)
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+            }
+            await ExecuteAsync(connection, null, "PRAGMA foreign_keys = ON;", CancellationToken.None);
+            throw;
+        }
         catch (Exception exception)
         {
-            await transaction.RollbackAsync(cancellationToken);
-            await ExecuteAsync(connection, null, "PRAGMA foreign_keys = ON;", cancellationToken);
+            if (!transactionCommitted)
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+            }
+            await ExecuteAsync(connection, null, "PRAGMA foreign_keys = ON;", CancellationToken.None);
             throw new InvalidOperationException("The workspace database could not be upgraded to schema version 14.", exception);
         }
     }
@@ -763,6 +791,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     private static async Task MigrateToVersion12Async(SqliteConnection connection, CancellationToken cancellationToken)
     {
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var transactionCommitted = false;
         try
         {
             var columns = new (string Table, string Name, string Definition)[]
@@ -790,10 +819,22 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
 
             await VerifyForeignKeyIntegrityAsync(connection, transaction, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            transactionCommitted = true;
+        }
+        catch (OperationCanceledException)
+        {
+            if (!transactionCommitted)
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+            }
+            throw;
         }
         catch (Exception exception)
         {
-            await transaction.RollbackAsync(cancellationToken);
+            if (!transactionCommitted)
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+            }
             throw new InvalidOperationException(
                 "The workspace database could not be upgraded from schema version 11 to 12. Restore a backup or use an older FusionCanvas version.", exception);
         }
@@ -802,6 +843,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     private static async Task MigrateToVersion11Async(SqliteConnection connection, CancellationToken cancellationToken)
     {
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var transactionCommitted = false;
         try
         {
             if (!await ColumnExistsAsync(connection, "stores", "fulfillment_strategy", cancellationToken))
@@ -899,10 +941,22 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
 
             await VerifyForeignKeyIntegrityAsync(connection, transaction, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            transactionCommitted = true;
+        }
+        catch (OperationCanceledException)
+        {
+            if (!transactionCommitted)
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+            }
+            throw;
         }
         catch (Exception exception)
         {
-            await transaction.RollbackAsync(cancellationToken);
+            if (!transactionCommitted)
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+            }
             throw new InvalidOperationException(
                 "The workspace database could not be upgraded from schema version 10 to 11. Restore a backup or use an older FusionCanvas version.", exception);
         }
