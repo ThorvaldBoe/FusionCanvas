@@ -106,7 +106,11 @@ public sealed class AssetManagementService : IAssetManagementService
         var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
         if (saveError is not null)
         {
-            _fileStore.TryDelete(managed.WorkspaceRelativePath);
+            if (!TryCleanupManagedFile(managed.WorkspaceRelativePath))
+            {
+                saveError = AppendCleanupFailure(saveError, managed.WorkspaceRelativePath);
+            }
+
             return Failure(saveError, snapshot, request.Context);
         }
 
@@ -196,7 +200,13 @@ public sealed class AssetManagementService : IAssetManagementService
             return Failure(saveError, BuildState(snapshot, context));
         }
 
-        _fileStore.TryDelete(existing.WorkspaceRelativePath);
+        if (!TryCleanupManagedFile(existing.WorkspaceRelativePath))
+        {
+            return AssetManagementResult.Failure(
+                $"The asset record was removed, but the managed file '{existing.WorkspaceRelativePath}' could not be removed.",
+                BuildState(updated, context));
+        }
+
         return AssetManagementResult.Success(ToSummary(snapshot, existing, context is null ? null : DescribeContext(snapshot, context), includeContextLabel: context is null || context.Kind == WorkspaceEntityKind.Store, isMissing: false), BuildState(updated, context));
     }
 
@@ -261,6 +271,22 @@ public sealed class AssetManagementService : IAssetManagementService
             return true;
         }
     }
+
+    private bool TryCleanupManagedFile(string workspaceRelativePath)
+    {
+        try
+        {
+            return _fileStore.TryDelete(workspaceRelativePath)
+                || !_fileStore.Exists(workspaceRelativePath);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private static string AppendCleanupFailure(string error, string workspaceRelativePath) =>
+        $"{error} The imported managed file '{workspaceRelativePath}' could not be removed.";
 
     private static string? DeriveContextLabel(WorkspaceSnapshot snapshot, Asset asset)
     {
