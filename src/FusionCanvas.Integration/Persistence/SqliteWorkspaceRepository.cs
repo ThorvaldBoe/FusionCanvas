@@ -28,7 +28,6 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_databasePath))!);
 
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        await SqliteDatabaseSchema.EnsureAsync(connection, cancellationToken);
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
@@ -185,7 +184,6 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         }
 
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        await SqliteDatabaseSchema.EnsureAsync(connection, cancellationToken);
 
         return new WorkspaceSnapshot(
             await LoadWorkspacesAsync(connection, cancellationToken),
@@ -235,9 +233,18 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             Pooling = useConnectionPooling
         }.ToString();
         var connection = new SqliteConnection(connectionString);
-        await connection.OpenAsync(cancellationToken);
-        await ExecuteAsync(connection, null, "PRAGMA foreign_keys = ON;", cancellationToken);
-        return connection;
+        try
+        {
+            await connection.OpenAsync(cancellationToken);
+            await ExecuteAsync(connection, null, "PRAGMA foreign_keys = ON;", cancellationToken);
+            await SqliteDatabaseSchema.EnsureAsync(connection, cancellationToken);
+            return connection;
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
     }
 
     internal static async Task EnsureSchemaCoreAsync(
