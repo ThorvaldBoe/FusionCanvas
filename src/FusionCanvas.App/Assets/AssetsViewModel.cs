@@ -8,6 +8,7 @@ using FusionCanvas.Application.Assets;
 
 namespace FusionCanvas.App.Assets;
 
+// Async operations update bindable state after I/O and must preserve the captured UI synchronization context.
 public sealed class AssetsViewModel : INotifyPropertyChanged
 {
     private readonly IAssetManagementService _service;
@@ -104,14 +105,14 @@ public sealed class AssetsViewModel : INotifyPropertyChanged
         PendingImportFileName = null;
         PendingImportPurpose = null;
         ErrorMessage = null;
-        await LoadAsync(context, cancellationToken).ConfigureAwait(false);
+        await LoadAsync(context, cancellationToken);
     }
 
     public async Task ReloadAsync(CancellationToken cancellationToken = default)
     {
         if (_context is AssetContextReference context)
         {
-            await LoadAsync(context, cancellationToken).ConfigureAwait(false);
+            await LoadAsync(context, cancellationToken);
         }
     }
 
@@ -119,7 +120,7 @@ public sealed class AssetsViewModel : INotifyPropertyChanged
     {
         IsBusy = true;
         ErrorMessage = null;
-        var state = await _service.LoadAsync(context, cancellationToken).ConfigureAwait(false);
+        var state = await _service.LoadAsync(context, cancellationToken);
         ApplyState(state);
         IsBusy = false;
     }
@@ -160,7 +161,7 @@ public sealed class AssetsViewModel : INotifyPropertyChanged
     private async Task BeginImportAsync()
     {
         if (!CanImport || _context is null) return;
-        var path = await _filePicker.PickImportFileAsync().ConfigureAwait(false);
+        var path = await _filePicker.PickImportFileAsync();
         if (string.IsNullOrWhiteSpace(path))
         {
             return;
@@ -180,8 +181,7 @@ public sealed class AssetsViewModel : INotifyPropertyChanged
         IsBusy = true;
         ErrorMessage = null;
         var result = await _service.ImportAssetAsync(
-            new AssetManagementImportRequest(_context, _pendingImportPath, PendingImportPurpose.Kind))
-            .ConfigureAwait(false);
+            new AssetManagementImportRequest(_context, _pendingImportPath, PendingImportPurpose.Kind));
         IsBusy = false;
         if (!result.Succeeded)
         {
@@ -217,7 +217,7 @@ public sealed class AssetsViewModel : INotifyPropertyChanged
         if (IsBusy) return;
         IsBusy = true;
         ErrorMessage = null;
-        var result = await _service.RelabelAssetAsync(new AssetManagementRelabelRequest(row.Id, kind)).ConfigureAwait(false);
+        var result = await _service.RelabelAssetAsync(new AssetManagementRelabelRequest(row.Id, kind));
         IsBusy = false;
         if (!result.Succeeded)
         {
@@ -247,7 +247,7 @@ public sealed class AssetsViewModel : INotifyPropertyChanged
         RemovalConfirmationVisible = false;
         IsBusy = true;
         ErrorMessage = null;
-        var result = await _service.RemoveAssetAsync(new AssetManagementRemoveRequest(row.Id, ConfirmPermanentRemoval: true)).ConfigureAwait(false);
+        var result = await _service.RemoveAssetAsync(new AssetManagementRemoveRequest(row.Id, ConfirmPermanentRemoval: true));
         IsBusy = false;
         if (!result.Succeeded)
         {

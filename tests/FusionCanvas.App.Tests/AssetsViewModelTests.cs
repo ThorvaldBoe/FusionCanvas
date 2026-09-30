@@ -1,4 +1,5 @@
 using FusionCanvas.App.Assets;
+using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Assets;
@@ -13,6 +14,40 @@ namespace FusionCanvas.App.Tests;
 
 public class AssetsViewModelTests
 {
+    [Fact]
+    public void OpenForContext_AppliesLoadedStateOnCapturedSynchronizationContext()
+    {
+        var sample = Sample.Create();
+        var service = new DeferredLoadAssetManagementService(sample.Service());
+        var previousContext = SynchronizationContext.Current;
+        using var uiContext = new PumpingSynchronizationContext();
+        var uiThreadId = Environment.CurrentManagedThreadId;
+        var notificationThreadId = 0;
+
+        SynchronizationContext.SetSynchronizationContext(uiContext);
+        try
+        {
+            var viewModel = new AssetsViewModel(service, new FakeFilePicker());
+            viewModel.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(AssetsViewModel.ContextTitle))
+                {
+                    notificationThreadId = Environment.CurrentManagedThreadId;
+                }
+            };
+
+            var openTask = viewModel.OpenForContextAsync(sample.ItemContext, TestContext.Current.CancellationToken);
+            service.ReleaseLoad();
+            uiContext.PumpUntil(openTask, TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previousContext);
+        }
+
+        Assert.Equal(uiThreadId, notificationThreadId);
+    }
+
     [Fact]
     public async Task OpenForContext_LoadsAssetsAndContextHeader()
     {
@@ -176,6 +211,32 @@ public class AssetsViewModelTests
 
         public Task<string?> PickImportFileAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(_path);
+    }
+
+    private sealed class DeferredLoadAssetManagementService(IAssetManagementService inner) : IAssetManagementService
+    {
+        private readonly TaskCompletionSource _loadRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Guid? ActiveWorkspaceId => inner.ActiveWorkspaceId;
+
+        public void SetActiveWorkspace(Guid? workspaceId) => inner.SetActiveWorkspace(workspaceId);
+
+        public async Task<AssetManagementState> LoadAsync(AssetContextReference context, CancellationToken cancellationToken = default)
+        {
+            await _loadRelease.Task.WaitAsync(cancellationToken);
+            return await inner.LoadAsync(context, cancellationToken);
+        }
+
+        public Task<AssetManagementResult> ImportAssetAsync(AssetManagementImportRequest request, CancellationToken cancellationToken = default) =>
+            inner.ImportAssetAsync(request, cancellationToken);
+
+        public Task<AssetManagementResult> RelabelAssetAsync(AssetManagementRelabelRequest request, CancellationToken cancellationToken = default) =>
+            inner.RelabelAssetAsync(request, cancellationToken);
+
+        public Task<AssetManagementResult> RemoveAssetAsync(AssetManagementRemoveRequest request, CancellationToken cancellationToken = default) =>
+            inner.RemoveAssetAsync(request, cancellationToken);
+
+        public void ReleaseLoad() => _loadRelease.TrySetResult();
     }
 
     private sealed class Repository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
