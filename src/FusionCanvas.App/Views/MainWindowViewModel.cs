@@ -55,6 +55,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     private readonly IToolContextResolver _toolContextResolver;
     private readonly IStageToolHostService _stageToolHostService;
+    private readonly IStageToolContentResolver _stageToolContentResolver;
     private readonly IWorkspaceRepository? _workspaceRepository;
     private readonly IGroupManagementService _groupManagementService;
     private readonly IItemManagementService _itemManagementService;
@@ -105,7 +106,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IStageToolHostService stageToolHostService,
         AppWorkspaceRuntime runtime,
         SettingsViewModel? settings,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IStageToolContentResolver? stageToolContentResolver = null)
         : this(
             workflowNavigator,
             documentWindow,
@@ -127,7 +129,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             runtime.TitleOptimization,
             mockupGenerationService: runtime.MockupGeneration,
             artworkGenerationService: runtime.ArtworkGeneration,
-            cancellationToken: cancellationToken)
+            cancellationToken: cancellationToken,
+            stageToolContentResolver: stageToolContentResolver)
     {
     }
 
@@ -152,7 +155,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ITitleOptimizationService? titleOptimizationService = null,
         IMockupGenerationService? mockupGenerationService = null,
         IArtworkGenerationService? artworkGenerationService = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IStageToolContentResolver? stageToolContentResolver = null)
     {
         WorkflowNavigator = workflowNavigator;
         DocumentWindow = documentWindow;
@@ -225,6 +229,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _ = StoreManagement.RefreshNichePopulationAvailabilityAsync();
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
+        _stageToolContentResolver = stageToolContentResolver ?? new BuiltInStageToolContentResolver();
         _workspaceRepository = workspaceRepository;
         _workspaceSnapshot = workspaceSnapshot;
         NavigationState = new NavigationTreePresentationState();
@@ -310,6 +315,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public DesignStageToolViewModel DesignTool { get; }
 
     public ListingStageToolViewModel ListingTool { get; }
+
+    public StageToolContentViewModel? ActiveStageToolContent { get; private set; }
+
+    public string ActiveStageToolContentKey => ActiveStageToolContent?.DetailViewKey ?? "No hosted content";
 
     public IdeationViewModel Ideation { get; }
 
@@ -431,10 +440,18 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public string StatusConfirmationMessage { get; private set; } = string.Empty;
 
-    public bool ShowsIdeaStageTool => DocumentWindow.ActiveContext?.WorkflowStage == WorkflowStage.Idea;
-    public bool ShowsConceptStageTool => DocumentWindow.ActiveContext?.WorkflowStage == WorkflowStage.Concept;
-    public bool ShowsDesignStageTool => DocumentWindow.ActiveContext?.WorkflowStage == WorkflowStage.Design;
-    public bool ShowsListingStageTool => DocumentWindow.ActiveContext?.WorkflowStage == WorkflowStage.Listing;
+    public bool ShowsIdeaStageTool => ActiveStageToolContent?.Kind == StageToolContentKind.Idea;
+    public bool ShowsConceptStageTool => ActiveStageToolContent?.Kind == StageToolContentKind.Concept;
+    public bool ShowsDesignStageTool => ActiveStageToolContent?.Kind == StageToolContentKind.Design;
+    public bool ShowsListingStageTool => ActiveStageToolContent?.Kind == StageToolContentKind.Listing;
+
+    public string ActiveStageToolContentUnavailableMessage =>
+        DocumentWindow.StageToolHostState?.SelectedTool is { } selected && ActiveStageToolContent is null
+            ? $"The selected stage tool has no hosted content for '{selected.Tool.DetailViewKey}'."
+            : string.Empty;
+
+    public bool HasActiveStageToolContentUnavailableMessage =>
+        !string.IsNullOrWhiteSpace(ActiveStageToolContentUnavailableMessage);
 
     public bool IsIdeationActionVisible =>
         DocumentWindow.ActiveContext is
@@ -849,6 +866,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             WorkflowNavigator.SetActiveItem(null);
             DocumentWindow.ApplyToolContext(null);
             DocumentWindow.ApplyStageToolHostState(null);
+            ApplyStageToolContent(null);
             ItemInspector.Clear();
             GroupDetails.Clear();
             RaiseLifecycleProperties();
@@ -1272,6 +1290,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         {
             DocumentWindow.ApplyToolContext(null);
             DocumentWindow.ApplyStageToolHostState(null);
+            ApplyStageToolContent(null);
             return;
         }
 
@@ -1300,6 +1319,23 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         DocumentWindow.ApplyToolContext(resolution);
         DocumentWindow.ApplyStageToolHostState(hostState);
+        ApplyStageToolContent(hostState);
+    }
+
+    private void ApplyStageToolContent(StageToolHostState? state)
+    {
+        ActiveStageToolContent = state?.SelectedTool is { } selected
+            ? _stageToolContentResolver.Resolve(selected.Tool, this)
+            : null;
+
+        OnPropertyChanged(nameof(ActiveStageToolContent));
+        OnPropertyChanged(nameof(ActiveStageToolContentKey));
+        OnPropertyChanged(nameof(ShowsIdeaStageTool));
+        OnPropertyChanged(nameof(ShowsConceptStageTool));
+        OnPropertyChanged(nameof(ShowsDesignStageTool));
+        OnPropertyChanged(nameof(ShowsListingStageTool));
+        OnPropertyChanged(nameof(ActiveStageToolContentUnavailableMessage));
+        OnPropertyChanged(nameof(HasActiveStageToolContentUnavailableMessage));
     }
 
     private void SelectStageTool(string toolId)

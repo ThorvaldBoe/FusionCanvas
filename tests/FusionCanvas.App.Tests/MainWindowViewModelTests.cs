@@ -1,5 +1,6 @@
 using FusionCanvas.App.Stores;
 using FusionCanvas.App.Settings;
+using FusionCanvas.App.StageTools;
 using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Views;
 using FusionCanvas.App.Workflow;
@@ -104,6 +105,8 @@ public class MainWindowViewModelTests
 
         Assert.Equal(WorkflowStage.Listing, viewModel.DocumentWindow.ActiveContext?.WorkflowStage);
         Assert.Equal("listing-stage-tool", viewModel.DocumentWindow.ActiveDetailViewKey);
+        Assert.Equal("listing-stage-tool", viewModel.ActiveStageToolContentKey);
+        Assert.Equal(StageToolContentKind.Listing, viewModel.ActiveStageToolContent?.Kind);
         Assert.Equal(WorkflowStage.Listing, viewModel.WorkflowNavigator.ActiveViewStage);
     }
 
