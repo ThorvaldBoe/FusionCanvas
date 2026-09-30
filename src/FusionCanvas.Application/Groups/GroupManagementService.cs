@@ -687,6 +687,11 @@ public sealed class GroupManagementService : IGroupManagementService
             return "Group name is required.";
         }
 
+        if (name.Contains('\n') || name.Contains('\r'))
+        {
+            return "Group name must be a single line.";
+        }
+
         var duplicate = snapshot.Groups.Any(group =>
             group.Id != existingGroupId &&
             !group.IsArchived &&

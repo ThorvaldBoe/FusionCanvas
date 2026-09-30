@@ -217,9 +217,9 @@ public sealed class GroupDetailsViewModel : INotifyPropertyChanged
 
         string? nameError = null;
         var normalizedName = Name.Trim();
-        if (normalizedName.Length == 0 || normalizedName.Contains('\n') || normalizedName.Contains('\r'))
+        if (normalizedName.Length == 0)
         {
-            nameError = "The group name must be a non-empty single line. It was reverted to its last saved value.";
+            nameError = "The group name must be non-empty. It was reverted to its last saved value.";
         }
         else if (_activeGroups.Any(candidate =>
                      candidate.Id != group.Id
