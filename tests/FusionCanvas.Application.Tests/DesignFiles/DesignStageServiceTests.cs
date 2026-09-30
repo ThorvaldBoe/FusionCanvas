@@ -258,7 +258,7 @@ public class DesignStageServiceTests
         var result = await service.AssignSlotImageAsync(itemId, state.Rows[0].RowId, state.Rows[0].Slots[0].DesignAreaId, "test.jpg", TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
-        Assert.Contains("PNG", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Only PNG files can be assigned to final design artwork slots. The selected file was not imported.", result.Error);
     }
 
     [Fact]

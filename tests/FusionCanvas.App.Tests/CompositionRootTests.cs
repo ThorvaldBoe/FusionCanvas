@@ -20,6 +20,18 @@ public sealed class CompositionRootTests
     }
 
     [Fact]
+    public void MainWindowDelegatesFinalArtworkFormatValidationToTheUseCase()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root, "src", "FusionCanvas.App", "Views", "MainWindow.axaml.cs"));
+
+        Assert.DoesNotContain("Path.GetExtension(path).Equals(\".png\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Only PNG files can be assigned", source, StringComparison.Ordinal);
+        Assert.Contains("AssignSlotImageAsync(rowVM.RowId, slotVm.DesignAreaId, path)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CompositionFactoriesOwnTheConcreteWorkspaceAndCsvAdapters()
     {
         var root = FindRepositoryRoot();
