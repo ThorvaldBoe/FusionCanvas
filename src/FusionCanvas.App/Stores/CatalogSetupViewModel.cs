@@ -989,6 +989,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         if (!string.IsNullOrWhiteSpace(path))
         {
             var dimensions = (Width: 0, Height: 0);
+            string? previewReadError = null;
             if (_rasterImageMetadataReader is not null)
             {
                 try
@@ -996,14 +997,25 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
                     var image = await _rasterImageMetadataReader.ReadAsync(path).ConfigureAwait(true);
                     dimensions = (image.Width, image.Height);
                 }
-                catch (Exception exception) when (exception is not OperationCanceledException)
+                catch (OperationCanceledException)
                 {
-                    // Preserve the existing zero-dimension fallback for unreadable local previews.
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    // Keep zero dimensions as a fallback while preserving the failure for presentation.
                     dimensions = (0, 0);
+                    previewReadError = string.IsNullOrWhiteSpace(exception.Message)
+                        ? $"Preview dimensions could not be read ({exception.GetType().Name})."
+                        : $"Preview dimensions could not be read: {exception.Message}";
                 }
             }
+            else
+            {
+                previewReadError = "Preview dimensions could not be read because the image metadata reader is unavailable.";
+            }
 
-            var draft = new LocalMockupSourceDraftViewModel(path, [], imageWidth: dimensions.Width, imageHeight: dimensions.Height);
+            var draft = new LocalMockupSourceDraftViewModel(path, [], imageWidth: dimensions.Width, imageHeight: dimensions.Height, previewReadError: previewReadError);
             LocalSourceDrafts.Add(draft);
             SelectLocalSource(draft);
             foreach (var color in TemplateColorChoices) color.IsSelected = false;
