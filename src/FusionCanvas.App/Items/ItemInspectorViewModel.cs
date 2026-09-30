@@ -70,15 +70,15 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         _itemManagement = itemManagement ?? throw new ArgumentNullException(nameof(itemManagement));
         _tagManagement = tagManagement;
         _optimization = optimization;
-        AddTagCommand = new RelayCommand(_ => Run(AddTagAsync()));
+        AddTagCommand = new RelayCommand(_ => Run(AddTagAsync));
         RemoveTagCommand = new RelayCommand(parameter =>
         {
             if (parameter is string name)
             {
-                Run(RemoveTagAsync(name));
+                Run(() => RemoveTagAsync(name));
             }
         });
-        OptimizeCommand = new RelayCommand(_ => Run(OptimizeTitleAsync()), () => CanOptimize);
+        OptimizeCommand = new RelayCommand(_ => Run(OptimizeTitleAsync), () => CanOptimize);
         SetIdeaRatingCommand = new RelayCommand(parameter =>
         {
             var rating = parameter switch
@@ -87,14 +87,14 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
                 string text when int.TryParse(text, out var value) => value,
                 _ => -1
             };
-            if (rating >= 0) Run(SetIdeaRatingAsync(rating));
+            if (rating >= 0) Run(() => SetIdeaRatingAsync(rating));
         });
         RequestArchiveCommand = new RelayCommand(_ => ArchiveConfirmationVisible = true, () => CanArchive);
-        ConfirmArchiveCommand = new RelayCommand(_ => Run(ConfirmArchiveAsync()));
+        ConfirmArchiveCommand = new RelayCommand(_ => Run(ConfirmArchiveAsync));
         CancelArchiveCommand = new RelayCommand(_ => ArchiveConfirmationVisible = false);
-        RestoreCommand = new RelayCommand(_ => Run(RestoreAsync()), () => CanRestore);
+        RestoreCommand = new RelayCommand(_ => Run(RestoreAsync), () => CanRestore);
         RequestDeleteCommand = new RelayCommand(_ => DeleteConfirmationVisible = true, () => CanDelete);
-        ConfirmDeleteCommand = new RelayCommand(_ => Run(ConfirmDeleteAsync()));
+        ConfirmDeleteCommand = new RelayCommand(_ => Run(ConfirmDeleteAsync));
         CancelDeleteCommand = new RelayCommand(_ => DeleteConfirmationVisible = false);
     }
 
@@ -704,7 +704,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         _inFlightCommit = completion.Task;
         _inFlightCommitLoadSequence = loadSequence;
         _commitAgainRequested = false;
-        _ = RunCommitDrainAsync(cancellationToken, completion, loadSequence);
+        Run(() => RunCommitDrainAsync(cancellationToken, completion, loadSequence));
         return completion.Task;
     }
 
@@ -721,7 +721,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         _deferredCommit = completion.Task;
         _deferredCommitLoadSequence = loadSequence;
         _deferredCommitCancellationToken = cancellationToken;
-        _ = RunDeferredCommitAsync(inFlightCommit, loadSequence, cancellationToken, completion);
+        Run(() => RunDeferredCommitAsync(inFlightCommit, loadSequence, cancellationToken, completion));
         return completion.Task;
     }
 
@@ -1162,7 +1162,23 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new(name));
 
-    private static void Run(Task task) => _ = task;
+    private void Run(Func<Task> operation) => _ = ObserveAsync(operation);
+
+    private async Task ObserveAsync(Func<Task> operation)
+    {
+        try
+        {
+            await operation().ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            ErrorMessage = exception.Message;
+            IsBusy = false;
+        }
+    }
 
     private ItemStageSavePayload CreateStagePayload(WorkflowStage stage) =>
         stage switch
