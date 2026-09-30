@@ -9,10 +9,14 @@ public sealed record IdeaGenerationResult(
     bool Succeeded,
     string? Text,
     AiTextFailureKind? FailureKind,
-    string? Error)
+    string? Error,
+    Exception? TechnicalCause = null)
 {
     public static IdeaGenerationResult Success(string text) => new(true, text, null, null);
 
-    public static IdeaGenerationResult Failure(AiTextFailureKind kind, string error) =>
-        new(false, null, kind, error);
+    public static IdeaGenerationResult Failure(
+        AiTextFailureKind kind,
+        string error,
+        Exception? technicalCause = null) =>
+        new(false, null, kind, error, technicalCause);
 }
