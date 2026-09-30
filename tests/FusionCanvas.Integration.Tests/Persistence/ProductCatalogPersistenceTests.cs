@@ -367,6 +367,25 @@ public class ProductCatalogPersistenceTests
         Assert.Empty(loaded.DesignAreas);
     }
 
+    [Theory]
+    [InlineData(11)]
+    [InlineData(12)]
+    [InlineData(13)]
+    [InlineData(14)]
+    public async Task LoadAsync_WhenMigrationCancellationIsRequested_PreservesCancellation(int schemaVersion)
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("cancelled-migration.db");
+        await new SqliteWorkspaceRepository(databasePath).SaveAsync(CreateCatalogSnapshot(), TestContext.Current.CancellationToken);
+        await SetSchemaVersionAsync(databasePath, schemaVersion - 1);
+
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => new SqliteWorkspaceRepository(databasePath).LoadAsync(cancellation.Token));
+    }
+
     [Fact]
     public async Task SaveAsync_RejectsCrossOfferingApplicableVariant()
     {
@@ -622,6 +641,15 @@ public class ProductCatalogPersistenceTests
         await using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version;";
         return Convert.ToInt32(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken));
+    }
+
+    private static async Task SetSchemaVersionAsync(string databasePath, int version)
+    {
+        await using var connection = new SqliteConnection($"Data Source={databasePath}");
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"PRAGMA user_version = {version};";
+        await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
     }
 
     private static async Task<IReadOnlyList<string>> ReadColumnNamesAsync(string databasePath, string table)
