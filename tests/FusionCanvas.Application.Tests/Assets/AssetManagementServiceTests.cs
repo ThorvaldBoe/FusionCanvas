@@ -37,6 +37,19 @@ public class AssetManagementServiceTests
     }
 
     [Fact]
+    public async Task LoadAsync_PreservesAssetStoreProbeFailureInsteadOfReportingMissing()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot);
+        var fileStore = new FakeFileStore { ProbeFailure = new IOException("asset store unavailable") };
+        var service = sample.Service(repository, fileStore);
+
+        var exception = await Assert.ThrowsAsync<IOException>(() => service.LoadAsync(sample.ItemContext));
+
+        Assert.Equal("asset store unavailable", exception.Message);
+    }
+
+    [Fact]
     public async Task ImportAsync_CopiesFileAndCreatesAssetAndLinkAtomically()
     {
         var sample = Sample.Create();
@@ -230,6 +243,7 @@ public class AssetManagementServiceTests
 
         public string WorkspaceRoot => @"C:\workspace";
         public bool FailDelete { get; init; }
+        public Exception? ProbeFailure { get; init; }
         public IReadOnlyList<string> Imports { get; } = new List<string>();
         public IReadOnlyCollection<string> ExistingReferences => _existing;
 
@@ -268,7 +282,11 @@ public class AssetManagementServiceTests
                 sourcePath));
         }
 
-        public bool Exists(string workspaceRelativePath) => _existing.Contains(workspaceRelativePath.Replace('\\', '/'));
+        public bool Exists(string workspaceRelativePath)
+        {
+            if (ProbeFailure is not null) throw ProbeFailure;
+            return _existing.Contains(workspaceRelativePath.Replace('\\', '/'));
+        }
 
         public bool TryDelete(string workspaceRelativePath) => !FailDelete && _existing.Remove(workspaceRelativePath.Replace('\\', '/'));
 

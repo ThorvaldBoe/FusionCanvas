@@ -260,17 +260,7 @@ public sealed class AssetManagementService : IAssetManagementService
             Path.Combine(_fileStore.WorkspaceRoot, asset.WorkspaceRelativePath));
     }
 
-    private bool IsMissing(Asset asset)
-    {
-        try
-        {
-            return !_fileStore.Exists(asset.WorkspaceRelativePath);
-        }
-        catch (Exception)
-        {
-            return true;
-        }
-    }
+    private bool IsMissing(Asset asset) => !_fileStore.Exists(asset.WorkspaceRelativePath);
 
     private bool TryCleanupManagedFile(string workspaceRelativePath)
     {
