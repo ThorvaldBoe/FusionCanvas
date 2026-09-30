@@ -1022,6 +1022,27 @@ public sealed class CatalogSetupViewModelTests
     }
 
     [Fact]
+    public async Task MockupTemplateDraft_SourceLoadFailureIsObservedAndReported()
+    {
+        const string failureMessage = "local source catalog unavailable";
+        var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(
+            referencedByTemplate: true,
+            sourceImages: new FailingMockupTemplateSourceImageService(new IOException(failureMessage)));
+        var error = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(viewModel.ErrorMessage))
+                error.TrySetResult(viewModel.ErrorMessage);
+        };
+
+        viewModel.EditTemplateCommand.Execute(Assert.Single(viewModel.MockupTemplateCards));
+
+        Assert.Equal(failureMessage, await error.Task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken));
+        Assert.True(viewModel.IsAddingTemplate);
+        Assert.False(viewModel.IsBusy);
+    }
+
+    [Fact]
     public async Task MockupTemplateDraft_ArchivedStoreCannotOpenAddOrEdit()
     {
         var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: true, storeArchived: true);
@@ -1139,6 +1160,18 @@ public sealed class CatalogSetupViewModelTests
     private sealed class FixedMockupTemplateSourceImageService(MockupTemplateSourceState state) : IMockupTemplateSourceImageService
     {
         public Task<MockupTemplateSourceState> LoadAsync(Guid storeId, Guid templateId, CancellationToken cancellationToken = default) => Task.FromResult(state);
+
+        public Task<MockupTemplateSetupResult> AddAsync(AddLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<MockupTemplateSetupResult> UpdateAsync(UpdateLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class FailingMockupTemplateSourceImageService(Exception failure) : IMockupTemplateSourceImageService
+    {
+        public Task<MockupTemplateSourceState> LoadAsync(Guid storeId, Guid templateId, CancellationToken cancellationToken = default) =>
+            Task.FromException<MockupTemplateSourceState>(failure);
 
         public Task<MockupTemplateSetupResult> AddAsync(AddLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();

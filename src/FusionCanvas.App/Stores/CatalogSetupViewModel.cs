@@ -1172,7 +1172,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         }
         else
         {
-            _ = LoadLocalSourceDraftsAsync(template.Id);
+            ObserveLocalSourceDrafts(template.Id);
         }
         MockupTemplateEditorRequested?.Invoke(this, EventArgs.Empty);
     }
@@ -1826,6 +1826,24 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         {
             _mockupTemplateDraftBaseline = CurrentMockupTemplateDraftState();
             OnPropertyChanged(nameof(HasMeaningfulMockupTemplateDraft));
+        }
+    }
+
+    private void ObserveLocalSourceDrafts(Guid templateId) => _ = ObserveLocalSourceDraftsAsync(templateId);
+
+    private async Task ObserveLocalSourceDraftsAsync(Guid templateId)
+    {
+        try
+        {
+            await LoadLocalSourceDraftsAsync(templateId).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            if (IsAddingTemplate && SelectedTemplate?.Id == templateId)
+                ErrorMessage = exception.Message;
         }
     }
 
