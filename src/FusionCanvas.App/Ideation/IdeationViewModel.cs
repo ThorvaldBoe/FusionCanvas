@@ -51,14 +51,14 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
         _snowcloneLibrary = snowcloneLibrary;
         _rejectedPhrases = rejectedPhrases;
         _accessStatus.AvailabilityChanged += (_, _) => Dispatcher.UIThread.Post(RaiseCommandState);
-        GenerateCommand = new RelayCommand(_ => _ = GenerateAsync(), () => CanGenerate);
+        GenerateCommand = new RelayCommand(_ => Run(GenerateAsync), () => CanGenerate);
         IncrementCountCommand = new RelayCommand(_ => IncrementCount(), () => CanIncrementCount);
         DecrementCountCommand = new RelayCommand(_ => DecrementCount(), () => CanDecrementCount);
         CreateCandidateCommand = new RelayCommand(candidate =>
         {
             if (candidate is IdeaCandidateViewModel row)
             {
-                _ = CreateCandidateAsync(row);
+                Run(() => CreateCandidateAsync(row));
             }
         });
         RejectCandidateCommand = new RelayCommand(candidate =>
@@ -72,7 +72,7 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(RejectionReason));
             }
         });
-        ConfirmRejectCommand = new RelayCommand(_ => _ = ConfirmRejectAsync());
+        ConfirmRejectCommand = new RelayCommand(_ => Run(ConfirmRejectAsync));
         CancelRejectCommand = new RelayCommand(_ => CancelReject());
         RequestClearCommand = new RelayCommand(_ => RequestDiscard(DiscardAction.Clear));
         RequestCloseCommand = new RelayCommand(_ => RequestDiscard(DiscardAction.Close));
@@ -358,6 +358,17 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            if (token == _generationToken && IsOpen)
+            {
+                Error = exception.Message;
+            }
+        }
         finally
         {
             if (token == _generationToken)
@@ -379,20 +390,33 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
 
         candidate.IsBusy = true;
         candidate.Error = null;
-        var result = await _service.CreateAsync(_scope, candidate.Text);
-        if (result.Succeeded)
+        try
         {
-            Candidates.Remove(candidate);
-            OnPropertyChanged(nameof(HasCandidates));
-            OnPropertyChanged(nameof(CanDiscard));
-            WorkspaceChanged?.Invoke(this, EventArgs.Empty);
+            var result = await _service.CreateAsync(_scope, candidate.Text);
+            if (result.Succeeded)
+            {
+                Candidates.Remove(candidate);
+                OnPropertyChanged(nameof(HasCandidates));
+                OnPropertyChanged(nameof(CanDiscard));
+                WorkspaceChanged?.Invoke(this, EventArgs.Empty);
+            }
+            else
+            {
+                candidate.Error = result.Error ?? "The idea could not be created.";
+            }
         }
-        else
+        catch (OperationCanceledException)
         {
-            candidate.Error = result.Error ?? "The idea could not be created.";
+            throw;
         }
-
-        candidate.IsBusy = false;
+        catch (Exception exception)
+        {
+            candidate.Error = exception.Message;
+        }
+        finally
+        {
+            candidate.IsBusy = false;
+        }
     }
 
     public async Task ConfirmRejectAsync()
@@ -405,22 +429,36 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
 
         candidate.IsBusy = true;
         candidate.Error = null;
-        var result = await _service.RejectAsync(
-            _scope,
-            candidate.Text,
-            string.IsNullOrWhiteSpace(RejectionReason) ? null : RejectionReason.Trim(),
-            candidate.Mode);
-        if (result.Succeeded)
+        try
         {
-            Candidates.Remove(candidate);
-            CancelReject();
-            OnPropertyChanged(nameof(HasCandidates));
-            OnPropertyChanged(nameof(CanDiscard));
-            WorkspaceChanged?.Invoke(this, EventArgs.Empty);
+            var result = await _service.RejectAsync(
+                _scope,
+                candidate.Text,
+                string.IsNullOrWhiteSpace(RejectionReason) ? null : RejectionReason.Trim(),
+                candidate.Mode);
+            if (result.Succeeded)
+            {
+                Candidates.Remove(candidate);
+                CancelReject();
+                OnPropertyChanged(nameof(HasCandidates));
+                OnPropertyChanged(nameof(CanDiscard));
+                WorkspaceChanged?.Invoke(this, EventArgs.Empty);
+            }
+            else
+            {
+                candidate.Error = result.Error ?? "The rejection could not be saved.";
+            }
         }
-        else
+        catch (OperationCanceledException)
         {
-            candidate.Error = result.Error ?? "The rejection could not be saved.";
+            throw;
+        }
+        catch (Exception exception)
+        {
+            candidate.Error = exception.Message;
+        }
+        finally
+        {
             candidate.IsBusy = false;
         }
     }
@@ -608,6 +646,23 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
 
     private static string Normalize(string value) =>
         string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)).Trim();
+
+    private void Run(Func<Task> operation) => _ = ObserveAsync(operation);
+
+    private async Task ObserveAsync(Func<Task> operation)
+    {
+        try
+        {
+            await operation().ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+    }
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
