@@ -1,3 +1,4 @@
+using System.IO;
 using Avalonia.Headless.XUnit;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.Domain.Workspace;
@@ -104,6 +105,72 @@ public class WorkspaceManagementViewModelTests
         Assert.Equal(uiThreadId, activeWorkspacesNotificationThreadId);
     }
 
+    [Fact]
+    public async Task LoadAsync_ReportsUnexpectedFailure()
+    {
+        var service = new FailingWorkspaceManagementService(FailingOperation.Load);
+        var viewModel = new WorkspaceManagementViewModel(service);
+
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("load failed", viewModel.ErrorMessage);
+    }
+
+    [Theory]
+    [InlineData(FailingOperation.Create)]
+    [InlineData(FailingOperation.Update)]
+    [InlineData(FailingOperation.Archive)]
+    [InlineData(FailingOperation.Restore)]
+    [InlineData(FailingOperation.Delete)]
+    [InlineData(FailingOperation.Select)]
+    public async Task Commands_ObserveUnexpectedFailures(FailingOperation operation)
+    {
+        var activeWorkspace = NewWorkspace("Personal");
+        var archivedWorkspace = NewWorkspace("Archived") with { IsArchived = true };
+        var service = new FailingWorkspaceManagementService(
+            operation,
+            new WorkspaceManagementState(
+                [ToSummary(activeWorkspace)],
+                [ToSummary(archivedWorkspace)],
+                activeWorkspace.Id,
+                ToSummary(activeWorkspace),
+                NeedsFirstWorkspace: false));
+        var viewModel = new WorkspaceManagementViewModel(service);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+
+        switch (operation)
+        {
+            case FailingOperation.Create:
+                viewModel.StartCreateWorkspaceCommand.Execute(null);
+                viewModel.CreateWorkspaceCommand.Execute(null);
+                break;
+            case FailingOperation.Update:
+                viewModel.SaveSelectedWorkspaceCommand.Execute(null);
+                break;
+            case FailingOperation.Archive:
+                viewModel.ArchiveSelectedWorkspaceCommand.Execute(null);
+                break;
+            case FailingOperation.Restore:
+                viewModel.RestoreWorkspaceCommand.Execute(viewModel.ArchivedWorkspaces.Single());
+                break;
+            case FailingOperation.Delete:
+                viewModel.RequestDeleteSelectedWorkspaceCommand.Execute(null);
+                viewModel.DeleteConfirmationName = "Personal";
+                viewModel.ConfirmDeleteWorkspaceCommand.Execute(null);
+                break;
+            case FailingOperation.Select:
+                viewModel.SelectWorkspaceCommand.Execute(viewModel.ActiveWorkspaces.Single());
+                break;
+        }
+
+        await TestSupport.HeadlessUiWait.UntilAsync(
+            () => viewModel.ErrorMessage == $"{operation.ToString().ToLowerInvariant()} failed",
+            $"{operation} failure is observed",
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal($"{operation.ToString().ToLowerInvariant()} failed", viewModel.ErrorMessage);
+    }
+
     private static WorkspaceManagementViewModel NewViewModel(WorkspaceSnapshot snapshot) =>
         NewViewModel(new InMemoryWorkspaceRepository(snapshot));
 
@@ -112,6 +179,20 @@ public class WorkspaceManagementViewModelTests
 
     private static FusionCanvas.Domain.Workspace.Workspace NewWorkspace(string name) =>
         new(Guid.NewGuid(), name, null, false, Now, Now, "{}");
+
+    private static WorkspaceSummary ToSummary(FusionCanvas.Domain.Workspace.Workspace workspace) =>
+        new(workspace.Id, workspace.Name, new WorkspaceContext(), workspace.IsArchived, workspace.CreatedAt, workspace.UpdatedAt);
+
+    public enum FailingOperation
+    {
+        Load,
+        Create,
+        Update,
+        Archive,
+        Restore,
+        Delete,
+        Select
+    }
 
     private sealed class InMemoryWorkspaceRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
     {
@@ -162,5 +243,54 @@ public class WorkspaceManagementViewModelTests
 
         public Task<WorkspaceManagementResult> SelectWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+    }
+
+    private sealed class FailingWorkspaceManagementService : IWorkspaceManagementService
+    {
+        private readonly FailingOperation _operation;
+        private readonly WorkspaceManagementState _state;
+
+        public FailingWorkspaceManagementService(
+            FailingOperation operation,
+            WorkspaceManagementState? state = null)
+        {
+            _operation = operation;
+            _state = state ?? new WorkspaceManagementState([], [], null, null, NeedsFirstWorkspace: true);
+        }
+
+        public Guid? ActiveWorkspaceId => _state.ActiveWorkspaceId;
+
+        public Task<WorkspaceManagementState> LoadAsync(CancellationToken cancellationToken = default) =>
+            _operation == FailingOperation.Load
+                ? Task.FromException<WorkspaceManagementState>(new IOException("load failed"))
+                : Task.FromResult(_state);
+
+        public Task<WorkspaceManagementResult> CreateWorkspaceAsync(WorkspaceManagementCreateRequest request, CancellationToken cancellationToken = default) =>
+            FailIf(FailingOperation.Create);
+
+        public Task<WorkspaceManagementResult> UpdateWorkspaceAsync(WorkspaceManagementUpdateRequest request, CancellationToken cancellationToken = default) =>
+            FailIf(FailingOperation.Update);
+
+        public Task<WorkspaceManagementResult> ArchiveWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default) =>
+            FailIf(FailingOperation.Archive);
+
+        public Task<WorkspaceManagementResult> RestoreWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default) =>
+            FailIf(FailingOperation.Restore);
+
+        public Task<WorkspaceManagementResult> DeleteWorkspaceAsync(WorkspaceManagementDeleteRequest request, CancellationToken cancellationToken = default) =>
+            FailIf(FailingOperation.Delete);
+
+        public Task<WorkspaceManagementResult> SelectWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default) =>
+            FailIf(FailingOperation.Select);
+
+        private Task<WorkspaceManagementResult> FailIf(FailingOperation expected)
+        {
+            if (_operation == expected)
+            {
+                return Task.FromException<WorkspaceManagementResult>(new IOException($"{expected.ToString().ToLowerInvariant()} failed"));
+            }
+
+            return Task.FromResult(WorkspaceManagementResult.Failure("Unexpected operation.", _state));
+        }
     }
 }

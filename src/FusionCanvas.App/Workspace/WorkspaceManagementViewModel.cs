@@ -294,8 +294,19 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
-        var state = await _service.LoadAsync(cancellationToken).ConfigureAwait(false);
-        await OnUiThreadAsync(() => ApplyState(state));
+        try
+        {
+            var state = await _service.LoadAsync(cancellationToken).ConfigureAwait(false);
+            await OnUiThreadAsync(() => ApplyState(state));
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            await ReportFailureAsync(exception);
+        }
     }
 
     public async Task CreateWorkspaceAsync(CancellationToken cancellationToken = default)
@@ -631,7 +642,25 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
     private static string? EmptyToNull(string value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static void Run(Task task) => _ = task;
+    private void Run(Task task) => _ = ObserveAsync(task);
+
+    private async Task ObserveAsync(Task task)
+    {
+        try
+        {
+            await task.ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            await ReportFailureAsync(exception);
+        }
+    }
+
+    private Task ReportFailureAsync(Exception exception) =>
+        OnUiThreadAsync(() => ErrorMessage = exception.Message);
 
     private static async Task OnUiThreadAsync(Action action)
     {
