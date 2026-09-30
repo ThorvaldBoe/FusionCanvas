@@ -12,14 +12,16 @@ public class LocalWorkspaceFileStoreTests
         using var root = new TemporaryDirectory();
         var workspaceRoot = root.GetPath("workspace");
         var store = new LocalWorkspaceFileStore(workspaceRoot);
+        using var createdContent = new MemoryStream([1, 2, 3]);
+        using var skippedContent = new MemoryStream([9]);
 
         var created = await store.RestoreAsync(
             "assets/restored.png",
-            new MemoryStream([1, 2, 3]),
+            createdContent,
             TestContext.Current.CancellationToken);
         var skipped = await store.RestoreAsync(
             "assets/restored.png",
-            new MemoryStream([9]),
+            skippedContent,
             TestContext.Current.CancellationToken);
 
         Assert.Equal(WorkspaceFileRestoreOutcome.Created, created);
@@ -32,10 +34,11 @@ public class LocalWorkspaceFileStoreTests
     {
         using var root = new TemporaryDirectory();
         var store = new LocalWorkspaceFileStore(root.GetPath("workspace"));
+        using var content = new MemoryStream([1]);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => store.RestoreAsync(
             "../escape.png",
-            new MemoryStream([1]),
+            content,
             TestContext.Current.CancellationToken));
     }
 
