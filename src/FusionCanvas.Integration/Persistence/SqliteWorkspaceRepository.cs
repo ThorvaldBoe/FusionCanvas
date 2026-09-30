@@ -587,6 +587,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await ApplyMigrationAsync(3, () => MigrateToVersion3Async(connection, cancellationToken));
             await ApplyMigrationAsync(4, () => MigrateToVersion4Async(connection, cancellationToken));
             await ApplyMigrationAsync(5, () => MigrateToVersion5Async(connection, cancellationToken));
+            await ApplyMigrationAsync(6, () => MigrateToVersion6Async(connection, cancellationToken));
         }
 
         await ApplyMigrationAsync(7, () => MigrateToVersion7Async(connection, cancellationToken));
