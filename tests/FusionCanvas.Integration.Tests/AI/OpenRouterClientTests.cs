@@ -492,6 +492,37 @@ public class OpenRouterClientTests
         Assert.DoesNotContain("sensitive-api-key", System.Text.Json.JsonSerializer.Serialize(entry));
     }
 
+    [Fact]
+    public async Task GenerateAsync_WhenCallerCancels_RecordsCancelledTelemetryAndRethrows()
+    {
+        using var temp = new TelemetryTestDirectory();
+        var workspaceId = Guid.NewGuid();
+        var context = new TestTelemetryWorkspaceContext(workspaceId);
+        using var telemetry = new WorkspaceTelemetryService(new SqliteTelemetryStore(temp.GetPath("telemetry.db")), context);
+        await telemetry.SaveSettingsAsync(workspaceId, WorkspaceTelemetrySettings.Default with { DebugModeEnabled = true });
+        await telemetry.GetSettingsAsync(workspaceId);
+        using var cancellation = new CancellationTokenSource();
+        var handler = new CancellingHandler(cancellation);
+        var client = new OpenRouterClient(
+            new HttpClient(handler) { BaseAddress = OpenRouterClient.DefaultBaseAddress }, telemetry);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.GenerateAsync(
+            new AiProviderTextRequest(
+                "secret",
+                "model",
+                [new AiTextMessage(AiMessageRole.User, "prompt")],
+                AiProfileSettings.Empty with { ModelId = "model" },
+                false),
+            cancellation.Token));
+
+        var entry = Assert.Single(await telemetry.ReadAllAsync(workspaceId));
+        Assert.Equal("Integration.OpenRouter", entry.Area);
+        Assert.Equal("HttpRequest", entry.Name);
+        Assert.Equal("Information", entry.Severity);
+        Assert.Equal("Cancelled", entry.Outcome);
+        Assert.DoesNotContain("secret", System.Text.Json.JsonSerializer.Serialize(entry));
+    }
+
     private static OpenRouterClient CreateClient(RecordingHandler handler) =>
         new(new HttpClient(handler) { BaseAddress = OpenRouterClient.DefaultBaseAddress });
 
@@ -524,6 +555,17 @@ public class OpenRouterClientTests
                 request.Headers.Authorization?.Parameter,
                 request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken)));
             return _responses.Dequeue();
+        }
+    }
+
+    private sealed class CancellingHandler(CancellationTokenSource cancellation) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            cancellation.Cancel();
+            return Task.FromCanceled<HttpResponseMessage>(cancellationToken);
         }
     }
 
