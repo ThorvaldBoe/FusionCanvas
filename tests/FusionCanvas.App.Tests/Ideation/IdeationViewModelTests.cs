@@ -100,6 +100,65 @@ public sealed class IdeationViewModelTests
     }
 
     [Fact]
+    public async Task GenerateUnexpectedFailureIsObservedAndReenablesGeneration()
+    {
+        var service = new StubService
+        {
+            Generate = _ => Task.FromException<IdeationGenerationResult>(new InvalidOperationException("provider unavailable"))
+        };
+        var viewModel = new IdeationViewModel(service, new StubAccess(true));
+        viewModel.Open(Scope);
+
+        await viewModel.GenerateAsync();
+
+        Assert.Equal("provider unavailable", viewModel.Error);
+        Assert.False(viewModel.IsBusy);
+        Assert.True(viewModel.CanGenerate);
+    }
+
+    [Fact]
+    public async Task CreateUnexpectedFailureKeepsCandidateAndReportsError()
+    {
+        var service = new StubService
+        {
+            GenerationResult = new(true, false, [new(0, "Pug phrase")], 1, 1, 0, null),
+            Create = (_, _) => Task.FromException<IdeationDecisionResult>(new InvalidOperationException("create unavailable"))
+        };
+        var viewModel = new IdeationViewModel(service, new StubAccess(true));
+        viewModel.Open(Scope);
+        await viewModel.GenerateAsync();
+        var candidate = Assert.Single(viewModel.Candidates);
+
+        await viewModel.CreateCandidateAsync(candidate);
+
+        Assert.Same(candidate, Assert.Single(viewModel.Candidates));
+        Assert.Equal("create unavailable", candidate.Error);
+        Assert.False(candidate.IsBusy);
+    }
+
+    [Fact]
+    public async Task RejectUnexpectedFailureKeepsCandidateAndReportsError()
+    {
+        var service = new StubService
+        {
+            GenerationResult = new(true, false, [new(0, "Pug phrase")], 1, 1, 0, null),
+            Reject = (_, _, _, _) => Task.FromException<IdeationDecisionResult>(new InvalidOperationException("reject unavailable"))
+        };
+        var viewModel = new IdeationViewModel(service, new StubAccess(true));
+        viewModel.Open(Scope);
+        await viewModel.GenerateAsync();
+        var candidate = Assert.Single(viewModel.Candidates);
+        viewModel.RejectCandidateCommand.Execute(candidate);
+
+        await viewModel.ConfirmRejectAsync();
+
+        Assert.Same(candidate, Assert.Single(viewModel.Candidates));
+        Assert.True(viewModel.IsRejectionVisible);
+        Assert.Equal("reject unavailable", candidate.Error);
+        Assert.False(candidate.IsBusy);
+    }
+
+    [Fact]
     public async Task DeclinedClosePreservesStateAndConfirmedCloseIgnoresLateGeneration()
     {
         var pending = new TaskCompletionSource<IdeationGenerationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -202,6 +261,10 @@ public sealed class IdeationViewModelTests
 
         public Func<CancellationToken, Task<IdeationGenerationResult>>? Generate { get; set; }
 
+        public Func<IdeationScope, string, Task<IdeationDecisionResult>>? Create { get; set; }
+
+        public Func<IdeationScope, string, string?, IdeationMode, Task<IdeationDecisionResult>>? Reject { get; set; }
+
         public string? LastRejectionReason { get; private set; }
 
         public IdeationScopeResult ResolveScope(WorkspaceSnapshot snapshot, WorkspaceEntityKind entityKind, Guid entityId) =>
@@ -220,7 +283,7 @@ public sealed class IdeationViewModelTests
             IdeationScope scope,
             string candidateText,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult(CreateResult);
+            Create?.Invoke(scope, candidateText) ?? Task.FromResult(CreateResult);
 
         public Task<IdeationDecisionResult> RejectAsync(
             IdeationScope scope,
@@ -230,7 +293,7 @@ public sealed class IdeationViewModelTests
             CancellationToken cancellationToken = default)
         {
             LastRejectionReason = reason;
-            return Task.FromResult(RejectResult);
+            return Reject?.Invoke(scope, candidateText, reason, mode) ?? Task.FromResult(RejectResult);
         }
     }
 }
