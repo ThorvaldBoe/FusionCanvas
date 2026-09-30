@@ -138,11 +138,12 @@ public sealed class IdeationService : IIdeationService
                     {
                         throw;
                     }
-                    catch
+                    catch (Exception exception) when (exception is not OperationCanceledException)
                     {
                         failures.Add(IdeaGenerationResult.Failure(
                             AiTextFailureKind.ProviderFailure,
-                            "The AI provider could not generate an idea."));
+                            "The AI provider could not generate an idea.",
+                            exception));
                         Interlocked.Increment(ref failed);
                     }
                     finally
@@ -174,6 +175,9 @@ public sealed class IdeationService : IIdeationService
         var failureDetail = failures
             .Select(result => result.Error)
             .FirstOrDefault(message => !string.IsNullOrWhiteSpace(message));
+        var technicalCause = failures
+            .Select(result => result.TechnicalCause)
+            .FirstOrDefault(cause => cause is not null);
         var error = failed switch
         {
             0 => null,
@@ -188,7 +192,8 @@ public sealed class IdeationService : IIdeationService
             request.Count,
             completed,
             failed,
-            error);
+            error,
+            technicalCause);
     }
 
     public async Task<IdeationDecisionResult> CreateAsync(

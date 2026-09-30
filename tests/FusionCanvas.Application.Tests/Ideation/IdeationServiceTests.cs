@@ -75,11 +75,12 @@ public sealed class IdeationServiceTests
     public async Task Generate_DeduplicatesAndReportsPartialFailure()
     {
         var sample = Sample.Create();
+        var technicalCause = new InvalidOperationException("failure");
         var generator = new DelegateGenerator((_, index, _) => index switch
         {
             0 => Task.FromResult("  Same   idea "),
             1 => Task.FromResult("same idea"),
-            2 => throw new InvalidOperationException("failure"),
+            2 => throw technicalCause,
             _ => Task.FromResult("Different idea")
         });
         var service = NewService(new InMemoryRepository(sample.Snapshot), generator);
@@ -93,6 +94,7 @@ public sealed class IdeationServiceTests
         Assert.Equal(1, result.Failed);
         Assert.Equal(["Same   idea", "Different idea"], result.Candidates.Select(candidate => candidate.Text));
         Assert.NotNull(result.Error);
+        Assert.Same(technicalCause, result.TechnicalCause);
     }
 
     [Fact]
@@ -255,6 +257,8 @@ public sealed class IdeationServiceTests
         Assert.False(failed.Succeeded);
         Assert.Equal(2, failed.Failed);
         Assert.Empty(failed.Candidates);
+        Assert.NotNull(failed.TechnicalCause);
+        Assert.Equal("failed", failed.TechnicalCause.Message);
 
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
