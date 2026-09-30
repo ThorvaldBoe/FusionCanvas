@@ -5,6 +5,7 @@ using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Groups;
+using FusionCanvas.Application.WorkspaceTree;
 
 namespace FusionCanvas.App.Tests;
 
@@ -187,6 +188,122 @@ public class GroupDetailsViewModelTests
         Assert.False(viewModel.HasError);
         Assert.NotNull(changed);
         Assert.False(sample.Repository.Snapshot.Groups.Single(group => group.Id == archived.Id).IsArchived);
+    }
+
+    [Theory]
+    [InlineData(FailingOperation.Move)]
+    [InlineData(FailingOperation.Archive)]
+    [InlineData(FailingOperation.Restore)]
+    public async Task Commands_ObserveThrownFailures(FailingOperation operation)
+    {
+        var sample = Sample.Create();
+        if (operation == FailingOperation.Restore)
+        {
+            sample.Repository.Set(sample.Snapshot with
+            {
+                Groups = [sample.Group with { IsArchived = true }, sample.Sibling]
+            });
+        }
+
+        var state = await new GroupManagementService(sample.Repository).LoadAsync(sample.Store.Id, sample.Niche.Id);
+        var viewModel = new GroupDetailsViewModel(new FailingGroupManagementService(state, operation));
+        await viewModel.LoadAsync(sample.Group.Id, sample.Store.Id, sample.Niche.Id);
+
+        switch (operation)
+        {
+            case FailingOperation.Move:
+                viewModel.SelectedDestination = viewModel.Destinations.Single(candidate =>
+                    candidate.Parent.Kind == WorkspaceEntityKind.Group && candidate.Parent.Id == sample.Sibling.Id);
+                viewModel.MoveCommand.Execute(null);
+                break;
+            case FailingOperation.Archive:
+                viewModel.RequestArchiveCommand.Execute(null);
+                viewModel.ConfirmArchiveCommand.Execute(null);
+                break;
+            case FailingOperation.Restore:
+                viewModel.RestoreCommand.Execute(null);
+                break;
+        }
+
+        Assert.Equal($"{operation.ToString().ToLowerInvariant()} failed", viewModel.ErrorMessage);
+        Assert.False(viewModel.IsBusy);
+    }
+
+    public enum FailingOperation
+    {
+        Move,
+        Archive,
+        Restore
+    }
+
+    private sealed class FailingGroupManagementService(
+        GroupManagementState state,
+        FailingOperation operation) : IGroupManagementService
+    {
+        public Guid? ActiveWorkspaceId => null;
+        public Guid? ActiveStoreId => state.ActiveStoreId;
+        public Guid? ActiveNicheId => state.ActiveNicheId;
+        public Guid? ActiveGroupId => state.ActiveGroupId;
+
+        public void SetActiveWorkspace(Guid? workspaceId)
+        {
+        }
+
+        public Task<GroupManagementState> LoadAsync(
+            Guid? storeId,
+            Guid? nicheId = null,
+            CancellationToken cancellationToken = default) => Task.FromResult(state);
+
+        public Task<GroupManagementResult> CreateGroupAsync(
+            GroupManagementCreateRequest request,
+            CancellationToken cancellationToken = default) => UnsupportedResult();
+
+        public Task<GroupManagementResult> UpdateGroupAsync(
+            GroupManagementUpdateRequest request,
+            CancellationToken cancellationToken = default) => UnsupportedResult();
+
+        public Task<GroupManagementResult> MoveGroupAsync(
+            GroupManagementMoveRequest request,
+            CancellationToken cancellationToken = default) => FailIf(FailingOperation.Move);
+
+        public Task<GroupManagementResult> CopyGroupAsync(
+            GroupManagementCopyRequest request,
+            CancellationToken cancellationToken = default) => UnsupportedResult();
+
+        public Task<GroupManagementResult> DeleteGroupAsync(
+            GroupManagementDeleteRequest request,
+            CancellationToken cancellationToken = default) => UnsupportedResult();
+
+        public Task<GroupManagementResult> ArchiveGroupAsync(
+            Guid groupId,
+            CancellationToken cancellationToken = default) => FailIf(FailingOperation.Archive);
+
+        public Task<GroupManagementResult> RestoreGroupAsync(
+            Guid groupId,
+            CancellationToken cancellationToken = default) => FailIf(FailingOperation.Restore);
+
+        public Task<GroupManagementResult> SelectGroupAsync(
+            Guid groupId,
+            CancellationToken cancellationToken = default) => UnsupportedResult();
+
+        public Task<GroupManagementResult> SetDefaultNicheAsync(
+            Guid storeId,
+            Guid nicheId,
+            CancellationToken cancellationToken = default) => UnsupportedResult();
+
+        public Task<GroupCreationDestinationResult> ResolveCreateParentAsync(
+            Guid storeId,
+            WorkspaceTreeSelection? selection,
+            CancellationToken cancellationToken = default) =>
+            Task.FromException<GroupCreationDestinationResult>(new NotSupportedException());
+
+        private Task<GroupManagementResult> FailIf(FailingOperation expected) =>
+            operation == expected
+                ? Task.FromException<GroupManagementResult>(new IOException($"{expected.ToString().ToLowerInvariant()} failed"))
+                : UnsupportedResult();
+
+        private static Task<GroupManagementResult> UnsupportedResult() =>
+            Task.FromException<GroupManagementResult>(new NotSupportedException());
     }
 
     private sealed class TestRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
