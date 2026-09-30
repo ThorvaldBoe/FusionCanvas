@@ -50,7 +50,13 @@ public sealed class PrintifyApiKeyViewModel(
         Notify();
         PrintifyConfigurationResult result;
         try { result = await service.SaveAsync(scope, key).ConfigureAwait(false); }
-        catch (Exception) { result = PrintifyConfigurationResult.Unavailable; }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception exception)
+        {
+            result = string.IsNullOrWhiteSpace(exception.Message)
+                ? PrintifyConfigurationResult.Unavailable
+                : new(PrintifyConfigurationKind.Unavailable, $"Printify key could not be saved: {exception.Message}");
+        }
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
             IsBusy = false;

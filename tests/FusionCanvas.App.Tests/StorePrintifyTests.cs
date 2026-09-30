@@ -124,6 +124,23 @@ public class StorePrintifyTests
     }
 
     [AvaloniaFact]
+    public async Task Dialog_SaveExceptionRetainsSafeDiagnosticAndDraft()
+    {
+        var service = new Service { SaveFailure = new InvalidOperationException("Credential store is locked.") };
+        var model = new PrintifyApiKeyViewModel(service, new(Guid.NewGuid(), Guid.NewGuid()), "Store A")
+        {
+            Draft = "synthetic-token"
+        };
+
+        await model.SaveAsync();
+
+        Assert.False(model.Saved);
+        Assert.Equal("Printify key could not be saved: Credential store is locked.", model.Error);
+        Assert.Equal("synthetic-token", model.Draft);
+        Assert.False(model.IsBusy);
+    }
+
+    [AvaloniaFact]
     public async Task Dialog_IsMaskedAndKeyboardDismissalProtectsDraft()
     {
         var service = new Service();
@@ -289,6 +306,7 @@ public class StorePrintifyTests
         public int Verifications { get; private set; }
         public TaskCompletionSource<PrintifyConfigurationResult>? VerificationCompletion { get; set; }
         public TaskCompletionSource<PrintifyConfigurationResult>? SaveCompletion { get; set; }
+        public Exception? SaveFailure { get; set; }
         public StoreCredentialScope? VerifiedScope { get; private set; }
         public StoreCredentialScope? SavedScope { get; private set; }
         public CancellationToken LastCancellation { get; private set; }
@@ -305,6 +323,7 @@ public class StorePrintifyTests
         public Task<PrintifyConfigurationResult> SaveAsync(StoreCredentialScope scope, string key, CancellationToken cancellationToken = default)
         {
             Saves++; SavedScope = scope;
+            if (SaveFailure is not null) return Task.FromException<PrintifyConfigurationResult>(SaveFailure);
             return SaveCompletion?.Task ?? Task.FromResult(new PrintifyConfigurationResult(PrintifyConfigurationKind.Saved, "Saved"));
         }
         public Task<PrintifyConfigurationResult> VerifyAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default)
