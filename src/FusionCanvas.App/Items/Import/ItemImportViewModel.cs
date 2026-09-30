@@ -177,7 +177,7 @@ public sealed class ItemImportViewModel : INotifyPropertyChanged
             return;
         }
 
-        var stream = await _filePicker.OpenImportAsync().ConfigureAwait(false);
+        var stream = await _filePicker.OpenImportAsync();
         if (stream is null)
         {
             return;
@@ -188,7 +188,7 @@ public sealed class ItemImportViewModel : INotifyPropertyChanged
             try
             {
                 using var reader = new StreamReader(stream, StrictUtf8, detectEncodingFromByteOrderMarks: true);
-                RawSource = await reader.ReadToEndAsync().ConfigureAwait(false);
+                RawSource = await reader.ReadToEndAsync();
                 RunPreview();
             }
             catch (DecoderFallbackException)
@@ -205,7 +205,7 @@ public sealed class ItemImportViewModel : INotifyPropertyChanged
             return;
         }
 
-        var stream = await _filePicker.OpenExportAsync().ConfigureAwait(false);
+        var stream = await _filePicker.OpenExportAsync();
         if (stream is null)
         {
             return;
@@ -214,7 +214,7 @@ public sealed class ItemImportViewModel : INotifyPropertyChanged
         await using (stream)
         {
             var bytes = StrictUtf8.GetBytes(_codec.WriteSample());
-            await stream.WriteAsync(bytes).ConfigureAwait(false);
+            await stream.WriteAsync(bytes);
         }
     }
 
@@ -230,8 +230,7 @@ public sealed class ItemImportViewModel : INotifyPropertyChanged
         try
         {
             var result = await _importService
-                .ImportAsync(new ItemCsvImportRequest(_target, _parseResult.Rows))
-                .ConfigureAwait(false);
+                .ImportAsync(new ItemCsvImportRequest(_target, _parseResult.Rows));
             if (result.Succeeded)
             {
                 HasImportCompleted = true;
@@ -257,7 +256,7 @@ public sealed class ItemImportViewModel : INotifyPropertyChanged
     {
         try
         {
-            await task.ConfigureAwait(false);
+            await task;
         }
         catch (OperationCanceledException)
         {
