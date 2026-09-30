@@ -1,4 +1,5 @@
 using FusionCanvas.Application.AI;
+using FusionCanvas.Application.Telemetry;
 using ktsu.CredentialCache;
 using ktsu.CredentialCache.Storage;
 using ktsu.Semantics.Strings;
@@ -40,7 +41,7 @@ public sealed class NativeAiCredentialStore : IAiCredentialStore
             }
 
             return AiCredentialReadResult.Available(token.Token.ToString());
-        }, cancellationToken, TranslateReadFailure);
+        }, "AI credential read", cancellationToken, TranslateReadFailure);
 
     public Task<AiCredentialOperationResult> SaveAsync(
         string apiKey,
@@ -62,6 +63,7 @@ public sealed class NativeAiCredentialStore : IAiCredentialStore
                     });
                 return AiCredentialOperationResult.Success;
             },
+            "AI credential save",
             cancellationToken,
             exception => AiCredentialOperationResult.Failed(OperationMessage(exception, "saved")));
     }
@@ -75,11 +77,13 @@ public sealed class NativeAiCredentialStore : IAiCredentialStore
                     : AiCredentialOperationResult.Failed(
                         "The saved OpenRouter key was not found in the native credential store.");
             },
+            "AI credential remove",
             cancellationToken,
             exception => AiCredentialOperationResult.Failed(OperationMessage(exception, "removed")));
 
     private static async Task<T> RunAsync<T>(
         Func<T> operation,
+        string operationName,
         CancellationToken cancellationToken,
         Func<Exception, T> translate)
     {
@@ -94,6 +98,7 @@ public sealed class NativeAiCredentialStore : IAiCredentialStore
         }
         catch (Exception exception)
         {
+            TechnicalDiagnostics.RecordFailure(operationName, exception);
             return translate(exception);
         }
     }

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text.Json;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Settings;
+using FusionCanvas.Application.Telemetry;
 
 namespace FusionCanvas.Integration.Settings;
 
@@ -57,16 +58,19 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
         {
             throw;
         }
-        catch (JsonException)
+        catch (JsonException exception)
         {
+            TechnicalDiagnostics.RecordFailure("Application settings read", exception);
             return ApplicationSettingsLoadResult.Defaulted("The saved application settings are invalid and could not be read.");
         }
-        catch (IOException)
+        catch (IOException exception)
         {
+            TechnicalDiagnostics.RecordFailure("Application settings read", exception);
             return ApplicationSettingsLoadResult.Defaulted("The saved application settings could not be read.");
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException exception)
         {
+            TechnicalDiagnostics.RecordFailure("Application settings read", exception);
             return ApplicationSettingsLoadResult.Defaulted("The saved application settings could not be read.");
         }
 
@@ -167,13 +171,15 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
             TryDelete(tempPath);
             throw;
         }
-        catch (IOException)
+        catch (IOException exception)
         {
+            TechnicalDiagnostics.RecordFailure("Application settings save", exception);
             TryDelete(tempPath);
             return ApplicationSettingsSaveResult.Failed("The application settings could not be saved and may not survive restart.");
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException exception)
         {
+            TechnicalDiagnostics.RecordFailure("Application settings save", exception);
             TryDelete(tempPath);
             return ApplicationSettingsSaveResult.Failed("The application settings could not be saved and may not survive restart.");
         }
@@ -338,7 +344,10 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
     private static void TryDelete(string path)
     {
         try { File.Delete(path); }
-        catch { }
+        catch (Exception exception)
+        {
+            TechnicalDiagnostics.RecordFailure("Application settings temporary-file cleanup", exception);
+        }
     }
 
     private sealed class SettingsDocument

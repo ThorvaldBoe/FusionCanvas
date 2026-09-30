@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using FusionCanvas.Application.Stores.Printify;
+using FusionCanvas.Application.Telemetry;
 
 namespace FusionCanvas.Integration.Stores.Printify;
 
@@ -61,10 +62,26 @@ public sealed class PrintifyCredentialVerifier(HttpClient client) : IPrintifyCre
             return new(PrintifyConfigurationKind.Verified, "Printify api key verified. Shopify connectivity and publishing permissions were not tested.", shops);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-        catch (OperationCanceledException) { return new(PrintifyConfigurationKind.NetworkFailure, "Printify verification timed out. Try Verify again."); }
-        catch (HttpRequestException) { return new(PrintifyConfigurationKind.NetworkFailure, "Printify could not be reached. Try Verify again."); }
-        catch (IOException) { return new(PrintifyConfigurationKind.NetworkFailure, "Printify response could not be read. Try Verify again."); }
-        catch (JsonException) { return Unexpected(); }
+        catch (OperationCanceledException exception)
+        {
+            TechnicalDiagnostics.RecordFailure("Printify credential verification timeout", exception);
+            return new(PrintifyConfigurationKind.NetworkFailure, "Printify verification timed out. Try Verify again.");
+        }
+        catch (HttpRequestException exception)
+        {
+            TechnicalDiagnostics.RecordFailure("Printify credential verification request", exception);
+            return new(PrintifyConfigurationKind.NetworkFailure, "Printify could not be reached. Try Verify again.");
+        }
+        catch (IOException exception)
+        {
+            TechnicalDiagnostics.RecordFailure("Printify credential verification response read", exception);
+            return new(PrintifyConfigurationKind.NetworkFailure, "Printify response could not be read. Try Verify again.");
+        }
+        catch (JsonException exception)
+        {
+            TechnicalDiagnostics.RecordFailure("Printify credential verification response parse", exception);
+            return Unexpected();
+        }
     }
 
     private static PrintifyConfigurationResult Unexpected() =>

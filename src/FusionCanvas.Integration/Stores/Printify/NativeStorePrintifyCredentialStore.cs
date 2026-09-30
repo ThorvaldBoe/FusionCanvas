@@ -1,4 +1,5 @@
 using FusionCanvas.Application.Stores.Printify;
+using FusionCanvas.Application.Telemetry;
 using ktsu.CredentialCache;
 using ktsu.CredentialCache.Storage;
 using ktsu.Semantics.Strings;
@@ -35,7 +36,11 @@ public sealed class NativeStorePrintifyCredentialStore : IStorePrintifyCredentia
             }, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-        catch (Exception) { return new(PrintifyConfigurationResult.Unavailable); }
+        catch (Exception exception)
+        {
+            TechnicalDiagnostics.RecordFailure("Printify credential read", exception);
+            return new(PrintifyConfigurationResult.Unavailable);
+        }
     }
 
     public async Task<PrintifyConfigurationResult> SaveAsync(StoreCredentialScope scope, string key, CancellationToken cancellationToken = default)
@@ -55,7 +60,11 @@ public sealed class NativeStorePrintifyCredentialStore : IStorePrintifyCredentia
             }, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-        catch (Exception) { return PrintifyConfigurationResult.Unavailable; }
+        catch (Exception exception)
+        {
+            TechnicalDiagnostics.RecordFailure("Printify credential save", exception);
+            return PrintifyConfigurationResult.Unavailable;
+        }
     }
 
     private static PersonaGUID Persona(StoreCredentialScope scope)

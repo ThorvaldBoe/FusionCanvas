@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Text.Json;
 using FusionCanvas.Application.Workspaces.Transfer;
+using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Integration.Files;
 using FusionCanvas.Integration.Persistence;
@@ -127,6 +128,7 @@ public sealed class ZipWorkspacePackageReader : IWorkspacePackageReader
         }
         catch (Exception exception) when (exception is InvalidDataException or JsonException or IOException or UnauthorizedAccessException or SqliteException or ArgumentException or InvalidOperationException)
         {
+            TechnicalDiagnostics.RecordFailure("Workspace package read", exception);
             return WorkspacePackageReadResult.Failure(
                 exception.Message.Contains("requires a newer FusionCanvas", StringComparison.OrdinalIgnoreCase)
                     ? "This workspace package requires a newer FusionCanvas version."
@@ -184,11 +186,13 @@ public sealed class ZipWorkspacePackageReader : IWorkspacePackageReader
                 directory.Delete(recursive: true);
             }
         }
-        catch (IOException)
+        catch (IOException exception)
         {
+            TechnicalDiagnostics.RecordFailure("Workspace package temporary-directory cleanup", exception);
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException exception)
         {
+            TechnicalDiagnostics.RecordFailure("Workspace package temporary-directory cleanup", exception);
         }
     }
 
