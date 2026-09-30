@@ -6,9 +6,14 @@ public sealed class AvaloniaTelemetryExportFilePicker(IStorageProvider storagePr
 {
     private readonly IStorageProvider _storageProvider = storageProvider ?? throw new ArgumentNullException(nameof(storageProvider));
 
-    public async Task<string?> PickPathAsync(CancellationToken cancellationToken = default)
+    public async Task<Stream?> OpenExportAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (!_storageProvider.CanSave)
+        {
+            return null;
+        }
+
         var file = await _storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "Export telemetry",
@@ -16,6 +21,8 @@ public sealed class AvaloniaTelemetryExportFilePicker(IStorageProvider storagePr
             DefaultExtension = "json",
             FileTypeChoices = [new FilePickerFileType("JSON") { Patterns = ["*.json"] }]
         });
-        return file?.TryGetLocalPath();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return file is null ? null : await file.OpenWriteAsync();
     }
 }

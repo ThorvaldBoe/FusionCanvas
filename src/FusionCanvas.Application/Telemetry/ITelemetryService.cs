@@ -13,5 +13,6 @@ public interface ITelemetryService
     Task<IReadOnlyList<TelemetryEntry>> ReadAllAsync(Guid workspaceId, CancellationToken cancellationToken = default);
     Task<int> DeleteAllAsync(Guid workspaceId, CancellationToken cancellationToken = default);
     Task<string> ExportJsonAsync(Guid workspaceId, CancellationToken cancellationToken = default);
+    Task ExportAsync(Guid workspaceId, Stream destination, CancellationToken cancellationToken = default);
     Task<int> CleanupExpiredAsync(Guid workspaceId, CancellationToken cancellationToken = default);
 }

@@ -85,6 +85,25 @@ public sealed class WorkspaceTelemetryServiceTests
         Assert.Single(store.Entries);
     }
 
+    [Fact]
+    public async Task ExportAsync_WritesSanitizedRecordsWithoutDeletingThem()
+    {
+        var workspace = Guid.NewGuid();
+        var store = new MemoryTelemetryStore();
+        var context = new TestWorkspaceContext(workspace);
+        using var service = new WorkspaceTelemetryService(store, context);
+        await service.SaveSettingsAsync(workspace, WorkspaceTelemetrySettings.Default with { DebugModeEnabled = true });
+        await service.RecordAsync(Event("kept", "{\"api_key\":\"credential-value\",\"message\":\"useful\"}"));
+
+        await using var stream = new MemoryStream();
+        await service.ExportAsync(workspace, stream);
+
+        var json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+        Assert.Contains("useful", json);
+        Assert.DoesNotContain("credential-value", json);
+        Assert.Single(store.Entries);
+    }
+
     private static TelemetryEventRequest Event(string message, string? response = null) =>
         new("Workspace", "TestEvent", "Information", "Succeeded", message, ResponseBody: response);
 
