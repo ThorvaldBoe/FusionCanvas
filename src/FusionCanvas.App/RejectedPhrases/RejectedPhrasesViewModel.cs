@@ -276,7 +276,7 @@ public sealed class RejectedPhrasesViewModel : INotifyPropertyChanged
         ClearMessages();
         try
         {
-            var result = await _service.InitializeAsync(scope, SearchText, cancellationToken).ConfigureAwait(false);
+            var result = await _service.InitializeAsync(scope, SearchText, cancellationToken);
             ApplyResult(result, selectAffected: false);
             if (result.Succeeded && SelectedRejection is null && !IsNewDraft)
             {
@@ -297,7 +297,7 @@ public sealed class RejectedPhrasesViewModel : INotifyPropertyChanged
 
     private async Task RefreshSearchAsync(int generation)
     {
-        var result = await _service.LoadAsync(Scope, SearchText).ConfigureAwait(false);
+        var result = await _service.LoadAsync(Scope, SearchText);
         if (generation != Volatile.Read(ref _searchGeneration))
         {
             return;
@@ -309,7 +309,7 @@ public sealed class RejectedPhrasesViewModel : INotifyPropertyChanged
     private async Task ChangeScopeAsync(RejectedPhraseScope scope)
     {
         Scope = scope;
-        var result = await _service.LoadAsync(scope, SearchText).ConfigureAwait(false);
+        var result = await _service.LoadAsync(scope, SearchText);
         ApplyResult(result, selectAffected: false);
         if (result.Succeeded)
         {
@@ -382,14 +382,14 @@ public sealed class RejectedPhrasesViewModel : INotifyPropertyChanged
         {
             var result = IsNewDraft
                 ? await _service.CreateAsync(
-                    new RejectedPhraseCreateRequest(Phrase, Reason, Scope, SearchText)).ConfigureAwait(false)
+                    new RejectedPhraseCreateRequest(Phrase, Reason, Scope, SearchText))
                 : await _service.UpdateAsync(
                     new RejectedPhraseUpdateRequest(
                         SelectedRejection!.Id,
                         Phrase,
                         Reason,
                         Scope,
-                        SearchText)).ConfigureAwait(false);
+                        SearchText));
 
             ApplyResult(result, selectAffected: result.Succeeded);
             if (result.Succeeded)
@@ -433,7 +433,7 @@ public sealed class RejectedPhrasesViewModel : INotifyPropertyChanged
         ClearMessages();
         try
         {
-            var result = await _service.DeleteAsync(id, Scope, SearchText).ConfigureAwait(false);
+            var result = await _service.DeleteAsync(id, Scope, SearchText);
             ApplyResult(result, selectAffected: false);
             if (result.Succeeded)
             {
@@ -469,11 +469,11 @@ public sealed class RejectedPhrasesViewModel : INotifyPropertyChanged
     {
         var transition = _pendingTransition;
         UnsavedPromptVisible = false;
-        await SaveAsync().ConfigureAwait(false);
+        await SaveAsync();
         if (!HasError && !IsDirty && transition is not null)
         {
             _pendingTransition = null;
-            await transition().ConfigureAwait(false);
+            await transition();
         }
         else
         {
@@ -489,7 +489,7 @@ public sealed class RejectedPhrasesViewModel : INotifyPropertyChanged
         RestoreConfirmedDraft();
         if (transition is not null)
         {
-            await transition().ConfigureAwait(false);
+            await transition();
         }
     }
 
@@ -631,7 +631,7 @@ public sealed class RejectedPhrasesViewModel : INotifyPropertyChanged
     {
         try
         {
-            await task.ConfigureAwait(false);
+            await task;
         }
         catch (OperationCanceledException)
         {

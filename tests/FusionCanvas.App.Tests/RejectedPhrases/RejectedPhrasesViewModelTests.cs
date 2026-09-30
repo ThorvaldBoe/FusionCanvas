@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using FusionCanvas.App.RejectedPhrases;
+using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.Application.RejectedPhrases;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Groups;
@@ -31,6 +33,96 @@ public sealed class RejectedPhrasesViewModelTests
         Assert.Equal(alpha.Id, fixture.ViewModel.SelectedRejection!.Id);
         Assert.Equal("Alpha phrase", fixture.ViewModel.Phrase);
         Assert.Equal("Reason", fixture.ViewModel.Reason);
+    }
+
+    [Fact]
+    public void OpenAsync_AppliesLoadedStateOnCapturedSynchronizationContext()
+    {
+        var sample = Sample.Create();
+        var rejection = Rejection(sample, "Phrase", null);
+        var repository = new InMemoryRepository(sample.Snapshot with { IdeationRejections = [rejection] });
+        var delayedLoad = repository.DelayNextLoad();
+        var service = new RejectedPhraseManagementService(repository, clock: () => Now);
+        var viewModel = new RejectedPhrasesViewModel(service);
+        var notificationThreadIds = new ConcurrentBag<int>();
+        viewModel.PropertyChanged += (_, _) =>
+            notificationThreadIds.Add(Environment.CurrentManagedThreadId);
+        viewModel.Rejections.CollectionChanged += (_, _) =>
+            notificationThreadIds.Add(Environment.CurrentManagedThreadId);
+
+        var uiThreadId = Environment.CurrentManagedThreadId;
+        var originalContext = SynchronizationContext.Current;
+        using var uiContext = new PumpingSynchronizationContext();
+        SynchronizationContext.SetSynchronizationContext(uiContext);
+        Task? openTask = null;
+        try
+        {
+            openTask = viewModel.OpenAsync(
+                RejectedPhraseScope.WholeWorkspaceView,
+                ScopeOptions(sample),
+                TestContext.Current.CancellationToken);
+            delayedLoad.SetResult(repository.Snapshot);
+            uiContext.PumpUntil(openTask, TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            delayedLoad.TrySetResult(repository.Snapshot);
+            SynchronizationContext.SetSynchronizationContext(originalContext);
+        }
+
+        Assert.NotNull(openTask);
+        Assert.Equal(rejection.Id, viewModel.Rejections.Single().Id);
+        Assert.NotEmpty(notificationThreadIds);
+        Assert.All(notificationThreadIds, threadId => Assert.Equal(uiThreadId, threadId));
+    }
+
+    [Fact]
+    public async Task SaveAndContinue_UpdatesSelectionOnCapturedSynchronizationContext()
+    {
+        var sample = Sample.Create();
+        var first = Rejection(sample, "First", null);
+        var second = Rejection(sample, "Second", null);
+        var repository = new InMemoryRepository(sample.Snapshot with { IdeationRejections = [first, second] });
+        var service = new RejectedPhraseManagementService(repository, clock: () => Now);
+        var viewModel = new RejectedPhrasesViewModel(service);
+        await viewModel.OpenAsync(
+            RejectedPhraseScope.WholeWorkspaceView,
+            ScopeOptions(sample),
+            TestContext.Current.CancellationToken);
+
+        viewModel.Reason = "Updated reason";
+        viewModel.SelectRejectionCommand.Execute(viewModel.Rejections.Single(item => item.Id == second.Id));
+        Assert.True(viewModel.UnsavedPromptVisible);
+
+        var delayedLoad = repository.DelayNextLoad();
+        var selectionThreadIds = new ConcurrentBag<int>();
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(RejectedPhrasesViewModel.SelectedRejection))
+            {
+                selectionThreadIds.Add(Environment.CurrentManagedThreadId);
+            }
+        };
+
+        var uiThreadId = Environment.CurrentManagedThreadId;
+        var originalContext = SynchronizationContext.Current;
+        using var uiContext = new PumpingSynchronizationContext();
+        SynchronizationContext.SetSynchronizationContext(uiContext);
+        try
+        {
+            viewModel.SaveAndContinueCommand.Execute(null);
+            delayedLoad.SetResult(repository.Snapshot);
+            uiContext.PumpUntil(viewModel.WhenIdleAsync(), TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            delayedLoad.TrySetResult(repository.Snapshot);
+            SynchronizationContext.SetSynchronizationContext(originalContext);
+        }
+
+        Assert.Equal(second.Id, viewModel.SelectedRejection?.Id);
+        Assert.NotEmpty(selectionThreadIds);
+        Assert.All(selectionThreadIds, threadId => Assert.Equal(uiThreadId, threadId));
     }
 
     [Fact]
@@ -350,12 +442,28 @@ public sealed class RejectedPhrasesViewModelTests
 
     private sealed class InMemoryRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
     {
+        private TaskCompletionSource<WorkspaceSnapshot>? _nextLoadCompletion;
+
         public WorkspaceSnapshot Snapshot { get; set; } = snapshot;
 
         public bool FailSave { get; set; }
 
-        public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(Snapshot);
+        public TaskCompletionSource<WorkspaceSnapshot> DelayNextLoad()
+        {
+            var completion = new TaskCompletionSource<WorkspaceSnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (Interlocked.CompareExchange(ref _nextLoadCompletion, completion, null) is not null)
+            {
+                throw new InvalidOperationException("A workspace load is already delayed.");
+            }
+
+            return completion;
+        }
+
+        public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default)
+        {
+            var completion = Interlocked.Exchange(ref _nextLoadCompletion, null);
+            return completion?.Task ?? Task.FromResult(Snapshot);
+        }
 
         public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
         {
