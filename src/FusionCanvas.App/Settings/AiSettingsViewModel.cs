@@ -331,6 +331,8 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         }
     }
 
+    public void EnsureLoaded() => Run(EnsureLoadedAsync);
+
     public void DiscardCredentialDraft()
     {
         CredentialDraft = string.Empty;
@@ -634,7 +636,25 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         ApplyModelFilter();
         if (HasCredential)
         {
-            _ = EnsureCatalogAsync(false);
+            Run(() => EnsureCatalogAsync(false));
+        }
+    }
+
+    private void Run(Func<Task> operation) => _ = ObserveAsync(operation);
+
+    private async Task ObserveAsync(Func<Task> operation)
+    {
+        try
+        {
+            await operation().ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception)
+        {
+            Message = "AI settings could not be loaded. Review the saved credential and model catalog.";
         }
     }
 
