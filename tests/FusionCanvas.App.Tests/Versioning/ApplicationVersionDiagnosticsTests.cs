@@ -1,6 +1,7 @@
+using FusionCanvas.App.Versioning;
 using FusionCanvas.Application.Versioning;
 
-namespace FusionCanvas.Application.Tests.Versioning;
+namespace FusionCanvas.App.Tests.Versioning;
 
 public class ApplicationVersionDiagnosticsTests
 {
