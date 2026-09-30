@@ -1,14 +1,10 @@
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.IO;
-using System.Runtime.CompilerServices;
-using Avalonia.Media.Imaging;
 using FusionCanvas.Application.DesignFiles;
 using FusionCanvas.Domain.Products;
 
 namespace FusionCanvas.App.StageTools;
 
-public sealed class DesignRowViewModel : INotifyPropertyChanged
+public sealed class DesignRowViewModel
 {
     public DesignRowViewModel(DesignRowSummary summary, bool isReadOnly)
     {
@@ -23,8 +19,6 @@ public sealed class DesignRowViewModel : INotifyPropertyChanged
         }
     }
 
-    public event PropertyChangedEventHandler? PropertyChanged;
-
     public Guid RowId { get; }
     public bool IsDefault { get; }
     public int SortOrder { get; }
@@ -35,6 +29,4 @@ public sealed class DesignRowViewModel : INotifyPropertyChanged
 
     public bool CanRemove => !IsDefault && !IsReadOnly;
 
-    private void OnPropertyChanged([CallerMemberName] string? name = null) =>
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }

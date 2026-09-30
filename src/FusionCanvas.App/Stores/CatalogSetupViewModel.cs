@@ -1316,7 +1316,6 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     }
 
     private void CancelOfferingDelete() { IsDeleteOfferingConfirmationVisible = false; DeleteOfferingPlan = null; }
-    private void CancelArchiveOfferingDelete() { CancelOfferingDelete(); }
     private bool CanPreviewBulkVariants() => CanEdit && _offeringManagement is not null && BulkColor is not null && BulkSizeChoices.Any(value => value.IsSelected);
 
     private OfferingContext CurrentContext()
