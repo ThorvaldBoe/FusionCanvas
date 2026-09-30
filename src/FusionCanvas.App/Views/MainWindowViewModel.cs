@@ -165,7 +165,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             applicationServices.MockupTemplateSourceImages,
             new NullAssetFilePicker(),
             workspaceRepository,
-            applicationServices.NichePopulation);
+            applicationServices.NichePopulation,
+            applicationServices.RasterImageMetadataReader);
         StoreManagement.ActiveStoreChanged += (_, store) => Settings.UpdateActiveStore(store?.Id);
         _groupManagementService = applicationServices.GroupManagement;
         _itemManagementService = applicationServices.ItemManagement;
