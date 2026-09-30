@@ -7,6 +7,7 @@ using FusionCanvas.Application.Snowclones;
 
 namespace FusionCanvas.App.Snowclones;
 
+// Async operations update bindable library state and must keep the captured UI synchronization context.
 public sealed class SnowcloneLibraryViewModel : INotifyPropertyChanged
 {
     private readonly ISnowcloneLibraryService _service;
@@ -271,7 +272,7 @@ public sealed class SnowcloneLibraryViewModel : INotifyPropertyChanged
         ClearMessages();
         try
         {
-            var result = await _service.InitializeAsync(SearchText, cancellationToken).ConfigureAwait(false);
+            var result = await _service.InitializeAsync(SearchText, cancellationToken);
             ApplyResult(result, selectAffected: false);
             if (result.Succeeded && SelectedSnowclone is null && !IsNewDraft)
             {
@@ -292,7 +293,7 @@ public sealed class SnowcloneLibraryViewModel : INotifyPropertyChanged
 
     private async Task RefreshSearchAsync(int generation)
     {
-        var result = await _service.LoadAsync(SearchText).ConfigureAwait(false);
+        var result = await _service.LoadAsync(SearchText);
         if (generation != Volatile.Read(ref _searchGeneration))
         {
             return;
@@ -366,13 +367,13 @@ public sealed class SnowcloneLibraryViewModel : INotifyPropertyChanged
         {
             var result = IsNewDraft
                 ? await _service.CreateAsync(
-                    new SnowcloneCreateRequest(Phrase, Guidance, SearchText)).ConfigureAwait(false)
+                    new SnowcloneCreateRequest(Phrase, Guidance, SearchText))
                 : await _service.UpdateAsync(
                     new SnowcloneUpdateRequest(
                         SelectedSnowclone!.Id,
                         Phrase,
                         Guidance,
-                        SearchText)).ConfigureAwait(false);
+                        SearchText));
 
             ApplyResult(result, selectAffected: result.Succeeded);
             if (result.Succeeded)
@@ -415,7 +416,7 @@ public sealed class SnowcloneLibraryViewModel : INotifyPropertyChanged
         ClearMessages();
         try
         {
-            var result = await _service.DeleteAsync(id, SearchText).ConfigureAwait(false);
+            var result = await _service.DeleteAsync(id, SearchText);
             ApplyResult(result, selectAffected: false);
             if (result.Succeeded)
             {
@@ -452,7 +453,7 @@ public sealed class SnowcloneLibraryViewModel : INotifyPropertyChanged
             return;
         }
 
-        var stream = await FilePicker.OpenImportAsync().ConfigureAwait(false);
+        var stream = await FilePicker.OpenImportAsync();
         if (stream is null)
         {
             return;
@@ -464,7 +465,7 @@ public sealed class SnowcloneLibraryViewModel : INotifyPropertyChanged
             ClearMessages();
             try
             {
-                var result = await _service.ImportAsync(stream, SearchText).ConfigureAwait(false);
+                var result = await _service.ImportAsync(stream, SearchText);
                 ApplyResult(result, selectAffected: false, preserveDraft: true);
                 if (result.Succeeded)
                 {
@@ -489,7 +490,7 @@ public sealed class SnowcloneLibraryViewModel : INotifyPropertyChanged
         ClearMessages();
         try
         {
-            var result = await _service.ImportBundledAsync(SearchText).ConfigureAwait(false);
+            var result = await _service.ImportBundledAsync(SearchText);
             ApplyResult(result, selectAffected: false, preserveDraft: true);
             if (result.Succeeded)
             {
@@ -509,7 +510,7 @@ public sealed class SnowcloneLibraryViewModel : INotifyPropertyChanged
             return;
         }
 
-        var stream = await FilePicker.OpenExportAsync().ConfigureAwait(false);
+        var stream = await FilePicker.OpenExportAsync();
         if (stream is null)
         {
             return;
@@ -521,7 +522,7 @@ public sealed class SnowcloneLibraryViewModel : INotifyPropertyChanged
             ClearMessages();
             try
             {
-                var result = await _service.ExportAsync(stream, SearchText).ConfigureAwait(false);
+                var result = await _service.ExportAsync(stream, SearchText);
                 ApplyResult(result, selectAffected: false, preserveDraft: true);
                 if (result.Succeeded)
                 {
@@ -539,11 +540,11 @@ public sealed class SnowcloneLibraryViewModel : INotifyPropertyChanged
     {
         var transition = _pendingTransition;
         UnsavedPromptVisible = false;
-        await SaveAsync().ConfigureAwait(false);
+        await SaveAsync();
         if (!HasError && !IsDirty && transition is not null)
         {
             _pendingTransition = null;
-            await transition().ConfigureAwait(false);
+            await transition();
         }
         else
         {
@@ -559,7 +560,7 @@ public sealed class SnowcloneLibraryViewModel : INotifyPropertyChanged
         RestoreConfirmedDraft();
         if (transition is not null)
         {
-            await transition().ConfigureAwait(false);
+            await transition();
         }
     }
 
@@ -694,7 +695,7 @@ public sealed class SnowcloneLibraryViewModel : INotifyPropertyChanged
     {
         try
         {
-            await task.ConfigureAwait(false);
+            await task;
         }
         catch (OperationCanceledException)
         {
