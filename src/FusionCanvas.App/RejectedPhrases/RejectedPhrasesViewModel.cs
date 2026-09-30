@@ -317,20 +317,6 @@ public sealed class RejectedPhrasesViewModel : INotifyPropertyChanged
         }
     }
 
-    private void RequestSelection(Guid id)
-    {
-        if (SelectedRejection?.Id == id && !IsNewDraft)
-        {
-            return;
-        }
-
-        RequestTransition(() =>
-        {
-            SelectConfirmed(id);
-            return Task.CompletedTask;
-        });
-    }
-
     private void RequestTransition(Func<Task> transition)
     {
         ArgumentNullException.ThrowIfNull(transition);

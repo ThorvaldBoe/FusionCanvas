@@ -963,9 +963,6 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         }
     }
 
-    private static Task<Guid> ReadSingleGuidAsync(SqliteConnection connection, string sql, CancellationToken cancellationToken, params (string Name, object? Value)[] parameters) =>
-        ReadSingleGuidInTransactionAsync(connection, sql, cancellationToken, null, parameters);
-
     private static async Task<Guid> ReadSingleGuidInTransactionAsync(SqliteConnection connection, string sql, CancellationToken cancellationToken, System.Data.Common.DbTransaction? transaction, params (string Name, object? Value)[] parameters)
     {
         await using var command = connection.CreateCommand();
