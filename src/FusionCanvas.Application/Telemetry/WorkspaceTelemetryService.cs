@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using System.Diagnostics;
 using System.Threading;
@@ -116,8 +117,20 @@ public sealed class WorkspaceTelemetryService : ITelemetryService, IDisposable
 
     public async Task<string> ExportJsonAsync(Guid workspaceId, CancellationToken cancellationToken = default)
     {
+        await using var stream = new MemoryStream();
+        await ExportAsync(workspaceId, stream, cancellationToken).ConfigureAwait(false);
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    public async Task ExportAsync(Guid workspaceId, Stream destination, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(destination);
         var entries = await _store.ReadAllAsync(workspaceId, cancellationToken).ConfigureAwait(false);
-        return JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true });
+        await JsonSerializer.SerializeAsync(
+            destination,
+            entries,
+            new JsonSerializerOptions { WriteIndented = true },
+            cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<int> CleanupExpiredAsync(Guid workspaceId, CancellationToken cancellationToken = default)

@@ -217,7 +217,11 @@ public sealed class WorkspaceTelemetrySettingsTests
     {
         private readonly TaskCompletionSource<string?> _path = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public Task<string?> PickPathAsync(CancellationToken cancellationToken = default) => _path.Task;
+        public async Task<Stream?> OpenExportAsync(CancellationToken cancellationToken = default)
+        {
+            var path = await _path.Task.WaitAsync(cancellationToken);
+            return path is null ? null : File.Create(path);
+        }
 
         public void Complete(string path) => _path.TrySetResult(path);
     }
@@ -237,7 +241,16 @@ public sealed class WorkspaceTelemetrySettingsTests
         public Task<IReadOnlyList<TelemetryEntry>> ReadAllAsync(Guid workspaceId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<TelemetryEntry>>([]);
         public Task<int> DeleteAllAsync(Guid workspaceId, CancellationToken cancellationToken = default) => Task.FromResult(0);
-        public Task<string> ExportJsonAsync(Guid workspaceId, CancellationToken cancellationToken = default) => _export.Task;
+        public async Task<string> ExportJsonAsync(Guid workspaceId, CancellationToken cancellationToken = default)
+        {
+            return await _export.Task.WaitAsync(cancellationToken);
+        }
+
+        public async Task ExportAsync(Guid workspaceId, Stream destination, CancellationToken cancellationToken = default)
+        {
+            var json = await _export.Task.WaitAsync(cancellationToken);
+            await destination.WriteAsync(System.Text.Encoding.UTF8.GetBytes(json), cancellationToken);
+        }
         public Task<int> CleanupExpiredAsync(Guid workspaceId, CancellationToken cancellationToken = default) => Task.FromResult(0);
         public void CompleteExport(string json) => _export.TrySetResult(json);
     }

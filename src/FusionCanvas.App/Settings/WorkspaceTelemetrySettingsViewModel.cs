@@ -251,22 +251,25 @@ public sealed class WorkspaceTelemetrySettingsViewModel : INotifyPropertyChanged
     private async Task ExportAsync()
     {
         if (_workspaceId is not { } id || _service is null || _filePicker is null) return;
-        var path = await _filePicker.PickPathAsync();
-        if (string.IsNullOrWhiteSpace(path)) return;
-        IsBusy = true;
-        try
+        var stream = await _filePicker.OpenExportAsync();
+        if (stream is null) return;
+
+        await using (stream)
         {
-            var json = await _service.ExportJsonAsync(id);
-            await File.WriteAllTextAsync(path, json, new System.Text.UTF8Encoding(false));
-            Dispatch(() => StatusMessage = "Telemetry export completed.");
-        }
-        catch (Exception)
-        {
-            Dispatch(() => StatusMessage = "Telemetry export could not be completed.");
-        }
-        finally
-        {
-            Dispatch(() => IsBusy = false);
+            IsBusy = true;
+            try
+            {
+                await _service.ExportAsync(id, stream).ConfigureAwait(false);
+                Dispatch(() => StatusMessage = "Telemetry export completed.");
+            }
+            catch (Exception)
+            {
+                Dispatch(() => StatusMessage = "Telemetry export could not be completed.");
+            }
+            finally
+            {
+                Dispatch(() => IsBusy = false);
+            }
         }
     }
 
