@@ -59,14 +59,19 @@ public class DesignFileServiceTests
         var sample = Sample.Create();
         var repository = new TestRepository(sample.Snapshot);
         var fileStore = new FakeFileStore();
-        var service = new DesignFileService(repository, fileStore);
+        var assetId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var importedAt = new DateTimeOffset(2026, 9, 30, 12, 34, 56, TimeSpan.Zero);
+        var service = new DesignFileService(repository, fileStore, () => importedAt, () => assetId);
 
         var result = await service.ImportAsync(sample.Item.Id, sample.SourcePngPath, TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded, result.Error);
         Assert.Equal(1, repository.SaveCount);
+        Assert.Equal(assetId, result.File!.AssetId);
         var persisted = repository.Snapshot.Assets.Single(asset => asset.Id == result.File!.AssetId);
         Assert.Equal(AssetKind.ExportedImage, persisted.Kind);
+        Assert.Equal(importedAt, persisted.CreatedAt);
+        Assert.Equal(importedAt, persisted.UpdatedAt);
         Assert.Equal(sample.Item.Id, repository.Snapshot.AssetLinks.Single(link => link.AssetId == persisted.Id).EntityId);
     }
 
