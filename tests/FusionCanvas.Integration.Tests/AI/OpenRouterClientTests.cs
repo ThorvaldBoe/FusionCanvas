@@ -366,6 +366,24 @@ public class OpenRouterClientTests
         Assert.Equal(2, handler.Requests.Count);
     }
 
+    [Fact]
+    public async Task GetModelsAsync_MapsAbsoluteRetryAfterUsingInjectedUtcNow()
+    {
+        var now = new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero);
+        var retryAt = now.AddSeconds(12);
+        var handler = new RecordingHandler(
+            JsonWithRetryDate((HttpStatusCode)429, retryAt, "{\"error\":{\"message\":\"slow\"}}"),
+            JsonWithRetryDate((HttpStatusCode)429, retryAt, "{\"error\":{\"message\":\"slow\"}}"));
+        var client = new OpenRouterClient(
+            new HttpClient(handler) { BaseAddress = OpenRouterClient.DefaultBaseAddress },
+            timeProvider: new FixedTimeProvider(now));
+
+        var exception = await Assert.ThrowsAsync<AiModelCatalogFetchException>(
+            () => client.GetModelsAsync("secret", false, TestContext.Current.CancellationToken));
+
+        Assert.Equal(TimeSpan.FromSeconds(12), exception.RetryAfter);
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.Unauthorized, AiCredentialValidationKind.Invalid)]
     [InlineData(HttpStatusCode.Forbidden, AiCredentialValidationKind.PermissionDenied)]
@@ -614,6 +632,21 @@ public class OpenRouterClientTests
         };
         response.Headers.RetryAfter = new RetryConditionHeaderValue(retryAfter);
         return response;
+    }
+
+    private static HttpResponseMessage JsonWithRetryDate(HttpStatusCode status, DateTimeOffset retryAt, string json)
+    {
+        var response = new HttpResponseMessage(status)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+        response.Headers.RetryAfter = new RetryConditionHeaderValue(retryAt);
+        return response;
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
     }
 
     private sealed class RecordingHandler(params HttpResponseMessage[] responses) : HttpMessageHandler
