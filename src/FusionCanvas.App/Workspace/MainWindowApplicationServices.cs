@@ -27,6 +27,7 @@ public sealed record MainWindowApplicationServices(
     IMockupTemplateSourceImageService MockupTemplateSourceImages,
     IGroupManagementService GroupManagement,
     IItemManagementService ItemManagement,
+    IItemCsvExportService ItemCsvExport,
     IItemCsvImportService ItemCsvImport,
     IAssetManagementService AssetManagement,
     IItemInspectorService ItemInspector,

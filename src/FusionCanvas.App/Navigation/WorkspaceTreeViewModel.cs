@@ -66,17 +66,17 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged, IAsyncDispo
         IWorkspaceRepository repository,
         IGroupManagementService groups,
         WorkspaceSnapshot snapshot,
+        IItemManagementService items,
+        IItemCsvExportService csvExport,
         WorkspaceTreeSelectionCoordinator? selection = null,
         WorkspaceTreeClipboard? clipboard = null,
-        IItemManagementService? items = null,
-        IItemCsvExportService? csvExport = null,
         IItemCsvCodec? csvCodec = null,
         IItemCsvFilePicker? filePicker = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _groups = groups ?? throw new ArgumentNullException(nameof(groups));
-        _items = items ?? new ItemManagementService(repository);
-        _csvExport = csvExport ?? new ItemCsvExportService();
+        _items = items ?? throw new ArgumentNullException(nameof(items));
+        _csvExport = csvExport ?? throw new ArgumentNullException(nameof(csvExport));
         _csvCodec = csvCodec ?? NullItemCsvCodec.Instance;
         FilePicker = filePicker ?? new NullItemCsvFilePicker();
         _snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));

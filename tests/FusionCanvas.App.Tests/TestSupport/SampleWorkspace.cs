@@ -117,6 +117,7 @@ internal static class MainWindowViewModelFactory
     {
         var fileStore = new EmptyWorkspaceFileStore();
         var itemManagement = new ItemManagementService(repository);
+        var mockupTemplateSetup = new MockupTemplateSetupService(repository);
         var providerCatalog = new UnavailableProviderCatalogCandidateSource();
         var accessStatus = ideationAccessStatus ?? new DisabledIdeationAccessStatus();
         var services = new MainWindowApplicationServices(
@@ -125,12 +126,13 @@ internal static class MainWindowViewModelFactory
             new TagManagementService(repository),
             new LegacyCatalogCompatibilityService(repository),
             new CatalogSetupService(repository),
-            new MockupTemplateSetupService(repository),
+            mockupTemplateSetup,
             new OfferingManagementService(repository, providerCatalog),
             providerCatalog,
-            new MockupTemplateSourceImageService(repository, fileStore, new RasterImageMetadataReader()),
+            new MockupTemplateSourceImageService(repository, fileStore, new RasterImageMetadataReader(), mockupTemplateSetup),
             new GroupManagementService(repository),
             itemManagement,
+            new ItemCsvExportService(),
             new ItemCsvImportService(repository),
             new AssetManagementService(repository, fileStore),
             itemInspectorService ?? new ItemInspectorService(repository),

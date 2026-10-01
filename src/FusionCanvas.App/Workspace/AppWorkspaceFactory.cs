@@ -98,7 +98,8 @@ public static class AppWorkspaceFactory
         var mockupTemplateSetup = new MockupTemplateSetupService(repository);
         var providerCatalog = new UnavailableProviderCatalogCandidateSource();
         var offeringManagement = new OfferingManagementService(repository, providerCatalog);
-        var mockupTemplateSourceImages = new MockupTemplateSourceImageService(repository, fileStore, rasterImageMetadata);
+        var mockupTemplateSourceImages = new MockupTemplateSourceImageService(repository, fileStore, rasterImageMetadata, mockupTemplateSetup);
+        var itemCsvExport = new ItemCsvExportService();
         var itemCsvImport = new ItemCsvImportService(repository);
         var designStage = new DesignStageService(repository, fileStore);
         var sllDocumentCodec = new SllDocumentCodec();
@@ -142,6 +143,7 @@ public static class AppWorkspaceFactory
             mockupTemplateSourceImages,
             groupManagement,
             itemManagement,
+            itemCsvExport,
             itemCsvImport,
             assetManagement,
             itemInspector,

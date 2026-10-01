@@ -228,7 +228,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         _workspaceRepository = workspaceRepository;
         _workspaceSnapshot = workspaceSnapshot;
         NavigationState = new NavigationTreePresentationState();
-        WorkspaceTree = new WorkspaceTreeViewModel(workspaceRepository, _groupManagementService, workspaceSnapshot, items: _itemManagementService);
+        WorkspaceTree = new WorkspaceTreeViewModel(
+            workspaceRepository,
+            _groupManagementService,
+            workspaceSnapshot,
+            _itemManagementService,
+            applicationServices.ItemCsvExport);
         OpenNavigationContextCommand = new RelayCommand(parameter =>
         {
             if (parameter is NavigationDocumentContext navigationContext)
