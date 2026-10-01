@@ -4,6 +4,8 @@ using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Domain.Assets;
+using FusionCanvas.Domain.Concepts;
+using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Workspace;
 
@@ -61,27 +63,45 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
         var item = snapshot.Items.SingleOrDefault(value => value.Id == request.ItemId);
         if (item is null) return DesignStageResult.Failure("Item was not found.");
-        if (item.IsArchived) return DesignStageResult.Failure("Archived Items are read-only.");
 
         var configuration = snapshot.ItemListingConfigurations.SingleOrDefault(value => value.ItemId == item.Id);
-        if (configuration is null) return DesignStageResult.Failure("Select a Listing Configuration before generating artwork.");
-        var area = ResolveArea(snapshot, configuration.OfferingId, request.DesignAreaId);
-        if (area is null) return DesignStageResult.Failure("The selected Design Area is not active for this Listing Configuration.");
+        var area = configuration is null
+            ? null
+            : ResolveArea(snapshot, configuration.OfferingId, request.DesignAreaId);
         var row = snapshot.DesignVariantRows.SingleOrDefault(value => value.ItemId == item.Id && value.IsDefault);
-        if (row is null || !snapshot.DesignVariantRowColors.Any(value => value.RowId == row.Id))
-            return DesignStageResult.Failure("Select at least one product color before generating artwork.");
+        var hasDefaultRowWithSelectedColor = row is not null
+            && snapshot.DesignVariantRowColors.Any(value => value.RowId == row.Id);
+
+        var metadata = ItemMetadataCodec.ParseMetadata(item.MetadataJson);
+        var designTriangleComplete = DesignTriangleScore.FromValues(
+            metadata.GetValueOrDefault(ItemMetadataCodec.ConceptIdeaKey),
+            metadata.GetValueOrDefault(ItemMetadataCodec.PhraseKey),
+            metadata.GetValueOrDefault(ItemMetadataCodec.GraphicDirectionKey)) == 100;
 
         var settings = new AiConfigurationSettings(request.RequireZeroDataRetention, false, request.ArtworkProfile,
             AiPurposeProfileSettings.InheritGeneral, AiPurposeProfileSettings.InheritGeneral, AiPurposeProfileSettings.InheritGeneral)
         { Artwork = request.ArtworkProfile };
         var resolution = AiConfigurationResolver.ResolveArtwork(settings, request.Models);
-        if (resolution.Availability != AiConfigurationAvailability.Ready)
-            return DesignStageResult.Failure(resolution.Errors.FirstOrDefault() ?? "Artwork AI is not ready.");
 
-        var selection = AiImageEndpointPolicy.SelectEndpoint(request.Endpoints, request.ArtworkProfile.ModelId!, request.RequireZeroDataRetention, request.TransparentBackground, area.Size);
-        if (selection is null) return DesignStageResult.Failure("No compatible image endpoint is available for this target and privacy policy.");
+        var selection = resolution.Availability == AiConfigurationAvailability.Ready
+            && request.ArtworkProfile.ModelId is { Length: > 0 } modelId
+            && area is not null
+            ? AiImageEndpointPolicy.SelectEndpoint(request.Endpoints, modelId, request.RequireZeroDataRetention, request.TransparentBackground, area.Size)
+            : null;
+        var readiness = ArtworkGenerationReadinessPolicy.Evaluate(
+            ItemWorkflowPolicy.CanPerformOperation(item, ItemOperationKind.DesignStage).IsAllowed,
+            resolution.Availability == AiConfigurationAvailability.Ready,
+            selection is not null,
+            configuration is not null,
+            area is not null,
+            designTriangleComplete,
+            hasDefaultRowWithSelectedColor);
+        if (!readiness.IsReady)
+            return DesignStageResult.Failure(readiness.Blockers[0]);
 
-        var metadata = ItemMetadataCodec.ParseMetadata(item.MetadataJson);
+        var readyArea = area!;
+        var readySelection = selection!;
+        var readyRow = row!;
         var nicheContext = BuildNicheContext(snapshot, item.NicheId);
         var sll = metadata.GetValueOrDefault(ItemMetadataCodec.SllKey);
         var fingerprint = metadata.GetValueOrDefault(ItemMetadataCodec.SllSourceFingerprintKey);
@@ -91,13 +111,13 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         var prompt = ArtworkPromptBuilder.Build(new ArtworkPromptContext(
             metadata.GetValueOrDefault(ItemMetadataCodec.IdeaKey) ?? "", metadata.GetValueOrDefault(ItemMetadataCodec.ConceptIdeaKey) ?? "",
             metadata.GetValueOrDefault(ItemMetadataCodec.PhraseKey) ?? "", metadata.GetValueOrDefault(ItemMetadataCodec.GraphicDirectionKey) ?? "",
-            area.Name, area.Position, area.Size, area.DecorationMethod, area.Guidance is null ? null : $"Recommended format: {area.Guidance.FileFormat ?? "PNG"}; background: {area.Guidance.Background ?? "transparent when requested"}.",
+            readyArea.Name, readyArea.Position, readyArea.Size, readyArea.DecorationMethod, readyArea.Guidance is null ? null : $"Recommended format: {readyArea.Guidance.FileFormat ?? "PNG"}; background: {readyArea.Guidance.Background ?? "transparent when requested"}.",
             metadata.GetValueOrDefault(ItemMetadataCodec.NotesKey), sll, !string.IsNullOrWhiteSpace(sll) && !string.Equals(fingerprint, currentFingerprint, StringComparison.Ordinal), nicheContext));
 
         setStage("provider_dispatch");
         var dispatch = await _provider.GenerateAsync(new AiImageGenerationRequest(
-            request.ArtworkProfile.ModelId!, prompt, selection.ProviderSize, request.TransparentBackground, request.ApiKey,
-            request.RequireZeroDataRetention, selection.Endpoint.EndpointId, selection.Options), cancellationToken).ConfigureAwait(false);
+            request.ArtworkProfile.ModelId!, prompt, readySelection.ProviderSize, request.TransparentBackground, request.ApiKey,
+            request.RequireZeroDataRetention, readySelection.Endpoint.EndpointId, readySelection.Options), cancellationToken).ConfigureAwait(false);
         if (dispatch.Failure is not null || dispatch.Result is null)
             return DesignStageResult.Failure(dispatch.Failure?.Message ?? "The image provider returned no artwork.");
         await RecordStageAsync("provider_dispatch", "Succeeded", "The image provider returned artwork.").ConfigureAwait(false);
@@ -108,7 +128,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         setStage("image_normalization");
         try
         {
-            normalized = await _normalizer.NormalizeAsync(source, new RasterArtworkNormalizationRequest(area.Size, request.TransparentBackground), cancellationToken).ConfigureAwait(false);
+            normalized = await _normalizer.NormalizeAsync(source, new RasterArtworkNormalizationRequest(readyArea.Size, request.TransparentBackground), cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is InvalidDataException or ArgumentException)
         {
@@ -118,7 +138,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
 
         var now = _clock();
         var provenance = new AiImageProvenance(result.Provider, result.SelectedModelId, result.ResolvedModelId, prompt,
-            selection.ProviderSize, normalized.FinalSize, request.TransparentBackground, normalized.HasTransparency, now,
+            readySelection.ProviderSize, normalized.FinalSize, request.TransparentBackground, normalized.HasTransparency, now,
             result.ProviderRequestId, result.Usage, normalized.Warnings, request.DesignAreaId);
         setStage("file_storage");
         ManagedWorkspaceFile managed;
@@ -128,14 +148,14 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         }
         await RecordStageAsync("file_storage", "Succeeded", "The normalized artwork file was stored.").ConfigureAwait(false);
         var assetId = _newId();
-        var asset = new Asset(assetId, item.StoreId, $"{GeneratedArtworkName} - {area.Name}", null, AssetKind.ExportedImage,
+        var asset = new Asset(assetId, item.StoreId, $"{GeneratedArtworkName} - {readyArea.Name}", null, AssetKind.ExportedImage,
             managed.WorkspaceRelativePath, null, false, false, now, now, _provenanceCodec.Serialize(provenance));
-        var assignment = new DesignSlotAssignment(row.Id, request.DesignAreaId, assetId);
+        var assignment = new DesignSlotAssignment(readyRow.Id, request.DesignAreaId, assetId);
         var updated = snapshot with
         {
             Assets = [.. snapshot.Assets, asset],
             AssetLinks = [.. snapshot.AssetLinks, new AssetLink(assetId, WorkspaceEntityKind.Item, item.Id)],
-            DesignSlotAssignments = [.. snapshot.DesignSlotAssignments.Where(value => value.RowId != row.Id || value.DesignAreaId != request.DesignAreaId), assignment]
+            DesignSlotAssignments = [.. snapshot.DesignSlotAssignments.Where(value => value.RowId != readyRow.Id || value.DesignAreaId != request.DesignAreaId), assignment]
         };
         try
         {
