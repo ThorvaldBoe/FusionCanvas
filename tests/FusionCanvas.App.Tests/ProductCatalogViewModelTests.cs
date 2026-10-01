@@ -10,6 +10,7 @@ using FusionCanvas.Application.Stores;
 using FusionCanvas.Application.Niches;
 using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.Products;
+using FusionCanvas.Application.Catalog.Compatibility;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.DesignFiles;
@@ -43,7 +44,7 @@ public class ProductCatalogViewModelTests
     {
         var store = NewStore("North Star");
         var repository = new InMemoryWorkspaceRepository(SnapshotWithCatalog(store, addProduct: false));
-        var editor = new ProductCatalogEditorViewModel(new ProductSupplierSetupService(repository));
+        var editor = new ProductCatalogEditorViewModel(new LegacyCatalogCompatibilityService(repository));
         editor.SetScope(new StoreManagementScope(store.WorkspaceId, store.Id));
 
         await editor.LoadAsync(TestContext.Current.CancellationToken);
@@ -68,7 +69,7 @@ public class ProductCatalogViewModelTests
         var store = NewStore("North Star");
         var repository = new SaveGatedWorkspaceRepository(SnapshotWithCatalog(store, addProduct: false));
         var workspaceChanged = false;
-        var editor = new ProductCatalogEditorViewModel(new ProductSupplierSetupService(repository), workspaceChanged: () => workspaceChanged = true);
+        var editor = new ProductCatalogEditorViewModel(new LegacyCatalogCompatibilityService(repository), workspaceChanged: () => workspaceChanged = true);
         editor.SetScope(new StoreManagementScope(store.WorkspaceId, store.Id));
         await editor.LoadAsync(TestContext.Current.CancellationToken);
         editor.StartCreateProduct();
@@ -93,7 +94,7 @@ public class ProductCatalogViewModelTests
         var store = NewStore("North Star");
         var repository = new SaveGatedWorkspaceRepository(SnapshotWithCatalog(store, addProduct: true));
         var workspaceChanged = false;
-        var editor = new ProductCatalogEditorViewModel(new ProductSupplierSetupService(repository), workspaceChanged: () => workspaceChanged = true);
+        var editor = new ProductCatalogEditorViewModel(new LegacyCatalogCompatibilityService(repository), workspaceChanged: () => workspaceChanged = true);
         editor.SetScope(new StoreManagementScope(store.WorkspaceId, store.Id));
         await editor.LoadAsync(TestContext.Current.CancellationToken);
         editor.SelectProductForEditing(Assert.Single(editor.Products));
@@ -117,7 +118,7 @@ public class ProductCatalogViewModelTests
     [Fact]
     public void ProductCatalogEditor_NavigationRequestsDiscardForUnsavedProduct()
     {
-        var editor = new ProductCatalogEditorViewModel(new ProductSupplierSetupService(new InMemoryWorkspaceRepository()));
+        var editor = new ProductCatalogEditorViewModel(new LegacyCatalogCompatibilityService(new InMemoryWorkspaceRepository()));
         editor.SetScope(new StoreManagementScope(Guid.NewGuid(), Guid.NewGuid()));
         editor.StartCreateProduct();
         editor.ProductName = "Unsaved product";
@@ -135,7 +136,7 @@ public class ProductCatalogViewModelTests
     [Fact]
     public void ChangingProductEditorScopeRaisesAvailabilityPropertyNotifications()
     {
-        var editor = new ProductCatalogEditorViewModel(new ProductSupplierSetupService(new InMemoryWorkspaceRepository()));
+        var editor = new ProductCatalogEditorViewModel(new LegacyCatalogCompatibilityService(new InMemoryWorkspaceRepository()));
         var workspaceId = Guid.NewGuid();
         var storeId = Guid.NewGuid();
         editor.SetScope(new StoreManagementScope(workspaceId, storeId, IsStoreArchived: true));
@@ -178,7 +179,7 @@ public class ProductCatalogViewModelTests
         var firstStore = NewStore("First store");
         var secondStore = NewStore("Second store");
         var repository = new DelayedFirstLoadWorkspaceRepository(SnapshotWithCatalog(firstStore, addProduct: true));
-        var editor = new ProductCatalogEditorViewModel(new ProductSupplierSetupService(repository));
+        var editor = new ProductCatalogEditorViewModel(new LegacyCatalogCompatibilityService(repository));
         editor.SetScope(new StoreManagementScope(firstStore.WorkspaceId, firstStore.Id));
         var oldLoad = editor.LoadAsync(TestContext.Current.CancellationToken);
         await repository.FirstLoadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
@@ -644,7 +645,7 @@ public class ProductCatalogViewModelTests
             new StoreManagementService(productRepository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(productRepository),
             new TagManagementService(productRepository),
-            new ProductSupplierSetupService(productRepository),
+            new LegacyCatalogCompatibilityService(productRepository),
             new CatalogSetupService(catalogRepository),
             new MockupTemplateSetupService(catalogRepository));
 
@@ -653,7 +654,7 @@ public class ProductCatalogViewModelTests
             new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(repository),
             new TagManagementService(repository),
-            new ProductSupplierSetupService(repository));
+            new LegacyCatalogCompatibilityService(repository));
 
     private static DesignStageToolViewModel NewDesignToolViewModel(InMemoryWorkspaceRepository repository) =>
         new(

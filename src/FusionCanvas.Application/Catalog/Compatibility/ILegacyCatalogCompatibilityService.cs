@@ -1,6 +1,12 @@
-namespace FusionCanvas.Application.Products;
+using FusionCanvas.Application.Products;
 
-public interface IProductSupplierSetupService
+namespace FusionCanvas.Application.Catalog.Compatibility;
+
+/// <summary>
+/// Compatibility boundary for the pre-normalized Product/Supplier catalog projection.
+/// The normalized catalog services are authoritative for current catalog editing.
+/// </summary>
+public interface ILegacyCatalogCompatibilityService
 {
     Task<ProductSupplierSetupState> LoadForStoreAsync(Guid storeId, CancellationToken cancellationToken = default);
 
@@ -10,7 +16,7 @@ public interface IProductSupplierSetupService
 
     Task<ProductSupplierSetupResult> DeleteProductAsync(DeleteProductRequest request, CancellationToken cancellationToken = default);
 
-    Task<ProductSupplierSetupResult> CreateOfferingAsync(CreateOfferingRequest request, CancellationToken cancellationToken = default);
+    Task<ProductSupplierSetupResult> CreateOfferingAsync(FusionCanvas.Application.Products.CreateOfferingRequest request, CancellationToken cancellationToken = default);
 
     Task<ProductSupplierSetupResult> UpdateOfferingAsync(UpdateOfferingRequest request, CancellationToken cancellationToken = default);
 

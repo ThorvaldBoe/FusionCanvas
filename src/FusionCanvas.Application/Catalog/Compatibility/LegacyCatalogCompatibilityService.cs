@@ -4,16 +4,22 @@ using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Catalog;
+using FusionCanvas.Application.Products;
 
-namespace FusionCanvas.Application.Products;
+namespace FusionCanvas.Application.Catalog.Compatibility;
 
-public sealed class ProductSupplierSetupService : IProductSupplierSetupService
+/// <summary>
+/// Preserves the legacy Product/Supplier projection contract for compatibility consumers.
+/// Current catalog editing belongs to <see cref="CatalogSetupService"/> and the normalized
+/// catalog graph; this service is intentionally isolated from that implementation boundary.
+/// </summary>
+public sealed class LegacyCatalogCompatibilityService : ILegacyCatalogCompatibilityService
 {
     private readonly IWorkspaceRepository _repository;
     private readonly Func<DateTimeOffset> _clock;
     private readonly Func<Guid> _newId;
 
-    public ProductSupplierSetupService(
+    public LegacyCatalogCompatibilityService(
         IWorkspaceRepository repository,
         Func<DateTimeOffset>? clock = null,
         Func<Guid>? newId = null)
@@ -72,10 +78,10 @@ public sealed class ProductSupplierSetupService : IProductSupplierSetupService
     {
         ArgumentNullException.ThrowIfNull(request);
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        // Product editing is still exposed through the legacy projection, while
-        // the catalog screen reads the normalized Blueprint projection. Repair
-        // and mirror the store first so an edit updates the same record in both
-        // projections (including workspaces created before the catalog migration).
+        // Compatibility editing is still exposed through the legacy projection,
+        // while the catalog screen reads the normalized Blueprint projection.
+        // Repair and mirror the store first so an edit updates the same record
+        // in both projections (including pre-migration workspaces).
         snapshot = SynchronizeCatalog(snapshot, request.ProductId);
         var product = snapshot.StoreProducts.SingleOrDefault(item => item.Id == request.ProductId);
         if (product is null)
@@ -169,7 +175,7 @@ public sealed class ProductSupplierSetupService : IProductSupplierSetupService
         return ProductSupplierSetupResult.Success(BuildState(updated, product.StoreId));
     }
 
-    public async Task<ProductSupplierSetupResult> CreateOfferingAsync(CreateOfferingRequest request, CancellationToken cancellationToken = default)
+    public async Task<ProductSupplierSetupResult> CreateOfferingAsync(FusionCanvas.Application.Products.CreateOfferingRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);

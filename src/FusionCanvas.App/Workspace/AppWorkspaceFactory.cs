@@ -20,6 +20,7 @@ using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Application.ConceptRefinement;
 using FusionCanvas.Application.SllGeneration;
 using FusionCanvas.Application.Products;
+using FusionCanvas.Application.Catalog.Compatibility;
 using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.Application.Niches;
@@ -90,7 +91,7 @@ public static class AppWorkspaceFactory
             initialActiveWorkspaceId: initialActiveWorkspaceId,
             initialActiveStoreId: initialActiveStoreId);
         var nicheManagement = new NicheManagementService(repository);
-        var productSupplierSetup = new ProductSupplierSetupService(repository);
+        var productSupplierSetup = new LegacyCatalogCompatibilityService(repository);
         var catalogSetup = new CatalogSetupService(repository);
         var mockupTemplateSetup = new MockupTemplateSetupService(repository);
         var providerCatalog = new UnavailableProviderCatalogCandidateSource();

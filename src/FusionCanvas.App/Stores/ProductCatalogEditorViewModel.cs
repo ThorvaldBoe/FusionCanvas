@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.Products;
+using FusionCanvas.Application.Catalog.Compatibility;
 using FusionCanvas.App.Assets;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Stores;
@@ -16,7 +17,7 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
     private sealed record ProductDraft(string Name, string Description, string ExternalId);
     private sealed record OfferingDraft(string Name, string Description, string ExternalId, int KindIndex, string ProviderName, string AreaName, string AreaPosition, string AreaDecorationMethod, string AreaWidth, string AreaHeight, string VariantColor, string VariantSize);
 
-    private readonly IProductSupplierSetupService? _productsService;
+    private readonly ILegacyCatalogCompatibilityService? _legacyCatalogCompatibility;
     private readonly ICatalogSetupService? _catalogService;
     private readonly IOfferingManagementService? _offeringService;
     private readonly Action<Func<CancellationToken, Task>> _runOperation;
@@ -66,14 +67,14 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
     private CatalogSetupViewModel? _catalogSetup;
 
     public ProductCatalogEditorViewModel(
-        IProductSupplierSetupService? productsService = null,
+        ILegacyCatalogCompatibilityService? legacyCatalogCompatibility = null,
         ICatalogSetupService? catalogService = null,
         IOfferingManagementService? offeringService = null,
         Action<Func<CancellationToken, Task>>? runOperation = null,
         Action<string?>? reportError = null,
         Action? workspaceChanged = null)
     {
-        _productsService = productsService;
+        _legacyCatalogCompatibility = legacyCatalogCompatibility;
         _catalogService = catalogService;
         _offeringService = offeringService;
         _runOperation = runOperation ?? (operation => _ = operation(CancellationToken.None));
@@ -134,12 +135,12 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
     public bool HasUnsavedOfferingDraft => CurrentOfferingDraft() != _originalOfferingDraft;
     internal void CaptureOriginalProductDraft() => _originalProductDraft = CurrentProductDraft();
     internal void CaptureOriginalOfferingDraft() => _originalOfferingDraft = CurrentOfferingDraft();
-    public bool CanSaveSelectedProduct => _productsService is not null && CanManageScope && HasUnsavedProductChanges;
-    public bool CanSaveSelectedOffering => _productsService is not null && CanManageScope && SelectedProduct is not null && HasUnsavedOfferingChanges;
+    public bool CanSaveSelectedProduct => _legacyCatalogCompatibility is not null && CanManageScope && HasUnsavedProductChanges;
+    public bool CanSaveSelectedOffering => _legacyCatalogCompatibility is not null && CanManageScope && SelectedProduct is not null && HasUnsavedOfferingChanges;
     public bool CanDeleteSelectedProduct => _catalogService is not null && SelectedProduct is { IsArchived: true } && !_isCreatingNewProduct && CanManageScope;
     public bool CanArchiveSelectedProduct => _catalogService is not null && SelectedProduct is { IsArchived: false } && !_isCreatingNewProduct && !HasUnsavedProductChanges && CanManageScope;
-    public bool CanDeleteSelectedOffering => _productsService is not null && SelectedOffering is not null && !_isCreatingNewOffering && CanManageScope;
-    public bool CanCreateCatalogItem => _productsService is not null && CanManageScope;
+    public bool CanDeleteSelectedOffering => _legacyCatalogCompatibility is not null && SelectedOffering is not null && !_isCreatingNewOffering && CanManageScope;
+    public bool CanCreateCatalogItem => _legacyCatalogCompatibility is not null && CanManageScope;
     public bool IsAddingVariant { get => _isAddingVariant; set => Set(ref _isAddingVariant, value); }
     public bool IsAddingDesignArea { get => _isAddingDesignArea; set => Set(ref _isAddingDesignArea, value); }
     public bool IsBlueprintBasicsExpanded { get => _isBlueprintBasicsExpanded; set => Set(ref _isBlueprintBasicsExpanded, value); }
@@ -192,9 +193,9 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
-        if (_productsService is null || !CanManageScope || _scope.StoreId is not { } storeId) return;
+        if (_legacyCatalogCompatibility is null || !CanManageScope || _scope.StoreId is not { } storeId) return;
         var scope = _scope; var version = _scopeVersion;
-        var state = await _productsService.LoadForStoreAsync(storeId, cancellationToken).ConfigureAwait(true);
+        var state = await _legacyCatalogCompatibility.LoadForStoreAsync(storeId, cancellationToken).ConfigureAwait(true);
         if (!IsCurrent(scope, version)) return;
         ApplyProductState(state);
     }
@@ -232,7 +233,7 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
 
     public async Task SaveSelectedProductAsync(CancellationToken cancellationToken = default)
     {
-        if (_productsService is null) { _reportError("Product and fulfillment setup is not available."); return; }
+        if (_legacyCatalogCompatibility is null) { _reportError("Product and fulfillment setup is not available."); return; }
         if (!CanManageScope || _scope.StoreId is not { } storeId) { _reportError("Select a store before saving a product."); return; }
         var scope = _scope;
         var version = _scopeVersion;
@@ -244,13 +245,13 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
         ProductSupplierSetupResult result;
         if (isCreatingNewProduct)
         {
-            result = await _productsService.CreateProductAsync(new CreateProductRequest(storeId, ProductName, EmptyToNull(ProductDescription), EmptyToNull(ExternalProductId)), cancellationToken).ConfigureAwait(true);
+            result = await _legacyCatalogCompatibility.CreateProductAsync(new CreateProductRequest(storeId, ProductName, EmptyToNull(ProductDescription), EmptyToNull(ExternalProductId)), cancellationToken).ConfigureAwait(true);
         }
         else
         {
             var selectedProduct = SelectedProduct;
             if (selectedProduct is null) { _reportError("Select a product before saving."); return; }
-            result = await _productsService.UpdateProductAsync(new UpdateProductRequest(selectedProduct.Id, ProductName, EmptyToNull(ProductDescription), EmptyToNull(ExternalProductId)), cancellationToken).ConfigureAwait(true);
+            result = await _legacyCatalogCompatibility.UpdateProductAsync(new UpdateProductRequest(selectedProduct.Id, ProductName, EmptyToNull(ProductDescription), EmptyToNull(ExternalProductId)), cancellationToken).ConfigureAwait(true);
         }
         if (!IsCurrent(scope, version) || draftGeneration != _draftGeneration || isCreatingNewProduct != _isCreatingNewProduct || draftProductId != _draftProductId || selectedProductId != SelectedProduct?.Id || draft != CurrentProductDraft())
         {
@@ -314,7 +315,7 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
 
     public void StartCreateOffering()
     {
-        if (_productsService is null || !CanManageScope || SelectedProduct is null) { _reportError("Select an active product before creating an offering."); return; }
+        if (_legacyCatalogCompatibility is null || !CanManageScope || SelectedProduct is null) { _reportError("Select an active product before creating an offering."); return; }
         if (HasAnyCatalogUnsavedChanges || CatalogSetup?.HasActiveDraft == true) { var scope = _scope; DiscardRequested?.Invoke(() => { if (scope == _scope) BeginCreateOfferingDraft(); }); return; }
         BeginCreateOfferingDraft();
     }
@@ -330,7 +331,7 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
 
     public async Task SaveSelectedOfferingAsync(CancellationToken cancellationToken = default)
     {
-        if (_productsService is null) { _reportError("Product and fulfillment setup is not available."); return; }
+        if (_legacyCatalogCompatibility is null) { _reportError("Product and fulfillment setup is not available."); return; }
         if (!CanManageScope || SelectedProduct is null) { _reportError("Select a product before saving an offering."); return; }
         var scope = _scope;
         var version = _scopeVersion;
@@ -344,13 +345,13 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
         ProductSupplierSetupResult result;
         if (isCreatingNewOffering)
         {
-            result = await _productsService.CreateOfferingAsync(new FusionCanvas.Application.Products.CreateOfferingRequest(productId, OfferingName, kind, kind == FulfillmentKind.FixedProvider ? EmptyToNull(OfferingProviderName) : null, EmptyToNull(OfferingDescription), EmptyToNull(OfferingExternalOfferingId)), cancellationToken).ConfigureAwait(true);
+            result = await _legacyCatalogCompatibility.CreateOfferingAsync(new FusionCanvas.Application.Products.CreateOfferingRequest(productId, OfferingName, kind, kind == FulfillmentKind.FixedProvider ? EmptyToNull(OfferingProviderName) : null, EmptyToNull(OfferingDescription), EmptyToNull(OfferingExternalOfferingId)), cancellationToken).ConfigureAwait(true);
         }
         else
         {
             var selectedOffering = SelectedOffering;
             if (selectedOffering is null) { _reportError("Select an offering before saving."); return; }
-            result = await _productsService.UpdateOfferingAsync(new UpdateOfferingRequest(selectedOffering.Id, OfferingName, kind, kind == FulfillmentKind.FixedProvider ? EmptyToNull(OfferingProviderName) : null, EmptyToNull(OfferingDescription), EmptyToNull(OfferingExternalOfferingId)), cancellationToken).ConfigureAwait(true);
+            result = await _legacyCatalogCompatibility.UpdateOfferingAsync(new UpdateOfferingRequest(selectedOffering.Id, OfferingName, kind, kind == FulfillmentKind.FixedProvider ? EmptyToNull(OfferingProviderName) : null, EmptyToNull(OfferingDescription), EmptyToNull(OfferingExternalOfferingId)), cancellationToken).ConfigureAwait(true);
         }
         if (!IsCurrent(scope, version) || draftGeneration != _draftGeneration || productId != SelectedProduct?.Id || selectedOfferingId != SelectedOffering?.Id || isCreatingNewOffering != _isCreatingNewOffering || draftOfferingId != _draftOfferingId || draft != CurrentOfferingDraft())
         {
@@ -381,10 +382,10 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
 
     public async Task ConfirmDeleteOfferingAsync(CancellationToken cancellationToken = default)
     {
-        if (_productsService is null || _pendingDeleteOffering is null || !CanManageScope) { _reportError("Select an offering before deleting."); return; }
+        if (_legacyCatalogCompatibility is null || _pendingDeleteOffering is null || !CanManageScope) { _reportError("Select an offering before deleting."); return; }
         var scope = _scope; var version = _scopeVersion; var draftGeneration = _draftGeneration;
         var productId = SelectedProduct?.Id; var selectedOfferingId = SelectedOffering?.Id;
-        var result = await _productsService.DeleteOfferingAsync(new DeleteOfferingRequest(_pendingDeleteOffering.Id, Confirm: true), cancellationToken).ConfigureAwait(true);
+        var result = await _legacyCatalogCompatibility.DeleteOfferingAsync(new DeleteOfferingRequest(_pendingDeleteOffering.Id, Confirm: true), cancellationToken).ConfigureAwait(true);
         if (!IsCurrent(scope, version) || draftGeneration != _draftGeneration || productId != SelectedProduct?.Id || selectedOfferingId != SelectedOffering?.Id) { if (result.Succeeded) _workspaceChanged(); return; }
         _reportError(result.Error); ApplyProductState(result.State);
         if (result.Succeeded && SelectedOffering is null) NavigationLevel = CatalogEditorLevel.ProductDetail;
@@ -408,12 +409,12 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
 
     public async Task AddVariantAsync(CancellationToken cancellationToken = default)
     {
-        if (_productsService is null || SelectedOffering is null || !CanManageScope) { _reportError("Select an offering before adding a variant."); return; }
+        if (_legacyCatalogCompatibility is null || SelectedOffering is null || !CanManageScope) { _reportError("Select an offering before adding a variant."); return; }
         var scope = _scope; var version = _scopeVersion; var draftGeneration = _draftGeneration; var offeringId = SelectedOffering.Id; var draft = CurrentOfferingDraft(); var options = new List<VariantOptionDraft>();
         if (!string.IsNullOrWhiteSpace(VariantColor)) options.Add(new VariantOptionDraft("Color", VariantColor.Trim()));
         if (!string.IsNullOrWhiteSpace(VariantSize)) options.Add(new VariantOptionDraft("Size", VariantSize.Trim()));
         if (options.Count == 0) { _reportError("Enter at least a color or size for the variant."); return; }
-        var result = await _productsService.CreateVariantAsync(new CreateVariantRequest(offeringId, options), cancellationToken).ConfigureAwait(true);
+        var result = await _legacyCatalogCompatibility.CreateVariantAsync(new CreateVariantRequest(offeringId, options), cancellationToken).ConfigureAwait(true);
         if (!IsCurrent(scope, version) || draftGeneration != _draftGeneration || offeringId != SelectedOffering?.Id || draft != CurrentOfferingDraft()) { if (result.Succeeded) _workspaceChanged(); return; }
         ApplyProductResult(result);
         if (result.Succeeded) { IsAddingVariant = false; VariantColor = string.Empty; VariantSize = string.Empty; }
@@ -421,20 +422,20 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
 
     public async Task RemoveVariantAsync(ProductVariantSummary variant, CancellationToken cancellationToken = default)
     {
-        if (_productsService is null || !CanManageScope || SelectedOffering is null) return;
+        if (_legacyCatalogCompatibility is null || !CanManageScope || SelectedOffering is null) return;
         var scope = _scope; var version = _scopeVersion; var draftGeneration = _draftGeneration; var offeringId = SelectedOffering.Id;
-        var result = await _productsService.DeleteVariantAsync(new DeleteVariantRequest(variant.Id, Confirm: true), cancellationToken).ConfigureAwait(true);
+        var result = await _legacyCatalogCompatibility.DeleteVariantAsync(new DeleteVariantRequest(variant.Id, Confirm: true), cancellationToken).ConfigureAwait(true);
         if (!IsCurrent(scope, version) || draftGeneration != _draftGeneration || offeringId != SelectedOffering?.Id) { if (result.Succeeded) _workspaceChanged(); return; }
         ApplyProductResult(result);
     }
 
     public async Task AddDesignAreaAsync(CancellationToken cancellationToken = default)
     {
-        if (_productsService is null || SelectedOffering is null || !CanManageScope) { _reportError("Select an offering before adding a printable area."); return; }
+        if (_legacyCatalogCompatibility is null || SelectedOffering is null || !CanManageScope) { _reportError("Select an offering before adding a printable area."); return; }
         if (!int.TryParse(AreaWidth, out var width) || width <= 0 || !int.TryParse(AreaHeight, out var height) || height <= 0) { _reportError("Design area width and height must be positive whole numbers."); return; }
         var scope = _scope; var version = _scopeVersion; var draftGeneration = _draftGeneration; var offeringId = SelectedOffering.Id; var draft = CurrentOfferingDraft();
         var applicableVariantIds = ApplicableVariants.Where(item => item.IsSelected).Select(item => item.Id).ToArray();
-        var result = await _productsService.CreateDesignAreaAsync(new CreateDesignAreaRequest(offeringId, AreaName, string.IsNullOrWhiteSpace(AreaPosition) ? "front" : AreaPosition.Trim(), string.IsNullOrWhiteSpace(AreaDecorationMethod) ? "DTG" : AreaDecorationMethod.Trim(), width, height, applicableVariantIds), cancellationToken).ConfigureAwait(true);
+        var result = await _legacyCatalogCompatibility.CreateDesignAreaAsync(new CreateDesignAreaRequest(offeringId, AreaName, string.IsNullOrWhiteSpace(AreaPosition) ? "front" : AreaPosition.Trim(), string.IsNullOrWhiteSpace(AreaDecorationMethod) ? "DTG" : AreaDecorationMethod.Trim(), width, height, applicableVariantIds), cancellationToken).ConfigureAwait(true);
         if (!IsCurrent(scope, version) || draftGeneration != _draftGeneration || offeringId != SelectedOffering?.Id || draft != CurrentOfferingDraft() || !applicableVariantIds.SequenceEqual(ApplicableVariants.Where(item => item.IsSelected).Select(item => item.Id))) { if (result.Succeeded) _workspaceChanged(); return; }
         ApplyProductResult(result);
         if (result.Succeeded) { IsAddingDesignArea = false; AreaName = AreaPosition = AreaDecorationMethod = AreaWidth = AreaHeight = string.Empty; }
@@ -442,9 +443,9 @@ public sealed class ProductCatalogEditorViewModel : INotifyPropertyChanged
 
     public async Task RemoveDesignAreaAsync(DesignAreaSummary area, CancellationToken cancellationToken = default)
     {
-        if (_productsService is null || !CanManageScope || SelectedOffering is null) return;
+        if (_legacyCatalogCompatibility is null || !CanManageScope || SelectedOffering is null) return;
         var scope = _scope; var version = _scopeVersion; var draftGeneration = _draftGeneration; var offeringId = SelectedOffering.Id;
-        var result = await _productsService.DeleteDesignAreaAsync(new DeleteDesignAreaRequest(area.Id, Confirm: true), cancellationToken).ConfigureAwait(true);
+        var result = await _legacyCatalogCompatibility.DeleteDesignAreaAsync(new DeleteDesignAreaRequest(area.Id, Confirm: true), cancellationToken).ConfigureAwait(true);
         if (!IsCurrent(scope, version) || draftGeneration != _draftGeneration || offeringId != SelectedOffering?.Id) { if (result.Succeeded) _workspaceChanged(); return; }
         ApplyProductResult(result);
     }

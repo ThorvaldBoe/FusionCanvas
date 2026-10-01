@@ -174,7 +174,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
             applicationServices.StoreManagement,
             applicationServices.NicheManagement,
             applicationServices.TagManagement,
-            applicationServices.ProductSupplierSetup,
+            applicationServices.LegacyCatalogCompatibility,
             applicationServices.CatalogSetup,
             applicationServices.MockupTemplateSetup,
             applicationServices.OfferingManagement,

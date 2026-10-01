@@ -8,6 +8,7 @@ using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.Niches;
 using FusionCanvas.Application.Products;
+using FusionCanvas.Application.Catalog.Compatibility;
 using FusionCanvas.Application.Stores;
 using FusionCanvas.Application.SllGeneration;
 using FusionCanvas.Application.Tags;
@@ -18,7 +19,7 @@ public sealed record MainWindowApplicationServices(
     IStoreManagementService StoreManagement,
     INicheManagementService NicheManagement,
     ITagManagementService TagManagement,
-    IProductSupplierSetupService ProductSupplierSetup,
+    ILegacyCatalogCompatibilityService LegacyCatalogCompatibility,
     ICatalogSetupService CatalogSetup,
     IMockupTemplateSetupService MockupTemplateSetup,
     IOfferingManagementService OfferingManagement,

@@ -5,10 +5,11 @@ using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Products;
+using FusionCanvas.Application.Catalog.Compatibility;
 
 namespace FusionCanvas.Application.Tests.Products;
 
-public class ProductSupplierSetupServiceTests
+public class LegacyCatalogCompatibilityServiceTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 4, 12, 0, 0, TimeSpan.Zero);
     private static readonly Guid StoreId = Guid.NewGuid();
@@ -353,10 +354,10 @@ public class ProductSupplierSetupServiceTests
         Assert.Equal([new VariantOption("Color", "White"), new VariantOption("Size", "L")], variant.Options);
     }
 
-    private static ProductSupplierSetupService New(InMemoryWorkspaceRepository repository) =>
+    private static LegacyCatalogCompatibilityService New(InMemoryWorkspaceRepository repository) =>
         new(repository, () => Now, Guid.NewGuid);
 
-    private static async Task<(Guid productId, Guid offeringId)> CreateProductOfferingAsync(ProductSupplierSetupService service)
+    private static async Task<(Guid productId, Guid offeringId)> CreateProductOfferingAsync(LegacyCatalogCompatibilityService service)
     {
         var productResult = await service.CreateProductAsync(new CreateProductRequest(StoreId, "Gildan 64000"), TestContext.Current.CancellationToken);
         var productId = productResult.State.Products[0].Id;

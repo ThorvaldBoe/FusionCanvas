@@ -12,6 +12,7 @@ using FusionCanvas.Application.RejectedPhrases;
 using FusionCanvas.Application.ConceptRefinement;
 using FusionCanvas.Application.SllGeneration;
 using FusionCanvas.Application.Products;
+using FusionCanvas.Application.Catalog.Compatibility;
 using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.Application.DesignFiles;
@@ -40,7 +41,7 @@ public sealed record AppWorkspaceRuntime(
     ISllGenerationService SllGeneration,
     ISllAccessStatus SllGenerationAccess,
     ITitleOptimizationService TitleOptimization,
-    IProductSupplierSetupService ProductSupplierSetup,
+    ILegacyCatalogCompatibilityService LegacyCatalogCompatibility,
     IItemCsvImportService ItemCsvImport,
     ISllDocumentCodec SllDocumentCodec,
     IMockupGenerationService MockupGeneration,
