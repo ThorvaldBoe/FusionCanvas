@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Text.Json;
+using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Workspaces.Transfer;
 using FusionCanvas.Application.Snowclones;
 using FusionCanvas.Application.Telemetry;
@@ -33,8 +34,8 @@ public class WorkspacePackageIntegrationTests
         await sourceRepository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
         await sourceFiles.RestoreAsync("assets/design.png", new MemoryStream([1, 2, 3, 4]), TestContext.Current.CancellationToken);
         var packagePath = temp.GetPath("roundtrip.fcworkspace");
-        var writer = new ZipWorkspacePackageWriter();
-        var reader = new ZipWorkspacePackageReader();
+        var writer = CreatePackageWriter();
+        var reader = CreatePackageReader();
         var exportService = new WorkspaceTransferService(sourceRepository, sourceFiles, writer, reader, () => Now);
 
         var exported = await exportService.ExportWorkspaceAsync(
@@ -235,12 +236,12 @@ public class WorkspacePackageIntegrationTests
             archive.CreateEntry("files/../escape.png");
         }
 
-        var unsafeResult = await new ZipWorkspacePackageReader().ReadAsync(
+        var unsafeResult = await CreatePackageReader().ReadAsync(
             packagePath,
             cancellationToken: TestContext.Current.CancellationToken);
         var corruptPath = temp.GetPath("corrupt.fcworkspace");
         await File.WriteAllTextAsync(corruptPath, "not a zip", TestContext.Current.CancellationToken);
-        var corruptResult = await new ZipWorkspacePackageReader().ReadAsync(
+        var corruptResult = await CreatePackageReader().ReadAsync(
             corruptPath,
             cancellationToken: TestContext.Current.CancellationToken);
 
@@ -294,10 +295,10 @@ public class WorkspacePackageIntegrationTests
         var schemaPackagePath = await CreatePackageAsync(temp, CreateSnapshot("Newer schema", "assets/file.png"));
         await UpdateManifestAsync(schemaPackagePath, manifest => manifest with { SchemaVersion = 99 });
 
-        var formatResult = await new ZipWorkspacePackageReader().ReadAsync(
+        var formatResult = await CreatePackageReader().ReadAsync(
             formatPackagePath,
             cancellationToken: TestContext.Current.CancellationToken);
-        var schemaResult = await new ZipWorkspacePackageReader().ReadAsync(
+        var schemaResult = await CreatePackageReader().ReadAsync(
             schemaPackagePath,
             cancellationToken: TestContext.Current.CancellationToken);
 
@@ -345,7 +346,7 @@ public class WorkspacePackageIntegrationTests
         }
 
         await UpdateManifestAsync(packagePath, manifest => manifest with { SchemaVersion = 4 });
-        var result = await new ZipWorkspacePackageReader().ReadAsync(
+        var result = await CreatePackageReader().ReadAsync(
             packagePath,
             cancellationToken: TestContext.Current.CancellationToken);
 
@@ -422,7 +423,16 @@ public class WorkspacePackageIntegrationTests
     private static WorkspaceTransferService NewService(
         SqliteWorkspaceRepository repository,
         LocalWorkspaceFileStore files) =>
-        new(repository, files, new ZipWorkspacePackageWriter(), new ZipWorkspacePackageReader(), () => Now);
+        new(repository, files, CreatePackageWriter(), CreatePackageReader(), () => Now);
+
+    private static ZipWorkspacePackageWriter CreatePackageWriter() =>
+        new(CreatePackageRepository);
+
+    private static ZipWorkspacePackageReader CreatePackageReader() =>
+        new(CreatePackageRepository);
+
+    private static IWorkspaceRepository CreatePackageRepository(string databasePath) =>
+        new SqliteWorkspaceRepository(databasePath, useConnectionPooling: false);
 
     private sealed class TestTelemetryWorkspaceContext(Guid? activeWorkspaceId) : ITelemetryWorkspaceContext
     {
