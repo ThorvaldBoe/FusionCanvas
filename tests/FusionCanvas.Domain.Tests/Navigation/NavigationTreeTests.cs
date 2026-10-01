@@ -126,6 +126,25 @@ public class NavigationTreeTests
     }
 
     [Fact]
+    public void BuildTree_RejectsCyclicGroupHierarchy()
+    {
+        var sample = NavigationSample.Create();
+        var cyclic = sample.Snapshot with
+        {
+            Groups =
+            [
+                sample.ParentGroup with { NicheId = null, ParentGroupId = sample.ChildGroup.Id },
+                sample.ChildGroup,
+                sample.GrandchildGroup
+            ]
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => WorkspaceNavigation.BuildTree(cyclic));
+
+        Assert.Equal("A group hierarchy must not contain cycles.", exception.Message);
+    }
+
+    [Fact]
     public void GroupHierarchy_ResolvesParentsNicheAncestorsDescendantsAndVisibility()
     {
         var sample = NavigationSample.Create();
