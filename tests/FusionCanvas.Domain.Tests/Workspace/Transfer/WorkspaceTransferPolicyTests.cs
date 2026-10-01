@@ -81,12 +81,12 @@ public class WorkspaceTransferPolicyTests
     }
 
     [Fact]
-    public void ResolveImportName_UsesFirstAvailableSuffixAndOnlyProvidedActiveNames()
+    public void WorkspaceNamePolicy_ResolvesImportNameUsingNormalizedActiveNames()
     {
-        Assert.Equal("Brand", WorkspaceImportPreflight.ResolveImportName(" Brand ", ["Archived Brand"]));
-        Assert.Equal("Brand (4)", WorkspaceImportPreflight.ResolveImportName(
-            "Brand",
-            ["brand", "Brand (2)", "BRAND (3)"]));
+        Assert.Equal("Brand", WorkspaceNamePolicy.ResolveImportName(" Brand ", [" Archived Brand "]));
+        Assert.Equal("Brand (4)", WorkspaceNamePolicy.ResolveImportName(
+            " Brand ",
+            [" brand ", "Brand (2)", "BRAND (3)"]));
     }
 
     private static Graph CreateGraph(string name, bool archived = false)

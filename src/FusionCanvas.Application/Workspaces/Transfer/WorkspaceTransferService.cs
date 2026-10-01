@@ -95,7 +95,7 @@ public sealed class WorkspaceTransferService(
             }
 
             var packagedWorkspace = session.Snapshot.Workspaces.Single();
-            var finalName = WorkspaceImportPreflight.ResolveImportName(
+            var finalName = WorkspaceNamePolicy.ResolveImportName(
                 packagedWorkspace.Name,
                 live.Workspaces.Where(workspace => !workspace.IsArchived).Select(workspace => workspace.Name));
 
