@@ -78,6 +78,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
     private long _workspaceSwitchGeneration;
     private readonly object _commandTaskGate = new();
     private readonly HashSet<Task> _activeCommandTasks = [];
+    private readonly CancellationTokenSource _shutdownCancellation = new();
     private int _commandStartsInProgress;
     private bool _commandAdmissionClosed;
     private bool _disposed;
@@ -220,8 +221,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
             Avalonia.Threading.Dispatcher.UIThread.Post(RaiseIdeationProperties);
         Settings.Ai.SettingsChanged += OnAiConfigurationChanged;
         Settings.Ai.AvailabilityChanged += OnAiConfigurationChanged;
-        Run(() => _ideationAccessStatus.RefreshAsync());
-        Run(() => StoreManagement.RefreshNichePopulationAvailabilityAsync());
+        Run(cancellationToken => _ideationAccessStatus.RefreshAsync(cancellationToken));
+        Run(cancellationToken => StoreManagement.RefreshNichePopulationAvailabilityAsync(cancellationToken));
         _toolContextResolver = toolContextResolver;
         _stageToolHostService = stageToolHostService;
         _stageToolContentResolver = stageToolContentResolver ?? new BuiltInStageToolContentResolver();
@@ -277,9 +278,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
             token => workspaceManagementService.LoadAsync(token),
             cancellationToken);
         WorkspaceManagement.ApplyInitialState(workspaceState);
-        Run(() => InitializeStoreManagementAsync());
+        Run(cancellationToken => InitializeStoreManagementAsync(cancellationToken));
         AssetsManagement.WorkspaceStructureChanged += (_, _) => RefreshWorkspaceSnapshot();
-        WorkspaceTree.ManageAssetsRequested += (_, selection) => Run(() => OpenManageAssetsAsync(selection));
+        WorkspaceTree.ManageAssetsRequested += (_, selection) => Run(cancellationToken => OpenManageAssetsAsync(selection, cancellationToken));
         DocumentWindow.ActiveContextChanged += (_, context) => CoordinateActiveContext(context);
         DocumentWindow.ToolScopeChangeRequested += (_, scope) => ResolveActiveToolContext(scope);
         DocumentWindow.StageToolSelectionRequested += (_, toolId) => SelectStageTool(toolId);
@@ -309,6 +310,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
 
         _disposed = true;
         CloseCommandAdmission();
+        _shutdownCancellation.Cancel();
         Settings.Ai.SettingsChanged -= OnAiConfigurationChanged;
         Settings.Ai.AvailabilityChanged -= OnAiConfigurationChanged;
         try
@@ -338,6 +340,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
     public async ValueTask DisposeAsync()
     {
         CloseCommandAdmission();
+        _shutdownCancellation.Cancel();
         await WaitForCommandStartsAsync().ConfigureAwait(true);
 
         try
@@ -613,7 +616,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
             return;
         }
 
-        GuardActiveItemInspectorLeave(() => Run(() => MoveStageAsync(item.Id, item.Stage + 1)));
+        GuardActiveItemInspectorLeave(() => Run(token => MoveStageAsync(item.Id, item.Stage + 1, token)));
     }
 
     private async Task MoveStageBackAsync()
@@ -624,13 +627,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
             return;
         }
 
-        GuardActiveItemInspectorLeave(() => Run(() => MoveStageAsync(item.Id, item.Stage - 1)));
+        GuardActiveItemInspectorLeave(() => Run(token => MoveStageAsync(item.Id, item.Stage - 1, token)));
     }
 
-    private async Task MoveStageAsync(Guid itemId, WorkflowStage destination)
+    private async Task MoveStageAsync(Guid itemId, WorkflowStage destination, CancellationToken cancellationToken)
     {
         var result = await _itemManagementService.MoveItemStageAsync(
-            new ItemManagementMoveStageRequest(itemId, destination)).ConfigureAwait(true);
+            new ItemManagementMoveStageRequest(itemId, destination), cancellationToken).ConfigureAwait(true);
         ApplyLifecycleResult(result, nameof(StageMoveError));
     }
 
@@ -667,11 +670,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
                 return;
             }
 
-            Run(() => SetItemStatusAsync(status, confirmed: false));
+            Run(cancellationToken => SetItemStatusAsync(status, confirmed: false, cancellationToken));
         });
     }
 
-    private async Task SetItemStatusAsync(ItemStatus status, bool confirmed)
+    private async Task SetItemStatusAsync(ItemStatus status, bool confirmed, CancellationToken cancellationToken)
     {
         var item = ActiveItem;
         if (item is null)
@@ -680,14 +683,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         }
 
         var result = await _itemManagementService.SetItemStatusAsync(
-            new ItemManagementSetStatusRequest(item.Id, status, ConfirmProtectedTransition: confirmed)).ConfigureAwait(true);
+            new ItemManagementSetStatusRequest(item.Id, status, ConfirmProtectedTransition: confirmed), cancellationToken).ConfigureAwait(true);
         ApplyLifecycleResult(result, nameof(StatusChangeError));
     }
 
     private void InitializeItemCommands()
     {
-        MoveStageForwardCommand = new RelayCommand(_ => Run(() => MoveStageForwardAsync()));
-        MoveStageBackCommand = new RelayCommand(_ => Run(() => MoveStageBackAsync()));
+        MoveStageForwardCommand = new RelayCommand(_ => Run(_ => MoveStageForwardAsync()));
+        MoveStageBackCommand = new RelayCommand(_ => Run(_ => MoveStageBackAsync()));
         SetItemStatusCommand = new RelayCommand(parameter =>
         {
             if (parameter is ItemStatus status)
@@ -734,13 +737,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         if (documentContext is not null)
         {
             DocumentWindow.RefreshContexts(id, WorkspaceEntityKind.Item, documentContext.Context);
-            Run(() => ReloadItemInspectorAsync(id, documentContext.Context.WorkflowStage));
+            Run(cancellationToken => ReloadItemInspectorAsync(id, documentContext.Context.WorkflowStage, cancellationToken));
         }
     }
 
-    private async Task ReloadItemInspectorAsync(Guid itemId, WorkflowStage activeViewStage)
+    private async Task ReloadItemInspectorAsync(
+        Guid itemId,
+        WorkflowStage activeViewStage,
+        CancellationToken cancellationToken)
     {
-        await ItemInspector.LoadAsync(itemId).ConfigureAwait(true);
+        await ItemInspector.LoadAsync(itemId, cancellationToken).ConfigureAwait(true);
         ItemInspector.ApplyStage(activeViewStage);
         RefreshStageToolState();
     }
@@ -777,17 +783,17 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         }
     }
 
-    private async Task InitializeStoreManagementAsync()
+    private async Task InitializeStoreManagementAsync(CancellationToken cancellationToken)
     {
         var activeWorkspaceId = WorkspaceManagement.SelectedWorkspace?.Id;
         try
         {
-            await StoreManagement.SetActiveWorkspaceAsync(activeWorkspaceId).ConfigureAwait(true);
+            await StoreManagement.SetActiveWorkspaceAsync(activeWorkspaceId, cancellationToken).ConfigureAwait(true);
             GroupManagementServiceSetWorkspace(activeWorkspaceId);
-            await StoreManagement.LoadAsync().ConfigureAwait(true);
+            await StoreManagement.LoadAsync(cancellationToken).ConfigureAwait(true);
             if (StoreManagement.SelectedStore is null && StoreManagement.ActiveStores.Count > 0)
             {
-                await StoreManagement.SelectStoreAsync(StoreManagement.ActiveStores[0]).ConfigureAwait(true);
+                await StoreManagement.SelectStoreAsync(StoreManagement.ActiveStores[0], cancellationToken).ConfigureAwait(true);
                 return;
             }
 
@@ -812,19 +818,22 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         }
 
         var generation = Interlocked.Increment(ref _workspaceSwitchGeneration);
-        Run(() => SwitchWorkspaceAsync(workspace, generation));
+        Run(cancellationToken => SwitchWorkspaceAsync(workspace, generation, cancellationToken));
     }
 
-    private async Task SwitchWorkspaceAsync(WorkspaceSummary? workspace, long generation)
+    private async Task SwitchWorkspaceAsync(
+        WorkspaceSummary? workspace,
+        long generation,
+        CancellationToken cancellationToken)
     {
-        await StoreManagement.SetActiveWorkspaceAsync(workspace?.Id).ConfigureAwait(true);
+        await StoreManagement.SetActiveWorkspaceAsync(workspace?.Id, cancellationToken).ConfigureAwait(true);
         if (generation != Interlocked.Read(ref _workspaceSwitchGeneration))
         {
             return;
         }
 
         GroupManagementServiceSetWorkspace(workspace?.Id);
-        if (!await RefreshWorkspaceSnapshotAsync(generation).ConfigureAwait(true))
+        if (!await RefreshWorkspaceSnapshotAsync(generation, cancellationToken).ConfigureAwait(true))
         {
             return;
         }
@@ -877,10 +886,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         RaiseLifecycleProperties();
     }
 
-    private async Task<bool> RefreshWorkspaceSnapshotAsync(long generation)
+    private async Task<bool> RefreshWorkspaceSnapshotAsync(long generation, CancellationToken cancellationToken)
     {
         var snapshot = _workspaceRepository is not null
-            ? await _workspaceRepository.LoadAsync().ConfigureAwait(true)
+            ? await _workspaceRepository.LoadAsync(cancellationToken).ConfigureAwait(true)
             : _workspaceSnapshot;
         if (generation != Interlocked.Read(ref _workspaceSwitchGeneration))
         {
@@ -912,7 +921,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
             && ItemInspector.HasState
             && !ItemInspector.HasUnsavedChanges)
         {
-            Run(() => ItemInspector.LoadAsync(itemId));
+            Run(cancellationToken => ItemInspector.LoadAsync(itemId, cancellationToken));
         }
     }
 
@@ -969,7 +978,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
                 var nicheId = WorkspaceContextResolver.ResolveEffectiveNicheId(_workspaceSnapshot, group.Id);
                 if (nicheId is Guid effectiveNicheId)
                 {
-                    Run(() => GroupDetails.LoadAsync(group.Id, group.StoreId, effectiveNicheId));
+                    Run(cancellationToken => GroupDetails.LoadAsync(group.Id, group.StoreId, effectiveNicheId, cancellationToken));
                 }
             }
 
@@ -999,7 +1008,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
             return;
         }
 
-        Run(() => ItemInspector.LoadAsync(context.Id));
+        Run(cancellationToken => ItemInspector.LoadAsync(context.Id, cancellationToken));
     }
 
     private void InitializeGroupIntegration()
@@ -1055,7 +1064,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         AssetsManagement.SetActiveWorkspace(workspaceId);
     }
 
-    private async Task OpenManageAssetsAsync(WorkspaceTreeSelection selection)
+    private async Task OpenManageAssetsAsync(
+        WorkspaceTreeSelection selection,
+        CancellationToken cancellationToken)
     {
         RefreshWorkspaceSnapshot();
         var storeId = ResolveContextStoreId(selection);
@@ -1064,7 +1075,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
             return;
         }
 
-        await AssetsManagement.OpenForContextAsync(new AssetContextReference(selection.Kind, selection.Id)).ConfigureAwait(false);
+        await AssetsManagement.OpenForContextAsync(
+            new AssetContextReference(selection.Kind, selection.Id),
+            cancellationToken).ConfigureAwait(false);
     }
 
     public async Task OpenManageStoreAssetsAsync()
@@ -1131,20 +1144,20 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
     private void GuardActiveItemInspectorLeave(Action proceed)
     {
         ArgumentNullException.ThrowIfNull(proceed);
-        var commits = new List<Task>(2);
+        var commits = new List<Func<CancellationToken, Task>>(2);
         if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Item }
             && ItemInspector.HasState
             && !ItemInspector.IsReadOnly
             && (ItemInspector.HasUnsavedChanges || ConceptRefinement.HasPendingWorkingEdits))
         {
-            commits.Add(CommitActiveItemDetailsAsync());
+            commits.Add(CommitActiveItemDetailsAsync);
         }
 
         if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Group }
             && GroupDetails.HasState
             && GroupDetails.HasUnsavedChanges)
         {
-            commits.Add(GroupDetails.CommitEditsAsync());
+            commits.Add(GroupDetails.CommitEditsAsync);
         }
 
         if (commits.Count == 0)
@@ -1153,12 +1166,15 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
             return;
         }
 
-        Run(() => CommitAndProceedAsync(commits, proceed));
+        Run(cancellationToken => CommitAndProceedAsync(commits, proceed, cancellationToken));
     }
 
-    private async Task CommitAndProceedAsync(IReadOnlyCollection<Task> commits, Action proceed)
+    private async Task CommitAndProceedAsync(
+        IReadOnlyCollection<Func<CancellationToken, Task>> commits,
+        Action proceed,
+        CancellationToken cancellationToken)
     {
-        await Task.WhenAll(commits).ConfigureAwait(true);
+        await Task.WhenAll(commits.Select(commit => commit(cancellationToken))).ConfigureAwait(true);
         if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Item }
             && ItemInspector.HasState
             && (ItemInspector.HasUnsavedChanges || ConceptRefinement.HasPendingWorkingEdits))
@@ -1186,7 +1202,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
 
         _pendingStatus = null;
         IsStatusConfirmationVisible = false;
-        Run(() => SetItemStatusAsync(status, confirmed: true));
+        Run(cancellationToken => SetItemStatusAsync(status, confirmed: true, cancellationToken));
     }
 
     private void CancelStatusChange()
@@ -1202,19 +1218,19 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
     {
         if (ItemInspector.HasState && !ItemInspector.IsReadOnly)
         {
-            Run(() => CommitActiveItemDetailsAsync());
+            Run(cancellationToken => CommitActiveItemDetailsAsync(cancellationToken));
         }
 
         if (GroupDetails.HasState && !GroupDetails.IsReadOnly)
         {
-            Run(() => GroupDetails.CommitEditsAsync());
+            Run(cancellationToken => GroupDetails.CommitEditsAsync(cancellationToken));
         }
     }
 
-    private async Task CommitActiveItemDetailsAsync()
+    private async Task CommitActiveItemDetailsAsync(CancellationToken cancellationToken = default)
     {
-        await ConceptRefinement.CommitPendingWorkingEditsAsync().ConfigureAwait(true);
-        await ItemInspector.CommitEditsAsync().ConfigureAwait(true);
+        await ConceptRefinement.CommitPendingWorkingEditsAsync(cancellationToken).ConfigureAwait(true);
+        await ItemInspector.CommitEditsAsync(cancellationToken).ConfigureAwait(true);
     }
 
     private void HandleItemLifecycleChanged(ItemInspectorLifecycleEventArgs args)
@@ -1256,7 +1272,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         if (DocumentWindow.ActiveContext is { EntityKind: WorkspaceEntityKind.Item, Id: var itemId }
             && !ItemInspector.HasUnsavedChanges)
         {
-            Run(() => ItemInspector.LoadAsync(itemId));
+            Run(cancellationToken => ItemInspector.LoadAsync(itemId, cancellationToken));
         }
 
         RefreshStageToolState();
@@ -1269,12 +1285,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
             return;
         }
 
-        Run(() => _ideationAccessStatus.RefreshAsync());
-        Run(() => ConceptRefinement.RefreshAvailabilityAsync());
-        Run(() => SllGeneration.RefreshAvailabilityAsync());
-        Run(() => ItemInspector.RefreshTitleOptimizationAvailabilityAsync());
-        Run(() => DesignTool.RefreshArtworkAvailabilityAsync());
-        Run(() => StoreManagement.RefreshNichePopulationAvailabilityAsync());
+        Run(cancellationToken => _ideationAccessStatus.RefreshAsync(cancellationToken));
+        Run(cancellationToken => ConceptRefinement.RefreshAvailabilityAsync(cancellationToken));
+        Run(cancellationToken => SllGeneration.RefreshAvailabilityAsync(cancellationToken));
+        Run(cancellationToken => ItemInspector.RefreshTitleOptimizationAvailabilityAsync(cancellationToken));
+        Run(cancellationToken => DesignTool.RefreshArtworkAvailabilityAsync(cancellationToken));
+        Run(cancellationToken => StoreManagement.RefreshNichePopulationAvailabilityAsync(cancellationToken));
     }
 
     private void RefreshStageToolState()
@@ -1297,17 +1313,17 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
 
         var activeStage = DocumentWindow.ActiveContext?.WorkflowStage ?? item.Stage;
         var canEdit = ItemWorkflowPolicy.CanEditStage(item, activeStage).IsAllowed;
-        Run(() => ListingTool.LoadAsync(item.Id, item.Status, canEdit));
+        Run(cancellationToken => ListingTool.LoadAsync(item.Id, item.Status, canEdit, cancellationToken));
         if (activeStage == WorkflowStage.Design)
         {
-            Run(() => DesignTool.LoadAsync(item.Id, canEdit));
+            Run(cancellationToken => DesignTool.LoadAsync(item.Id, canEdit, cancellationToken));
         }
 
         // Refresh concept refinement availability when Concept surface loads (D8)
         if (activeStage == WorkflowStage.Concept)
         {
-            Run(() => ConceptRefinement.RefreshAvailabilityAsync());
-            Run(() => SllGeneration.RefreshAvailabilityAsync());
+            Run(cancellationToken => ConceptRefinement.RefreshAvailabilityAsync(cancellationToken));
+            Run(cancellationToken => SllGeneration.RefreshAvailabilityAsync(cancellationToken));
         }
     }
 
@@ -1346,7 +1362,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         OnPropertyChanged(nameof(GroupActionStatus));
     }
 
-    private void Run(Func<Task> operation)
+    private void Run(Func<CancellationToken, Task> operation)
     {
         lock (_commandTaskGate)
         {
@@ -1361,7 +1377,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         Task task;
         try
         {
-            task = operation();
+            task = operation(_shutdownCancellation.Token);
         }
         catch
         {

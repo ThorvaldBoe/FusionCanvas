@@ -56,7 +56,7 @@ public class MainWindowViewModelTests
         var operationCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var runInvocation = Task.Run(() => run.Invoke(viewModel, new object[]
         {
-            (Func<Task>)(() =>
+            (Func<CancellationToken, Task>)(_ =>
             {
                 startEntered.Set();
                 releaseStart.Wait();
@@ -84,6 +84,51 @@ public class MainWindowViewModelTests
         operationCompletion.TrySetResult();
         await (disposal ?? viewModel.DisposeAsync().AsTask())
             .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_CancelsAndAwaitsTrackedCommand()
+    {
+        var viewModel = MainWindowViewModelFactory.CreateSample();
+        var waitForCommands = typeof(MainWindowViewModel).GetMethod(
+            "WaitForCommandTasksAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        await ((Task)waitForCommands.Invoke(viewModel, null)!)
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var run = typeof(MainWindowViewModel).GetMethod("Run", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var operationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancellationObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        run.Invoke(viewModel, new object[]
+        {
+            (Func<CancellationToken, Task>)(async cancellationToken =>
+            {
+                operationStarted.TrySetResult();
+                try
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    cancellationObserved.TrySetResult();
+                    throw;
+                }
+            })
+        });
+
+        try
+        {
+            await operationStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            var disposalTask = viewModel.DisposeAsync().AsTask();
+            await cancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await disposalTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            await viewModel.DisposeAsync().AsTask().WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+        }
     }
 
     [Fact]
@@ -495,7 +540,7 @@ public class MainWindowViewModelTests
             "SwitchWorkspaceAsync",
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
             binder: null,
-            types: [typeof(FusionCanvas.Application.Workspaces.WorkspaceSummary), typeof(long)],
+            types: [typeof(FusionCanvas.Application.Workspaces.WorkspaceSummary), typeof(long), typeof(CancellationToken)],
             modifiers: null);
         Assert.NotNull(generationField);
         Assert.NotNull(switchMethod);
@@ -506,12 +551,12 @@ public class MainWindowViewModelTests
         {
             snapshotRepository.SetSnapshot(staleSnapshot);
             generationField.SetValue(viewModel, 1L);
-            staleSwitch = Assert.IsAssignableFrom<Task>(switchMethod.Invoke(viewModel, [clientWorkspace, 1L]));
+            staleSwitch = Assert.IsAssignableFrom<Task>(switchMethod.Invoke(viewModel, [clientWorkspace, 1L, CancellationToken.None]));
             await staleLoad.Started.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
             snapshotRepository.SetSnapshot(latestSnapshot);
             generationField.SetValue(viewModel, 2L);
-            latestSwitch = Assert.IsAssignableFrom<Task>(switchMethod.Invoke(viewModel, [personalWorkspace, 2L]));
+            latestSwitch = Assert.IsAssignableFrom<Task>(switchMethod.Invoke(viewModel, [personalWorkspace, 2L, CancellationToken.None]));
             await latestSwitch.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.Contains(viewModel.NavigationContexts, context => context.Context.Title == "Latest Personal Item");
 
