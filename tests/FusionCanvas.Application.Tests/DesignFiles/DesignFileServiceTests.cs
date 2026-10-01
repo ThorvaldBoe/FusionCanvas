@@ -40,6 +40,38 @@ public class DesignFileServiceTests
     }
 
     [Fact]
+    public async Task ImportAsync_ReportsMissingSourceWhenFileStoreCannotFindIt()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot);
+        var fileStore = new FakeFileStore { ImportFailure = new FileNotFoundException("source missing") };
+        var service = new DesignFileService(repository, fileStore);
+
+        var result = await service.ImportAsync(sample.Item.Id, sample.SourcePngPath, TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("The selected source file was not found.", result.Error);
+        Assert.Empty(fileStore.Imports);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task ImportAsync_ReportsFileStoreFailure()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot);
+        var fileStore = new FakeFileStore { ImportFailure = new IOException("disk full") };
+        var service = new DesignFileService(repository, fileStore);
+
+        var result = await service.ImportAsync(sample.Item.Id, sample.SourcePngPath, TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("The Design file could not be imported. disk full", result.Error);
+        Assert.Empty(fileStore.Imports);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Fact]
     public async Task ImportAsync_RejectsPublishedItem()
     {
         var sample = Sample.Create();
@@ -146,12 +178,18 @@ public class DesignFileServiceTests
     private sealed class FakeFileStore : IWorkspaceFileStore
     {
         public string WorkspaceRoot => "C:/workspace";
+        public Exception? ImportFailure { get; init; }
         public List<string> Imports { get; } = [];
         public List<string> Deletes { get; } = [];
         public HashSet<string> Existing { get; } = [];
 
         public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, AssetKind kind, CancellationToken cancellationToken = default)
         {
+            if (ImportFailure is not null)
+            {
+                throw ImportFailure;
+            }
+
             Imports.Add(sourcePath);
             var relative = $"assets/{Guid.NewGuid():N}.png";
             Existing.Add(relative);
