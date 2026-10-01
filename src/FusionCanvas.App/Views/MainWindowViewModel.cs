@@ -87,7 +87,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         IAiTextGenerationService ai,
         AppWorkspaceRuntime? workspace = null,
         IAiImageGenerationProvider? artworkProvider = null,
-        ITelemetryService? telemetry = null,
+        ITelemetryRecorder? telemetry = null,
         CancellationToken cancellationToken = default) =>
         new(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),

@@ -525,6 +525,20 @@ public class OpenRouterClientTests
     }
 
     [Fact]
+    public async Task ValidateAsync_AcceptsRecordOnlyTelemetryContract()
+    {
+        var telemetry = new RecordingTelemetryRecorder();
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK, """{"data":{"is_management_key":true}}"""));
+        var client = new OpenRouterClient(
+            new HttpClient(handler) { BaseAddress = OpenRouterClient.DefaultBaseAddress }, telemetry);
+
+        var result = await client.ValidateAsync("sensitive-api-key", TestContext.Current.CancellationToken);
+
+        Assert.Equal(AiCredentialValidationKind.ManagementKey, result.Kind);
+        Assert.Contains(telemetry.Records, request => request.Name == "HttpResponse");
+    }
+
+    [Fact]
     public async Task GenerateAsync_WhenCallerCancels_RecordsCancelledTelemetryAndRethrows()
     {
         using var temp = new TelemetryTestDirectory();
@@ -651,6 +665,19 @@ public class OpenRouterClientTests
     {
         public Guid? ActiveWorkspaceId { get; private set; } = activeWorkspaceId;
         public void SetActiveWorkspace(Guid? workspaceId) => ActiveWorkspaceId = workspaceId;
+    }
+
+    private sealed class RecordingTelemetryRecorder : ITelemetryRecorder
+    {
+        public bool IsCaptureEnabled => true;
+
+        public List<TelemetryEventRequest> Records { get; } = [];
+
+        public Task RecordAsync(TelemetryEventRequest request, CancellationToken cancellationToken = default)
+        {
+            Records.Add(request);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class TelemetryTestDirectory : IDisposable
