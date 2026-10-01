@@ -14,17 +14,20 @@ public sealed class DesignStageService : IDesignStageService
 {
     private readonly IWorkspaceRepository _repository;
     private readonly IWorkspaceFileStore _fileStore;
+    private readonly IAiImageProvenanceCodec _provenanceCodec;
     private readonly Func<DateTimeOffset> _clock;
     private readonly Func<Guid> _newId;
 
     public DesignStageService(
         IWorkspaceRepository repository,
         IWorkspaceFileStore fileStore,
+        IAiImageProvenanceCodec provenanceCodec,
         Func<DateTimeOffset>? clock = null,
         Func<Guid>? newId = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _fileStore = fileStore ?? throw new ArgumentNullException(nameof(fileStore));
+        _provenanceCodec = provenanceCodec ?? throw new ArgumentNullException(nameof(provenanceCodec));
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _newId = newId ?? Guid.NewGuid;
     }
@@ -734,7 +737,7 @@ public sealed class DesignStageService : IDesignStageService
         if (oldAssetId is not null)
         {
             var oldAsset = snapshot.Assets.SingleOrDefault(a => a.Id == oldAssetId);
-            var preserveGenerated = oldAsset is not null && AiImageProvenanceCodec.TryDeserialize(oldAsset.MetadataJson, out _);
+            var preserveGenerated = oldAsset is not null && _provenanceCodec.TryDeserialize(oldAsset.MetadataJson, out _);
             if (oldAsset is not null && !preserveGenerated)
             {
                 updatedAssets.RemoveAll(a => a.Id == oldAssetId);
@@ -763,7 +766,7 @@ public sealed class DesignStageService : IDesignStageService
         if (oldAssetId is not null)
         {
             var oldAsset = snapshot.Assets.SingleOrDefault(a => a.Id == oldAssetId);
-            var preserveGenerated = oldAsset is not null && AiImageProvenanceCodec.TryDeserialize(oldAsset.MetadataJson, out _);
+            var preserveGenerated = oldAsset is not null && _provenanceCodec.TryDeserialize(oldAsset.MetadataJson, out _);
             if (oldAsset is not null && !preserveGenerated)
             {
                 _fileStore.TryDelete(oldAsset.WorkspaceRelativePath);
@@ -1082,11 +1085,11 @@ public sealed class DesignStageService : IDesignStageService
             .Where(l => l.EntityKind == WorkspaceEntityKind.Item && l.EntityId == itemId)
             .Select(l => snapshot.Assets.SingleOrDefault(a => a.Id == l.AssetId))
             .Where(a => a is not null)
-            .Where(a => a!.Kind != AssetKind.ExportedImage || AiImageProvenanceCodec.TryDeserialize(a.MetadataJson, out _))
+            .Where(a => a!.Kind != AssetKind.ExportedImage || _provenanceCodec.TryDeserialize(a.MetadataJson, out _))
             .OrderByDescending(a => a!.Kind == AssetKind.ExportedImage ? a.CreatedAt : DateTimeOffset.MinValue)
             .Select(a => new DesignSlotSummary(
                 a!.Id,
-                a.Kind == AssetKind.ExportedImage && AiImageProvenanceCodec.TryDeserialize(a.MetadataJson, out var provenance)
+                a.Kind == AssetKind.ExportedImage && _provenanceCodec.TryDeserialize(a.MetadataJson, out var provenance)
                     ? $"Generated artwork · {provenance!.FinalSize.Width}×{provenance.FinalSize.Height}px"
                     : a.Name,
                 a.Id,
@@ -1096,7 +1099,7 @@ public sealed class DesignStageService : IDesignStageService
                 !a.IsMissing)
             {
                 IsGenerated = a.Kind == AssetKind.ExportedImage,
-                ArtworkWarning = a.Kind == AssetKind.ExportedImage && AiImageProvenanceCodec.TryDeserialize(a.MetadataJson, out var generatedProvenance)
+                ArtworkWarning = a.Kind == AssetKind.ExportedImage && _provenanceCodec.TryDeserialize(a.MetadataJson, out var generatedProvenance)
                     ? generatedProvenance!.Warnings?.FirstOrDefault()
                     : null
             })

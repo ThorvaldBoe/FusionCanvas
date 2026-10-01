@@ -1,19 +1,20 @@
 using System.Text.Json;
+using FusionCanvas.Application.AI;
 
-namespace FusionCanvas.Application.AI;
+namespace FusionCanvas.Integration.AI;
 
-public static class AiImageProvenanceCodec
+public sealed class AiImageProvenanceCodec : IAiImageProvenanceCodec
 {
     public const int CurrentVersion = 1;
     private static readonly JsonSerializerOptions Options = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, PropertyNameCaseInsensitive = true };
 
-    public static string Serialize(AiImageProvenance provenance)
+    public string Serialize(AiImageProvenance provenance)
     {
         ArgumentNullException.ThrowIfNull(provenance);
         return JsonSerializer.Serialize(new Envelope(CurrentVersion, provenance), Options);
     }
 
-    public static bool TryDeserialize(string? json, out AiImageProvenance? provenance)
+    public bool TryDeserialize(string? json, out AiImageProvenance? provenance)
     {
         provenance = null;
         if (string.IsNullOrWhiteSpace(json)) return false;

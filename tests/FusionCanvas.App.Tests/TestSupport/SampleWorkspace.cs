@@ -31,6 +31,7 @@ using FusionCanvas.Application.AI;
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Integration.Files;
+using FusionCanvas.Integration.AI;
 using FusionCanvas.Integration.SllGeneration;
 
 namespace FusionCanvas.App.Tests.TestSupport;
@@ -140,7 +141,7 @@ internal static class MainWindowViewModelFactory
                 DisabledIdeaGenerator.Instance,
                 EmptySnowcloneCatalog.Instance,
                 accessStatus),
-            new DesignStageService(repository, fileStore),
+            new DesignStageService(repository, fileStore, new AiImageProvenanceCodec()),
             new SllDocumentCodec(),
             null);
 

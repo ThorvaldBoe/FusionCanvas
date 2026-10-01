@@ -37,7 +37,7 @@ public sealed class ArtworkGenerationServiceTests
         });
         var provider = new Provider();
         var files = new Files { SaveFailure = failSave ? new IOException("File store failed.") : null };
-        var service = new ArtworkGenerationService(repo, files, provider, new Normalizer(), () => now, Guid.NewGuid);
+        var service = new ArtworkGenerationService(repo, files, new TestAiImageProvenanceCodec(), provider, new Normalizer(), () => now, Guid.NewGuid);
         var model = new AiModelDescriptor("image/model", "Image", null, null, ["text"], ["image"], [], null, null, null, null, true, null);
         var request = new ArtworkGenerationRequest(item.Id, area.Id, "secret", AiProfileSettings.Empty with { ModelId = model.Id }, [model],
             [new AiImageEndpointCapabilities("endpoint", model.Id, true, true, ["png"], [new(1200, 1400)], true)], false);
@@ -54,7 +54,7 @@ public sealed class ArtworkGenerationServiceTests
             Assert.Single(repo.Snapshot.Assets);
             Assert.Equal(repo.Snapshot.Assets[0].Id, repo.Snapshot.DesignSlotAssignments.Single().AssetId);
             Assert.Single(repo.Snapshot.AssetLinks);
-            Assert.Contains("RUN", repo.Snapshot.Assets[0].MetadataJson);
+            Assert.Equal("test-provenance", repo.Snapshot.Assets[0].MetadataJson);
             Assert.Equal(1, provider.Calls);
             Assert.Equal(new AiImageSize(1200, 1400), provider.LastRequest!.Options!.Size);
         }
