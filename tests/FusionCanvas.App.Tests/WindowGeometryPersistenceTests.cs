@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using FusionCanvas.App.Settings;
 using FusionCanvas.Application.Settings;
 using FusionCanvas.App.Views;
 

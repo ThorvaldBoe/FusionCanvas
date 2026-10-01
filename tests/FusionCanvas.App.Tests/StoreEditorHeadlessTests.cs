@@ -7,6 +7,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.VisualTree;
+using FusionCanvas.App.Settings;
 using FusionCanvas.App.Stores;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;

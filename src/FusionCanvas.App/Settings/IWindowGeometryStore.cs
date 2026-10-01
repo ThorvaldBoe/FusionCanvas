@@ -1,4 +1,6 @@
-namespace FusionCanvas.Application.Settings;
+using FusionCanvas.Application.Settings;
+
+namespace FusionCanvas.App.Settings;
 
 public interface IWindowGeometryStore
 {

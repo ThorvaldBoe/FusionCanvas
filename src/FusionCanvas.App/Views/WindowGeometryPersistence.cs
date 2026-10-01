@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using FusionCanvas.App.Settings;
 using FusionCanvas.Application.Settings;
 using System.Runtime.InteropServices;
 

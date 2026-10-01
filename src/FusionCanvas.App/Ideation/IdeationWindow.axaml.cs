@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using System.ComponentModel;
+using FusionCanvas.App.Settings;
 using FusionCanvas.App.RejectedPhrases;
 using FusionCanvas.App.Snowclones;
 using FusionCanvas.App.Views;
