@@ -12,8 +12,6 @@ namespace FusionCanvas.Application.Ideation;
 
 public sealed class IdeationService : IIdeationService
 {
-    public const int MinimumCount = 1;
-    public const int MaximumCount = 20;
     public const int MaximumConcurrency = 4;
 
     private static readonly Regex Whitespace = new(@"\s+", RegexOptions.Compiled);
@@ -65,9 +63,11 @@ public sealed class IdeationService : IIdeationService
             return IdeationGenerationResult.Failure("The selected Ideation mode is not supported.", request.Count);
         }
 
-        if (request.Count is < MinimumCount or > MaximumCount)
+        if (!IdeationCountPolicy.IsValid(request.Count))
         {
-            return IdeationGenerationResult.Failure($"Idea count must be between {MinimumCount} and {MaximumCount}.", request.Count);
+            return IdeationGenerationResult.Failure(
+                $"Idea count must be between {IdeationCountPolicy.MinimumCount} and {IdeationCountPolicy.MaximumCount}.",
+                request.Count);
         }
 
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
