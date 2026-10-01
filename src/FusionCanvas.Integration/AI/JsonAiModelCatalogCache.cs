@@ -15,8 +15,9 @@ public sealed class JsonAiModelCatalogCache : IAiModelCatalogCache
         PropertyNameCaseInsensitive = true,
         WriteIndented = true
     };
+    private readonly Func<DateTimeOffset> _clock;
 
-    public JsonAiModelCatalogCache(string directoryPath)
+    public JsonAiModelCatalogCache(string directoryPath, Func<DateTimeOffset>? clock = null)
     {
         if (string.IsNullOrWhiteSpace(directoryPath))
         {
@@ -24,6 +25,7 @@ public sealed class JsonAiModelCatalogCache : IAiModelCatalogCache
         }
 
         DirectoryPath = Path.GetFullPath(directoryPath);
+        _clock = clock ?? (() => DateTimeOffset.UtcNow);
     }
 
     public string DirectoryPath { get; }
@@ -59,7 +61,7 @@ public sealed class JsonAiModelCatalogCache : IAiModelCatalogCache
 
             return document.Catalog with
             {
-                IsStale = DateTimeOffset.UtcNow - document.Catalog.RetrievedAt > StaleAfter
+                IsStale = _clock() - document.Catalog.RetrievedAt > StaleAfter
             };
         }
         catch (OperationCanceledException)

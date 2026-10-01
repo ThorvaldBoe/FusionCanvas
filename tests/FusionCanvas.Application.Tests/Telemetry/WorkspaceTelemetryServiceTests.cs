@@ -43,6 +43,33 @@ public sealed class WorkspaceTelemetryServiceTests
     }
 
     [Fact]
+    public async Task RecordAsync_AndCleanupExpiredAsync_UseInjectedClock()
+    {
+        var workspace = Guid.NewGuid();
+        var now = new DateTimeOffset(2026, 1, 2, 12, 0, 0, TimeSpan.Zero);
+        var store = new MemoryTelemetryStore();
+        var context = new TestWorkspaceContext(workspace);
+        using var service = new WorkspaceTelemetryService(store, context, () => now);
+        await service.SaveSettingsAsync(workspace, WorkspaceTelemetrySettings.Default with { DebugModeEnabled = true });
+
+        await service.RecordAsync(Event("captured at the injected time"));
+
+        store.Entries.Add(new TelemetryEntry(
+            Guid.NewGuid(), workspace, now.AddDays(-1).AddTicks(-1), "Workspace", "Expired", "Information",
+            "Succeeded", "expired", null, null, null, null, null, null));
+        store.Entries.Add(new TelemetryEntry(
+            Guid.NewGuid(), workspace, now.AddDays(-1), "Workspace", "Boundary", "Information",
+            "Succeeded", "retained at the cutoff", null, null, null, null, null, null));
+
+        await service.CleanupExpiredAsync(workspace);
+
+        Assert.Contains(store.Entries, entry => entry.Message == "captured at the injected time" && entry.OccurredAt == now);
+        Assert.DoesNotContain(store.Entries, entry => entry.Message == "expired");
+        Assert.Contains(store.Entries, entry => entry.Message == "retained at the cutoff");
+        Assert.Equal(now.AddDays(-1), store.LastExpirationCutoff);
+    }
+
+    [Fact]
     public async Task RecordAsync_WhenStoreFails_DoesNotPropagateTelemetryFailure()
     {
         var workspace = Guid.NewGuid();
@@ -118,6 +145,7 @@ public sealed class WorkspaceTelemetryServiceTests
         private readonly Dictionary<Guid, WorkspaceTelemetrySettings> _settings = [];
         public List<TelemetryEntry> Entries { get; } = [];
         public bool FailWrites { get; init; }
+        public DateTimeOffset? LastExpirationCutoff { get; private set; }
 
         public Task<WorkspaceTelemetrySettings> ReadSettingsAsync(Guid workspaceId, CancellationToken cancellationToken = default) =>
             Task.FromResult(_settings.GetValueOrDefault(workspaceId, WorkspaceTelemetrySettings.Default));
@@ -143,6 +171,7 @@ public sealed class WorkspaceTelemetryServiceTests
         }
         public Task<int> DeleteExpiredAsync(Guid workspaceId, DateTimeOffset cutoff, CancellationToken cancellationToken = default)
         {
+            LastExpirationCutoff = cutoff;
             var count = Entries.RemoveAll(entry => entry.WorkspaceId == workspaceId && entry.OccurredAt < cutoff);
             return Task.FromResult(count);
         }
