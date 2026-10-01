@@ -16,13 +16,14 @@ public sealed class HeadlessInfrastructureTests
     public async Task Wait_observes_state_published_by_a_continuation()
     {
         var published = false;
-        _ = Task.Run(async () =>
+        var continuation = Task.Run(async () =>
         {
             await Task.Yield();
             published = true;
         });
 
         await TestSupport.HeadlessUiWait.UntilAsync(() => published, "published state");
+        await continuation;
         Assert.True(published);
     }
 
