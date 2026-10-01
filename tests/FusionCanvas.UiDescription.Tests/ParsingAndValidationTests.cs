@@ -6,6 +6,21 @@ namespace FusionCanvas.UiDescription.Tests;
 public sealed class ParsingAndValidationTests
 {
     [Fact]
+    public void Parser_disposes_the_yaml_reader_it_creates()
+    {
+        var parserSource = File.ReadAllText(Path.Combine(
+            TestSupport.RepositoryRoot,
+            "tools",
+            "FusionCanvas.UiDescription",
+            "Parsing",
+            "UiDescriptionParser.cs"));
+
+        Assert.Contains("using var reader = new StringReader(source);", parserSource, StringComparison.Ordinal);
+        Assert.Contains("yaml.Load(reader);", parserSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("yaml.Load(new StringReader(source));", parserSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Parser_accepts_supported_document_and_captures_locations()
     {
         var result = new UiDescriptionParser().Parse(TestSupport.MinimalYaml, "sample.ui.yaml");
