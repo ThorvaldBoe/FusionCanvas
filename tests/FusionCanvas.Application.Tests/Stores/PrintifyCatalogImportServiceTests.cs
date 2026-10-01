@@ -97,6 +97,46 @@ public sealed class PrintifyCatalogImportServiceTests
     }
 
     [Fact]
+    public async Task ReturnsSafeFailureWhenRepositoryLoadFails()
+    {
+        var store = TestStore();
+        var repository = TestRepository(store);
+        repository.LoadException = new IOException("Persistence failed.");
+        var client = new ClientStub
+        {
+            SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [Product("product-a", "Tee")])
+        };
+
+        var result = await TestService(store, repository, client)
+            .LoadSelectedAsync(new(store.WorkspaceId, store.Id), [68], TestContext.Current.CancellationToken);
+
+        Assert.Equal(PrintifyCatalogResultKind.UnexpectedResponse, result.Kind);
+        Assert.Equal("Printify catalog data could not be saved safely. No imported records were committed.", result.Message);
+        Assert.Equal(0, repository.SaveCount);
+        Assert.Empty(repository.Snapshot.Blueprints);
+    }
+
+    [Fact]
+    public async Task ReturnsSafeFailureWhenRepositorySaveFails()
+    {
+        var store = TestStore();
+        var repository = TestRepository(store);
+        repository.SaveException = new IOException("Persistence failed.");
+        var client = new ClientStub
+        {
+            SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [Product("product-a", "Tee")])
+        };
+
+        var result = await TestService(store, repository, client)
+            .LoadSelectedAsync(new(store.WorkspaceId, store.Id), [68], TestContext.Current.CancellationToken);
+
+        Assert.Equal(PrintifyCatalogResultKind.UnexpectedResponse, result.Kind);
+        Assert.Equal("Printify catalog data could not be saved safely. No imported records were committed.", result.Message);
+        Assert.Equal(1, repository.SaveCount);
+        Assert.Empty(repository.Snapshot.Blueprints);
+    }
+
+    [Fact]
     public async Task UsesInjectedClockAndIdSourcesForImportedRecords()
     {
         var store = TestStore();
@@ -533,8 +573,22 @@ public sealed class PrintifyCatalogImportServiceTests
     private sealed class RepositoryStub(WorkspaceSnapshot initial) : IWorkspaceRepository
     {
         public WorkspaceSnapshot Snapshot { get; private set; } = initial;
+        public Exception? LoadException { get; set; }
+        public Exception? SaveException { get; set; }
+        public int SaveCount { get; private set; }
         public void SetSnapshot(WorkspaceSnapshot snapshot) => Snapshot = snapshot;
-        public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(Snapshot);
-        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default) { Snapshot = snapshot; return Task.CompletedTask; }
+        public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default)
+        {
+            if (LoadException is not null) throw LoadException;
+            return Task.FromResult(Snapshot);
+        }
+
+        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
+        {
+            SaveCount++;
+            if (SaveException is not null) throw SaveException;
+            Snapshot = snapshot;
+            return Task.CompletedTask;
+        }
     }
 }
