@@ -11,7 +11,10 @@ public sealed class WorkspaceTelemetryService : ITelemetryService, IDisposable
     private readonly ITelemetryWorkspaceContext _workspaceContext;
     private readonly Func<DateTimeOffset> _clock;
     private readonly object _gate = new();
+    private readonly CancellationTokenSource _cleanupCancellation = new();
+    private readonly CancellationToken _cleanupCancellationToken;
     private readonly Timer _cleanupTimer;
+    private int _disposed;
     private WorkspaceTelemetrySettings _activeSettings = WorkspaceTelemetrySettings.Default;
     private Guid? _settingsWorkspaceId;
 
@@ -23,7 +26,8 @@ public sealed class WorkspaceTelemetryService : ITelemetryService, IDisposable
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _workspaceContext = workspaceContext ?? throw new ArgumentNullException(nameof(workspaceContext));
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
-        _cleanupTimer = new Timer(_ => _ = CleanupActiveWorkspaceAsync(), null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
+        _cleanupCancellationToken = _cleanupCancellation.Token;
+        _cleanupTimer = new Timer(_ => _ = RunScheduledCleanupAsync(), null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
     }
 
     public event EventHandler<TelemetryEntry>? EntryRecorded;
@@ -153,12 +157,17 @@ public sealed class WorkspaceTelemetryService : ITelemetryService, IDisposable
             _ => TimeSpan.FromDays(1)
         }), cancellationToken);
 
-    private async Task CleanupActiveWorkspaceAsync()
+    internal Task RunScheduledCleanupAsync() => CleanupActiveWorkspaceAsync(_cleanupCancellationToken);
+
+    private async Task CleanupActiveWorkspaceAsync(CancellationToken cancellationToken)
     {
         if (_workspaceContext.ActiveWorkspaceId is not { } workspaceId) return;
         try
         {
-            await CleanupExpiredAsync(workspaceId).ConfigureAwait(false);
+            await CleanupExpiredAsync(workspaceId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
         }
         catch (Exception exception)
         {
@@ -166,5 +175,12 @@ public sealed class WorkspaceTelemetryService : ITelemetryService, IDisposable
         }
     }
 
-    public void Dispose() => _cleanupTimer.Dispose();
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+
+        _cleanupCancellation.Cancel();
+        _cleanupTimer.Dispose();
+        _cleanupCancellation.Dispose();
+    }
 }

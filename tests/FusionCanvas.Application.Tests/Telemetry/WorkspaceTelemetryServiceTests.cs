@@ -84,6 +84,23 @@ public sealed class WorkspaceTelemetryServiceTests
     }
 
     [Fact]
+    public async Task Dispose_CancelsScheduledCleanup()
+    {
+        var workspace = Guid.NewGuid();
+        var store = new MemoryTelemetryStore { BlockExpirationCleanup = true };
+        var context = new TestWorkspaceContext(workspace);
+        using var service = new WorkspaceTelemetryService(store, context);
+
+        var cleanup = service.RunScheduledCleanupAsync();
+        await store.ExpirationStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        service.Dispose();
+
+        await store.ExpirationCanceled.Task.WaitAsync(TestContext.Current.CancellationToken);
+        await cleanup;
+    }
+
+    [Fact]
     public void SecretRedactor_SanitizesStringValuesInArraysAndJsonScalars()
     {
         var array = TelemetrySecretRedactor.Sanitize(Event("safe", "[\"Bearer token-value\",\"api_key=other-value&mode=fast\"]"));
@@ -145,6 +162,9 @@ public sealed class WorkspaceTelemetryServiceTests
         private readonly Dictionary<Guid, WorkspaceTelemetrySettings> _settings = [];
         public List<TelemetryEntry> Entries { get; } = [];
         public bool FailWrites { get; init; }
+        public bool BlockExpirationCleanup { get; init; }
+        public TaskCompletionSource<object?> ExpirationStarted { get; } = new();
+        public TaskCompletionSource<object?> ExpirationCanceled { get; } = new();
         public DateTimeOffset? LastExpirationCutoff { get; private set; }
 
         public Task<WorkspaceTelemetrySettings> ReadSettingsAsync(Guid workspaceId, CancellationToken cancellationToken = default) =>
@@ -171,9 +191,27 @@ public sealed class WorkspaceTelemetryServiceTests
         }
         public Task<int> DeleteExpiredAsync(Guid workspaceId, DateTimeOffset cutoff, CancellationToken cancellationToken = default)
         {
+            if (BlockExpirationCleanup) return WaitForExpirationCancellationAsync(cancellationToken);
+
             LastExpirationCutoff = cutoff;
             var count = Entries.RemoveAll(entry => entry.WorkspaceId == workspaceId && entry.OccurredAt < cutoff);
             return Task.FromResult(count);
+        }
+
+        private async Task<int> WaitForExpirationCancellationAsync(CancellationToken cancellationToken)
+        {
+            ExpirationStarted.TrySetResult(null);
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                ExpirationCanceled.TrySetResult(null);
+                throw;
+            }
+
+            return 0;
         }
     }
 }
