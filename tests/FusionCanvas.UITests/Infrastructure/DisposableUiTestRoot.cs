@@ -1,3 +1,5 @@
+using Microsoft.Data.Sqlite;
+
 namespace FusionCanvas.UITests.Infrastructure;
 
 internal sealed class DisposableUiTestRoot : IDisposable
@@ -50,6 +52,7 @@ internal sealed class DisposableUiTestRoot : IDisposable
             throw new InvalidOperationException($"Refusing to clean a path outside disposable UI test root '{_rootPath}'.");
         }
 
+        SqliteConnection.ClearAllPools();
         var deadline = DateTime.UtcNow.AddSeconds(5);
         while (true)
         {

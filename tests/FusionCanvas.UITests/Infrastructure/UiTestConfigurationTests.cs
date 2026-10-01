@@ -1,3 +1,5 @@
+using FusionCanvas.Integration.Persistence;
+
 namespace FusionCanvas.UITests.Infrastructure;
 
 public sealed class UiTestConfigurationTests
@@ -35,6 +37,24 @@ public sealed class UiTestConfigurationTests
         Assert.Contains("--fusioncanvas-workspace-db", arguments);
         Assert.Contains(root.DatabasePath, arguments);
         Assert.Contains("--fusioncanvas-settings-path", arguments);
+    }
+
+    [Fact]
+    public async Task DisposableUiTestRoot_ClearsPooledTelemetryConnectionsBeforeDeletingRoot()
+    {
+        var root = new DisposableUiTestRoot();
+        try
+        {
+            await new SqliteTelemetryStore(root.DatabasePath).ReadAllAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
+
+            root.Dispose();
+
+            Assert.False(Directory.Exists(root.RootPath));
+        }
+        finally
+        {
+            root.Dispose();
+        }
     }
 
     [Fact]
