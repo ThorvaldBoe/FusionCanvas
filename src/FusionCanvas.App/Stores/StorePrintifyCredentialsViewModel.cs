@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Avalonia.Threading;
+using FusionCanvas.App.Commands;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Settings;
 using FusionCanvas.Application.Stores;
