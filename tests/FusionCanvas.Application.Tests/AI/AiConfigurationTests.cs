@@ -1,3 +1,4 @@
+using System.Globalization;
 using FusionCanvas.Application.AI;
 
 namespace FusionCanvas.Application.Tests.AI;
@@ -64,6 +65,48 @@ public class AiConfigurationTests
         var sizes = new[] { new AiImageSize(1024, 1365), new AiImageSize(1536, 2048), new AiImageSize(2048, 2731) };
 
         Assert.Equal(new AiImageSize(1024, 1365), AiImageEndpointPolicy.SelectSize(sizes, target));
+    }
+
+    [Fact]
+    public void ImageEndpointPolicy_ParsesProviderRatioAndResolutionInvariantly()
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+        var originalUiCulture = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("de-DE");
+
+            var endpoint = new AiImageEndpointCapabilities(
+                "provider",
+                "image/model",
+                true,
+                true,
+                ["png"],
+                [],
+                false,
+                "Provider",
+                new AiImageEndpointParameterCapabilities(
+                    ["1.5:2", "1:1"],
+                    ["1.5K"],
+                    false,
+                    false,
+                    [],
+                    true));
+
+            var selected = AiImageEndpointPolicy.SelectEndpoint(
+                [endpoint], endpoint.ModelId, true, false, new AiImageSize(1200, 1600));
+
+            Assert.NotNull(selected);
+            Assert.Equal("1.5:2", selected.Options.AspectRatio);
+            Assert.Equal("1.5K", selected.Options.Resolution);
+            Assert.Equal(new AiImageSize(1152, 1536), selected.ProviderSize);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUiCulture;
+        }
     }
 
     [Fact]
