@@ -57,7 +57,8 @@ public sealed partial class UiDescriptionParser
         var yaml = new YamlStream();
         try
         {
-            yaml.Load(new StringReader(source));
+            using var reader = new StringReader(source);
+            yaml.Load(reader);
         }
         catch (YamlException exception)
         {
