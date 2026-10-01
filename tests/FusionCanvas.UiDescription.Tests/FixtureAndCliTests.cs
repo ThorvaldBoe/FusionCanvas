@@ -9,6 +9,8 @@ namespace FusionCanvas.UiDescription.Tests;
 
 public sealed class FixtureAndCliTests
 {
+    private static readonly SemaphoreSlim WorkingDirectoryLock = new(1, 1);
+
     public static TheoryData<string, string, string[]> Fixtures => new()
     {
         {
@@ -108,6 +110,54 @@ public sealed class FixtureAndCliTests
         finally
         {
             File.Delete(destination);
+        }
+    }
+
+    [Fact]
+    public async Task Cli_relative_output_path_is_resolved_against_the_process_working_directory()
+    {
+        var source = Path.Combine(TestSupport.RepositoryRoot, "docs", "Visuals", "ui-descriptions", "manage-variants.ui.yaml");
+        var expected = Path.Combine(TestSupport.RepositoryRoot, "docs", "Visuals", "ui-descriptions", "manage-variants.default.svg");
+        var originalWorkingDirectory = Environment.CurrentDirectory;
+        var workingDirectory = Path.Combine(Path.GetTempPath(), $"ui-description-working-directory-{Guid.NewGuid():N}");
+        var relativeDestination = Path.Combine("nested", "rendered.svg");
+
+        Directory.CreateDirectory(workingDirectory);
+        await WorkingDirectoryLock.WaitAsync(TestContext.Current.CancellationToken);
+        try
+        {
+            Directory.SetCurrentDirectory(workingDirectory);
+            var standardOutput = new StringWriter();
+            var errorOutput = new StringWriter();
+
+            var exit = await UiDescriptionCli.RunAsync(
+                ["render", source, "--state", "default", "--output", relativeDestination],
+                standardOutput,
+                errorOutput);
+
+            var destination = Path.Combine(workingDirectory, relativeDestination);
+            Assert.Equal(UiDescriptionCli.Success, exit);
+            Assert.Empty(errorOutput.ToString());
+            Assert.Equal(File.ReadAllBytes(expected), File.ReadAllBytes(destination));
+            Assert.Contains(destination, standardOutput.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            try
+            {
+                Directory.SetCurrentDirectory(originalWorkingDirectory);
+            }
+            finally
+            {
+                try
+                {
+                    Directory.Delete(workingDirectory, recursive: true);
+                }
+                finally
+                {
+                    WorkingDirectoryLock.Release();
+                }
+            }
         }
     }
 
