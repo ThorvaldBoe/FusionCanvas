@@ -492,6 +492,7 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged, 
         {
             var result = await _service.InitializeAsync(
                 EnsureSessionItemId(),
+                CaptureTriangle(),
                 _inspector.Idea,
                 ct).ConfigureAwait(true);
             return result;
@@ -880,9 +881,10 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged, 
         !string.IsNullOrWhiteSpace(value);
 
     private bool HasAnyNonWhitespaceCorner() =>
-        HasNonWhitespace(ConceptIdeaInput)
-        || HasNonWhitespace(PhraseInput)
-        || HasNonWhitespace(GraphicDirectionInput);
+        !ConceptRefinementInitializationPolicy.AreConceptFieldsEmpty(
+            ConceptIdeaInput,
+            PhraseInput,
+            GraphicDirectionInput);
 
     private void SyncInputsFromInspector()
     {
