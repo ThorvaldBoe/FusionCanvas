@@ -34,6 +34,27 @@ public sealed class MockupGenerationApplicabilityRegressionTests
         Assert.Equal(1, compositor.Calls); Assert.Equal(1, fixture.Files.SaveCount);
     }
 
+    [Fact]
+    public async Task Apply_reports_persisted_outputs_when_later_color_work_is_cancelled()
+    {
+        var fixture = AddSecondColor(CreateFixture(false));
+        var repository = new MemoryRepository(fixture.Snapshot);
+        var compositor = new CountingCompositor();
+        var service = new MockupGenerationService(repository, fixture.Files, new MockupTemplateSetupService(repository), compositor);
+        using var cancellation = new CancellationTokenSource();
+        repository.AfterSave = () => cancellation.Cancel();
+
+        var result = await service.ApplyAsync(new(fixture.Item.Id, fixture.Template.Id), cancellation.Token);
+
+        Assert.True(result.Succeeded);
+        var output = Assert.Single(result.Outputs);
+        Assert.Equal("Black", output.ColorValue);
+        Assert.Contains("cancelled", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, compositor.Calls);
+        Assert.Equal(1, fixture.Files.SaveCount);
+        Assert.Single(repository.Snapshot.AssetLinks.Where(link => link.EntityId == fixture.Item.Id));
+    }
+
     private static Fixture CreateFixture(bool twoSizeSpecificSources)
     {
         var storeId = Guid.NewGuid(); var offeringId = Guid.NewGuid();
@@ -59,9 +80,51 @@ public sealed class MockupGenerationApplicabilityRegressionTests
         var files = new MemoryFiles(); return new(snapshot, item, template, files);
     }
 
+    private static Fixture AddSecondColor(Fixture fixture)
+    {
+        var snapshot = fixture.Snapshot;
+        var offering = snapshot.BlueprintOfferings.Single();
+        var colorOption = snapshot.OfferingOptions.Single(value => value.OptionKind == OptionKind.Color);
+        var medium = snapshot.OfferingOptionValues.Single(value => value.Value == "M");
+        var white = new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, offering.Id, "White", 1);
+        var whiteVariant = new OfferingVariant(Guid.NewGuid(), offering.Id, "White M", [white.Id, medium.Id], false, Now, Now);
+        var originalPlaceholder = snapshot.OfferingPlaceholders.Single();
+        var placeholder = new OfferingPlaceholder(originalPlaceholder.Id, originalPlaceholder.OfferingId, originalPlaceholder.Name,
+            originalPlaceholder.Description, originalPlaceholder.Position, originalPlaceholder.DecorationMethod, originalPlaceholder.Width,
+            originalPlaceholder.Height, [.. originalPlaceholder.VariantIds, whiteVariant.Id], originalPlaceholder.IsArchived,
+            originalPlaceholder.CreatedAt, originalPlaceholder.UpdatedAt, originalPlaceholder.MetadataJson,
+            originalPlaceholder.ProviderReference, originalPlaceholder.ArtworkGuidance);
+        var design = new Asset(Guid.NewGuid(), fixture.Item.StoreId, "white-design.png", null, AssetKind.ExportedImage, "assets/white-design.png", null, false, false, Now, Now, "{}");
+        var row = new DesignVariantRow(Guid.NewGuid(), fixture.Item.Id, false, 1);
+        var updated = snapshot with
+        {
+            OfferingOptionValues = [.. snapshot.OfferingOptionValues, white],
+            OfferingVariants = [.. snapshot.OfferingVariants, whiteVariant],
+            OfferingPlaceholders = [placeholder],
+            DesignSelectedColors = [.. snapshot.DesignSelectedColors, new(fixture.Item.Id, "White")],
+            DesignVariantRows = [.. snapshot.DesignVariantRows, row],
+            DesignVariantRowColors = [.. snapshot.DesignVariantRowColors, new(row.Id, "White")],
+            DesignSlotAssignments = [.. snapshot.DesignSlotAssignments, new(row.Id, placeholder.Id, design.Id)],
+            Assets = [.. snapshot.Assets, design]
+        };
+        return fixture with { Snapshot = updated };
+    }
+
     private sealed record Fixture(WorkspaceSnapshot Snapshot, Item Item, MockupTemplate Template, MemoryFiles Files)
     { public MockupGenerationService Service(CountingCompositor compositor) { var repo = new MemoryRepository(Snapshot); return new(repo, Files, new MockupTemplateSetupService(repo), compositor); } }
-    private sealed class MemoryRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository { public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(snapshot); public Task SaveAsync(WorkspaceSnapshot value, CancellationToken cancellationToken = default) { snapshot = value; return Task.CompletedTask; } }
+    private sealed class MemoryRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
+    {
+        public WorkspaceSnapshot Snapshot => snapshot;
+        public Action? AfterSave { get; set; }
+        public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(snapshot);
+        public Task SaveAsync(WorkspaceSnapshot value, CancellationToken cancellationToken = default)
+        {
+            snapshot = value;
+            AfterSave?.Invoke();
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }
+    }
     private sealed class CountingCompositor : IMockupRasterCompositor { public int Calls { get; private set; } public Task<Stream> ComposeAsync(Stream template, Stream design, MockupImageSpaceMapping mapping, CancellationToken cancellationToken = default) { Calls++; return Task.FromResult<Stream>(new MemoryStream([1])); } }
     private sealed class MemoryFiles : IWorkspaceFileOutputStore { public string WorkspaceRoot => "unused"; public int SaveCount { get; private set; } public bool Exists(string workspaceRelativePath) => true; public bool TryDelete(string workspaceRelativePath) => true; public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default) => Task.FromResult<Stream>(new MemoryStream([1])); public Task<ManagedWorkspaceFile> SaveAsync(string fileName, AssetKind kind, Stream content, CancellationToken cancellationToken = default) { SaveCount++; return Task.FromResult(new ManagedWorkspaceFile(fileName, kind, $"assets/output-{SaveCount}.png", "unused", "unused")); } public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, AssetKind kind, CancellationToken cancellationToken = default) => throw new NotSupportedException(); public Task ExportCopyAsync(string workspaceRelativePath, string destinationPath, CancellationToken cancellationToken = default) => throw new NotSupportedException(); }
 }
