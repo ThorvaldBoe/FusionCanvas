@@ -99,6 +99,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private MockupTemplateDraftState? _mockupTemplateDraftBaseline;
     private bool _isDesignAreaDiscardConfirmationVisible;
     private DesignAreaDraftState? _designAreaDraftBaseline;
+    private bool _storeEditorAttached = true;
 
     public CatalogSetupViewModel(ICatalogSetupService catalog, IMockupTemplateSetupService mockups, IOfferingManagementService? offeringManagement = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, IAssetFilePicker? filePicker = null, IRasterImageMetadataReader? rasterImageMetadataReader = null)
     {
@@ -511,7 +512,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public bool IsAddingTemplate { get => _isAddingTemplate; private set { if (SetField(ref _isAddingTemplate, value)) { OnPropertyChanged(nameof(IsEditingMockupTemplate)); OnPropertyChanged(nameof(MockupTemplateEditorDialogTitle)); NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
     public bool IsAvailable { get; private set; }
     public bool IsReadOnly { get; private set; }
-    public bool CanEdit => IsAvailable && !IsReadOnly && !IsBusy && SelectedOffering?.IsArchived != true;
+    public bool CanEdit => _storeEditorAttached && IsAvailable && !IsReadOnly && !IsBusy && SelectedOffering?.IsArchived != true;
     public bool IsBusy { get => _isBusy; private set { if (SetField(ref _isBusy, value)) { OnPropertyChanged(nameof(CanEdit)); OnPropertyChanged(nameof(CanKeepAspectRatio)); NotifyCommands(); } } }
     public string ErrorMessage { get => _error; private set { if (SetField(ref _error, value)) OnPropertyChanged(nameof(HasError)); } }
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
@@ -1548,7 +1549,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void BeginManageOptionValues(OfferingOption? option)
     {
-        if (IsManagingOptionValues || option is null) return;
+        if (!CanEdit || IsManagingOptionValues || option is null) return;
         var currentOption = AvailableOptions.FirstOrDefault(value => value.Id == option.Id);
         if (currentOption is null) return;
         SelectedOption = currentOption;
@@ -1739,11 +1740,28 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void BeginNewDesignArea()
     {
+        if (!CanEdit) return;
         ResetPlaceholderDraft();
         SelectedPlaceholder = null;
         _designAreaDraftBaseline = CurrentDesignAreaDraftState();
         IsAddingPlaceholder = true;
         DesignAreaEditorRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    internal void AttachStoreEditor()
+    {
+        if (_storeEditorAttached) return;
+        _storeEditorAttached = true;
+        OnPropertyChanged(nameof(CanEdit));
+        NotifyCommands();
+    }
+
+    internal void DetachStoreEditor()
+    {
+        if (!_storeEditorAttached) return;
+        _storeEditorAttached = false;
+        OnPropertyChanged(nameof(CanEdit));
+        NotifyCommands();
     }
 
     private void BeginEditDesignArea(OfferingPlaceholder? area)
