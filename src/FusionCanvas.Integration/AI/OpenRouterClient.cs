@@ -28,11 +28,16 @@ public sealed class OpenRouterClient :
 
     private readonly HttpClient _httpClient;
     private readonly ITelemetryRecorder? _telemetry;
+    private readonly TimeProvider _timeProvider;
 
-    public OpenRouterClient(HttpClient httpClient, ITelemetryRecorder? telemetry = null)
+    public OpenRouterClient(
+        HttpClient httpClient,
+        ITelemetryRecorder? telemetry = null,
+        TimeProvider? timeProvider = null)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _telemetry = telemetry;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         _httpClient.BaseAddress ??= DefaultBaseAddress;
     }
 
@@ -225,7 +230,7 @@ public sealed class OpenRouterClient :
         }
     }
 
-    private static void EnsureCatalogSuccess(HttpResponseMessage response)
+    private void EnsureCatalogSuccess(HttpResponseMessage response)
     {
         if (response.IsSuccessStatusCode)
         {
@@ -916,7 +921,7 @@ public sealed class OpenRouterClient :
             ReadString(root, "id"));
     }
 
-    private static async Task<AiTextResult> ParseFailureAsync(
+    private async Task<AiTextResult> ParseFailureAsync(
         HttpResponseMessage response,
         string requestedModel,
         CancellationToken cancellationToken)
@@ -980,7 +985,7 @@ public sealed class OpenRouterClient :
         status is (HttpStatusCode)429 or HttpStatusCode.BadGateway or
             HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout;
 
-    private static TimeSpan? ReadRetryAfter(HttpResponseMessage response)
+    private TimeSpan? ReadRetryAfter(HttpResponseMessage response)
     {
         var retry = response.Headers.RetryAfter;
         if (retry?.Delta is { } delta)
@@ -993,7 +998,7 @@ public sealed class OpenRouterClient :
             return null;
         }
 
-        var remaining = date - DateTimeOffset.UtcNow;
+        var remaining = date - _timeProvider.GetUtcNow();
         return remaining < TimeSpan.Zero ? TimeSpan.Zero : remaining;
     }
 
