@@ -31,6 +31,22 @@ public class WorkspaceManagementServiceTests
     }
 
     [Fact]
+    public async Task CreateWorkspaceAsync_RejectsNormalizedActiveNameCollision()
+    {
+        var existing = NewWorkspace("Client Work");
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([existing], [], [], [], [], [], [], [], [], []));
+        var service = new WorkspaceManagementService(repository, new TestWorkspaceContextMapper(), () => Now);
+
+        var result = await service.CreateWorkspaceAsync(
+            new WorkspaceManagementCreateRequest(" client work "),
+            TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("already uses this name", result.Error);
+        Assert.Single((await repository.LoadAsync(TestContext.Current.CancellationToken)).Workspaces);
+    }
+
+    [Fact]
     public async Task LoadAsync_UsesPersistedActiveWorkspaceIdWhenItIsStillActive()
     {
         var personal = NewWorkspace("Personal");
