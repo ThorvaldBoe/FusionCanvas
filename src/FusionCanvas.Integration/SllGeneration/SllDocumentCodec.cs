@@ -14,10 +14,22 @@ public sealed class SllDocumentCodec : ISllDocumentCodec
 
     public bool TryDeserialize(string json, out SllDocument? document)
     {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            document = null;
+            return false;
+        }
+
         try
         {
             document = JsonSerializer.Deserialize<SllDocument>(json);
-            return document is not null;
+            if (document?.IsStructurallyComplete != true)
+            {
+                document = null;
+                return false;
+            }
+
+            return true;
         }
         catch (JsonException)
         {

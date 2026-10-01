@@ -35,6 +35,14 @@ public sealed class SllDocumentTests
     }
 
     [Fact]
+    public void Validate_StructurallyIncompleteDocument_ReturnsFalse()
+    {
+        var doc = Sample() with { Communication = null! };
+
+        Assert.False(doc.Validate(SuppliedPhrase));
+    }
+
+    [Fact]
     public void Validate_UnlabeledPhraseMutation_ReturnsFalse()
     {
         var doc = Sample(phrase: "CHANGED PHRASE WITHOUT LABEL");
