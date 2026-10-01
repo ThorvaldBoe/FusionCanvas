@@ -1,6 +1,6 @@
 namespace FusionCanvas.Application.Workspaces;
 
-public interface IWorkspaceFileRestoreStore : IWorkspaceFileStore
+public interface IWorkspaceFileRestoreStore : IWorkspaceFileReader, IWorkspaceFileDeleter
 {
     Task<WorkspaceFileRestoreOutcome> RestoreAsync(
         string workspaceRelativePath,

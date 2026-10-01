@@ -6,6 +6,21 @@ namespace FusionCanvas.Application.Tests.Workspaces;
 public class WorkspaceFileStoreContractTests
 {
     [Fact]
+    public async Task OutputStoreContract_RequiresOnlyOutputOperations()
+    {
+        IWorkspaceFileOutputStore fileStore = new OutputOnlyWorkspaceFileStore();
+
+        var saved = await fileStore.SaveAsync(
+            "generated.png",
+            AssetKind.ExportedImage,
+            new MemoryStream([1, 2, 3]),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal("generated.png", saved.Name);
+        Assert.True(fileStore.TryDelete(saved.WorkspaceRelativePath));
+    }
+
+    [Fact]
     public async Task WorkspaceFileStoreContract_ExposesAuthoritativeManagedReference()
     {
         IWorkspaceFileStore fileStore = new InMemoryWorkspaceFileStore();
@@ -60,7 +75,7 @@ public class WorkspaceFileStoreContractTests
             TestContext.Current.CancellationToken));
     }
 
-    private sealed class InMemoryWorkspaceFileStore : IWorkspaceFileRestoreStore
+    private sealed class InMemoryWorkspaceFileStore : IWorkspaceFileStore, IWorkspaceFileRestoreStore
     {
         private readonly Dictionary<string, byte[]> _files = new(StringComparer.Ordinal);
 
@@ -134,5 +149,28 @@ public class WorkspaceFileStoreContractTests
 
             return string.Join('/', segments);
         }
+    }
+
+    private sealed class OutputOnlyWorkspaceFileStore : IWorkspaceFileOutputStore
+    {
+        private readonly Dictionary<string, byte[]> _files = new(StringComparer.Ordinal);
+
+        public Task<ManagedWorkspaceFile> SaveAsync(
+            string fileName,
+            AssetKind kind,
+            Stream content,
+            CancellationToken cancellationToken = default)
+        {
+            using var buffer = new MemoryStream();
+            content.CopyTo(buffer);
+            const string relativePath = "assets/generated.png";
+            _files[relativePath] = buffer.ToArray();
+            return Task.FromResult(new ManagedWorkspaceFile(fileName, kind, relativePath, relativePath, string.Empty));
+        }
+
+        public bool TryDelete(string workspaceRelativePath) => _files.Remove(workspaceRelativePath);
+
+        public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default) =>
+            Task.FromResult<Stream>(new MemoryStream(_files[workspaceRelativePath], writable: false));
     }
 }

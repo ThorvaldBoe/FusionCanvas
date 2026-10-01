@@ -7,4 +7,4 @@ public sealed record WorkspacePackageWriteRequest(
     string DestinationPath,
     WorkspaceSnapshot Snapshot,
     WorkspacePackageManifest Manifest,
-    IWorkspaceFileStore FileStore);
+    IWorkspaceFileReader FileStore);
