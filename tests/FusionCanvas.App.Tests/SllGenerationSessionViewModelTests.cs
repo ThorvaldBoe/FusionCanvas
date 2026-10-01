@@ -165,7 +165,7 @@ public sealed class SllGenerationSessionViewModelTests
     }
 
     [Fact]
-    public async Task ItemSwitch_CancelsInFlightAndDoesNotApplyLateResult()
+    public async Task ItemSwitch_CancelsInFlightAndDefersSourceDisposalUntilOperationCompletes()
     {
         var inspector = CreateInspector();
         var svc = new StubSllService();
@@ -177,25 +177,51 @@ public sealed class SllGenerationSessionViewModelTests
             phrase: "A substantive phrase",
             graphicDirection: "A substantive graphic");
 
-        var tcs = new TaskCompletionSource<SllGenerationResult>();
-        svc.Func = async ct =>
+        var started = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        WaitHandle? waitHandle = null;
+        Exception? operationException = null;
+        svc.Func = async cancellationToken =>
         {
-            await Task.Delay(500, ct);
-            ct.ThrowIfCancellationRequested();
-            return SllGenerationResult.Success(SampleDocument("LATE"));
+            waitHandle = cancellationToken.WaitHandle;
+            started.TrySetResult(cancellationToken);
+            try
+            {
+                await release.Task.WaitAsync(TestContext.Current.CancellationToken);
+                waitHandle.WaitOne();
+                cancellationToken.ThrowIfCancellationRequested();
+                return SllGenerationResult.Success(SampleDocument("LATE"));
+            }
+            catch (Exception exception)
+            {
+                operationException = exception;
+                throw;
+            }
         };
 
         vm.GenerateCommand.Execute(null);
-        Assert.True(vm.IsBusy);
+        var token = await started.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var operationWaitHandle = waitHandle!;
 
-        vm.ResetSession();
-        await Task.Delay(50);
-        Assert.False(vm.IsBusy);
+        try
+        {
+            vm.ResetSession();
+            Assert.True(token.IsCancellationRequested);
+            Assert.False(operationWaitHandle.SafeWaitHandle.IsClosed);
 
-        tcs.TrySetResult(SllGenerationResult.Success(SampleDocument("LATE")));
-        await Task.Delay(200);
-        Assert.False(vm.HasCurrentSll);
-        Assert.Empty(inspector.Sll);
+            release.TrySetResult();
+            await vm.PendingOperation.WaitAsync(TestContext.Current.CancellationToken);
+
+            Assert.IsType<OperationCanceledException>(operationException);
+            Assert.True(operationWaitHandle.SafeWaitHandle.IsClosed);
+            Assert.False(vm.HasCurrentSll);
+            Assert.Empty(inspector.Sll);
+        }
+        finally
+        {
+            release.TrySetResult();
+            await vm.PendingOperation.WaitAsync(TestContext.Current.CancellationToken);
+        }
     }
 
     [Fact]
@@ -618,6 +644,28 @@ public sealed class SllGenerationSessionViewModelTests
         Assert.False(inspector.CanEditStage);
         Assert.False(vm.CanGenerate);
         Assert.Equal(inspector.StageReadOnlyReason, vm.GenerateDisabledReason);
+    }
+
+    [Fact]
+    public async Task DisposeCancelsAndDisposesSessionCancellationSource()
+    {
+        var inspector = CreateInspector();
+        var viewModel = CreateSessionViewModel(inspector);
+        await SetupLoadedInspectorAsync(inspector);
+
+        var sourceField = typeof(SllGenerationSessionViewModel).GetField(
+            "_sessionCts",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        var source = Assert.IsType<CancellationTokenSource>(sourceField?.GetValue(viewModel));
+        var token = source.Token;
+
+        viewModel.Dispose();
+
+        Assert.True(token.IsCancellationRequested);
+        Assert.Null(sourceField?.GetValue(viewModel));
+        Assert.Throws<ObjectDisposedException>(() => _ = source.Token);
+        await SetupLoadedInspectorAsync(inspector);
+        Assert.Null(sourceField?.GetValue(viewModel));
     }
 
     // --- Helpers ---

@@ -1,3 +1,4 @@
+using Avalonia.Headless.XUnit;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Stores;
 using FusionCanvas.App.Views;
@@ -20,6 +21,7 @@ using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
+using FusionCanvas.Application.Stores.Printify;
 
 namespace FusionCanvas.App.Tests;
 
@@ -543,6 +545,95 @@ public class StoreManagementViewModelTests
 
         Assert.True(operationToken.IsCancellationRequested);
         Assert.False(viewModel.IsBusy);
+    }
+
+    [AvaloniaFact]
+    public async Task DisposeAsync_DisposesOwnedPrintifyImportAndCredentialsSessions()
+    {
+        var service = new PendingPrintifyCatalogImportService();
+        var session = new PrintifyCatalogImportViewModel(
+            service,
+            () => new StoreCredentialScope(Guid.NewGuid(), Guid.NewGuid()));
+        var credentialsService = new PendingPrintifyCredentialConfigurationService();
+        var credentialsSession = new StorePrintifyCredentialsViewModel(credentialsService);
+        credentialsSession.SetContext(
+            NewStoreSummary("Printify") with { FulfillmentStrategy = FulfillmentStrategy.ShopifyPrintify },
+            FulfillmentStrategy.ShopifyPrintify,
+            isDraft: false,
+            editorOpen: true);
+        var owner = new StoreManagementViewModel(new FaultingStoreManagementService());
+        typeof(StoreManagementViewModel)
+            .GetProperty(nameof(StoreManagementViewModel.PrintifyCatalogImportSession))!
+            .SetValue(owner, session);
+        typeof(StoreManagementViewModel)
+            .GetProperty(nameof(StoreManagementViewModel.PrintifyCredentials))!
+            .SetValue(owner, credentialsSession);
+
+        session.Open();
+        var token = await service.LoadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var credentialsToken = await credentialsService.ReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        var catalogWaitHandle = service.LoadWaitHandle!;
+        var credentialWaitHandle = credentialsService.ReadWaitHandle!;
+        Task? disposalTask = null;
+        try
+        {
+            disposalTask = owner.DisposeAsync().AsTask();
+            Assert.True(token.IsCancellationRequested);
+            Assert.False(catalogWaitHandle.SafeWaitHandle.IsClosed);
+            Assert.True(credentialsToken.IsCancellationRequested);
+            Assert.False(credentialWaitHandle.SafeWaitHandle.IsClosed);
+            Assert.False(disposalTask.IsCompleted);
+
+            service.ReleaseLoad.TrySetResult();
+            credentialsService.ReleaseRead.TrySetResult();
+            await disposalTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            Assert.True(catalogWaitHandle.SafeWaitHandle.IsClosed);
+            Assert.True(credentialWaitHandle.SafeWaitHandle.IsClosed);
+        }
+        finally
+        {
+            service.ReleaseLoad.TrySetResult();
+            credentialsService.ReleaseRead.TrySetResult();
+            await owner.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            session.Dispose();
+            credentialsSession.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task DisposeAsyncTimeoutKeepsParentBusyUntilPrintifyChildDrains()
+    {
+        var service = new PendingPrintifyCatalogImportService();
+        var session = new PrintifyCatalogImportViewModel(
+            service,
+            () => new StoreCredentialScope(Guid.NewGuid(), Guid.NewGuid()));
+        var owner = new StoreManagementViewModel(new FaultingStoreManagementService());
+        typeof(StoreManagementViewModel)
+            .GetProperty(nameof(StoreManagementViewModel.PrintifyCatalogImportSession))!
+            .SetValue(owner, session);
+        session.Open();
+        var token = await service.LoadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        try
+        {
+            await owner.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            Assert.True(token.IsCancellationRequested);
+            Assert.True(owner.IsBusy);
+            Assert.True(session.HasPendingOperations);
+
+            service.ReleaseLoad.TrySetResult();
+            await session.WaitForPendingOperationsAsync().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.False(owner.IsBusy);
+        }
+        finally
+        {
+            service.ReleaseLoad.TrySetResult();
+            await owner.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            session.Dispose();
+        }
     }
 
     [Fact]
@@ -1287,6 +1378,68 @@ public class StoreManagementViewModelTests
             Task.FromResult(AiTextResult.Failure(
                 AiTextFailureKind.NotConfigured,
                 "No test credential."));
+    }
+
+    private sealed class PendingPrintifyCatalogImportService : IPrintifyCatalogImportService
+    {
+        public TaskCompletionSource<CancellationToken> LoadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource LoadFinished { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReleaseLoad { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public WaitHandle? LoadWaitHandle { get; private set; }
+
+        public async Task<PrintifyCatalogResult> LoadBlueprintsAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default)
+        {
+            LoadWaitHandle = cancellationToken.WaitHandle;
+            LoadStarted.TrySetResult(cancellationToken);
+            try
+            {
+                await ReleaseLoad.Task.WaitAsync(TestContext.Current.CancellationToken);
+                LoadWaitHandle.WaitOne();
+                cancellationToken.ThrowIfCancellationRequested();
+                return new(PrintifyCatalogResultKind.Succeeded, "Late result.", []);
+            }
+            finally
+            {
+                LoadFinished.TrySetResult();
+            }
+        }
+
+        public Task<PrintifyCatalogResult> LoadSelectedAsync(
+            StoreCredentialScope scope,
+            IReadOnlyCollection<int> blueprintIds,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Empty, "No items selected."));
+    }
+
+    private sealed class PendingPrintifyCredentialConfigurationService : IStorePrintifyConfigurationService
+    {
+        public TaskCompletionSource<CancellationToken> ReadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReadFinished { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReleaseRead { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public WaitHandle? ReadWaitHandle { get; private set; }
+
+        public async Task<PrintifyConfigurationResult> ReadStatusAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default)
+        {
+            ReadWaitHandle = cancellationToken.WaitHandle;
+            ReadStarted.TrySetResult(cancellationToken);
+            try
+            {
+                await ReleaseRead.Task.WaitAsync(TestContext.Current.CancellationToken);
+                ReadWaitHandle.WaitOne();
+                cancellationToken.ThrowIfCancellationRequested();
+                return new(PrintifyConfigurationKind.Missing, "Late result.");
+            }
+            finally
+            {
+                ReadFinished.TrySetResult();
+            }
+        }
+
+        public Task<PrintifyConfigurationResult> SaveAsync(StoreCredentialScope scope, string key, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PrintifyConfigurationResult(PrintifyConfigurationKind.Saved, "Saved."));
+
+        public Task<PrintifyConfigurationResult> VerifyAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new PrintifyConfigurationResult(PrintifyConfigurationKind.Verified, "Verified."));
     }
 
     private sealed class FaultingStoreManagementService : IStoreManagementService

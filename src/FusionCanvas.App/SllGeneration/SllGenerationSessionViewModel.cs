@@ -9,7 +9,7 @@ using FusionCanvas.Domain.Concepts;
 
 namespace FusionCanvas.App.SllGeneration;
 
-public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
+public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly ISllGenerationService _service;
     private readonly ISllAccessStatus _accessStatus;
@@ -19,7 +19,10 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
     private string? _errorMessage;
     private Guid? _sessionItemId;
     private CancellationTokenSource? _sessionCts;
+    private readonly List<CancellationTokenSource> _retiredSessionCts = [];
     private int _operationSequence;
+    private bool _isDisposed;
+    internal Task PendingOperation { get; private set; } = Task.CompletedTask;
     private SllDocument? _current;
     private bool _localSourceChanged;
     private bool _keepAsReference;
@@ -38,8 +41,8 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
 
         GenerateCommand = new RelayCommand(_ => Run(ExecuteGenerateAsync), () => CanGenerate);
         RegenerateCommand = new RelayCommand(_ => Run(ExecuteGenerateAsync), () => CanRegenerate);
-        ResetSllCommand = new RelayCommand(_ => Run(ResetSllAsync), () => HasCurrentSll && !IsBusy && _inspector.CanEditStage);
-        KeepSllReferenceCommand = new RelayCommand(_ => KeepSllAsReference(), () => IsStale && !IsBusy);
+        ResetSllCommand = new RelayCommand(_ => Run(ResetSllAsync), () => !_isDisposed && HasCurrentSll && !IsBusy && _inspector.CanEditStage);
+        KeepSllReferenceCommand = new RelayCommand(_ => KeepSllAsReference(), () => !_isDisposed && IsStale && !IsBusy);
 
         _inspector.PropertyChanged += OnInspectorPropertyChanged;
         _accessStatus.AvailabilityChanged += OnAccessAvailabilityChanged;
@@ -147,7 +150,8 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
     // --- Can ---
 
     public bool CanGenerate =>
-        !IsBusy
+        !_isDisposed
+        && !IsBusy
         && IsAvailable
         && IsComplete
         && _inspector.CanEditStage;
@@ -165,8 +169,31 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
 
     // --- Session lifecycle ---
 
+    public void Dispose()
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        _isDisposed = true;
+        _inspector.PropertyChanged -= OnInspectorPropertyChanged;
+        _accessStatus.AvailabilityChanged -= OnAccessAvailabilityChanged;
+        CancelInFlight();
+        _current = null;
+        _localSourceChanged = false;
+        _keepAsReference = false;
+        IsBusy = false;
+        RaiseCurrentChanged();
+    }
+
     public void ResetSession()
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
         if (_inspector.IsLoadingItem)
         {
             InvalidateSessionForItemLoad();
@@ -200,8 +227,16 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
 
     public async Task RefreshAvailabilityAsync(CancellationToken cancellationToken = default)
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
         await _accessStatus.RefreshAsync(cancellationToken).ConfigureAwait(true);
-        RaiseCommandStates();
+        if (!_isDisposed)
+        {
+            RaiseCommandStates();
+        }
     }
 
     // --- Execution ---
@@ -313,15 +348,45 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
 
     private void CancelInFlight()
     {
-        if (_sessionCts is not null)
-        {
-            _sessionCts.Cancel();
-            _sessionCts.Dispose();
-            _sessionCts = null;
-        }
-
+        var source = _sessionCts;
+        _sessionCts = null;
         _sessionItemId = null;
         _operationSequence = 0;
+        if (source is null)
+        {
+            return;
+        }
+
+        try
+        {
+            source.Cancel();
+        }
+        finally
+        {
+            if (IsBusy)
+            {
+                _retiredSessionCts.Add(source);
+            }
+            else
+            {
+                source.Dispose();
+            }
+        }
+    }
+
+    private void DisposeRetiredSessionSources()
+    {
+        if (IsBusy || _retiredSessionCts.Count == 0)
+        {
+            return;
+        }
+
+        var retiredSources = _retiredSessionCts.ToArray();
+        _retiredSessionCts.Clear();
+        foreach (var source in retiredSources)
+        {
+            source.Dispose();
+        }
     }
 
     private void RaiseCurrentChanged()
@@ -352,7 +417,7 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
 
     private async Task ResetSllAsync()
     {
-        if (!HasCurrentSll || !_inspector.CanEditStage || IsBusy)
+        if (_isDisposed || !HasCurrentSll || !_inspector.CanEditStage || IsBusy)
         {
             return;
         }
@@ -396,7 +461,7 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
 
     private void KeepSllAsReference()
     {
-        if (!IsStale)
+        if (_isDisposed || !IsStale)
             return;
 
         _keepAsReference = true;
@@ -408,6 +473,11 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
 
     private void OnInspectorPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
         if (args.PropertyName is nameof(ItemInspectorViewModel.IsLoadingItem))
         {
             if (_inspector.IsLoadingItem)
@@ -451,7 +521,13 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
 
     private void OnAccessAvailabilityChanged(object? sender, EventArgs args)
     {
-        Dispatcher.UIThread.Post(RaiseCommandStates);
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!_isDisposed)
+            {
+                RaiseCommandStates();
+            }
+        });
     }
 
     // Public setters for testing (section state visibility)
@@ -477,7 +553,7 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
     {
         var sessionItemId = _sessionItemId;
         var sessionCts = _sessionCts;
-        _ = ObserveAsync(operation, sessionItemId, sessionCts);
+        PendingOperation = ObserveAsync(operation, sessionItemId, sessionCts);
     }
 
     private async Task ObserveAsync(
@@ -499,6 +575,10 @@ public sealed class SllGenerationSessionViewModel : INotifyPropertyChanged
             {
                 ErrorMessage = exception.Message;
             }
+        }
+        finally
+        {
+            DisposeRetiredSessionSources();
         }
     }
 }

@@ -9,7 +9,7 @@ using FusionCanvas.Domain.Concepts;
 
 namespace FusionCanvas.App.ConceptRefinement;
 
-public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
+public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly IConceptRefinementService _service;
     private readonly IConceptRefinementAccessStatus _accessStatus;
@@ -18,8 +18,12 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
     private string? _errorMessage;
     private int _currentIndex = -1;
     private CancellationTokenSource? _sessionCts;
+    private readonly List<CancellationTokenSource> _retiredSessionCts = [];
+    private readonly object _operationGate = new();
     private Guid? _sessionItemId;
     private int _operationSequence;
+    private bool _isDisposed;
+    internal Task PendingOperation { get; private set; } = Task.CompletedTask;
     private bool _isApplying;
     private bool _isRollingBack;
     private string _conceptIdeaInput = string.Empty;
@@ -46,27 +50,27 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
         History = [];
 
         // Commands
-        InitializeCommand = new RelayCommand(_ => Run(ExecuteInitializeAsync()),
+        InitializeCommand = new RelayCommand(_ => Run(() => ExecuteInitializeAsync()),
             () => CanInitialize);
-        FineTuneConceptIdeaCommand = new RelayCommand(_ => Run(ExecuteFineTuneAsync(ConceptRefinementCorner.ConceptIdea)),
+        FineTuneConceptIdeaCommand = new RelayCommand(_ => Run(() => ExecuteFineTuneAsync(ConceptRefinementCorner.ConceptIdea)),
             () => CanFineTuneConceptIdea);
-        FineTunePhraseCommand = new RelayCommand(_ => Run(ExecuteFineTuneAsync(ConceptRefinementCorner.Phrase)),
+        FineTunePhraseCommand = new RelayCommand(_ => Run(() => ExecuteFineTuneAsync(ConceptRefinementCorner.Phrase)),
             () => CanFineTunePhrase);
-        FineTuneGraphicDirectionCommand = new RelayCommand(_ => Run(ExecuteFineTuneAsync(ConceptRefinementCorner.GraphicDirection)),
+        FineTuneGraphicDirectionCommand = new RelayCommand(_ => Run(() => ExecuteFineTuneAsync(ConceptRefinementCorner.GraphicDirection)),
             () => CanFineTuneGraphicDirection);
-        ChangeConceptIdeaCommand = new RelayCommand(_ => Run(ExecuteChangeAsync(ConceptRefinementCorner.ConceptIdea)),
+        ChangeConceptIdeaCommand = new RelayCommand(_ => Run(() => ExecuteChangeAsync(ConceptRefinementCorner.ConceptIdea)),
             () => CanChangeConceptIdea);
-        ChangePhraseCommand = new RelayCommand(_ => Run(ExecuteChangeAsync(ConceptRefinementCorner.Phrase)),
+        ChangePhraseCommand = new RelayCommand(_ => Run(() => ExecuteChangeAsync(ConceptRefinementCorner.Phrase)),
             () => CanChangePhrase);
-        ChangeGraphicDirectionCommand = new RelayCommand(_ => Run(ExecuteChangeAsync(ConceptRefinementCorner.GraphicDirection)),
+        ChangeGraphicDirectionCommand = new RelayCommand(_ => Run(() => ExecuteChangeAsync(ConceptRefinementCorner.GraphicDirection)),
             () => CanChangeGraphicDirection);
         SelectHistoryEntryCommand = new RelayCommand(parameter =>
         {
-            if (parameter is ConceptRefinementHistoryEntry entry)
+            if (!_isDisposed && parameter is ConceptRefinementHistoryEntry entry)
             {
-                Run(ExecuteRollbackAsync(entry));
+                Run(() => ExecuteRollbackAsync(entry));
             }
-        }, () => !IsBusy);
+        }, () => !_isDisposed && !IsBusy);
 
         // Subscribe to inspector events for manual-commit tracking
         _inspector.PropertyChanged += OnInspectorPropertyChanged;
@@ -91,9 +95,14 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
         get => _selectedHistoryEntry;
         set
         {
+            if (_isDisposed)
+            {
+                return;
+            }
+
             if (SetField(ref _selectedHistoryEntry, value) && value is not null)
             {
-                Run(ExecuteRollbackAsync(value));
+                Run(() => ExecuteRollbackAsync(value));
             }
         }
     }
@@ -146,7 +155,8 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     public bool HasPendingWorkingEdits =>
-        _inspector.CanEditStage
+        !_isDisposed
+        && _inspector.CanEditStage
         && (_conceptIdeaInputDirty || _phraseInputDirty || _graphicDirectionInputDirty);
 
     // --- Local refinement inputs ---
@@ -300,7 +310,8 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
     // --- Can initialize ---
 
     public bool CanInitialize =>
-        !IsBusy
+        !_isDisposed
+        && !IsBusy
         && IsAvailable
         && HasNonWhitespace(_inspector.Idea)
         && !HasAnyNonWhitespaceCorner()
@@ -324,7 +335,8 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
     public bool CanChangeGraphicDirection => CanRefine;
 
     private bool CanRefine =>
-        !IsBusy
+        !_isDisposed
+        && !IsBusy
         && IsAvailable
         && _inspector.CanEditStage;
 
@@ -342,11 +354,45 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
     // --- Session lifecycle ---
 
     /// <summary>
+    /// Releases the current session and stops observing the inspector and access status.
+    /// </summary>
+    public void Dispose()
+    {
+        lock (_operationGate)
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _isDisposed = true;
+        }
+
+        _inspector.PropertyChanged -= OnInspectorPropertyChanged;
+        _inspector.Saved -= OnInspectorSaved;
+        _accessStatus.AvailabilityChanged -= OnAccessAvailabilityChanged;
+        try
+        {
+            CancelInFlight();
+        }
+        finally
+        {
+            IsBusy = false;
+            RaiseCommandStates();
+        }
+    }
+
+    /// <summary>
     /// Call when the inspector loads a new item (item switch or Clear()).
     /// Cancels any in-flight operation and clears history.
     /// </summary>
     public void ResetSession()
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
         CancelInFlight();
         History.Clear();
         _currentIndex = -1;
@@ -373,10 +419,14 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     public async Task CommitPendingWorkingEditsAsync(CancellationToken cancellationToken = default)
     {
-        if (!HasPendingWorkingEdits)
+        if (_isDisposed || !HasPendingWorkingEdits)
         {
             return;
         }
+
+        var sessionItemId = _sessionItemId;
+        var sessionCts = _sessionCts;
+        var operationSequence = _operationSequence;
 
         if (_conceptIdeaInputDirty)
         {
@@ -394,6 +444,14 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
         }
 
         await _inspector.CommitEditsAsync(cancellationToken).ConfigureAwait(true);
+        if (_isDisposed
+            || _sessionItemId != sessionItemId
+            || _operationSequence != operationSequence
+            || !ReferenceEquals(_sessionCts, sessionCts))
+        {
+            return;
+        }
+
         if (!_inspector.HasError)
         {
             ClearWorkingInputDirtyFlags();
@@ -409,15 +467,23 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
     /// </summary>
     public async Task RefreshAvailabilityAsync(CancellationToken cancellationToken = default)
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
         await _accessStatus.RefreshAsync(cancellationToken).ConfigureAwait(true);
-        RaiseCommandStates();
+        if (!_isDisposed)
+        {
+            RaiseCommandStates();
+        }
     }
 
     // --- Command execution ---
 
     private async Task ExecuteInitializeAsync()
     {
-        if (!CanInitialize)
+        if (_isDisposed || !CanInitialize)
         {
             return;
         }
@@ -434,7 +500,7 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     private async Task ExecuteFineTuneAsync(ConceptRefinementCorner corner)
     {
-        if (!CanRefine)
+        if (_isDisposed || !CanRefine)
         {
             return;
         }
@@ -464,7 +530,7 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     private async Task ExecuteChangeAsync(ConceptRefinementCorner corner)
     {
-        if (!CanRefine)
+        if (_isDisposed || !CanRefine)
         {
             return;
         }
@@ -494,7 +560,7 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     private async Task ExecuteRollbackAsync(ConceptRefinementHistoryEntry entry)
     {
-        if (IsBusy || !_inspector.CanEditStage)
+        if (_isDisposed || IsBusy || !_inspector.CanEditStage)
         {
             return;
         }
@@ -504,6 +570,11 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
         {
             return;
         }
+
+        var sessionItemId = _sessionItemId;
+        var operationSequence = Interlocked.Increment(ref _operationSequence);
+        var sessionCts = _sessionCts;
+        var cancellationToken = sessionCts?.Token ?? CancellationToken.None;
 
         IsBusy = true;
         ErrorMessage = null;
@@ -517,18 +588,35 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
             _inspector.GraphicDirection = entry.GraphicDirection;
             SyncInputsFromInspector();
             _currentIndex = targetIndex;
-            await _inspector.CommitEditsAsync().ConfigureAwait(true);
+            await _inspector.CommitEditsAsync(cancellationToken).ConfigureAwait(true);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_isDisposed
+                || _sessionItemId != sessionItemId
+                || _operationSequence != operationSequence
+                || !ReferenceEquals(_sessionCts, sessionCts))
+            {
+                return;
+            }
+
             RecomputeScore();
             OnPropertyChanged(nameof(CurrentEntryIndex));
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            ErrorMessage = ex.Message;
+        }
+        catch (Exception exception) when (
+            exception is not OperationCanceledException
+            && !_isDisposed
+            && _sessionItemId == sessionItemId
+            && _operationSequence == operationSequence)
+        {
+            ErrorMessage = exception.Message;
         }
         finally
         {
             _isRollingBack = false;
             IsBusy = false;
+            DisposeRetiredSessionSources();
         }
     }
 
@@ -539,6 +627,11 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
         string actionLabel,
         ConceptRefinementCorner? singleCorner)
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
         IsBusy = true;
         ErrorMessage = null;
 
@@ -552,16 +645,18 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
             ct.ThrowIfCancellationRequested();
 
-            if (!result.Succeeded)
+            // Identity check: ensure we're still on the same item and the operation is still valid
+            if (_isDisposed
+                || _sessionItemId != captured.ItemId
+                || _operationSequence != captured.Sequence)
             {
-                ErrorMessage = result.Error ?? "The refinement operation failed.";
+                // Late result, discard
                 return;
             }
 
-            // Identity check: ensure we're still on the same item and the operation is still valid
-            if (_sessionItemId != captured.ItemId || _operationSequence != captured.Sequence)
+            if (!result.Succeeded)
             {
-                // Late result, discard
+                ErrorMessage = result.Error ?? "The refinement operation failed.";
                 return;
             }
 
@@ -613,10 +708,22 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
             _isApplying = true;
             try
             {
-                await _inspector.CommitEditsAsync().ConfigureAwait(true);
+                await _inspector.CommitEditsAsync(ct).ConfigureAwait(true);
+                ct.ThrowIfCancellationRequested();
+                if (_isDisposed
+                    || _sessionItemId != captured.ItemId
+                    || _operationSequence != captured.Sequence)
+                {
+                    return;
+                }
+
                 RecomputeScore();
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (
+                ex is not OperationCanceledException
+                && !_isDisposed
+                && _sessionItemId == captured.ItemId
+                && _operationSequence == captured.Sequence)
             {
                 // Failed commit: keep draft + entry but surface inline error
                 ErrorMessage = ex.Message;
@@ -630,13 +737,17 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
         {
             // Drafts, history unchanged; no error shown for cancellation
         }
-        catch (Exception ex)
+        catch (Exception ex) when (
+            !_isDisposed
+            && _sessionItemId == captured.ItemId
+            && _operationSequence == captured.Sequence)
         {
             ErrorMessage = ex.Message;
         }
         finally
         {
             IsBusy = false;
+            DisposeRetiredSessionSources();
         }
     }
 
@@ -716,15 +827,45 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     private void CancelInFlight()
     {
-        if (_sessionCts is not null)
-        {
-            _sessionCts.Cancel();
-            _sessionCts.Dispose();
-            _sessionCts = null;
-        }
-
+        var source = _sessionCts;
+        _sessionCts = null;
         _sessionItemId = null;
         _operationSequence = 0;
+        if (source is null)
+        {
+            return;
+        }
+
+        try
+        {
+            source.Cancel();
+        }
+        finally
+        {
+            if (IsBusy)
+            {
+                _retiredSessionCts.Add(source);
+            }
+            else
+            {
+                source.Dispose();
+            }
+        }
+    }
+
+    private void DisposeRetiredSessionSources()
+    {
+        if (IsBusy || _retiredSessionCts.Count == 0)
+        {
+            return;
+        }
+
+        var retiredSources = _retiredSessionCts.ToArray();
+        _retiredSessionCts.Clear();
+        foreach (var source in retiredSources)
+        {
+            source.Dispose();
+        }
     }
 
     private void RecomputeScore()
@@ -830,6 +971,11 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     private void OnInspectorPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
         if (args.PropertyName is nameof(ItemInspectorViewModel.ConceptIdea))
         {
             if (!_conceptIdeaInputDirty)
@@ -873,7 +1019,7 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
 
     private void OnInspectorSaved(object? sender, EventArgs args)
     {
-        if (_isApplying || _isRollingBack)
+        if (_isDisposed || _isApplying || _isRollingBack)
         {
             // Skip; not a user-driven manual edit.
             return;
@@ -950,7 +1096,13 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
         // Availability is refreshed after an async AI/catalog call and may raise
         // its event on a worker thread. Avalonia bindings must be notified on the
         // UI thread or the controls can remain stuck in their initial disabled state.
-        Dispatcher.UIThread.Post(RaiseCommandStates);
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!_isDisposed)
+            {
+                RaiseCommandStates();
+            }
+        });
     }
 
     // --- INotifyPropertyChanged ---
@@ -973,5 +1125,38 @@ public sealed class ConceptRefinementSessionViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-    private static void Run(Task task) => _ = task;
+    private void Run(Func<Task> operation)
+    {
+        lock (_operationGate)
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            PendingOperation = ObserveOperationAsync(operation());
+        }
+    }
+
+    private async Task ObserveOperationAsync(Task task)
+    {
+        try
+        {
+            await task.ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            if (!_isDisposed)
+            {
+                ErrorMessage = exception.Message;
+            }
+        }
+        finally
+        {
+            DisposeRetiredSessionSources();
+        }
+    }
 }

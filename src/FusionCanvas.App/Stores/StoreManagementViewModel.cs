@@ -62,6 +62,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
     private static readonly TimeSpan OperationShutdownTimeout = TimeSpan.FromSeconds(2);
     private readonly object _operationGate = new();
     private readonly HashSet<TrackedOperation> _inFlightOperations = [];
+    private readonly List<Task> _retiredPrintifyOperations = [];
     private readonly CancellationTokenSource _shutdownCts = new();
     private Task? _disposeTask;
     private bool _isDisposed;
@@ -487,8 +488,23 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         FusionCanvas.Application.Stores.Printify.IPrintifyCredentialVerifier verifier,
         FusionCanvas.Application.Stores.Printify.IPrintifyCatalogClient? catalogClient = null)
     {
-        PrintifyCredentials?.CancelPending();
-        if (PrintifyCredentials is not null) { PrintifyCredentials.ShopSelectionChanged -= OnPrintifyShopSelectionChanged; PrintifyCredentials.CancelPending(); }
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        if (PrintifyCredentials is { } oldCredentials)
+        {
+            TrackRetiredPrintifyOperation(oldCredentials.WaitForPendingOperationsAsync());
+            oldCredentials.ShopSelectionChanged -= OnPrintifyShopSelectionChanged;
+            oldCredentials.Dispose();
+        }
+
+        if (PrintifyCatalogImportSession is { } oldImportSession)
+        {
+            TrackRetiredPrintifyOperation(oldImportSession.WaitForPendingOperationsAsync());
+            oldImportSession.Dispose();
+        }
         PrintifyCredentials = new(new FusionCanvas.Application.Stores.Printify.StorePrintifyConfigurationService(_service, credentials, verifier));
         PrintifyCatalogImport = catalogClient is null
             ? null
@@ -538,6 +554,34 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         ShowStrategyWarning = false;
         if (SelectedStore is not null) SelectedFulfillmentStrategy = SelectedStore.FulfillmentStrategy;
     });
+
+    private bool HasRetiredPrintifyOperations
+    {
+        get
+        {
+            lock (_operationGate)
+            {
+                return _retiredPrintifyOperations.Any(operation => !operation.IsCompleted);
+            }
+        }
+    }
+
+    private void TrackRetiredPrintifyOperation(Task operation)
+    {
+        if (operation.IsCompleted)
+        {
+            return;
+        }
+
+        lock (_operationGate)
+        {
+            _retiredPrintifyOperations.RemoveAll(retired => retired.IsCompleted);
+            if (!operation.IsCompleted)
+            {
+                _retiredPrintifyOperations.Add(operation);
+            }
+        }
+    }
 
     private void RefreshPrintifyContext() => PrintifyCredentials?.SetContext(
         SelectedStore, SelectedFulfillmentStrategy, _isCreatingNewStore, IsStoreEditorOpen);
@@ -615,7 +659,11 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
-    public bool IsBusy => _isBusy;
+    public bool IsBusy =>
+        _isBusy
+        || HasRetiredPrintifyOperations
+        || PrintifyCredentials?.HasPendingOperations == true
+        || PrintifyCatalogImportSession?.HasPendingOperations == true;
 
     public bool ShouldShowFirstStorePrompt => NeedsFirstStore && !_firstStorePromptDismissed && !IsStoreEditorOpen;
 
@@ -2057,19 +2105,70 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
             _isDisposed = true;
             cancellationCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var operations = _inFlightOperations.Select(operation => operation.Completion.Task).ToArray();
+            var childOperations = new List<Task>(_retiredPrintifyOperations);
+            _retiredPrintifyOperations.Clear();
+            if (PrintifyCredentials is { } credentialsForShutdown)
+            {
+                childOperations.Add(credentialsForShutdown.WaitForPendingOperationsAsync());
+            }
+
+            if (PrintifyCatalogImportSession is { } importSession)
+            {
+                childOperations.Add(importSession.WaitForPendingOperationsAsync());
+            }
+
+            var operations = _inFlightOperations
+                .Select(operation => operation.Completion.Task)
+                .Concat(childOperations)
+                .Distinct()
+                .ToArray();
             _disposeTask = CompleteDisposalAsync(operations, cancellationCompleted.Task);
             disposalTask = _disposeTask;
+        }
+
+        Exception? shutdownException = null;
+        if (PrintifyCredentials is { } credentials)
+        {
+            credentials.ShopSelectionChanged -= OnPrintifyShopSelectionChanged;
+            try
+            {
+                credentials.Dispose();
+            }
+            catch (Exception exception)
+            {
+                shutdownException = exception;
+            }
+        }
+
+        try
+        {
+            PrintifyCatalogImportSession?.Dispose();
+        }
+        catch (Exception exception)
+        {
+            shutdownException = shutdownException is null
+                ? exception
+                : new AggregateException(shutdownException, exception);
         }
 
         try
         {
             _shutdownCts.Cancel();
-            cancellationCompleted.TrySetResult();
         }
         catch (Exception exception)
         {
-            cancellationCompleted.TrySetException(exception);
+            shutdownException = shutdownException is null
+                ? exception
+                : new AggregateException(shutdownException, exception);
+        }
+
+        if (shutdownException is null)
+        {
+            cancellationCompleted.TrySetResult();
+        }
+        else
+        {
+            cancellationCompleted.TrySetException(shutdownException);
         }
 
         return new ValueTask(disposalTask);
@@ -2077,25 +2176,41 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
 
     private async Task CompleteDisposalAsync(IReadOnlyCollection<Task> operations, Task cancellationCompleted)
     {
+        Exception? failure = null;
         try
         {
-            await cancellationCompleted.ConfigureAwait(false);
-            if (operations.Count == 0)
-            {
-                return;
-            }
-
             try
             {
-                await Task.WhenAll(operations).WaitAsync(OperationShutdownTimeout).ConfigureAwait(false);
+                await cancellationCompleted.ConfigureAwait(false);
             }
-            catch (TimeoutException)
+            catch (Exception exception)
             {
+                failure = exception;
+            }
+
+            if (operations.Count > 0)
+            {
+                try
+                {
+                    await Task.WhenAll(operations).WaitAsync(OperationShutdownTimeout).ConfigureAwait(false);
+                }
+                catch (TimeoutException)
+                {
+                }
+                catch (Exception exception) when (failure is not null)
+                {
+                    failure = new AggregateException(failure, exception);
+                }
             }
         }
         finally
         {
             _shutdownCts.Dispose();
+        }
+
+        if (failure is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
         }
     }
 

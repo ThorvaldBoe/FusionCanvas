@@ -95,14 +95,16 @@ public partial class App : Avalonia.Application
         }
 
         e.Cancel = true;
+        window.IsEnabled = false;
+        var mainWindowViewModel = window.DataContext as MainWindowViewModel;
         var storeManagement = window.DataContext switch
         {
             StoreManagementViewModel storeViewModel => storeViewModel,
             MainWindowViewModel mainViewModel => mainViewModel.StoreManagement,
             _ => null
         };
-        var workspaceTree = (window.DataContext as MainWindowViewModel)?.WorkspaceTree;
-        _shutdownTask ??= CompleteWindowShutdownAsync(window, storeManagement, workspaceTree);
+        var workspaceTree = mainWindowViewModel?.WorkspaceTree;
+        _shutdownTask ??= CompleteWindowShutdownAsync(window, storeManagement, workspaceTree, mainWindowViewModel);
         try
         {
             await _shutdownTask;
@@ -116,11 +118,14 @@ public partial class App : Avalonia.Application
     private async Task CompleteWindowShutdownAsync(
         Window window,
         StoreManagementViewModel? storeManagement,
-        WorkspaceTreeViewModel? workspaceTree)
+        WorkspaceTreeViewModel? workspaceTree,
+        MainWindowViewModel? mainWindowViewModel)
     {
         var storeManagementDrained = true;
         var workspaceTreeDrained = true;
+        var mainWindowViewModelDrained = true;
         var shouldCloseWindow = true;
+        var allOwnersDrained = false;
         try
         {
             if (storeManagement is not null)
@@ -166,9 +171,40 @@ public partial class App : Avalonia.Application
                 }
             }
 
+            if (mainWindowViewModel is not null)
+            {
+                try
+                {
+                    await mainWindowViewModel.DisposeAsync()
+                        .AsTask()
+                        .WaitAsync(TimeSpan.FromSeconds(15));
+                }
+                catch (Exception exception)
+                {
+                    mainWindowViewModelDrained = false;
+                    Trace.TraceError("Main window shutdown failed: {0}", exception);
+                }
+            }
+
+            if (!mainWindowViewModelDrained)
+            {
+                shouldCloseWindow = false;
+                Trace.TraceWarning("Keeping the window open because main-window commands are still running.");
+            }
+
+            allOwnersDrained = AreShutdownOwnersDrained(
+                storeManagementDrained,
+                workspaceTreeDrained,
+                mainWindowViewModelDrained);
+            if (!allOwnersDrained)
+            {
+                shouldCloseWindow = false;
+                Trace.TraceWarning("Keeping the window open because one or more view models still have in-flight operations.");
+            }
+
             if (_services is { } services)
             {
-                if (storeManagementDrained && workspaceTreeDrained)
+                if (allOwnersDrained)
                 {
                     try
                     {
@@ -210,10 +246,17 @@ public partial class App : Avalonia.Application
             }
             else
             {
+                window.IsEnabled = true;
                 _shutdownTask = null;
             }
         }
     }
+
+    internal static bool AreShutdownOwnersDrained(
+        bool storeManagementDrained,
+        bool workspaceTreeDrained,
+        bool mainWindowViewModelDrained) =>
+        storeManagementDrained && workspaceTreeDrained && mainWindowViewModelDrained;
 
     private void InitializeMainWindow(
         IClassicDesktopStyleApplicationLifetime desktop,
