@@ -129,6 +129,27 @@ public partial class App : Avalonia.Application
         var allOwnersDrained = false;
         try
         {
+            if (mainWindowViewModel is not null)
+            {
+                try
+                {
+                    await mainWindowViewModel.DisposeAsync()
+                        .AsTask()
+                        .WaitAsync(TimeSpan.FromSeconds(15));
+                }
+                catch (Exception exception)
+                {
+                    mainWindowViewModelDrained = false;
+                    Trace.TraceError("Main window shutdown failed: {0}", exception);
+                }
+            }
+
+            if (!mainWindowViewModelDrained)
+            {
+                shouldCloseWindow = false;
+                Trace.TraceWarning("Keeping the window open because main-window commands are still running.");
+            }
+
             if (storeManagement is not null)
             {
                 try
@@ -170,27 +191,6 @@ public partial class App : Avalonia.Application
                     shouldCloseWindow = false;
                     Trace.TraceWarning("Keeping the window open because workspace-tree commands are still running.");
                 }
-            }
-
-            if (mainWindowViewModel is not null)
-            {
-                try
-                {
-                    await mainWindowViewModel.DisposeAsync()
-                        .AsTask()
-                        .WaitAsync(TimeSpan.FromSeconds(15));
-                }
-                catch (Exception exception)
-                {
-                    mainWindowViewModelDrained = false;
-                    Trace.TraceError("Main window shutdown failed: {0}", exception);
-                }
-            }
-
-            if (!mainWindowViewModelDrained)
-            {
-                shouldCloseWindow = false;
-                Trace.TraceWarning("Keeping the window open because main-window commands are still running.");
             }
 
             allOwnersDrained = AreShutdownOwnersDrained(
