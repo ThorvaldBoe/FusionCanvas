@@ -24,13 +24,16 @@ public sealed class LocalWorkspaceFileStore : IWorkspaceFileOutputStore, IWorksp
         ".webp"
     };
 
-    public LocalWorkspaceFileStore(string workspaceRoot)
+    private readonly Func<DateTimeOffset> _clock;
+
+    public LocalWorkspaceFileStore(string workspaceRoot, Func<DateTimeOffset>? clock = null)
     {
         if (string.IsNullOrWhiteSpace(workspaceRoot))
         {
             throw new ArgumentException("Workspace root must not be empty.", nameof(workspaceRoot));
         }
 
+        _clock = clock ?? (() => DateTimeOffset.UtcNow);
         WorkspaceRoot = Path.GetFullPath(workspaceRoot);
         Directory.CreateDirectory(WorkspaceRoot);
     }
@@ -59,7 +62,7 @@ public sealed class LocalWorkspaceFileStore : IWorkspaceFileOutputStore, IWorksp
             throw new NotSupportedException($"The file extension '{extension}' is not a recognized creative asset type.");
         }
 
-        var importedAt = DateTimeOffset.UtcNow;
+        var importedAt = _clock();
         var assetDirectory = Path.Combine(WorkspaceRoot, "assets", importedAt.ToString("yyyy"), importedAt.ToString("MM"));
         Directory.CreateDirectory(assetDirectory);
 
@@ -92,7 +95,7 @@ public sealed class LocalWorkspaceFileStore : IWorkspaceFileOutputStore, IWorksp
     public async Task<ManagedWorkspaceFile> SaveAsync(string fileName, AssetKind kind, Stream content, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(content);
-        var importedAt = DateTimeOffset.UtcNow;
+        var importedAt = _clock();
         var directory = Path.Combine(WorkspaceRoot, "assets", importedAt.ToString("yyyy"), importedAt.ToString("MM"));
         Directory.CreateDirectory(directory);
         var safeName = Path.GetFileName(fileName);
