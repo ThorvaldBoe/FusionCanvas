@@ -365,7 +365,7 @@ public class WorkspaceTransferServiceTests
             Task.FromResult(Snapshot);
     }
 
-    private sealed class FakeFileStore(IEnumerable<string>? existing = null) : IWorkspaceFileStore
+    private sealed class FakeFileStore(IEnumerable<string>? existing = null) : IWorkspaceFileRestoreStore
     {
         private readonly Dictionary<string, byte[]> _files = (existing ?? [])
             .ToDictionary(path => path, _ => Array.Empty<byte>(), StringComparer.Ordinal);

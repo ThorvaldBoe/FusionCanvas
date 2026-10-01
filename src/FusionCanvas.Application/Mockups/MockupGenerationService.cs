@@ -12,13 +12,13 @@ namespace FusionCanvas.Application.Mockups;
 public sealed class MockupGenerationService : IMockupGenerationService
 {
     private readonly IWorkspaceRepository _repository;
-    private readonly IWorkspaceFileStore _fileStore;
+    private readonly IWorkspaceFileOutputStore _fileStore;
     private readonly IMockupTemplateSetupService _templates;
     private readonly IMockupRasterCompositor _compositor;
     private readonly Func<Guid> _newId;
     private readonly Func<DateTimeOffset> _clock;
 
-    public MockupGenerationService(IWorkspaceRepository repository, IWorkspaceFileStore fileStore, IMockupTemplateSetupService templates, IMockupRasterCompositor compositor, Func<Guid>? newId = null, Func<DateTimeOffset>? clock = null)
+    public MockupGenerationService(IWorkspaceRepository repository, IWorkspaceFileOutputStore fileStore, IMockupTemplateSetupService templates, IMockupRasterCompositor compositor, Func<Guid>? newId = null, Func<DateTimeOffset>? clock = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _fileStore = fileStore ?? throw new ArgumentNullException(nameof(fileStore));

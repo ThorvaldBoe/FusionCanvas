@@ -13,7 +13,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
 {
     private const string GeneratedArtworkName = "generated artwork";
     private readonly IWorkspaceRepository _repository;
-    private readonly IWorkspaceFileStore _fileStore;
+    private readonly IWorkspaceFileOutputStore _fileStore;
     private readonly IAiImageGenerationProvider _provider;
     private readonly IRasterArtworkNormalizer _normalizer;
     private readonly ITelemetryService? _telemetry;
@@ -22,7 +22,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
 
     public ArtworkGenerationService(
         IWorkspaceRepository repository,
-        IWorkspaceFileStore fileStore,
+        IWorkspaceFileOutputStore fileStore,
         IAiImageGenerationProvider provider,
         IRasterArtworkNormalizer normalizer,
         Func<DateTimeOffset>? clock = null,
