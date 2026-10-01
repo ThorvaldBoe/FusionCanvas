@@ -109,6 +109,24 @@ public class AssetManagementServiceTests
     }
 
     [Fact]
+    public async Task ImportAsync_CleansManagedFileAndPropagatesPersistenceCancellation()
+    {
+        var sample = Sample.Create();
+        var cancellation = new OperationCanceledException("Workspace save was cancelled.");
+        var repository = new TestRepository(sample.Snapshot) { SaveFailure = cancellation };
+        var fileStore = new FakeFileStore();
+        var service = sample.Service(repository, fileStore);
+
+        var thrown = await Assert.ThrowsAsync<OperationCanceledException>(
+            () => service.ImportAssetAsync(new(sample.ItemContext, @"C:\imports\design.svg", AssetKind.Svg)));
+
+        Assert.Same(cancellation, thrown);
+        Assert.Single(fileStore.Imports);
+        Assert.Empty(fileStore.ExistingReferences);
+        Assert.Equal(sample.Snapshot, repository.Snapshot);
+    }
+
+    [Fact]
     public async Task ImportAsync_ReportsCopiedFileWhenCleanupFailsAfterSaveFailure()
     {
         var sample = Sample.Create();
@@ -226,9 +244,11 @@ public class AssetManagementServiceTests
         public WorkspaceSnapshot Snapshot { get; private set; } = snapshot;
         public int SaveCount { get; private set; }
         public bool FailSaves { get; init; }
+        public Exception? SaveFailure { get; init; }
         public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(Snapshot);
         public Task SaveAsync(WorkspaceSnapshot value, CancellationToken cancellationToken = default)
         {
+            if (SaveFailure is not null) throw SaveFailure;
             if (FailSaves) throw new IOException("save failed");
             Snapshot = value;
             SaveCount++;

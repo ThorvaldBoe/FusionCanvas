@@ -119,7 +119,43 @@ public class DesignFileServiceTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(1, fileStore.Imports.Count);
-        Assert.Equal(1, fileStore.Deletes.Count);
+        Assert.Single(fileStore.Deletes);
+    }
+
+    [Fact]
+    public async Task ImportAsync_CleansManagedFileAndPropagatesPersistenceCancellation()
+    {
+        var sample = Sample.Create();
+        var cancellation = new OperationCanceledException("Workspace save was cancelled.");
+        var repository = new FailingRepository(sample.Snapshot, cancellation);
+        var fileStore = new FakeFileStore();
+        var service = new DesignFileService(repository, fileStore);
+
+        var thrown = await Assert.ThrowsAsync<OperationCanceledException>(
+            () => service.ImportAsync(sample.Item.Id, sample.SourcePngPath, TestContext.Current.CancellationToken));
+
+        Assert.Same(cancellation, thrown);
+        Assert.Single(fileStore.Deletes);
+        Assert.Empty(fileStore.Existing);
+        Assert.Equal(sample.Snapshot, repository.Snapshot);
+    }
+
+    [Fact]
+    public async Task ImportAsync_ReportsFailedCleanupWhenFileCanBeReadButExistsCheckFails()
+    {
+        var sample = Sample.Create();
+        var cancellation = new OperationCanceledException("Workspace save was cancelled.");
+        var repository = new FailingRepository(sample.Snapshot, cancellation);
+        var fileStore = new FakeFileStore { FailDeletes = true, ExistsOverride = false };
+        var service = new DesignFileService(repository, fileStore);
+
+        var thrown = await Assert.ThrowsAsync<OperationCanceledException>(
+            () => service.ImportAsync(sample.Item.Id, sample.SourcePngPath, TestContext.Current.CancellationToken));
+
+        Assert.Same(cancellation, thrown);
+        Assert.Equal("Failed", thrown.Data["FusionCanvas.ManagedWorkspaceFileCleanup.Status"]);
+        Assert.Single(fileStore.Deletes);
+        Assert.Equal(sample.Snapshot, repository.Snapshot);
     }
 
     [Fact]
@@ -136,7 +172,7 @@ public class DesignFileServiceTests
         Assert.True(result.Succeeded, result.Error);
         Assert.DoesNotContain(repository.Snapshot.Assets, asset => asset.Id == sample.PngAsset.Id);
         Assert.DoesNotContain(repository.Snapshot.AssetLinks, link => link.AssetId == sample.PngAsset.Id);
-        Assert.Equal(1, fileStore.Deletes.Count);
+        Assert.Single(fileStore.Deletes);
     }
 
     [Fact]
@@ -168,11 +204,11 @@ public class DesignFileServiceTests
         }
     }
 
-    private sealed class FailingRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
+    private sealed class FailingRepository(WorkspaceSnapshot snapshot, Exception? failure = null) : IWorkspaceRepository
     {
         public WorkspaceSnapshot Snapshot => snapshot;
         public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(snapshot);
-        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default) => throw new InvalidOperationException("Persistence failed.");
+        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default) => throw failure ?? new InvalidOperationException("Persistence failed.");
     }
 
     private sealed class FakeFileStore : IWorkspaceFileStore
@@ -180,6 +216,8 @@ public class DesignFileServiceTests
         public string WorkspaceRoot => "C:/workspace";
         public string ResolvePath(string workspaceRelativePath) => Path.Combine(WorkspaceRoot, workspaceRelativePath);
         public Exception? ImportFailure { get; init; }
+        public bool FailDeletes { get; init; }
+        public bool? ExistsOverride { get; init; }
         public List<string> Imports { get; } = [];
         public List<string> Deletes { get; } = [];
         public HashSet<string> Existing { get; } = [];
@@ -197,10 +235,15 @@ public class DesignFileServiceTests
             return Task.FromResult(new ManagedWorkspaceFile(Path.GetFileName(sourcePath), kind, relative, $"C:/workspace/{relative}", sourcePath));
         }
 
-        public bool Exists(string workspaceRelativePath) => Existing.Contains(workspaceRelativePath.Replace('\\', '/'));
+        public bool Exists(string workspaceRelativePath) => ExistsOverride ?? Existing.Contains(workspaceRelativePath.Replace('\\', '/'));
         public bool TryDelete(string workspaceRelativePath)
         {
             Deletes.Add(workspaceRelativePath);
+            if (FailDeletes)
+            {
+                return false;
+            }
+
             Existing.Remove(workspaceRelativePath.Replace('\\', '/'));
             return true;
         }

@@ -103,7 +103,18 @@ public sealed class AssetManagementService : IAssetManagementService
             AssetLinks = [.. snapshot.AssetLinks, link]
         };
 
-        var saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        string? saveError;
+        try
+        {
+            saveError = await TrySaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception)
+        {
+            var cleanup = await ManagedWorkspaceFileCleanup.TryDeleteAsync(_fileStore, managed.WorkspaceRelativePath).ConfigureAwait(false);
+            ManagedWorkspaceFileCleanup.PreserveDiagnostic(exception, cleanup, "Asset import");
+            throw;
+        }
+
         if (saveError is not null)
         {
             if (!TryCleanupManagedFile(managed.WorkspaceRelativePath))

@@ -26,8 +26,12 @@ public sealed class MockupRevisionRegressionTests
         var b = new MockupTemplateSourceImage(Guid.NewGuid(), template.Id, Guid.NewGuid(), null, false, Now, Now, 100, 100);
         var snapshot = new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [new Store(storeId, "Store", null, false, Now, Now, "{}")], [], [], [], [], [], [], [], [])
         {
-            Blueprints = [blueprint], BlueprintOfferings = [offering], OfferingOptions = [option], OfferingOptionValues = [black, white],
-            MockupTemplates = [template], MockupTemplateSourceImages = [a, b],
+            Blueprints = [blueprint],
+            BlueprintOfferings = [offering],
+            OfferingOptions = [option],
+            OfferingOptionValues = [black, white],
+            MockupTemplates = [template],
+            MockupTemplateSourceImages = [a, b],
             MockupTemplateSourceImageOptionValues = [new(a.Id, black.Id), new(b.Id, white.Id)],
             MockupTemplateColorVariants = []
         };
@@ -72,6 +76,43 @@ public sealed class MockupRevisionRegressionTests
     }
 
     [Fact]
+    public async Task AddAsync_CleansManagedFileAndPropagatesPersistenceCancellation()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprint = new Blueprint(Guid.NewGuid(), storeId, "Tee", null, false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, storeId, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "network", null, null, false, Now, Now);
+        var option = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
+        var black = new OfferingOptionValue(Guid.NewGuid(), option.Id, offering.Id, "Black", 0);
+        var template = new MockupTemplate(Guid.NewGuid(), offering.Id, null, "Front", null, 1, false, Now, Now);
+        var snapshot = new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [new Store(storeId, "Store", null, false, Now, Now, "{}")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint],
+            BlueprintOfferings = [offering],
+            OfferingOptions = [option],
+            OfferingOptionValues = [black],
+            MockupTemplates = [template]
+        };
+        var cancellation = new OperationCanceledException("Workspace save was cancelled.");
+        var repo = new MemoryRepository(snapshot) { SaveFailure = cancellation };
+        var files = new FakeFiles();
+        var service = new MockupTemplateSourceImageService(
+            repo,
+            files,
+            new FakeMetadata(),
+            new MockupTemplateSetupService(repo),
+            () => Now,
+            Guid.NewGuid);
+
+        var thrown = await Assert.ThrowsAsync<OperationCanceledException>(
+            () => service.AddAsync(new AddLocalMockupTemplateSourceRequest(storeId, template.Id, "source.png", [black.Id]), TestContext.Current.CancellationToken));
+
+        Assert.Same(cancellation, thrown);
+        Assert.Single(files.Imports);
+        Assert.Single(files.DeletedPaths);
+        Assert.Same(snapshot, repo.Snapshot);
+    }
+
+    [Fact]
     public async Task LoadResolvesManagedPreviewPathThroughFileStore()
     {
         var storeId = Guid.NewGuid();
@@ -82,8 +123,11 @@ public sealed class MockupRevisionRegressionTests
         var sourceImage = new MockupTemplateSourceImage(Guid.NewGuid(), template.Id, sourceAsset.Id, null, false, Now, Now, 100, 100);
         var snapshot = new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [new Store(storeId, "Store", null, false, Now, Now, "{}")], [], [], [], [], [], [], [], [])
         {
-            Blueprints = [blueprint], BlueprintOfferings = [offering], MockupTemplates = [template],
-            MockupTemplateSourceImages = [sourceImage], Assets = [sourceAsset]
+            Blueprints = [blueprint],
+            BlueprintOfferings = [offering],
+            MockupTemplates = [template],
+            MockupTemplateSourceImages = [sourceImage],
+            Assets = [sourceAsset]
         };
         var files = new FakeFiles { ThrowIfWorkspaceRootRead = true };
         var repository = new MemoryRepository(snapshot);
@@ -103,20 +147,28 @@ public sealed class MockupRevisionRegressionTests
     private sealed class MemoryRepository(WorkspaceSnapshot initial) : IWorkspaceRepository
     {
         public WorkspaceSnapshot Snapshot { get; private set; } = initial;
+        public Exception? SaveFailure { get; init; }
         public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(Snapshot);
-        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default) { Snapshot = snapshot; return Task.CompletedTask; }
+        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
+        {
+            if (SaveFailure is not null) throw SaveFailure;
+            Snapshot = snapshot;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeMetadata : IRasterImageMetadataReader { public Task<RasterImageInfo> ReadAsync(string sourcePath, CancellationToken cancellationToken = default) => Task.FromResult(new RasterImageInfo(100, 100)); }
     private sealed class FakeFiles : IWorkspaceFileStore
     {
         private int _next;
+        public List<string> Imports { get; } = [];
+        public List<string> DeletedPaths { get; } = [];
         public bool ThrowIfWorkspaceRootRead { get; init; }
         public string WorkspaceRoot => ThrowIfWorkspaceRootRead ? throw new InvalidOperationException("WorkspaceRoot should not be read.") : "workspace";
         public string ResolvePath(string workspaceRelativePath) => $"resolved/{workspaceRelativePath}";
-        public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, FusionCanvas.Domain.Assets.AssetKind kind, CancellationToken cancellationToken = default) { var n = ++_next; return Task.FromResult(new ManagedWorkspaceFile($"{n}.png", kind, $"assets/{n}.png", $"workspace/assets/{n}.png", sourcePath)); }
+        public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, FusionCanvas.Domain.Assets.AssetKind kind, CancellationToken cancellationToken = default) { var n = ++_next; Imports.Add(sourcePath); return Task.FromResult(new ManagedWorkspaceFile($"{n}.png", kind, $"assets/{n}.png", $"workspace/assets/{n}.png", sourcePath)); }
         public bool Exists(string workspaceRelativePath) => true;
-        public bool TryDelete(string workspaceRelativePath) => true;
+        public bool TryDelete(string workspaceRelativePath) { DeletedPaths.Add(workspaceRelativePath); return true; }
         public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default) => Task.FromResult<Stream>(new MemoryStream());
         public Task ExportCopyAsync(string workspaceRelativePath, string destinationPath, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }

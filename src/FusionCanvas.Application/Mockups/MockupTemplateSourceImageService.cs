@@ -90,8 +90,24 @@ public sealed class MockupTemplateSourceImageService : IMockupTemplateSourceImag
             MockupTemplateRevisionSourceImages = [.. snapshot.MockupTemplateRevisionSourceImages, .. revisionData.Images],
             MockupTemplateRevisionSourceImageOptionValues = [.. snapshot.MockupTemplateRevisionSourceImageOptionValues, .. revisionData.Conditions]
         };
-        try { await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false); }
-        catch (Exception exception) when (exception is not OperationCanceledException) { _fileStore.TryDelete(managed.WorkspaceRelativePath); return MockupTemplateSetupResult.Failure($"The source image could not be saved. {exception.Message}", await LoadForStoreAsync(request.StoreId, cancellationToken)); }
+        try
+        {
+            await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            var cleanup = await ManagedWorkspaceFileCleanup.TryDeleteAsync(_fileStore, managed.WorkspaceRelativePath).ConfigureAwait(false);
+            ManagedWorkspaceFileCleanup.PreserveDiagnostic(exception, cleanup, "Mockup template source-image import");
+            if (exception is OperationCanceledException)
+            {
+                throw;
+            }
+
+            return MockupTemplateSetupResult.Failure(
+                $"The source image could not be saved. {exception.Message}{ManagedWorkspaceFileCleanup.FailureMessage(cleanup)}",
+                await LoadForStoreAsync(request.StoreId, cancellationToken));
+        }
+
         return MockupTemplateSetupResult.Success(await LoadForStoreAsync(request.StoreId, cancellationToken));
     }
 

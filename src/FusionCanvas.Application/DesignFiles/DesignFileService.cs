@@ -96,10 +96,17 @@ public sealed class DesignFileService : IDesignFileService
         {
             await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception)
         {
-            _fileStore.TryDelete(imported.WorkspaceRelativePath);
-            return DesignFileImportResult.Failure($"The Design file record could not be persisted. {exception.Message}");
+            var cleanup = await ManagedWorkspaceFileCleanup.TryDeleteAsync(_fileStore, imported.WorkspaceRelativePath).ConfigureAwait(false);
+            ManagedWorkspaceFileCleanup.PreserveDiagnostic(exception, cleanup, "Design file import");
+            if (exception is OperationCanceledException)
+            {
+                throw;
+            }
+
+            return DesignFileImportResult.Failure(
+                $"The Design file record could not be persisted. {exception.Message}{ManagedWorkspaceFileCleanup.FailureMessage(cleanup)}");
         }
 
         return DesignFileImportResult.Success(ToSummary(asset));

@@ -51,9 +51,17 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         {
             return await GenerateCoreAsync(request, cancellationToken, value => stage = value).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException exception)
         {
-            await RecordStageAsync(stage, "Cancelled", "The operation was cancelled at this artwork-generation stage.").ConfigureAwait(false);
+            try
+            {
+                await RecordStageAsync(stage, "Cancelled", "The operation was cancelled at this artwork-generation stage.").ConfigureAwait(false);
+            }
+            catch (Exception telemetryException)
+            {
+                exception.Data["FusionCanvas.ArtworkGeneration.CancellationTelemetryError"] = telemetryException;
+            }
+
             throw;
         }
     }
@@ -162,14 +170,42 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
             setStage("workspace_save");
             await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception)
         {
-            _fileStore.TryDelete(managed.WorkspaceRelativePath);
-            return DesignStageResult.Failure($"The generated artwork could not be saved. {exception.Message}");
+            var cleanup = await CleanupGeneratedFileAfterFailureAsync(managed.WorkspaceRelativePath, exception).ConfigureAwait(false);
+            if (exception is OperationCanceledException)
+            {
+                throw;
+            }
+
+            var cleanupMessage = ManagedWorkspaceFileCleanup.FailureMessage(cleanup);
+            return DesignStageResult.Failure($"The generated artwork could not be saved. {exception.Message}{cleanupMessage}");
         }
 
         await RecordStageAsync("workspace_save", "Succeeded", "The artwork asset and design assignment were saved.").ConfigureAwait(false);
         return DesignStageResult.Success(BuildStateAfterSave(updated, item.Id));
+    }
+
+    private async Task<ManagedWorkspaceFileCleanup.Result> CleanupGeneratedFileAfterFailureAsync(string workspaceRelativePath, Exception primaryException)
+    {
+        var result = await ManagedWorkspaceFileCleanup.TryDeleteAsync(_fileStore, workspaceRelativePath).ConfigureAwait(false);
+        ManagedWorkspaceFileCleanup.PreserveDiagnostic(primaryException, result, "Artwork generation");
+        if (result.Status is ManagedWorkspaceFileCleanup.Status.Failed or ManagedWorkspaceFileCleanup.Status.Uninspectable)
+        {
+            var message = result.Status == ManagedWorkspaceFileCleanup.Status.Failed
+                ? "The generated artwork file could not be removed after workspace persistence failed."
+                : "The generated artwork file could not be inspected after a cleanup attempt.";
+            try
+            {
+                await RecordStageAsync("file_cleanup", result.Status.ToString(), message).ConfigureAwait(false);
+            }
+            catch (Exception telemetryException)
+            {
+                primaryException.Data["FusionCanvas.ManagedWorkspaceFileCleanup.TelemetryError"] = telemetryException;
+            }
+        }
+
+        return result;
     }
 
     private Task RecordStageAsync(string stage, string outcome, string message) => _telemetry?.IsCaptureEnabled == true
