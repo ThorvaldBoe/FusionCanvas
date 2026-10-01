@@ -4,6 +4,7 @@ using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Workflow;
+using FusionCanvas.Domain.Concepts;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Items;
@@ -789,6 +790,13 @@ public sealed class DesignStageService : IDesignStageService
 
         var config = snapshot.ItemListingConfigurations.SingleOrDefault(c => c.ItemId == itemId);
         var itemMetadata = ItemMetadataCodec.ParseMetadata(item.MetadataJson);
+        var isDesignTriangleComplete = DesignTriangleScore.FromValues(
+            itemMetadata.GetValueOrDefault(ItemMetadataCodec.ConceptIdeaKey),
+            itemMetadata.GetValueOrDefault(ItemMetadataCodec.PhraseKey),
+            itemMetadata.GetValueOrDefault(ItemMetadataCodec.GraphicDirectionKey)) == 100;
+        var defaultRow = snapshot.DesignVariantRows.SingleOrDefault(value => value.ItemId == itemId && value.IsDefault);
+        var hasDefaultRowWithSelectedColor = defaultRow is not null
+            && snapshot.DesignVariantRowColors.Any(value => value.RowId == defaultRow.Id);
 
         // The legacy offering projection retains archived rows so existing external
         // references remain valid. The Design selector is for new active choices only,
@@ -992,6 +1000,8 @@ public sealed class DesignStageService : IDesignStageService
             PersistedArtworkTargetId = persistedArtworkTargetId,
             HasPersistedArtworkTargetPreference = hasPersistedArtworkTargetPreference,
             PersistedTransparentBackground = persistedTransparentBackground,
+            IsDesignTriangleComplete = isDesignTriangleComplete,
+            HasDefaultRowWithSelectedColor = hasDefaultRowWithSelectedColor,
             HasStaleConfiguration = configuredOfferingIsStale,
             CanRecoverStaleConfiguration = configuredOfferingIsStale
                 && store is { IsArchived: false }

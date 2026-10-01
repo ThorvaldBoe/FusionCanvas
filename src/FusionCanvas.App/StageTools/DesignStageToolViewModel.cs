@@ -21,6 +21,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     private bool _isReadOnly;
     private bool _isBusy;
     private bool _hasConfiguration;
+    private bool _isDesignTriangleComplete;
+    private bool _hasDefaultRowWithSelectedColor;
     private string _configPrompt = "Select a listing configuration to begin.";
     private bool _showPreviewDialog;
     private Guid _previewAssetId;
@@ -444,19 +446,49 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         }
     }
 
-    public string ArtworkGenerationGuidance => !HasConfiguration
-        ? "Select a Listing Configuration to choose an artwork target."
-        : ArtworkTargets.Count == 0
-            ? "Configure an active Design Area and optional primary in Store setup before generating artwork."
-            : SelectedArtworkTargetId is null
-                ? "Choose a Design Area before generating artwork."
-                : !_artworkCapabilitiesLoaded
-                    ? "Checking the selected image model's endpoint capabilities…"
-                    : !HasCompatibleArtworkEndpoint(transparentBackground: false)
-                        ? _artworkCapabilityMessage ?? "The selected image model has no endpoint compatible with this target and privacy policy. Review Artwork AI Settings."
-                        : !CanUseTransparentBackground
-                            ? "The selected image model supports opaque artwork for this target; transparent background is unavailable."
-                            : "Generation uses the current Concept triangle and does not upload Supporting Images automatically.";
+    public string ArtworkGenerationGuidance
+    {
+        get
+        {
+            if (!HasConfiguration)
+            {
+                return "Select a Listing Configuration to choose an artwork target.";
+            }
+
+            if (ArtworkTargets.Count == 0)
+            {
+                return "Configure an active Design Area and optional primary in Store setup before generating artwork.";
+            }
+
+            if (SelectedArtworkTargetId is null)
+            {
+                return "Choose a Design Area before generating artwork.";
+            }
+
+            if (!_artworkCapabilitiesLoaded)
+            {
+                return "Checking the selected image model's endpoint capabilities…";
+            }
+
+            if (!HasCompatibleArtworkEndpoint(transparentBackground: false))
+            {
+                return _artworkCapabilityMessage ?? "The selected image model has no endpoint compatible with this target and privacy policy. Review Artwork AI Settings.";
+            }
+
+            var readiness = EvaluateArtworkReadiness();
+            if (!readiness.IsReady)
+            {
+                return readiness.Blockers[0];
+            }
+
+            if (!CanUseTransparentBackground)
+            {
+                return "The selected image model supports opaque artwork for this target; transparent background is unavailable.";
+            }
+
+            return "Generation uses the current Concept triangle and does not upload Supporting Images automatically.";
+        }
+    }
 
     public bool IsArtworkBusy
     {
@@ -464,7 +496,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         private set { if (_isArtworkBusy == value) return; _isArtworkBusy = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanGenerateArtwork)); GenerateArtworkCommand.NotifyCanExecuteChanged(); CancelArtworkCommand.NotifyCanExecuteChanged(); }
     }
 
-    public bool CanGenerateArtwork => _artworkGenerationService is not null && !IsArtworkBusy && !IsReadOnly && _selectedArtworkTargetId is not null && HasConfiguration && HasCompatibleArtworkEndpoint(transparentBackground: false);
+    public bool CanGenerateArtwork => _artworkGenerationService is not null && !IsArtworkBusy && EvaluateArtworkReadiness().IsReady;
     public bool CanUseTransparentBackground => !IsReadOnly && HasCompatibleArtworkEndpoint(transparentBackground: true);
     public string ArtworkProgress => IsArtworkBusy ? "Generating artwork…" : string.Empty;
     public RelayCommand GenerateArtworkCommand { get; }
@@ -966,6 +998,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         try
         {
             HasStaleConfiguration = state.HasStaleConfiguration;
+            _isDesignTriangleComplete = state.IsDesignTriangleComplete;
+            _hasDefaultRowWithSelectedColor = state.HasDefaultRowWithSelectedColor;
             CanRecoverStaleConfiguration = canEdit && state.CanRecoverStaleConfiguration;
             StaleConfigurationDisplayName = state.StaleConfigurationDisplayName;
             RecoveryGuidance = state.RecoveryGuidance;
@@ -1127,6 +1161,22 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             _aiConfiguration.Current.RequireZeroDataRetention,
             transparentBackground,
             new AiImageSize(target.Width, target.Height)) is not null;
+    }
+
+    private ArtworkGenerationReadiness EvaluateArtworkReadiness()
+    {
+        var artworkProfileReady = _aiConfiguration is not null
+            && AiConfigurationResolver.ResolveArtwork(_aiConfiguration.Current, _aiConfiguration.AvailableModels).Availability == AiConfigurationAvailability.Ready;
+        var hasActiveTarget = _selectedArtworkTargetId is Guid targetId
+            && ArtworkTargets.Any(target => target.Id == targetId);
+        return ArtworkGenerationReadinessPolicy.Evaluate(
+            !IsReadOnly,
+            artworkProfileReady,
+            HasCompatibleArtworkEndpoint(transparentBackground: false),
+            HasConfiguration,
+            hasActiveTarget,
+            _isDesignTriangleComplete,
+            _hasDefaultRowWithSelectedColor);
     }
 
     private void NotifyArtworkCapabilityState()
