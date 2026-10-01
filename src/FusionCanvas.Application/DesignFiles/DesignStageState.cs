@@ -26,6 +26,8 @@ public sealed record DesignStageState(
     public Guid? PersistedArtworkTargetId { get; init; }
     public bool HasPersistedArtworkTargetPreference { get; init; }
     public bool? PersistedTransparentBackground { get; init; }
+    public bool IsDesignTriangleComplete { get; init; }
+    public bool HasDefaultRowWithSelectedColor { get; init; }
     public bool HasStaleConfiguration { get; init; }
     public bool CanRecoverStaleConfiguration { get; init; }
     public string? StaleConfigurationDisplayName { get; init; }

@@ -1,9 +1,14 @@
 using FusionCanvas.App.StageTools;
+using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.DesignFiles;
 using FusionCanvas.Application.Settings;
+using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Catalog;
+using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Products;
+using FusionCanvas.Integration.AI;
 
 namespace FusionCanvas.App.Tests;
 
@@ -36,6 +41,28 @@ public class DesignStageToolViewModelTests
         Assert.False(viewModel.CanUseTransparentBackground);
         Assert.True(viewModel.CanGenerateArtwork);
         Assert.Contains("opaque artwork", viewModel.ArtworkGenerationGuidance, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task LoadAsync_IncompleteConceptTriangle_DisablesArtworkGenerationWithGuidance()
+    {
+        var viewModel = await CreateArtworkReadinessViewModelAsync(
+            conceptComplete: false,
+            includeDefaultRowColor: true);
+
+        Assert.False(viewModel.CanGenerateArtwork);
+        Assert.Contains("Concept", viewModel.ArtworkGenerationGuidance, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task LoadAsync_DefaultRowWithoutSelectedColor_DisablesArtworkGenerationWithGuidance()
+    {
+        var viewModel = await CreateArtworkReadinessViewModelAsync(
+            conceptComplete: true,
+            includeDefaultRowColor: false);
+
+        Assert.False(viewModel.CanGenerateArtwork);
+        Assert.Contains("product color", viewModel.ArtworkGenerationGuidance, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -185,7 +212,9 @@ public class DesignStageToolViewModelTests
                 ],
                 HasPersistedArtworkTargetPreference = persistInitialTarget,
                 PersistedArtworkTargetId = persistInitialTarget ? firstTargetId : null,
-                PersistedTransparentBackground = initialTransparency
+                PersistedTransparentBackground = initialTransparency,
+                IsDesignTriangleComplete = true,
+                HasDefaultRowWithSelectedColor = true
             };
         }
 
@@ -339,6 +368,81 @@ public class DesignStageToolViewModelTests
     private sealed class UnusedArtworkGenerationService : IArtworkGenerationService
     {
         public Task<DesignStageResult> GenerateAsync(ArtworkGenerationRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private static async Task<DesignStageToolViewModel> CreateArtworkReadinessViewModelAsync(
+        bool conceptComplete,
+        bool includeDefaultRowColor)
+    {
+        const string modelId = "openai/gpt-5.4-image-2";
+        var snapshot = SampleWorkspace.Create();
+        var item = snapshot.Items.Single(value => value.Id == SampleWorkspace.DesignNodeId);
+        var offering = Assert.Single(snapshot.FulfillmentOfferings);
+        var area = Assert.Single(snapshot.DesignAreas);
+        var rowId = Guid.NewGuid();
+        var metadataJson = conceptComplete
+            ? """{"concept.idea":"A thoughtful idea with substance","phrase":"A concise memorable phrase","graphicDirection":"A detailed graphic direction"}"""
+            : "{}";
+        var updatedItem = item with { MetadataJson = metadataJson };
+        snapshot = snapshot with
+        {
+            Items = [.. snapshot.Items.Where(value => value.Id != item.Id), updatedItem],
+            ItemListingConfigurations = [new ItemListingConfiguration(item.Id, offering.Id)],
+            DesignSelectedColors = includeDefaultRowColor ? [new DesignSelectedColor(item.Id, "Black")] : [],
+            DesignVariantRows = [new DesignVariantRow(rowId, item.Id, isDefault: true, sortOrder: 0)],
+            DesignVariantRowColors = includeDefaultRowColor ? [new DesignVariantRowColor(rowId, "Black")] : []
+        };
+
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+        var designStageService = new DesignStageService(repository, new UnusedWorkspaceFileStore(), new AiImageProvenanceCodec());
+        var preferenceResult = await designStageService.SaveArtworkPreferencesAsync(
+            item.Id, area.Id, transparentBackground: false, TestContext.Current.CancellationToken);
+        Assert.True(preferenceResult.Succeeded);
+
+        var endpoint = new AiImageEndpointCapabilities(
+            "openai", modelId, false, true, ["png"], [], false, "OpenAI",
+            new AiImageEndpointParameterCapabilities(["1:1", "2:3", "3:4"], [], false, false, ["auto", "opaque"], true));
+        var aiConfiguration = new TestAiConfigurationProvider(
+            AiConfigurationSettings.Default with
+            {
+                RequireZeroDataRetention = false,
+                Artwork = AiProfileSettings.Empty with { ModelId = modelId }
+            },
+            [new AiModelDescriptor(modelId, modelId, null, null, ["text"], ["image"], [], 1000, null, null, null, false, null)],
+            [endpoint]);
+        var viewModel = new DesignStageToolViewModel(designStageService, new UnusedArtworkGenerationService(), aiConfiguration);
+        await viewModel.LoadAsync(item.Id, canEdit: true, TestContext.Current.CancellationToken);
+
+        Assert.Equal(area.Id, viewModel.SelectedArtworkTargetId);
+        Assert.True(viewModel.HasConfiguration);
+        Assert.False(viewModel.IsReadOnly);
+        return viewModel;
+    }
+
+    private sealed class UnusedWorkspaceFileStore : IWorkspaceFileStore
+    {
+        public string WorkspaceRoot => string.Empty;
+
+        public string ResolvePath(string workspaceRelativePath) => workspaceRelativePath;
+
+        public Task<ManagedWorkspaceFile> ImportAsync(
+            string sourcePath,
+            AssetKind kind,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public bool Exists(string workspaceRelativePath) => false;
+
+        public bool TryDelete(string workspaceRelativePath) => false;
+
+        public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task ExportCopyAsync(
+            string workspaceRelativePath,
+            string destinationPath,
+            CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }
 }
