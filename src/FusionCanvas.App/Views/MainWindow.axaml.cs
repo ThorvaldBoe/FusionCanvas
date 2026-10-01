@@ -45,6 +45,7 @@ public partial class MainWindow : Window
     private WindowLayoutSettings? _normalLayout;
     private bool _layoutReady;
     private bool _applyingLayout;
+    private volatile bool _dispatcherCallbacksDisabled;
     private FusionCanvas.Application.Items.Import.IItemCsvCodec? _itemCsvImportCodec;
     private DesignStageToolViewModel? _subscribedDesignTool;
 
@@ -85,7 +86,7 @@ public partial class MainWindow : Window
                 // StoreEditorWindow updates this property from its Closing handler.
                 // Defer synchronization until that close has completed so we do not
                 // re-enter Window.Close while Avalonia is still processing Closing.
-                Dispatcher.UIThread.Post(
+                PostToDispatcher(
                     () => SyncStoreEditorWindow(viewModel.StoreManagement),
                     DispatcherPriority.Background);
             }
@@ -94,14 +95,14 @@ public partial class MainWindow : Window
         {
             if (args.PropertyName == nameof(WorkspaceManagementViewModel.IsWorkspaceManagementOpen))
             {
-                Dispatcher.UIThread.Post(() => SyncWorkspaceManagementWindow(viewModel.WorkspaceManagement), DispatcherPriority.Background);
+                PostToDispatcher(() => SyncWorkspaceManagementWindow(viewModel.WorkspaceManagement), DispatcherPriority.Background);
             }
         };
         viewModel.AssetsManagement.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(AssetsViewModel.IsOpen))
             {
-                Dispatcher.UIThread.Post(() => SyncAssetsWindow(viewModel.AssetsManagement), DispatcherPriority.Background);
+                PostToDispatcher(() => SyncAssetsWindow(viewModel.AssetsManagement), DispatcherPriority.Background);
             }
         };
         viewModel.PropertyChanged += (_, args) =>
@@ -109,14 +110,14 @@ public partial class MainWindow : Window
             if (args.PropertyName == nameof(MainWindowViewModel.IsStatusConfirmationVisible)
                 && viewModel.IsStatusConfirmationVisible)
             {
-                Dispatcher.UIThread.Post(() => CancelStatusChangeButton.Focus(), DispatcherPriority.Input);
+                PostToDispatcher(() => CancelStatusChangeButton.Focus(), DispatcherPriority.Input);
             }
         };
         viewModel.Ideation.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(IdeationViewModel.IsOpen))
             {
-                Dispatcher.UIThread.Post(() => SyncIdeationWindow(viewModel.Ideation), DispatcherPriority.Background);
+                PostToDispatcher(() => SyncIdeationWindow(viewModel.Ideation), DispatcherPriority.Background);
             }
         };
         viewModel.Settings.PropertyChanged += (_, args) =>
@@ -126,7 +127,7 @@ public partial class MainWindow : Window
                 // SettingsWindow updates this property from its Closing handler.
                 // Defer synchronization until that close has completed so native
                 // geometry can be captured without re-entering Window.Close.
-                Dispatcher.UIThread.Post(
+                PostToDispatcher(
                     () => SyncSettingsWindow(viewModel.Settings),
                     DispatcherPriority.Background);
             }
@@ -135,7 +136,7 @@ public partial class MainWindow : Window
         {
             if (args.PropertyName == nameof(WorkspaceTelemetrySettingsViewModel.IsDebugWindowOpen))
             {
-                Dispatcher.UIThread.Post(() => SyncTelemetryDebugWindow(viewModel.Settings.Telemetry), DispatcherPriority.Background);
+                PostToDispatcher(() => SyncTelemetryDebugWindow(viewModel.Settings.Telemetry), DispatcherPriority.Background);
             }
         };
         DataContext = viewModel;
@@ -170,12 +171,12 @@ public partial class MainWindow : Window
 
         if (args.PropertyName == nameof(DesignStageToolViewModel.ShowPreviewDialog))
         {
-            Dispatcher.UIThread.Post(() => SyncDesignPreviewWindow(designTool), DispatcherPriority.Background);
+            PostToDispatcher(() => SyncDesignPreviewWindow(designTool), DispatcherPriority.Background);
         }
         else if (args.PropertyName == nameof(DesignStageToolViewModel.IsRecoveryConfirmationVisible)
             && designTool.IsRecoveryConfirmationVisible)
         {
-            Dispatcher.UIThread.Post(() => ConfirmConfigurationRecoveryButton.Focus(), DispatcherPriority.Background);
+            PostToDispatcher(() => ConfirmConfigurationRecoveryButton.Focus(), DispatcherPriority.Background);
         }
     }
 
@@ -185,6 +186,7 @@ public partial class MainWindow : Window
         Opened += OnWindowOpened;
         Closing += OnWindowClosing;
         Closed += OnWindowClosed;
+        Dispatcher.UIThread.ShutdownStarted += OnDispatcherShutdownStarted;
         SizeChanged += (_, _) => CaptureNormalLayout();
         PositionChanged += (_, _) => CaptureNormalLayout();
     }
@@ -225,9 +227,41 @@ public partial class MainWindow : Window
 
     private void OnWindowClosed(object? sender, EventArgs e)
     {
+        _dispatcherCallbacksDisabled = true;
+        Dispatcher.UIThread.ShutdownStarted -= OnDispatcherShutdownStarted;
         if (DataContext is MainWindowViewModel viewModel)
         {
             viewModel.Dispose();
+        }
+    }
+
+    private void OnDispatcherShutdownStarted(object? sender, EventArgs e)
+        => _dispatcherCallbacksDisabled = true;
+
+    internal void PostToDispatcher(Action callback, DispatcherPriority priority)
+    {
+        ArgumentNullException.ThrowIfNull(callback);
+        if (_dispatcherCallbacksDisabled)
+        {
+            return;
+        }
+
+        try
+        {
+            Dispatcher.UIThread.Post(
+                () =>
+                {
+                    if (!_dispatcherCallbacksDisabled)
+                    {
+                        callback();
+                    }
+                },
+                priority);
+        }
+        catch (InvalidOperationException) when (_dispatcherCallbacksDisabled)
+        {
+            // The dispatcher can reject a post while shutdown is racing with
+            // the final boundary check above.
         }
     }
 
@@ -754,7 +788,7 @@ public partial class MainWindow : Window
         }
 
         await vm.DesignTool.ConfirmStaleConfigurationRecoveryAsync();
-        Dispatcher.UIThread.Post(
+        PostToDispatcher(
             () => (vm.DesignTool.HasStaleConfiguration ? RecoveryOfferingComboBox : DesignConfigurationComboBox).Focus(),
             DispatcherPriority.Background);
     }
@@ -767,7 +801,7 @@ public partial class MainWindow : Window
         }
 
         vm.DesignTool.CancelStaleConfigurationRecovery();
-        Dispatcher.UIThread.Post(() => RecoveryOfferingComboBox.Focus(), DispatcherPriority.Background);
+        PostToDispatcher(() => RecoveryOfferingComboBox.Focus(), DispatcherPriority.Background);
     }
 
     private void OnRecoveryConfirmationKeyDown(object? sender, KeyEventArgs e)
@@ -781,7 +815,7 @@ public partial class MainWindow : Window
 
         vm.DesignTool.CancelStaleConfigurationRecovery();
         e.Handled = true;
-        Dispatcher.UIThread.Post(() => RecoveryOfferingComboBox.Focus(), DispatcherPriority.Background);
+        PostToDispatcher(() => RecoveryOfferingComboBox.Focus(), DispatcherPriority.Background);
     }
 
     private async void OnColorToggle(object? sender, RoutedEventArgs e)
@@ -1056,7 +1090,7 @@ public partial class MainWindow : Window
     {
         if (sender is TextBox textBox && textBox.IsVisible)
         {
-            Dispatcher.UIThread.Post(() =>
+            PostToDispatcher(() =>
             {
                 textBox.Focus();
                 textBox.SelectAll();
@@ -1439,7 +1473,7 @@ public partial class MainWindow : Window
 
     private void FocusVisibleTreeEditor()
     {
-        Dispatcher.UIThread.Post(() =>
+        PostToDispatcher(() =>
         {
             var editor = WorkspaceTreeControl
                 .GetVisualDescendants()
