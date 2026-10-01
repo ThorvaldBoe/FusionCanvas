@@ -63,7 +63,7 @@ public class WorkspaceFileStoreContractTests
 
         public string WorkspaceRoot => @"C:\workspace";
         public string ResolvePath(string workspaceRelativePath) =>
-            Path.Combine(WorkspaceRoot, WorkspaceFileReference.Normalize(workspaceRelativePath).Replace('/', Path.DirectorySeparatorChar));
+            Path.Combine(WorkspaceRoot, workspaceRelativePath.Replace('/', Path.DirectorySeparatorChar));
 
         public Task<ManagedWorkspaceFile> ImportAsync(
             string sourcePath,

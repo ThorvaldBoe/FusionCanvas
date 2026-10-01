@@ -86,7 +86,14 @@ public sealed class MockupRevisionRegressionTests
             MockupTemplateSourceImages = [sourceImage], Assets = [sourceAsset]
         };
         var files = new FakeFiles { ThrowIfWorkspaceRootRead = true };
-        var service = new MockupTemplateSourceImageService(new MemoryRepository(snapshot), files, new FakeMetadata(), () => Now, Guid.NewGuid);
+        var repository = new MemoryRepository(snapshot);
+        var service = new MockupTemplateSourceImageService(
+            repository,
+            files,
+            new FakeMetadata(),
+            new MockupTemplateSetupService(repository),
+            () => Now,
+            Guid.NewGuid);
 
         var result = await service.LoadAsync(storeId, template.Id, TestContext.Current.CancellationToken);
 
