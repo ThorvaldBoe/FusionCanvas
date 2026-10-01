@@ -40,6 +40,33 @@ public class StoreEditorHeadlessTests
     private static readonly DateTimeOffset Now = new(2026, 7, 4, 12, 0, 0, TimeSpan.Zero);
 
     [AvaloniaFact]
+    public void StoreEditorWindow_DetachesViewModelAndCatalogSubscriptionsOnRebindAndClose()
+    {
+        var window = CreateEditorWindow();
+        var first = (StoreManagementViewModel)window.DataContext!;
+        var firstCatalog = first.CatalogSetup!;
+        var secondWindow = CreateEditorWindow(showWindow: false);
+        var second = (StoreManagementViewModel)secondWindow.DataContext!;
+        var secondCatalog = second.CatalogSetup!;
+        secondWindow.DataContext = null;
+
+        Assert.Equal(1, SubscriptionCount(first, nameof(StoreManagementViewModel.StoreNameFocusRequested)));
+        Assert.Equal(1, SubscriptionCount(firstCatalog, nameof(CatalogSetupViewModel.OptionValueManagementRequested)));
+
+        window.DataContext = second;
+
+        Assert.Equal(0, SubscriptionCount(first, nameof(StoreManagementViewModel.StoreNameFocusRequested)));
+        Assert.Equal(0, SubscriptionCount(firstCatalog, nameof(CatalogSetupViewModel.OptionValueManagementRequested)));
+        Assert.Equal(1, SubscriptionCount(second, nameof(StoreManagementViewModel.StoreNameFocusRequested)));
+        Assert.Equal(1, SubscriptionCount(secondCatalog, nameof(CatalogSetupViewModel.OptionValueManagementRequested)));
+
+        window.Close();
+
+        Assert.Equal(0, SubscriptionCount(second, nameof(StoreManagementViewModel.StoreNameFocusRequested)));
+        Assert.Equal(0, SubscriptionCount(secondCatalog, nameof(CatalogSetupViewModel.OptionValueManagementRequested)));
+    }
+
+    [AvaloniaFact]
     public async Task PrintifyImportPanelSupportsKeyboardCancelWithoutProviderImageControls()
     {
         var store = new Store(Guid.NewGuid(), "Printify Store", null, false, Now, Now, "{\"printifyShopId\":\"42\"}", null, FulfillmentStrategy.ShopifyPrintify);
@@ -2720,6 +2747,14 @@ public class StoreEditorHeadlessTests
             window.UpdateLayout();
         }
         return window;
+    }
+
+    private static int SubscriptionCount(object source, string eventName)
+    {
+        var eventField = source.GetType().GetField(
+            eventName,
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        return (eventField?.GetValue(source) as Delegate)?.GetInvocationList().Length ?? 0;
     }
 
     private sealed class RecordingGeometryStore : IWindowGeometryStore

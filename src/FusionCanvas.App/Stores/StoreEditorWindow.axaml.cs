@@ -44,15 +44,13 @@ public partial class StoreEditorWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
-        if (_subscribedViewModel?.PrintifyCatalogImportSession is { } printifyImport)
-        {
-            printifyImport.SelectionFocusRequested -= OnPrintifySelectionFocusRequested;
-            printifyImport.ImportFocusRequested -= OnPrintifyImportFocusRequested;
-        }
+        DetachViewModelSubscriptions();
+        DetachCatalogSubscriptions();
         if (_printify is not null)
         {
             _printify.EditRequested -= OnPrintifyEditRequested;
             _printify.CancelPending();
+            _printify = null;
         }
         if (_mockupTemplateEditorWindow is { IsVisible: true } dialog)
         {
@@ -80,32 +78,9 @@ public partial class StoreEditorWindow : Window
         if (_printify is not null) _printify.EditRequested -= OnPrintifyEditRequested;
         _printify = (DataContext as StoreManagementViewModel)?.PrintifyCredentials;
         if (_printify is not null) _printify.EditRequested += OnPrintifyEditRequested;
-        if (_subscribedViewModel is not null)
-        {
-            if (_subscribedViewModel.PrintifyCatalogImportSession is { } previousImport)
-            {
-                previousImport.SelectionFocusRequested -= OnPrintifySelectionFocusRequested;
-                previousImport.ImportFocusRequested -= OnPrintifyImportFocusRequested;
-            }
-            _subscribedViewModel.StoreNameFocusRequested -= OnStoreNameFocusRequested;
-            _subscribedViewModel.ProductNameFocusRequested -= OnProductNameFocusRequested;
-            _subscribedViewModel.OfferingNameFocusRequested -= OnOfferingNameFocusRequested;
-            _subscribedViewModel = null;
-        }
-        if (_subscribedCatalog is not null)
-        {
-            _subscribedCatalog.OptionValueManagementRequested -= OnOptionValueManagementRequested;
-            _subscribedCatalog.OptionChoiceFocusRequested -= OnOptionChoiceFocusRequested;
-            _subscribedCatalog.AddVariantRequested -= OnAddVariantRequested;
-            _subscribedCatalog.VariantActionsFocusRequested -= OnVariantActionsFocusRequested;
-            _subscribedCatalog.BulkVariantsRequested -= OnBulkVariantsRequested;
-            _subscribedCatalog.BulkVariantActionFocusRequested -= OnBulkVariantActionFocusRequested;
-            _subscribedCatalog.DesignAreaArchiveConfirmationRequested -= OnDesignAreaArchiveConfirmationRequested;
-            _subscribedCatalog.DesignAreaArchiveFocusRequested -= OnDesignAreaArchiveFocusRequested;
-            _subscribedCatalog.MockupTemplateEditorRequested -= OnMockupTemplateEditorRequested;
-            _subscribedCatalog.DesignAreaEditorRequested -= OnDesignAreaEditorRequested;
-            _subscribedCatalog = null;
-        }
+
+        DetachViewModelSubscriptions();
+        DetachCatalogSubscriptions();
 
         if (sender is not StoreEditorWindow { DataContext: StoreManagementViewModel viewModel })
         {
@@ -124,6 +99,7 @@ public partial class StoreEditorWindow : Window
         if (viewModel.CatalogSetup is { } catalog)
         {
             _subscribedCatalog = catalog;
+            catalog.AttachStoreEditor();
             if (TopLevel.GetTopLevel(this)?.StorageProvider is { } storageProvider)
                 catalog.FilePicker = new AvaloniaAssetFilePicker(storageProvider);
             catalog.OptionValueManagementRequested += OnOptionValueManagementRequested;
@@ -137,6 +113,39 @@ public partial class StoreEditorWindow : Window
             catalog.MockupTemplateEditorRequested += OnMockupTemplateEditorRequested;
             catalog.DesignAreaEditorRequested += OnDesignAreaEditorRequested;
         }
+    }
+
+    private void DetachViewModelSubscriptions()
+    {
+        if (_subscribedViewModel is null) return;
+
+        if (_subscribedViewModel.PrintifyCatalogImportSession is { } printifyImport)
+        {
+            printifyImport.SelectionFocusRequested -= OnPrintifySelectionFocusRequested;
+            printifyImport.ImportFocusRequested -= OnPrintifyImportFocusRequested;
+        }
+        _subscribedViewModel.StoreNameFocusRequested -= OnStoreNameFocusRequested;
+        _subscribedViewModel.ProductNameFocusRequested -= OnProductNameFocusRequested;
+        _subscribedViewModel.OfferingNameFocusRequested -= OnOfferingNameFocusRequested;
+        _subscribedViewModel = null;
+    }
+
+    private void DetachCatalogSubscriptions()
+    {
+        if (_subscribedCatalog is null) return;
+
+        _subscribedCatalog.DetachStoreEditor();
+        _subscribedCatalog.OptionValueManagementRequested -= OnOptionValueManagementRequested;
+        _subscribedCatalog.OptionChoiceFocusRequested -= OnOptionChoiceFocusRequested;
+        _subscribedCatalog.AddVariantRequested -= OnAddVariantRequested;
+        _subscribedCatalog.VariantActionsFocusRequested -= OnVariantActionsFocusRequested;
+        _subscribedCatalog.BulkVariantsRequested -= OnBulkVariantsRequested;
+        _subscribedCatalog.BulkVariantActionFocusRequested -= OnBulkVariantActionFocusRequested;
+        _subscribedCatalog.DesignAreaArchiveConfirmationRequested -= OnDesignAreaArchiveConfirmationRequested;
+        _subscribedCatalog.DesignAreaArchiveFocusRequested -= OnDesignAreaArchiveFocusRequested;
+        _subscribedCatalog.MockupTemplateEditorRequested -= OnMockupTemplateEditorRequested;
+        _subscribedCatalog.DesignAreaEditorRequested -= OnDesignAreaEditorRequested;
+        _subscribedCatalog = null;
     }
 
     private void OnPrintifySelectionFocusRequested(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
