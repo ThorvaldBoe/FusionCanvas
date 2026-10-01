@@ -8,7 +8,6 @@ public interface ICatalogSetupService
     Task<CatalogSetupState> LoadForStoreAsync(Guid storeId, CancellationToken cancellationToken = default);
     Task<CatalogSetupResult> CreateBlueprintAsync(CreateBlueprintRequest request, CancellationToken cancellationToken = default);
     Task<CatalogSetupResult> CreatePrintProviderAsync(CreatePrintProviderRequest request, CancellationToken cancellationToken = default);
-    Task<CatalogSetupResult> CreateOfferingAsync(CreateOfferingRequest request, CancellationToken cancellationToken = default);
     Task<CatalogSetupResult> CreateOptionAsync(CreateOfferingOptionRequest request, CancellationToken cancellationToken = default);
     Task<CatalogSetupResult> CreateOptionValueAsync(CreateOptionValueRequest request, CancellationToken cancellationToken = default);
     Task<CatalogSetupResult> ReorderOptionValuesAsync(ReorderOptionValuesRequest request, CancellationToken cancellationToken = default);

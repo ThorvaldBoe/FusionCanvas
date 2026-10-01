@@ -57,25 +57,6 @@ public sealed class CatalogSetupService : ICatalogSetupService
             return Success(snapshot with { PrintProviders = [.. snapshot.PrintProviders, new PrintProvider(_newId(), request.StoreId, request.Name, request.ExternalProviderId, false, now, now)] }, request.StoreId);
         }, cancellationToken);
 
-    public Task<CatalogSetupResult> CreateOfferingAsync(CreateOfferingRequest request, CancellationToken cancellationToken = default) =>
-        MutateAsync(request.StoreId, snapshot =>
-        {
-            var storeCheck = EnsureWritableStore(snapshot, request.StoreId);
-            if (storeCheck is not null) return Failure(snapshot, request.StoreId, storeCheck);
-            var blueprint = snapshot.Blueprints.SingleOrDefault(value => value.Id == request.BlueprintId && value.StoreId == request.StoreId);
-            if (blueprint is null) return Failure(snapshot, request.StoreId, "Blueprint was not found in this Store.");
-            if (request.Kind == BlueprintOfferingKind.FixedPrintProvider)
-            {
-                if (request.PrintProviderId is not Guid providerId || !snapshot.PrintProviders.Any(value => value.Id == providerId && value.StoreId == request.StoreId && !value.IsArchived))
-                    return Failure(snapshot, request.StoreId, "A fixed-provider offering requires an active Print Provider from this Store.");
-            }
-            if (request.Kind == BlueprintOfferingKind.ProviderNetwork && string.IsNullOrWhiteSpace(request.ProviderNetworkCode))
-                return Failure(snapshot, request.StoreId, "A Provider-Network offering requires a stable provider-network code.");
-            var now = _clock();
-            var offering = new BlueprintOffering(_newId(), blueprint.Id, request.StoreId, request.Name, request.Description, request.Kind, request.PrintProviderId, request.ProviderNetworkCode, null, request.ExternalOfferingId, false, now, now);
-            return Success(snapshot with { BlueprintOfferings = [.. snapshot.BlueprintOfferings, offering] }, request.StoreId);
-        }, cancellationToken);
-
     public Task<CatalogSetupResult> CreateOptionAsync(CreateOfferingOptionRequest request, CancellationToken cancellationToken = default) =>
         MutateAsync(null, snapshot =>
         {
