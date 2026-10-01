@@ -371,6 +371,7 @@ public class WorkspaceTransferServiceTests
             .ToDictionary(path => path, _ => Array.Empty<byte>(), StringComparer.Ordinal);
 
         public string WorkspaceRoot => "memory";
+        public string ResolvePath(string workspaceRelativePath) => Path.Combine(WorkspaceRoot, workspaceRelativePath);
 
         public bool FailDelete { get; init; }
 

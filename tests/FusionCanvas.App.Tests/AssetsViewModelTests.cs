@@ -352,6 +352,7 @@ public class AssetsViewModelTests
         private readonly HashSet<string> _existing = [];
 
         public string WorkspaceRoot => @"C:\workspace";
+        public string ResolvePath(string workspaceRelativePath) => Path.Combine(WorkspaceRoot, workspaceRelativePath);
 
         public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, AssetKind kind, CancellationToken cancellationToken = default)
         {

@@ -141,7 +141,7 @@ public sealed class MockupTemplateSourceImageService : IMockupTemplateSourceImag
         var asset = snapshot.Assets.Single(value => value.Id == image.SourceAssetId);
         var conditions = snapshot.MockupTemplateSourceImageOptionValues.Where(value => value.SourceImageId == image.Id).Select(value => value.OptionValueId).ToArray();
         var dimensions = new RasterImageInfo(image.ImageWidth, image.ImageHeight);
-        return new(image.Id, asset.Id, asset.Name, asset.WorkspaceRelativePath, dimensions, image.ImageMapping, conditions, Path.Combine(_fileStore.WorkspaceRoot, asset.WorkspaceRelativePath));
+        return new(image.Id, asset.Id, asset.Name, asset.WorkspaceRelativePath, dimensions, image.ImageMapping, conditions, _fileStore.ResolvePath(asset.WorkspaceRelativePath));
     }
 
     private (MockupTemplateRevisionSourceImage[] Images, MockupTemplateRevisionSourceImageOptionValue[] Conditions) SnapshotActiveSourceImages(

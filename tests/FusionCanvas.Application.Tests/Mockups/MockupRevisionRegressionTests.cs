@@ -1,5 +1,6 @@
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Domain.Stores;
@@ -63,6 +64,28 @@ public sealed class MockupRevisionRegressionTests
         Assert.Equal(count, repo.Snapshot.MockupTemplateRevisions.Count);
     }
 
+    [Fact]
+    public async Task LoadResolvesManagedPreviewPathThroughFileStore()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprint = new Blueprint(Guid.NewGuid(), storeId, "Tee", null, false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, storeId, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "network", null, null, false, Now, Now);
+        var template = new MockupTemplate(Guid.NewGuid(), offering.Id, null, "Front", null, 1, false, Now, Now);
+        var sourceAsset = new Asset(Guid.NewGuid(), storeId, "source.png", null, AssetKind.MockupImage, "assets/source.png", null, false, false, Now, Now, "{}");
+        var sourceImage = new MockupTemplateSourceImage(Guid.NewGuid(), template.Id, sourceAsset.Id, null, false, Now, Now, 100, 100);
+        var snapshot = new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [new Store(storeId, "Store", null, false, Now, Now, "{}")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint], BlueprintOfferings = [offering], MockupTemplates = [template],
+            MockupTemplateSourceImages = [sourceImage], Assets = [sourceAsset]
+        };
+        var files = new FakeFiles { ThrowIfWorkspaceRootRead = true };
+        var service = new MockupTemplateSourceImageService(new MemoryRepository(snapshot), files, new FakeMetadata(), () => Now, Guid.NewGuid);
+
+        var result = await service.LoadAsync(storeId, template.Id, TestContext.Current.CancellationToken);
+
+        Assert.Equal("resolved/assets/source.png", Assert.Single(result.Images).PreviewPath);
+    }
+
     private sealed class MemoryRepository(WorkspaceSnapshot initial) : IWorkspaceRepository
     {
         public WorkspaceSnapshot Snapshot { get; private set; } = initial;
@@ -74,7 +97,9 @@ public sealed class MockupRevisionRegressionTests
     private sealed class FakeFiles : IWorkspaceFileStore
     {
         private int _next;
-        public string WorkspaceRoot => "workspace";
+        public bool ThrowIfWorkspaceRootRead { get; init; }
+        public string WorkspaceRoot => ThrowIfWorkspaceRootRead ? throw new InvalidOperationException("WorkspaceRoot should not be read.") : "workspace";
+        public string ResolvePath(string workspaceRelativePath) => $"resolved/{workspaceRelativePath}";
         public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, FusionCanvas.Domain.Assets.AssetKind kind, CancellationToken cancellationToken = default) { var n = ++_next; return Task.FromResult(new ManagedWorkspaceFile($"{n}.png", kind, $"assets/{n}.png", $"workspace/assets/{n}.png", sourcePath)); }
         public bool Exists(string workspaceRelativePath) => true;
         public bool TryDelete(string workspaceRelativePath) => true;

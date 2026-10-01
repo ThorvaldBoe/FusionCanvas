@@ -13,6 +13,9 @@ internal sealed class NullWorkspaceFileStore : IWorkspaceFileStore
 
     public string WorkspaceRoot => string.Empty;
 
+    public string ResolvePath(string workspaceRelativePath) =>
+        throw new InvalidOperationException("The workspace file store is not configured. The composition root must inject it.");
+
     public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, AssetKind kind, CancellationToken cancellationToken = default) =>
         throw new InvalidOperationException("The workspace file store is not configured. The composition root must inject it.");
 

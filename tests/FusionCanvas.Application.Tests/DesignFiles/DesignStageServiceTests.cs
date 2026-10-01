@@ -940,6 +940,7 @@ public class DesignStageServiceTests
         private int _counter;
 
         public string WorkspaceRoot => Path.GetTempPath();
+        public string ResolvePath(string workspaceRelativePath) => Path.Combine(WorkspaceRoot, workspaceRelativePath);
 
         public bool Exists(string workspaceRelativePath) => File.Exists(Path.Combine(WorkspaceRoot, workspaceRelativePath));
 

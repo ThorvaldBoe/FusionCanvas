@@ -100,6 +100,18 @@ public class LocalWorkspaceFileStoreTests
     }
 
     [Fact]
+    public void ResolvePath_ResolvesWithinWorkspaceAndRejectsTraversal()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var store = new LocalWorkspaceFileStore(tempDirectory.GetPath("workspace"));
+
+        Assert.Equal(
+            Path.Combine(store.WorkspaceRoot, "assets", "source.png"),
+            store.ResolvePath("assets/source.png"));
+        Assert.Throws<InvalidOperationException>(() => store.ResolvePath("../escape.png"));
+    }
+
+    [Fact]
     public async Task ImportAsync_PreservesOriginalSourceOnlyAsTraceabilityMetadata()
     {
         using var tempDirectory = new TemporaryDirectory();

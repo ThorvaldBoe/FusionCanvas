@@ -62,6 +62,8 @@ public class WorkspaceFileStoreContractTests
         private readonly Dictionary<string, byte[]> _files = new(StringComparer.Ordinal);
 
         public string WorkspaceRoot => @"C:\workspace";
+        public string ResolvePath(string workspaceRelativePath) =>
+            Path.Combine(WorkspaceRoot, WorkspaceFileReference.Normalize(workspaceRelativePath).Replace('/', Path.DirectorySeparatorChar));
 
         public Task<ManagedWorkspaceFile> ImportAsync(
             string sourcePath,
