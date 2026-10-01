@@ -156,18 +156,10 @@ public sealed class PrintifyCatalogImportPersistenceTests
              [new(7, "Changed provider", [new("Color", "color", [new(1, "Black")])], [new(33719, "Changed variant", true, true, [1], [new("front", "dtg", width, 4500)])])])
     ];
 
-    private sealed class StoresStub(StoreSummary store) : IStoreManagementService
+    private sealed class StoresStub(StoreSummary store) : IStoreContextReader
     {
-        public Guid? ActiveWorkspaceId => store.WorkspaceId;
-        public Guid? ActiveStoreId => store.Id;
-        public void SetActiveWorkspace(Guid? workspaceId) { }
-        public Task<StoreManagementState> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(new StoreManagementState(store.WorkspaceId, [store], [], store.Id, store, false));
-        public Task<StoreManagementResult> CreateStoreAsync(StoreManagementCreateRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<StoreManagementResult> UpdateStoreAsync(StoreManagementUpdateRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<StoreManagementResult> ArchiveStoreAsync(Guid storeId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<StoreManagementResult> RestoreStoreAsync(Guid storeId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<StoreManagementResult> DeleteStoreAsync(StoreManagementDeleteRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<StoreManagementResult> SelectStoreAsync(Guid storeId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<StoreSummary?> ResolveActiveStoreAsync(Guid workspaceId, Guid storeId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<StoreSummary?>(workspaceId == store.WorkspaceId && storeId == store.Id && !store.IsArchived ? store : null);
     }
 
     private sealed class CredentialStore : IStorePrintifyCredentialStore

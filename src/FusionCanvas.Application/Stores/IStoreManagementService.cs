@@ -1,6 +1,6 @@
 namespace FusionCanvas.Application.Stores;
 
-public interface IStoreManagementService
+public interface IStoreManagementService : IStoreContextReader
 {
     Guid? ActiveWorkspaceId { get; }
 

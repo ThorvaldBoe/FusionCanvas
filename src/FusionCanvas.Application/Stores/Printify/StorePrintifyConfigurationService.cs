@@ -3,7 +3,7 @@ using FusionCanvas.Domain.Stores;
 namespace FusionCanvas.Application.Stores.Printify;
 
 public sealed class StorePrintifyConfigurationService(
-    IStoreManagementService stores,
+    IStoreContextReader stores,
     IStorePrintifyCredentialStore credentials,
     IPrintifyCredentialVerifier verifier) : IStorePrintifyConfigurationService
 {
@@ -39,13 +39,6 @@ public sealed class StorePrintifyConfigurationService(
         return await verifier.VerifyAsync(read.Secret!, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<StoreSummary?> ResolveAsync(StoreCredentialScope scope, CancellationToken cancellationToken)
-    {
-        var state = await stores.LoadAsync(cancellationToken).ConfigureAwait(false);
-        if (scope.WorkspaceId == Guid.Empty || scope.StoreId == Guid.Empty ||
-            state.ActiveWorkspaceId != scope.WorkspaceId || stores.ActiveWorkspaceId != scope.WorkspaceId)
-            return null;
-        return state.ActiveStores.FirstOrDefault(store =>
-            store.Id == scope.StoreId && store.WorkspaceId == scope.WorkspaceId && !store.IsArchived);
-    }
+    private Task<StoreSummary?> ResolveAsync(StoreCredentialScope scope, CancellationToken cancellationToken) =>
+        stores.ResolveActiveStoreAsync(scope.WorkspaceId, scope.StoreId, cancellationToken);
 }

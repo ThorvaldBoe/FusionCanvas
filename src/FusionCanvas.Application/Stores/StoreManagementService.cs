@@ -51,6 +51,25 @@ public sealed class StoreManagementService : IStoreManagementService
         return BuildState(snapshot);
     }
 
+    public async Task<StoreSummary?> ResolveActiveStoreAsync(
+        Guid workspaceId,
+        Guid storeId,
+        CancellationToken cancellationToken = default)
+    {
+        if (workspaceId == Guid.Empty || storeId == Guid.Empty)
+        {
+            return null;
+        }
+
+        var state = await LoadAsync(cancellationToken).ConfigureAwait(false);
+        if (state.ActiveWorkspaceId != workspaceId)
+        {
+            return null;
+        }
+
+        return state.ActiveStores.SingleOrDefault(store => store.Id == storeId);
+    }
+
     public async Task<StoreManagementResult> CreateStoreAsync(
         StoreManagementCreateRequest request,
         CancellationToken cancellationToken = default)
