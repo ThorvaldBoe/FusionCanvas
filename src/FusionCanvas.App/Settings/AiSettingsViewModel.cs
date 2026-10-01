@@ -12,8 +12,8 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
     private readonly IAiCredentialValidator _validator;
     private readonly IAiModelCatalogProvider _catalogProvider;
     private readonly IAiModelCatalogCache _catalogCache;
+    private readonly object _loadGate = new();
     private AiConfigurationSettings _settings;
-    private bool _loaded;
     private bool _busy;
     private bool _hasCredential;
     private bool _isEditingCredential;
@@ -26,6 +26,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
     private bool _ideationUseGeneral;
     private bool _conceptUseGeneral;
     private bool _sllUseGeneral;
+    private Task? _ensureLoadedTask;
 
     public AiSettingsViewModel(
         AiConfigurationSettings settings,
@@ -98,6 +99,10 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
 
     public async Task<IReadOnlyList<AiImageEndpointCapabilities>> GetArtworkEndpointsAsync(CancellationToken cancellationToken = default)
     {
+        // Artwork generation can be reached without opening the AI settings pane.
+        // Hydrate the catalog first so a persisted Artwork profile is resolved against
+        // its model descriptor instead of an empty in-memory catalog.
+        await EnsureLoadedAsync(cancellationToken).ConfigureAwait(true);
         if (_catalogProvider is not IAiImageEndpointCatalogProvider provider || string.IsNullOrWhiteSpace(_settings.Artwork.ModelId))
             return [];
         var key = await ReadApiKeyAsync(cancellationToken).ConfigureAwait(false);
@@ -301,18 +306,25 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
     public ICommand ConfirmZdrOptOutCommand { get; }
     public ICommand CancelZdrOptOutCommand { get; }
 
-    public async Task EnsureLoadedAsync()
+    public Task EnsureLoadedAsync(CancellationToken cancellationToken = default)
     {
-        if (_loaded)
+        lock (_loadGate)
         {
-            return;
-        }
+            if (_ensureLoadedTask is not null && !_ensureLoadedTask.IsFaulted && !_ensureLoadedTask.IsCanceled)
+            {
+                return _ensureLoadedTask;
+            }
 
-        _loaded = true;
+            return _ensureLoadedTask = LoadAsync(cancellationToken);
+        }
+    }
+
+    private async Task LoadAsync(CancellationToken cancellationToken)
+    {
         IsBusy = true;
         try
         {
-            var credential = await _credentials.ReadAsync().ConfigureAwait(true);
+            var credential = await _credentials.ReadAsync(cancellationToken).ConfigureAwait(true);
             HasCredential = credential.State == AiCredentialStateKind.Available;
             CredentialStatus = credential.State switch
             {
@@ -324,7 +336,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
                 AiCredentialStateKind.Locked or AiCredentialStateKind.AccessDenied
                 ? credential.Message
                 : null;
-            await EnsureCatalogAsync(false).ConfigureAwait(true);
+            await EnsureCatalogAsync(false, cancellationToken).ConfigureAwait(true);
         }
         finally
         {
@@ -332,7 +344,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         }
     }
 
-    public void EnsureLoaded() => Run(EnsureLoadedAsync);
+    public void EnsureLoaded() => Run(() => EnsureLoadedAsync());
 
     public void DiscardCredentialDraft()
     {
@@ -435,7 +447,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         }
     }
 
-    internal async Task EnsureCatalogAsync(bool force)
+    internal async Task EnsureCatalogAsync(bool force, CancellationToken cancellationToken = default)
     {
         if (_catalogLoading)
         {
@@ -460,14 +472,14 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         {
             if (!force)
             {
-                var cached = await LoadCatalogFromCacheAsync().ConfigureAwait(true);
+                var cached = await LoadCatalogFromCacheAsync(cancellationToken).ConfigureAwait(true);
                 if (cached is not null)
                 {
                     return;
                 }
             }
 
-            await RefreshCatalogAsync().ConfigureAwait(true);
+            await RefreshCatalogAsync(cancellationToken).ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
@@ -476,7 +488,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         catch (Exception)
         {
             Message = "OpenRouter models could not be refreshed. A cached catalog remains available when present.";
-            await LoadCatalogFromCacheAsync().ConfigureAwait(true);
+            await LoadCatalogFromCacheAsync(cancellationToken).ConfigureAwait(true);
         }
         finally
         {
@@ -488,9 +500,9 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         }
     }
 
-    private async Task RefreshCatalogAsync()
+    private async Task RefreshCatalogAsync(CancellationToken cancellationToken)
     {
-        var credential = await _credentials.ReadAsync().ConfigureAwait(true);
+        var credential = await _credentials.ReadAsync(cancellationToken).ConfigureAwait(true);
         if (credential.State != AiCredentialStateKind.Available || credential.Secret is null)
         {
             Message = credential.Message ?? "The saved API key is unavailable.";
@@ -501,14 +513,15 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         {
             var catalog = await _catalogProvider.GetModelsAsync(
                 credential.Secret,
-                RequireZeroDataRetention).ConfigureAwait(true);
+                RequireZeroDataRetention,
+                cancellationToken).ConfigureAwait(true);
             var imageCatalog = _catalogProvider is IAiImageModelCatalogProvider imageProvider
-                ? await imageProvider.GetImageModelsAsync(credential.Secret, RequireZeroDataRetention).ConfigureAwait(true)
+                ? await imageProvider.GetImageModelsAsync(credential.Secret, RequireZeroDataRetention, cancellationToken).ConfigureAwait(true)
                 : new AiModelCatalog(RequireZeroDataRetention, catalog.RetrievedAt, []);
             var combinedCatalog = catalog with { Models = MergeModelDescriptors(catalog.Models.Concat(imageCatalog.Models)) };
             SetModels(combinedCatalog.Models);
             Message = null;
-            await SaveCatalogCacheAsync(combinedCatalog).ConfigureAwait(true);
+            await SaveCatalogCacheAsync(combinedCatalog, cancellationToken).ConfigureAwait(true);
             if (catalog.Models.Count == 0)
             {
                 Message = "No compatible text models were returned.";
@@ -521,15 +534,15 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         catch (AiModelCatalogFetchException exception)
         {
             Message = CatalogFailureMessage(exception);
-            await LoadCatalogFromCacheAsync().ConfigureAwait(true);
+            await LoadCatalogFromCacheAsync(cancellationToken).ConfigureAwait(true);
         }
     }
 
-    private async Task SaveCatalogCacheAsync(AiModelCatalog catalog)
+    private async Task SaveCatalogCacheAsync(AiModelCatalog catalog, CancellationToken cancellationToken)
     {
         try
         {
-            await _catalogCache.SaveAsync(catalog).ConfigureAwait(true);
+            await _catalogCache.SaveAsync(catalog, cancellationToken).ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
@@ -555,9 +568,9 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         _ => "OpenRouter models could not be refreshed. A cached catalog remains available when present."
     };
 
-    private async Task<AiModelCatalog?> LoadCatalogFromCacheAsync()
+    private async Task<AiModelCatalog?> LoadCatalogFromCacheAsync(CancellationToken cancellationToken)
     {
-        var catalog = await _catalogCache.LoadAsync(RequireZeroDataRetention).ConfigureAwait(true);
+        var catalog = await _catalogCache.LoadAsync(RequireZeroDataRetention, cancellationToken).ConfigureAwait(true);
         SetModels(catalog?.Models ?? []);
         if (catalog?.IsStale == true)
         {
