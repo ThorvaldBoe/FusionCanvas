@@ -629,10 +629,17 @@ public sealed class DesignStageService : IDesignStageService
         {
             await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception)
         {
-            _fileStore.TryDelete(imported.WorkspaceRelativePath);
-            return DesignStageResult.Failure($"The supporting image record could not be persisted. {exception.Message}");
+            var cleanup = await ManagedWorkspaceFileCleanup.TryDeleteAsync(_fileStore, imported.WorkspaceRelativePath).ConfigureAwait(false);
+            ManagedWorkspaceFileCleanup.PreserveDiagnostic(exception, cleanup, "Supporting image import");
+            if (exception is OperationCanceledException)
+            {
+                throw;
+            }
+
+            return DesignStageResult.Failure(
+                $"The supporting image record could not be persisted. {exception.Message}{ManagedWorkspaceFileCleanup.FailureMessage(cleanup)}");
         }
 
         return DesignStageResult.Success(BuildState(updated, itemId));
@@ -757,10 +764,18 @@ public sealed class DesignStageService : IDesignStageService
         {
             await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception)
         {
-            _fileStore.TryDelete(imported.WorkspaceRelativePath);
-            return DesignStageResult.Failure($"The slot image could not be persisted. {exception.Message}", BuildState(snapshot, item.Id));
+            var cleanup = await ManagedWorkspaceFileCleanup.TryDeleteAsync(_fileStore, imported.WorkspaceRelativePath).ConfigureAwait(false);
+            ManagedWorkspaceFileCleanup.PreserveDiagnostic(exception, cleanup, "Design slot image import");
+            if (exception is OperationCanceledException)
+            {
+                throw;
+            }
+
+            return DesignStageResult.Failure(
+                $"The slot image could not be persisted. {exception.Message}{ManagedWorkspaceFileCleanup.FailureMessage(cleanup)}",
+                BuildState(snapshot, item.Id));
         }
 
         // Best-effort old file cleanup

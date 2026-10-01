@@ -369,6 +369,30 @@ public class DesignStageServiceTests
     }
 
     [Fact]
+    public async Task AssignSlotImageAsync_CleansManagedFileAndPropagatesPersistenceCancellation()
+    {
+        var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
+        var fileStore = new DeterministicFileStore();
+        var service = new DesignStageService(repo, fileStore, new TestAiImageProvenanceCodec(), () => Now, Guid.NewGuid);
+        var (itemId, offeringId) = await AddItemWithConfig(service, repo);
+        await service.SelectConfigurationAsync(itemId, offeringId, TestContext.Current.CancellationToken);
+        await service.AddSelectedColorAsync(itemId, "Black", TestContext.Current.CancellationToken);
+        var state = await service.LoadDesignStageStateAsync(itemId, TestContext.Current.CancellationToken);
+        var originalSnapshot = repo.Snapshot;
+        var cancellation = new OperationCanceledException("Workspace save was cancelled.");
+        repo.SaveFailure = cancellation;
+
+        var thrown = await Assert.ThrowsAsync<OperationCanceledException>(
+            () => service.AssignSlotImageAsync(itemId, state.Rows[0].RowId, state.Rows[0].Slots[0].DesignAreaId,
+                fileStore.CreateSourcePng(), TestContext.Current.CancellationToken));
+
+        Assert.Same(cancellation, thrown);
+        Assert.Single(fileStore.ImportedPaths);
+        Assert.Equal(fileStore.ImportedPaths, fileStore.DeletedPaths);
+        Assert.Equal(originalSnapshot, repo.Snapshot);
+    }
+
+    [Fact]
     public async Task AssignSlotImageAsync_FillTwice_ReplacesAndCleansUp()
     {
         var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
@@ -471,6 +495,27 @@ public class DesignStageServiceTests
         Assert.True(result.Succeeded);
         var images = await service.ListSupportingImagesAsync(itemId, TestContext.Current.CancellationToken);
         Assert.NotEmpty(images);
+    }
+
+    [Fact]
+    public async Task ImportSupportingImageAsync_CleansManagedFileAndPropagatesPersistenceCancellation()
+    {
+        var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
+        var fileStore = new DeterministicFileStore();
+        var service = new DesignStageService(repo, fileStore, new TestAiImageProvenanceCodec(), () => Now, Guid.NewGuid);
+        var (itemId, _) = await AddItemWithConfig(service, repo);
+        var originalSnapshot = repo.Snapshot;
+        var cancellation = new OperationCanceledException("Workspace save was cancelled.");
+        var sourcePath = fileStore.CreateSourcePng();
+        repo.SaveFailure = cancellation;
+
+        var thrown = await Assert.ThrowsAsync<OperationCanceledException>(
+            () => service.ImportSupportingImageAsync(itemId, sourcePath, TestContext.Current.CancellationToken));
+
+        Assert.Same(cancellation, thrown);
+        Assert.Single(fileStore.ImportedPaths);
+        Assert.Equal(fileStore.ImportedPaths, fileStore.DeletedPaths);
+        Assert.Equal(originalSnapshot, repo.Snapshot);
     }
 
     [Fact]
@@ -910,9 +955,15 @@ public class DesignStageServiceTests
         }
 
         public bool ThrowOnSave { get; set; }
+        public Exception? SaveFailure { get; set; }
 
         public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
         {
+            if (SaveFailure is not null)
+            {
+                throw SaveFailure;
+            }
+
             if (ThrowOnSave)
             {
                 throw new InvalidOperationException("Simulated save failure.");
@@ -939,6 +990,8 @@ public class DesignStageServiceTests
     {
         private int _counter;
 
+        public List<string> ImportedPaths { get; } = [];
+        public List<string> DeletedPaths { get; } = [];
         public string WorkspaceRoot => Path.GetTempPath();
         public string ResolvePath(string workspaceRelativePath) => Path.Combine(WorkspaceRoot, workspaceRelativePath);
 
@@ -946,6 +999,7 @@ public class DesignStageServiceTests
 
         public bool TryDelete(string workspaceRelativePath)
         {
+            DeletedPaths.Add(workspaceRelativePath);
             try
             {
                 var fullPath = Path.Combine(WorkspaceRoot, workspaceRelativePath);
@@ -975,6 +1029,7 @@ public class DesignStageServiceTests
 
             var relativePath = $"designs/{Guid.NewGuid():N}.png";
             var fullPath = Path.Combine(WorkspaceRoot, relativePath);
+            ImportedPaths.Add(relativePath);
             var managed = new ManagedWorkspaceFile(
                 Path.GetFileName(sourcePath),
                 kind,
