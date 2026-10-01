@@ -118,6 +118,25 @@ public sealed class SnowcloneCsvCodecTests
     }
 
     [Fact]
+    public async Task ReadAsync_CancellationInterruptsBlockedStreamRead()
+    {
+        await using var stream = new BlockingReadStream();
+        using var cancellation = new CancellationTokenSource();
+        var readTask = Task.Run(() => _codec.ReadAsync(stream, cancellation.Token));
+
+        Assert.True(stream.ReadStarted.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        cancellation.Cancel();
+
+        var completed = await Task.WhenAny(
+            readTask,
+            Task.Delay(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken));
+        stream.Release();
+
+        Assert.Same(readTask, completed);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => readTask);
+    }
+
+    [Fact]
     public async Task EmbeddedStarterResource_UsesTheNormalCsvContract()
     {
         var source = new EmbeddedBundledSnowcloneSource();
@@ -181,5 +200,75 @@ public sealed class SnowcloneCsvCodecTests
     {
         await using var stream = new MemoryStream(new UTF8Encoding(false).GetBytes(csv));
         return await _codec.ReadAsync(stream, TestContext.Current.CancellationToken);
+    }
+
+    private sealed class BlockingReadStream : Stream
+    {
+        private readonly ManualResetEventSlim _release = new();
+
+        public ManualResetEventSlim ReadStarted { get; } = new();
+
+        public void Release() => _release.Set();
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush() => throw new NotSupportedException();
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            ReadStarted.Set();
+            _release.Wait();
+            return 0;
+        }
+
+        public override int Read(Span<byte> buffer)
+        {
+            ReadStarted.Set();
+            _release.Wait();
+            return 0;
+        }
+
+        public override ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            ReadStarted.Set();
+            return WaitForCancellationAsync(cancellationToken);
+        }
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _release.Dispose();
+                ReadStarted.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+
+        private static async ValueTask<int> WaitForCancellationAsync(CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return 0;
+        }
     }
 }
