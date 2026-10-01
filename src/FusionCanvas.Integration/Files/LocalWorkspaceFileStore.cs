@@ -3,7 +3,7 @@ using FusionCanvas.Application.Workspaces;
 
 namespace FusionCanvas.Integration.Files;
 
-public sealed class LocalWorkspaceFileStore : IWorkspaceFileStore
+public sealed class LocalWorkspaceFileStore : IWorkspaceFileOutputStore, IWorkspaceFileRestoreStore
 {
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {

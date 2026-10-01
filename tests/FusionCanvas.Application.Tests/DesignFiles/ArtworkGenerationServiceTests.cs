@@ -87,7 +87,7 @@ public sealed class ArtworkGenerationServiceTests
             Task.FromResult(new RasterArtworkNormalizationResult([137, 80, 78, 71], request.TargetSize, true, []));
     }
 
-    private sealed class Files : IWorkspaceFileStore
+    private sealed class Files : IWorkspaceFileOutputStore
     {
         public Stream? SavedContent { get; private set; }
         public Exception? SaveFailure { get; init; }

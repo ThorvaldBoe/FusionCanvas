@@ -213,7 +213,7 @@ public sealed class LocalMockupTemplateReadinessTests
             Task.FromResult<Stream>(new MemoryStream([1, 2, 3]));
     }
 
-    private sealed class MemoryFileStore : IWorkspaceFileStore
+    private sealed class MemoryFileStore : IWorkspaceFileOutputStore
     {
         public string WorkspaceRoot => "unused";
         public int SaveCount { get; private set; }

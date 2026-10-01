@@ -6,7 +6,7 @@ namespace FusionCanvas.Application.Workspaces.Transfer;
 
 public sealed class WorkspaceTransferService(
     IWorkspaceRepository repository,
-    IWorkspaceFileStore fileStore,
+    IWorkspaceFileRestoreStore fileStore,
     IWorkspacePackageWriter packageWriter,
     IWorkspacePackageReader packageReader,
     Func<DateTimeOffset>? clock = null) : IWorkspaceTransferService

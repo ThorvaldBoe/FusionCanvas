@@ -27,7 +27,7 @@ public class WorkspaceFileStoreContractTests
     [Fact]
     public async Task RestoreAsync_CreatesOnceAndSkipsExistingContent()
     {
-        IWorkspaceFileStore fileStore = new InMemoryWorkspaceFileStore();
+        IWorkspaceFileRestoreStore fileStore = new InMemoryWorkspaceFileStore();
 
         var created = await fileStore.RestoreAsync(
             "assets/restored.png",
@@ -49,7 +49,7 @@ public class WorkspaceFileStoreContractTests
     [Fact]
     public async Task RestoreAsync_RejectsTraversal()
     {
-        IWorkspaceFileStore fileStore = new InMemoryWorkspaceFileStore();
+        IWorkspaceFileRestoreStore fileStore = new InMemoryWorkspaceFileStore();
 
         await Assert.ThrowsAsync<ArgumentException>(() => fileStore.RestoreAsync(
             "../escape.png",
@@ -57,7 +57,7 @@ public class WorkspaceFileStoreContractTests
             TestContext.Current.CancellationToken));
     }
 
-    private sealed class InMemoryWorkspaceFileStore : IWorkspaceFileStore
+    private sealed class InMemoryWorkspaceFileStore : IWorkspaceFileRestoreStore
     {
         private readonly Dictionary<string, byte[]> _files = new(StringComparer.Ordinal);
 
