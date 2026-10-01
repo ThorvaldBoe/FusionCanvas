@@ -1,4 +1,6 @@
 using FusionCanvas.Application.AI;
+using FusionCanvas.Integration.Testing;
+using System.Text.Json;
 
 namespace FusionCanvas.Application.Tests.AI;
 
@@ -15,7 +17,7 @@ public class AiTextGenerationServiceTests
 
         Assert.Equal(AiTextFailureKind.InvalidRequest, result.FailureKind);
         Assert.Equal(0, fixture.Credentials.Reads);
-        Assert.Equal(0, fixture.Provider.Calls);
+        Assert.Empty(fixture.Provider.TextRequests);
     }
 
     [Fact]
@@ -29,7 +31,7 @@ public class AiTextGenerationServiceTests
 
         Assert.Equal(AiTextFailureKind.NotConfigured, result.FailureKind);
         Assert.Equal(0, fixture.Credentials.Reads);
-        Assert.Equal(0, fixture.Provider.Calls);
+        Assert.Empty(fixture.Provider.TextRequests);
     }
 
     [Fact]
@@ -47,10 +49,10 @@ public class AiTextGenerationServiceTests
         var result = await fixture.Service.GenerateAsync(Request(), TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
-        Assert.Equal(1, fixture.Provider.Calls);
-        Assert.Equal("secret", fixture.Provider.Request!.ApiKey);
-        Assert.Equal(0.4, fixture.Provider.Request.Profile.Temperature);
-        Assert.Equal(0.9, fixture.Provider.Request.Profile.TopP);
+        var providerRequest = Assert.Single(fixture.Provider.TextRequests);
+        Assert.Equal(0.4, providerRequest.Profile.Temperature);
+        Assert.Equal(0.9, providerRequest.Profile.TopP);
+        Assert.DoesNotContain("secret", JsonSerializer.Serialize(fixture.Provider.TextRequests), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -79,8 +81,9 @@ public class AiTextGenerationServiceTests
             TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
-        Assert.Equal("ideation/model", fixture.Provider.Request!.ModelId);
-        Assert.Equal(0.8, fixture.Provider.Request.Profile.Temperature);
+        var providerRequest = Assert.Single(fixture.Provider.TextRequests);
+        Assert.Equal("ideation/model", providerRequest.ModelId);
+        Assert.Equal(0.8, providerRequest.Profile.Temperature);
     }
 
     [Fact]
@@ -93,7 +96,7 @@ public class AiTextGenerationServiceTests
             new CancellationToken(canceled: true)));
 
         Assert.Equal(0, fixture.Credentials.Reads);
-        Assert.Equal(0, fixture.Provider.Calls);
+        Assert.Empty(fixture.Provider.TextRequests);
     }
 
     [Fact]
@@ -125,7 +128,7 @@ public class AiTextGenerationServiceTests
             TestContext.Current.CancellationToken);
         Assert.Equal(AiAvailabilityKind.Ready, ready.Kind);
         Assert.DoesNotContain("never-return-this", ready.Message, StringComparison.Ordinal);
-        Assert.Equal(0, fixture.Provider.Calls);
+        Assert.Empty(fixture.Provider.TextRequests);
     }
 
     [Fact]
@@ -168,14 +171,14 @@ public class AiTextGenerationServiceTests
             Configuration = new ConfigurationProvider(settings);
             Credentials = new CredentialStore();
             Cache = new CatalogCache();
-            Provider = new TextProvider();
+            Provider = new MockOpenRouterClient();
             Service = new AiTextGenerationService(Configuration, Credentials, Cache, Provider);
         }
 
         public ConfigurationProvider Configuration { get; }
         public CredentialStore Credentials { get; }
         public CatalogCache Cache { get; }
-        public TextProvider Provider { get; }
+        public MockOpenRouterClient Provider { get; }
         public AiTextGenerationService Service { get; }
     }
 
@@ -209,15 +212,4 @@ public class AiTextGenerationServiceTests
             Task.FromResult(Catalog);
     }
 
-    private sealed class TextProvider : IAiTextProvider
-    {
-        public int Calls { get; private set; }
-        public AiProviderTextRequest? Request { get; private set; }
-        public Task<AiTextResult> GenerateAsync(AiProviderTextRequest request, CancellationToken cancellationToken = default)
-        {
-            Calls++;
-            Request = request;
-            return Task.FromResult(AiTextResult.Success("answer", request.ModelId));
-        }
-    }
 }
