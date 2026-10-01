@@ -961,6 +961,32 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
+    public void StatusConfirmation_RaisesVisibilityChangedOnlyWhenItChanges()
+    {
+        var viewModel = MainWindowViewModelFactory.CreateSample();
+        viewModel.OpenFromNavigation(ReadyItemContext(viewModel));
+        var notifications = new List<(string? PropertyName, bool IsVisible)>();
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(MainWindowViewModel.IsStatusConfirmationVisible))
+            {
+                notifications.Add((args.PropertyName, viewModel.IsStatusConfirmationVisible));
+            }
+        };
+
+        viewModel.SetItemStatusCommand.Execute(ItemStatus.Rejected);
+        viewModel.SetItemStatusCommand.Execute(ItemStatus.Rejected);
+        viewModel.CancelStatusChangeCommand.Execute(null);
+
+        Assert.Equal(
+            [
+                (nameof(MainWindowViewModel.IsStatusConfirmationVisible), true),
+                (nameof(MainWindowViewModel.IsStatusConfirmationVisible), false)
+            ],
+            notifications);
+    }
+
+    [Fact]
     public void StageToolVisibility_FollowsActiveReviewStage()
     {
         var viewModel = MainWindowViewModelFactory.CreateSample();
