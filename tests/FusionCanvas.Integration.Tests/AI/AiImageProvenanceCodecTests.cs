@@ -1,17 +1,19 @@
 using FusionCanvas.Application.AI;
+using FusionCanvas.Integration.AI;
 
-namespace FusionCanvas.Application.Tests.AI;
+namespace FusionCanvas.Integration.Tests.AI;
 
-public sealed class AiImageProvenanceTests
+public sealed class AiImageProvenanceCodecTests
 {
     [Fact]
     public void Codec_RoundTripsCompleteNonSecretProvenance()
     {
         var source = new AiImageProvenance("OpenRouter", "selected/model", "provider/model", "prompt", new(512, 512), new(1200, 1400), true, false, DateTimeOffset.UtcNow, "request-1", new(2, 3, 0.04m), ["warning"]);
 
-        var json = AiImageProvenanceCodec.Serialize(source);
+        var codec = new AiImageProvenanceCodec();
+        var json = codec.Serialize(source);
 
-        Assert.True(AiImageProvenanceCodec.TryDeserialize(json, out var restored));
+        Assert.True(codec.TryDeserialize(json, out var restored));
         Assert.NotNull(restored);
         if (restored is null) return;
         Assert.Equal(source.Provider, restored.Provider);
@@ -35,6 +37,6 @@ public sealed class AiImageProvenanceTests
     [InlineData("{\"version\":1,\"provenance\":null}")]
     public void Codec_RejectsMalformedOrUnknownVersionsWithoutThrowing(string json)
     {
-        Assert.False(AiImageProvenanceCodec.TryDeserialize(json, out _));
+        Assert.False(new AiImageProvenanceCodec().TryDeserialize(json, out _));
     }
 }

@@ -266,7 +266,7 @@ public class DesignStageServiceTests
     {
         var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
         var fileStore = new DeterministicFileStore();
-        var service = new DesignStageService(repo, fileStore, () => Now, Guid.NewGuid);
+        var service = new DesignStageService(repo, fileStore, new TestAiImageProvenanceCodec(), () => Now, Guid.NewGuid);
         var (itemId, offeringId) = await AddItemWithConfig(service, repo);
         await service.SelectConfigurationAsync(itemId, offeringId, TestContext.Current.CancellationToken);
         await service.AddSelectedColorAsync(itemId, "Black", TestContext.Current.CancellationToken);
@@ -282,7 +282,7 @@ public class DesignStageServiceTests
     {
         var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
         var fileStore = new DeterministicFileStore();
-        var service = new DesignStageService(repo, fileStore, () => Now, Guid.NewGuid);
+        var service = new DesignStageService(repo, fileStore, new TestAiImageProvenanceCodec(), () => Now, Guid.NewGuid);
         var (itemId, offeringId) = await AddItemWithConfig(service, repo);
         await service.SelectConfigurationAsync(itemId, offeringId, TestContext.Current.CancellationToken);
         await service.AddSelectedColorAsync(itemId, "Black", TestContext.Current.CancellationToken);
@@ -303,7 +303,7 @@ public class DesignStageServiceTests
     {
         var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
         var fileStore = new DeterministicFileStore();
-        var service = new DesignStageService(repo, fileStore, () => Now, Guid.NewGuid);
+        var service = new DesignStageService(repo, fileStore, new TestAiImageProvenanceCodec(), () => Now, Guid.NewGuid);
         var (itemId, offeringId) = await AddItemWithConfig(service, repo);
         await service.SelectConfigurationAsync(itemId, offeringId, TestContext.Current.CancellationToken);
         await service.AddSelectedColorAsync(itemId, "Black", TestContext.Current.CancellationToken);
@@ -326,7 +326,7 @@ public class DesignStageServiceTests
     {
         var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
         var fileStore = new DeterministicFileStore();
-        var service = new DesignStageService(repo, fileStore, () => Now, Guid.NewGuid);
+        var service = new DesignStageService(repo, fileStore, new TestAiImageProvenanceCodec(), () => Now, Guid.NewGuid);
         var (itemId, offeringId) = await AddItemWithConfig(service, repo);
         var secondArea = new DesignArea(
             Guid.NewGuid(), offeringId, "Back", null, "back", "DTG", 3000, 4500, null, Now, Now, "{}");
@@ -350,7 +350,7 @@ public class DesignStageServiceTests
     {
         var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
         var fileStore = new DeterministicFileStore();
-        var service = new DesignStageService(repo, fileStore, () => Now, Guid.NewGuid);
+        var service = new DesignStageService(repo, fileStore, new TestAiImageProvenanceCodec(), () => Now, Guid.NewGuid);
         var (itemId, offeringId) = await AddItemWithConfig(service, repo);
         await service.SelectConfigurationAsync(itemId, offeringId, TestContext.Current.CancellationToken);
         await service.AddSelectedColorAsync(itemId, "Black", TestContext.Current.CancellationToken);
@@ -373,7 +373,7 @@ public class DesignStageServiceTests
     {
         var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
         var fileStore = new DeterministicFileStore();
-        var service = new DesignStageService(repo, fileStore, () => Now, Guid.NewGuid);
+        var service = new DesignStageService(repo, fileStore, new TestAiImageProvenanceCodec(), () => Now, Guid.NewGuid);
         var (itemId, offeringId) = await AddItemWithConfig(service, repo);
         await service.SelectConfigurationAsync(itemId, offeringId, TestContext.Current.CancellationToken);
         await service.AddSelectedColorAsync(itemId, "Black", TestContext.Current.CancellationToken);
@@ -448,7 +448,7 @@ public class DesignStageServiceTests
     {
         var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
         var fileStore = new DeterministicFileStore();
-        var service = new DesignStageService(repo, fileStore, () => Now, Guid.NewGuid);
+        var service = new DesignStageService(repo, fileStore, new TestAiImageProvenanceCodec(), () => Now, Guid.NewGuid);
         var (itemId, _) = await AddItemWithConfig(service, repo);
 
         var result = await service.ImportSupportingImageAsync(itemId, "nonexistent.jpg", TestContext.Current.CancellationToken);
@@ -462,7 +462,7 @@ public class DesignStageServiceTests
     {
         var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
         var fileStore = new DeterministicFileStore();
-        var service = new DesignStageService(repo, fileStore, () => Now, Guid.NewGuid);
+        var service = new DesignStageService(repo, fileStore, new TestAiImageProvenanceCodec(), () => Now, Guid.NewGuid);
         var (itemId, _) = await AddItemWithConfig(service, repo);
         var sourcePath = fileStore.CreateSourcePng();
 
@@ -478,7 +478,7 @@ public class DesignStageServiceTests
     {
         var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
         var fileStore = new DeterministicFileStore();
-        var service = new DesignStageService(repo, fileStore, () => Now, Guid.NewGuid);
+        var service = new DesignStageService(repo, fileStore, new TestAiImageProvenanceCodec(), () => Now, Guid.NewGuid);
         var (itemId, _) = await AddItemWithConfig(service, repo);
         var sourcePath = fileStore.CreateSourcePng();
         await service.ImportSupportingImageAsync(itemId, sourcePath, TestContext.Current.CancellationToken);
@@ -777,7 +777,7 @@ public class DesignStageServiceTests
     // --- Helpers ---
 
     private static DesignStageService New(InMemoryWorkspaceRepository repo) =>
-        new(repo, new DeterministicFileStore(), () => Now, Guid.NewGuid);
+        new(repo, new DeterministicFileStore(), new TestAiImageProvenanceCodec(), () => Now, Guid.NewGuid);
 
     private static async Task<(Guid itemId, Guid offeringId)> AddItemAndConfig(DesignStageService service, InMemoryWorkspaceRepository repo)
     {

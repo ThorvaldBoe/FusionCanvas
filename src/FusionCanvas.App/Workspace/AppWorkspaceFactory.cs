@@ -101,7 +101,8 @@ public static class AppWorkspaceFactory
         var mockupTemplateSourceImages = new MockupTemplateSourceImageService(repository, fileStore, rasterImageMetadata, mockupTemplateSetup);
         var itemCsvExport = new ItemCsvExportService();
         var itemCsvImport = new ItemCsvImportService(repository);
-        var designStage = new DesignStageService(repository, fileStore);
+        var aiImageProvenanceCodec = new AiImageProvenanceCodec();
+        var designStage = new DesignStageService(repository, fileStore, aiImageProvenanceCodec);
         var sllDocumentCodec = new SllDocumentCodec();
         var nichePopulation = new NichePopulationService(ai);
         var ideationAccess = new ConfiguredIdeationAccessStatus(ai);
@@ -182,7 +183,7 @@ public static class AppWorkspaceFactory
             sllDocumentCodec,
             new MockupGenerationService(repository, fileStore, mockupTemplateSetup, new ImageSharpMockupRasterCompositor()),
             mainWindowServices,
-            artworkProvider is null ? null : new ArtworkGenerationService(repository, fileStore, artworkProvider, new ImageSharpArtworkNormalizer(), telemetry: telemetry));
+            artworkProvider is null ? null : new ArtworkGenerationService(repository, fileStore, aiImageProvenanceCodec, artworkProvider, new ImageSharpArtworkNormalizer(), telemetry: telemetry));
     }
 
     private static string DefaultDatabasePath()

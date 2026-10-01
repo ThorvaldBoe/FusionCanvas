@@ -14,6 +14,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
     private const string GeneratedArtworkName = "generated artwork";
     private readonly IWorkspaceRepository _repository;
     private readonly IWorkspaceFileOutputStore _fileStore;
+    private readonly IAiImageProvenanceCodec _provenanceCodec;
     private readonly IAiImageGenerationProvider _provider;
     private readonly IRasterArtworkNormalizer _normalizer;
     private readonly ITelemetryService? _telemetry;
@@ -23,6 +24,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
     public ArtworkGenerationService(
         IWorkspaceRepository repository,
         IWorkspaceFileOutputStore fileStore,
+        IAiImageProvenanceCodec provenanceCodec,
         IAiImageGenerationProvider provider,
         IRasterArtworkNormalizer normalizer,
         Func<DateTimeOffset>? clock = null,
@@ -31,6 +33,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _fileStore = fileStore ?? throw new ArgumentNullException(nameof(fileStore));
+        _provenanceCodec = provenanceCodec ?? throw new ArgumentNullException(nameof(provenanceCodec));
         _provider = provider ?? throw new ArgumentNullException(nameof(provider));
         _normalizer = normalizer ?? throw new ArgumentNullException(nameof(normalizer));
         _telemetry = telemetry;
@@ -126,7 +129,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         await RecordStageAsync("file_storage", "Succeeded", "The normalized artwork file was stored.").ConfigureAwait(false);
         var assetId = _newId();
         var asset = new Asset(assetId, item.StoreId, $"{GeneratedArtworkName} - {area.Name}", null, AssetKind.ExportedImage,
-            managed.WorkspaceRelativePath, null, false, false, now, now, AiImageProvenanceCodec.Serialize(provenance));
+            managed.WorkspaceRelativePath, null, false, false, now, now, _provenanceCodec.Serialize(provenance));
         var assignment = new DesignSlotAssignment(row.Id, request.DesignAreaId, assetId);
         var updated = snapshot with
         {
