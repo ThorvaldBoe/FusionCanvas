@@ -248,6 +248,24 @@ public sealed class SllGenerationSessionViewModelTests
     }
 
     [Fact]
+    public async Task Load_PreservesPersistedSllForStaleIncompleteTriangle()
+    {
+        var inspector = CreateInspector();
+        var vm = CreateSessionViewModel(inspector);
+
+        await SetupLoadedInspectorAsync(
+            inspector,
+            conceptIdea: "A short idea",
+            phrase: "",
+            graphicDirection: "",
+            sll: Codec.Serialize(SampleDocument("PERSISTED STALE VERSION")));
+
+        Assert.True(vm.HasCurrentSll);
+        Assert.Contains("PERSISTED STALE VERSION", vm.AsciiSketch);
+        Assert.True(vm.IsStale);
+    }
+
+    [Fact]
     public async Task CommitFailure_RetainsSllDraftAndSurfacesRecoverableError()
     {
         var inspector = CreateInspector();

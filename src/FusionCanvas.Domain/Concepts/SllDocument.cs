@@ -15,10 +15,23 @@ public sealed record SllDocument(
     SllValidation Validation)
 {
     /// <summary>
+    /// Indicates whether the document contains every required top-level SLL section.
+    /// Optional values inside those sections may be empty, but the sections themselves
+    /// must be present for a persisted SLL to be displayable.
+    /// </summary>
+    public bool IsStructurallyComplete =>
+        Assumptions is not null
+        && Communication is not null
+        && Triangle is not null
+        && !string.IsNullOrWhiteSpace(AsciiSketch)
+        && Notes is not null
+        && Validation is not null;
+
+    /// <summary>
     /// Validates the hard SLL invariants: the ASCII sketch is non-empty and the triangle's
     /// phrase preserves the supplied phrase unless an explicit revision is recorded.
     /// </summary>
     public bool Validate(string suppliedPhrase) =>
-        !string.IsNullOrWhiteSpace(AsciiSketch)
+        IsStructurallyComplete
         && Triangle.IsPhrasePreserved(suppliedPhrase);
 }

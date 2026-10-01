@@ -57,4 +57,19 @@ public sealed class SllDocumentCodecTests
         Assert.False(ok);
         Assert.Null(parsed);
     }
+
+    [Theory]
+    [InlineData("{\"Communication\":{},\"Triangle\":{},\"AsciiSketch\":\"sketch\",\"Notes\":{},\"Validation\":{}}")]
+    [InlineData("{\"Assumptions\":[],\"Triangle\":{},\"AsciiSketch\":\"sketch\",\"Notes\":{},\"Validation\":{}}")]
+    [InlineData("{\"Assumptions\":[],\"Communication\":{},\"AsciiSketch\":\"sketch\",\"Notes\":{},\"Validation\":{}}")]
+    [InlineData("{\"Assumptions\":[],\"Communication\":{},\"Triangle\":{},\"Notes\":{},\"Validation\":{}}")]
+    [InlineData("{\"Assumptions\":[],\"Communication\":{},\"Triangle\":{},\"AsciiSketch\":\"sketch\",\"Validation\":{}}")]
+    [InlineData("{\"Assumptions\":[],\"Communication\":{},\"Triangle\":{},\"AsciiSketch\":\"sketch\",\"Notes\":{}}")]
+    public void TryDeserialize_StructurallyIncompleteDocument_ReturnsFalse(string json)
+    {
+        var ok = _codec.TryDeserialize(json, out var parsed);
+
+        Assert.False(ok);
+        Assert.Null(parsed);
+    }
 }
