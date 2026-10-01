@@ -91,6 +91,38 @@ public class OpenRouterClientTests
     }
 
     [Fact]
+    public async Task GetImageModelsAsync_MapsTimeoutToNetworkOrServiceFailure()
+    {
+        var client = CreateClient(new ExceptionHandler(new TaskCanceledException("simulated timeout")));
+
+        var exception = await Assert.ThrowsAsync<AiModelCatalogFetchException>(
+            () => client.GetImageModelsAsync("secret", false, TestContext.Current.CancellationToken));
+
+        Assert.Equal(AiModelCatalogFailureKind.NetworkOrService, exception.Kind);
+    }
+
+    [Fact]
+    public async Task GetImageModelsAsync_MapsTransportFailureToNetworkOrServiceFailure()
+    {
+        var client = CreateClient(new ExceptionHandler(new HttpRequestException("simulated transport failure")));
+
+        var exception = await Assert.ThrowsAsync<AiModelCatalogFetchException>(
+            () => client.GetImageModelsAsync("secret", false, TestContext.Current.CancellationToken));
+
+        Assert.Equal(AiModelCatalogFailureKind.NetworkOrService, exception.Kind);
+    }
+
+    [Fact]
+    public async Task GetImageModelsAsync_RethrowsCallerRequestedCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var client = CreateClient(new CancellingHandler(cancellation));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            client.GetImageModelsAsync("secret", false, cancellation.Token));
+    }
+
+    [Fact]
     public async Task GetImageEndpointsAsync_ReadsCurrentEndpointsEnvelopeAndUsesProviderTag()
     {
         var handler = new RecordingHandler(Json(HttpStatusCode.OK, """
@@ -523,7 +555,7 @@ public class OpenRouterClientTests
         Assert.DoesNotContain("secret", System.Text.Json.JsonSerializer.Serialize(entry));
     }
 
-    private static OpenRouterClient CreateClient(RecordingHandler handler) =>
+    private static OpenRouterClient CreateClient(HttpMessageHandler handler) =>
         new(new HttpClient(handler) { BaseAddress = OpenRouterClient.DefaultBaseAddress });
 
     private static HttpResponseMessage Json(HttpStatusCode status, string json) =>
@@ -567,6 +599,14 @@ public class OpenRouterClientTests
             cancellation.Cancel();
             return Task.FromCanceled<HttpResponseMessage>(cancellationToken);
         }
+    }
+
+    private sealed class ExceptionHandler(Exception exception) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            Task.FromException<HttpResponseMessage>(exception);
     }
 
     private sealed record RequestRecord(

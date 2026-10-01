@@ -329,8 +329,16 @@ public sealed class OpenRouterClient :
             return new AiModelCatalog(requireZeroDataRetention, DateTimeOffset.UtcNow, models);
         }
         catch (AiModelCatalogFetchException) { throw; }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new AiModelCatalogFetchException(AiModelCatalogFailureKind.NetworkOrService, CatalogFailureMessage(AiModelCatalogFailureKind.NetworkOrService));
+        }
         catch (OperationCanceledException) { throw; }
-        catch (Exception exception) when (exception is HttpRequestException or IOException or JsonException or InvalidDataException or InvalidOperationException)
+        catch (HttpRequestException)
+        {
+            throw new AiModelCatalogFetchException(AiModelCatalogFailureKind.NetworkOrService, CatalogFailureMessage(AiModelCatalogFailureKind.NetworkOrService));
+        }
+        catch (Exception exception) when (exception is IOException or JsonException or InvalidDataException or InvalidOperationException)
         {
             throw new AiModelCatalogFetchException(AiModelCatalogFailureKind.InvalidResponse, "OpenRouter image model catalog could not be loaded.");
         }
