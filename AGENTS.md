@@ -26,6 +26,14 @@ Read these in order; drill into detail only where the task touches them:
 
 `docs/LifeOS/` is optional historical reference. It may contain useful ideas, but it is potentially stale and is not required context, current scope, feature ordering, or acceptance authority.
 
+## Software Factory context
+
+When a request refers to the **Software Factory**, **factory**, **audit**, or an **audit axis**, first read the local context file `.codex/software-factory.local.md` when it exists. That ignored file contains the private LifeOS location and the navigation map for the user's current factory specification. Do not add its private path or copied private content to tracked files, commits, issues, pull requests, or final reports.
+
+In this repository, an **audit** means a scoped, evidence-based Software Factory QA run against the requested axis or axes. Use only the explicitly requested axis or axes; run all six axes only when the user explicitly requests a full audit. The current axis names are Architecture & Code Structure, Functionality & Logic, UX, UI, Security & Privacy, and Values, Vision & Taste. Read the corresponding factory standard, source-extract definition, and audit procedure before assessing work. Preserve `UNKNOWN` and blocked questions, distinguish findings from audit challenges, retain evidence and provenance, and revalidate affected prior results after changes. A factory audit does not replace OpenSpec: any proposed behavior change still follows the repository's OpenSpec workflow.
+
+If the local context file is absent, do not guess what the private terms mean; state that the private Software Factory context is unavailable and use the public repository guidance only.
+
 ## OpenSpec Workflow (mandatory for behavior changes)
 
 Every feature that adds or changes behavior goes through a rolling delivery-module workflow:

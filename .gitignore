@@ -43,3 +43,6 @@ appsettings.*.local.json
 appsettings.Local.json
 *.secret
 *.key
+
+#Private local context for the user's external Software Factory specification
+.codex/software-factory.local.md
