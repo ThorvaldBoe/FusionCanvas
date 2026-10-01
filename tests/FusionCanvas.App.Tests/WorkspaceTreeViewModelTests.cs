@@ -24,7 +24,7 @@ public class WorkspaceTreeViewModelTests
     {
         var sample = Sample.Create();
         var repository = new TestRepository(sample.Snapshot) { FailLoads = true };
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
 
         viewModel.BeginCreateCommand.Execute(null);
@@ -40,7 +40,7 @@ public class WorkspaceTreeViewModelTests
     {
         var sample = Sample.Create();
         var repository = new TestRepository(sample.Snapshot) { FailLoads = true };
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
 
         await viewModel.ExecuteTrackedCommandAsync(viewModel.ReloadAsync, TestContext.Current.CancellationToken);
@@ -55,7 +55,7 @@ public class WorkspaceTreeViewModelTests
     {
         var sample = Sample.Create();
         var repository = new TestRepository(sample.Snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
         var commandStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseCommand = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -91,7 +91,7 @@ public class WorkspaceTreeViewModelTests
     {
         var sample = Sample.Create();
         var repository = new BlockingLoadRepository(sample.Snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
 
         viewModel.BeginCreateCommand.Execute(null);
@@ -110,7 +110,7 @@ public class WorkspaceTreeViewModelTests
     {
         var sample = Sample.Create();
         var repository = new NonCancellableLoadRepository(sample.Snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
         var busyNotifications = new List<bool>();
         viewModel.PropertyChanged += (_, args) =>
@@ -143,7 +143,7 @@ public class WorkspaceTreeViewModelTests
     {
         var sample = Sample.Create();
         var repository = new DeferredLoadRepository(sample.Snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
         var notificationThreadId = 0;
         viewModel.Roots.CollectionChanged += (_, _) => notificationThreadId = Environment.CurrentManagedThreadId;
@@ -171,7 +171,7 @@ public class WorkspaceTreeViewModelTests
     {
         var sample = Sample.Create();
         var repository = new NonCancellableLoadRepository(sample.Snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
         var operation = viewModel.ExecuteTrackedCommandAsync(viewModel.ReloadAsync, TestContext.Current.CancellationToken);
 
@@ -202,7 +202,7 @@ public class WorkspaceTreeViewModelTests
         var item = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Item", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Items = [item] };
         var repository = new BlockingLoadRepository(snapshot, blockOnLoadNumber: 2);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot, items: new ItemManagementService(repository));
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot, items: new ItemManagementService(repository));
         viewModel.SetStore(sample.Store.Id, snapshot);
         var node = viewModel.Roots.Single().Children.Single(candidate => candidate.EntityId == item.Id);
         viewModel.SelectNodeWithModifiers(node, toggle: false, range: false);
@@ -233,7 +233,7 @@ public class WorkspaceTreeViewModelTests
         var teaItem = new Item(Guid.NewGuid(), store.Id, tea.Id, null, "Tea item", null, ItemStatus.Draft, WorkflowStage.Idea, false, now, now, "{}");
         var snapshot = new WorkspaceSnapshot([store], [coffee, tea], [coffeeGroup, teaGroup], [coffeeFirst, coffeeSecond, teaItem], [], [], [], [], []);
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(store.Id, snapshot);
 
         var nodes = FlattenNodes(viewModel.Roots).ToDictionary(node => node.EntityId);
@@ -275,7 +275,7 @@ public class WorkspaceTreeViewModelTests
             Items = [visible, otherStage, archived, otherStoreDesign]
         };
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
 
         viewModel.SetStore(sample.Store.Id, snapshot);
         Assert.Equal("0/2 designs showing.", viewModel.DesignCountLabel);
@@ -316,7 +316,7 @@ public class WorkspaceTreeViewModelTests
             .ToArray();
         var snapshot = sample.Snapshot with { Items = [.. activeItems, .. archivedItems] };
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
 
         viewModel.SetStore(sample.Store.Id, snapshot);
         Assert.Equal("0/4 designs showing.", viewModel.DesignCountLabel);
@@ -334,7 +334,7 @@ public class WorkspaceTreeViewModelTests
             WorkflowStage.Design, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Items = [design] };
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
 
         viewModel.SetStore(sample.Store.Id, snapshot);
         var niche = Assert.Single(viewModel.Roots);
@@ -356,7 +356,7 @@ public class WorkspaceTreeViewModelTests
         var item = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Design", null, ItemStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Items = [item] };
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
         Assert.Equal("0/1 designs showing.", viewModel.DesignCountLabel);
 
@@ -373,7 +373,7 @@ public class WorkspaceTreeViewModelTests
         var repository = new TestRepository(sample.Snapshot);
         var ids = new Queue<Guid>([Guid.NewGuid()]);
         var groups = new GroupManagementService(repository, () => sample.Now.AddMinutes(1), () => ids.Dequeue());
-        var viewModel = new WorkspaceTreeViewModel(repository, groups, sample.Snapshot);
+        var viewModel = CreateViewModel(repository, groups, sample.Snapshot);
         var openedTabs = 0;
         viewModel.OpenInTabRequested += (_, _) => openedTabs++;
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
@@ -398,7 +398,7 @@ public class WorkspaceTreeViewModelTests
     {
         var sample = Sample.Create(withGroup: true);
         var repository = new TestRepository(sample.Snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
         WorkspaceTreeSelection? opened = null;
         viewModel.OpenInTabRequested += (_, selection) => opened = selection;
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
@@ -419,7 +419,7 @@ public class WorkspaceTreeViewModelTests
         var itemRecord = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, groupId, "Item", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Items = [itemRecord] };
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
         var root = Assert.Single(viewModel.Roots);
         var group = Assert.Single(root.Children);
@@ -441,7 +441,7 @@ public class WorkspaceTreeViewModelTests
         var otherNiche = new Niche(Guid.NewGuid(), sample.Store.Id, "Other", null, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Niches = [.. sample.Snapshot.Niches, otherNiche] };
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
         var source = viewModel.Roots.Single(root => root.EntityId == sample.Niche.Id).Children.Single();
         var destination = viewModel.Roots.Single(root => root.EntityId == otherNiche.Id);
@@ -461,7 +461,7 @@ public class WorkspaceTreeViewModelTests
     {
         var sample = Sample.Create(withGroup: true);
         var repository = new TestRepository(sample.Snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
         var root = Assert.Single(viewModel.Roots);
         var group = Assert.Single(root.Children);
@@ -482,7 +482,7 @@ public class WorkspaceTreeViewModelTests
     {
         var sample = Sample.Create(withGroup: true);
         var repository = new TestRepository(sample.Snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
         var group = Assert.Single(Assert.Single(viewModel.Roots).Children);
         Assert.False(group.CanPaste);
@@ -502,7 +502,7 @@ public class WorkspaceTreeViewModelTests
         var listing = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, child.Id, "Item", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Groups = [root, child], Items = [listing] };
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
         var rootNode = Assert.Single(Assert.Single(viewModel.Roots).Children);
         var childNode = Assert.Single(rootNode.Children);
@@ -540,7 +540,7 @@ public class WorkspaceTreeViewModelTests
         var child = new TopicGroup(Guid.NewGuid(), sample.Store.Id, null, root.Id, "Child", null, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Groups = [root, child] };
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
         var rootNode = Assert.Single(Assert.Single(viewModel.Roots).Children);
         var childNode = Assert.Single(rootNode.Children);
@@ -569,7 +569,7 @@ public class WorkspaceTreeViewModelTests
         var child = new TopicGroup(Guid.NewGuid(), sample.Store.Id, null, root.Id, "Child", null, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Groups = [root, child] };
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
         var target = viewModel.Roots.Single().Children.Single().Children.Single();
         var sources = new[] { new WorkspaceTreeSelection(WorkspaceEntityKind.Group, root.Id) };
@@ -599,7 +599,7 @@ public class WorkspaceTreeViewModelTests
             1);
         var snapshot = sample.Snapshot with { Groups = [root, destination] };
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
 
         var destinationNode = viewModel.Roots.Single().Children.Single(node => node.EntityId == destination.Id);
@@ -620,7 +620,7 @@ public class WorkspaceTreeViewModelTests
         var second = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Second", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Groups = [group], Items = [first, second] };
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(
+        var viewModel = CreateViewModel(
             repository,
             new GroupManagementService(repository),
             snapshot,
@@ -658,7 +658,7 @@ public class WorkspaceTreeViewModelTests
             SaveInterceptor = (saveNumber, cancellationToken) =>
                 BlockSecondSaveAsync(saveNumber, cancellationToken, secondSaveStarted)
         };
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot, items: new ItemManagementService(repository));
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot, items: new ItemManagementService(repository));
         viewModel.SetStore(sample.Store.Id, snapshot);
         var destination = viewModel.Roots.Single().Children.Single(node => node.EntityId == destinationGroup.Id);
         var sources = new[]
@@ -687,7 +687,7 @@ public class WorkspaceTreeViewModelTests
         var otherNiche = new Niche(Guid.NewGuid(), sample.Store.Id, "Other", null, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Niches = [sample.Niche, otherNiche] };
         var repository = new TestRepository(snapshot) { FailSaves = true };
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
         var source = viewModel.Roots.Single(root => root.EntityId == sample.Niche.Id).Children.Single();
         var destination = viewModel.Roots.Single(root => root.EntityId == otherNiche.Id);
@@ -708,7 +708,7 @@ public class WorkspaceTreeViewModelTests
         var sample = Sample.Create();
         var repository = new TestRepository(sample.Snapshot);
         var items = new ItemManagementService(repository);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot, items: items);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), sample.Snapshot, items: items);
         var openedTabs = 0;
         viewModel.OpenInTabRequested += (_, _) => openedTabs++;
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
@@ -741,7 +741,7 @@ public class WorkspaceTreeViewModelTests
         var snapshot = sample.Snapshot with { Niches = [sample.Niche, other], Items = [first, second] };
         var repository = new TestRepository(snapshot);
         var items = new ItemManagementService(repository);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot, items: items);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot, items: items);
         viewModel.SetStore(sample.Store.Id, snapshot);
         var sourceRoot = viewModel.Roots.Single(root => root.EntityId == sample.Niche.Id);
         Assert.Equal(["Alpha", "Zulu"], sourceRoot.Children.Select(node => node.Name));
@@ -773,7 +773,7 @@ public class WorkspaceTreeViewModelTests
         };
         var group = snapshot.Groups.Single();
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
         Assert.Equal(3, viewModel.Roots.Single().Children.Count);
 
@@ -797,7 +797,7 @@ public class WorkspaceTreeViewModelTests
         var otherNiche = new Niche(Guid.NewGuid(), sample.Store.Id, "Other", null, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Niches = [sample.Niche, otherNiche] };
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
         var nicheNode = viewModel.Roots.Single(root => root.EntityId == sample.Niche.Id);
 
@@ -820,7 +820,7 @@ public class WorkspaceTreeViewModelTests
         var archived = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Ghost", null, ItemStatus.Draft, WorkflowStage.Idea, true, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Items = [archived] };
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
         Assert.Empty(viewModel.Roots.Single().Children);
 
@@ -841,7 +841,7 @@ public class WorkspaceTreeViewModelTests
     {
         var sample = Sample.Create(withGroup: true);
         var repository = new TestRepository(sample.Snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
         var nicheRoot = viewModel.Roots.Single();
         var group = Assert.Single(nicheRoot.Children);
@@ -866,7 +866,7 @@ public class WorkspaceTreeViewModelTests
     {
         var sample = Sample.Create(withGroup: true);
         var repository = new TestRepository(sample.Snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
 
         Assert.False(viewModel.CanScopeToCurrentTopic);
@@ -884,7 +884,7 @@ public class WorkspaceTreeViewModelTests
     {
         var sample = Sample.Create();
         var repository = new TestRepository(sample.Snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
 
         viewModel.QueryText = "zzz nothing matches";
@@ -901,7 +901,7 @@ public class WorkspaceTreeViewModelTests
         var tag = new Tag(Guid.NewGuid(), sample.Store.Id, "Halloween", null, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Tags = [tag] };
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
 
         Assert.False(viewModel.HasNonTextFilters);
@@ -941,7 +941,7 @@ public class WorkspaceTreeViewModelTests
             Tags = [tea, coffee, archived, otherTag]
         };
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
 
         Assert.Equal(["Coffee", "Tea"], viewModel.AvailableTags.Select(entry => entry.Name));
@@ -954,7 +954,7 @@ public class WorkspaceTreeViewModelTests
         var idea = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Idea listing", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
         var design = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Design listing", null, ItemStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Items = [idea, design] };
-        var viewModel = new WorkspaceTreeViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
+        var viewModel = CreateViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
 
         var allItems = viewModel.Roots.SelectMany(r => r.Children).Where(n => n.IsItem).ToArray();
@@ -977,7 +977,7 @@ public class WorkspaceTreeViewModelTests
         var draft = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Draft listing", null, ItemStatus.Draft, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
         var rejected = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Rejected listing", null, ItemStatus.Rejected, WorkflowStage.Concept, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Items = [draft, rejected] };
-        var viewModel = new WorkspaceTreeViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
+        var viewModel = CreateViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
 
         viewModel.StatusFilterIndex = 4;
@@ -999,7 +999,7 @@ public class WorkspaceTreeViewModelTests
             .ToArray();
         var snapshot = sample.Snapshot with { Items = items };
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
 
         viewModel.IdeaRatingFilterIndex = 9;
@@ -1025,7 +1025,7 @@ public class WorkspaceTreeViewModelTests
         var sample = Sample.Create();
         var rejected = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "Rejected", null, ItemStatus.Rejected, WorkflowStage.Concept, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Items = [rejected] };
-        var viewModel = new WorkspaceTreeViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
+        var viewModel = CreateViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
 
         var node = viewModel.Roots.SelectMany(r => r.Children).Single(n => n.IsItem);
@@ -1040,7 +1040,7 @@ public class WorkspaceTreeViewModelTests
         var ideaRejected = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "IdeaRejected", null, ItemStatus.Rejected, WorkflowStage.Idea, false, sample.Now, sample.Now, "{}");
         var designDraft = new Item(Guid.NewGuid(), sample.Store.Id, sample.Niche.Id, null, "DesignDraft", null, ItemStatus.Draft, WorkflowStage.Design, false, sample.Now, sample.Now, "{}");
         var snapshot = sample.Snapshot with { Items = [ideaDraft, ideaRejected, designDraft] };
-        var viewModel = new WorkspaceTreeViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
+        var viewModel = CreateViewModel(new TestRepository(snapshot), new GroupManagementService(new TestRepository(snapshot)), snapshot);
         viewModel.SetStore(sample.Store.Id, snapshot);
 
         viewModel.StageFilterIndex = 1;
@@ -1058,7 +1058,7 @@ public class WorkspaceTreeViewModelTests
     {
         var sample = Sample.Create(withGroup: true);
         var repository = new TestRepository(sample.Snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
 
         Assert.True(viewModel.NextToggleExpands);
@@ -1071,7 +1071,7 @@ public class WorkspaceTreeViewModelTests
     {
         var (snapshot, store, _, _, _) = CreateNestedSample();
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(store.Id, snapshot);
 
         // All topic nodes start collapsed
@@ -1095,7 +1095,7 @@ public class WorkspaceTreeViewModelTests
     {
         var (snapshot, store, _, _, _) = CreateNestedSample();
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(store.Id, snapshot);
 
         viewModel.ToggleExpandCollapseAllCommand.Execute(null); // expand all
@@ -1113,7 +1113,7 @@ public class WorkspaceTreeViewModelTests
     {
         var (snapshot, store, _, group, subGroup) = CreateNestedSample();
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(store.Id, snapshot);
 
         var nicheNode = Assert.Single(viewModel.Roots);
@@ -1137,7 +1137,7 @@ public class WorkspaceTreeViewModelTests
     {
         var (snapshot, store, _, _, _) = CreateNestedSample();
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(store.Id, snapshot);
 
         viewModel.QueryText = "Item";
@@ -1155,7 +1155,7 @@ public class WorkspaceTreeViewModelTests
     {
         var (snapshot, store, _, group, _) = CreateNestedSample();
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(store.Id, snapshot);
 
         // Expand all
@@ -1182,7 +1182,7 @@ public class WorkspaceTreeViewModelTests
     {
         var (snapshot, store, _, _, _) = CreateNestedSample();
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(store.Id, snapshot);
 
         viewModel.ToggleExpandCollapseAllCommand.Execute(null);
@@ -1202,7 +1202,7 @@ public class WorkspaceTreeViewModelTests
     {
         var sample = Sample.Create(withGroup: true);
         var repository = new TestRepository(sample.Snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
 
         Assert.True(viewModel.CanToggleExpandCollapseAll);
@@ -1223,7 +1223,7 @@ public class WorkspaceTreeViewModelTests
     {
         var sample = Sample.Create(withGroup: false);
         var repository = new TestRepository(sample.Snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), sample.Snapshot);
         viewModel.SetStore(sample.Store.Id, sample.Snapshot);
 
         Assert.False(viewModel.CanToggleExpandCollapseAll);
@@ -1235,7 +1235,7 @@ public class WorkspaceTreeViewModelTests
     {
         var (snapshot, store, _, group, subGroup, unrelatedNiche, unrelatedGroup) = CreateNestedSampleWithUnrelatedBranch();
         var repository = new TestRepository(snapshot);
-        var viewModel = new WorkspaceTreeViewModel(repository, new GroupManagementService(repository), snapshot);
+        var viewModel = CreateViewModel(repository, new GroupManagementService(repository), snapshot);
         viewModel.SetStore(store.Id, snapshot);
 
         // Expand all so tree is fully expanded
@@ -1330,13 +1330,34 @@ public class WorkspaceTreeViewModelTests
     private static IEnumerable<WorkspaceTreeNodeViewModel> FlattenNodes(IEnumerable<WorkspaceTreeNodeViewModel> nodes) =>
         nodes.SelectMany(node => new[] { node }.Concat(FlattenNodes(node.Children)));
 
+    private static WorkspaceTreeViewModel CreateViewModel(
+        IWorkspaceRepository repository,
+        IGroupManagementService groups,
+        WorkspaceSnapshot snapshot,
+        WorkspaceTreeSelectionCoordinator? selection = null,
+        WorkspaceTreeClipboard? clipboard = null,
+        IItemManagementService? items = null,
+        IItemCsvExportService? csvExport = null,
+        IItemCsvCodec? csvCodec = null,
+        IItemCsvFilePicker? filePicker = null) =>
+        new(
+            repository,
+            groups,
+            snapshot,
+            items ?? new ItemManagementService(repository),
+            csvExport ?? new ItemCsvExportService(),
+            selection,
+            clipboard,
+            csvCodec,
+            filePicker);
+
     [Fact]
     public async Task ExportCsv_WithNullPickerWritesNothing()
     {
         var sample = Sample.Create(withGroup: true);
         var repository = new TestRepository(sample.Snapshot);
         var codec = new RecordingCsvCodec(new ItemCsvCodec());
-        var viewModel = new WorkspaceTreeViewModel(
+        var viewModel = CreateViewModel(
             repository,
             new GroupManagementService(repository),
             sample.Snapshot,
@@ -1356,7 +1377,7 @@ public class WorkspaceTreeViewModelTests
         var sample = Sample.Create(withGroup: true);
         var repository = new TestRepository(sample.Snapshot);
         var codec = new RecordingCsvCodec(new ItemCsvCodec());
-        var viewModel = new WorkspaceTreeViewModel(
+        var viewModel = CreateViewModel(
             repository,
             new GroupManagementService(repository),
             sample.Snapshot,
@@ -1376,7 +1397,7 @@ public class WorkspaceTreeViewModelTests
     {
         var sample = Sample.Create(withGroup: true);
         var repository = new TestRepository(sample.Snapshot);
-        var viewModel = new WorkspaceTreeViewModel(
+        var viewModel = CreateViewModel(
             repository,
             new GroupManagementService(repository),
             sample.Snapshot,

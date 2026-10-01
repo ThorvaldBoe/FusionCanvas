@@ -10,14 +10,22 @@ public sealed class MockupTemplateSourceImageService : IMockupTemplateSourceImag
     private readonly IWorkspaceRepository _repository;
     private readonly IWorkspaceFileStore _fileStore;
     private readonly IRasterImageMetadataReader _metadata;
+    private readonly IMockupTemplateSetupService _templateSetup;
     private readonly Func<DateTimeOffset> _clock;
     private readonly Func<Guid> _newId;
 
-    public MockupTemplateSourceImageService(IWorkspaceRepository repository, IWorkspaceFileStore fileStore, IRasterImageMetadataReader metadata, Func<DateTimeOffset>? clock = null, Func<Guid>? newId = null)
+    public MockupTemplateSourceImageService(
+        IWorkspaceRepository repository,
+        IWorkspaceFileStore fileStore,
+        IRasterImageMetadataReader metadata,
+        IMockupTemplateSetupService templateSetup,
+        Func<DateTimeOffset>? clock = null,
+        Func<Guid>? newId = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _fileStore = fileStore ?? throw new ArgumentNullException(nameof(fileStore));
         _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
+        _templateSetup = templateSetup ?? throw new ArgumentNullException(nameof(templateSetup));
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _newId = newId ?? Guid.NewGuid;
     }
@@ -180,5 +188,5 @@ public sealed class MockupTemplateSourceImageService : IMockupTemplateSourceImag
     }
 
     private async Task<MockupTemplateSetupState> LoadForStoreAsync(Guid storeId, CancellationToken cancellationToken) =>
-        await new MockupTemplateSetupService(_repository).LoadForStoreAsync(storeId, cancellationToken).ConfigureAwait(false);
+        await _templateSetup.LoadForStoreAsync(storeId, cancellationToken).ConfigureAwait(false);
 }

@@ -49,7 +49,14 @@ public sealed class MockupRevisionRegressionTests
         var white = new OfferingOptionValue(Guid.NewGuid(), option.Id, offering.Id, "White", 1);
         var template = new MockupTemplate(Guid.NewGuid(), offering.Id, null, "Front", null, 1, false, Now, Now);
         var repo = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [new Store(storeId, "Store", null, false, Now, Now, "{}")], [], [], [], [], [], [], [], []) { Blueprints = [blueprint], BlueprintOfferings = [offering], OfferingOptions = [option], OfferingOptionValues = [black, white], MockupTemplates = [template] });
-        var files = new FakeFiles(); var service = new MockupTemplateSourceImageService(repo, files, new FakeMetadata(), () => Now, Guid.NewGuid);
+        var files = new FakeFiles();
+        var service = new MockupTemplateSourceImageService(
+            repo,
+            files,
+            new FakeMetadata(),
+            new MockupTemplateSetupService(repo),
+            () => Now,
+            Guid.NewGuid);
         await service.AddAsync(new AddLocalMockupTemplateSourceRequest(storeId, template.Id, "a.png", [black.Id]));
         await service.AddAsync(new AddLocalMockupTemplateSourceRequest(storeId, template.Id, "b.png", [white.Id]));
         var latest = repo.Snapshot.MockupTemplateRevisions.Single(value => value.RevisionNumber == 3);
