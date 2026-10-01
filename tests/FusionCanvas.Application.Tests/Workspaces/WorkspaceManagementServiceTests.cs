@@ -31,6 +31,22 @@ public class WorkspaceManagementServiceTests
     }
 
     [Fact]
+    public async Task CreateWorkspaceAsync_RejectsActiveNameCollisionAfterNormalization()
+    {
+        var existing = NewWorkspace("Client Work");
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([existing], [], [], [], [], [], [], [], [], []));
+        var service = new WorkspaceManagementService(repository, new TestWorkspaceContextMapper());
+
+        var result = await service.CreateWorkspaceAsync(
+            new WorkspaceManagementCreateRequest(" client work "),
+            TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("already uses this name", result.Error);
+        Assert.Single((await repository.LoadAsync(TestContext.Current.CancellationToken)).Workspaces);
+    }
+
+    [Fact]
     public async Task LoadAsync_UsesPersistedActiveWorkspaceIdWhenItIsStillActive()
     {
         var personal = NewWorkspace("Personal");
@@ -63,6 +79,21 @@ public class WorkspaceManagementServiceTests
         Assert.True(restored.Succeeded);
         Assert.True(archivedActive.Succeeded);
         Assert.Contains(archivedActive.State.ArchivedWorkspaces, workspace => workspace.Id == active.Id);
+    }
+
+    [Fact]
+    public async Task RestoreWorkspaceAsync_RejectsActiveNameCollisionAfterNormalization()
+    {
+        var active = NewWorkspace("Client Work");
+        var archived = NewWorkspace(" client work ") with { IsArchived = true };
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([active, archived], [], [], [], [], [], [], [], [], []));
+        var service = new WorkspaceManagementService(repository, new TestWorkspaceContextMapper());
+
+        var result = await service.RestoreWorkspaceAsync(archived.Id, TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("already uses this name", result.Error);
+        Assert.True((await repository.LoadAsync(TestContext.Current.CancellationToken)).Workspaces.Single(workspace => workspace.Id == archived.Id).IsArchived);
     }
 
     [Fact]

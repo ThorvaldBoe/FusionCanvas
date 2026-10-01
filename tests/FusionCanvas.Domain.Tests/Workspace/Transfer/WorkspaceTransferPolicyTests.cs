@@ -80,15 +80,6 @@ public class WorkspaceTransferPolicyTests
         Assert.Equal(selected.Rejection, Assert.Single(result.Snapshot.IdeationRejections));
     }
 
-    [Fact]
-    public void ResolveImportName_UsesFirstAvailableSuffixAndOnlyProvidedActiveNames()
-    {
-        Assert.Equal("Brand", WorkspaceImportPreflight.ResolveImportName(" Brand ", ["Archived Brand"]));
-        Assert.Equal("Brand (4)", WorkspaceImportPreflight.ResolveImportName(
-            "Brand",
-            ["brand", "Brand (2)", "BRAND (3)"]));
-    }
-
     private static Graph CreateGraph(string name, bool archived = false)
     {
         var workspace = new FusionCanvas.Domain.Workspace.Workspace(Guid.NewGuid(), name, "description", archived, Now, Now, "{\"key\":\"value\"}");

@@ -136,11 +136,7 @@ public sealed class WorkspaceManagementService : IWorkspaceManagementService
             return WorkspaceManagementResult.Failure("Workspace was not found.", BuildState(snapshot));
         }
 
-        var duplicate = snapshot.Workspaces.Any(workspace =>
-            workspace.Id != existing.Id &&
-            !workspace.IsArchived &&
-            string.Equals(workspace.Name, existing.Name, StringComparison.OrdinalIgnoreCase));
-        if (duplicate)
+        if (WorkspaceNamePolicy.HasActiveNameCollision(existing.Name, snapshot.Workspaces, existing.Id))
         {
             return WorkspaceManagementResult.Failure("An active workspace already uses this name.", BuildState(snapshot));
         }
@@ -298,12 +294,9 @@ public sealed class WorkspaceManagementService : IWorkspaceManagementService
             return "Workspace name is required.";
         }
 
-        var duplicate = snapshot.Workspaces.Any(workspace =>
-            workspace.Id != existingWorkspaceId &&
-            !workspace.IsArchived &&
-            string.Equals(workspace.Name, name, StringComparison.OrdinalIgnoreCase));
-
-        return duplicate ? "An active workspace already uses this name." : null;
+        return WorkspaceNamePolicy.HasActiveNameCollision(name, snapshot.Workspaces, existingWorkspaceId)
+            ? "An active workspace already uses this name."
+            : null;
     }
 
     private WorkspaceSummary ToSummary(FusionCanvas.Domain.Workspace.Workspace workspace) =>
