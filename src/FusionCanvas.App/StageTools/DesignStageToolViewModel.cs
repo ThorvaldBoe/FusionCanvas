@@ -15,7 +15,7 @@ namespace FusionCanvas.App.StageTools;
 
 
 
-public sealed class DesignStageToolViewModel : INotifyPropertyChanged
+public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly IDesignStageService _designStageService;
     private string _readOnlyReason = string.Empty;
@@ -60,6 +60,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
     private bool _isRecoveryConfirmationVisible;
     private string _recoveryConfirmationMessage = string.Empty;
     private bool _canEditContext;
+    private bool _isDisposed;
 
     public DesignStageToolViewModel(IDesignStageService designStageService, IArtworkGenerationService? artworkGenerationService = null, AiSettingsViewModel? aiSettings = null)
     {
@@ -687,11 +688,17 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
 
     public async Task PreviewSlotImageAsync(Guid rowId, Guid designAreaId, CancellationToken ct = default)
     {
-        if (IsBusy) return;
+        if (IsBusy || _isDisposed) return;
         IsBusy = true;
         try
         {
             var stream = await _designStageService.OpenSlotPreviewAsync(rowId, designAreaId, ct).ConfigureAwait(true);
+            if (_isDisposed)
+            {
+                stream?.Dispose();
+                return;
+            }
+
             PreviewStream?.Dispose();
             PreviewBitmap?.Dispose();
             PreviewStream = stream;
@@ -766,6 +773,11 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
 
     public void PreviewSupportingImage(Guid assetId, string? thumbnailPath)
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
         // For supporting images, load the thumbnail directly from the managed file path
         try
         {
@@ -820,9 +832,39 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
         PreviewStream = null;
     }
 
+    public void Dispose()
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        _isDisposed = true;
+        Interlocked.Increment(ref _loadGeneration);
+        Interlocked.Increment(ref _artworkAvailabilityGeneration);
+        _artworkCts?.Cancel();
+        ClosePreviewDialog();
+
+        foreach (var row in Rows)
+        {
+            foreach (var slot in row.Slots)
+            {
+                slot.Dispose();
+            }
+        }
+
+        Rows.Clear();
+        foreach (var image in SupportingImages)
+        {
+            image.Dispose();
+        }
+
+        SupportingImages.Clear();
+    }
+
     public async Task GenerateArtworkAsync(CancellationToken cancellationToken = default)
     {
-        if (!CanGenerateArtwork || _aiSettings is null || _selectedArtworkTargetId is not Guid targetId)
+        if (_isDisposed || !CanGenerateArtwork || _aiSettings is null || _selectedArtworkTargetId is not Guid targetId)
             return;
 
         _artworkCts?.Dispose();
@@ -883,6 +925,11 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
     // --- Load ---
     public async Task LoadAsync(Guid itemId, bool canEdit, CancellationToken cancellationToken = default)
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
         _artworkCts?.Cancel();
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         _artworkCapabilitiesLoaded = false;
@@ -908,7 +955,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged
         {
             _artworkPreferenceSaveGate.Release();
         }
-        if (loadGeneration != Volatile.Read(ref _loadGeneration))
+        if (_isDisposed || loadGeneration != Volatile.Read(ref _loadGeneration))
         {
             return;
         }

@@ -12,6 +12,7 @@ namespace FusionCanvas.App.Assets;
 public sealed class AssetRowViewModel : INotifyPropertyChanged, IDisposable
 {
     private AssetPurposeOption _selectedPurpose;
+    private Bitmap? _thumbnail;
     private bool _suppressRelabel;
 
     public AssetRowViewModel(AssetSummary summary, IReadOnlyList<AssetPurposeOption> purposes, AssetsViewModel parent)
@@ -21,7 +22,7 @@ public sealed class AssetRowViewModel : INotifyPropertyChanged, IDisposable
         ManagedFileName = summary.ManagedFileName;
         IsMissing = summary.IsMissing;
         ContextLabel = summary.ContextLabel;
-        Thumbnail = CreateThumbnail(summary);
+        _thumbnail = CreateThumbnail(summary);
         Purpose = summary.Kind;
         _selectedPurpose = purposes.SingleOrDefault(option => option.Kind == summary.Kind) ?? purposes[0];
         Parent = parent;
@@ -37,7 +38,7 @@ public sealed class AssetRowViewModel : INotifyPropertyChanged, IDisposable
     public string? ContextLabel { get; }
     public AssetKind Purpose { get; private set; }
     public AssetsViewModel Parent { get; }
-    public Bitmap? Thumbnail { get; }
+    public Bitmap? Thumbnail => _thumbnail;
     public bool CanPreview => Thumbnail is not null;
 
     public AssetPurposeOption SelectedPurpose
@@ -86,7 +87,24 @@ public sealed class AssetRowViewModel : INotifyPropertyChanged, IDisposable
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-    public void Dispose() => Thumbnail?.Dispose();
+    public void Dispose()
+    {
+        var thumbnail = Interlocked.Exchange(ref _thumbnail, null);
+        if (thumbnail is null)
+        {
+            return;
+        }
+
+        try
+        {
+            thumbnail.Dispose();
+        }
+        finally
+        {
+            OnPropertyChanged(nameof(Thumbnail));
+            OnPropertyChanged(nameof(CanPreview));
+        }
+    }
 
     private static Bitmap? CreateThumbnail(AssetSummary summary)
     {

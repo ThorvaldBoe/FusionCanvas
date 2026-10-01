@@ -46,7 +46,7 @@ using FusionCanvas.App.ConceptRefinement;
 
 namespace FusionCanvas.App.Views;
 
-public sealed class MainWindowViewModel : INotifyPropertyChanged
+public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 {
     private static readonly IReadOnlyDictionary<ItemStatus, ItemStatusOptionViewModel> StatusOptions =
         ItemStatuses.Ordered.ToDictionary(
@@ -76,6 +76,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private IReadOnlyList<NavigationDocumentContext> _navigationContexts = [];
     private int _isInitializingWorkspace = 1;
     private long _workspaceSwitchGeneration;
+    private bool _disposed;
 
     public static MainWindowViewModel CreateForDefaultWorkspace(
         SettingsViewModel settings,
@@ -295,6 +296,24 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        try
+        {
+            AssetsManagement.Dispose();
+        }
+        finally
+        {
+            DesignTool.Dispose();
+        }
+    }
 
     public WorkflowStageNavigatorViewModel WorkflowNavigator { get; }
 

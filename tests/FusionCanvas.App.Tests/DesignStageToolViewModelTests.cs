@@ -135,10 +135,40 @@ public class DesignStageToolViewModelTests
         Assert.Equal(selectedTargetId, viewModel.SelectedArtworkTargetId);
     }
 
+    [Fact]
+    public async Task DisposeWhileSlotPreviewIsLoading_DisposesTheReturnedStream()
+    {
+        var service = new DelayedArtworkPreferenceService(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var viewModel = new DesignStageToolViewModel(service);
+        var previewTask = viewModel.PreviewSlotImageAsync(Guid.NewGuid(), Guid.NewGuid(), TestContext.Current.CancellationToken);
+        await service.PreviewStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        viewModel.Dispose();
+        var stream = new TrackingMemoryStream();
+        service.CompletePreview(stream);
+        await previewTask;
+
+        Assert.True(stream.WasDisposed);
+        Assert.Null(viewModel.PreviewStream);
+        Assert.Null(viewModel.PreviewBitmap);
+    }
+
+    private sealed class TrackingMemoryStream : MemoryStream
+    {
+        public bool WasDisposed { get; private set; }
+
+        protected override void Dispose(bool disposing)
+        {
+            WasDisposed = true;
+            base.Dispose(disposing);
+        }
+    }
+
     private sealed class DelayedArtworkPreferenceService : IDesignStageService
     {
         private readonly Guid _itemId;
         private readonly TaskCompletionSource _saveCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<Stream> _previewCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public DelayedArtworkPreferenceService(
             Guid itemId,
@@ -165,6 +195,7 @@ public class DesignStageToolViewModelTests
 
         public DesignStageState State { get; private set; }
         public TaskCompletionSource SaveStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource PreviewStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Task<DesignStageState> LoadDesignStageStateAsync(Guid itemId, CancellationToken cancellationToken = default) =>
             Task.FromResult(State);
@@ -185,6 +216,8 @@ public class DesignStageToolViewModelTests
 
         public void CompleteSave() => _saveCompletion.TrySetResult();
 
+        public void CompletePreview(Stream stream) => _previewCompletion.TrySetResult(stream);
+
         public Task<DesignStageResult> SelectConfigurationAsync(Guid itemId, Guid offeringId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<DesignStageResult> RecoverStaleConfigurationAsync(Guid itemId, Guid offeringId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<DesignStageResult> AddSelectedColorAsync(Guid itemId, string colorValue, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -194,7 +227,11 @@ public class DesignStageToolViewModelTests
         public Task<DesignStageResult> AssignSlotImageAsync(Guid itemId, Guid rowId, Guid designAreaId, string sourcePath, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<DesignStageResult> ReplaceSlotImageAsync(Guid itemId, Guid rowId, Guid designAreaId, string sourcePath, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<DesignStageResult> RemoveSlotImageAsync(Guid itemId, Guid rowId, Guid designAreaId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<Stream> OpenSlotPreviewAsync(Guid rowId, Guid designAreaId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<Stream> OpenSlotPreviewAsync(Guid rowId, Guid designAreaId, CancellationToken cancellationToken = default)
+        {
+            PreviewStarted.TrySetResult();
+            return _previewCompletion.Task;
+        }
         public Task ExportSlotImageAsync(Guid rowId, Guid designAreaId, string destinationPath, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task ExportSupportingImageAsync(Guid assetId, string destinationPath, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<DesignSlotSummary>> ListSupportingImagesAsync(Guid itemId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
