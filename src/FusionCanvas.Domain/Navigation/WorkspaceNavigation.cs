@@ -127,7 +127,7 @@ public static class WorkspaceNavigation
 
         EnsureActiveDestination(snapshot, parentGroup);
 
-        if (parentGroup.Id == group.Id || IsDescendantGroup(snapshot.Groups, descendantId: parentGroup.Id, ancestorId: group.Id))
+        if (parentGroup.Id == group.Id || GroupHierarchy.IsDescendant(snapshot, parentGroup.Id, group.Id))
         {
             throw new InvalidOperationException("A topic cannot be moved under itself or its descendants.");
         }
@@ -295,10 +295,7 @@ public static class WorkspaceNavigation
 
         foreach (var group in snapshot.Groups)
         {
-            if (IsDescendantGroup(snapshot.Groups, descendantId: group.Id, ancestorId: group.Id))
-            {
-                throw new InvalidOperationException("A group hierarchy must not contain cycles.");
-            }
+            _ = GroupHierarchy.GetAncestors(snapshot, group);
         }
 
         foreach (var item in snapshot.Items)
@@ -323,30 +320,6 @@ public static class WorkspaceNavigation
                 throw new InvalidOperationException("An item group parent must exist.");
             }
         }
-    }
-
-    private static bool IsDescendantGroup(IEnumerable<TopicGroup> groups, Guid descendantId, Guid ancestorId)
-    {
-        var parentByGroup = groups.ToDictionary(group => group.Id, group => group.ParentGroupId);
-        var visited = new HashSet<Guid>();
-        var current = descendantId;
-
-        while (parentByGroup.TryGetValue(current, out var parentId) && parentId is not null)
-        {
-            if (!visited.Add(current))
-            {
-                return true;
-            }
-
-            if (parentId == ancestorId)
-            {
-                return true;
-            }
-
-            current = parentId.Value;
-        }
-
-        return false;
     }
 
     private static void EnsureActiveDestination(WorkspaceSnapshot snapshot, Niche niche)
