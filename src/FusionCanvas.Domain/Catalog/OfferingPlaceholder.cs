@@ -18,7 +18,7 @@ public sealed record OfferingPlaceholder
         IsArchived = isArchived;
         CreatedAt = createdAt;
         UpdatedAt = updatedAt;
-        MetadataJson = string.IsNullOrWhiteSpace(metadataJson) ? "{}" : metadataJson;
+        MetadataJson = MetadataJsonDefaults.Normalize(metadataJson);
         ProviderReference = CatalogRecordValidation.Optional(providerReference);
         ArtworkGuidance = artworkGuidance;
     }

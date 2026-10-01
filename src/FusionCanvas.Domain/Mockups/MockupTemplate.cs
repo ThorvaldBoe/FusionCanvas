@@ -15,7 +15,7 @@ public sealed record MockupTemplate
         UpdatedAt = updatedAt;
         PositionKey = Optional(positionKey);
         FutureAssetState = Optional(futureAssetState);
-        MetadataJson = string.IsNullOrWhiteSpace(metadataJson) ? "{}" : metadataJson;
+        MetadataJson = MetadataJsonDefaults.Normalize(metadataJson);
     }
 
     public Guid Id { get; init; }

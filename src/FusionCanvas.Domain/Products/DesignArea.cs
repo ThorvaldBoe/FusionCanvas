@@ -38,7 +38,7 @@ public sealed record DesignArea
         _variantIds = variantIds?.Distinct().ToArray() ?? [];
         CreatedAt = createdAt;
         UpdatedAt = updatedAt;
-        MetadataJson = string.IsNullOrWhiteSpace(metadataJson) ? "{}" : metadataJson;
+        MetadataJson = MetadataJsonDefaults.Normalize(metadataJson);
     }
 
     public Guid Id { get; init; }

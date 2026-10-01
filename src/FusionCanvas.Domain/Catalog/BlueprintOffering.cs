@@ -18,7 +18,7 @@ public sealed record BlueprintOffering
         IsArchived = isArchived;
         CreatedAt = createdAt;
         UpdatedAt = updatedAt;
-        MetadataJson = string.IsNullOrWhiteSpace(metadataJson) ? "{}" : metadataJson;
+        MetadataJson = MetadataJsonDefaults.Normalize(metadataJson);
     }
 
     public Guid Id { get; init; }

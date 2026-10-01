@@ -10,7 +10,7 @@ public sealed record OfferingOptionValue
         Value = CatalogRecordValidation.Text(value, nameof(value));
         SortOrder = sortOrder;
         IsArchived = isArchived;
-        MetadataJson = string.IsNullOrWhiteSpace(metadataJson) ? "{}" : metadataJson;
+        MetadataJson = MetadataJsonDefaults.Normalize(metadataJson);
     }
 
     public Guid Id { get; init; }
