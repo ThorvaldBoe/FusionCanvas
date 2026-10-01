@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using FusionCanvas.App.Commands;
 using FusionCanvas.Application.AI;
 
 namespace FusionCanvas.App.Settings;

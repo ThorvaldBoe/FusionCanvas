@@ -1,6 +1,6 @@
-using FusionCanvas.App.Settings;
+using FusionCanvas.App.Commands;
 
-namespace FusionCanvas.App.Tests.Settings;
+namespace FusionCanvas.App.Tests.Commands;
 
 public sealed class AsyncRelayCommandTests
 {

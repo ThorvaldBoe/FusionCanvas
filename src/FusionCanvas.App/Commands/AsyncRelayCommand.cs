@@ -1,6 +1,6 @@
 using System.Windows.Input;
 
-namespace FusionCanvas.App.Settings;
+namespace FusionCanvas.App.Commands;
 
 public sealed class AsyncRelayCommand : ICommand
 {
