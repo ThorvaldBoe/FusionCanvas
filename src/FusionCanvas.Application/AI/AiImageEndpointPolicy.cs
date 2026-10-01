@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace FusionCanvas.Application.AI;
 
 public static class AiImageEndpointPolicy
@@ -167,7 +169,10 @@ public static class AiImageEndpointPolicy
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
         var parts = value.Split(':', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        return parts.Length == 2 && decimal.TryParse(parts[0], out var width) && decimal.TryParse(parts[1], out var height) && width > 0 && height > 0
+        return parts.Length == 2 &&
+            decimal.TryParse(parts[0], NumberStyles.Number, CultureInfo.InvariantCulture, out var width) &&
+            decimal.TryParse(parts[1], NumberStyles.Number, CultureInfo.InvariantCulture, out var height) &&
+            width > 0 && height > 0
             ? width / height
             : null;
     }
@@ -176,9 +181,11 @@ public static class AiImageEndpointPolicy
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
         var normalized = value.Trim();
-        if (normalized.EndsWith('K') && decimal.TryParse(normalized[..^1], out var thousands) && thousands > 0)
+        if (normalized.EndsWith('K') &&
+            decimal.TryParse(normalized[..^1], NumberStyles.Number, CultureInfo.InvariantCulture, out var thousands) &&
+            thousands > 0)
             return (int)Math.Round(thousands * 1024, MidpointRounding.AwayFromZero);
-        return int.TryParse(normalized, out var pixels) && pixels > 0 ? pixels : null;
+        return int.TryParse(normalized, NumberStyles.Integer, CultureInfo.InvariantCulture, out var pixels) && pixels > 0 ? pixels : null;
     }
 
     private static string PreferredRasterFormat(IReadOnlyList<string> formats, bool transparentBackground)
