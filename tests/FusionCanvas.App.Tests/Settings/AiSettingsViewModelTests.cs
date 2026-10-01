@@ -162,6 +162,27 @@ public class AiSettingsViewModelTests
     }
 
     [Fact]
+    public async Task GetArtworkEndpointsAsync_HydratesPersistedArtworkModelBeforeReturningEndpoints()
+    {
+        const string modelId = "image/model";
+        var credentials = new CredentialStore { Result = AiCredentialReadResult.Available("secret") };
+        var catalog = new CatalogProvider
+        {
+            Models = [Model(modelId, image: true)]
+        };
+        var vm = Create(
+            credentials,
+            catalogProvider: catalog,
+            catalogCache: new CatalogCache());
+        vm.Artwork.ModelId = modelId;
+
+        var endpoints = await vm.GetArtworkEndpointsAsync(TestContext.Current.CancellationToken);
+
+        Assert.Single(endpoints);
+        Assert.Contains(vm.AvailableModels, model => model.Id == modelId);
+    }
+
+    [Fact]
     public async Task EnsureLoaded_DoesNotFetchWhenCacheExists()
     {
         var credentials = new CredentialStore { Result = AiCredentialReadResult.Available("secret") };
@@ -307,8 +328,8 @@ public class AiSettingsViewModelTests
         Assert.Equal(2, vm.General.Models.Count);
     }
 
-    private static AiModelDescriptor Model(string id, bool zdr = true) =>
-        new(id, id, null, null, ["text"], ["text"], [], 1000, null, null, null, zdr, null);
+    private static AiModelDescriptor Model(string id, bool zdr = true, bool image = false) =>
+        new(id, id, null, null, ["text"], image ? ["image"] : ["text"], [], 1000, null, null, null, zdr, null);
 
     private static AiSettingsViewModel Create(
         CredentialStore? credentials = null,
@@ -350,7 +371,7 @@ public class AiSettingsViewModelTests
             Task.FromResult(new AiCredentialValidationResult(Kind));
     }
 
-    private sealed class CatalogProvider : IAiModelCatalogProvider
+    private sealed class CatalogProvider : IAiModelCatalogProvider, IAiImageEndpointCatalogProvider
     {
         public int Calls { get; private set; }
         public IReadOnlyList<AiModelDescriptor> Models { get; set; } = [];
@@ -377,6 +398,21 @@ public class AiSettingsViewModelTests
                 DateTimeOffset.UtcNow,
                 Models));
         }
+
+        public Task<IReadOnlyList<AiImageEndpointCapabilities>> GetImageEndpointsAsync(
+            string apiKey,
+            string modelId,
+            bool requireZeroDataRetention,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<AiImageEndpointCapabilities>>(
+            [new AiImageEndpointCapabilities(
+                "image-endpoint",
+                modelId,
+                requireZeroDataRetention,
+                true,
+                ["png"],
+                [new AiImageSize(1024, 1024)],
+                false)]);
     }
 
     private sealed class CatalogCache : IAiModelCatalogCache
