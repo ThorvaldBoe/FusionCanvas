@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text.Json;
+using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Workspaces.Transfer;
 using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Domain.Assets;
@@ -11,7 +12,15 @@ namespace FusionCanvas.Integration.Packages;
 
 public sealed class ZipWorkspacePackageReader : IWorkspacePackageReader
 {
+    private readonly Func<string, IWorkspaceRepository> _repositoryFactory;
+
     public const int CurrentFormatVersion = 1;
+
+    public ZipWorkspacePackageReader(Func<string, IWorkspaceRepository> repositoryFactory)
+    {
+        ArgumentNullException.ThrowIfNull(repositoryFactory);
+        _repositoryFactory = repositoryFactory;
+    }
 
     public async Task<WorkspacePackageReadResult> ReadAsync(
         string packagePath,
@@ -77,7 +86,7 @@ public sealed class ZipWorkspacePackageReader : IWorkspacePackageReader
                 await databaseInput.CopyToAsync(databaseOutput, cancellationToken);
             }
 
-            var snapshot = await new SqliteWorkspaceRepository(databasePath, useConnectionPooling: false)
+            var snapshot = await _repositoryFactory(databasePath)
                 .LoadAsync(cancellationToken);
             progress?.Report(new WorkspaceTransferProgress("Reading workspace data", 1, 1));
             if (snapshot.Workspaces.Count != 1 ||

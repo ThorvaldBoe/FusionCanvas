@@ -69,13 +69,15 @@ public static class AppWorkspaceFactory
     {
         ArgumentNullException.ThrowIfNull(ai);
         var repository = new SqliteWorkspaceRepository(databasePath);
+        Func<string, IWorkspaceRepository> packageRepositoryFactory =
+            static path => new SqliteWorkspaceRepository(path, useConnectionPooling: false);
         var snowcloneRepository = new SqliteSnowcloneRepository(databasePath);
         var fileStore = new LocalWorkspaceFileStore(workspaceRootPath);
         var workspaceTransfer = new WorkspaceTransferService(
             repository,
             fileStore,
-            new ZipWorkspacePackageWriter(),
-            new ZipWorkspacePackageReader());
+            new ZipWorkspacePackageWriter(packageRepositoryFactory),
+            new ZipWorkspacePackageReader(packageRepositoryFactory));
         var rasterImageMetadata = new RasterImageMetadataReader();
         var snapshot = StartupTaskRunner.Run(
             token => repository.LoadAsync(token),

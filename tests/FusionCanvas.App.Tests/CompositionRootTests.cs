@@ -58,6 +58,9 @@ public sealed class CompositionRootTests
 
         Assert.Contains("new LocalWorkspaceFileStore", workspaceFactory, StringComparison.Ordinal);
         Assert.Contains("new WorkspaceTransferService", workspaceFactory, StringComparison.Ordinal);
+        Assert.Contains("Func<string, IWorkspaceRepository> packageRepositoryFactory", workspaceFactory, StringComparison.Ordinal);
+        Assert.Contains("new ZipWorkspacePackageWriter(packageRepositoryFactory)", workspaceFactory, StringComparison.Ordinal);
+        Assert.Contains("new ZipWorkspacePackageReader(packageRepositoryFactory)", workspaceFactory, StringComparison.Ordinal);
         Assert.Contains("new WorkspaceManagementService", workspaceFactory, StringComparison.Ordinal);
         Assert.Contains("new RasterImageMetadataReader", workspaceFactory, StringComparison.Ordinal);
         Assert.Contains("new FusionCanvas.Integration.Items.ItemCsvCodec", servicesFactory, StringComparison.Ordinal);

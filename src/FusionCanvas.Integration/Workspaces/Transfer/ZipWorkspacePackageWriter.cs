@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Reflection;
 using System.Text.Json;
+using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Workspaces.Transfer;
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Integration.Persistence;
@@ -9,6 +10,14 @@ namespace FusionCanvas.Integration.Packages;
 
 public sealed class ZipWorkspacePackageWriter : IWorkspacePackageWriter
 {
+    private readonly Func<string, IWorkspaceRepository> _repositoryFactory;
+
+    public ZipWorkspacePackageWriter(Func<string, IWorkspaceRepository> repositoryFactory)
+    {
+        ArgumentNullException.ThrowIfNull(repositoryFactory);
+        _repositoryFactory = repositoryFactory;
+    }
+
     public int CurrentFormatVersion => ZipWorkspacePackageReader.CurrentFormatVersion;
 
     public int CurrentSchemaVersion => SqliteWorkspaceRepository.CurrentSchemaVersion;
@@ -35,7 +44,7 @@ public sealed class ZipWorkspacePackageWriter : IWorkspacePackageWriter
         {
             cancellationToken.ThrowIfCancellationRequested();
             progress?.Report(new WorkspaceTransferProgress("Writing workspace data", 0, 1));
-            await new SqliteWorkspaceRepository(databasePath, useConnectionPooling: false)
+            await _repositoryFactory(databasePath)
                 .SaveAsync(request.Snapshot, cancellationToken);
             progress?.Report(new WorkspaceTransferProgress("Writing workspace data", 1, 1));
 
