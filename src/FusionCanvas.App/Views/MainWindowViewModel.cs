@@ -496,7 +496,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
     public bool IsStatusConfirmationVisible
     {
         get => _isStatusConfirmationVisible;
-        private set => SetField(ref _isStatusConfirmationVisible, value);
+        private set
+        {
+            if (_isStatusConfirmationVisible == value)
+            {
+                return;
+            }
+
+            _isStatusConfirmationVisible = value;
+            OnPropertyChanged();
+        }
     }
 
     public string StatusConfirmationMessage { get; private set; } = string.Empty;
@@ -1652,15 +1661,4 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
-    private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
-    {
-        if (EqualityComparer<T>.Default.Equals(field, value))
-        {
-            return false;
-        }
-
-        field = value;
-        OnPropertyChanged(propertyName);
-        return true;
-    }
 }
