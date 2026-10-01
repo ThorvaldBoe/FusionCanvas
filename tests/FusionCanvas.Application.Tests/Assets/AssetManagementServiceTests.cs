@@ -242,6 +242,7 @@ public class AssetManagementServiceTests
         private bool _sourceMissing;
 
         public string WorkspaceRoot => @"C:\workspace";
+        public string ResolvePath(string workspaceRelativePath) => Path.Combine(WorkspaceRoot, workspaceRelativePath);
         public bool FailDelete { get; init; }
         public Exception? ProbeFailure { get; init; }
         public IReadOnlyList<string> Imports { get; } = new List<string>();

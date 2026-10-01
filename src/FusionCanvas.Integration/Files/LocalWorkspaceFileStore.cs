@@ -40,6 +40,9 @@ public sealed class LocalWorkspaceFileStore : IWorkspaceFileOutputStore, IWorksp
 
     public string WorkspaceRoot { get; }
 
+    public string ResolvePath(string workspaceRelativePath) =>
+        ResolveWithinWorkspaceOrThrow(workspaceRelativePath);
+
     internal static bool IsSupportedCreativeAssetPath(string path)
     {
         var extension = Path.GetExtension(path);

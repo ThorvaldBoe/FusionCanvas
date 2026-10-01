@@ -178,6 +178,7 @@ public class DesignFileServiceTests
     private sealed class FakeFileStore : IWorkspaceFileStore
     {
         public string WorkspaceRoot => "C:/workspace";
+        public string ResolvePath(string workspaceRelativePath) => Path.Combine(WorkspaceRoot, workspaceRelativePath);
         public Exception? ImportFailure { get; init; }
         public List<string> Imports { get; } = [];
         public List<string> Deletes { get; } = [];

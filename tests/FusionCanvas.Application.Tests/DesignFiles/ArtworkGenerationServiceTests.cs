@@ -92,6 +92,7 @@ public sealed class ArtworkGenerationServiceTests
         public Stream? SavedContent { get; private set; }
         public Exception? SaveFailure { get; init; }
         public string WorkspaceRoot => "workspace";
+        public string ResolvePath(string workspaceRelativePath) => Path.Combine(WorkspaceRoot, workspaceRelativePath);
         public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, AssetKind kind, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ManagedWorkspaceFile> SaveAsync(string fileName, AssetKind kind, Stream content, CancellationToken cancellationToken = default)
         {

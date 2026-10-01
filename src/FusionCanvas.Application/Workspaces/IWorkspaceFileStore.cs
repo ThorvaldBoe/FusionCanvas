@@ -6,6 +6,8 @@ public interface IWorkspaceFileStore
 {
     string WorkspaceRoot { get; }
 
+    string ResolvePath(string workspaceRelativePath);
+
     Task<ManagedWorkspaceFile> ImportAsync(
         string sourcePath,
         AssetKind kind,

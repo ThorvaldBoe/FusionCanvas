@@ -216,6 +216,7 @@ public sealed class LocalMockupTemplateReadinessTests
     private sealed class MemoryFileStore : IWorkspaceFileOutputStore
     {
         public string WorkspaceRoot => "unused";
+        public string ResolvePath(string workspaceRelativePath) => Path.Combine(WorkspaceRoot, workspaceRelativePath);
         public int SaveCount { get; private set; }
         public List<string> SavedFileNames { get; } = [];
         public bool Exists(string workspaceRelativePath) => true;

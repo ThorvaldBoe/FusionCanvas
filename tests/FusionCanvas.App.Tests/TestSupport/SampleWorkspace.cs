@@ -164,6 +164,7 @@ internal static class MainWindowViewModelFactory
     private sealed class EmptyWorkspaceFileStore : IWorkspaceFileStore
     {
         public string WorkspaceRoot => string.Empty;
+        public string ResolvePath(string workspaceRelativePath) => throw new InvalidOperationException();
 
         public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, AssetKind kind, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("The test workspace file store is not configured.");
