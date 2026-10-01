@@ -111,7 +111,8 @@ internal static class MainWindowViewModelFactory
         IIdeationAccessStatus? ideationAccessStatus = null,
         IWorkspaceRepository? workspaceSnapshotRepository = null,
         SettingsViewModel? settings = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IItemInspectorService? itemInspectorService = null)
     {
         var fileStore = new EmptyWorkspaceFileStore();
         var itemManagement = new ItemManagementService(repository);
@@ -131,7 +132,7 @@ internal static class MainWindowViewModelFactory
             itemManagement,
             new ItemCsvImportService(repository),
             new AssetManagementService(repository, fileStore),
-            new ItemInspectorService(repository),
+            itemInspectorService ?? new ItemInspectorService(repository),
             ideationService ?? new IdeationService(
                 repository,
                 itemManagement,

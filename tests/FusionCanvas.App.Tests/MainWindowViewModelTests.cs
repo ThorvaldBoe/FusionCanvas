@@ -1,5 +1,8 @@
+using System.Reflection;
 using FusionCanvas.App.Stores;
+using FusionCanvas.App.Items;
 using FusionCanvas.App.Settings;
+using FusionCanvas.Application.Items;
 using FusionCanvas.App.StageTools;
 using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Views;
@@ -21,6 +24,123 @@ namespace FusionCanvas.App.Tests;
 
 public class MainWindowViewModelTests
 {
+    [Theory]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public void ShutdownCompletesOnlyWhenEveryOwnerHasDrained(
+        bool storeManagementDrained,
+        bool workspaceTreeDrained,
+        bool mainWindowDrained)
+    {
+        Assert.Equal(
+            storeManagementDrained && workspaceTreeDrained && mainWindowDrained,
+            App.AreShutdownOwnersDrained(storeManagementDrained, workspaceTreeDrained, mainWindowDrained));
+    }
+
+    [Fact]
+    public async Task DisposeAsync_WaitsForAdmittedCommandFactoryBeforeDisposingChildren()
+    {
+        var viewModel = MainWindowViewModelFactory.CreateSample();
+        var waitForCommands = typeof(MainWindowViewModel).GetMethod(
+            "WaitForCommandTasksAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        await ((Task)waitForCommands.Invoke(viewModel, null)!)
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var run = typeof(MainWindowViewModel).GetMethod("Run", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var conceptNotifications = 0;
+        viewModel.ConceptRefinement.InitializeCommand.CanExecuteChanged += (_, _) => conceptNotifications++;
+        using var startEntered = new ManualResetEventSlim();
+        using var releaseStart = new ManualResetEventSlim();
+        var operationCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var runInvocation = Task.Run(() => run.Invoke(viewModel, new object[]
+        {
+            (Func<Task>)(() =>
+            {
+                startEntered.Set();
+                releaseStart.Wait();
+                return operationCompletion.Task;
+            })
+        }));
+
+        Task? disposal = null;
+        try
+        {
+            Assert.True(startEntered.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+            var notificationsBeforeDispose = conceptNotifications;
+            disposal = viewModel.DisposeAsync().AsTask();
+            viewModel.ItemInspector.Idea = "Still observing while a command start is admitted";
+            Assert.True(conceptNotifications > notificationsBeforeDispose);
+            await Task.Yield();
+            Assert.False(disposal.IsCompleted);
+        }
+        finally
+        {
+            releaseStart.Set();
+        }
+
+        await runInvocation.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        operationCompletion.TrySetResult();
+        await (disposal ?? viewModel.DisposeAsync().AsTask())
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_WaitsForInFlightDetailsCommitCommand()
+    {
+        var snapshot = SampleWorkspace.Create();
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+        var inspectorService = new BlockingItemInspectorService(new ItemInspectorService(repository));
+        var viewModel = MainWindowViewModelFactory.CreateFromSnapshot(
+            snapshot,
+            repository,
+            itemInspectorService: inspectorService);
+        var itemLoaded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        viewModel.ItemInspector.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(ItemInspectorViewModel.HasState) && viewModel.ItemInspector.HasState)
+            {
+                itemLoaded.TrySetResult();
+            }
+        };
+
+        viewModel.OpenFromNavigation(ActiveItemContext(viewModel));
+        if (viewModel.ItemInspector.HasState)
+        {
+            itemLoaded.TrySetResult();
+        }
+
+        await itemLoaded.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.False(viewModel.ItemInspector.IsReadOnly);
+        viewModel.ItemInspector.Title = "Updated while command is pending";
+        Assert.True(viewModel.ItemInspector.HasUnsavedChanges);
+        viewModel.CommitActiveDetailsEdits();
+        await inspectorService.SaveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Task? disposalTask = null;
+        try
+        {
+            disposalTask = viewModel.DisposeAsync().AsTask();
+            Assert.False(disposalTask.IsCompleted);
+            inspectorService.ReleaseSave.TrySetResult();
+            await disposalTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.True(inspectorService.SaveFinished.Task.IsCompletedSuccessfully);
+        }
+        finally
+        {
+            inspectorService.ReleaseSave.TrySetResult();
+            if (disposalTask is null)
+            {
+                await viewModel.DisposeAsync();
+            }
+            else
+            {
+                await disposalTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            }
+        }
+    }
+
     [Fact]
     public async Task StartupAccessStatusRefresh_ObservesFailures()
     {
@@ -557,6 +677,37 @@ public class MainWindowViewModelTests
         viewModel.NavigationContexts.Single(context =>
             context.Context.EntityKind == WorkspaceEntityKind.Group &&
             context.Context.Title == "Dogs and coffee");
+
+    private sealed class BlockingItemInspectorService(IItemInspectorService inner) : IItemInspectorService
+    {
+        public TaskCompletionSource SaveStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReleaseSave { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource SaveFinished { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<ItemInspectorState?> LoadAsync(Guid itemId, CancellationToken cancellationToken = default) =>
+            inner.LoadAsync(itemId, cancellationToken);
+
+        public Task<ItemInspectorSaveResult> SaveAsync(
+            ItemInspectorSaveRequest request,
+            CancellationToken cancellationToken = default) =>
+            inner.SaveAsync(request, cancellationToken);
+
+        public async Task<ItemInspectorSaveResult> SaveStageAsync(
+            ItemStageAwareSaveRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            SaveStarted.TrySetResult();
+            try
+            {
+                await ReleaseSave.Task.WaitAsync(TestContext.Current.CancellationToken);
+                return await inner.SaveStageAsync(request, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                SaveFinished.TrySetResult();
+            }
+        }
+    }
 
     private static NavigationDocumentContext DraftItemContext(MainWindowViewModel viewModel) =>
         viewModel.NavigationContexts.Single(context =>

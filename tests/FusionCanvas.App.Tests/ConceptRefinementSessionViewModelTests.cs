@@ -29,6 +29,44 @@ public sealed class ConceptRefinementSessionViewModelTests
     }
 
     [Fact]
+    public async Task DisposedSession_DisablesAndRejectsNewInitializeCommand()
+    {
+        var inspector = CreateInspector();
+        var (service, access) = (new StubRefinementService(), new StubRefinementAccess(true));
+        var initializeCalls = 0;
+        var refineCalls = 0;
+        service.InitializeFunc = _ =>
+        {
+            initializeCalls++;
+            return Task.FromResult(ConceptRefinementResult.Success("Idea", "Phrase", "Graphic"));
+        };
+        service.RefineFunc = _ =>
+        {
+            refineCalls++;
+            return Task.FromResult(ConceptRefinementResult.Success("Idea", "Phrase", "Graphic"));
+        };
+        var vm = new ConceptRefinementSessionViewModel(service, access, inspector);
+
+        await SetupLoadedInspectorAsync(inspector);
+        vm.ResetSession();
+        inspector.Idea = "Base idea text";
+        Assert.True(vm.CanInitialize);
+        Assert.True(vm.ChangePhraseCommand.CanExecute(null));
+
+        vm.Dispose();
+
+        Assert.False(vm.InitializeCommand.CanExecute(null));
+        Assert.False(vm.ChangePhraseCommand.CanExecute(null));
+        vm.InitializeCommand.Execute(null);
+        vm.ChangePhraseCommand.Execute(null);
+        await vm.PendingOperation;
+
+        Assert.Equal(0, initializeCalls);
+        Assert.Equal(0, refineCalls);
+        Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
     public void Score_ComputesCorrectlyFromInspectorDrafts()
     {
         var inspector = CreateInspector();
@@ -674,6 +712,66 @@ public sealed class ConceptRefinementSessionViewModelTests
     }
 
     [Fact]
+    public async Task DisposeDuringRollbackCancelsCommitAndDefersSourceDisposalUntilCompletion()
+    {
+        var inspector = CreateInspector();
+        var viewModel = new ConceptRefinementSessionViewModel(
+            new StubRefinementService(), new StubRefinementAccess(true), inspector);
+        var itemService = Assert.IsType<StubItemInspectorService>(
+            typeof(ItemInspectorViewModel).GetField("_service", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .GetValue(inspector));
+
+        await SetupLoadedInspectorAsync(inspector);
+        viewModel.ResetSession();
+        var sourceField = typeof(ConceptRefinementSessionViewModel).GetField(
+            "_sessionCts", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        var source = Assert.IsType<CancellationTokenSource>(sourceField.GetValue(viewModel));
+        var entry = new ConceptRefinementHistoryEntry(
+            "Earlier", "Earlier idea", "Earlier phrase", "Earlier graphic", DateTimeOffset.UtcNow);
+        viewModel.History.Add(entry);
+        inspector.ConceptIdea = "Current idea";
+        inspector.Phrase = "Current phrase";
+        inspector.GraphicDirection = "Current graphic";
+        itemService.BlockSaveStage = true;
+        var disposed = false;
+        var lateCurrentIndexNotifications = 0;
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (disposed && args.PropertyName == nameof(viewModel.CurrentEntryIndex))
+            {
+                lateCurrentIndexNotifications++;
+            }
+        };
+
+        viewModel.SelectHistoryEntryCommand.Execute(entry);
+        var token = await itemService.SaveStageStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var waitHandle = token.WaitHandle;
+
+        try
+        {
+            viewModel.Dispose();
+            disposed = true;
+
+            Assert.True(token.IsCancellationRequested);
+            Assert.False(waitHandle.SafeWaitHandle.IsClosed);
+            itemService.ReleaseSaveStage.TrySetResult();
+            await viewModel.PendingOperation.WaitAsync(TestContext.Current.CancellationToken);
+
+            Assert.IsType<OperationCanceledException>(itemService.SaveStageException);
+            Assert.Null(viewModel.ErrorMessage);
+            Assert.Equal(0, lateCurrentIndexNotifications);
+            Assert.True(waitHandle.SafeWaitHandle.IsClosed);
+            Assert.Throws<ObjectDisposedException>(() => _ = source.Token);
+        }
+        finally
+        {
+            itemService.ReleaseSaveStage.TrySetResult();
+            viewModel.Dispose();
+            await viewModel.PendingOperation.WaitAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
     public async Task PostRollbackAction_TruncatesLaterEntries()
     {
         var inspector = CreateInspector();
@@ -770,6 +868,29 @@ public sealed class ConceptRefinementSessionViewModelTests
         Assert.Empty(vm.History);
         Assert.False(vm.IsBusy);
         Assert.Null(vm.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task DisposeCancelsAndDisposesSessionCancellationSource()
+    {
+        var inspector = CreateInspector();
+        var viewModel = CreateSessionViewModel(inspector);
+        await SetupLoadedInspectorAsync(inspector);
+        viewModel.ResetSession();
+
+        var sourceField = typeof(ConceptRefinementSessionViewModel).GetField(
+            "_sessionCts",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        var source = Assert.IsType<CancellationTokenSource>(sourceField?.GetValue(viewModel));
+        var token = source.Token;
+
+        viewModel.Dispose();
+
+        Assert.True(token.IsCancellationRequested);
+        Assert.Null(sourceField?.GetValue(viewModel));
+        Assert.Throws<ObjectDisposedException>(() => _ = source.Token);
+        viewModel.ResetSession();
+        Assert.Null(sourceField?.GetValue(viewModel));
     }
 
     [Fact]
@@ -937,7 +1058,8 @@ public sealed class ConceptRefinementSessionViewModelTests
 
         // Create a state that is not effectively active → read-only with restore message
         var state = CreateValidState(conceptIdea: "Some idea", phrase: "Some phrase", graphicDirection: "Some graphic")
-            with { IsEffectivelyActive = false };
+            with
+        { IsEffectivelyActive = false };
         var svcField = typeof(ItemInspectorViewModel).GetField(
             "_service",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -1180,6 +1302,10 @@ public sealed class ConceptRefinementSessionViewModelTests
     {
         public ItemInspectorState? StateToReturn { get; set; }
         public bool FailSaves { get; set; }
+        public bool BlockSaveStage { get; set; }
+        public TaskCompletionSource<CancellationToken> SaveStageStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReleaseSaveStage { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Exception? SaveStageException { get; private set; }
 
         public Task<ItemInspectorState?> LoadAsync(Guid itemId, CancellationToken cancellationToken = default) =>
             Task.FromResult(StateToReturn);
@@ -1191,7 +1317,36 @@ public sealed class ConceptRefinementSessionViewModelTests
                     ? ItemInspectorSaveResult.Success(s)
                     : ItemInspectorSaveResult.Failure("No state"));
 
-        public Task<ItemInspectorSaveResult> SaveStageAsync(ItemStageAwareSaveRequest request, CancellationToken cancellationToken = default)
+        public Task<ItemInspectorSaveResult> SaveStageAsync(ItemStageAwareSaveRequest request, CancellationToken cancellationToken = default) =>
+            BlockSaveStage
+                ? SaveStageWhenReleasedAsync(request, cancellationToken)
+                : SaveStageImmediately(request);
+
+        private async Task<ItemInspectorSaveResult> SaveStageWhenReleasedAsync(
+            ItemStageAwareSaveRequest request,
+            CancellationToken cancellationToken)
+        {
+            var waitHandle = cancellationToken.WaitHandle;
+            SaveStageStarted.TrySetResult(cancellationToken);
+            try
+            {
+                await ReleaseSaveStage.Task.WaitAsync(TestContext.Current.CancellationToken);
+                if (!waitHandle.WaitOne(TimeSpan.FromSeconds(1)))
+                {
+                    throw new TimeoutException("The save cancellation token was not signaled.");
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                return await SaveStageImmediately(request).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                SaveStageException = exception;
+                throw;
+            }
+        }
+
+        private Task<ItemInspectorSaveResult> SaveStageImmediately(ItemStageAwareSaveRequest request)
         {
             if (FailSaves)
             {

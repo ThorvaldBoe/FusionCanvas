@@ -99,7 +99,7 @@ public sealed class PrintifyCatalogImportViewModelTests
         await WaitForAsync(() => viewModel.IsBusy);
         viewModel.CancelCommand.Execute(null);
         pending.SetResult(new(PrintifyCatalogResultKind.Succeeded, "late", SelectedCatalog: []));
-        await Task.Yield();
+        await viewModel.PendingOperation.WaitAsync(TestContext.Current.CancellationToken);
 
         Assert.False(viewModel.IsBusy);
         Assert.False(refreshed);
@@ -126,6 +126,61 @@ public sealed class PrintifyCatalogImportViewModelTests
 
         Assert.True(refreshed);
         Assert.False(viewModel.IsOpen);
+        Assert.Throws<ObjectDisposedException>(() => _ = service.BlueprintsToken.WaitHandle);
+        Assert.Throws<ObjectDisposedException>(() => _ = service.SelectedToken.WaitHandle);
+    }
+
+    [Fact]
+    public async Task DisposeCancelsPendingLoadAndDefersSourceDisposalUntilCompletion()
+    {
+        var scope = new StoreCredentialScope(Guid.NewGuid(), Guid.NewGuid());
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var service = new StubService();
+        service.BlueprintsOperation = async cancellationToken =>
+        {
+            var waitHandle = cancellationToken.WaitHandle;
+            service.BlueprintsWaitHandle = waitHandle;
+            started.TrySetResult(cancellationToken);
+            try
+            {
+                await release.Task.WaitAsync(TestContext.Current.CancellationToken);
+                waitHandle.WaitOne();
+                cancellationToken.ThrowIfCancellationRequested();
+                return new(PrintifyCatalogResultKind.Succeeded, "late", [new(68, "Late", null, null, null)]);
+            }
+            catch (Exception exception)
+            {
+                service.BlueprintsException = exception;
+                throw;
+            }
+        };
+        var viewModel = new PrintifyCatalogImportViewModel(service, () => scope);
+
+        try
+        {
+            viewModel.Open();
+            var token = await started.Task.WaitAsync(TestContext.Current.CancellationToken);
+            var waitHandle = service.BlueprintsWaitHandle!;
+
+            viewModel.Dispose();
+
+            Assert.True(token.IsCancellationRequested);
+            Assert.False(waitHandle.SafeWaitHandle.IsClosed);
+            Assert.False(viewModel.CanStart);
+            release.TrySetResult();
+            await viewModel.PendingOperation.WaitAsync(TestContext.Current.CancellationToken);
+
+            Assert.IsType<OperationCanceledException>(service.BlueprintsException);
+            Assert.True(waitHandle.SafeWaitHandle.IsClosed);
+            Assert.Empty(viewModel.Blueprints);
+        }
+        finally
+        {
+            release.TrySetResult();
+            viewModel.Dispose();
+            await viewModel.PendingOperation.WaitAsync(TestContext.Current.CancellationToken);
+        }
     }
 
     [Fact]
@@ -183,9 +238,26 @@ public sealed class PrintifyCatalogImportViewModelTests
     {
         public Task<PrintifyCatalogResult> BlueprintsTask { get; init; } = Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Empty, "empty", []));
         public Queue<Task<PrintifyCatalogResult>>? BlueprintTasks { get; init; }
+        public Func<CancellationToken, Task<PrintifyCatalogResult>>? BlueprintsOperation { get; set; }
+        public WaitHandle? BlueprintsWaitHandle { get; set; }
+        public Exception? BlueprintsException { get; set; }
         public Task<PrintifyCatalogResult> SelectedTask { get; init; } = Task.FromResult(new PrintifyCatalogResult(PrintifyCatalogResultKind.Empty, "empty", []));
         public int SelectedCalls { get; private set; }
-        public Task<PrintifyCatalogResult> LoadBlueprintsAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default) => BlueprintTasks is null ? BlueprintsTask : BlueprintTasks.Dequeue();
-        public Task<PrintifyCatalogResult> LoadSelectedAsync(StoreCredentialScope scope, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken = default) { SelectedCalls++; return SelectedTask; }
+        public CancellationToken BlueprintsToken { get; private set; }
+        public CancellationToken SelectedToken { get; private set; }
+
+        public Task<PrintifyCatalogResult> LoadBlueprintsAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default)
+        {
+            BlueprintsToken = cancellationToken;
+            return BlueprintsOperation?.Invoke(cancellationToken)
+                ?? (BlueprintTasks is null ? BlueprintsTask : BlueprintTasks.Dequeue());
+        }
+
+        public Task<PrintifyCatalogResult> LoadSelectedAsync(StoreCredentialScope scope, IReadOnlyCollection<int> blueprintIds, CancellationToken cancellationToken = default)
+        {
+            SelectedCalls++;
+            SelectedToken = cancellationToken;
+            return SelectedTask;
+        }
     }
 }

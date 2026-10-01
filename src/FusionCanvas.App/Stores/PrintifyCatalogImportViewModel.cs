@@ -8,13 +8,16 @@ using FusionCanvas.Application.Stores.Printify;
 
 namespace FusionCanvas.App.Stores;
 
-public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
+public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly IPrintifyCatalogImportService _service;
     private readonly Func<StoreCredentialScope?> _scope;
     private readonly Func<StoreCredentialScope, CancellationToken, Task>? _onImported;
     private CancellationTokenSource? _operationCancellation;
+    private readonly object _operationGate = new();
+    private readonly HashSet<Task> _activeOperations = [];
     private long _operationVersion;
+    private bool _isDisposed;
     private bool _isOpen;
     private bool _isBusy;
     private string? _errorMessage;
@@ -26,7 +29,7 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
         _onImported = onImported;
         OpenCommand = new RelayCommand(_ => Open());
         LoadCommand = new AsyncRelayCommand(StartLoadAsync);
-        ConfirmCommand = new AsyncRelayCommand(ConfirmAsync, () => CanConfirm);
+        ConfirmCommand = new AsyncRelayCommand(() => PendingOperation = TrackOperation(ConfirmAsync()), () => CanConfirm);
         CancelCommand = new RelayCommand(_ => Cancel());
     }
 
@@ -37,46 +40,77 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
     public ICommand CancelCommand { get; }
     public bool IsOpen { get => _isOpen; private set => SetField(ref _isOpen, value); }
     public bool IsBusy { get => _isBusy; private set => SetField(ref _isBusy, value); }
+    public Task PendingOperation { get; private set; } = Task.CompletedTask;
+    public bool HasPendingOperations
+    {
+        get
+        {
+            lock (_operationGate)
+            {
+                return _activeOperations.Any(operation => !operation.IsCompleted);
+            }
+        }
+    }
+
+    public Task WaitForPendingOperationsAsync()
+    {
+        lock (_operationGate)
+        {
+            return Task.WhenAll(_activeOperations.ToArray());
+        }
+    }
     public string? ErrorMessage { get => _errorMessage; private set => SetField(ref _errorMessage, value); }
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
     public int SelectedCount => Blueprints.Count(item => item.IsSelected);
     public bool HasBlueprints => Blueprints.Count > 0;
-    public bool CanStart => !IsBusy;
-    public bool CanConfirm => IsOpen && !IsBusy && SelectedCount > 0;
+    public bool CanStart => !_isDisposed && !IsBusy;
+    public bool CanConfirm => !_isDisposed && IsOpen && !IsBusy && SelectedCount > 0;
     public event EventHandler? SelectionFocusRequested;
     public event EventHandler? ImportFocusRequested;
 
     private Task StartLoadAsync()
     {
-        if (IsBusy) return Task.CompletedTask;
+        if (_isDisposed || IsBusy) return Task.CompletedTask;
         InvalidateOperation();
         ClearBlueprints();
-        _operationCancellation = new CancellationTokenSource();
-        return LoadAsync(_operationVersion, _operationCancellation.Token);
+        var source = _operationCancellation = new CancellationTokenSource();
+        return PendingOperation = TrackOperation(LoadAsync(_operationVersion, source));
     }
 
     public void Open()
     {
-        if (IsBusy) return;
+        if (_isDisposed || IsBusy) return;
         InvalidateOperation();
         ClearBlueprints();
         IsOpen = true;
         ErrorMessage = null;
-        _operationCancellation = new CancellationTokenSource();
-        _ = LoadAsync(_operationVersion, _operationCancellation.Token);
+        var source = _operationCancellation = new CancellationTokenSource();
+        PendingOperation = TrackOperation(LoadAsync(_operationVersion, source));
     }
 
-    private async Task LoadAsync(long operationVersion, CancellationToken cancellationToken)
+    private async Task LoadAsync(long operationVersion, CancellationTokenSource source)
     {
-        if (IsBusy) return;
-        var scope = _scope();
-        if (scope is null) { ErrorMessage = "Save and select an active Printify Store first."; return; }
-        IsBusy = true;
-        ErrorMessage = null;
+        var cancellationToken = source.Token;
+        if (IsBusy)
+        {
+            DisposeCompletedOperation(operationVersion, source);
+            return;
+        }
+
+        StoreCredentialScope? scope = null;
         try
         {
-            var result = await _service.LoadBlueprintsAsync(scope, cancellationToken).ConfigureAwait(true);
-            if (!CanPublish(operationVersion, scope)) return;
+            scope = _scope();
+            if (scope is not { } currentScope)
+            {
+                ErrorMessage = "Save and select an active Printify Store first.";
+                return;
+            }
+
+            IsBusy = true;
+            ErrorMessage = null;
+            var result = await _service.LoadBlueprintsAsync(currentScope, cancellationToken).ConfigureAwait(true);
+            if (!CanPublish(operationVersion, currentScope)) return;
             if (!result.Succeeded) { ErrorMessage = result.Message; return; }
             var products = result.Products ?? result.Blueprints?.Select(blueprint =>
                 new PrintifyShopProductSummary(blueprint.Id.ToString(), blueprint.Title, blueprint.Description, blueprint.Id, 1)) ?? [];
@@ -92,13 +126,15 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception)
         {
-            if (CanPublish(operationVersion, scope))
+            if (IsCurrentVersion(operationVersion)
+                && (scope is null || CanPublish(operationVersion, scope)))
             {
                 ErrorMessage = "Printify catalog could not be loaded. Try again.";
             }
         }
         finally
         {
+            DisposeCompletedOperation(operationVersion, source);
             if (IsCurrentVersion(operationVersion))
             {
                 IsBusy = false;
@@ -109,12 +145,13 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
 
     private async Task ConfirmAsync()
     {
+        if (_isDisposed) return;
         var scope = _scope();
         if (scope is null || !CanConfirm) return;
         InvalidateOperation();
-        _operationCancellation = new CancellationTokenSource();
+        var source = _operationCancellation = new CancellationTokenSource();
         var operationVersion = _operationVersion;
-        var cancellationToken = _operationCancellation.Token;
+        var cancellationToken = source.Token;
         IsBusy = true;
         ErrorMessage = null;
         try
@@ -138,6 +175,7 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
         }
         finally
         {
+            DisposeCompletedOperation(operationVersion, source);
             if (IsCurrentVersion(operationVersion))
             {
                 IsBusy = false;
@@ -146,8 +184,26 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
         }
     }
 
+    public void Dispose()
+    {
+        if (_isDisposed) return;
+        _isDisposed = true;
+        try
+        {
+            InvalidateOperation();
+        }
+        finally
+        {
+            IsBusy = false;
+            IsOpen = false;
+            ClearBlueprints();
+            NotifyCommands();
+        }
+    }
+
     private void Cancel()
     {
+        if (_isDisposed) return;
         InvalidateOperation();
         IsBusy = false;
         IsOpen = false;
@@ -162,14 +218,39 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
     private bool IsCurrentVersion(long operationVersion) => operationVersion == _operationVersion;
 
     private bool CanPublish(long operationVersion, StoreCredentialScope expected) =>
-        IsOpen && IsCurrentOperation(operationVersion, expected);
+        !_isDisposed && IsOpen && IsCurrentOperation(operationVersion, expected);
+
+    private void DisposeCompletedOperation(long operationVersion, CancellationTokenSource source)
+    {
+        if (IsCurrentVersion(operationVersion) && ReferenceEquals(_operationCancellation, source))
+        {
+            _operationCancellation = null;
+        }
+
+        source.Dispose();
+    }
 
     private void InvalidateOperation()
     {
-        _operationCancellation?.Cancel();
-        _operationCancellation?.Dispose();
+        var source = _operationCancellation;
         _operationCancellation = null;
         _operationVersion++;
+        if (source is null)
+        {
+            return;
+        }
+
+        try
+        {
+            source.Cancel();
+        }
+        finally
+        {
+            if (!IsBusy)
+            {
+                source.Dispose();
+            }
+        }
     }
 
     private void ClearBlueprints()
@@ -185,7 +266,7 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
 
     private void OnItemPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
-        if (args.PropertyName == nameof(PrintifyCatalogImportItemViewModel.IsSelected)) NotifyCommands();
+        if (!_isDisposed && args.PropertyName == nameof(PrintifyCatalogImportItemViewModel.IsSelected)) NotifyCommands();
     }
 
     private void NotifyCommands()
@@ -195,6 +276,36 @@ public sealed class PrintifyCatalogImportViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(HasError));
         OnPropertyChanged(nameof(CanStart));
         (ConfirmCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+    }
+
+    private Task TrackOperation(Task operation)
+    {
+        lock (_operationGate)
+        {
+            _activeOperations.Add(operation);
+            PendingOperation = operation;
+        }
+
+        _ = RemoveCompletedOperationAsync(operation);
+        return operation;
+    }
+
+    private async Task RemoveCompletedOperationAsync(Task operation)
+    {
+        try
+        {
+            await operation.ConfigureAwait(false);
+        }
+        catch
+        {
+        }
+        finally
+        {
+            lock (_operationGate)
+            {
+                _activeOperations.Remove(operation);
+            }
+        }
     }
 
     private void SetField<T>(ref T field, T value, [CallerMemberName] string? name = null)

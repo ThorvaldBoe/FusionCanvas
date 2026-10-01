@@ -59,6 +59,59 @@ public class StorePrintifyTests
     }
 
     [AvaloniaFact]
+    public async Task CompletedCredentialOperationsDisposeTheirCancellationSources()
+    {
+        var service = new Service { Kind = PrintifyConfigurationKind.Available };
+        var model = new StorePrintifyCredentialsViewModel(service);
+        model.SetContext(Store(), FulfillmentStrategy.ShopifyPrintify, isDraft: false, editorOpen: true);
+        await model.PendingOperation;
+
+        Assert.Throws<ObjectDisposedException>(() => _ = service.ReadCancellation.WaitHandle);
+        await model.VerifyAsync();
+        Assert.Throws<ObjectDisposedException>(() => _ = service.LastCancellation.WaitHandle);
+    }
+
+    [AvaloniaFact]
+    public async Task CancelPendingDefersCredentialSourceDisposalUntilReadCompletes()
+    {
+        var started = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var service = new Service();
+        service.ReadOperation = async cancellationToken =>
+        {
+            var waitHandle = cancellationToken.WaitHandle;
+            service.ReadWaitHandle = waitHandle;
+            started.TrySetResult(cancellationToken);
+            await release.Task.WaitAsync(TestContext.Current.CancellationToken);
+            waitHandle.WaitOne();
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(PrintifyConfigurationKind.Available, "late");
+        };
+        var viewModel = new StorePrintifyCredentialsViewModel(service);
+        viewModel.SetContext(Store(), FulfillmentStrategy.ShopifyPrintify, isDraft: false, editorOpen: true);
+
+        try
+        {
+            var token = await started.Task.WaitAsync(TestContext.Current.CancellationToken);
+            var waitHandle = service.ReadWaitHandle!;
+            viewModel.Dispose();
+
+            Assert.True(token.IsCancellationRequested);
+            Assert.False(waitHandle.SafeWaitHandle.IsClosed);
+            release.TrySetResult();
+            await viewModel.WaitForPendingOperationsAsync().WaitAsync(TestContext.Current.CancellationToken);
+
+            Assert.True(waitHandle.SafeWaitHandle.IsClosed);
+        }
+        finally
+        {
+            release.TrySetResult();
+            viewModel.Dispose();
+            await viewModel.WaitForPendingOperationsAsync().WaitAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [AvaloniaFact]
     public async Task UnreadableStorage_PreventsOverwriteAndRetries()
     {
         var service = new Service { Kind = PrintifyConfigurationKind.Unavailable };
@@ -310,15 +363,20 @@ public class StorePrintifyTests
         public StoreCredentialScope? VerifiedScope { get; private set; }
         public StoreCredentialScope? SavedScope { get; private set; }
         public CancellationToken LastCancellation { get; private set; }
+        public CancellationToken ReadCancellation { get; private set; }
+        public Func<CancellationToken, Task<PrintifyConfigurationResult>>? ReadOperation { get; set; }
+        public WaitHandle? ReadWaitHandle { get; set; }
         public Task<PrintifyConfigurationResult> ReadStatusAsync(StoreCredentialScope scope, CancellationToken cancellationToken = default)
         {
             Reads++;
-            return Task.FromResult(new PrintifyConfigurationResult(Kind, Kind switch
-            {
-                PrintifyConfigurationKind.Missing => "Printify api key is required",
-                PrintifyConfigurationKind.Available => "Printify api key is provided",
-                _ => "Storage unavailable"
-            }));
+            ReadCancellation = cancellationToken;
+            return ReadOperation?.Invoke(cancellationToken)
+                ?? Task.FromResult(new PrintifyConfigurationResult(Kind, Kind switch
+                {
+                    PrintifyConfigurationKind.Missing => "Printify api key is required",
+                    PrintifyConfigurationKind.Available => "Printify api key is provided",
+                    _ => "Storage unavailable"
+                }));
         }
         public Task<PrintifyConfigurationResult> SaveAsync(StoreCredentialScope scope, string key, CancellationToken cancellationToken = default)
         {

@@ -8,12 +8,15 @@ using FusionCanvas.Domain.Stores;
 
 namespace FusionCanvas.App.Stores;
 
-public sealed class StorePrintifyCredentialsViewModel(IStorePrintifyConfigurationService service) : INotifyPropertyChanged
+public sealed class StorePrintifyCredentialsViewModel(IStorePrintifyConfigurationService service) : INotifyPropertyChanged, IDisposable
 {
     private StoreSummary? _store;
     private StoreCredentialScope? _scope;
     private CancellationTokenSource? _pending;
+    private readonly object _operationGate = new();
+    private readonly HashSet<Task> _activeOperations = [];
     private long _generation;
+    private bool _isDisposed;
     private bool _persistedPrintify;
     private int? _selectedShopId;
     private PrintifyShopOption? _selectedShop;
@@ -49,17 +52,22 @@ public sealed class StorePrintifyCredentialsViewModel(IStorePrintifyConfiguratio
     public bool HasKey => _kind == PrintifyConfigurationKind.Available;
     public bool IsMissing => _kind == PrintifyConfigurationKind.Missing;
     public bool HasError => _kind is PrintifyConfigurationKind.Unavailable or PrintifyConfigurationKind.InvalidContext;
-    public bool CanManage => IsVisible && _scope is not null && !IsBusy && (HasKey || IsMissing);
+    public bool CanManage => !_isDisposed && IsVisible && _scope is not null && !IsBusy && (HasKey || IsMissing);
     public bool CanVerify => CanManage && HasKey && _persistedPrintify;
     public bool ShowSaveGuidance => HasKey && !_persistedPrintify;
     public string ManageLabel => HasKey ? "Manage" : "Add";
     public Task PendingOperation { get; private set; } = Task.CompletedTask;
     public RelayCommand ManageCommand => new(_ => { if (CanManage) EditRequested?.Invoke(this, EventArgs.Empty); }, () => CanManage);
     public AsyncRelayCommand VerifyCommand => new(VerifyAsync, () => CanVerify);
-    public AsyncRelayCommand RetryCommand => new(RefreshAsync, () => !IsBusy && _scope is not null);
+    public AsyncRelayCommand RetryCommand => new(RefreshAsync, () => !_isDisposed && !IsBusy && _scope is not null);
 
     public void SetContext(StoreSummary? store, FulfillmentStrategy selectedStrategy, bool isDraft, bool editorOpen)
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
         if (!Dispatcher.UIThread.CheckAccess())
         {
             Dispatcher.UIThread.Post(() => SetContext(store, selectedStrategy, isDraft, editorOpen));
@@ -90,14 +98,20 @@ public sealed class StorePrintifyCredentialsViewModel(IStorePrintifyConfiguratio
     public PrintifyApiKeyViewModel? CreateEditor() =>
         CanManage && _scope is not null ? new(service, _scope, _store!.Name) : null;
 
-    public async Task RefreshAsync()
+    public Task RefreshAsync()
     {
-        if (_scope is null) return;
+        if (_isDisposed || _scope is null) return Task.CompletedTask;
+        return TrackOperation(RefreshCoreAsync());
+    }
+
+    private async Task RefreshCoreAsync()
+    {
+        if (_isDisposed || _scope is null) return;
         CancelPending();
         var generation = _generation;
         var scope = _scope;
-        _pending = new();
-        var cancellation = _pending.Token;
+        var pending = _pending = new CancellationTokenSource();
+        var cancellation = pending.Token;
         IsBusy = true;
         _kind = null;
         Status = "Reading Printify credential status…";
@@ -110,17 +124,37 @@ public sealed class StorePrintifyCredentialsViewModel(IStorePrintifyConfiguratio
         }
         catch (OperationCanceledException) { }
         catch (Exception) { await PublishAsync(generation, () => { _kind = PrintifyConfigurationKind.Unavailable; Status = PrintifyConfigurationResult.Unavailable.Message; }); }
-        finally { await PublishAsync(generation, () => IsBusy = false); }
+        finally
+        {
+            try
+            {
+                await PublishAsync(generation, () =>
+                {
+                    ClearPending(generation, pending);
+                    IsBusy = false;
+                });
+            }
+            finally
+            {
+                pending.Dispose();
+            }
+        }
     }
 
-    public async Task VerifyAsync()
+    public Task VerifyAsync()
     {
-        if (!CanVerify || _scope is null) return;
+        if (_isDisposed || !CanVerify || _scope is null) return Task.CompletedTask;
+        return TrackOperation(VerifyCoreAsync());
+    }
+
+    private async Task VerifyCoreAsync()
+    {
+        if (_isDisposed || !CanVerify || _scope is null) return;
+        CancelPending();
         var generation = _generation;
         var scope = _scope;
-        _pending?.Dispose();
-        _pending = new();
-        var cancellation = _pending.Token;
+        var pending = _pending = new CancellationTokenSource();
+        var cancellation = pending.Token;
         IsBusy = true;
         Verification = "Verifying Printify key…";
         Notify();
@@ -144,16 +178,104 @@ public sealed class StorePrintifyCredentialsViewModel(IStorePrintifyConfiguratio
         }
         catch (OperationCanceledException) { }
         catch (Exception) { await PublishAsync(generation, () => Verification = "Printify verification could not complete. Try again."); }
-        finally { await PublishAsync(generation, () => IsBusy = false); }
+        finally
+        {
+            try
+            {
+                await PublishAsync(generation, () =>
+                {
+                    ClearPending(generation, pending);
+                    IsBusy = false;
+                });
+            }
+            finally
+            {
+                pending.Dispose();
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        _isDisposed = true;
+        CancelPending();
     }
 
     public void CancelPending()
     {
         _generation++;
-        _pending?.Cancel();
-        _pending?.Dispose();
+        var pending = _pending;
         _pending = null;
-        IsBusy = false;
+        try
+        {
+            pending?.Cancel();
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public bool HasPendingOperations
+    {
+        get
+        {
+            lock (_operationGate)
+            {
+                return _activeOperations.Any(operation => !operation.IsCompleted);
+            }
+        }
+    }
+
+    public Task WaitForPendingOperationsAsync()
+    {
+        lock (_operationGate)
+        {
+            return Task.WhenAll(_activeOperations.ToArray());
+        }
+    }
+
+    private Task TrackOperation(Task operation)
+    {
+        lock (_operationGate)
+        {
+            _activeOperations.Add(operation);
+            PendingOperation = operation;
+        }
+
+        _ = RemoveCompletedOperationAsync(operation);
+        return operation;
+    }
+
+    private async Task RemoveCompletedOperationAsync(Task operation)
+    {
+        try
+        {
+            await operation.ConfigureAwait(false);
+        }
+        catch
+        {
+        }
+        finally
+        {
+            lock (_operationGate)
+            {
+                _activeOperations.Remove(operation);
+            }
+        }
+    }
+
+    private void ClearPending(long generation, CancellationTokenSource pending)
+    {
+        if (generation == _generation && ReferenceEquals(_pending, pending))
+        {
+            _pending = null;
+        }
     }
 
     private async Task PublishAsync(long generation, Action action)

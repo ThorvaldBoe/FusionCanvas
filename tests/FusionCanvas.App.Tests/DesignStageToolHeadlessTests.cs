@@ -874,6 +874,35 @@ public class DesignStageToolHeadlessTests
         Assert.Null(rowSlot.Thumbnail);
         Assert.Null(supportingImage.Thumbnail);
     }
+
+    [AvaloniaFact]
+    public async Task ClosingMainWindowDisposesConceptAndSllSessionCancellationSources()
+    {
+        var snapshot = SampleWorkspace.Create();
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+        using var fixture = new MainWindowFixture(snapshot: snapshot, repository: repository);
+        await fixture.ViewModel.ItemInspector.LoadAsync(SampleWorkspace.IdeaNodeId, TestContext.Current.CancellationToken);
+
+        var conceptSource = GetSessionCancellationSource(fixture.ViewModel.ConceptRefinement);
+        var sllSource = GetSessionCancellationSource(fixture.ViewModel.SllGeneration);
+        var conceptToken = conceptSource.Token;
+        var sllToken = sllSource.Token;
+
+        fixture.Window.Close();
+
+        Assert.True(conceptToken.IsCancellationRequested);
+        Assert.True(sllToken.IsCancellationRequested);
+        Assert.Throws<ObjectDisposedException>(() => _ = conceptSource.Token);
+        Assert.Throws<ObjectDisposedException>(() => _ = sllSource.Token);
+    }
+
+    private static CancellationTokenSource GetSessionCancellationSource(object viewModel)
+    {
+        var field = viewModel.GetType().GetField(
+            "_sessionCts",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        return Assert.IsType<CancellationTokenSource>(field?.GetValue(viewModel));
+    }
 }
 
 internal sealed record StaleDesignFixture(
