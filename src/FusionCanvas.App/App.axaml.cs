@@ -6,6 +6,7 @@ using Avalonia.Threading;
 using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Settings;
 using FusionCanvas.App.Stores;
+using FusionCanvas.App.Versioning;
 using FusionCanvas.App.Views;
 
 namespace FusionCanvas.App;
@@ -33,7 +34,7 @@ public partial class App : Avalonia.Application
                 return;
             }
 
-            var splash = new SplashWindow();
+            var splash = new SplashWindow(new AssemblyApplicationVersionProvider());
             _startupCancellation = new CancellationTokenSource();
             desktop.ShutdownRequested += OnShutdownRequested;
             desktop.MainWindow = splash;

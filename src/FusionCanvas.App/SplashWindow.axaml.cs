@@ -8,13 +8,14 @@ namespace FusionCanvas.App;
 public partial class SplashWindow : Window
 {
     public SplashWindow()
-        : this(null)
+        : this(AssemblyApplicationVersionProvider.Instance)
     {
     }
 
-    public SplashWindow(IApplicationVersionProvider? versionProvider)
+    public SplashWindow(IApplicationVersionProvider versionProvider)
     {
-        DataContext = (versionProvider ?? new AssemblyApplicationVersionProvider()).GetVersion();
+        ArgumentNullException.ThrowIfNull(versionProvider);
+        DataContext = versionProvider.GetVersion();
         InitializeComponent();
     }
 

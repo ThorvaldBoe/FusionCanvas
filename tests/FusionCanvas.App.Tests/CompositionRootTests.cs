@@ -20,6 +20,22 @@ public sealed class CompositionRootTests
     }
 
     [Fact]
+    public void SplashWindowReceivesVersionProviderFromCompositionRoot()
+    {
+        var root = FindRepositoryRoot();
+        var splashWindow = File.ReadAllText(Path.Combine(
+            root, "src", "FusionCanvas.App", "SplashWindow.axaml.cs"));
+        var app = File.ReadAllText(Path.Combine(
+            root, "src", "FusionCanvas.App", "App.axaml.cs"));
+
+        Assert.DoesNotContain("new AssemblyApplicationVersionProvider", splashWindow, StringComparison.Ordinal);
+        Assert.Contains(
+            "new SplashWindow(new AssemblyApplicationVersionProvider())",
+            app,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainWindowDelegatesFinalArtworkFormatValidationToTheUseCase()
     {
         var root = FindRepositoryRoot();
