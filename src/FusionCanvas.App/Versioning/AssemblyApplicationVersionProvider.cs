@@ -5,6 +5,8 @@ namespace FusionCanvas.App.Versioning;
 
 public sealed class AssemblyApplicationVersionProvider : IApplicationVersionProvider
 {
+    public static AssemblyApplicationVersionProvider Instance { get; } = new();
+
     private readonly ApplicationVersionInfo _info;
 
     public AssemblyApplicationVersionProvider()
