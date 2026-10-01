@@ -3,14 +3,14 @@ namespace FusionCanvas.Application.AI;
 public sealed class AiTextGenerationService : IAiTextGenerationService
 {
     private readonly IAiConfigurationProvider _configuration;
-    private readonly IAiCredentialStore _credentials;
-    private readonly IAiModelCatalogCache _catalogCache;
+    private readonly IAiCredentialReader _credentials;
+    private readonly IAiModelCatalogReader _catalogCache;
     private readonly IAiTextProvider _provider;
 
     public AiTextGenerationService(
         IAiConfigurationProvider configuration,
-        IAiCredentialStore credentials,
-        IAiModelCatalogCache catalogCache,
+        IAiCredentialReader credentials,
+        IAiModelCatalogReader catalogCache,
         IAiTextProvider provider)
     {
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));

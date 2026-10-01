@@ -191,7 +191,7 @@ public class AiTextGenerationServiceTests
             CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<AiImageEndpointCapabilities>>([]);
     }
 
-    private sealed class CredentialStore : IAiCredentialStore
+    private sealed class CredentialStore : IAiCredentialReader
     {
         public int Reads { get; private set; }
         public AiCredentialReadResult Result { get; set; } = AiCredentialReadResult.NotFound;
@@ -200,19 +200,13 @@ public class AiTextGenerationServiceTests
             Reads++;
             return Task.FromResult(Result);
         }
-        public Task<AiCredentialOperationResult> SaveAsync(string apiKey, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-        public Task<AiCredentialOperationResult> RemoveAsync(CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
     }
 
-    private sealed class CatalogCache : IAiModelCatalogCache
+    private sealed class CatalogCache : IAiModelCatalogReader
     {
         public AiModelCatalog? Catalog { get; set; }
         public Task<AiModelCatalog?> LoadAsync(bool requireZeroDataRetention, CancellationToken cancellationToken = default) =>
             Task.FromResult(Catalog);
-        public Task SaveAsync(AiModelCatalog catalog, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
     }
 
     private sealed class TextProvider : IAiTextProvider

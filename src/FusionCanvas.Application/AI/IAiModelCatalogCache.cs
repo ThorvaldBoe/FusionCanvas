@@ -1,7 +1,6 @@
 namespace FusionCanvas.Application.AI;
 
-public interface IAiModelCatalogCache
+public interface IAiModelCatalogCache : IAiModelCatalogReader
 {
-    Task<AiModelCatalog?> LoadAsync(bool requireZeroDataRetention, CancellationToken cancellationToken = default);
     Task SaveAsync(AiModelCatalog catalog, CancellationToken cancellationToken = default);
 }
