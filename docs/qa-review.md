@@ -257,7 +257,7 @@ Context: FusionCanvas is a local-first desktop app with no network attack surfac
 3. **Docs vs. specs vs. code:**
    - `README.md`, `docs/*.md`, `openspec/project.md` agree on layer names, project structure, test commands, and workflow. (Known historical example: `docs/architecture.md` used the name "Infrastructure" while the accepted name is "Integration".)
    - `docs/coding-standard.md` remains consistent with the architecture-guidelines and testing-baseline specs, `docs/architecture.md`, the actual toolchain, and this QA playbook.
-   - `docs/LifeOS/` remains optional historical reference; canonical documents do not treat its inventory, ordering, or acceptance text as current authority, and reused ideas still go through discovery and OpenSpec.
+   - Historical planning material is not part of the current documentation set; canonical documents derive current scope and acceptance from user intent, accepted specs, the application, and the rolling roadmap.
    - `AGENTS.md` remains consistent with this playbook and the workflow skills in `.codex/skills/`.
 4. **Archived context preserved:** archived changes exist under `openspec/changes/archive/` with their artifacts; nothing was casually deleted.
 

@@ -24,8 +24,6 @@ Read these in order; drill into detail only where the task touches them:
    - `data-model.md`, `design-pipeline.md`, `plugin-model.md`, `product-vision.md`, `strategic-decisions.md`, `roadmap.md` as relevant.
    - `qa-review.md` — the QA review playbook (see below).
 
-`docs/LifeOS/` is optional historical reference. It may contain useful ideas, but it is potentially stale and is not required context, current scope, feature ordering, or acceptance authority.
-
 ## OpenSpec Workflow (mandatory for behavior changes)
 
 Every feature that adds or changes behavior goes through a rolling delivery-module workflow:

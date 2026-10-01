@@ -20,9 +20,8 @@ context: |
   non-goals, edge cases, assumptions, dependencies, and high-impact decisions before
   implementation. Do not create a separate module-specification document by default.
   Once the module is understood well enough to name and bound, create or refine its
-  OpenSpec change and capture each conclusion in its authoritative artifact. Historical
-  LifeOS files under docs/LifeOS are optional, potentially stale idea sources only;
-  never infer current priority, ordering, requirements, or acceptance criteria from them.
+  OpenSpec change and capture each conclusion in its authoritative artifact. Archived
+  planning references are not current scope, priority, requirements, or acceptance criteria.
 
   Each change is a delivery package: proposal.md is the module-level anchor for outcome,
   scope, boundaries, dependencies, risks, rationale, and verification approach; delta

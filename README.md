@@ -150,8 +150,6 @@ OpenSpec is the backbone of feature work regardless of which tool drives it. A d
 
 All three produce and consume the same OpenSpec artifacts and honor the same approval and archive gates, so work can move freely between Codex and OpenCode. See [.opencode/README.md](.opencode/README.md) for the agent loop details.
 
-The original LifeOS planning files remain under `docs/LifeOS` as optional, potentially stale historical reference. They are not required reading, a current roadmap, or acceptance authority.
-
 ## Repository Structure
 
 The planned repository structure is:
@@ -173,9 +171,7 @@ FusionCanvas/
 │  ├─ plugin-model.md
 │  ├─ product-vision.md
 │  ├─ strategic-decisions.md
-│  ├─ roadmap.md
-│  └─ LifeOS/
-│     └─ PRD/
+│  └─ roadmap.md
 ├─ openspec/
 │  ├─ project.md
 │  ├─ specs/
