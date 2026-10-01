@@ -1453,6 +1453,9 @@ public class StoreManagementViewModelTests
 
         public void SetActiveWorkspace(Guid? workspaceId) { }
 
+        public Task<StoreSummary?> ResolveActiveStoreAsync(Guid workspaceId, Guid storeId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<StoreManagementState> LoadAsync(CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 

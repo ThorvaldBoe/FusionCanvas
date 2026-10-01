@@ -155,6 +155,7 @@ public class StoreEditorScopeTests
         public void SetActiveWorkspace(Guid? workspaceId) => ActiveWorkspaceId = workspaceId;
         public void CompleteCreate(StoreManagementResult result) => _createCompletion.TrySetResult(result);
         public void CompleteDelete(StoreManagementResult result) => _deleteCompletion.TrySetResult(result);
+        public Task<StoreSummary?> ResolveActiveStoreAsync(Guid workspaceId, Guid storeId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<StoreManagementState> LoadAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<StoreManagementResult> CreateStoreAsync(StoreManagementCreateRequest request, CancellationToken cancellationToken = default)
         {

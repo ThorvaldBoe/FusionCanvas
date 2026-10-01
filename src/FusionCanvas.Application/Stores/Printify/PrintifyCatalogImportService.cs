@@ -8,7 +8,7 @@ using FusionCanvas.Domain.Workspace;
 namespace FusionCanvas.Application.Stores.Printify;
 
 public sealed class PrintifyCatalogImportService(
-    IStoreManagementService stores,
+    IStoreContextReader stores,
     IStorePrintifyCredentialStore credentials,
     IPrintifyCatalogClient client,
     IWorkspaceRepository? repository = null,
@@ -35,11 +35,7 @@ public sealed class PrintifyCatalogImportService(
         Func<string, int, CancellationToken, Task<PrintifyCatalogResult>> operation,
         CancellationToken cancellationToken)
     {
-        if (scope.WorkspaceId == Guid.Empty || scope.StoreId == Guid.Empty) return InvalidContext;
-        var state = await stores.LoadAsync(cancellationToken).ConfigureAwait(false);
-        if (state.ActiveWorkspaceId != scope.WorkspaceId || stores.ActiveWorkspaceId != scope.WorkspaceId)
-            return InvalidContext;
-        var store = state.ActiveStores.SingleOrDefault(candidate => candidate.Id == scope.StoreId && candidate.WorkspaceId == scope.WorkspaceId);
+        var store = await stores.ResolveActiveStoreAsync(scope.WorkspaceId, scope.StoreId, cancellationToken).ConfigureAwait(false);
         if (store is null || store.IsArchived || !FulfillmentStrategyPolicy.RequiresPrintifyKey(store.FulfillmentStrategy) || store.Context.PrintifyShopId is null)
             return InvalidContext;
         var read = await credentials.ReadAsync(scope, cancellationToken).ConfigureAwait(false);
@@ -54,10 +50,8 @@ public sealed class PrintifyCatalogImportService(
             cancellationToken.ThrowIfCancellationRequested();
             // The request may outlive a Store/workspace switch. Never publish
             // a response into the context that was active only when loading began.
-            var current = await stores.LoadAsync(cancellationToken).ConfigureAwait(false);
-            var currentStore = current.ActiveStores.SingleOrDefault(candidate => candidate.Id == scope.StoreId && candidate.WorkspaceId == scope.WorkspaceId);
-            if (current.ActiveWorkspaceId != scope.WorkspaceId || stores.ActiveWorkspaceId != scope.WorkspaceId
-                || currentStore is null || currentStore.IsArchived
+            var currentStore = await stores.ResolveActiveStoreAsync(scope.WorkspaceId, scope.StoreId, cancellationToken).ConfigureAwait(false);
+            if (currentStore is null
                 || !FulfillmentStrategyPolicy.RequiresPrintifyKey(currentStore.FulfillmentStrategy)
                 || currentStore.Context.PrintifyShopId != store.Context.PrintifyShopId)
                 return InvalidContext;

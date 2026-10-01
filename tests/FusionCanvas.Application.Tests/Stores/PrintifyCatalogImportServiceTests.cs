@@ -522,18 +522,10 @@ public sealed class PrintifyCatalogImportServiceTests
     private static PrintifyCatalogBlueprint Product(string productId, string title) => new(
         new(68, title, null, "Brand", "Model"), [new(9, "Provider", [new("Color", "color", [new(1, "Black")])], [new(33719, title, true, true, [1], [])])]) { ProductId = productId };
 
-    private sealed class StoresStub(StoreSummary store) : IStoreManagementService
+    private sealed class StoresStub(StoreSummary store) : IStoreContextReader
     {
-        public Guid? ActiveWorkspaceId => store.WorkspaceId;
-        public Guid? ActiveStoreId => store.Id;
-        public void SetActiveWorkspace(Guid? workspaceId) { }
-        public Task<StoreManagementState> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(new StoreManagementState(store.WorkspaceId, [store], [], store.Id, store, false));
-        public Task<StoreManagementResult> CreateStoreAsync(StoreManagementCreateRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<StoreManagementResult> UpdateStoreAsync(StoreManagementUpdateRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<StoreManagementResult> ArchiveStoreAsync(Guid storeId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<StoreManagementResult> RestoreStoreAsync(Guid storeId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<StoreManagementResult> DeleteStoreAsync(StoreManagementDeleteRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<StoreManagementResult> SelectStoreAsync(Guid storeId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<StoreSummary?> ResolveActiveStoreAsync(Guid workspaceId, Guid storeId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<StoreSummary?>(workspaceId == store.WorkspaceId && storeId == store.Id && !store.IsArchived ? store : null);
     }
 
     private sealed class CredentialsStub : IStorePrintifyCredentialStore

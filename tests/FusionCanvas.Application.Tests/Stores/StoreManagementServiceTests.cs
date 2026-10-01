@@ -249,6 +249,24 @@ public class StoreManagementServiceTests
     }
 
     [Fact]
+    public async Task ResolveActiveStoreAsync_ResolvesOnlyActiveStoreInActiveWorkspace()
+    {
+        var active = NewStore("Active");
+        var archived = NewStore("Archived") with { IsArchived = true };
+        var otherWorkspace = NewStore("Other Workspace") with { WorkspaceId = Guid.NewGuid() };
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([active, archived, otherWorkspace], [], [], [], [], [], [], [], []));
+        var service = new StoreManagementService(repository, new TestStoreContextMapper());
+
+        var resolved = await service.ResolveActiveStoreAsync(active.WorkspaceId, active.Id, TestContext.Current.CancellationToken);
+        var archivedResult = await service.ResolveActiveStoreAsync(active.WorkspaceId, archived.Id, TestContext.Current.CancellationToken);
+        var otherWorkspaceResult = await service.ResolveActiveStoreAsync(otherWorkspace.WorkspaceId, otherWorkspace.Id, TestContext.Current.CancellationToken);
+
+        Assert.Equal(active.Id, resolved?.Id);
+        Assert.Null(archivedResult);
+        Assert.Null(otherWorkspaceResult);
+    }
+
+    [Fact]
     public async Task StoreManagement_IsScopedToActiveWorkspace()
     {
         var personal = NewWorkspace("Personal");
