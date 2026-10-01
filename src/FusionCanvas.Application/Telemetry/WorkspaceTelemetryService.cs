@@ -9,15 +9,20 @@ public sealed class WorkspaceTelemetryService : ITelemetryService, IDisposable
 {
     private readonly ITelemetryStore _store;
     private readonly ITelemetryWorkspaceContext _workspaceContext;
+    private readonly Func<DateTimeOffset> _clock;
     private readonly object _gate = new();
     private readonly Timer _cleanupTimer;
     private WorkspaceTelemetrySettings _activeSettings = WorkspaceTelemetrySettings.Default;
     private Guid? _settingsWorkspaceId;
 
-    public WorkspaceTelemetryService(ITelemetryStore store, ITelemetryWorkspaceContext workspaceContext)
+    public WorkspaceTelemetryService(
+        ITelemetryStore store,
+        ITelemetryWorkspaceContext workspaceContext,
+        Func<DateTimeOffset>? clock = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _workspaceContext = workspaceContext ?? throw new ArgumentNullException(nameof(workspaceContext));
+        _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _cleanupTimer = new Timer(_ => _ = CleanupActiveWorkspaceAsync(), null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
     }
 
@@ -80,7 +85,7 @@ public sealed class WorkspaceTelemetryService : ITelemetryService, IDisposable
         {
             var safe = TelemetrySecretRedactor.Sanitize(request);
             var entry = new TelemetryEntry(
-                Guid.NewGuid(), workspaceId.Value, DateTimeOffset.UtcNow, safe.Area, safe.Name, safe.Severity,
+                Guid.NewGuid(), workspaceId.Value, _clock(), safe.Area, safe.Name, safe.Severity,
                 safe.Outcome, safe.Message, safe.MetadataJson, safe.RequestBody, safe.ResponseBody,
                 safe.RequestDetailsJson, safe.ResponseDetailsJson, safe.CorrelationId);
             await _store.AddAsync(entry, cancellationToken).ConfigureAwait(false);
@@ -140,7 +145,7 @@ public sealed class WorkspaceTelemetryService : ITelemetryService, IDisposable
     }
 
     private Task<int> DeleteExpiredAsync(Guid workspaceId, TelemetryRetentionPeriod period, CancellationToken cancellationToken) =>
-        _store.DeleteExpiredAsync(workspaceId, DateTimeOffset.UtcNow - (period switch
+        _store.DeleteExpiredAsync(workspaceId, _clock() - (period switch
         {
             TelemetryRetentionPeriod.OneHour => TimeSpan.FromHours(1),
             TelemetryRetentionPeriod.OneDay => TimeSpan.FromDays(1),

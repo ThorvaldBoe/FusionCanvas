@@ -67,6 +67,26 @@ public class JsonAiModelCatalogCacheTests
     }
 
     [Fact]
+    public async Task LoadAsync_UsesInjectedClockAtTheExpiryBoundary()
+    {
+        using var directory = new TemporaryDirectory();
+        var now = new DateTimeOffset(2026, 1, 2, 12, 0, 0, TimeSpan.Zero);
+        var cache = new JsonAiModelCatalogCache(directory.Path, () => now);
+        var catalog = new AiModelCatalog(true, now.AddHours(-24), []);
+
+        await cache.SaveAsync(catalog, TestContext.Current.CancellationToken);
+
+        var atBoundary = await cache.LoadAsync(true, TestContext.Current.CancellationToken);
+        now = now.AddTicks(1);
+        var afterBoundary = await cache.LoadAsync(true, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(atBoundary);
+        Assert.False(atBoundary.IsStale);
+        Assert.NotNull(afterBoundary);
+        Assert.True(afterBoundary.IsStale);
+    }
+
+    [Fact]
     public async Task LoadAndSaveAsync_HonorCancellation()
     {
         using var directory = new TemporaryDirectory();
