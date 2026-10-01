@@ -5,7 +5,7 @@ using System.Diagnostics;
 
 namespace FusionCanvas.Integration.Files;
 
-public sealed class LocalWorkspaceFileStore : IWorkspaceFileOutputStore, IWorkspaceFileRestoreStore
+public sealed class LocalWorkspaceFileStore : IWorkspaceFileStore, IWorkspaceFileOutputStore, IWorkspaceFileRestoreStore
 {
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
