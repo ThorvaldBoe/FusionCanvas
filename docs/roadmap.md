@@ -40,8 +40,6 @@ Later opportunities stay deliberately brief until promoted to **Candidate Next M
 - Add publishing integrations while preserving local authority.
 - Add analytics and automation only after the underlying workflows are stable and observable.
 
-Historical LifeOS planning files remain under `docs/LifeOS` as optional, potentially stale idea sources. Any idea reused from them must be revalidated through current module discovery and OpenSpec; the historical ordering and descriptions are not current commitments.
-
 ## Recently Completed Modules
 
 Use archived OpenSpec changes under `openspec/changes/archive/` as the authoritative history. Add only short pointers here when they materially help choose the next module; do not rebuild a second feature catalog.

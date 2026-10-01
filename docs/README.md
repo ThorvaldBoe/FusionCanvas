@@ -36,8 +36,6 @@ FusionCanvas uses a rolling OpenSpec workflow: discover the next module collabor
 
 One delivery module normally maps to one OpenSpec change. The proposal is the module-level anchor; delta specs, design, tasks, and verification carry their respective detail. A separate module-specification document is not created by default.
 
-The original LifeOS planning files under `docs/LifeOS` are preserved only as optional historical idea sources. They may be stale and do not define current priorities, ordering, requirements, or acceptance criteria.
-
 ## Core Concept
 
 FusionCanvas treats Print on Demand creation as a pipeline:

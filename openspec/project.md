@@ -285,11 +285,9 @@ Acceptance criteria are completion gates. Every scenario is mapped to planned ve
 
 Agent assignments are capability-based. High-reasoning agents or humans handle discovery, specification, design review, ambiguous corrections, and final acceptance. Lower-cost agents may implement bounded approved tasks when the delivery package is explicit enough. A handoff names the change, artifacts, task range, validation commands, prohibited scope expansion, and escalation conditions. Missing product or architecture decisions are escalated rather than guessed.
 
-## Historical Planning References
+## Planning References
 
-The original LifeOS roadmap and product requirements are preserved under `docs/LifeOS` as optional historical idea sources. They may be stale and are not required reading, current plans, feature ordering, acceptance criteria, or accepted specifications.
-
-Start module discovery from current user intent, accepted specs, the current application, recent verification and retrospectives, and `docs/roadmap.md`. Consult LifeOS material only when historical ideas or rationale would help, then revalidate anything useful through the normal discovery and OpenSpec workflow. Do not copy its inventory or assumptions into current scope by default.
+Start module discovery from current user intent, accepted specs, the current application, recent verification and retrospectives, and `docs/roadmap.md`. Archived OpenSpec changes may mention historical planning material, but they are not current scope, feature ordering, requirements, or acceptance authority.
 
 ---
 
