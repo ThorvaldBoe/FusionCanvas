@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using FusionCanvas.App.Settings;
 using FusionCanvas.Application.Settings;
 
 namespace FusionCanvas.App.Views;

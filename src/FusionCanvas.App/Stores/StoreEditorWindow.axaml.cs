@@ -3,6 +3,7 @@ using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Assets;
+using FusionCanvas.App.Settings;
 using FusionCanvas.Application.Settings;
 using FusionCanvas.App.Views;
 
