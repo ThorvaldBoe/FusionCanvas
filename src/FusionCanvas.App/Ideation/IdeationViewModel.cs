@@ -15,17 +15,13 @@ namespace FusionCanvas.App.Ideation;
 
 public sealed class IdeationViewModel : INotifyPropertyChanged
 {
-    public const int DefaultCount = 5;
-    public const int MinimumCount = 1;
-    public const int MaximumCount = 20;
-
     private readonly IIdeationService _service;
     private readonly IIdeationAccessStatus _accessStatus;
     private readonly ISnowcloneLibraryService? _snowcloneLibrary;
     private readonly IRejectedPhraseManagementService? _rejectedPhrases;
     private IdeationScope? _scope;
     private string _guidance = string.Empty;
-    private string _countText = DefaultCount.ToString();
+    private string _countText = IdeationCountPolicy.DefaultCount.ToString();
     private string _rejectionReason = string.Empty;
     private IdeationMode _selectedMode = IdeationMode.Basic;
     private bool _isOpen;
@@ -153,13 +149,15 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
         }
     }
 
-    public string? CountError => TryGetCount(out _) ? null : $"Enter a whole number from {MinimumCount} to {MaximumCount}.";
+    public string? CountError => TryGetCount(out _)
+        ? null
+        : $"Enter a whole number from {IdeationCountPolicy.MinimumCount} to {IdeationCountPolicy.MaximumCount}.";
 
     public bool CanIncrementCount =>
-        !IsBusy && !(TryGetCount(out int n) && n == MaximumCount);
+        !IsBusy && !(TryGetCount(out int n) && n == IdeationCountPolicy.MaximumCount);
 
     public bool CanDecrementCount =>
-        !IsBusy && !(TryGetCount(out int n) && n == MinimumCount);
+        !IsBusy && !(TryGetCount(out int n) && n == IdeationCountPolicy.MinimumCount);
 
     public IdeationMode SelectedMode
     {
@@ -281,7 +279,7 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
         CancelGeneration();
         _scope = scope;
         Guidance = string.Empty;
-        CountText = DefaultCount.ToString();
+        CountText = IdeationCountPolicy.DefaultCount.ToString();
         SelectedMode = IdeationMode.Basic;
         Candidates.Clear();
         Completed = 0;
@@ -528,7 +526,7 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
     }
 
     private bool TryGetCount(out int count) =>
-        int.TryParse(CountText, out count) && count is >= MinimumCount and <= MaximumCount;
+        IdeationCountPolicy.TryParse(CountText, out count);
 
     private void IncrementCount() => CountText = GetNextCountText(1);
 
@@ -538,12 +536,15 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
     {
         if (int.TryParse(CountText, out int n))
         {
-            n = Math.Clamp(n, MinimumCount, MaximumCount);
-            n = Math.Clamp(n + direction, MinimumCount, MaximumCount);
+            n = Math.Clamp(n, IdeationCountPolicy.MinimumCount, IdeationCountPolicy.MaximumCount);
+            n = Math.Clamp(
+                n + direction,
+                IdeationCountPolicy.MinimumCount,
+                IdeationCountPolicy.MaximumCount);
             return n.ToString();
         }
 
-        return (direction > 0 ? DefaultCount : MinimumCount).ToString();
+        return (direction > 0 ? IdeationCountPolicy.DefaultCount : IdeationCountPolicy.MinimumCount).ToString();
     }
 
     private void RaiseCommandState()
