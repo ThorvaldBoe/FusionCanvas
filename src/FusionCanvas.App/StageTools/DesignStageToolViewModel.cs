@@ -7,7 +7,6 @@ using FusionCanvas.Application.DesignFiles;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Application.AI;
-using FusionCanvas.App.Settings;
 using FusionCanvas.App.DocumentWindow;
 
 namespace FusionCanvas.App.StageTools;
@@ -41,7 +40,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     private long _loadGeneration;
     private bool _isApplyingState;
     private readonly IArtworkGenerationService? _artworkGenerationService;
-    private readonly AiSettingsViewModel? _aiSettings;
+    private readonly IAiConfigurationProvider? _aiConfiguration;
     private CancellationTokenSource? _artworkCts;
     private readonly SemaphoreSlim _artworkPreferenceSaveGate = new(1, 1);
     private bool _isArtworkBusy;
@@ -62,11 +61,14 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     private bool _canEditContext;
     private bool _isDisposed;
 
-    public DesignStageToolViewModel(IDesignStageService designStageService, IArtworkGenerationService? artworkGenerationService = null, AiSettingsViewModel? aiSettings = null)
+    public DesignStageToolViewModel(
+        IDesignStageService designStageService,
+        IArtworkGenerationService? artworkGenerationService = null,
+        IAiConfigurationProvider? aiConfiguration = null)
     {
         _designStageService = designStageService ?? throw new ArgumentNullException(nameof(designStageService));
         _artworkGenerationService = artworkGenerationService;
-        _aiSettings = aiSettings;
+        _aiConfiguration = aiConfiguration;
         GenerateArtworkCommand = new RelayCommand(_ => _ = GenerateArtworkAsync(), () => CanGenerateArtwork);
         CancelArtworkCommand = new RelayCommand(_ => _artworkCts?.Cancel(), () => IsArtworkBusy);
     }
@@ -864,7 +866,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
 
     public async Task GenerateArtworkAsync(CancellationToken cancellationToken = default)
     {
-        if (_isDisposed || !CanGenerateArtwork || _aiSettings is null || _selectedArtworkTargetId is not Guid targetId)
+        if (_isDisposed || !CanGenerateArtwork || _aiConfiguration is null || _selectedArtworkTargetId is not Guid targetId)
             return;
 
         _artworkCts?.Dispose();
@@ -873,9 +875,9 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         ErrorMessage = null;
         try
         {
-            var key = await _aiSettings.ReadApiKeyAsync(_artworkCts.Token).ConfigureAwait(true);
-            var profile = _aiSettings.Current.Artwork;
-            var endpoints = await _aiSettings.GetArtworkEndpointsAsync(_artworkCts.Token).ConfigureAwait(true);
+            var key = await _aiConfiguration.ReadApiKeyAsync(_artworkCts.Token).ConfigureAwait(true);
+            var profile = _aiConfiguration.Current.Artwork;
+            var endpoints = await _aiConfiguration.GetArtworkEndpointsAsync(_artworkCts.Token).ConfigureAwait(true);
             ApplyArtworkEndpointCapabilities(endpoints);
             if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(profile.ModelId))
             {
@@ -889,8 +891,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             }
 
             var result = await _artworkGenerationService!.GenerateAsync(new ArtworkGenerationRequest(
-                _itemId, targetId, key, profile, _aiSettings.AvailableModels, endpoints,
-                TransparentBackground, _aiSettings.RequireZeroDataRetention), _artworkCts.Token).ConfigureAwait(true);
+                _itemId, targetId, key, profile, _aiConfiguration.AvailableModels, endpoints,
+                TransparentBackground, _aiConfiguration.Current.RequireZeroDataRetention), _artworkCts.Token).ConfigureAwait(true);
             ErrorMessage = result.Error;
             if (result.Succeeded)
             {
@@ -1076,7 +1078,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     public async Task RefreshArtworkAvailabilityAsync(CancellationToken cancellationToken = default)
     {
         var generation = Interlocked.Increment(ref _artworkAvailabilityGeneration);
-        if (_aiSettings is null || _itemId == Guid.Empty)
+        if (_aiConfiguration is null || _itemId == Guid.Empty)
         {
             ApplyArtworkEndpointCapabilities([], "Configure an Artwork image model and API key in AI Settings.");
             return;
@@ -1084,7 +1086,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
 
         try
         {
-            var endpoints = await _aiSettings.GetArtworkEndpointsAsync(cancellationToken).ConfigureAwait(true);
+            var endpoints = await _aiConfiguration.GetArtworkEndpointsAsync(cancellationToken).ConfigureAwait(true);
             if (generation != Volatile.Read(ref _artworkAvailabilityGeneration)) return;
             ApplyArtworkEndpointCapabilities(endpoints);
         }
@@ -1116,13 +1118,13 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
 
     private bool HasCompatibleArtworkEndpoint(bool transparentBackground)
     {
-        if (!_artworkCapabilitiesLoaded || _aiSettings?.Current.Artwork.ModelId is not { Length: > 0 } modelId)
+        if (!_artworkCapabilitiesLoaded || _aiConfiguration?.Current.Artwork.ModelId is not { Length: > 0 } modelId)
             return false;
         var target = ArtworkTargets.SingleOrDefault(candidate => candidate.Id == _selectedArtworkTargetId);
         return target is not null && AiImageEndpointPolicy.SelectEndpoint(
             _artworkEndpoints,
             modelId,
-            _aiSettings.RequireZeroDataRetention,
+            _aiConfiguration.Current.RequireZeroDataRetention,
             transparentBackground,
             new AiImageSize(target.Width, target.Height)) is not null;
     }
