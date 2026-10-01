@@ -7,6 +7,17 @@ namespace FusionCanvas.Integration.Tests.Files;
 public class LocalWorkspaceFileStoreTests
 {
     [Fact]
+    public void ManagedWorkspacePath_NormalizesSeparatorsAndRejectsEscapingPaths()
+    {
+        Assert.Equal("assets/2026/06/design.png", ManagedWorkspacePath.Normalize(@"assets\2026\06\design.png"));
+        Assert.Throws<ArgumentException>(() => ManagedWorkspacePath.Normalize(""));
+        Assert.Throws<ArgumentException>(() => ManagedWorkspacePath.Normalize("   "));
+        Assert.Throws<ArgumentException>(() => ManagedWorkspacePath.Normalize("../design.png"));
+        Assert.Throws<ArgumentException>(() => ManagedWorkspacePath.Normalize("assets/../design.png"));
+        Assert.Throws<ArgumentException>(() => ManagedWorkspacePath.Normalize(Path.GetFullPath("design.png")));
+    }
+
+    [Fact]
     public async Task RestoreAsync_CreatesFileAndSkipsExistingWithoutOverwriting()
     {
         using var root = new TemporaryDirectory();

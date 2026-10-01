@@ -79,13 +79,13 @@ public class WorkspaceFileStoreContractTests
                 sourcePath));
         }
 
-        public bool Exists(string workspaceRelativePath) => _files.ContainsKey(WorkspaceFileReference.Normalize(workspaceRelativePath));
+        public bool Exists(string workspaceRelativePath) => _files.ContainsKey(NormalizeReference(workspaceRelativePath));
 
-        public bool TryDelete(string workspaceRelativePath) => _files.Remove(WorkspaceFileReference.Normalize(workspaceRelativePath));
+        public bool TryDelete(string workspaceRelativePath) => _files.Remove(NormalizeReference(workspaceRelativePath));
 
         public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default)
         {
-            var normalized = WorkspaceFileReference.Normalize(workspaceRelativePath);
+            var normalized = NormalizeReference(workspaceRelativePath);
             return Task.FromResult<Stream>(new MemoryStream(_files[normalized], writable: false));
         }
 
@@ -94,7 +94,7 @@ public class WorkspaceFileStoreContractTests
             Stream content,
             CancellationToken cancellationToken = default)
         {
-            var normalized = WorkspaceFileReference.Normalize(workspaceRelativePath);
+            var normalized = NormalizeReference(workspaceRelativePath);
             if (_files.ContainsKey(normalized))
             {
                 return WorkspaceFileRestoreOutcome.SkippedExisting;
@@ -107,5 +107,27 @@ public class WorkspaceFileStoreContractTests
         }
 
         public Task ExportCopyAsync(string workspaceRelativePath, string destinationPath, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        private static string NormalizeReference(string workspaceRelativePath)
+        {
+            if (string.IsNullOrWhiteSpace(workspaceRelativePath))
+            {
+                throw new ArgumentException("Workspace-relative path must not be empty.", nameof(workspaceRelativePath));
+            }
+
+            var normalized = workspaceRelativePath.Replace('\\', '/').Trim();
+            if (Path.IsPathRooted(normalized))
+            {
+                throw new ArgumentException("Workspace-relative path must not be rooted.", nameof(workspaceRelativePath));
+            }
+
+            var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length == 0 || segments.Any(segment => segment is "." or ".."))
+            {
+                throw new ArgumentException("Workspace-relative path must stay within the managed workspace.", nameof(workspaceRelativePath));
+            }
+
+            return string.Join('/', segments);
+        }
     }
 }

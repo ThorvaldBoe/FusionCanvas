@@ -68,7 +68,7 @@ public sealed class LocalWorkspaceFileStore : IWorkspaceFileOutputStore, IWorksp
 
         var fileName = $"{Path.GetFileNameWithoutExtension(sourcePath)}-{Guid.NewGuid():N}{extension}";
         var destinationPath = Path.Combine(assetDirectory, fileName);
-        var relativePath = WorkspaceFileReference.Normalize(Path.GetRelativePath(WorkspaceRoot, destinationPath));
+        var relativePath = ManagedWorkspacePath.Normalize(Path.GetRelativePath(WorkspaceRoot, destinationPath));
 
         try
         {
@@ -102,7 +102,7 @@ public sealed class LocalWorkspaceFileStore : IWorkspaceFileOutputStore, IWorksp
         var extension = Path.GetExtension(safeName);
         if (string.IsNullOrWhiteSpace(extension)) safeName += ".png";
         var destination = Path.Combine(directory, $"{Path.GetFileNameWithoutExtension(safeName)}-{Guid.NewGuid():N}{Path.GetExtension(safeName)}");
-        var relativePath = WorkspaceFileReference.Normalize(Path.GetRelativePath(WorkspaceRoot, destination));
+        var relativePath = ManagedWorkspacePath.Normalize(Path.GetRelativePath(WorkspaceRoot, destination));
 
         try
         {
@@ -122,7 +122,7 @@ public sealed class LocalWorkspaceFileStore : IWorkspaceFileOutputStore, IWorksp
         string normalizedReference;
         try
         {
-            normalizedReference = WorkspaceFileReference.Normalize(workspaceRelativePath);
+            normalizedReference = ManagedWorkspacePath.Normalize(workspaceRelativePath);
         }
         catch (ArgumentException)
         {
@@ -141,7 +141,7 @@ public sealed class LocalWorkspaceFileStore : IWorkspaceFileOutputStore, IWorksp
         string normalizedReference;
         try
         {
-            normalizedReference = WorkspaceFileReference.Normalize(workspaceRelativePath);
+            normalizedReference = ManagedWorkspacePath.Normalize(workspaceRelativePath);
         }
         catch (ArgumentException)
         {
@@ -245,7 +245,7 @@ public sealed class LocalWorkspaceFileStore : IWorkspaceFileOutputStore, IWorksp
         string normalizedReference;
         try
         {
-            normalizedReference = WorkspaceFileReference.Normalize(workspaceRelativePath);
+            normalizedReference = ManagedWorkspacePath.Normalize(workspaceRelativePath);
         }
         catch (ArgumentException exception)
         {
