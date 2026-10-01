@@ -4,6 +4,7 @@ public interface IConceptRefinementService
 {
     Task<ConceptRefinementResult> InitializeAsync(
         Guid itemId,
+        ConceptRefinementTriangle current,
         string originalIdea,
         CancellationToken cancellationToken = default);
 

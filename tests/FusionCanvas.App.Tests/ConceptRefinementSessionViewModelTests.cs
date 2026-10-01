@@ -1259,7 +1259,8 @@ public sealed class ConceptRefinementSessionViewModelTests
         public string? LastInstruction { get; private set; }
 
         public Task<ConceptRefinementResult> InitializeAsync(
-            Guid itemId, string originalIdea, CancellationToken cancellationToken = default) =>
+            Guid itemId, ConceptRefinementTriangle current, string originalIdea,
+            CancellationToken cancellationToken = default) =>
             InitializeFunc?.Invoke(cancellationToken) ?? Task.FromResult(InitializeResult);
 
         public Task<ConceptRefinementResult> RefineAsync(

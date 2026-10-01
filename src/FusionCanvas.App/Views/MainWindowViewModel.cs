@@ -1582,6 +1582,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
 
         public Task<ConceptRefinementResult> InitializeAsync(
             Guid itemId,
+            ConceptRefinementTriangle current,
             string originalIdea,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(ConceptRefinementResult.Failure(

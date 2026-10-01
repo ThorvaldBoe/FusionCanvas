@@ -21,6 +21,23 @@ public sealed class ConceptRefinementServiceTests
     private static readonly Guid GroupId = Guid.NewGuid();
 
     [Fact]
+    public async Task InitializeAsync_WhenTriangleIsNotEmpty_ReturnsInvalidRequestBeforeAi()
+    {
+        var (service, ai, _) = CreateService(CreateSnapshot());
+
+        var result = await service.InitializeAsync(
+            ItemId,
+            new ConceptRefinementTriangle("Existing concept", "", ""),
+            "Mountain cabin",
+            TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(AiTextFailureKind.InvalidRequest, result.FailureKind);
+        Assert.Contains("empty Concept fields", result.Error);
+        Assert.Null(ai.LastRequest);
+    }
+
+    [Fact]
     public async Task InitializeAsync_WhenAiSucceeds_ParsesLabeledResponseAndReturnsSuccess()
     {
         var (service, ai, _) = CreateService(CreateSnapshot());
@@ -32,7 +49,11 @@ public sealed class ConceptRefinementServiceTests
             """,
             "test-model");
 
-        var result = await service.InitializeAsync(ItemId, "Mountain cabin", TestContext.Current.CancellationToken);
+        var result = await service.InitializeAsync(
+            ItemId,
+            EmptyTriangle(),
+            "Mountain cabin",
+            TestContext.Current.CancellationToken);
 
         Assert.True(result.Succeeded);
         Assert.Equal("A cozy mountain cabin in winter", result.ConceptIdea);
@@ -47,7 +68,11 @@ public sealed class ConceptRefinementServiceTests
         var (service, ai, _) = CreateService(CreateSnapshot());
         ai.Result = AiTextResult.Failure(AiTextFailureKind.ProviderFailure, "Provider error.");
 
-        var result = await service.InitializeAsync(ItemId, "Mountain cabin", TestContext.Current.CancellationToken);
+        var result = await service.InitializeAsync(
+            ItemId,
+            EmptyTriangle(),
+            "Mountain cabin",
+            TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
         Assert.Contains("Provider error.", result.Error);
@@ -59,7 +84,11 @@ public sealed class ConceptRefinementServiceTests
         var (service, ai, _) = CreateService(CreateSnapshot());
         ai.Result = AiTextResult.Success("Some random text without labels", "test-model");
 
-        var result = await service.InitializeAsync(ItemId, "Mountain cabin", TestContext.Current.CancellationToken);
+        var result = await service.InitializeAsync(
+            ItemId,
+            EmptyTriangle(),
+            "Mountain cabin",
+            TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
         Assert.Equal(AiTextFailureKind.InvalidProviderResponse, result.FailureKind);
@@ -80,7 +109,11 @@ public sealed class ConceptRefinementServiceTests
             """,
             "test-model");
 
-        var result = await service.InitializeAsync(ItemId, "Mountain cabin", TestContext.Current.CancellationToken);
+        var result = await service.InitializeAsync(
+            ItemId,
+            EmptyTriangle(),
+            "Mountain cabin",
+            TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
         Assert.Equal(AiTextFailureKind.InvalidProviderResponse, result.FailureKind);
@@ -98,7 +131,11 @@ public sealed class ConceptRefinementServiceTests
             """,
             "test-model");
 
-        await service.InitializeAsync(ItemId, "Mountain cabin", TestContext.Current.CancellationToken);
+        await service.InitializeAsync(
+            ItemId,
+            EmptyTriangle(),
+            "Mountain cabin",
+            TestContext.Current.CancellationToken);
 
         Assert.NotNull(ai.LastRequest);
         Assert.Equal(AiRequestPurpose.Concept, ai.LastRequest.Purpose);
@@ -410,7 +447,11 @@ public sealed class ConceptRefinementServiceTests
             """,
             "test-model");
 
-        await service.InitializeAsync(ItemId, "Base idea", TestContext.Current.CancellationToken);
+        await service.InitializeAsync(
+            ItemId,
+            EmptyTriangle(),
+            "Base idea",
+            TestContext.Current.CancellationToken);
 
         Assert.NotNull(ai.LastRequest);
         var userMessage = ai.LastRequest.Messages[1];
@@ -437,7 +478,11 @@ public sealed class ConceptRefinementServiceTests
             """,
             "test-model");
 
-        await service.InitializeAsync(ItemId, "Base idea", TestContext.Current.CancellationToken);
+        await service.InitializeAsync(
+            ItemId,
+            EmptyTriangle(),
+            "Base idea",
+            TestContext.Current.CancellationToken);
 
         Assert.NotNull(ai.LastRequest);
         var userMessage = ai.LastRequest.Messages[1];
@@ -456,6 +501,9 @@ public sealed class ConceptRefinementServiceTests
         Assert.DoesNotContain("createdAt", userMessage.Text, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("inherited", userMessage.Text, StringComparison.OrdinalIgnoreCase);
     }
+
+    private static ConceptRefinementTriangle EmptyTriangle() =>
+        new("", "", "");
 
     private static (ConceptRefinementService Service, CapturingAi Ai, InMemoryRepository Repo) CreateService(WorkspaceSnapshot snapshot)
     {

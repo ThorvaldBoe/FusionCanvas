@@ -1,6 +1,7 @@
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Domain.Concepts;
 using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Workspace;
 
@@ -24,10 +25,23 @@ public sealed class ConceptRefinementService : IConceptRefinementService
 
     public async Task<ConceptRefinementResult> InitializeAsync(
         Guid itemId,
+        ConceptRefinementTriangle current,
         string originalIdea,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(current);
         ArgumentNullException.ThrowIfNull(originalIdea);
+
+        if (!ConceptRefinementInitializationPolicy.CanInitializeFromBaseIdea(
+                originalIdea,
+                current.ConceptIdea,
+                current.Phrase,
+                current.GraphicDirection))
+        {
+            return ConceptRefinementResult.Failure(
+                AiTextFailureKind.InvalidRequest,
+                "Initialization requires a non-empty original idea and empty Concept fields.");
+        }
 
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
         var context = ResolveCreativeContext(snapshot, itemId);
