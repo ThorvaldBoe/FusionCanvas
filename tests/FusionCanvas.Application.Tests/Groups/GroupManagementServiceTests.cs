@@ -11,6 +11,7 @@ using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Groups;
 using FusionCanvas.Application.WorkspaceTree;
+using System.Text.Json;
 
 namespace FusionCanvas.Application.Tests.Groups;
 
@@ -66,6 +67,26 @@ public class GroupManagementServiceTests
         Assert.True(separateBranch.Succeeded);
         Assert.False(renameDuplicate.Succeeded);
         Assert.Equal("Child", repository.Snapshot.Groups.Single(group => group.Id == sample.ChildGroup.Id).Name);
+    }
+
+    [Fact]
+    public async Task UpdateGroupAsync_PreservesStructuredMetadataWhileUpdatingNotes()
+    {
+        var sample = Sample.CreateWithGroups();
+        var group = sample.RootGroup! with { MetadataJson = """{"custom":{"mode":"nested"},"count":3}""" };
+        var repository = new TestRepository(sample.Snapshot with { Groups = [group, sample.ChildGroup!] });
+        var service = new GroupManagementService(repository);
+
+        var result = await service.UpdateGroupAsync(new GroupManagementUpdateRequest(
+            group.Id,
+            group.Name,
+            new GroupContext(Notes: " Updated notes ")));
+
+        Assert.True(result.Succeeded, result.Error);
+        using var metadata = JsonDocument.Parse(repository.Snapshot.Groups.Single(item => item.Id == group.Id).MetadataJson);
+        Assert.Equal(JsonValueKind.Object, metadata.RootElement.GetProperty("custom").ValueKind);
+        Assert.Equal(JsonValueKind.Number, metadata.RootElement.GetProperty("count").ValueKind);
+        Assert.Equal("Updated notes", metadata.RootElement.GetProperty("notes").GetString());
     }
 
     [Fact]
