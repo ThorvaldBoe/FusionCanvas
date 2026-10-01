@@ -48,9 +48,10 @@ public class LocalWorkspaceFileStoreTests
         using var tempDirectory = new TemporaryDirectory();
         var sourcePath = tempDirectory.GetPath("source.png");
         var workspaceRoot = tempDirectory.GetPath("workspace");
+        var importedAt = new DateTimeOffset(2025, 12, 31, 23, 59, 0, TimeSpan.Zero);
         await File.WriteAllTextAsync(sourcePath, "image-bytes", TestContext.Current.CancellationToken);
 
-        var store = new LocalWorkspaceFileStore(workspaceRoot);
+        var store = new LocalWorkspaceFileStore(workspaceRoot, clock: () => importedAt);
 
         var imported = await store.ImportAsync(
             sourcePath,
@@ -63,7 +64,7 @@ public class LocalWorkspaceFileStoreTests
         Assert.True(store.Exists(imported.WorkspaceRelativePath));
         Assert.NotEqual(sourcePath, imported.FullPath);
         Assert.False(Path.IsPathRooted(imported.WorkspaceRelativePath));
-        Assert.StartsWith($"assets/{DateTimeOffset.UtcNow:yyyy}", imported.WorkspaceRelativePath);
+        Assert.StartsWith($"assets/{importedAt:yyyy}/{importedAt:MM}/", imported.WorkspaceRelativePath);
     }
 
     [Fact]
