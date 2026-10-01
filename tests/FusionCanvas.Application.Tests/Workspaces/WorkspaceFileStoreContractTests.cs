@@ -28,14 +28,16 @@ public class WorkspaceFileStoreContractTests
     public async Task RestoreAsync_CreatesOnceAndSkipsExistingContent()
     {
         IWorkspaceFileRestoreStore fileStore = new InMemoryWorkspaceFileStore();
+        using var createdContent = new MemoryStream([1, 2, 3]);
+        using var skippedContent = new MemoryStream([9, 9, 9]);
 
         var created = await fileStore.RestoreAsync(
             "assets/restored.png",
-            new MemoryStream([1, 2, 3]),
+            createdContent,
             TestContext.Current.CancellationToken);
         var skipped = await fileStore.RestoreAsync(
             "assets/restored.png",
-            new MemoryStream([9, 9, 9]),
+            skippedContent,
             TestContext.Current.CancellationToken);
         await using var restored = await fileStore.OpenReadAsync("assets/restored.png", TestContext.Current.CancellationToken);
         using var buffer = new MemoryStream();
@@ -50,10 +52,11 @@ public class WorkspaceFileStoreContractTests
     public async Task RestoreAsync_RejectsTraversal()
     {
         IWorkspaceFileRestoreStore fileStore = new InMemoryWorkspaceFileStore();
+        using var content = new MemoryStream([1]);
 
         await Assert.ThrowsAsync<ArgumentException>(() => fileStore.RestoreAsync(
             "../escape.png",
-            new MemoryStream([1]),
+            content,
             TestContext.Current.CancellationToken));
     }
 

@@ -32,7 +32,8 @@ public class WorkspacePackageIntegrationTests
         var sourceFiles = new LocalWorkspaceFileStore(temp.GetPath("source-files"));
         var snapshot = AddNormalizedCatalog(CreateSnapshot("Round trip", "assets/design.png", archivedAsset: true));
         await sourceRepository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
-        await sourceFiles.RestoreAsync("assets/design.png", new MemoryStream([1, 2, 3, 4]), TestContext.Current.CancellationToken);
+        using var sourceContent = new MemoryStream([1, 2, 3, 4]);
+        await sourceFiles.RestoreAsync("assets/design.png", sourceContent, TestContext.Current.CancellationToken);
         var packagePath = temp.GetPath("roundtrip.fcworkspace");
         var writer = CreatePackageWriter();
         var reader = CreatePackageReader();
@@ -274,7 +275,8 @@ public class WorkspacePackageIntegrationTests
         var packagePath = await CreatePackageAsync(temp, CreateSnapshot("Existing", "assets/file.png"), [1, 2, 3]);
         var repository = new SqliteWorkspaceRepository(temp.GetPath("destination.db"));
         var destinationFiles = new LocalWorkspaceFileStore(temp.GetPath("destination-files"));
-        await destinationFiles.RestoreAsync("assets/file.png", new MemoryStream([9, 9]), TestContext.Current.CancellationToken);
+        using var existingContent = new MemoryStream([9, 9]);
+        await destinationFiles.RestoreAsync("assets/file.png", existingContent, TestContext.Current.CancellationToken);
         var service = NewService(repository, destinationFiles);
 
         var result = await service.ImportWorkspaceAsync(
@@ -365,7 +367,8 @@ public class WorkspacePackageIntegrationTests
         var repository = new SqliteWorkspaceRepository(temp.GetPath("source.db"));
         await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
         var files = new LocalWorkspaceFileStore(temp.GetPath("files"));
-        await files.RestoreAsync("assets/file.png", new MemoryStream(new byte[1024]), TestContext.Current.CancellationToken);
+        using var existingContent = new MemoryStream(new byte[1024]);
+        await files.RestoreAsync("assets/file.png", existingContent, TestContext.Current.CancellationToken);
         var destination = temp.GetPath("existing.fcworkspace");
         await File.WriteAllTextAsync(destination, "original", TestContext.Current.CancellationToken);
         using var cancellation = new CancellationTokenSource();
@@ -450,7 +453,8 @@ public class WorkspacePackageIntegrationTests
         var files = new LocalWorkspaceFileStore(temp.GetPath($"files-{Guid.NewGuid():N}"));
         if (fileBytes is not null)
         {
-            await files.RestoreAsync(snapshot.Assets[0].WorkspaceRelativePath, new MemoryStream(fileBytes), TestContext.Current.CancellationToken);
+            using var content = new MemoryStream(fileBytes);
+            await files.RestoreAsync(snapshot.Assets[0].WorkspaceRelativePath, content, TestContext.Current.CancellationToken);
         }
 
         var packagePath = temp.GetPath($"{Guid.NewGuid():N}.fcworkspace");
