@@ -63,6 +63,19 @@ public sealed class RasterImageMetadataReaderTests
             new RasterImageMetadataReader().ReadAsync(image.Path, cancellation.Token));
     }
 
+    [Fact]
+    public async Task ReadStreamAsync_HonorsCancellationDuringJpegScan()
+    {
+        await using var image = new CancellationAwareJpegStream();
+        using var cancellation = new CancellationTokenSource();
+
+        var read = RasterImageMetadataReader.ReadStreamAsync(image, cancellation.Token);
+        await image.WaitForScanReadAsync();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => read);
+    }
+
     private static byte[] CreatePng(int width, int height) =>
     [
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
@@ -98,6 +111,34 @@ public sealed class RasterImageMetadataReaderTests
             var directory = System.IO.Path.GetDirectoryName(Path);
             if (directory is not null && Directory.Exists(directory))
                 Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private sealed class CancellationAwareJpegStream : MemoryStream
+    {
+        private readonly TaskCompletionSource _scanReadStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private bool _headerRead;
+
+        public CancellationAwareJpegStream()
+            : base([0xFF, 0xD8])
+        {
+        }
+
+        public Task WaitForScanReadAsync() => _scanReadStarted.Task;
+
+        public override long Length => base.Length + 1;
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (!_headerRead)
+            {
+                _headerRead = true;
+                return await base.ReadAsync(buffer[..2], CancellationToken.None);
+            }
+
+            _scanReadStarted.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return 0;
         }
     }
 }
