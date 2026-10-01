@@ -44,7 +44,7 @@ public sealed class WorkspaceManagementService : IWorkspaceManagementService
     {
         ArgumentNullException.ThrowIfNull(request);
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var normalizedName = NormalizeName(request.Name);
+        var normalizedName = WorkspaceNamePolicy.Normalize(request.Name);
         var validation = ValidateName(normalizedName, snapshot, existingWorkspaceId: null);
         if (validation is not null)
         {
@@ -81,7 +81,7 @@ public sealed class WorkspaceManagementService : IWorkspaceManagementService
             return WorkspaceManagementResult.Failure("Workspace was not found.", BuildState(snapshot));
         }
 
-        var normalizedName = NormalizeName(request.Name);
+        var normalizedName = WorkspaceNamePolicy.Normalize(request.Name);
         var validation = ValidateName(normalizedName, snapshot, existing.Id);
         if (validation is not null)
         {
@@ -136,10 +136,11 @@ public sealed class WorkspaceManagementService : IWorkspaceManagementService
             return WorkspaceManagementResult.Failure("Workspace was not found.", BuildState(snapshot));
         }
 
-        var duplicate = snapshot.Workspaces.Any(workspace =>
-            workspace.Id != existing.Id &&
-            !workspace.IsArchived &&
-            string.Equals(workspace.Name, existing.Name, StringComparison.OrdinalIgnoreCase));
+        var duplicate = WorkspaceNamePolicy.IsTaken(
+            existing.Name,
+            snapshot.Workspaces
+                .Where(workspace => workspace.Id != existing.Id && !workspace.IsArchived)
+                .Select(workspace => workspace.Name));
         if (duplicate)
         {
             return WorkspaceManagementResult.Failure("An active workspace already uses this name.", BuildState(snapshot));
@@ -298,18 +299,17 @@ public sealed class WorkspaceManagementService : IWorkspaceManagementService
             return "Workspace name is required.";
         }
 
-        var duplicate = snapshot.Workspaces.Any(workspace =>
-            workspace.Id != existingWorkspaceId &&
-            !workspace.IsArchived &&
-            string.Equals(workspace.Name, name, StringComparison.OrdinalIgnoreCase));
+        var duplicate = WorkspaceNamePolicy.IsTaken(
+            name,
+            snapshot.Workspaces
+                .Where(workspace => workspace.Id != existingWorkspaceId && !workspace.IsArchived)
+                .Select(workspace => workspace.Name));
 
         return duplicate ? "An active workspace already uses this name." : null;
     }
 
     private WorkspaceSummary ToSummary(FusionCanvas.Domain.Workspace.Workspace workspace) =>
         new(workspace.Id, workspace.Name, _contextMapper.Read(workspace), workspace.IsArchived, workspace.CreatedAt, workspace.UpdatedAt);
-
-    private static string NormalizeName(string name) => name.Trim();
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
