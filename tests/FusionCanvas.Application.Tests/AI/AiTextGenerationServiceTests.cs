@@ -182,6 +182,13 @@ public class AiTextGenerationServiceTests
     private sealed class ConfigurationProvider(AiConfigurationSettings settings) : IAiConfigurationProvider
     {
         public AiConfigurationSettings Current { get; set; } = settings;
+        public IReadOnlyList<AiModelDescriptor> AvailableModels { get; } = [];
+
+        public Task<string?> ReadApiKeyAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<string?>(null);
+
+        public Task<IReadOnlyList<AiImageEndpointCapabilities>> GetArtworkEndpointsAsync(
+            CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<AiImageEndpointCapabilities>>([]);
     }
 
     private sealed class CredentialStore : IAiCredentialStore

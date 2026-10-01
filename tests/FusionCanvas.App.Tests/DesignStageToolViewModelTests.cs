@@ -1,5 +1,4 @@
 using FusionCanvas.App.StageTools;
-using FusionCanvas.App.Settings;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.DesignFiles;
 using FusionCanvas.Application.Settings;
@@ -20,18 +19,15 @@ public class DesignStageToolViewModelTests
         var endpoint = new AiImageEndpointCapabilities(
             "openai", modelId, false, true, ["png"], [], false, "OpenAI",
             new AiImageEndpointParameterCapabilities(["1:1", "2:3", "3:4"], [], false, false, ["auto", "opaque"], true));
-        var catalog = new ArtworkCatalogProvider([endpoint]);
-        var aiSettings = new AiSettingsViewModel(
+        var aiConfiguration = new TestAiConfigurationProvider(
             AiConfigurationSettings.Default with
             {
                 RequireZeroDataRetention = false,
                 Artwork = AiProfileSettings.Empty with { ModelId = modelId }
             },
-            new AvailableCredentialStore(),
-            new ValidCredentialValidator(),
-            catalog,
-            new EmptyCatalogCache());
-        var viewModel = new DesignStageToolViewModel(designService, new UnusedArtworkGenerationService(), aiSettings);
+            [new AiModelDescriptor(modelId, modelId, null, null, ["text"], ["image"], [], 1000, null, null, null, false, null)],
+            [endpoint]);
+        var viewModel = new DesignStageToolViewModel(designService, new UnusedArtworkGenerationService(), aiConfiguration);
 
         await viewModel.LoadAsync(itemId, canEdit: true, TestContext.Current.CancellationToken);
 
@@ -325,40 +321,19 @@ public class DesignStageToolViewModelTests
         public Task<DesignStageResult> RemoveSupportingImageAsync(Guid itemId, Guid assetId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
-    private sealed class ArtworkCatalogProvider(IReadOnlyList<AiImageEndpointCapabilities> endpoints) :
-        IAiModelCatalogProvider,
-        IAiImageEndpointCatalogProvider
+    private sealed class TestAiConfigurationProvider(
+        AiConfigurationSettings settings,
+        IReadOnlyList<AiModelDescriptor> models,
+        IReadOnlyList<AiImageEndpointCapabilities> endpoints) : IAiConfigurationProvider
     {
-        public Task<AiModelCatalog> GetModelsAsync(string apiKey, bool requireZeroDataRetention, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new AiModelCatalog(requireZeroDataRetention, DateTimeOffset.UtcNow, []));
+        public AiConfigurationSettings Current { get; } = settings;
+        public IReadOnlyList<AiModelDescriptor> AvailableModels { get; } = models;
 
-        public Task<IReadOnlyList<AiImageEndpointCapabilities>> GetImageEndpointsAsync(
-            string apiKey,
-            string modelId,
-            bool requireZeroDataRetention,
+        public Task<string?> ReadApiKeyAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<string?>("secret");
+
+        public Task<IReadOnlyList<AiImageEndpointCapabilities>> GetArtworkEndpointsAsync(
             CancellationToken cancellationToken = default) => Task.FromResult(endpoints);
-    }
-
-    private sealed class AvailableCredentialStore : IAiCredentialStore
-    {
-        public Task<AiCredentialReadResult> ReadAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(AiCredentialReadResult.Available("secret"));
-        public Task<AiCredentialOperationResult> SaveAsync(string apiKey, CancellationToken cancellationToken = default) =>
-            Task.FromResult(AiCredentialOperationResult.Success);
-        public Task<AiCredentialOperationResult> RemoveAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(AiCredentialOperationResult.Success);
-    }
-
-    private sealed class ValidCredentialValidator : IAiCredentialValidator
-    {
-        public Task<AiCredentialValidationResult> ValidateAsync(string apiKey, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new AiCredentialValidationResult(AiCredentialValidationKind.Valid));
-    }
-
-    private sealed class EmptyCatalogCache : IAiModelCatalogCache
-    {
-        public Task<AiModelCatalog?> LoadAsync(bool requireZeroDataRetention, CancellationToken cancellationToken = default) => Task.FromResult<AiModelCatalog?>(null);
-        public Task SaveAsync(AiModelCatalog catalog, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class UnusedArtworkGenerationService : IArtworkGenerationService
