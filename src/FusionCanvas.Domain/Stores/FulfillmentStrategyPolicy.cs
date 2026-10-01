@@ -6,7 +6,7 @@ public static class FulfillmentStrategyPolicy
         [FulfillmentStrategy.Manual, FulfillmentStrategy.ShopifyManual, FulfillmentStrategy.ShopifyPrintify, FulfillmentStrategy.Printify];
 
     public static bool IsAvailable(FulfillmentStrategy strategy) =>
-        strategy is FulfillmentStrategy.Manual or FulfillmentStrategy.ShopifyManual or FulfillmentStrategy.ShopifyPrintify or FulfillmentStrategy.Printify;
+        AvailableStrategies.Contains(strategy);
 
     public static bool RequiresPrintifyKey(FulfillmentStrategy strategy) =>
         strategy is FulfillmentStrategy.ShopifyPrintify or FulfillmentStrategy.Printify;
