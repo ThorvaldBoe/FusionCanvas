@@ -248,6 +248,30 @@ public class LocalWorkspaceFileStoreTests
             () => store.ExportCopyAsync(imported.WorkspaceRelativePath, imported.FullPath, TestContext.Current.CancellationToken));
     }
 
+    [Fact]
+    public async Task ExportCopyAsync_CancellationPreservesExistingDestinationAndRemovesTemporaryArtifact()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var sourcePath = tempDirectory.GetPath("source.png");
+        var destinationPath = tempDirectory.GetPath("export.png");
+        var workspaceRoot = tempDirectory.GetPath("workspace");
+        await File.WriteAllTextAsync(sourcePath, "export-bytes", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(destinationPath, "original", TestContext.Current.CancellationToken);
+        var store = new LocalWorkspaceFileStore(workspaceRoot);
+        var imported = await store.ImportAsync(sourcePath, AssetKind.ExportedImage, TestContext.Current.CancellationToken);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => store.ExportCopyAsync(imported.WorkspaceRelativePath, destinationPath, cancellation.Token));
+
+        Assert.Equal("original", await File.ReadAllTextAsync(destinationPath, TestContext.Current.CancellationToken));
+        Assert.Empty(Directory.EnumerateFiles(
+            Path.GetDirectoryName(destinationPath)!,
+            $"{Path.GetFileName(destinationPath)}.*.tmp",
+            SearchOption.TopDirectoryOnly));
+    }
+
     private sealed class TemporaryDirectory : IDisposable
     {
         private readonly DirectoryInfo _directory = Directory.CreateTempSubdirectory();

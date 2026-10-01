@@ -1,6 +1,8 @@
 ﻿using FusionCanvas.Domain.Assets;
 using FusionCanvas.Application.Workspaces;
 
+using System.Diagnostics;
+
 namespace FusionCanvas.Integration.Files;
 
 public sealed class LocalWorkspaceFileStore : IWorkspaceFileOutputStore, IWorkspaceFileRestoreStore
@@ -229,9 +231,52 @@ public sealed class LocalWorkspaceFileStore : IWorkspaceFileOutputStore, IWorksp
             throw new InvalidOperationException("Export copy destination must differ from the managed source.");
         }
 
-        await using var source = File.OpenRead(fullPath);
-        await using var destination = File.Create(normalizedDestination);
-        await source.CopyToAsync(destination, cancellationToken);
+        var temporaryDestination = $"{normalizedDestination}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            await using (var source = File.OpenRead(fullPath))
+            await using (var destination = new FileStream(
+                temporaryDestination,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                81920,
+                FileOptions.Asynchronous | FileOptions.SequentialScan))
+            {
+                await source.CopyToAsync(destination, cancellationToken);
+            }
+
+            File.Move(temporaryDestination, normalizedDestination, overwrite: true);
+        }
+        finally
+        {
+            TryDeleteTemporaryExport(temporaryDestination);
+        }
+    }
+
+    private static void TryDeleteTemporaryExport(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (IOException exception)
+        {
+            Trace.TraceWarning(
+                "Managed file export temporary-file cleanup failed for '{0}': {1}",
+                path,
+                exception.Message);
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            Trace.TraceWarning(
+                "Managed file export temporary-file cleanup failed for '{0}': {1}",
+                path,
+                exception.Message);
+        }
     }
 
     private string? ResolveWithinWorkspace(string normalizedReference)
