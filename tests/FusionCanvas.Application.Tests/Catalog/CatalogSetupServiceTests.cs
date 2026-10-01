@@ -39,7 +39,7 @@ public sealed class CatalogSetupServiceTests
     }
 
     [Fact]
-    public async Task CreatesTypedOfferingGraphAndKeepsStoreIsolation()
+    public async Task CreatesBlueprintAndProviderAndKeepsStoreIsolation()
     {
         var storeId = Guid.NewGuid();
         var otherStoreId = Guid.NewGuid();
@@ -49,12 +49,11 @@ public sealed class CatalogSetupServiceTests
         var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
 
         var blueprint = await service.CreateBlueprintAsync(new CreateBlueprintRequest(storeId, "T-shirt"), TestContext.Current.CancellationToken);
-        var blueprintId = Assert.Single(blueprint.State.Blueprints).Id;
+        Assert.Single(blueprint.State.Blueprints);
         var provider = await service.CreatePrintProviderAsync(new CreatePrintProviderRequest(storeId, "Printful"), TestContext.Current.CancellationToken);
-        var providerId = Assert.Single(provider.State.PrintProviders).Id;
-        var offering = await service.CreateOfferingAsync(new CreateOfferingRequest(storeId, blueprintId, "Tee", BlueprintOfferingKind.FixedPrintProvider, providerId), TestContext.Current.CancellationToken);
-
-        Assert.True(offering.Succeeded);
+        Assert.Single(provider.State.PrintProviders);
+        Assert.True(blueprint.Succeeded);
+        Assert.True(provider.Succeeded);
         Assert.Empty((await service.LoadForStoreAsync(otherStoreId, TestContext.Current.CancellationToken)).Blueprints);
     }
 
@@ -95,14 +94,18 @@ public sealed class CatalogSetupServiceTests
     public async Task RejectsDuplicateVariantCombinationAndCrossOfferingPlaceholder()
     {
         var storeId = Guid.NewGuid();
-        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "First")], [], [], [], [], [], [], [], []));
+        var blueprint = new Blueprint(Guid.NewGuid(), storeId, "T-shirt", null, false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, storeId, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "printify-choice", null, null, false, Now, Now);
+        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "First")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint],
+            BlueprintOfferings = [offering]
+        });
         var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
-        var blueprint = await service.CreateBlueprintAsync(new CreateBlueprintRequest(storeId, "T-shirt"));
-        var offering = await service.CreateOfferingAsync(new CreateOfferingRequest(storeId, blueprint.State.Blueprints[0].Id, "Tee", BlueprintOfferingKind.ProviderNetwork, ProviderNetworkCode: "printify-choice"));
-        var option = await service.CreateOptionAsync(new CreateOfferingOptionRequest(offering.State.Offerings[0].Id, OptionKind.Color, "Color"));
-        var value = await service.CreateOptionValueAsync(new CreateOptionValueRequest(offering.State.Offerings[0].Id, option.State.Options[0].Id, "Black"));
-        var first = await service.CreateVariantAsync(new CreateOfferingVariantRequest(offering.State.Offerings[0].Id, "Black", [value.State.OptionValues[0].Id]));
-        var duplicate = await service.CreateVariantAsync(new CreateOfferingVariantRequest(offering.State.Offerings[0].Id, "Black again", [value.State.OptionValues[0].Id]));
+        var option = await service.CreateOptionAsync(new CreateOfferingOptionRequest(offering.Id, OptionKind.Color, "Color"));
+        var value = await service.CreateOptionValueAsync(new CreateOptionValueRequest(offering.Id, option.State.Options[0].Id, "Black"));
+        var first = await service.CreateVariantAsync(new CreateOfferingVariantRequest(offering.Id, "Black", [value.State.OptionValues[0].Id]));
+        var duplicate = await service.CreateVariantAsync(new CreateOfferingVariantRequest(offering.Id, "Black again", [value.State.OptionValues[0].Id]));
 
         Assert.True(first.Succeeded);
         Assert.False(duplicate.Succeeded);
