@@ -16,9 +16,14 @@ public sealed class AsyncRelayCommand : ICommand
 
     public event EventHandler? CanExecuteChanged;
 
+    /// <summary>
+    /// Gets the task for the most recent accepted execution.
+    /// </summary>
+    public Task? ExecutionTask { get; private set; }
+
     public bool CanExecute(object? parameter) => !_isRunning && (_canExecute?.Invoke() ?? true);
 
-    public async void Execute(object? parameter)
+    public void Execute(object? parameter)
     {
         if (!CanExecute(parameter))
         {
@@ -27,6 +32,11 @@ public sealed class AsyncRelayCommand : ICommand
 
         _isRunning = true;
         NotifyCanExecuteChanged();
+        ExecutionTask = ExecuteCoreAsync();
+    }
+
+    private async Task ExecuteCoreAsync()
+    {
         try
         {
             await _execute().ConfigureAwait(true);
