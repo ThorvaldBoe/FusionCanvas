@@ -2,7 +2,6 @@ using System.Runtime.InteropServices;
 using FusionCanvas.Integration.Persistence;
 using FusionCanvas.UITests.Infrastructure;
 using FusionCanvas.UITests.Pages;
-using Microsoft.Data.Sqlite;
 using OpenQA.Selenium.Appium;
 using OpenQA.Selenium.Appium.Windows;
 
@@ -36,7 +35,6 @@ public sealed class TelemetryDebugWindowUiTests
         var telemetry = new SqliteTelemetryStore(session.TestRoot.DatabasePath);
         Assert.Contains(await telemetry.ReadAllAsync(workspace.Id, TestContext.Current.CancellationToken),
             entry => entry.Name == "DebugWindowOpened");
-        SqliteConnection.ClearAllPools();
     }
 
     private static string ReadText(OpenQA.Selenium.IWebElement element) =>
