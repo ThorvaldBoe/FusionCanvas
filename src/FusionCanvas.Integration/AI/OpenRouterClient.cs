@@ -27,9 +27,9 @@ public sealed class OpenRouterClient :
     private const int MaximumDisplayText = 4096;
 
     private readonly HttpClient _httpClient;
-    private readonly ITelemetryService? _telemetry;
+    private readonly ITelemetryRecorder? _telemetry;
 
-    public OpenRouterClient(HttpClient httpClient, ITelemetryService? telemetry = null)
+    public OpenRouterClient(HttpClient httpClient, ITelemetryRecorder? telemetry = null)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _telemetry = telemetry;

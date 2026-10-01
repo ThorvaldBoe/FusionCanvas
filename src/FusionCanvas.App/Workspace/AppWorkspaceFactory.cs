@@ -41,7 +41,7 @@ public static class AppWorkspaceFactory
     public static AppWorkspaceRuntime CreateDefault(
         IAiTextGenerationService ai,
         IAiImageGenerationProvider? artworkProvider = null,
-        ITelemetryService? telemetry = null,
+        ITelemetryRecorder? telemetry = null,
         Guid? initialActiveWorkspaceId = null,
         Guid? initialActiveStoreId = null,
         CancellationToken cancellationToken = default)
@@ -51,7 +51,7 @@ public static class AppWorkspaceFactory
         string databasePath,
         IAiTextGenerationService ai,
         IAiImageGenerationProvider? artworkProvider = null,
-        ITelemetryService? telemetry = null,
+        ITelemetryRecorder? telemetry = null,
         Guid? initialActiveWorkspaceId = null,
         Guid? initialActiveStoreId = null,
         CancellationToken cancellationToken = default)
@@ -62,7 +62,7 @@ public static class AppWorkspaceFactory
         string workspaceRootPath,
         IAiTextGenerationService ai,
         IAiImageGenerationProvider? artworkProvider = null,
-        ITelemetryService? telemetry = null,
+        ITelemetryRecorder? telemetry = null,
         Guid? initialActiveWorkspaceId = null,
         Guid? initialActiveStoreId = null,
         CancellationToken cancellationToken = default)

@@ -17,7 +17,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
     private readonly IAiImageProvenanceCodec _provenanceCodec;
     private readonly IAiImageGenerationProvider _provider;
     private readonly IRasterArtworkNormalizer _normalizer;
-    private readonly ITelemetryService? _telemetry;
+    private readonly ITelemetryRecorder? _telemetry;
     private readonly Func<DateTimeOffset> _clock;
     private readonly Func<Guid> _newId;
 
@@ -29,7 +29,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         IRasterArtworkNormalizer normalizer,
         Func<DateTimeOffset>? clock = null,
         Func<Guid>? newId = null,
-        ITelemetryService? telemetry = null)
+        ITelemetryRecorder? telemetry = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _fileStore = fileStore ?? throw new ArgumentNullException(nameof(fileStore));

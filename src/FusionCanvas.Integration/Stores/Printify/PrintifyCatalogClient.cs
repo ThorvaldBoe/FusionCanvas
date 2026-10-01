@@ -7,9 +7,9 @@ using System.Diagnostics;
 
 namespace FusionCanvas.Integration.Stores.Printify;
 
-public sealed class PrintifyCatalogClient(HttpClient client, ITelemetryService? telemetry = null) : IPrintifyCatalogClient
+public sealed class PrintifyCatalogClient(HttpClient client, ITelemetryRecorder? telemetry = null) : IPrintifyCatalogClient
 {
-    private readonly ITelemetryService? _telemetry = telemetry;
+    private readonly ITelemetryRecorder? _telemetry = telemetry;
     private sealed record ProductPage(IReadOnlyList<PrintifyShopProductSummary> Products, IReadOnlyList<PrintifyCatalogBlueprint> Details, int LastPage);
     public static Uri CatalogBaseUri { get; } = new("https://api.printify.com/v1/catalog/");
     public static Uri ApiBaseUri { get; } = new("https://api.printify.com/v1/");
