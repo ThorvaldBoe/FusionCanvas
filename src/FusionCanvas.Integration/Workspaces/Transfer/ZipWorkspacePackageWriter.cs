@@ -4,6 +4,7 @@ using System.Text.Json;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Workspaces.Transfer;
 using FusionCanvas.Domain.Assets;
+using FusionCanvas.Integration.Files;
 using FusionCanvas.Integration.Persistence;
 
 namespace FusionCanvas.Integration.Packages;
@@ -51,7 +52,7 @@ public sealed class ZipWorkspacePackageWriter : IWorkspacePackageWriter
             var packagedFiles = new List<WorkspacePackageFile>();
             var missingFiles = request.Manifest.MissingFiles.ToHashSet(StringComparer.Ordinal);
             var filePaths = request.Snapshot.Assets
-                .Select(asset => WorkspaceFileReference.Normalize(asset.WorkspaceRelativePath))
+                .Select(asset => ManagedWorkspacePath.Normalize(asset.WorkspaceRelativePath))
                 .Distinct(StringComparer.Ordinal)
                 .ToArray();
 

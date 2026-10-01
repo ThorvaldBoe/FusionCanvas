@@ -1,16 +1,7 @@
-namespace FusionCanvas.Domain.Assets;
+namespace FusionCanvas.Integration.Files;
 
-public sealed record WorkspaceFileReference
+internal static class ManagedWorkspacePath
 {
-    public WorkspaceFileReference(string workspaceRelativePath)
-    {
-        WorkspaceRelativePath = Normalize(workspaceRelativePath);
-    }
-
-    public string WorkspaceRelativePath { get; }
-
-    public override string ToString() => WorkspaceRelativePath;
-
     public static string Normalize(string workspaceRelativePath)
     {
         if (string.IsNullOrWhiteSpace(workspaceRelativePath))

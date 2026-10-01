@@ -99,7 +99,7 @@ public sealed class ZipWorkspacePackageReader : IWorkspacePackageReader
             var restorableFiles = new List<WorkspacePackageReadEntry>();
             foreach (var file in manifest.Files)
             {
-                var normalizedPath = WorkspaceFileReference.Normalize(file.Path);
+                var normalizedPath = ManagedWorkspacePath.Normalize(file.Path);
                 var entry = archive.GetEntry($"files/{normalizedPath}");
                 if (entry is null)
                 {
@@ -169,7 +169,7 @@ public sealed class ZipWorkspacePackageReader : IWorkspacePackageReader
                 throw new InvalidDataException("The package contains an invalid entry.");
             }
 
-            WorkspaceFileReference.Normalize(path["files/".Length..]);
+            ManagedWorkspacePath.Normalize(path["files/".Length..]);
         }
     }
 
@@ -177,12 +177,12 @@ public sealed class ZipWorkspacePackageReader : IWorkspacePackageReader
     {
         foreach (var file in manifest.Files)
         {
-            WorkspaceFileReference.Normalize(file.Path);
+            ManagedWorkspacePath.Normalize(file.Path);
         }
 
         foreach (var file in manifest.MissingFiles)
         {
-            WorkspaceFileReference.Normalize(file);
+            ManagedWorkspacePath.Normalize(file);
         }
     }
 

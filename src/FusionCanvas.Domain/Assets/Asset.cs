@@ -21,7 +21,8 @@ public sealed record Asset : WorkspaceEntity
     {
         StoreId = storeId;
         Kind = kind;
-        WorkspaceRelativePath = WorkspaceFileReference.Normalize(workspaceRelativePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRelativePath);
+        WorkspaceRelativePath = workspaceRelativePath;
         OriginalSourcePath = string.IsNullOrWhiteSpace(originalSourcePath) ? null : originalSourcePath;
         IsMissing = isMissing;
     }

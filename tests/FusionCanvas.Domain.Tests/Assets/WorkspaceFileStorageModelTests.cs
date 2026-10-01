@@ -25,20 +25,6 @@ public class WorkspaceFileStorageModelTests
     }
 
     [Fact]
-    public void WorkspaceFileReference_NormalizesSeparatorsAndRejectsEscapingPaths()
-    {
-        var reference = new WorkspaceFileReference(@"assets\2026\06\design.png");
-
-        Assert.Equal("assets/2026/06/design.png", reference.WorkspaceRelativePath);
-        Assert.Equal("assets/2026/06/design.png", reference.ToString());
-        Assert.Throws<ArgumentException>(() => new WorkspaceFileReference(""));
-        Assert.Throws<ArgumentException>(() => new WorkspaceFileReference("   "));
-        Assert.Throws<ArgumentException>(() => new WorkspaceFileReference("../design.png"));
-        Assert.Throws<ArgumentException>(() => new WorkspaceFileReference("assets/../design.png"));
-        Assert.Throws<ArgumentException>(() => new WorkspaceFileReference(Path.GetFullPath("design.png")));
-    }
-
-    [Fact]
     public void Asset_StoresWorkspaceReferenceMetadataWithoutFileBytes()
     {
         var asset = new Asset(
@@ -47,7 +33,7 @@ public class WorkspaceFileStorageModelTests
             "Design export",
             "Primary PNG export",
             AssetKind.ExportedImage,
-            @"assets\2026\06\design.png",
+            "assets/2026/06/design.png",
             @"C:\imports\design.png",
             isMissing: false,
             isArchived: false,
