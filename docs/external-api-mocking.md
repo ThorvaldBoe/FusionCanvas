@@ -13,6 +13,7 @@ Shopify is planned but is not implemented in the current codebase, so it has no 
 ## Testing boundary
 
 - Application and business-logic tests that consume these contracts use the reusable mock twin or an equivalent contract-focused double. They do not construct a live adapter or real `HttpClient`.
+- Current application-consumer examples include `AiTextGenerationServiceTests` using `MockOpenRouterClient` and `ExternalApiMockConsumerTests` using both Printify mock twins.
 - Live-adapter tests remain under the AI and Stores integration-test folders. They use local fake HTTP handlers to verify endpoint paths, headers, serialization, response parsing, retry behavior, and limits. They never call a real endpoint.
 - Mock defaults are synthetic and endpoint-free. Mock observations omit API keys and other credentials.
 
