@@ -118,7 +118,11 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
             selection.ProviderSize, normalized.FinalSize, request.TransparentBackground, normalized.HasTransparency, now,
             result.ProviderRequestId, result.Usage, normalized.Warnings, request.DesignAreaId);
         setStage("file_storage");
-        var managed = await _fileStore.SaveAsync($"generated-artwork-{_newId():N}.png", AssetKind.ExportedImage, new MemoryStream(normalized.PngBytes, writable: false), cancellationToken).ConfigureAwait(false);
+        ManagedWorkspaceFile managed;
+        await using (var content = new MemoryStream(normalized.PngBytes, writable: false))
+        {
+            managed = await _fileStore.SaveAsync($"generated-artwork-{_newId():N}.png", AssetKind.ExportedImage, content, cancellationToken).ConfigureAwait(false);
+        }
         await RecordStageAsync("file_storage", "Succeeded", "The normalized artwork file was stored.").ConfigureAwait(false);
         var assetId = _newId();
         var asset = new Asset(assetId, item.StoreId, $"{GeneratedArtworkName} - {area.Name}", null, AssetKind.ExportedImage,
