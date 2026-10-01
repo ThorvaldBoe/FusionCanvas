@@ -24,6 +24,7 @@ using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.Niches;
 using FusionCanvas.Application.Products;
+using FusionCanvas.Application.Catalog.Compatibility;
 using FusionCanvas.Application.Stores;
 using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.AI;
@@ -122,7 +123,7 @@ internal static class MainWindowViewModelFactory
             new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(repository),
             new TagManagementService(repository),
-            new ProductSupplierSetupService(repository),
+            new LegacyCatalogCompatibilityService(repository),
             new CatalogSetupService(repository),
             new MockupTemplateSetupService(repository),
             new OfferingManagementService(repository, providerCatalog),

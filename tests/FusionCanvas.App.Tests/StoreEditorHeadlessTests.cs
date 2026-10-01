@@ -21,6 +21,7 @@ using FusionCanvas.Application.Stores;
 using FusionCanvas.Application.Niches;
 using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.Products;
+using FusionCanvas.Application.Catalog.Compatibility;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.Settings;
@@ -488,7 +489,7 @@ public class StoreEditorHeadlessTests
             new StoreManagementService(repo, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(repo),
             new TagManagementService(repo),
-            new ProductSupplierSetupService(repo),
+            new LegacyCatalogCompatibilityService(repo),
             new CatalogSetupService(repo),
             new MockupTemplateSetupService(repo),
             new OfferingManagementService(repo),
@@ -2703,7 +2704,7 @@ public class StoreEditorHeadlessTests
             new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(repository),
             new TagManagementService(repository),
-            new ProductSupplierSetupService(repository),
+            new LegacyCatalogCompatibilityService(repository),
             new CatalogSetupService(repository),
             new MockupTemplateSetupService(repository),
             new OfferingManagementService(repository, providerCatalog),
@@ -2763,7 +2764,7 @@ public class StoreEditorHeadlessTests
             new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(repository),
             new TagManagementService(repository),
-            new ProductSupplierSetupService(repository),
+            new LegacyCatalogCompatibilityService(repository),
             new CatalogSetupService(repository),
             new MockupTemplateSetupService(repository),
             new OfferingManagementService(repository));
