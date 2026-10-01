@@ -1,4 +1,4 @@
-using System.Text.Json;
+using FusionCanvas.Application.Metadata;
 using FusionCanvas.Application.Stores;
 using FusionCanvas.Domain.Stores;
 
@@ -20,7 +20,7 @@ public sealed class StoreContextMapper : IStoreContextMapper
     public StoreContext Read(Store store)
     {
         ArgumentNullException.ThrowIfNull(store);
-        var metadata = ParseMetadata(store.MetadataJson);
+        var metadata = StringMetadataCodec.Parse(store.MetadataJson);
         return new StoreContext(
             store.Description,
             metadata.GetValueOrDefault(NotesKey),
@@ -37,49 +37,19 @@ public sealed class StoreContextMapper : IStoreContextMapper
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(context);
 
-        var metadata = ParseMetadata(store.MetadataJson);
-        SetOptional(metadata, NotesKey, context.Notes);
-        SetOptional(metadata, TargetMarketKey, context.TargetMarket);
-        SetOptional(metadata, BrandDirectionKey, context.BrandDirection);
-        SetOptional(metadata, PlanningContextKey, context.PlanningContext);
-        SetOptional(metadata, UrlKey, context.Url);
-        SetOptional(metadata, PrintifyShopIdKey, context.PrintifyShopId?.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        SetOptional(metadata, PrintifyShopTitleKey, context.PrintifyShopTitle);
+        var metadata = StringMetadataCodec.Parse(store.MetadataJson);
+        StringMetadataCodec.SetOptional(metadata, NotesKey, context.Notes);
+        StringMetadataCodec.SetOptional(metadata, TargetMarketKey, context.TargetMarket);
+        StringMetadataCodec.SetOptional(metadata, BrandDirectionKey, context.BrandDirection);
+        StringMetadataCodec.SetOptional(metadata, PlanningContextKey, context.PlanningContext);
+        StringMetadataCodec.SetOptional(metadata, UrlKey, context.Url);
+        StringMetadataCodec.SetOptional(metadata, PrintifyShopIdKey, context.PrintifyShopId?.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        StringMetadataCodec.SetOptional(metadata, PrintifyShopTitleKey, context.PrintifyShopTitle);
 
         return store with
         {
             Description = context.Description,
-            MetadataJson = metadata.Count == 0 ? "{}" : JsonSerializer.Serialize(metadata)
+            MetadataJson = StringMetadataCodec.Serialize(metadata)
         };
-    }
-
-    private static Dictionary<string, string> ParseMetadata(string metadataJson)
-    {
-        if (string.IsNullOrWhiteSpace(metadataJson) || metadataJson.Trim() == "{}")
-        {
-            return new Dictionary<string, string>(StringComparer.Ordinal);
-        }
-
-        using var document = JsonDocument.Parse(metadataJson);
-        if (document.RootElement.ValueKind != JsonValueKind.Object)
-        {
-            return new Dictionary<string, string>(StringComparer.Ordinal);
-        }
-
-        return document.RootElement
-            .EnumerateObject()
-            .ToDictionary(property => property.Name, property => property.Value.ToString(), StringComparer.Ordinal);
-    }
-
-    private static void SetOptional(Dictionary<string, string> metadata, string key, string? value)
-    {
-        var normalized = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-        if (normalized is null)
-        {
-            metadata.Remove(key);
-            return;
-        }
-
-        metadata[key] = normalized;
     }
 }

@@ -1,9 +1,9 @@
-using System.Text.Json;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.Metadata;
 
 namespace FusionCanvas.Application.Niches;
 
@@ -351,7 +351,7 @@ public sealed class NicheManagementService : INicheManagementService
 
     private static NicheContext ToContext(Niche niche)
     {
-        var metadata = ParseMetadata(niche.MetadataJson);
+        var metadata = StringMetadataCodec.Parse(niche.MetadataJson);
         return new NicheContext(
             niche.Description,
             metadata.GetValueOrDefault(AudienceKey),
@@ -365,50 +365,19 @@ public sealed class NicheManagementService : INicheManagementService
 
     private static string ToMetadataJson(NicheContext context, string existingMetadataJson = "{}")
     {
-        var metadata = ParseMetadata(existingMetadataJson);
-        SetOptional(metadata, AudienceKey, context.Audience);
-        SetOptional(metadata, HumorStyleKey, context.HumorStyle);
-        SetOptional(metadata, VisualStyleGuidanceKey, context.VisualStyleGuidance);
-        SetOptional(metadata, ConstraintsKey, context.Constraints);
-        SetOptional(metadata, RisksKey, context.Risks);
-        SetOptional(metadata, ResearchNotesKey, context.ResearchNotes);
-        SetOptional(metadata, NotesKey, context.Notes);
+        var metadata = StringMetadataCodec.Parse(existingMetadataJson);
+        StringMetadataCodec.SetOptional(metadata, AudienceKey, context.Audience);
+        StringMetadataCodec.SetOptional(metadata, HumorStyleKey, context.HumorStyle);
+        StringMetadataCodec.SetOptional(metadata, VisualStyleGuidanceKey, context.VisualStyleGuidance);
+        StringMetadataCodec.SetOptional(metadata, ConstraintsKey, context.Constraints);
+        StringMetadataCodec.SetOptional(metadata, RisksKey, context.Risks);
+        StringMetadataCodec.SetOptional(metadata, ResearchNotesKey, context.ResearchNotes);
+        StringMetadataCodec.SetOptional(metadata, NotesKey, context.Notes);
 
-        return metadata.Count == 0 ? "{}" : JsonSerializer.Serialize(metadata);
-    }
-
-    private static Dictionary<string, string> ParseMetadata(string metadataJson)
-    {
-        if (string.IsNullOrWhiteSpace(metadataJson) || metadataJson.Trim() == "{}")
-        {
-            return new Dictionary<string, string>(StringComparer.Ordinal);
-        }
-
-        using var document = JsonDocument.Parse(metadataJson);
-        if (document.RootElement.ValueKind != JsonValueKind.Object)
-        {
-            return new Dictionary<string, string>(StringComparer.Ordinal);
-        }
-
-        return document.RootElement
-            .EnumerateObject()
-            .ToDictionary(property => property.Name, property => property.Value.ToString(), StringComparer.Ordinal);
-    }
-
-    private static void SetOptional(Dictionary<string, string> metadata, string key, string? value)
-    {
-        var normalized = NormalizeOptional(value);
-        if (normalized is null)
-        {
-            metadata.Remove(key);
-            return;
-        }
-
-        metadata[key] = normalized;
+        return StringMetadataCodec.Serialize(metadata);
     }
 
     private static string NormalizeName(string name) => name.Trim();
 
-    private static string? NormalizeOptional(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string? NormalizeOptional(string? value) => StringMetadataCodec.NormalizeOptional(value);
 }

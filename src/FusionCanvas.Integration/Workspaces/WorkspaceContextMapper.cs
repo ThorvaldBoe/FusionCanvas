@@ -1,4 +1,4 @@
-using System.Text.Json;
+using FusionCanvas.Application.Metadata;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Workspace;
 
@@ -14,7 +14,7 @@ public sealed class WorkspaceContextMapper : IWorkspaceContextMapper
     public WorkspaceContext Read(Workspace workspace)
     {
         ArgumentNullException.ThrowIfNull(workspace);
-        var metadata = ParseMetadata(workspace.MetadataJson);
+        var metadata = StringMetadataCodec.Parse(workspace.MetadataJson);
         return new WorkspaceContext(workspace.Description, metadata.GetValueOrDefault(NotesKey));
     }
 
@@ -23,42 +23,12 @@ public sealed class WorkspaceContextMapper : IWorkspaceContextMapper
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(context);
 
-        var metadata = ParseMetadata(workspace.MetadataJson);
-        SetOptional(metadata, NotesKey, context.Notes);
+        var metadata = StringMetadataCodec.Parse(workspace.MetadataJson);
+        StringMetadataCodec.SetOptional(metadata, NotesKey, context.Notes);
         return workspace with
         {
             Description = context.Description,
-            MetadataJson = metadata.Count == 0 ? "{}" : JsonSerializer.Serialize(metadata)
+            MetadataJson = StringMetadataCodec.Serialize(metadata)
         };
-    }
-
-    private static Dictionary<string, string> ParseMetadata(string metadataJson)
-    {
-        if (string.IsNullOrWhiteSpace(metadataJson) || metadataJson.Trim() == "{}")
-        {
-            return new Dictionary<string, string>(StringComparer.Ordinal);
-        }
-
-        using var document = JsonDocument.Parse(metadataJson);
-        if (document.RootElement.ValueKind != JsonValueKind.Object)
-        {
-            return new Dictionary<string, string>(StringComparer.Ordinal);
-        }
-
-        return document.RootElement
-            .EnumerateObject()
-            .ToDictionary(property => property.Name, property => property.Value.ToString(), StringComparer.Ordinal);
-    }
-
-    private static void SetOptional(Dictionary<string, string> metadata, string key, string? value)
-    {
-        var normalized = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-        if (normalized is null)
-        {
-            metadata.Remove(key);
-            return;
-        }
-
-        metadata[key] = normalized;
     }
 }
