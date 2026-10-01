@@ -72,66 +72,76 @@ public sealed class MockupGenerationService : IMockupGenerationService
         var colors = snapshot.DesignSelectedColors.Where(value => value.ItemId == item.Id).Select(value => value.ColorValue).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var results = new List<MockupGenerationOutput>();
         var diagnostics = new List<MockupGenerationDiagnostic>();
-        foreach (var color in colors)
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var colorOption = snapshot.OfferingOptionValues.FirstOrDefault(value => value.OfferingId == config.OfferingId
-                && string.Equals(value.Value, color, StringComparison.OrdinalIgnoreCase)
-                && !value.IsArchived
-                && snapshot.OfferingOptions.Any(option => option.Id == value.OptionId && option.OptionKind == OptionKind.Color && !option.IsArchived));
-            var compatibleVariants = colorOption is null
-                ? Array.Empty<OfferingVariant>()
-                : snapshot.OfferingVariants.Where(variant => !variant.IsArchived
-                    && variant.OfferingId == config.OfferingId
-                    && variant.OptionValueIds.Contains(colorOption.Id)
-                    && snapshot.OfferingPlaceholders.Any(area => area.Id == template.TargetPlaceholderId && area.VariantIds.Contains(variant.Id)))
-                    .ToArray();
-            var sources = revisionImages.Select(image => new MockupTemplateSourceImage(
-                image.Id, template.Id, image.SourceAssetId, image.ImageMapping, false, revision.CreatedAt, revision.CreatedAt,
-                image.ImageWidth, image.ImageHeight)).ToArray();
-            var sourceConditions = revisionImages.SelectMany(image => conditions[image.Id]
-                .Select(optionValueId => new MockupTemplateSourceImageOptionValue(image.Id, optionValueId))).ToArray();
-            var resolutions = MockupTemplateSourcePolicy.Resolve(compatibleVariants, sources, sourceConditions,
-                snapshot.OfferingOptionValues.Where(value => value.OfferingId == config.OfferingId));
-            var resolvedSourceIds = resolutions.SelectMany(value => value.SourceImageIds).Distinct().ToArray();
-            if (resolutions.Count == 0 || resolutions.Any(value => value.Kind != MockupTemplateSourceResolutionKind.Resolved) || resolvedSourceIds.Length != 1)
+            foreach (var color in colors)
             {
-                var message = resolvedSourceIds.Length > 1 || resolutions.Any(value => value.Kind == MockupTemplateSourceResolutionKind.Ambiguous)
-                    ? "Multiple template source images match this Color; refine applicability so generation has one deterministic source."
-                    : "No template source image is configured for this Color and its compatible Variants.";
-                diagnostics.Add(new(color, message));
-                continue;
-            }
-            var source = revisionImages.Single(image => image.Id == resolvedSourceIds[0]);
-            var design = FindDesignAsset(snapshot, item.Id, color, template.TargetPlaceholderId);
-            if (source is null) { diagnostics.Add(new(color, "No template source image is configured for this Color.")); continue; }
-            if (design is null) { diagnostics.Add(new(color, "No Design PNG is assigned for this Color and Design Area.")); continue; }
-            if (source.ImageMapping is null) { diagnostics.Add(new(color, "The template source image has no valid placement mapping.")); continue; }
+                cancellationToken.ThrowIfCancellationRequested();
+                var colorOption = snapshot.OfferingOptionValues.FirstOrDefault(value => value.OfferingId == config.OfferingId
+                    && string.Equals(value.Value, color, StringComparison.OrdinalIgnoreCase)
+                    && !value.IsArchived
+                    && snapshot.OfferingOptions.Any(option => option.Id == value.OptionId && option.OptionKind == OptionKind.Color && !option.IsArchived));
+                var compatibleVariants = colorOption is null
+                    ? Array.Empty<OfferingVariant>()
+                    : snapshot.OfferingVariants.Where(variant => !variant.IsArchived
+                        && variant.OfferingId == config.OfferingId
+                        && variant.OptionValueIds.Contains(colorOption.Id)
+                        && snapshot.OfferingPlaceholders.Any(area => area.Id == template.TargetPlaceholderId && area.VariantIds.Contains(variant.Id)))
+                        .ToArray();
+                var sources = revisionImages.Select(image => new MockupTemplateSourceImage(
+                    image.Id, template.Id, image.SourceAssetId, image.ImageMapping, false, revision.CreatedAt, revision.CreatedAt,
+                    image.ImageWidth, image.ImageHeight)).ToArray();
+                var sourceConditions = revisionImages.SelectMany(image => conditions[image.Id]
+                    .Select(optionValueId => new MockupTemplateSourceImageOptionValue(image.Id, optionValueId))).ToArray();
+                var resolutions = MockupTemplateSourcePolicy.Resolve(compatibleVariants, sources, sourceConditions,
+                    snapshot.OfferingOptionValues.Where(value => value.OfferingId == config.OfferingId));
+                var resolvedSourceIds = resolutions.SelectMany(value => value.SourceImageIds).Distinct().ToArray();
+                if (resolutions.Count == 0 || resolutions.Any(value => value.Kind != MockupTemplateSourceResolutionKind.Resolved) || resolvedSourceIds.Length != 1)
+                {
+                    var message = resolvedSourceIds.Length > 1 || resolutions.Any(value => value.Kind == MockupTemplateSourceResolutionKind.Ambiguous)
+                        ? "Multiple template source images match this Color; refine applicability so generation has one deterministic source."
+                        : "No template source image is configured for this Color and its compatible Variants.";
+                    diagnostics.Add(new(color, message));
+                    continue;
+                }
+                var source = revisionImages.Single(image => image.Id == resolvedSourceIds[0]);
+                var design = FindDesignAsset(snapshot, item.Id, color, template.TargetPlaceholderId);
+                if (source is null) { diagnostics.Add(new(color, "No template source image is configured for this Color.")); continue; }
+                if (design is null) { diagnostics.Add(new(color, "No Design PNG is assigned for this Color and Design Area.")); continue; }
+                if (source.ImageMapping is null) { diagnostics.Add(new(color, "The template source image has no valid placement mapping.")); continue; }
 
-            Asset? sourceAsset = snapshot.Assets.SingleOrDefault(value => value.Id == source.SourceAssetId);
-            Asset? designAsset = snapshot.Assets.SingleOrDefault(value => value.Id == design.Value);
-            if (sourceAsset is null || designAsset is null) { diagnostics.Add(new(color, "A source file record is missing.")); continue; }
-            ManagedWorkspaceFile? managed = null;
-            try
-            {
-                await using var templateStream = await _fileStore.OpenReadAsync(sourceAsset.WorkspaceRelativePath, cancellationToken).ConfigureAwait(false);
-                await using var designStream = await _fileStore.OpenReadAsync(designAsset.WorkspaceRelativePath, cancellationToken).ConfigureAwait(false);
-                await using var output = await _compositor.ComposeAsync(templateStream, designStream, source.ImageMapping, cancellationToken).ConfigureAwait(false);
-                managed = await _fileStore.SaveAsync($"{SafeFileNamePart(item.Name)}-{SafeFileNamePart(color)}-mockup.png", AssetKind.MockupImage, output, cancellationToken).ConfigureAwait(false);
-                var now = _clock();
-                var assetId = _newId();
-                var asset = new Asset(assetId, item.StoreId, managed.Name, null, AssetKind.MockupImage, managed.WorkspaceRelativePath, null, false, false, now, now,
-                    JsonSerializer.Serialize(new { itemId = item.Id, color, templateId = template.Id, templateRevision = revision.RevisionNumber, designAssetId = designAsset.Id }));
-                var updated = snapshot with { Assets = [.. snapshot.Assets, asset], AssetLinks = [.. snapshot.AssetLinks, new AssetLink(asset.Id, WorkspaceEntityKind.Item, item.Id)] };
-                await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
-                snapshot = updated;
-                results.Add(new(asset.Id, asset.Name, asset.WorkspaceRelativePath, color, template.Id, revision.RevisionNumber, designAsset.Id));
+                Asset? sourceAsset = snapshot.Assets.SingleOrDefault(value => value.Id == source.SourceAssetId);
+                Asset? designAsset = snapshot.Assets.SingleOrDefault(value => value.Id == design.Value);
+                if (sourceAsset is null || designAsset is null) { diagnostics.Add(new(color, "A source file record is missing.")); continue; }
+                ManagedWorkspaceFile? managed = null;
+                try
+                {
+                    await using var templateStream = await _fileStore.OpenReadAsync(sourceAsset.WorkspaceRelativePath, cancellationToken).ConfigureAwait(false);
+                    await using var designStream = await _fileStore.OpenReadAsync(designAsset.WorkspaceRelativePath, cancellationToken).ConfigureAwait(false);
+                    await using var output = await _compositor.ComposeAsync(templateStream, designStream, source.ImageMapping, cancellationToken).ConfigureAwait(false);
+                    managed = await _fileStore.SaveAsync($"{SafeFileNamePart(item.Name)}-{SafeFileNamePart(color)}-mockup.png", AssetKind.MockupImage, output, cancellationToken).ConfigureAwait(false);
+                    var now = _clock();
+                    var assetId = _newId();
+                    var asset = new Asset(assetId, item.StoreId, managed.Name, null, AssetKind.MockupImage, managed.WorkspaceRelativePath, null, false, false, now, now,
+                        JsonSerializer.Serialize(new { itemId = item.Id, color, templateId = template.Id, templateRevision = revision.RevisionNumber, designAssetId = designAsset.Id }));
+                    var updated = snapshot with { Assets = [.. snapshot.Assets, asset], AssetLinks = [.. snapshot.AssetLinks, new AssetLink(asset.Id, WorkspaceEntityKind.Item, item.Id)] };
+                    await _repository.SaveAsync(updated, CancellationToken.None).ConfigureAwait(false);
+                    snapshot = updated;
+                    results.Add(new(asset.Id, asset.Name, asset.WorkspaceRelativePath, color, template.Id, revision.RevisionNumber, designAsset.Id));
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    if (managed is not null) _fileStore.TryDelete(managed.WorkspaceRelativePath);
+                    diagnostics.Add(new(color, exception.Message));
+                }
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                if (managed is not null) _fileStore.TryDelete(managed.WorkspaceRelativePath);
-                diagnostics.Add(new(color, exception.Message));
-            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            var message = results.Count == 0
+                ? "Mockup generation was cancelled."
+                : "Mockup generation was cancelled; previously persisted mockups were retained.";
+            return new(results.Count > 0, message, results, diagnostics);
         }
         return new(results.Count > 0, diagnostics.Count == 0 ? null : "Some mockups could not be generated.", results, diagnostics);
     }
