@@ -9,11 +9,46 @@ using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Application.Snowclones;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace FusionCanvas.App.Tests.Ideation;
 
 public sealed class IdeationWindowTests
 {
+    [Fact]
+    public async Task AsyncCallbackPolicyObservesUnexpectedFailuresAndIgnoresCancellation()
+    {
+        Exception? reported = null;
+
+        await IdeationWindow.ObserveCallbackAsync(
+            () => Task.FromException(new InvalidOperationException("callback failed")),
+            exception => reported = exception);
+
+        Assert.IsType<InvalidOperationException>(reported);
+        Assert.Equal("callback failed", reported!.Message);
+
+        var cancellationReported = false;
+        await IdeationWindow.ObserveCallbackAsync(
+            () => Task.FromException(new OperationCanceledException()),
+            _ => cancellationReported = true);
+
+        Assert.False(cancellationReported);
+    }
+
+    [Fact]
+    public void AsyncEventAdaptersDoNotUseAsyncVoid()
+    {
+        var asyncVoidMethods = typeof(IdeationWindow)
+            .GetMethods(BindingFlags.Instance | BindingFlags.NonPublic)
+            .Where(method => method.ReturnType == typeof(void))
+            .Where(method => method.GetCustomAttribute<AsyncStateMachineAttribute>() is not null)
+            .Select(method => method.Name)
+            .ToArray();
+
+        Assert.Empty(asyncVoidMethods);
+    }
+
     [AvaloniaFact]
     public void WindowConstructsWithScopeInputModeCountAndAccessibleCandidateList()
     {

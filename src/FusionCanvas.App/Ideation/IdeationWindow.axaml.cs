@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using System.Diagnostics;
 using System.ComponentModel;
 using FusionCanvas.App.Settings;
 using FusionCanvas.App.RejectedPhrases;
@@ -29,88 +30,92 @@ public partial class IdeationWindow : Window
 
     private IdeationViewModel? ViewModel => DataContext as IdeationViewModel;
 
-    private async void OnCreateCandidate(object? sender, RoutedEventArgs e)
-    {
-        if (sender is Button { DataContext: IdeaCandidateViewModel candidate } && ViewModel is { } viewModel)
+    private void OnCreateCandidate(object? sender, RoutedEventArgs e) =>
+        Run(async () =>
         {
-            await viewModel.CreateCandidateAsync(candidate);
+            if (sender is Button { DataContext: IdeaCandidateViewModel candidate } && ViewModel is { } viewModel)
+            {
+                await viewModel.CreateCandidateAsync(candidate);
+                FocusNextCandidate();
+            }
+        });
+
+    private void OnRejectCandidate(object? sender, RoutedEventArgs e) =>
+        Run(async () =>
+        {
+            if (_rejectWindow is not null ||
+                sender is not Button { DataContext: IdeaCandidateViewModel candidate } ||
+                ViewModel is not { } viewModel)
+            {
+                return;
+            }
+
+            viewModel.RejectCandidateCommand.Execute(candidate);
+            _rejectWindow = new RejectIdeaWindow { DataContext = viewModel };
+            if (GeometryStore is { } rejectStore)
+            {
+                WindowGeometryRegistrar.Register(_rejectWindow, rejectStore, WindowLayoutKeys.RejectIdea, _rejectWindow.MinWidth, _rejectWindow.MinHeight);
+            }
+            await _rejectWindow.ShowDialog(this);
+            _rejectWindow = null;
             FocusNextCandidate();
-        }
-    }
+        });
 
-    private async void OnRejectCandidate(object? sender, RoutedEventArgs e)
-    {
-        if (_rejectWindow is not null ||
-            sender is not Button { DataContext: IdeaCandidateViewModel candidate } ||
-            ViewModel is not { } viewModel)
+    private void OnClearAll(object? sender, RoutedEventArgs e) =>
+        Run(() => RequestDiscardAsync(close: false));
+
+    private void OnManageSnowclones(object? sender, RoutedEventArgs e) =>
+        Run(async () =>
         {
-            return;
-        }
+            if (_snowcloneLibraryWindow is not null || ViewModel is not { } viewModel)
+            {
+                return;
+            }
 
-        viewModel.RejectCandidateCommand.Execute(candidate);
-        _rejectWindow = new RejectIdeaWindow { DataContext = viewModel };
-        if (GeometryStore is { } rejectStore)
+            viewModel.OpenSnowcloneLibrary();
+            if (viewModel.SnowcloneLibrary is not { } library)
+            {
+                return;
+            }
+
+            _snowcloneLibraryWindow = new SnowcloneLibraryWindow { DataContext = library };
+            if (GeometryStore is { } snowcloneStore)
+            {
+                WindowGeometryRegistrar.Register(_snowcloneLibraryWindow, snowcloneStore, WindowLayoutKeys.SnowcloneLibrary, _snowcloneLibraryWindow.MinWidth, _snowcloneLibraryWindow.MinHeight);
+            }
+            await _snowcloneLibraryWindow.ShowDialog(this);
+            _snowcloneLibraryWindow = null;
+            await viewModel.CompleteSnowcloneLibraryAsync();
+            Dispatcher.UIThread.Post(() => ManageSnowclonesButton.Focus(), DispatcherPriority.Input);
+        });
+
+    private void OnManageRejectedPhrases(object? sender, RoutedEventArgs e) =>
+        Run(async () =>
         {
-            WindowGeometryRegistrar.Register(_rejectWindow, rejectStore, WindowLayoutKeys.RejectIdea, _rejectWindow.MinWidth, _rejectWindow.MinHeight);
-        }
-        await _rejectWindow.ShowDialog(this);
-        _rejectWindow = null;
-        FocusNextCandidate();
-    }
+            if (_rejectedPhrasesWindow is not null || ViewModel is not { } viewModel)
+            {
+                return;
+            }
 
-    private async void OnClearAll(object? sender, RoutedEventArgs e) =>
-        await RequestDiscardAsync(close: false);
+            viewModel.OpenRejectedPhrases();
+            if (viewModel.RejectedPhrases is not { } manager)
+            {
+                return;
+            }
 
-    private async void OnManageSnowclones(object? sender, RoutedEventArgs e)
-    {
-        if (_snowcloneLibraryWindow is not null || ViewModel is not { } viewModel)
-        {
-            return;
-        }
+            _rejectedPhrasesWindow = new RejectedPhrasesWindow { DataContext = manager };
+            if (GeometryStore is { } rejectedPhrasesStore)
+            {
+                WindowGeometryRegistrar.Register(_rejectedPhrasesWindow, rejectedPhrasesStore, WindowLayoutKeys.RejectedPhrases, _rejectedPhrasesWindow.MinWidth, _rejectedPhrasesWindow.MinHeight);
+            }
+            await _rejectedPhrasesWindow.ShowDialog(this);
+            _rejectedPhrasesWindow = null;
+            await viewModel.CompleteRejectedPhrasesAsync();
+            Dispatcher.UIThread.Post(() => ManageRejectedPhrasesButton.Focus(), DispatcherPriority.Input);
+        });
 
-        viewModel.OpenSnowcloneLibrary();
-        if (viewModel.SnowcloneLibrary is not { } library)
-        {
-            return;
-        }
-
-        _snowcloneLibraryWindow = new SnowcloneLibraryWindow { DataContext = library };
-        if (GeometryStore is { } snowcloneStore)
-        {
-            WindowGeometryRegistrar.Register(_snowcloneLibraryWindow, snowcloneStore, WindowLayoutKeys.SnowcloneLibrary, _snowcloneLibraryWindow.MinWidth, _snowcloneLibraryWindow.MinHeight);
-        }
-        await _snowcloneLibraryWindow.ShowDialog(this);
-        _snowcloneLibraryWindow = null;
-        await viewModel.CompleteSnowcloneLibraryAsync();
-        Dispatcher.UIThread.Post(() => ManageSnowclonesButton.Focus(), DispatcherPriority.Input);
-    }
-
-    private async void OnManageRejectedPhrases(object? sender, RoutedEventArgs e)
-    {
-        if (_rejectedPhrasesWindow is not null || ViewModel is not { } viewModel)
-        {
-            return;
-        }
-
-        viewModel.OpenRejectedPhrases();
-        if (viewModel.RejectedPhrases is not { } manager)
-        {
-            return;
-        }
-
-        _rejectedPhrasesWindow = new RejectedPhrasesWindow { DataContext = manager };
-        if (GeometryStore is { } rejectedPhrasesStore)
-        {
-            WindowGeometryRegistrar.Register(_rejectedPhrasesWindow, rejectedPhrasesStore, WindowLayoutKeys.RejectedPhrases, _rejectedPhrasesWindow.MinWidth, _rejectedPhrasesWindow.MinHeight);
-        }
-        await _rejectedPhrasesWindow.ShowDialog(this);
-        _rejectedPhrasesWindow = null;
-        await viewModel.CompleteRejectedPhrasesAsync();
-        Dispatcher.UIThread.Post(() => ManageRejectedPhrasesButton.Focus(), DispatcherPriority.Input);
-    }
-
-    private async void OnClose(object? sender, RoutedEventArgs e) =>
-        await RequestDiscardAsync(close: true);
+    private void OnClose(object? sender, RoutedEventArgs e) =>
+        Run(() => RequestDiscardAsync(close: true));
 
     private void OnClosing(object? sender, WindowClosingEventArgs e)
     {
@@ -134,7 +139,7 @@ public partial class IdeationWindow : Window
         }
 
         e.Cancel = true;
-        Dispatcher.UIThread.Post(async () => await RequestDiscardAsync(close: true));
+        RunOnDispatcher(() => RequestDiscardAsync(close: true));
     }
 
     private async Task RequestDiscardAsync(bool close)
@@ -195,4 +200,31 @@ public partial class IdeationWindow : Window
             }
         }, DispatcherPriority.Input);
     }
+
+    private void Run(Func<Task> operation) => _ = ObserveCallbackAsync(operation);
+
+    private void RunOnDispatcher(Func<Task> operation) =>
+        _ = ObserveCallbackAsync(() => Dispatcher.UIThread.InvokeAsync(operation));
+
+    internal static async Task ObserveCallbackAsync(
+        Func<Task> operation,
+        Action<Exception>? reportFailure = null)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+
+        try
+        {
+            await operation().ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            (reportFailure ?? ReportCallbackFailure)(exception);
+        }
+    }
+
+    private static void ReportCallbackFailure(Exception exception) =>
+        Trace.TraceError("Ideation window async callback failed: {0}", exception);
 }
