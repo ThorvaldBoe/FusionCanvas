@@ -259,7 +259,8 @@ public sealed class OpenRouterClient :
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var timeout = new CancellationTokenSource();
+        using var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         timeout.CancelAfter(GenerationTimeout);
 
         try
@@ -270,17 +271,18 @@ public sealed class OpenRouterClient :
             using var response = await SendWithTelemetryAsync(
                 message,
                 HttpCompletionOption.ResponseHeadersRead,
-                timeout.Token,
+                requestCancellation.Token,
                 GenerationTimeout,
                 MaximumResponseBytes,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                timeout.Token).ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
             {
-                return await ParseFailureAsync(response, request.ModelId, timeout.Token).ConfigureAwait(false);
+                return await ParseFailureAsync(response, request.ModelId, requestCancellation.Token).ConfigureAwait(false);
             }
 
-            using var json = await ReadJsonAsync(response, timeout.Token).ConfigureAwait(false);
+            using var json = await ReadJsonAsync(response, requestCancellation.Token).ConfigureAwait(false);
             return ParseSuccess(json.RootElement, request.ModelId);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -378,7 +380,8 @@ public sealed class OpenRouterClient :
         if (string.IsNullOrWhiteSpace(request.ApiKey))
             return (null, new(AiImageGenerationFailureKind.Authentication, "An OpenRouter API key is required."));
 
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var timeout = new CancellationTokenSource();
+        using var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         timeout.CancelAfter(GenerationTimeout);
         try
         {
@@ -388,14 +391,15 @@ public sealed class OpenRouterClient :
             using var response = await SendWithTelemetryAsync(
                 message,
                 HttpCompletionOption.ResponseHeadersRead,
-                timeout.Token,
+                requestCancellation.Token,
                 GenerationTimeout,
                 MaximumImageResponseBytes,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                timeout.Token).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
                 return (null, new(MapImageFailure(response.StatusCode), "OpenRouter could not complete the image request."));
 
-            using var json = await ReadJsonAsync(response, timeout.Token, MaximumImageResponseBytes).ConfigureAwait(false);
+            using var json = await ReadJsonAsync(response, requestCancellation.Token, MaximumImageResponseBytes).ConfigureAwait(false);
             var data = RequiredArray(json.RootElement, "data");
             if (data.GetArrayLength() != 1)
                 return (null, new(AiImageGenerationFailureKind.InvalidResponse, "OpenRouter did not return exactly one image."));
@@ -461,7 +465,8 @@ public sealed class OpenRouterClient :
         string? apiKey,
         CancellationToken cancellationToken)
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var timeout = new CancellationTokenSource();
+        using var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         timeout.CancelAfter(MetadataTimeout);
 
         for (var attempt = 0; ; attempt++)
@@ -474,10 +479,11 @@ public sealed class OpenRouterClient :
             var response = await SendWithTelemetryAsync(
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
-                timeout.Token,
+                requestCancellation.Token,
                 MetadataTimeout,
                 MaximumResponseBytes,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                timeout.Token).ConfigureAwait(false);
             if (attempt > 0 || !IsRetryable(response.StatusCode))
             {
                 return response;
@@ -490,38 +496,41 @@ public sealed class OpenRouterClient :
                 delay = TimeSpan.FromSeconds(5);
             }
 
-            await Task.Delay(delay, timeout.Token).ConfigureAwait(false);
+            await Task.Delay(delay, requestCancellation.Token).ConfigureAwait(false);
         }
     }
 
     private async Task<HttpResponseMessage> SendWithTelemetryAsync(
         HttpRequestMessage request,
         HttpCompletionOption completionOption,
-        CancellationToken cancellationToken,
+        CancellationToken requestCancellationToken,
         TimeSpan timeout,
         int maximumBodyBytes,
-        CancellationToken callerCancellationToken)
+        CancellationToken callerCancellationToken,
+        CancellationToken timeoutCancellationToken)
     {
         var capture = _telemetry?.IsCaptureEnabled == true;
         var requestBody = capture && request.Content is not null
-            ? await request.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false)
+            ? await request.Content.ReadAsStringAsync(requestCancellationToken).ConfigureAwait(false)
             : null;
         var requestDetails = capture ? BuildRequestDetails(request) : null;
         var stopwatch = Stopwatch.StartNew();
         HttpResponseMessage response;
         try
         {
-            response = await _httpClient.SendAsync(request, completionOption, cancellationToken).ConfigureAwait(false);
+            response = await _httpClient.SendAsync(request, completionOption, requestCancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException exception)
         {
             if (capture)
             {
-                var cancelledByCaller = callerCancellationToken.IsCancellationRequested;
+                var (severity, outcome) = ClassifyCancellation(
+                    callerCancellationToken,
+                    timeoutCancellationToken);
                 await _telemetry!.RecordAsync(new TelemetryEventRequest(
                     "Integration.OpenRouter", "HttpRequest",
-                    cancelledByCaller ? "Information" : "Error",
-                    cancelledByCaller ? "Cancelled" : "Timeout",
+                    severity,
+                    outcome,
                     exception.GetType().Name,
                     RequestBody: requestBody,
                     RequestDetailsJson: requestDetails,
@@ -559,7 +568,7 @@ public sealed class OpenRouterClient :
             var originalHeaders = originalContent.Headers
                 .SelectMany(header => header.Value.Select(value => (header.Key, Value: value)))
                 .ToArray();
-            var bytes = await originalContent.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+            var bytes = await originalContent.ReadAsByteArrayAsync(requestCancellationToken).ConfigureAwait(false);
             if (bytes.Length <= maximumBodyBytes)
             {
                 responseBody = Encoding.UTF8.GetString(bytes);
@@ -586,6 +595,15 @@ public sealed class OpenRouterClient :
             MetadataJson: JsonSerializer.Serialize(new { elapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds, timeoutSeconds = timeout.TotalSeconds })));
         return response;
     }
+
+    private static (string Severity, string Outcome) ClassifyCancellation(
+        CancellationToken callerCancellationToken,
+        CancellationToken timeoutCancellationToken) =>
+        callerCancellationToken.IsCancellationRequested
+            ? ("Information", "Cancelled")
+            : timeoutCancellationToken.IsCancellationRequested
+                ? ("Error", "Timeout")
+                : ("Error", "Failed");
 
     private static string BuildRequestDetails(HttpRequestMessage request) => JsonSerializer.Serialize(new
     {

@@ -555,6 +555,37 @@ public class OpenRouterClientTests
         Assert.DoesNotContain("secret", System.Text.Json.JsonSerializer.Serialize(entry));
     }
 
+    [Fact]
+    public async Task GenerateAsync_WhenTransportCancels_RecordsFailedTelemetry()
+    {
+        using var temp = new TelemetryTestDirectory();
+        var workspaceId = Guid.NewGuid();
+        var context = new TestTelemetryWorkspaceContext(workspaceId);
+        using var telemetry = new WorkspaceTelemetryService(new SqliteTelemetryStore(temp.GetPath("telemetry.db")), context);
+        await telemetry.SaveSettingsAsync(workspaceId, WorkspaceTelemetrySettings.Default with { DebugModeEnabled = true });
+        await telemetry.GetSettingsAsync(workspaceId);
+        var client = new OpenRouterClient(
+            new HttpClient(new ExceptionHandler(new TaskCanceledException("simulated transport cancellation")))
+            {
+                BaseAddress = OpenRouterClient.DefaultBaseAddress
+            },
+            telemetry);
+
+        var result = await client.GenerateAsync(
+            new AiProviderTextRequest(
+                "secret",
+                "model",
+                [new AiTextMessage(AiMessageRole.User, "prompt")],
+                AiProfileSettings.Empty with { ModelId = "model" },
+                false),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(AiTextFailureKind.Timeout, result.FailureKind);
+        var entry = Assert.Single(await telemetry.ReadAllAsync(workspaceId));
+        Assert.Equal("Error", entry.Severity);
+        Assert.Equal("Failed", entry.Outcome);
+    }
+
     private static OpenRouterClient CreateClient(HttpMessageHandler handler) =>
         new(new HttpClient(handler) { BaseAddress = OpenRouterClient.DefaultBaseAddress });
 
