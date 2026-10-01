@@ -926,25 +926,45 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
                     template = templateResult.State.Templates.Single(value => value.Id == template.Id);
                     sourceState = templateResult.State;
                 }
+                var sourceChangesTotal = LocalSourceDrafts.Count + _archivedLocalSourceDrafts.Count;
+                var sourceChangesSaved = 0;
                 foreach (var draft in LocalSourceDrafts)
                 {
                     var existingSourceImageIds = sourceState?.SourceImages?.Select(image => image.Id).ToHashSet() ?? [];
                     var sourceResult = draft.IsManaged
                         ? await _sourceImages.UpdateAsync(new UpdateLocalMockupTemplateSourceRequest(SelectedOffering.StoreId, template.Id, draft.SourceImageId ?? Guid.Empty, draft.OptionValueIds, draft.Mapping)).ConfigureAwait(true)
                         : await _sourceImages.AddAsync(new AddLocalMockupTemplateSourceRequest(SelectedOffering.StoreId, template.Id, draft.Path, draft.OptionValueIds, draft.Mapping)).ConfigureAwait(true);
-                    if (!sourceResult.Succeeded) { ErrorMessage = sourceResult.Error ?? $"The local source image '{draft.DisplayName}' could not be added."; return; }
+                    sourceState = sourceResult.State;
+                    if (!sourceResult.Succeeded)
+                    {
+                        ApplyMockups(sourceState);
+                        ErrorMessage = FormatPartialLocalSourceSaveError(
+                            sourceResult.Error ?? $"The local source image '{draft.DisplayName}' could not be added.",
+                            sourceChangesSaved,
+                            sourceChangesTotal);
+                        return;
+                    }
+                    sourceChangesSaved++;
                     if (!draft.IsManaged && sourceResult.State.SourceImages is { } savedImages)
                     {
                         var addedImage = savedImages.SingleOrDefault(image => !existingSourceImageIds.Contains(image.Id));
                         if (addedImage is not null) draft.MarkManaged(addedImage.Id);
                     }
-                    sourceState = sourceResult.State;
                 }
                 foreach (var draft in _archivedLocalSourceDrafts.Where(value => value.SourceImageId is not null))
                 {
                     var archiveResult = await _sourceImages.UpdateAsync(new UpdateLocalMockupTemplateSourceRequest(SelectedOffering.StoreId, template.Id, draft.SourceImageId!.Value, draft.OptionValueIds, draft.Mapping, Archive: true)).ConfigureAwait(true);
-                    if (!archiveResult.Succeeded) { ErrorMessage = archiveResult.Error ?? $"The local source image '{draft.DisplayName}' could not be archived."; return; }
                     sourceState = archiveResult.State;
+                    if (!archiveResult.Succeeded)
+                    {
+                        ApplyMockups(sourceState);
+                        ErrorMessage = FormatPartialLocalSourceSaveError(
+                            archiveResult.Error ?? $"The local source image '{draft.DisplayName}' could not be archived.",
+                            sourceChangesSaved,
+                            sourceChangesTotal);
+                        return;
+                    }
+                    sourceChangesSaved++;
                 }
                 if (sourceState is not null) ApplyMockups(sourceState);
                 SelectedTemplate = template;
@@ -2055,6 +2075,11 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static string MessageSuffix(string message) => string.IsNullOrWhiteSpace(message) ? "." : $": {message}";
+    private static string FormatPartialLocalSourceSaveError(string error, int saved, int total)
+    {
+        var sourceChangeLabel = total == 1 ? "source image change" : "source image changes";
+        return $"Mockup Template save partially completed: the template and {saved} of {total} {sourceChangeLabel} were saved. {error}";
+    }
     private static void Replace<T>(ObservableCollection<T> target, IEnumerable<T> values) { target.Clear(); foreach (var value in values) target.Add(value); }
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? name = null)
     {

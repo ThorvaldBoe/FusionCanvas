@@ -1,3 +1,4 @@
+using FusionCanvas.App.Commands;
 using FusionCanvas.App.Assets;
 using FusionCanvas.App.Stores;
 using FusionCanvas.Application.Catalog;
@@ -104,6 +105,34 @@ public sealed class CatalogSetupViewModelTests
         Assert.Equal(sourceImages.SourceImageId, archive.SourceImageId);
         Assert.True(archive.Archive);
         Assert.False(viewModel.IsAddingTemplate);
+    }
+
+    [Fact]
+    public async Task SavingLocalSourcesSummarizesPartialCompletionWhenLaterSourceFails()
+    {
+        var sourceImages = new PartialSaveMockupTemplateSourceImageService();
+        var (viewModel, _, offering) = await CreateCatalogWithDesignAreaAsync(
+            referencedByTemplate: false,
+            sourceImages: sourceImages);
+        sourceImages.OfferingId = offering.Id;
+        viewModel.StartAddTemplateCommand.Execute(null);
+        viewModel.TemplateName = "Manual front";
+        var first = new LocalMockupSourceDraftViewModel("first.png", []);
+        var second = new LocalMockupSourceDraftViewModel("second.png", []);
+        viewModel.LocalSourceDrafts.Add(first);
+        viewModel.LocalSourceDrafts.Add(second);
+        viewModel.SelectLocalSourceCommand.Execute(first);
+
+        var command = Assert.IsType<AsyncRelayCommand>(viewModel.CreateTemplateCommand);
+        command.Execute(null);
+        await command.ExecutionTask!;
+
+        Assert.Equal(2, sourceImages.AddCallCount);
+        Assert.Contains("save partially completed", viewModel.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("1 of 2 source image changes were saved", viewModel.ErrorMessage, StringComparison.Ordinal);
+        Assert.Contains("second source image failed", viewModel.ErrorMessage, StringComparison.Ordinal);
+        Assert.True(viewModel.IsAddingTemplate);
+        Assert.False(viewModel.IsBusy);
     }
     [Fact]
     public async Task LoadsNormalizedSelectionsAndEnablesTypedSetupCommands()
@@ -1196,6 +1225,29 @@ public sealed class CatalogSetupViewModelTests
             Updates.Add(request);
             return Task.FromResult(MockupTemplateSetupResult.Success(new MockupTemplateSetupState(request.StoreId, false, [], [], [])));
         }
+    }
+
+    private sealed class PartialSaveMockupTemplateSourceImageService : IMockupTemplateSourceImageService
+    {
+        public int AddCallCount { get; private set; }
+        public Guid OfferingId { get; set; }
+
+        public Task<MockupTemplateSourceState> LoadAsync(Guid storeId, Guid templateId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new MockupTemplateSourceState([], [], false));
+
+        public Task<MockupTemplateSetupResult> AddAsync(AddLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default)
+        {
+            AddCallCount++;
+            var state = new MockupTemplateSetupState(request.StoreId, false,
+                [new MockupTemplate(request.TemplateId, OfferingId, null, "Manual front", null, 1, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)],
+                [], []);
+            return Task.FromResult(AddCallCount == 1
+                ? MockupTemplateSetupResult.Success(state, request.TemplateId)
+                : MockupTemplateSetupResult.Failure("The second source image failed.", state));
+        }
+
+        public Task<MockupTemplateSetupResult> UpdateAsync(UpdateLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private static (CatalogSetupViewModel ViewModel, Guid StoreId) CreateProviderCatalogStateViewModel(IProviderCatalogCandidateSource? source)
