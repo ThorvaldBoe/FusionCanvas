@@ -3003,18 +3003,6 @@ public class StoreEditorHeadlessTests
         }
     }
 
-    private sealed class FixedProviderCatalog(ProviderCatalogCandidateDescriptor descriptor) : IProviderCatalogCandidateSource
-    {
-        public Task<ProviderCatalogCandidateDescriptor> LoadAsync(OfferingContext context, CancellationToken cancellationToken = default) =>
-            Task.FromResult(descriptor);
-    }
-
-    private sealed class FailingProviderCatalog : IProviderCatalogCandidateSource
-    {
-        public Task<ProviderCatalogCandidateDescriptor> LoadAsync(OfferingContext context, CancellationToken cancellationToken = default) =>
-            throw new InvalidOperationException("Provider request failed.");
-    }
-
     private sealed class HeadlessNichePopulationService : INichePopulationService
     {
         public NichePopulationResult Result { get; set; } = NichePopulationResult.Success(new Dictionary<NichePopulationField, string>());
