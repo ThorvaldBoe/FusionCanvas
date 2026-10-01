@@ -12,6 +12,4 @@ internal sealed class MainWindowDriver(MainWindow window)
         .Where(control => (AutomationProperties.GetAutomationId(control) ?? string.Empty).StartsWith("Workspace.Group", StringComparison.Ordinal))
         .ToArray();
 
-    internal T Find<T>(string automationId) where T : Control =>
-        window.GetVisualDescendants().OfType<T>().Single(control => AutomationProperties.GetAutomationId(control) == automationId);
 }
