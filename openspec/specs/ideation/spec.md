@@ -25,23 +25,6 @@ FusionCanvas SHALL expose Ideation as an auxiliary action for an active Idea-sta
 - **THEN** FusionCanvas does not allow the Ideation dialog to open
 - **AND** it communicates that an active niche context is required
 
-### Requirement: Ideation availability uses placeholder API access
-FusionCanvas SHALL treat a non-empty `FUSIONCANVAS_AI_API_KEY` environment value as placeholder AI access for this module, SHALL never persist or transmit that value, and SHALL keep the Ideation action visible but disabled when the value is absent.
-
-#### Scenario: Placeholder API access is present
-- **WHEN** `FUSIONCANVAS_AI_API_KEY` contains a non-whitespace value
-- **THEN** the Ideation action is enabled for a supported Idea-stage context
-- **AND** the fake generator can be invoked
-
-#### Scenario: Placeholder API access is absent
-- **WHEN** `FUSIONCANVAS_AI_API_KEY` is missing, empty, or whitespace
-- **THEN** the Ideation action remains visible but disabled
-- **AND** its unavailable guidance explains that placeholder AI access must be configured
-
-#### Scenario: Generator request is assembled
-- **WHEN** FusionCanvas prepares a request for the fake generator
-- **THEN** the placeholder API-key value is absent from the request payload, logs, errors, and durable workspace data
-
 ### Requirement: The dialog captures mode, guidance, count, and visible scope
 The Ideation dialog SHALL display the resolved store, niche, and optional group scope, SHALL provide one optional multi-line guidance field, SHALL provide an extensible mode selector initially containing `Basic` and `Snowclones`, SHALL constrain desired candidate count to 1 through 20 with a default of 5, and SHALL expose a count-up arrow button and a count-down arrow button beside the count text field that adjust the desired count by one within the 1 through 20 range. The count text field SHALL continue to accept free-text entry, the count-up and count-down arrows SHALL be the only controls that adjust the count by clicking, and the arrows SHALL NOT submit generation or otherwise alter dialog state beyond the count text.
 
@@ -270,3 +253,31 @@ FusionCanvas SHALL make essential Ideation controls keyboard reachable in a logi
 - **WHEN** the application appearance changes while Ideation or a confirmation dialog is open
 - **THEN** every open Ideation surface adopts the active theme
 - **AND** busy, disabled, warning, destructive, selected, and error states remain distinguishable
+
+### Requirement: Ideation availability uses configured secure AI access
+FusionCanvas SHALL derive Ideation availability from the securely stored OpenRouter inference credential and the effective Ideation AI profile, SHALL keep the action visible but disabled when generation is not ready, and SHALL identify the blocking prerequisite without reading or exposing secret material in presentation code.
+
+#### Scenario: OpenRouter-backed Ideation is ready
+- **WHEN** a readable OpenRouter inference key is saved and the effective Ideation profile resolves to an available compatible model
+- **THEN** the Ideation action is enabled for a supported Idea-stage context
+- **AND** generation uses the provider-independent AI text service with the Ideation request purpose
+
+#### Scenario: OpenRouter key is absent
+- **WHEN** no OpenRouter credential is saved
+- **THEN** the Ideation action remains visible but disabled
+- **AND** its unavailable guidance directs the creator to add a key in AI Settings
+
+#### Scenario: Credential store is unavailable
+- **WHEN** the saved credential cannot be read because native secure storage is locked, denied, or unavailable
+- **THEN** the Ideation action remains disabled
+- **AND** the guidance distinguishes credential unavailability from a missing key without exposing credential content
+
+#### Scenario: Ideation profile is incomplete
+- **WHEN** the credential is readable but the effective Ideation profile has no usable model or conflicts with the privacy policy or advertised capabilities
+- **THEN** the Ideation action remains disabled
+- **AND** the guidance directs the creator to complete the Ideation AI profile
+
+#### Scenario: Environment placeholder is present
+- **WHEN** `FUSIONCANVAS_AI_API_KEY` contains a value but no readable OpenRouter credential and profile are available
+- **THEN** the environment value does not enable Ideation
+- **AND** the value is neither persisted nor transmitted
