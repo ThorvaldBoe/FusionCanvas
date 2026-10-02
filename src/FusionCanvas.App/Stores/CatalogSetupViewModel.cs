@@ -1274,7 +1274,24 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             DesignAreaCardViewModel value => value.Id,
             _ => Guid.Empty
         };
-        if (id == Guid.Empty || SelectedOffering is null) return;
+        if (SelectedOffering is null)
+        {
+            ErrorMessage = "Select an offering before archiving a catalog record.";
+            return;
+        }
+
+        if (id == Guid.Empty)
+        {
+            ErrorMessage = "The selected catalog record could not be identified. Refresh the offering and try again.";
+            return;
+        }
+
+        if (kind == CatalogRecordKind.Variant && AvailableVariants.All(value => value.Id != id))
+        {
+            ErrorMessage = "The selected Variant is no longer active in this offering. Refresh the offering and try again.";
+            return;
+        }
+
         _ = RunMutationAsync(() => _catalog.ArchiveAsync(new ArchiveCatalogRecordRequest(SelectedOffering.StoreId, kind, id)));
     }
 
