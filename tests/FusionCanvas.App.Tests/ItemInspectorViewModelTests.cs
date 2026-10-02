@@ -694,6 +694,7 @@ public class ItemInspectorViewModelTests
         Assert.True(viewModel.IsOptimizing);
         Assert.False(viewModel.CanEditShared);
         Assert.False(viewModel.CanOptimize);
+        Assert.Contains("Optimizing", viewModel.OptimizeGuidance);
 
         gate.SetResult();
         await WaitUntilAsync(() => !viewModel.IsOptimizing);
