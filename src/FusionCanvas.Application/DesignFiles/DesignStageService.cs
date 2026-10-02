@@ -1139,9 +1139,8 @@ public sealed class DesignStageService : IDesignStageService
     private string? ResolveThumbnailPath(Asset? asset)
     {
         if (asset is null || asset.IsMissing) return null;
-        // Resolve the workspace-relative path against the file store root so
-        // the UI can bind an absolute path that actually renders.
-        return Path.Combine(_fileStore.WorkspaceRoot, asset.WorkspaceRelativePath);
+        // Let the file store own normalization and containment policy.
+        return _fileStore.ResolvePath(asset.WorkspaceRelativePath);
     }
 
     private static bool IsPng(string path) =>

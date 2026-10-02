@@ -268,7 +268,7 @@ public sealed class AssetManagementService : IAssetManagementService
             contextLabel,
             asset.CreatedAt,
             asset.UpdatedAt,
-            Path.Combine(_fileStore.WorkspaceRoot, asset.WorkspaceRelativePath));
+            _fileStore.ResolvePath(asset.WorkspaceRelativePath));
     }
 
     private bool IsMissing(Asset asset) => !_fileStore.Exists(asset.WorkspaceRelativePath);
