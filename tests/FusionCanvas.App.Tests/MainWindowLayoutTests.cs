@@ -7,6 +7,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.VisualTree;
+using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Views;
 using FusionCanvas.Application.AI;
@@ -84,6 +85,35 @@ public class MainWindowConstructionTests
         Assert.Equal("Item overview context", AutomationProperties.GetName(composition));
         Assert.Contains(composition, header.GetVisualAncestors());
         Assert.Contains(composition, overview.GetVisualAncestors());
+    }
+
+    [AvaloniaFact]
+    public void LongNavigationPath_IsTrimmedWithFullValueDisclosureAtRepresentativeWidths()
+    {
+        const string longPath = "North Star Studio / Coffee / Dogs and coffee / Seasonal ideas / Morning rituals / Weekend routines / Espresso listing draft";
+
+        foreach (var width in new[] { 900d, 1180d })
+        {
+            using var fixture = new MainWindowFixture(width: width);
+            fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+            var activeContext = fixture.ViewModel.DocumentWindow.ActiveContext!;
+            fixture.ViewModel.DocumentWindow.ReplaceActiveContext(activeContext with
+            {
+                NavigationLocation = new DocumentNavigationLocation(
+                    activeContext.NavigationLocation!.NodePath,
+                    longPath)
+            });
+            fixture.PumpLayout();
+
+            var path = fixture.FindControl<TextBlock>(textBlock =>
+                textBlock.Name == "ActiveNavigationPathText" && textBlock.IsVisible);
+
+            Assert.Equal(longPath, path.Text);
+            Assert.Equal(TextTrimming.CharacterEllipsis, path.TextTrimming);
+            Assert.Equal(longPath, ToolTip.GetTip(path));
+            Assert.Equal(longPath, AutomationProperties.GetName(path));
+            Assert.True(path.Bounds.Width > 0);
+        }
     }
 
     [AvaloniaFact]
