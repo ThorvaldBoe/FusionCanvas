@@ -29,13 +29,7 @@ namespace FusionCanvas.App.Views;
 
 public partial class MainWindow : Window
 {
-    private StoreEditorWindow? _storeEditorWindow;
-    private WorkspaceManagementWindow? _workspaceManagementWindow;
-    private SettingsWindow? _settingsWindow;
-    private TelemetryDebugWindow? _telemetryDebugWindow;
-    private AssetsWindow? _assetsWindow;
-    private IdeationWindow? _ideationWindow;
-    private Window? _designPreviewWindow;
+    private MainWindowWindowCoordinator _windowCoordinator = null!;
     private PointerPressedEventArgs? _dragPointerArgs;
     private WorkspaceTreeNodeViewModel? _dragNode;
     private IReadOnlyList<WorkspaceTreeSelection>? _dragSelections;
@@ -52,6 +46,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _windowCoordinator = new MainWindowWindowCoordinator(this, WorkspaceTreeControl);
         WorkspaceTreeControl.AddHandler(PointerPressedEvent, OnWorkspaceTreePointerPressed, RoutingStrategies.Tunnel);
         WorkspaceTreeControl.AddHandler(KeyDownEvent, OnWorkspaceTreeKeyDown, RoutingStrategies.Tunnel);
         DataContextChanged += OnDesignToolDataContextChanged;
@@ -62,6 +57,7 @@ public partial class MainWindow : Window
     {
         ArgumentNullException.ThrowIfNull(services);
         InitializeComponent();
+        _windowCoordinator = new MainWindowWindowCoordinator(this, WorkspaceTreeControl);
         WorkspaceTreeControl.AddHandler(PointerPressedEvent, OnWorkspaceTreePointerPressed, RoutingStrategies.Tunnel);
         WorkspaceTreeControl.AddHandler(KeyDownEvent, OnWorkspaceTreeKeyDown, RoutingStrategies.Tunnel);
         DataContextChanged += OnDesignToolDataContextChanged;
@@ -87,7 +83,7 @@ public partial class MainWindow : Window
                 // Defer synchronization until that close has completed so we do not
                 // re-enter Window.Close while Avalonia is still processing Closing.
                 PostToDispatcher(
-                    () => SyncStoreEditorWindow(viewModel.StoreManagement),
+                    () => _windowCoordinator.SyncStoreEditorWindow(viewModel.StoreManagement),
                     DispatcherPriority.Background);
             }
         };
@@ -95,14 +91,14 @@ public partial class MainWindow : Window
         {
             if (args.PropertyName == nameof(WorkspaceManagementViewModel.IsWorkspaceManagementOpen))
             {
-                PostToDispatcher(() => SyncWorkspaceManagementWindow(viewModel.WorkspaceManagement), DispatcherPriority.Background);
+                PostToDispatcher(() => _windowCoordinator.SyncWorkspaceManagementWindow(viewModel.WorkspaceManagement), DispatcherPriority.Background);
             }
         };
         viewModel.AssetsManagement.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(AssetsViewModel.IsOpen))
             {
-                PostToDispatcher(() => SyncAssetsWindow(viewModel.AssetsManagement), DispatcherPriority.Background);
+                PostToDispatcher(() => _windowCoordinator.SyncAssetsWindow(viewModel.AssetsManagement), DispatcherPriority.Background);
             }
         };
         viewModel.PropertyChanged += (_, args) =>
@@ -117,7 +113,7 @@ public partial class MainWindow : Window
         {
             if (args.PropertyName == nameof(IdeationViewModel.IsOpen))
             {
-                PostToDispatcher(() => SyncIdeationWindow(viewModel.Ideation), DispatcherPriority.Background);
+                PostToDispatcher(() => _windowCoordinator.SyncIdeationWindow(viewModel.Ideation), DispatcherPriority.Background);
             }
         };
         viewModel.Settings.PropertyChanged += (_, args) =>
@@ -128,7 +124,7 @@ public partial class MainWindow : Window
                 // Defer synchronization until that close has completed so native
                 // geometry can be captured without re-entering Window.Close.
                 PostToDispatcher(
-                    () => SyncSettingsWindow(viewModel.Settings),
+                    () => _windowCoordinator.SyncSettingsWindow(viewModel.Settings),
                     DispatcherPriority.Background);
             }
         };
@@ -136,16 +132,16 @@ public partial class MainWindow : Window
         {
             if (args.PropertyName == nameof(WorkspaceTelemetrySettingsViewModel.IsDebugWindowOpen))
             {
-                PostToDispatcher(() => SyncTelemetryDebugWindow(viewModel.Settings.Telemetry), DispatcherPriority.Background);
+                PostToDispatcher(() => _windowCoordinator.SyncTelemetryDebugWindow(viewModel.Settings.Telemetry), DispatcherPriority.Background);
             }
         };
         DataContext = viewModel;
-        SyncSettingsWindow(viewModel.Settings);
-        SyncWorkspaceManagementWindow(viewModel.WorkspaceManagement);
-        SyncStoreEditorWindow(viewModel.StoreManagement);
-        SyncAssetsWindow(viewModel.AssetsManagement);
-        SyncIdeationWindow(viewModel.Ideation);
-        SyncTelemetryDebugWindow(viewModel.Settings.Telemetry);
+        _windowCoordinator.SyncSettingsWindow(viewModel.Settings);
+        _windowCoordinator.SyncWorkspaceManagementWindow(viewModel.WorkspaceManagement);
+        _windowCoordinator.SyncStoreEditorWindow(viewModel.StoreManagement);
+        _windowCoordinator.SyncAssetsWindow(viewModel.AssetsManagement);
+        _windowCoordinator.SyncIdeationWindow(viewModel.Ideation);
+        _windowCoordinator.SyncTelemetryDebugWindow(viewModel.Settings.Telemetry);
     }
 
     private void OnDesignToolDataContextChanged(object? sender, EventArgs e)
@@ -171,7 +167,7 @@ public partial class MainWindow : Window
 
         if (args.PropertyName == nameof(DesignStageToolViewModel.ShowPreviewDialog))
         {
-            PostToDispatcher(() => SyncDesignPreviewWindow(designTool), DispatcherPriority.Background);
+            PostToDispatcher(() => _windowCoordinator.SyncDesignPreviewWindow(designTool), DispatcherPriority.Background);
         }
         else if (args.PropertyName == nameof(DesignStageToolViewModel.IsRecoveryConfirmationVisible)
             && designTool.IsRecoveryConfirmationVisible)
@@ -183,6 +179,7 @@ public partial class MainWindow : Window
     private void InitializeWindowLayout(SettingsViewModel? settings)
     {
         _settings = settings;
+        _windowCoordinator.SetSettings(settings);
         Opened += OnWindowOpened;
         Closing += OnWindowClosing;
         Closed += OnWindowClosed;
@@ -306,232 +303,6 @@ public partial class MainWindow : Window
         }
 
         _normalLayout = layout;
-    }
-
-    private void SyncSettingsWindow(SettingsViewModel settings)
-    {
-        if (settings.IsOpen && _settingsWindow is null)
-        {
-            _settingsWindow = new SettingsWindow { DataContext = settings };
-            if (_settings is not null)
-            {
-                WindowGeometryRegistrar.Register(_settingsWindow, _settings, WindowLayoutKeys.Settings, _settingsWindow.MinWidth, _settingsWindow.MinHeight);
-            }
-            _settingsWindow.Closed += (_, _) =>
-            {
-                _settingsWindow = null;
-                if (settings.IsOpen)
-                {
-                    settings.CloseCommand.Execute(null);
-                }
-
-                if (CanFocusOwner(this))
-                {
-                    this.Activate();
-                }
-            };
-            _settingsWindow.Show(this);
-            return;
-        }
-
-        if (!settings.IsOpen && _settingsWindow is not null)
-        {
-            _settingsWindow.Close();
-        }
-    }
-
-    private void SyncTelemetryDebugWindow(WorkspaceTelemetrySettingsViewModel telemetry)
-    {
-        if (telemetry.IsDebugWindowOpen && _telemetryDebugWindow is null)
-        {
-            var window = new TelemetryDebugWindow { DataContext = telemetry };
-            _telemetryDebugWindow = window;
-            window.Opened += (_, _) => PositionTelemetryWindow(window);
-            window.Closed += (_, _) =>
-            {
-                if (ReferenceEquals(_telemetryDebugWindow, window)) _telemetryDebugWindow = null;
-                telemetry.CloseDebugWindow();
-            };
-            window.Show(this);
-            return;
-        }
-
-        if (!telemetry.IsDebugWindowOpen && _telemetryDebugWindow is { } openWindow)
-        {
-            _telemetryDebugWindow = null;
-            openWindow.Close();
-        }
-    }
-
-    private void PositionTelemetryWindow(TelemetryDebugWindow window)
-    {
-        var scale = Screens.All.FirstOrDefault(screen => screen.WorkingArea.Contains(Position))?.Scaling ?? 1;
-        var screen = Screens.All.FirstOrDefault(value => value.WorkingArea.Contains(Position))
-            ?? Screens.Primary;
-        if (screen is null) return;
-        var width = (int)(window.Width * scale);
-        var height = (int)(window.Height * scale);
-        var x = Position.X + (int)(Width * scale) + 8;
-        var y = Position.Y;
-        if (x + width > screen.WorkingArea.Right) x = Position.X - width - 8;
-        x = Math.Clamp(x, screen.WorkingArea.X, Math.Max(screen.WorkingArea.X, screen.WorkingArea.Right - width));
-        y = Math.Clamp(y, screen.WorkingArea.Y, Math.Max(screen.WorkingArea.Y, screen.WorkingArea.Bottom - height));
-        window.Position = new PixelPoint(x, y);
-    }
-
-    private void SyncWorkspaceManagementWindow(WorkspaceManagementViewModel workspaceManagement)
-    {
-        if (workspaceManagement.IsWorkspaceManagementOpen && _workspaceManagementWindow is null)
-        {
-            _workspaceManagementWindow = new WorkspaceManagementWindow { DataContext = workspaceManagement };
-            if (_settings is not null)
-            {
-                WindowGeometryRegistrar.Register(_workspaceManagementWindow, _settings, WindowLayoutKeys.WorkspaceManagement, _workspaceManagementWindow.MinWidth, _workspaceManagementWindow.MinHeight);
-            }
-            _workspaceManagementWindow.Closed += (_, _) =>
-            {
-                _workspaceManagementWindow = null;
-                if (workspaceManagement.IsWorkspaceManagementOpen)
-                {
-                    workspaceManagement.CloseWorkspaceManagementCommand.Execute(null);
-                }
-
-                if (_settingsWindow is { } settings && settings.IsVisible)
-                {
-                    settings.Activate();
-                }
-            };
-            _workspaceManagementWindow.Show((Window?)_settingsWindow ?? this);
-            return;
-        }
-
-        if (!workspaceManagement.IsWorkspaceManagementOpen && _workspaceManagementWindow is not null)
-        {
-            _workspaceManagementWindow.Close();
-        }
-    }
-
-    private static bool CanFocusOwner(Window window)
-    {
-        try { return window.IsVisible; }
-        catch { return false; }
-    }
-
-    private void SyncStoreEditorWindow(StoreManagementViewModel storeManagement)
-    {
-        if (storeManagement.IsStoreEditorOpen && _storeEditorWindow is null)
-        {
-            _storeEditorWindow = new StoreEditorWindow { DataContext = storeManagement };
-            if (_settings is not null)
-            {
-                _storeEditorWindow.GeometryStore = _settings;
-                WindowGeometryRegistrar.Register(_storeEditorWindow, _settings, WindowLayoutKeys.StoreEditor, _storeEditorWindow.MinWidth, _storeEditorWindow.MinHeight);
-            }
-            _storeEditorWindow.Closed += (_, _) =>
-            {
-                _storeEditorWindow = null;
-                if (storeManagement.IsStoreEditorOpen)
-                {
-                    storeManagement.CloseStoreEditorCommand.Execute(null);
-                }
-            };
-            _storeEditorWindow.Show(this);
-            return;
-        }
-
-        if (!storeManagement.IsStoreEditorOpen && _storeEditorWindow is not null)
-        {
-            _storeEditorWindow.Close();
-        }
-    }
-
-    private void SyncAssetsWindow(AssetsViewModel assets)
-    {
-        if (assets.IsOpen && _assetsWindow is null)
-        {
-            _assetsWindow = new AssetsWindow { DataContext = assets };
-            assets.FilePicker = new AvaloniaAssetFilePicker(_assetsWindow.StorageProvider);
-            if (_settings is not null)
-            {
-                WindowGeometryRegistrar.Register(_assetsWindow, _settings, WindowLayoutKeys.Assets, _assetsWindow.MinWidth, _assetsWindow.MinHeight);
-            }
-            _assetsWindow.Closed += (_, _) =>
-            {
-                _assetsWindow = null;
-                if (assets.IsOpen)
-                {
-                    assets.CloseCommand.Execute(null);
-                }
-
-                WorkspaceTreeControl.Focus();
-            };
-            _assetsWindow.Show(this);
-            return;
-        }
-
-        if (!assets.IsOpen && _assetsWindow is not null)
-        {
-            _assetsWindow.Close();
-        }
-    }
-
-    private void SyncIdeationWindow(IdeationViewModel ideation)
-    {
-        if (ideation.IsOpen && _ideationWindow is null)
-        {
-            _ideationWindow = new IdeationWindow { DataContext = ideation };
-            if (_settings is not null)
-            {
-                _ideationWindow.GeometryStore = _settings;
-                WindowGeometryRegistrar.Register(_ideationWindow, _settings, WindowLayoutKeys.Ideation, _ideationWindow.MinWidth, _ideationWindow.MinHeight);
-            }
-            _ideationWindow.Closed += (_, _) =>
-            {
-                _ideationWindow = null;
-                if (CanFocusOwner(this))
-                {
-                    Activate();
-                    var contextHeader = this.GetVisualDescendants()
-                        .OfType<DocumentContextHeader>()
-                        .FirstOrDefault(header => header.IsVisible);
-                    if (contextHeader is null || !contextHeader.FocusIdeationButton())
-                    {
-                        WorkspaceTreeControl.Focus();
-                    }
-                }
-            };
-            _ = _ideationWindow.ShowDialog(this);
-            return;
-        }
-
-        if (!ideation.IsOpen && _ideationWindow is not null)
-        {
-            _ideationWindow.Close();
-        }
-    }
-
-    private void SyncDesignPreviewWindow(DesignStageToolViewModel designTool)
-    {
-        if (designTool.ShowPreviewDialog && _designPreviewWindow is null)
-        {
-            _designPreviewWindow = new DesignPreviewWindow { DataContext = designTool };
-            if (_settings is not null)
-            {
-                WindowGeometryRegistrar.Register(_designPreviewWindow, _settings, WindowLayoutKeys.DesignPreview, _designPreviewWindow.MinWidth, _designPreviewWindow.MinHeight);
-            }
-            _designPreviewWindow.Closed += (_, _) =>
-            {
-                _designPreviewWindow = null;
-                designTool.ClosePreviewDialog();
-            };
-            _designPreviewWindow.Show(this);
-            return;
-        }
-
-        if (!designTool.ShowPreviewDialog && _designPreviewWindow is not null)
-        {
-            _designPreviewWindow.Close();
-        }
     }
 
     private void OnWorkspaceTreePointerPressed(object? sender, PointerPressedEventArgs e)

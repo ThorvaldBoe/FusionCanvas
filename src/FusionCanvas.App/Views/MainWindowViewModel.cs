@@ -1,4 +1,5 @@
 ﻿using FusionCanvas.App.Assets;
+using FusionCanvas.App.Commands;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Groups;
 using FusionCanvas.App.Ideation;
@@ -76,11 +77,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
     private IReadOnlyList<NavigationDocumentContext> _navigationContexts = [];
     private int _isInitializingWorkspace = 1;
     private long _workspaceSwitchGeneration;
-    private readonly object _commandTaskGate = new();
-    private readonly HashSet<Task> _activeCommandTasks = [];
-    private readonly CancellationTokenSource _shutdownCancellation = new();
-    private int _commandStartsInProgress;
-    private bool _commandAdmissionClosed;
+    private readonly CommandTaskCoordinator _commandTasks;
     private bool _disposed;
 
     public static MainWindowViewModel CreateForDefaultWorkspace(
@@ -171,6 +168,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
             workspaceManagementService,
             workspaceTransferService ?? NullWorkspaceTransferService.Instance);
         Settings = CreateSettings(settings);
+        _commandTasks = new CommandTaskCoordinator(exception => Settings.Telemetry.RecordAsync(
+            new FusionCanvas.Application.Telemetry.TelemetryEventRequest(
+                "Workspace", "CommandFailed", "Error", "Failed", exception.GetType().Name)));
         StoreManagement = new StoreManagementViewModel(
             applicationServices.StoreManagement,
             applicationServices.NicheManagement,
@@ -309,8 +309,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         }
 
         _disposed = true;
-        CloseCommandAdmission();
-        _shutdownCancellation.Cancel();
+        _commandTasks.Dispose();
         Settings.Ai.SettingsChanged -= OnAiConfigurationChanged;
         Settings.Ai.AvailabilityChanged -= OnAiConfigurationChanged;
         try
@@ -339,9 +338,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
 
     public async ValueTask DisposeAsync()
     {
-        CloseCommandAdmission();
-        _shutdownCancellation.Cancel();
-        await WaitForCommandStartsAsync().ConfigureAwait(true);
+        _commandTasks.CloseAdmission();
+        _commandTasks.CancelPending();
+        await _commandTasks.WaitForStartsAsync().ConfigureAwait(true);
 
         try
         {
@@ -352,7 +351,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
             await Task.WhenAll(
                 ConceptRefinement.PendingOperation,
                 SllGeneration.PendingOperation,
-                WaitForCommandTasksAsync())
+                _commandTasks.WaitForTasksAsync())
                 .ConfigureAwait(true);
         }
     }
@@ -1371,117 +1370,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         OnPropertyChanged(nameof(GroupActionStatus));
     }
 
-    private void Run(Func<CancellationToken, Task> operation)
-    {
-        lock (_commandTaskGate)
-        {
-            if (_commandAdmissionClosed)
-            {
-                return;
-            }
-
-            _commandStartsInProgress++;
-        }
-
-        Task task;
-        try
-        {
-            task = operation(_shutdownCancellation.Token);
-        }
-        catch
-        {
-            lock (_commandTaskGate)
-            {
-                _commandStartsInProgress--;
-            }
-
-            throw;
-        }
-
-        var observedTask = ObserveCommandAsync(task);
-        lock (_commandTaskGate)
-        {
-            _activeCommandTasks.RemoveWhere(activeTask => activeTask.IsCompleted);
-            _activeCommandTasks.Add(observedTask);
-            _commandStartsInProgress--;
-        }
-    }
-
-    private void CloseCommandAdmission()
-    {
-        lock (_commandTaskGate)
-        {
-            _commandAdmissionClosed = true;
-        }
-    }
-
-    private async Task WaitForCommandStartsAsync()
-    {
-        while (true)
-        {
-            lock (_commandTaskGate)
-            {
-                if (_commandStartsInProgress == 0)
-                {
-                    return;
-                }
-            }
-
-            await Task.Yield();
-        }
-    }
-
-    private async Task WaitForCommandTasksAsync()
-    {
-        while (true)
-        {
-            Task[] pendingTasks;
-            bool hasPendingStarts;
-            lock (_commandTaskGate)
-            {
-                _activeCommandTasks.RemoveWhere(activeTask => activeTask.IsCompleted);
-                pendingTasks = _activeCommandTasks.ToArray();
-                hasPendingStarts = _commandStartsInProgress > 0;
-            }
-
-            if (pendingTasks.Length > 0)
-            {
-                await Task.WhenAll(pendingTasks).ConfigureAwait(true);
-            }
-            else if (hasPendingStarts)
-            {
-                await Task.Yield();
-            }
-            else
-            {
-                return;
-            }
-        }
-    }
-
-    private async Task ObserveCommandAsync(Task task)
-    {
-        try
-        {
-            await task.ConfigureAwait(true);
-        }
-        catch (OperationCanceledException)
-        {
-            return;
-        }
-        catch (Exception exception)
-        {
-            try
-            {
-                await Settings.Telemetry.RecordAsync(new FusionCanvas.Application.Telemetry.TelemetryEventRequest(
-                    "Workspace", "CommandFailed", "Error", "Failed", exception.GetType().Name))
-                    .ConfigureAwait(true);
-            }
-            catch
-            {
-            }
-        }
-    }
+    private void Run(Func<CancellationToken, Task> operation) => _commandTasks.Run(operation);
 
     private SettingsViewModel CreateSettings(SettingsViewModel? provided)
     {
