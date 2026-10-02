@@ -518,6 +518,21 @@ public sealed class CatalogSetupViewModelTests
     }
 
     [Fact]
+    public async Task ArchiveVariantCommandReportsWhenTheSellableVariantRowIsStale()
+    {
+        var (viewModel, _, _, _) = await CreateCatalogWithOptionsAsync();
+        var staleRow = new SellableVariantRowViewModel(Guid.NewGuid(), "Stale", "Black", "M", null, false);
+
+        viewModel.ArchiveVariantCommand.Execute(staleRow);
+        for (var attempt = 0; attempt < 20 && viewModel.IsBusy; attempt++)
+            await Task.Yield();
+
+        Assert.True(viewModel.HasError);
+        Assert.Contains("no longer active", viewModel.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(viewModel.SellableVariantRows);
+    }
+
+    [Fact]
     public async Task StartAddVariantRaisesRequestEvent()
     {
         var (viewModel, _, _, _) = await CreateCatalogWithOptionsAsync();

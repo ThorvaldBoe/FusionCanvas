@@ -39,6 +39,28 @@ public sealed class CatalogSetupServiceTests
     }
 
     [Fact]
+    public async Task ArchiveVariantWithUnknownIdentityReturnsRecoverableFailureWithoutSaving()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprint = new Blueprint(Guid.NewGuid(), storeId, "Blueprint", null, false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, storeId, "Offering", null, BlueprintOfferingKind.ProviderNetwork, null, "network", null, null, false, Now, Now);
+        var repository = new MemoryRepository(new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [NewStore(storeId, "Store")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint],
+            BlueprintOfferings = [offering]
+        });
+        var service = new CatalogSetupService(repository, () => Now, Guid.NewGuid);
+
+        var result = await service.ArchiveAsync(
+            new ArchiveCatalogRecordRequest(storeId, CatalogRecordKind.Variant, Guid.NewGuid()),
+            TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("not found", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Fact]
     public async Task CreatesBlueprintAndProviderAndKeepsStoreIsolation()
     {
         var storeId = Guid.NewGuid();
