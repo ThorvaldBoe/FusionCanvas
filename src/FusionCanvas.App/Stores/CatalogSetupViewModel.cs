@@ -1555,10 +1555,40 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
         var templateSummaries = AvailableTemplates.Select(template =>
         {
-            var colorIds = TemplateColors.Where(value => value.MockupTemplateId == template.Id && !value.IsArchived).Select(value => value.ColorOptionValueId).ToArray();
+            var templateSourceImages = _templateSourceImages
+                .Where(value => value.MockupTemplateId == template.Id)
+                .ToArray();
+            var activeSourceImageIds = templateSourceImages
+                .Where(value => !value.IsArchived)
+                .Select(value => value.Id)
+                .ToHashSet();
+            var colorIds = templateSourceImages.Length > 0
+                ? _templateSourceConditions
+                    .Where(value => activeSourceImageIds.Contains(value.SourceImageId))
+                    .Select(value => value.OptionValueId)
+                    .Where(value => OptionValues.Any(optionValue => optionValue.Id == value
+                        && optionValue.OfferingId == template.BlueprintOfferingId
+                        && Options.Any(option => option.Id == optionValue.OptionId
+                            && option.OfferingId == template.BlueprintOfferingId
+                            && option.OptionKind == OptionKind.Color)))
+                    .Distinct()
+                    .ToArray()
+                : TemplateColors
+                    .Where(value => value.MockupTemplateId == template.Id && !value.IsArchived)
+                    .Select(value => value.ColorOptionValueId)
+                    .ToArray();
             var targetName = Placeholders.FirstOrDefault(value => value.Id == template.TargetPlaceholderId)?.Name;
             var revision = TemplateRevisions.FirstOrDefault(value => value.MockupTemplateId == template.Id && value.RevisionNumber == template.CurrentRevision);
-            var compatibleVariantIds = AvailableVariants.Where(value => value.OptionValueIds.Any(colorIds.Contains)).Select(value => value.Id).ToArray();
+            var compatibleVariantIds = templateSourceImages.Length > 0
+                ? AvailableVariants
+                    .Where(value => template.TargetPlaceholderId is Guid targetId
+                        && AvailablePlaceholders.FirstOrDefault(area => area.Id == targetId)?.VariantIds.Contains(value.Id) == true)
+                    .Select(value => value.Id)
+                    .ToArray()
+                : AvailableVariants
+                    .Where(value => value.OptionValueIds.Any(colorIds.Contains))
+                    .Select(value => value.Id)
+                    .ToArray();
             var effectiveRevision = revision ?? new MockupTemplateRevision(template.Id, template.Id, template.CurrentRevision, template.TargetPlaceholderId, template.CreatedAt);
             var readiness = MockupTemplateReadinessPolicy.Evaluate(new(template, effectiveRevision, colorIds, Options, OptionValues, Variants, Placeholders,
                 SourceImages: _templateSourceImages, SourceImageOptionValues: _templateSourceConditions));
@@ -1915,7 +1945,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             providerMockupReference: SelectedProviderMockup?.ProviderReference, imageMapping: mapping);
         return MockupTemplateReadinessPolicy.Evaluate(new(template, revision,
             TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).ToArray(),
-            Options, OptionValues, Variants, Placeholders, SelectedProviderMockup?.SupportedColorOptionValueIds.ToHashSet()));
+            Options, OptionValues, Variants, Placeholders, SelectedProviderMockup?.SupportedColorOptionValueIds.ToHashSet(),
+            SourceImages: SelectedTemplate is null ? null : _templateSourceImages,
+            SourceImageOptionValues: SelectedTemplate is null ? null : _templateSourceConditions));
     }
 
     private bool TryCreateMapping(out MockupImageSpaceMapping? mapping)
