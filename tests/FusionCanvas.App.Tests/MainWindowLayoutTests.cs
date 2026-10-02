@@ -768,6 +768,68 @@ public class MainWindowTitleOptimizationTests
         Assert.True(buttonIndex > titleIndex);
     }
 
+    [AvaloniaFact]
+    public async Task OptimizeTitle_ShowsBusyProgressUntilRequestCompletes()
+    {
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var optimization = new DelayedTitleOptimization(gate);
+        using var fixture = new MainWindowFixture(titleOptimization: optimization);
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.PumpLayout();
+        await Task.Delay(150);
+
+        var progress = fixture.FindControl<ProgressBar>(bar =>
+            AutomationProperties.GetName(bar) == "Optimizing title");
+        var optimizeButton = fixture.FindControl<Button>(button =>
+            AutomationProperties.GetName(button) == "Optimize title" && button.IsVisible);
+
+        Assert.False(progress.IsVisible);
+        Assert.True(optimizeButton.IsEnabled);
+
+        fixture.ViewModel.ItemInspector.OptimizeCommand.Execute(null);
+        await WaitUntilAsync(() => fixture.ViewModel.ItemInspector.IsOptimizing);
+        fixture.PumpLayout();
+
+        Assert.True(progress.IsVisible);
+        Assert.True(progress.IsIndeterminate);
+        Assert.False(optimizeButton.IsEnabled);
+
+        gate.SetResult();
+        await WaitUntilAsync(() => !fixture.ViewModel.ItemInspector.IsOptimizing);
+        fixture.PumpLayout();
+
+        Assert.False(progress.IsVisible);
+        Assert.True(optimizeButton.IsEnabled);
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 2000)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        while (!condition())
+        {
+            if (stopwatch.ElapsedMilliseconds > timeoutMs)
+            {
+                throw new TimeoutException("Condition was not met within the timeout.");
+            }
+
+            await Task.Delay(10);
+        }
+    }
+
+    private sealed class DelayedTitleOptimization(TaskCompletionSource gate) : ITitleOptimizationService
+    {
+        public Task<AiAvailabilityResult> GetAvailabilityAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(AiAvailabilityResult.Ready);
+
+        public async Task<TitleOptimizationResult> OptimizeAsync(
+            TitleOptimizationRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            await gate.Task.WaitAsync(cancellationToken);
+            return TitleOptimizationResult.Success("Optimized title");
+        }
+    }
+
     private sealed class UnavailableTitleOptimization : ITitleOptimizationService
     {
         public Task<AiAvailabilityResult> GetAvailabilityAsync(CancellationToken cancellationToken = default) =>

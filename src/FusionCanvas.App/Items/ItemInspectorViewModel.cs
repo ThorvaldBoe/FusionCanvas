@@ -412,6 +412,11 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
                     : _optimizeDisabledReason;
             }
 
+            if (IsOptimizing)
+            {
+                return "Optimizing the working title…";
+            }
+
             if (!HasCreativeContentForOptimize)
             {
                 return "Add creative content (Idea, Concept idea, Phrase, or Graphic direction) before optimizing the title.";

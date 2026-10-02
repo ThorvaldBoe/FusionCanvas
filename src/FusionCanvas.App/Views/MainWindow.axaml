@@ -669,13 +669,20 @@
                                    AutomationProperties.Name="Item working title"
                                    LostFocus="OnDetailsFieldLostFocus" />
                           <Border Grid.Column="1"
-                                  Background="Transparent"
-                                  ToolTip.Tip="{Binding ItemInspector.OptimizeGuidance}">
-                            <Button Padding="{DynamicResource Token.Control.ButtonPadding}"
-                                    Content="Optimize"
-                                    Command="{Binding ItemInspector.OptimizeCommand}"
-                                    IsEnabled="{Binding ItemInspector.CanOptimize}"
-                                    AutomationProperties.Name="Optimize title" />
+                                  Background="Transparent">
+                            <StackPanel Spacing="{DynamicResource Token.Spacing.CompactGap}"
+                                         ToolTip.Tip="{Binding ItemInspector.OptimizeGuidance}">
+                              <Button Padding="{DynamicResource Token.Control.ButtonPadding}"
+                                      Content="Optimize"
+                                      Command="{Binding ItemInspector.OptimizeCommand}"
+                                      IsEnabled="{Binding ItemInspector.CanOptimize}"
+                                      AutomationProperties.Name="Optimize title" />
+                              <ProgressBar Height="3"
+                                           IsVisible="{Binding ItemInspector.IsOptimizing}"
+                                           IsIndeterminate="True"
+                                           AutomationProperties.Name="Optimizing title"
+                                           ToolTip.Tip="Optimizing the working title…" />
+                            </StackPanel>
                           </Border>
                         </Grid>
                       </StackPanel>
