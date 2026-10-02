@@ -1,0 +1,214 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="FusionCanvas.App.DesignSystem.DesignSystemGalleryWindow"
+        Title="Design System Gallery"
+        Width="1120"
+        Height="820"
+        MinWidth="860"
+        MinHeight="620"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Token.Color.WindowBackground}">
+  <ScrollViewer Padding="{DynamicResource Token.Layout.PageInset}">
+    <StackPanel Spacing="{DynamicResource Token.Spacing.SectionGap}">
+      <StackPanel Spacing="{DynamicResource Token.Spacing.CompactGap}">
+        <TextBlock Text="Design System Gallery"
+                   FontSize="{DynamicResource Token.Typography.Title}"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource Token.Color.TextPrimary}" />
+        <TextBlock Text="Developer reference for shared FusionCanvas tokens, controls, states, and the Concept Overview composition."
+                   FontSize="{DynamicResource Token.Typography.Body}"
+                   Foreground="{DynamicResource Token.Color.TextSecondary}"
+                   TextWrapping="Wrap" />
+      </StackPanel>
+
+      <Border Padding="{DynamicResource Token.Layout.CardPadding}"
+              Background="{DynamicResource Token.Color.SurfaceElevated}"
+              BorderBrush="{DynamicResource Token.Color.Border}"
+              BorderThickness="{DynamicResource Token.Border.Default}"
+              CornerRadius="{DynamicResource Token.Radius.Card}"
+              AutomationProperties.AutomationId="DesignSystemGallery.ColorTokens">
+        <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
+          <TextBlock Text="Color tokens"
+                     FontSize="{DynamicResource Token.Typography.SectionHeading}"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource Token.Color.TextStrong}" />
+          <Grid ColumnDefinitions="*,*,*,*"
+                RowDefinitions="Auto,Auto,Auto,Auto"
+                ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}"
+                RowSpacing="{DynamicResource Token.Spacing.ControlGap}">
+            <Border Grid.Row="0" Grid.Column="0" Classes="swatch" Background="{DynamicResource Token.Color.WindowBackground}"><TextBlock Text="Window" Classes="swatchLabel" /></Border>
+            <Border Grid.Row="0" Grid.Column="1" Classes="swatch" Background="{DynamicResource Token.Color.Surface}"><TextBlock Text="Surface" Classes="swatchLabel" /></Border>
+            <Border Grid.Row="0" Grid.Column="2" Classes="swatch" Background="{DynamicResource Token.Color.SurfaceElevated}"><TextBlock Text="Elevated" Classes="swatchLabel" /></Border>
+            <Border Grid.Row="0" Grid.Column="3" Classes="swatch" Background="{DynamicResource Token.Color.Border}"><TextBlock Text="Border" Classes="swatchLabel" /></Border>
+            <Border Grid.Row="1" Grid.Column="0" Classes="swatch" Background="{DynamicResource Token.Color.TextPrimary}"><TextBlock Text="Text primary" Classes="swatchLabel" /></Border>
+            <Border Grid.Row="1" Grid.Column="1" Classes="swatch" Background="{DynamicResource Token.Color.TextMuted}"><TextBlock Text="Text muted" Classes="swatchLabel" /></Border>
+            <Border Grid.Row="1" Grid.Column="2" Classes="swatch" Background="{DynamicResource Token.Color.Accent}"><TextBlock Text="Accent" Classes="swatchLabel" /></Border>
+            <Border Grid.Row="1" Grid.Column="3" Classes="swatch" Background="{DynamicResource Token.Color.Selection}"><TextBlock Text="Selection" Classes="swatchLabel" /></Border>
+            <Border Grid.Row="2" Grid.Column="0" Classes="swatch" Background="{DynamicResource Token.Color.Success}"><TextBlock Text="Success" Classes="swatchLabel" /></Border>
+            <Border Grid.Row="2" Grid.Column="1" Classes="swatch" Background="{DynamicResource Token.Color.Information}"><TextBlock Text="Information" Classes="swatchLabel" /></Border>
+            <Border Grid.Row="2" Grid.Column="2" Classes="swatch" Background="{DynamicResource Token.Color.Warning}"><TextBlock Text="Warning" Classes="swatchLabel" /></Border>
+            <Border Grid.Row="2" Grid.Column="3" Classes="swatch" Background="{DynamicResource Token.Color.Error}"><TextBlock Text="Error" Classes="swatchLabel" /></Border>
+            <Border Grid.Row="3" Grid.Column="0" Classes="swatch" Background="{DynamicResource Token.Color.Destructive}"><TextBlock Text="Destructive" Classes="swatchLabel" /></Border>
+            <Border Grid.Row="3" Grid.Column="1" Classes="swatch" Background="{DynamicResource Token.Color.Disabled}"><TextBlock Text="Disabled" Classes="swatchLabel" /></Border>
+            <Border Grid.Row="3" Grid.Column="2" Classes="swatch" Background="{DynamicResource Token.Color.AccentSoft}"><TextBlock Text="Accent soft" Classes="swatchLabel" /></Border>
+            <Border Grid.Row="3" Grid.Column="3" Classes="swatch" Background="{DynamicResource Token.Color.Hover}"><TextBlock Text="Hover" Classes="swatchLabel" /></Border>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="{DynamicResource Token.Spacing.SectionGap}">
+        <Border Grid.Column="0"
+                Padding="{DynamicResource Token.Layout.CardPadding}"
+                Background="{DynamicResource Token.Color.SurfaceElevated}"
+                BorderBrush="{DynamicResource Token.Color.Border}"
+                BorderThickness="{DynamicResource Token.Border.Default}"
+                CornerRadius="{DynamicResource Token.Radius.Card}"
+                AutomationProperties.AutomationId="DesignSystemGallery.TypographyTokens">
+          <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
+            <TextBlock Text="Typography tokens"
+                       FontSize="{DynamicResource Token.Typography.SectionHeading}"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource Token.Color.TextStrong}" />
+            <TextBlock Text="Title — Concept Overview" FontSize="{DynamicResource Token.Typography.Title}" Foreground="{DynamicResource Token.Color.TextPrimary}" />
+            <TextBlock Text="Section heading — Overview" FontSize="{DynamicResource Token.Typography.SectionHeading}" FontWeight="SemiBold" Foreground="{DynamicResource Token.Color.TextStrong}" />
+            <TextBlock Text="Body — Keep the current item context visible." FontSize="{DynamicResource Token.Typography.Body}" Foreground="{DynamicResource Token.Color.TextPrimary}" />
+            <TextBlock Text="Label · Caption · Helper · Validation · Numeric/data" FontSize="{DynamicResource Token.Typography.Label}" Foreground="{DynamicResource Token.Color.TextSecondary}" />
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Column="1"
+                Padding="{DynamicResource Token.Layout.CardPadding}"
+                Background="{DynamicResource Token.Color.SurfaceElevated}"
+                BorderBrush="{DynamicResource Token.Color.Border}"
+                BorderThickness="{DynamicResource Token.Border.Default}"
+                CornerRadius="{DynamicResource Token.Radius.Card}"
+                AutomationProperties.AutomationId="DesignSystemGallery.SpacingTokens">
+          <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
+            <TextBlock Text="Spacing, shape, and control tokens"
+                       FontSize="{DynamicResource Token.Typography.SectionHeading}"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource Token.Color.TextStrong}" />
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
+              <Border Width="{DynamicResource Token.Spacing.PageInset}" Height="8" Background="{DynamicResource Token.Color.Accent}" />
+              <TextBlock Text="Page inset" FontSize="{DynamicResource Token.Typography.Caption}" VerticalAlignment="Center" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
+              <Border Width="{DynamicResource Token.Spacing.SectionGap}" Height="8" Background="{DynamicResource Token.Color.Accent}" />
+              <TextBlock Text="Section gap" FontSize="{DynamicResource Token.Typography.Caption}" VerticalAlignment="Center" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
+              <Border Width="{DynamicResource Token.Spacing.ControlGap}" Height="8" Background="{DynamicResource Token.Color.Accent}" />
+              <TextBlock Text="Control gap" FontSize="{DynamicResource Token.Typography.Caption}" VerticalAlignment="Center" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
+              <Border Width="{DynamicResource Token.Control.MinHeight}" Height="8" Background="{DynamicResource Token.Color.Accent}" />
+              <TextBlock Text="Minimum control height" FontSize="{DynamicResource Token.Typography.Caption}" VerticalAlignment="Center" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <Border Padding="{DynamicResource Token.Layout.CardPadding}"
+              Background="{DynamicResource Token.Color.SurfaceElevated}"
+              BorderBrush="{DynamicResource Token.Color.Border}"
+              BorderThickness="{DynamicResource Token.Border.Default}"
+              CornerRadius="{DynamicResource Token.Radius.Card}"
+              AutomationProperties.AutomationId="DesignSystemGallery.Controls">
+        <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
+          <TextBlock Text="Controls and states"
+                     FontSize="{DynamicResource Token.Typography.SectionHeading}"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource Token.Color.TextStrong}" />
+          <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*"
+                ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
+            <Button Grid.Column="0" Content="Primary" Classes="galleryPrimary" AutomationProperties.Name="Gallery primary button" />
+            <Button Grid.Column="1" Content="Secondary" Classes="gallerySecondary" AutomationProperties.Name="Gallery secondary button" />
+            <Button Grid.Column="2" Content="Destructive" Classes="galleryDestructive" AutomationProperties.Name="Gallery destructive button" />
+            <Button Grid.Column="3" Content="Disabled" IsEnabled="False" AutomationProperties.Name="Gallery disabled button" />
+            <TextBox Grid.Column="4" Text="Shared field" MinHeight="{DynamicResource Token.Control.MinHeight}" AutomationProperties.Name="Gallery text field" />
+          </Grid>
+          <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="{DynamicResource Token.Spacing.SectionGap}">
+            <ComboBox Grid.Column="0" SelectedIndex="0" MinWidth="150" AutomationProperties.Name="Gallery selector">
+              <ComboBoxItem Content="Selected state" />
+              <ComboBoxItem Content="Another option" />
+            </ComboBox>
+            <CheckBox Grid.Column="1" Content="Checked" IsChecked="True" />
+            <ToggleSwitch Grid.Column="2" Content="Enabled" IsChecked="True" />
+            <ProgressBar Grid.Column="3" Minimum="0" Maximum="100" Value="64" VerticalAlignment="Center" AutomationProperties.Name="Gallery progress" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <Border Padding="{DynamicResource Token.Layout.CardPadding}"
+              Background="{DynamicResource Token.Color.Surface}"
+              BorderBrush="{DynamicResource Token.Color.BorderSelected}"
+              BorderThickness="{DynamicResource Token.Border.Selected}"
+              CornerRadius="{DynamicResource Token.Radius.Card}"
+              AutomationProperties.AutomationId="DesignSystemGallery.Overview">
+        <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
+          <TextBlock Text="Concept Overview composition"
+                     FontSize="{DynamicResource Token.Typography.SectionHeading}"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource Token.Color.TextStrong}" />
+          <TextBlock Text="Representative shared surface used by the Item Overview panel."
+                     FontSize="{DynamicResource Token.Typography.Caption}"
+                     Foreground="{DynamicResource Token.Color.TextSecondary}" />
+          <Border Padding="{DynamicResource Token.Layout.CardPadding}"
+                  Background="{DynamicResource Token.Color.SurfaceElevated}"
+                  BorderBrush="{DynamicResource Token.Color.Border}"
+                  BorderThickness="{DynamicResource Token.Border.Default}"
+                  CornerRadius="{DynamicResource Token.Radius.Card}"
+                  AutomationProperties.AutomationId="DesignSystemGallery.OverviewSample">
+            <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
+              <TextBlock Text="Overview" FontSize="{DynamicResource Token.Typography.SectionHeading}" FontWeight="SemiBold" Foreground="{DynamicResource Token.Color.TextStrong}" />
+              <TextBlock Text="Working title" FontSize="{DynamicResource Token.Typography.Label}" Foreground="{DynamicResource Token.Color.TextSecondary}" />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
+                <TextBox Grid.Column="0" Text="A focused creative concept" MinHeight="{DynamicResource Token.Control.MinHeight}" AutomationProperties.Name="Gallery overview working title" />
+                <Button Grid.Column="1" Content="Optimize" Classes="gallerySecondary" AutomationProperties.Name="Gallery overview optimize" />
+              </Grid>
+              <TextBlock Text="Idea potential" FontSize="{DynamicResource Token.Typography.Label}" Foreground="{DynamicResource Token.Color.TextSecondary}" />
+              <TextBlock Text="★★★★★  Strong" FontSize="{DynamicResource Token.Typography.Numeric}" Foreground="{DynamicResource Token.Color.Accent}" AutomationProperties.Name="Gallery overview rating" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+
+  <Window.Styles>
+    <Style Selector="Border.swatch">
+      <Setter Property="Height" Value="48" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Token.Color.Border}" />
+      <Setter Property="BorderThickness" Value="{DynamicResource Token.Border.Default}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource Token.Radius.Control}" />
+      <Setter Property="Padding" Value="{DynamicResource Token.Layout.CompactPadding}" />
+    </Style>
+    <Style Selector="TextBlock.swatchLabel">
+      <Setter Property="FontSize" Value="{DynamicResource Token.Typography.Caption}" />
+      <Setter Property="Foreground" Value="{DynamicResource Token.Color.TextPrimary}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.galleryPrimary">
+      <Setter Property="Padding" Value="{DynamicResource Token.Control.ButtonPadding}" />
+      <Setter Property="Background" Value="{DynamicResource Token.Color.AccentStrong}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Token.Color.AccentStrong}" />
+      <Setter Property="BorderThickness" Value="{DynamicResource Token.Border.Default}" />
+    </Style>
+    <Style Selector="Button.gallerySecondary">
+      <Setter Property="Padding" Value="{DynamicResource Token.Control.ButtonPadding}" />
+      <Setter Property="Background" Value="{DynamicResource Token.Color.SurfaceElevated}" />
+      <Setter Property="Foreground" Value="{DynamicResource Token.Color.TextStrong}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Token.Color.Border}" />
+      <Setter Property="BorderThickness" Value="{DynamicResource Token.Border.Default}" />
+    </Style>
+    <Style Selector="Button.galleryDestructive">
+      <Setter Property="Padding" Value="{DynamicResource Token.Control.ButtonPadding}" />
+      <Setter Property="Background" Value="{DynamicResource Token.Color.Destructive}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Token.Color.Destructive}" />
+      <Setter Property="BorderThickness" Value="{DynamicResource Token.Border.Destructive}" />
+    </Style>
+  </Window.Styles>
+</Window>
