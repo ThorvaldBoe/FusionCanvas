@@ -819,10 +819,47 @@ public class DesignStageServiceTests
         Assert.Equal(["Black", "Navy", "Heather Gray"], state.AvailableColors);
     }
 
+    [Fact]
+    public async Task ListSupportingImagesAsync_ResolvesThumbnailThroughFileStoreBoundary()
+    {
+        var repository = new InMemoryWorkspaceRepository(SeedWithProduct());
+        var fileStore = new DeterministicFileStore
+        {
+            ThrowOnWorkspaceRootRead = true
+        };
+        var service = New(repository, fileStore);
+        var (itemId, _) = await AddItemWithConfig(service, repository);
+        var assetId = Guid.NewGuid();
+        var asset = new Asset(
+            assetId,
+            StoreId,
+            "reference.png",
+            null,
+            AssetKind.ReferenceImage,
+            "supporting/reference.png",
+            null,
+            false,
+            false,
+            Now,
+            Now,
+            "{}");
+        repository.Snapshot = repository.Snapshot with
+        {
+            Assets = [.. repository.Snapshot.Assets, asset],
+            AssetLinks = [.. repository.Snapshot.AssetLinks, new AssetLink(assetId, WorkspaceEntityKind.Item, itemId)]
+        };
+
+        var images = await service.ListSupportingImagesAsync(itemId, TestContext.Current.CancellationToken);
+
+        var image = Assert.Single(images);
+        Assert.Equal("resolved/supporting/reference.png", image.ThumbnailPath);
+        Assert.Equal([asset.WorkspaceRelativePath], fileStore.ResolvedPaths);
+    }
+
     // --- Helpers ---
 
-    private static DesignStageService New(InMemoryWorkspaceRepository repo) =>
-        new(repo, new DeterministicFileStore(), new TestAiImageProvenanceCodec(), () => Now, Guid.NewGuid);
+    private static DesignStageService New(InMemoryWorkspaceRepository repo, DeterministicFileStore? fileStore = null) =>
+        new(repo, fileStore ?? new DeterministicFileStore(), new TestAiImageProvenanceCodec(), () => Now, Guid.NewGuid);
 
     private static async Task<(Guid itemId, Guid offeringId)> AddItemAndConfig(DesignStageService service, InMemoryWorkspaceRepository repo)
     {
@@ -992,8 +1029,16 @@ public class DesignStageServiceTests
 
         public List<string> ImportedPaths { get; } = [];
         public List<string> DeletedPaths { get; } = [];
-        public string WorkspaceRoot => Path.GetTempPath();
-        public string ResolvePath(string workspaceRelativePath) => Path.Combine(WorkspaceRoot, workspaceRelativePath);
+        public bool ThrowOnWorkspaceRootRead { get; init; }
+        public List<string> ResolvedPaths { get; } = [];
+        public string WorkspaceRoot => ThrowOnWorkspaceRootRead
+            ? throw new InvalidOperationException("Application code must not read WorkspaceRoot.")
+            : Path.GetTempPath();
+        public string ResolvePath(string workspaceRelativePath)
+        {
+            ResolvedPaths.Add(workspaceRelativePath);
+            return $"resolved/{workspaceRelativePath}";
+        }
 
         public bool Exists(string workspaceRelativePath) => File.Exists(Path.Combine(WorkspaceRoot, workspaceRelativePath));
 
