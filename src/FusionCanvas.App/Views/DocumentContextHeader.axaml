@@ -10,7 +10,11 @@
                  FontSize="24"
                  FontWeight="SemiBold"
                  Foreground="{DynamicResource PrimaryTextBrush}" />
-      <TextBlock Text="{Binding DocumentWindow.ActiveNavigationPath}"
+      <TextBlock x:Name="ActiveNavigationPathText"
+                 Text="{Binding DocumentWindow.ActiveNavigationPath}"
+                 TextTrimming="CharacterEllipsis"
+                 ToolTip.Tip="{Binding DocumentWindow.ActiveNavigationPath}"
+                 AutomationProperties.Name="{Binding DocumentWindow.ActiveNavigationPath}"
                  FontSize="12"
                  Foreground="{DynamicResource SecondaryTextBrush}" />
       <TextBlock Text="{Binding IdeationUnavailableMessage}"
