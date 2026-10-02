@@ -1096,7 +1096,12 @@ public sealed class CatalogSetupViewModelTests
     {
         var (viewModel, _, offering) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: true, completeLocalSource: true);
 
-        Assert.Equal("Ready for use", Assert.Single(viewModel.MockupTemplateCards).Status);
+        var card = Assert.Single(viewModel.MockupTemplateCards);
+        Assert.Equal("Black", card.ColorSummary);
+        Assert.Equal("1 compatible Variants", card.VariantSummary);
+        Assert.Equal("Ready for use", card.Status);
+        viewModel.EditTemplateCommand.Execute(card);
+        Assert.Equal("Ready for use", viewModel.MockupTemplateLifecycleLabel);
         await viewModel.LoadForStoreAsync(offering.StoreId, TestContext.Current.CancellationToken);
         viewModel.SelectOffering(offering.Id);
         Assert.Equal("Ready for use", Assert.Single(viewModel.MockupTemplateCards).Status);
