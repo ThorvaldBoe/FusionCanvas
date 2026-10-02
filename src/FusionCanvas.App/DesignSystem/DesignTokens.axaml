@@ -1,0 +1,209 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!--
+    FusionCanvas design-token registry.
+
+    Theme-specific colors live under the Light and Dark dictionaries. The
+    Token.* keys are the semantic contract for new UI. The existing brush
+    keys are retained as compatibility names while the application is
+    migrated surface by surface.
+  -->
+  <ResourceDictionary.ThemeDictionaries>
+    <ResourceDictionary x:Key="Light">
+      <!-- Semantic color tokens -->
+      <SolidColorBrush x:Key="Token.Color.WindowBackground" Color="#F7F8FA" />
+      <SolidColorBrush x:Key="Token.Color.Surface" Color="#F7F8FA" />
+      <SolidColorBrush x:Key="Token.Color.SurfaceElevated" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="Token.Color.SurfaceSubtle" Color="#F3F4F6" />
+      <SolidColorBrush x:Key="Token.Color.TextPrimary" Color="#1E2733" />
+      <SolidColorBrush x:Key="Token.Color.TextStrong" Color="#243447" />
+      <SolidColorBrush x:Key="Token.Color.TextSecondary" Color="#687385" />
+      <SolidColorBrush x:Key="Token.Color.TextMuted" Color="#7C8797" />
+      <SolidColorBrush x:Key="Token.Color.TextDisabled" Color="#8B95A3" />
+      <SolidColorBrush x:Key="Token.Color.Border" Color="#D9DEE7" />
+      <SolidColorBrush x:Key="Token.Color.BorderSubtle" Color="#E1E5EA" />
+      <SolidColorBrush x:Key="Token.Color.BorderSelected" Color="#3C8C69" />
+      <SolidColorBrush x:Key="Token.Color.Focus" Color="#3C8C69" />
+      <SolidColorBrush x:Key="Token.Color.Selection" Color="#E2EAF2" />
+      <SolidColorBrush x:Key="Token.Color.SelectionSubtle" Color="#F0F4F8" />
+      <SolidColorBrush x:Key="Token.Color.Hover" Color="#F0F3F7" />
+      <SolidColorBrush x:Key="Token.Color.Accent" Color="#59A17D" />
+      <SolidColorBrush x:Key="Token.Color.AccentStrong" Color="#3C8C69" />
+      <SolidColorBrush x:Key="Token.Color.AccentSoft" Color="#EEF6FF" />
+      <SolidColorBrush x:Key="Token.Color.AccentSoftText" Color="#204466" />
+      <SolidColorBrush x:Key="Token.Color.Success" Color="#3C8C69" />
+      <SolidColorBrush x:Key="Token.Color.Information" Color="#204466" />
+      <SolidColorBrush x:Key="Token.Color.Warning" Color="#8A6A1F" />
+      <SolidColorBrush x:Key="Token.Color.Error" Color="#9A4B43" />
+      <SolidColorBrush x:Key="Token.Color.Destructive" Color="#B42318" />
+      <SolidColorBrush x:Key="Token.Color.Disabled" Color="#F1F3F6" />
+
+      <!-- Existing shared brush names (compatibility during incremental migration) -->
+      <SolidColorBrush x:Key="ApplicationBackgroundBrush" Color="#F7F8FA" />
+      <SolidColorBrush x:Key="ElevatedSurfaceBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="PanelSurfaceBrush" Color="#F7F8FA" />
+      <SolidColorBrush x:Key="TabBarBackgroundBrush" Color="#F3F4F6" />
+      <SolidColorBrush x:Key="OverlayScrimBrush" Color="#99000000" />
+      <SolidColorBrush x:Key="PrimaryTextBrush" Color="#1E2733" />
+      <SolidColorBrush x:Key="StrongTextBrush" Color="#243447" />
+      <SolidColorBrush x:Key="SecondaryTextBrush" Color="#687385" />
+      <SolidColorBrush x:Key="MutedTextBrush" Color="#7C8797" />
+      <SolidColorBrush x:Key="DisabledTextBrush" Color="#8B95A3" />
+      <SolidColorBrush x:Key="EmptyStateTextBrush" Color="#697586" />
+      <SolidColorBrush x:Key="TreeIconForegroundBrush" Color="#526173" />
+      <SolidColorBrush x:Key="ControlBorderBrush" Color="#D9DEE7" />
+      <SolidColorBrush x:Key="SubtleBorderBrush" Color="#E1E5EA" />
+      <SolidColorBrush x:Key="TabBorderBrush" Color="#D3D8E0" />
+      <SolidColorBrush x:Key="AccentBrush" Color="#59A17D" />
+      <SolidColorBrush x:Key="AccentStrongBrush" Color="#3C8C69" />
+      <SolidColorBrush x:Key="CommandBackgroundBrush" Color="#243447" />
+      <SolidColorBrush x:Key="CommandForegroundBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="CommandBorderBrush" Color="#243447" />
+      <SolidColorBrush x:Key="SecondaryButtonBackgroundBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="SecondaryButtonForegroundBrush" Color="#425066" />
+      <SolidColorBrush x:Key="IconButtonBackgroundBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="IconButtonForegroundBrush" Color="#425066" />
+      <SolidColorBrush x:Key="SelectionBackgroundBrush" Color="#E2EAF2" />
+      <SolidColorBrush x:Key="SelectionSubtleBackgroundBrush" Color="#F0F4F8" />
+      <SolidColorBrush x:Key="HoverBackgroundBrush" Color="#F0F3F7" />
+      <SolidColorBrush x:Key="DropTargetBackgroundBrush" Color="#DDF1E7" />
+      <SolidColorBrush x:Key="AccentSoftBackgroundBrush" Color="#EEF6FF" />
+      <SolidColorBrush x:Key="AccentSoftForegroundBrush" Color="#204466" />
+      <SolidColorBrush x:Key="AccentSoftBorderBrush" Color="#B9D7F2" />
+      <SolidColorBrush x:Key="UnavailableBackgroundBrush" Color="#F1F3F6" />
+      <SolidColorBrush x:Key="UnavailableForegroundBrush" Color="#8B95A3" />
+      <SolidColorBrush x:Key="CountBadgeBackgroundBrush" Color="#E8EDF3" />
+      <SolidColorBrush x:Key="CountBadgeForegroundBrush" Color="#526173" />
+      <SolidColorBrush x:Key="CloseTabHoverBackgroundBrush" Color="#E7E9ED" />
+      <SolidColorBrush x:Key="DangerBackgroundBrush" Color="#FEECEB" />
+      <SolidColorBrush x:Key="DangerTextBrush" Color="#9A4B43" />
+      <SolidColorBrush x:Key="DangerStrongBrush" Color="#B42318" />
+      <SolidColorBrush x:Key="DangerBorderBrush" Color="#E3B4B0" />
+      <SolidColorBrush x:Key="WarningBackgroundBrush" Color="#FFF4E5" />
+      <SolidColorBrush x:Key="WarningBorderBrush" Color="#E5B86A" />
+      <SolidColorBrush x:Key="WarningTextBrush" Color="#8A6A1F" />
+    </ResourceDictionary>
+
+    <ResourceDictionary x:Key="Dark">
+      <!-- Semantic color tokens -->
+      <SolidColorBrush x:Key="Token.Color.WindowBackground" Color="#161B22" />
+      <SolidColorBrush x:Key="Token.Color.Surface" Color="#1C222B" />
+      <SolidColorBrush x:Key="Token.Color.SurfaceElevated" Color="#222833" />
+      <SolidColorBrush x:Key="Token.Color.SurfaceSubtle" Color="#1C222B" />
+      <SolidColorBrush x:Key="Token.Color.TextPrimary" Color="#E6EAF0" />
+      <SolidColorBrush x:Key="Token.Color.TextStrong" Color="#F0F3F7" />
+      <SolidColorBrush x:Key="Token.Color.TextSecondary" Color="#9AA4B2" />
+      <SolidColorBrush x:Key="Token.Color.TextMuted" Color="#7C8694" />
+      <SolidColorBrush x:Key="Token.Color.TextDisabled" Color="#5C6675" />
+      <SolidColorBrush x:Key="Token.Color.Border" Color="#364154" />
+      <SolidColorBrush x:Key="Token.Color.BorderSubtle" Color="#2B3445" />
+      <SolidColorBrush x:Key="Token.Color.BorderSelected" Color="#4FA37C" />
+      <SolidColorBrush x:Key="Token.Color.Focus" Color="#4FA37C" />
+      <SolidColorBrush x:Key="Token.Color.Selection" Color="#2F4258" />
+      <SolidColorBrush x:Key="Token.Color.SelectionSubtle" Color="#263442" />
+      <SolidColorBrush x:Key="Token.Color.Hover" Color="#222833" />
+      <SolidColorBrush x:Key="Token.Color.Accent" Color="#6FBF94" />
+      <SolidColorBrush x:Key="Token.Color.AccentStrong" Color="#4FA37C" />
+      <SolidColorBrush x:Key="Token.Color.AccentSoft" Color="#1E3A5C" />
+      <SolidColorBrush x:Key="Token.Color.AccentSoftText" Color="#B9D7F2" />
+      <SolidColorBrush x:Key="Token.Color.Success" Color="#4FA37C" />
+      <SolidColorBrush x:Key="Token.Color.Information" Color="#B9D7F2" />
+      <SolidColorBrush x:Key="Token.Color.Warning" Color="#D9B873" />
+      <SolidColorBrush x:Key="Token.Color.Error" Color="#E59B95" />
+      <SolidColorBrush x:Key="Token.Color.Destructive" Color="#FF6B5C" />
+      <SolidColorBrush x:Key="Token.Color.Disabled" Color="#1C222B" />
+
+      <!-- Existing shared brush names (compatibility during incremental migration) -->
+      <SolidColorBrush x:Key="ApplicationBackgroundBrush" Color="#161B22" />
+      <SolidColorBrush x:Key="ElevatedSurfaceBrush" Color="#222833" />
+      <SolidColorBrush x:Key="PanelSurfaceBrush" Color="#1C222B" />
+      <SolidColorBrush x:Key="TabBarBackgroundBrush" Color="#1C222B" />
+      <SolidColorBrush x:Key="OverlayScrimBrush" Color="#99000000" />
+      <SolidColorBrush x:Key="PrimaryTextBrush" Color="#E6EAF0" />
+      <SolidColorBrush x:Key="StrongTextBrush" Color="#F0F3F7" />
+      <SolidColorBrush x:Key="SecondaryTextBrush" Color="#9AA4B2" />
+      <SolidColorBrush x:Key="MutedTextBrush" Color="#7C8694" />
+      <SolidColorBrush x:Key="DisabledTextBrush" Color="#5C6675" />
+      <SolidColorBrush x:Key="EmptyStateTextBrush" Color="#8A94A4" />
+      <SolidColorBrush x:Key="TreeIconForegroundBrush" Color="#9AA4B2" />
+      <SolidColorBrush x:Key="ControlBorderBrush" Color="#364154" />
+      <SolidColorBrush x:Key="SubtleBorderBrush" Color="#2B3445" />
+      <SolidColorBrush x:Key="TabBorderBrush" Color="#364154" />
+      <SolidColorBrush x:Key="AccentBrush" Color="#6FBF94" />
+      <SolidColorBrush x:Key="AccentStrongBrush" Color="#4FA37C" />
+      <SolidColorBrush x:Key="CommandBackgroundBrush" Color="#3D5A7A" />
+      <SolidColorBrush x:Key="CommandForegroundBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="CommandBorderBrush" Color="#3D5A7A" />
+      <SolidColorBrush x:Key="SecondaryButtonBackgroundBrush" Color="#222833" />
+      <SolidColorBrush x:Key="SecondaryButtonForegroundBrush" Color="#C2CAD6" />
+      <SolidColorBrush x:Key="IconButtonBackgroundBrush" Color="#222833" />
+      <SolidColorBrush x:Key="IconButtonForegroundBrush" Color="#C2CAD6" />
+      <SolidColorBrush x:Key="SelectionBackgroundBrush" Color="#2F4258" />
+      <SolidColorBrush x:Key="SelectionSubtleBackgroundBrush" Color="#263442" />
+      <SolidColorBrush x:Key="HoverBackgroundBrush" Color="#222833" />
+      <SolidColorBrush x:Key="DropTargetBackgroundBrush" Color="#23402F" />
+      <SolidColorBrush x:Key="AccentSoftBackgroundBrush" Color="#1E3A5C" />
+      <SolidColorBrush x:Key="AccentSoftForegroundBrush" Color="#B9D7F2" />
+      <SolidColorBrush x:Key="AccentSoftBorderBrush" Color="#2E5A82" />
+      <SolidColorBrush x:Key="UnavailableBackgroundBrush" Color="#1C222B" />
+      <SolidColorBrush x:Key="UnavailableForegroundBrush" Color="#5C6675" />
+      <SolidColorBrush x:Key="CountBadgeBackgroundBrush" Color="#364154" />
+      <SolidColorBrush x:Key="CountBadgeForegroundBrush" Color="#9AA4B2" />
+      <SolidColorBrush x:Key="CloseTabHoverBackgroundBrush" Color="#2B3445" />
+      <SolidColorBrush x:Key="DangerBackgroundBrush" Color="#3A2326" />
+      <SolidColorBrush x:Key="DangerTextBrush" Color="#E59B95" />
+      <SolidColorBrush x:Key="DangerStrongBrush" Color="#FF6B5C" />
+      <SolidColorBrush x:Key="DangerBorderBrush" Color="#7A5A5A" />
+      <SolidColorBrush x:Key="WarningBackgroundBrush" Color="#3A3220" />
+      <SolidColorBrush x:Key="WarningBorderBrush" Color="#8A6F35" />
+      <SolidColorBrush x:Key="WarningTextBrush" Color="#D9B873" />
+    </ResourceDictionary>
+  </ResourceDictionary.ThemeDictionaries>
+
+  <!-- Shared, theme-independent layout, type, control, icon, elevation, and border tokens. -->
+  <x:Double x:Key="Token.Spacing.PageInset">24</x:Double>
+  <x:Double x:Key="Token.Spacing.SectionGap">14</x:Double>
+  <x:Double x:Key="Token.Spacing.GroupGap">10</x:Double>
+  <x:Double x:Key="Token.Spacing.ControlGap">8</x:Double>
+  <x:Double x:Key="Token.Spacing.InlineGap">6</x:Double>
+  <x:Double x:Key="Token.Spacing.CompactGap">4</x:Double>
+  <x:Double x:Key="Token.Spacing.CardPadding">14</x:Double>
+  <Thickness x:Key="Token.Layout.CompactPadding">4</Thickness>
+  <Thickness x:Key="Token.Layout.PageInset">24</Thickness>
+  <Thickness x:Key="Token.Layout.CardPadding">14</Thickness>
+
+  <x:Double x:Key="Token.Typography.Title">24</x:Double>
+  <x:Double x:Key="Token.Typography.SectionHeading">14</x:Double>
+  <x:Double x:Key="Token.Typography.Body">13</x:Double>
+  <x:Double x:Key="Token.Typography.Label">11</x:Double>
+  <x:Double x:Key="Token.Typography.Caption">12</x:Double>
+  <x:Double x:Key="Token.Typography.Helper">11</x:Double>
+  <x:Double x:Key="Token.Typography.Validation">12</x:Double>
+  <x:Double x:Key="Token.Typography.Numeric">13</x:Double>
+
+  <CornerRadius x:Key="Token.Radius.Control">4</CornerRadius>
+  <CornerRadius x:Key="Token.Radius.Card">6</CornerRadius>
+  <CornerRadius x:Key="Token.Radius.Dialog">6</CornerRadius>
+  <CornerRadius x:Key="Token.Radius.Badge">10</CornerRadius>
+
+  <x:Double x:Key="Token.Control.MinHeight">32</x:Double>
+  <x:Double x:Key="Token.Control.CompactHeight">28</x:Double>
+  <Thickness x:Key="Token.Control.ButtonPadding">12,6</Thickness>
+  <x:Double x:Key="Token.Control.IconSize">18</x:Double>
+
+  <x:Double x:Key="Token.Icon.Inline">16</x:Double>
+  <x:Double x:Key="Token.Icon.Control">18</x:Double>
+  <x:Double x:Key="Token.Icon.Toolbar">20</x:Double>
+  <x:Double x:Key="Token.Icon.Navigation">16</x:Double>
+  <x:Double x:Key="Token.Icon.Decorative">24</x:Double>
+
+  <x:Double x:Key="Token.Elevation.Surface">0</x:Double>
+  <x:Double x:Key="Token.Elevation.Dialog">8</x:Double>
+
+  <Thickness x:Key="Token.Border.Default">1</Thickness>
+  <Thickness x:Key="Token.Border.Focused">2</Thickness>
+  <Thickness x:Key="Token.Border.Selected">1</Thickness>
+  <Thickness x:Key="Token.Border.Disabled">1</Thickness>
+  <Thickness x:Key="Token.Border.Validation">1</Thickness>
+  <Thickness x:Key="Token.Border.Destructive">1</Thickness>
+</ResourceDictionary>

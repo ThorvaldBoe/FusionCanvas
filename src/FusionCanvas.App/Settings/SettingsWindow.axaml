@@ -152,6 +152,13 @@
                         HorizontalAlignment="Left"
                         MinWidth="160"
                         Classes="primary" />
+                <Button Content="Open design system gallery"
+                        Click="OnOpenDesignSystemGallery"
+                        ToolTip.Tip="Inspect shared UI tokens, controls, states, and compositions"
+                        HorizontalAlignment="Left"
+                        MinWidth="220"
+                        AutomationProperties.AutomationId="Settings.OpenDesignSystemGallery"
+                        Classes="primary" />
               </StackPanel>
             </StackPanel>
           </Border>
