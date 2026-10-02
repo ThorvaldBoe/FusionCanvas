@@ -546,56 +546,7 @@
                         VerticalScrollBarVisibility="Auto"
                         Padding="0,0,16,0">
             <StackPanel Spacing="12">
-            <Grid ColumnDefinitions="*,Auto,Auto,Auto"
-                  ColumnSpacing="8">
-              <StackPanel Grid.Column="0" Spacing="3">
-                <TextBlock Text="{Binding DocumentWindow.ActiveDetailTitle}"
-                           FontSize="24"
-                           FontWeight="SemiBold"
-                           Foreground="{DynamicResource PrimaryTextBrush}" />
-                <TextBlock Text="{Binding DocumentWindow.ActiveNavigationPath}"
-                           FontSize="12"
-                           Foreground="{DynamicResource SecondaryTextBrush}" />
-                <TextBlock Text="{Binding IdeationUnavailableMessage}"
-                           IsVisible="{Binding IdeationUnavailableMessage, Converter={x:Static ObjectConverters.IsNotNull}}"
-                           TextWrapping="Wrap"
-                           FontSize="11"
-                           Foreground="{DynamicResource DangerTextBrush}" />
-              </StackPanel>
-              <Button x:Name="IdeationButton"
-                      Grid.Column="3"
-                      IsVisible="{Binding IsIdeationActionVisible}"
-                      IsEnabled="{Binding CanOpenIdeation}"
-                      Command="{Binding OpenIdeationCommand}"
-                      Content="Ideation…"
-                      Margin="0,0,12,0"
-                      AutomationProperties.Name="Open Ideation"
-                      ToolTip.Tip="{Binding IdeationUnavailableMessage}"
-                      VerticalAlignment="Center" />
-              <TextBlock Grid.Column="1"
-                         IsVisible="{Binding ItemInspector.HasState}"
-                         Text="{Binding ItemInspector.StageLabel}"
-                         FontSize="11"
-                         FontWeight="SemiBold"
-                         Foreground="{DynamicResource AccentBrush}"
-                         VerticalAlignment="Center" />
-              <ComboBox Grid.Column="2"
-                         IsVisible="{Binding HasActiveItem}"
-                         ItemsSource="{Binding AvailableItemStatusOptions}"
-                         SelectedItem="{Binding SelectedItemStatusOption}"
-                         PlaceholderText="{Binding SelectedItemStatusLabel}"
-                         MinWidth="120"
-                         VerticalAlignment="Center"
-                         AutomationProperties.Name="Item lifecycle status"
-                         ToolTip.Tip="Lifecycle status"
-                         Classes="statusSelector">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate x:DataType="views:ItemStatusOptionViewModel">
-                    <TextBlock Text="{Binding Label}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-            </Grid>
+            <views:DocumentContextHeader IsVisible="{Binding !ItemInspector.HasState}" />
             <Border MinHeight="360"
                     Padding="22"
                     Background="{DynamicResource PanelSurfaceBrush}"
@@ -674,13 +625,16 @@
               </Grid>
             </Border>
 
-            <Border IsVisible="{Binding ItemInspector.HasState}"
+            <Border x:Name="ItemOverviewComposition"
+                    AutomationProperties.Name="Item overview context"
+                    IsVisible="{Binding ItemInspector.HasState}"
                     MinHeight="360"
                     Padding="22"
                     Background="{DynamicResource PanelSurfaceBrush}"
                     BorderBrush="{DynamicResource ControlBorderBrush}"
                     BorderThickness="1">
                 <StackPanel Spacing="14">
+                  <views:DocumentContextHeader />
                   <TextBlock IsVisible="{Binding ItemInspector.IsReadOnly}"
                              Text="{Binding ItemInspector.InactiveNotice}"
                              TextWrapping="Wrap"

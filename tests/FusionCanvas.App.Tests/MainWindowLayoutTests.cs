@@ -69,6 +69,24 @@ public class MainWindowConstructionTests
     }
 
     [AvaloniaFact]
+    public void ItemOverviewContext_GroupsHeaderAndOverviewDetailsInOneSurface()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.PumpLayout();
+
+        var composition = fixture.FindControl<Border>(border =>
+            border.Name == "ItemOverviewComposition" && border.IsVisible);
+        var header = fixture.FindControl<DocumentContextHeader>(contextHeader => contextHeader.IsVisible);
+        var overview = fixture.FindControl<TextBlock>(textBlock =>
+            textBlock.Text == "Overview" && textBlock.IsVisible);
+
+        Assert.Equal("Item overview context", AutomationProperties.GetName(composition));
+        Assert.Contains(composition, header.GetVisualAncestors());
+        Assert.Contains(composition, overview.GetVisualAncestors());
+    }
+
+    [AvaloniaFact]
     public void OpeningGroup_EnablesGroupDetailsPane()
     {
         using var fixture = new MainWindowFixture();
