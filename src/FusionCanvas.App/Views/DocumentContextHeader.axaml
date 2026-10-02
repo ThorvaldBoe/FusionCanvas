@@ -1,0 +1,56 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:FusionCanvas.App.Views"
+             x:Class="FusionCanvas.App.Views.DocumentContextHeader"
+             x:DataType="views:MainWindowViewModel">
+  <Grid ColumnDefinitions="*,Auto,Auto,Auto"
+        ColumnSpacing="8">
+    <StackPanel Grid.Column="0" Spacing="3">
+      <TextBlock Text="{Binding DocumentWindow.ActiveDetailTitle}"
+                 FontSize="24"
+                 FontWeight="SemiBold"
+                 Foreground="{DynamicResource PrimaryTextBrush}" />
+      <TextBlock Text="{Binding DocumentWindow.ActiveNavigationPath}"
+                 FontSize="12"
+                 Foreground="{DynamicResource SecondaryTextBrush}" />
+      <TextBlock Text="{Binding IdeationUnavailableMessage}"
+                 IsVisible="{Binding IdeationUnavailableMessage, Converter={x:Static ObjectConverters.IsNotNull}}"
+                 TextWrapping="Wrap"
+                 FontSize="11"
+                 Foreground="{DynamicResource DangerTextBrush}" />
+    </StackPanel>
+    <Button x:Name="IdeationButton"
+            Grid.Column="3"
+            IsVisible="{Binding IsIdeationActionVisible}"
+            IsEnabled="{Binding CanOpenIdeation}"
+            Command="{Binding OpenIdeationCommand}"
+            Content="Ideation…"
+            Margin="0,0,12,0"
+            AutomationProperties.Name="Open Ideation"
+            ToolTip.Tip="{Binding IdeationUnavailableMessage}"
+            VerticalAlignment="Center" />
+    <TextBlock Grid.Column="1"
+               IsVisible="{Binding ItemInspector.HasState}"
+               Text="{Binding ItemInspector.StageLabel}"
+               FontSize="11"
+               FontWeight="SemiBold"
+               Foreground="{DynamicResource AccentBrush}"
+               VerticalAlignment="Center" />
+    <ComboBox Grid.Column="2"
+              IsVisible="{Binding HasActiveItem}"
+              ItemsSource="{Binding AvailableItemStatusOptions}"
+              SelectedItem="{Binding SelectedItemStatusOption}"
+              PlaceholderText="{Binding SelectedItemStatusLabel}"
+              MinWidth="120"
+              VerticalAlignment="Center"
+              AutomationProperties.Name="Item lifecycle status"
+              ToolTip.Tip="Lifecycle status"
+              Classes="statusSelector">
+      <ComboBox.ItemTemplate>
+        <DataTemplate x:DataType="views:ItemStatusOptionViewModel">
+          <TextBlock Text="{Binding Label}" />
+        </DataTemplate>
+      </ComboBox.ItemTemplate>
+    </ComboBox>
+  </Grid>
+</UserControl>

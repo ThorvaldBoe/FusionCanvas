@@ -491,7 +491,10 @@ public partial class MainWindow : Window
                 if (CanFocusOwner(this))
                 {
                     Activate();
-                    if (!IdeationButton.Focus())
+                    var contextHeader = this.GetVisualDescendants()
+                        .OfType<DocumentContextHeader>()
+                        .FirstOrDefault(header => header.IsVisible);
+                    if (contextHeader is null || !contextHeader.FocusIdeationButton())
                     {
                         WorkspaceTreeControl.Focus();
                     }
