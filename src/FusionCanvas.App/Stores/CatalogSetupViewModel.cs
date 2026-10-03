@@ -27,6 +27,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private readonly IMockupTemplateSourceImageService? _sourceImages;
     private readonly IRasterImageMetadataReader? _rasterImageMetadataReader;
     private readonly IMockupSourceMetadataAssistanceService? _mockupSourceMetadataAssistance;
+    private readonly IMockupPlacementPreviewReader? _mockupPlacementPreviewReader;
     private IReadOnlyList<MockupTemplateSourceImage> _templateSourceImages = [];
     private IReadOnlyList<MockupTemplateSourceImageOptionValue> _templateSourceConditions = [];
     private IAssetFilePicker _filePicker;
@@ -115,7 +116,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private string _mockupSourceMetadataAssistanceStatus = string.Empty;
     private long _mockupSourceMetadataAssistanceVersion;
 
-    public CatalogSetupViewModel(ICatalogSetupService catalog, IMockupTemplateSetupService mockups, IOfferingManagementService? offeringManagement = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, IAssetFilePicker? filePicker = null, IRasterImageMetadataReader? rasterImageMetadataReader = null, IMockupSourceMetadataAssistanceService? mockupSourceMetadataAssistance = null)
+    public CatalogSetupViewModel(ICatalogSetupService catalog, IMockupTemplateSetupService mockups, IOfferingManagementService? offeringManagement = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, IAssetFilePicker? filePicker = null, IRasterImageMetadataReader? rasterImageMetadataReader = null, IMockupSourceMetadataAssistanceService? mockupSourceMetadataAssistance = null, IMockupPlacementPreviewReader? mockupPlacementPreviewReader = null)
     {
         _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         _mockups = mockups ?? throw new ArgumentNullException(nameof(mockups));
@@ -125,6 +126,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         _filePicker = filePicker ?? new NullAssetFilePicker();
         _rasterImageMetadataReader = rasterImageMetadataReader;
         _mockupSourceMetadataAssistance = mockupSourceMetadataAssistance;
+        _mockupPlacementPreviewReader = mockupPlacementPreviewReader;
 
         SaveOfferingCommand = new AsyncRelayCommand(SaveOfferingAsync, CanSaveOffering);
         StartAddPrintProviderCommand = new RelayCommand(_ => IsAddingPrintProvider = true, () => CanEdit && SelectedOffering is not null && !IsProviderNetworkOffering);
@@ -284,6 +286,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         : "Archive selected";
     public LocalMockupSourceDraftViewModel? SelectedMappingSource { get => _selectedMappingSource; set => SetField(ref _selectedMappingSource, value); }
     public string? SelectedImagePreviewPath => SelectedLocalSource?.PreviewPath;
+
+    internal Stream OpenPreviewRead(string sourcePath) =>
+        _mockupPlacementPreviewReader?.OpenRead(sourcePath)
+        ?? throw new InvalidOperationException("Mockup preview image access is unavailable.");
     public bool HasSelectedLocalSource => SelectedLocalSource is not null;
     public bool HasLocalSource => LocalSourceDrafts.Count > 0 || !string.IsNullOrWhiteSpace(LocalSourcePath);
     public bool IsMockupSourceMetadataAssistanceBusy => _isMockupSourceMetadataAssistanceBusy;

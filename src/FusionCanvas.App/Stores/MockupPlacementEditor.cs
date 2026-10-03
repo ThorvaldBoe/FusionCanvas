@@ -45,7 +45,7 @@ public sealed class MockupPlacementEditor : Control
     public double AspectRatio { get => GetValue(AspectRatioProperty); set => SetValue(AspectRatioProperty, value); }
     public bool KeepAspectRatio { get => GetValue(KeepAspectRatioProperty); set => SetValue(KeepAspectRatioProperty, value); }
 
-    internal Func<string, Bitmap> PreviewBitmapFactory { get; set; } = static imagePath => new Bitmap(imagePath);
+    internal Func<string, Stream>? PreviewImageStreamFactory { get; set; }
 
     public Rect ImageDisplayBounds => ImageRect();
 
@@ -77,22 +77,25 @@ public sealed class MockupPlacementEditor : Control
         }
         else
         {
-            Bitmap? bitmap = null;
-            try
-            {
-                bitmap = PreviewBitmapFactory(ImagePath);
-            }
-            catch (Exception exception) when (IsExpectedPreviewLoadFailure(exception))
+            if (PreviewImageStreamFactory is null)
             {
                 previewUnavailable = true;
             }
-
-            if (!previewUnavailable)
+            else
             {
-                using var loadedBitmap = bitmap ?? throw new InvalidOperationException("The preview bitmap factory returned no bitmap.");
-                context.DrawImage(loadedBitmap, new Rect(0, 0, loadedBitmap.PixelSize.Width, loadedBitmap.PixelSize.Height), imageRect);
-                AutomationProperties.SetHelpText(this, null);
+                try
+                {
+                    using var stream = PreviewImageStreamFactory(ImagePath);
+                    using var loadedBitmap = new Bitmap(stream);
+                    context.DrawImage(loadedBitmap, new Rect(0, 0, loadedBitmap.PixelSize.Width, loadedBitmap.PixelSize.Height), imageRect);
+                    AutomationProperties.SetHelpText(this, null);
+                }
+                catch (Exception exception) when (IsExpectedPreviewLoadFailure(exception))
+                {
+                    previewUnavailable = true;
+                }
             }
+
         }
 
         if (HasImage())

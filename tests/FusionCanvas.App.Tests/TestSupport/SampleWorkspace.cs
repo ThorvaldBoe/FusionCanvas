@@ -147,7 +147,8 @@ internal static class MainWindowViewModelFactory
             new DesignStageService(repository, fileStore, new AiImageProvenanceCodec()),
             new SllDocumentCodec(),
             null,
-            new WorkspaceBatchRollbackService(repository));
+            new WorkspaceBatchRollbackService(repository),
+            MockupPlacementPreviewReader: new LocalMockupPlacementPreviewReader());
 
         return new(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),
