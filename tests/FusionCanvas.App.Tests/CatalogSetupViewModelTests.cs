@@ -49,6 +49,39 @@ public sealed class CatalogSetupViewModelTests
     }
 
     [Fact]
+    public async Task LocalSourceSelectionSupportsReplaceToggleRangeAndBulkArchive()
+    {
+        var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: false);
+        viewModel.StartAddTemplateCommand.Execute(null);
+        var first = new LocalMockupSourceDraftViewModel("01-first.png", []);
+        var second = new LocalMockupSourceDraftViewModel("02-second.png", []);
+        var third = new LocalMockupSourceDraftViewModel("03-third.png", []);
+        var fourth = new LocalMockupSourceDraftViewModel("04-fourth.png", []);
+        viewModel.LocalSourceDrafts.Add(first);
+        viewModel.LocalSourceDrafts.Add(second);
+        viewModel.LocalSourceDrafts.Add(third);
+        viewModel.LocalSourceDrafts.Add(fourth);
+
+        viewModel.SelectLocalSourceCommand.Execute(first);
+        viewModel.SelectLocalSourceWithModifiers(third, toggle: true, range: false);
+        Assert.Equal([first, third], viewModel.SelectedLocalSources);
+        Assert.Same(third, viewModel.SelectedLocalSource);
+
+        viewModel.SelectLocalSourceWithModifiers(fourth, toggle: false, range: true);
+        Assert.Equal([first, second, third, fourth], viewModel.SelectedLocalSources);
+        Assert.Equal("4 source images selected", viewModel.LocalSourceSelectionSummary);
+        Assert.Equal("Archive selected (4)", viewModel.LocalSourceArchiveLabel);
+
+        viewModel.SelectLocalSourceWithModifiers(second, toggle: true, range: false);
+        Assert.Equal([first, third, fourth], viewModel.SelectedLocalSources);
+        viewModel.RemoveLocalSourceCommand.Execute(null);
+
+        Assert.Equal([second], viewModel.LocalSourceDrafts);
+        Assert.Same(second, viewModel.SelectedLocalSource);
+        Assert.Equal(1, viewModel.SelectedLocalSourceCount);
+    }
+
+    [Fact]
     public async Task BrowseLocalSourceGetsDimensionsFromMetadataService()
     {
         var now = DateTimeOffset.UtcNow;

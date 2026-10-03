@@ -14,6 +14,7 @@ public partial class MockupTemplateEditorWindow : Window
     private CatalogSetupViewModel? _viewModel;
     private bool _allowClose;
     private bool _enlargedEditorOpen;
+    private bool _sourceFilePointerSelectionHandled;
     private Button? _enlargedEditorButton;
 
     public MockupTemplateEditorWindow()
@@ -24,7 +25,8 @@ public partial class MockupTemplateEditorWindow : Window
         Closing += OnClosing;
         KeyDown += OnKeyDown;
         LayoutUpdated += OnLayoutUpdated;
-        AddHandler(Button.ClickEvent, OnButtonClick, RoutingStrategies.Bubble);
+        AddHandler(Button.ClickEvent, OnButtonClick, RoutingStrategies.Bubble, handledEventsToo: true);
+        AddHandler(InputElement.PointerPressedEvent, OnSourceFilePointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
     }
 
     protected override void OnClosed(EventArgs e)
@@ -99,8 +101,19 @@ public partial class MockupTemplateEditorWindow : Window
 
     private void OnButtonClick(object? sender, RoutedEventArgs e)
     {
-        if (e.Source is Button button && AutomationProperties.GetName(button) == "Open enlarged image placement editor")
+        if (e.Source is not Button button) return;
+        if (AutomationProperties.GetName(button) == "Open enlarged image placement editor")
             _enlargedEditorButton = button;
+        else if (button.Classes.Contains("mockupTableFile") && button.DataContext is LocalMockupSourceDraftViewModel source)
+        {
+            if (_sourceFilePointerSelectionHandled)
+            {
+                _sourceFilePointerSelectionHandled = false;
+                return;
+            }
+
+            _viewModel?.SelectLocalSourceCommand.Execute(source);
+        }
     }
 
     private void OnSourceRowPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -109,7 +122,29 @@ public partial class MockupTemplateEditorWindow : Window
             return;
 
         row.Focus();
-        SelectSourceRow(row);
+        SelectSourceRow(row, e.KeyModifiers);
+        e.Handled = true;
+    }
+
+    private void OnSourceFilePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+        var point = e.GetPosition(this);
+        var file = this.GetVisualDescendants().OfType<Button>()
+            .Where(button => button.Classes.Contains("mockupTableFile"))
+            .FirstOrDefault(button => button.TranslatePoint(new Point(0, 0), this) is { } origin &&
+                new Rect(origin, button.Bounds.Size).Contains(point));
+        if (file is null) return;
+
+        var row = file.GetVisualAncestors().OfType<Border>()
+            .FirstOrDefault(candidate => candidate.Classes.Contains("mockupTableRow"));
+        if (row is null) return;
+
+        row.Focus();
+        SelectSourceRow(row, e.KeyModifiers);
+        _sourceFilePointerSelectionHandled = true;
+        Dispatcher.UIThread.Post(() => _sourceFilePointerSelectionHandled = false);
         e.Handled = true;
     }
 
@@ -118,15 +153,20 @@ public partial class MockupTemplateEditorWindow : Window
         if (sender is not Border row || !ReferenceEquals(e.Source, row) || e.Key is not (Key.Enter or Key.Space))
             return;
 
-        SelectSourceRow(row);
+        SelectSourceRow(row, e.KeyModifiers);
         e.Handled = true;
     }
 
-    private void SelectSourceRow(Border row)
+    private void SelectSourceRow(Border row, KeyModifiers modifiers)
     {
         if (row.DataContext is LocalMockupSourceDraftViewModel source &&
             _viewModel?.SelectLocalSourceCommand.CanExecute(source) == true)
-            _viewModel.SelectLocalSourceCommand.Execute(source);
+        {
+            var toggle = (modifiers & KeyModifiers.Control) != 0;
+            var range = (modifiers & KeyModifiers.Shift) != 0;
+            if (toggle || range) _viewModel.SelectLocalSourceWithModifiers(source, toggle, range);
+            else _viewModel.SelectLocalSourceCommand.Execute(source);
+        }
     }
 
     private static bool IsFromChildButton(Border row, object? source)
