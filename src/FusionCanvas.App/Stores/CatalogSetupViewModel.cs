@@ -103,6 +103,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private bool _isDesignAreaDiscardConfirmationVisible;
     private DesignAreaDraftState? _designAreaDraftBaseline;
     private bool _storeEditorAttached = true;
+    private OfferingReadinessSummary? _offeringReadiness;
+    private long _readinessLoadVersion;
 
     public CatalogSetupViewModel(ICatalogSetupService catalog, IMockupTemplateSetupService mockups, IOfferingManagementService? offeringManagement = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, IAssetFilePicker? filePicker = null, IRasterImageMetadataReader? rasterImageMetadataReader = null)
     {
@@ -284,6 +286,12 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             }
             LoadOfferingFields();
             RefreshOfferingCollections();
+            _offeringReadiness = null;
+            OnPropertyChanged(nameof(ReadyMockupTemplateCount));
+            OnPropertyChanged(nameof(HasOfferingReadinessGuidance));
+            OnPropertyChanged(nameof(OfferingReadinessGuidance));
+            OnPropertyChanged(nameof(OfferingReadinessSummary));
+            OnPropertyChanged(nameof(OfferingReadinessStatus));
             OnPropertyChanged(nameof(SelectedOfferingId));
             OnPropertyChanged(nameof(HasSelectedOffering));
             OnPropertyChanged(nameof(IsOfferingContextUnavailable));
@@ -597,6 +605,17 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public int AvailableVariantCount => AvailableVariants.Count();
     public int AvailableDesignAreaCount => AvailablePlaceholders.Count();
     public int AvailableTemplateCount => AvailableTemplates.Count();
+    public int ReadyMockupTemplateCount => _offeringReadiness?.ReadyMockupTemplateCount ?? 0;
+    public IReadOnlyList<string> OfferingReadinessGuidance => _offeringReadiness?.Issues.Select(OfferingReadinessMessageTranslator.Translate).ToArray() ?? [];
+    public bool HasOfferingReadinessGuidance => OfferingReadinessGuidance.Count > 0;
+    public string OfferingReadinessSummary => _offeringReadiness is null
+        ? "Catalog readiness is loading."
+        : _offeringReadiness.Status switch
+        {
+            FusionCanvas.Application.Catalog.OfferingReadinessStatus.ReadyForMockupGeneration => $"{ReadyMockupTemplateCount} Mockup Template{(ReadyMockupTemplateCount == 1 ? string.Empty : "s")} ready for mockup generation. Item Colors and Design artwork are still configured per Item.",
+            FusionCanvas.Application.Catalog.OfferingReadinessStatus.NeedsAttention => "Mockup Templates need attention before they can be used.",
+            _ => "Catalog setup is incomplete. Complete the named prerequisites before using mockups."
+        };
     public string OfferingReadinessStatus
     {
         get
@@ -606,10 +625,13 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
                 return "Archived";
             }
 
-            var counts = CatalogSetupQueries.CountSetup(Variants, Placeholders, Templates, SelectedOffering?.Id);
-            return counts.VariantsComplete && counts.DesignAreasComplete && counts.MockupTemplatesComplete
-                ? "Ready"
-                : "Setup incomplete";
+            return _offeringReadiness?.Status switch
+            {
+                FusionCanvas.Application.Catalog.OfferingReadinessStatus.ReadyForMockupGeneration => "Ready for mockup generation",
+                FusionCanvas.Application.Catalog.OfferingReadinessStatus.NeedsAttention => "Needs attention",
+                FusionCanvas.Application.Catalog.OfferingReadinessStatus.Incomplete => "Setup incomplete",
+                _ => "Catalog readiness is loading"
+            };
         }
     }
 
@@ -693,6 +715,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             Replace(TemplateRevisions, mockups.Revisions);
             SelectedTemplate = Templates.FirstOrDefault(value => value.Id == SelectedTemplate?.Id) ?? AvailableTemplates.FirstOrDefault();
             RefreshOfferingCollections();
+            await LoadOfferingReadinessAsync(cancellationToken).ConfigureAwait(true);
             await LoadProviderMockupsAsync(cancellationToken).ConfigureAwait(true);
         }
         catch (Exception exception)
@@ -720,6 +743,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         _requestedOfferingId = offeringId;
         SelectedOffering = offeringId is null ? null : Offerings.FirstOrDefault(value => value.Id == offeringId.Value);
         OnPropertyChanged(nameof(IsOfferingContextUnavailable));
+        _ = LoadOfferingReadinessAsync();
         _ = LoadProviderMockupsAsync();
     }
 
@@ -1481,6 +1505,12 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void ApplyOfferingState(OfferingManagementState state)
     {
+        _offeringReadiness = state.Summary.Readiness;
+        OnPropertyChanged(nameof(ReadyMockupTemplateCount));
+        OnPropertyChanged(nameof(HasOfferingReadinessGuidance));
+        OnPropertyChanged(nameof(OfferingReadinessGuidance));
+        OnPropertyChanged(nameof(OfferingReadinessSummary));
+        OnPropertyChanged(nameof(OfferingReadinessStatus));
         var selectedPlaceholderId = SelectedPlaceholder?.Id;
         Replace(Options, Options.Where(value => value.OfferingId != state.Offering.Id).Concat(state.Options));
         Replace(OptionValues, OptionValues.Where(value => value.OfferingId != state.Offering.Id).Concat(state.OptionValues));
@@ -1501,6 +1531,47 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             ?? state.DesignAreas.FirstOrDefault(value => value.Id == state.Offering.DefaultPlaceholderId)
             ?? state.DesignAreas.FirstOrDefault();
         RefreshOfferingCollections();
+    }
+
+    private async Task LoadOfferingReadinessAsync(CancellationToken cancellationToken = default)
+    {
+        if (_offeringManagement is null || SelectedOffering is not { } offering)
+        {
+            _offeringReadiness = null;
+            OnPropertyChanged(nameof(ReadyMockupTemplateCount));
+            OnPropertyChanged(nameof(HasOfferingReadinessGuidance));
+            OnPropertyChanged(nameof(OfferingReadinessGuidance));
+            OnPropertyChanged(nameof(OfferingReadinessSummary));
+            OnPropertyChanged(nameof(OfferingReadinessStatus));
+            return;
+        }
+
+        var version = Interlocked.Increment(ref _readinessLoadVersion);
+        try
+        {
+            var state = await _offeringManagement.LoadOfferingAsync(
+                new OfferingContext(offering.StoreId, offering.BlueprintId, offering.Id), cancellationToken).ConfigureAwait(true);
+            if (version != Volatile.Read(ref _readinessLoadVersion) || SelectedOffering?.Id != offering.Id) return;
+            _offeringReadiness = state.Summary.Readiness;
+            OnPropertyChanged(nameof(ReadyMockupTemplateCount));
+            OnPropertyChanged(nameof(HasOfferingReadinessGuidance));
+            OnPropertyChanged(nameof(OfferingReadinessGuidance));
+            OnPropertyChanged(nameof(OfferingReadinessSummary));
+            OnPropertyChanged(nameof(OfferingReadinessStatus));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch
+        {
+            if (version != Volatile.Read(ref _readinessLoadVersion) || SelectedOffering?.Id != offering.Id) return;
+            _offeringReadiness = null;
+            OnPropertyChanged(nameof(ReadyMockupTemplateCount));
+            OnPropertyChanged(nameof(HasOfferingReadinessGuidance));
+            OnPropertyChanged(nameof(OfferingReadinessGuidance));
+            OnPropertyChanged(nameof(OfferingReadinessSummary));
+            OnPropertyChanged(nameof(OfferingReadinessStatus));
+        }
     }
 
     private void ResetBulkDraft()
@@ -1620,6 +1691,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(AvailableVariantCount));
         OnPropertyChanged(nameof(AvailableDesignAreaCount));
         OnPropertyChanged(nameof(AvailableTemplateCount));
+        OnPropertyChanged(nameof(ReadyMockupTemplateCount));
+        OnPropertyChanged(nameof(HasOfferingReadinessGuidance));
+        OnPropertyChanged(nameof(OfferingReadinessGuidance));
+        OnPropertyChanged(nameof(OfferingReadinessSummary));
         OnPropertyChanged(nameof(OfferingReadinessStatus));
         var groups = AvailableOptions.Select(option => new OfferingChoiceGroupViewModel(
             option,

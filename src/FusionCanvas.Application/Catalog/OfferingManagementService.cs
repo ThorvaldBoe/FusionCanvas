@@ -381,7 +381,8 @@ public sealed class OfferingManagementService : IOfferingManagementService
             new OfferingSetupCounts(
                 snapshot.OfferingVariants.Count(value => value.OfferingId == offering.Id && !value.IsArchived),
                 snapshot.OfferingPlaceholders.Count(value => value.OfferingId == offering.Id && !value.IsArchived),
-                snapshot.MockupTemplates.Count(value => value.BlueprintOfferingId == offering.Id && !value.IsArchived)));
+                snapshot.MockupTemplates.Count(value => value.BlueprintOfferingId == offering.Id && !value.IsArchived)),
+            OfferingReadinessBuilder.Build(snapshot, offering));
     }
 
     private static OfferingFulfillmentContext FixedProviderContext(WorkspaceSnapshot snapshot, BlueprintOffering offering)

@@ -686,6 +686,11 @@
                             <TextBlock Text="{Binding SetupSummary}"
                                        FontSize="12"
                                        Foreground="{DynamicResource SecondaryTextBrush}" />
+                            <TextBlock Text="{Binding ReadinessSummary}"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       AutomationProperties.Name="Offering readiness summary" />
                           </StackPanel>
                         </Button>
                       </DataTemplate>
@@ -943,6 +948,30 @@
                                Foreground="{DynamicResource SecondaryTextBrush}" />
                     <Button Grid.Row="4" Grid.Column="2" Content="Manage Mockup Templates" Command="{Binding OpenMockupTemplateManagementCommand}" Classes="secondary" HorizontalAlignment="Stretch" />
                   </Grid>
+                </Border>
+                <Border Classes="panel" Padding="10"
+                        AutomationProperties.AutomationId="Catalog.OfferingReadiness">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="Setup readiness" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding CatalogSetup.OfferingReadinessSummary}"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource SecondaryTextBrush}"
+                               AutomationProperties.Name="Offering setup readiness" />
+                    <TextBlock Text="{Binding CatalogSetup.ReadyMockupTemplateCount, StringFormat='{}{0} ready Mockup Templates'}"
+                               FontSize="12"
+                               Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <ItemsControl ItemsSource="{Binding CatalogSetup.OfferingReadinessGuidance}"
+                                  IsVisible="{Binding CatalogSetup.HasOfferingReadinessGuidance}"
+                                  AutomationProperties.Name="Offering readiness guidance">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <TextBlock Text="{Binding}"
+                                     TextWrapping="Wrap"
+                                     Foreground="{DynamicResource WarningTextBrush}" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
                 </Border>
                 </StackPanel>
               </Border>
