@@ -13,6 +13,10 @@
              AutomationProperties.AutomationId="Printify.Key" />
     <TextBlock Text="Save stores this key securely for this Store immediately, independently of Store Save. An existing key is replaced and is never displayed. Verification needs shops.read access."
                TextWrapping="Wrap" />
+    <ProgressBar IsVisible="{Binding IsBusy}"
+                 IsIndeterminate="True"
+                 Height="4"
+                 AutomationProperties.Name="Saving Printify API key" />
     <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource DangerStrongBrush}" />
     <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
       <Button Content="Save" Command="{Binding SaveCommand}" IsEnabled="{Binding CanSave}" />

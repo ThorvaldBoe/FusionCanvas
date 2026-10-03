@@ -30,6 +30,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     private string _workspaceName = "No workspace";
     private int _saveGeneration;
     private Task _saveChain = Task.CompletedTask;
+    private int _busyOperationCount;
 
     public SettingsViewModel(
         IApplicationSettingsStore store,
@@ -57,6 +58,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
 
         OpenCommand = new RelayCommand(_ => Open());
         Ai = ai ?? CreateOfflineAi(initialSettings.Ai);
+        Ai.PropertyChanged += (_, _) => OnPropertyChanged(nameof(IsBusy));
+        Telemetry.PropertyChanged += (_, _) => OnPropertyChanged(nameof(IsBusy));
         Ai.SettingsChanged += (_, _) =>
         {
             _currentSettings = _currentSettings with { Ai = Ai.Current };
@@ -162,6 +165,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     }
 
     public bool HasMessage => !string.IsNullOrWhiteSpace(ErrorMessage);
+
+    public bool IsBusy => Volatile.Read(ref _busyOperationCount) > 0 || Ai.IsBusy || Telemetry.IsBusy;
 
     public string WorkspaceName
     {
@@ -299,7 +304,20 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         await _clipboard.SetTextAsync(DiagnosticsText).ConfigureAwait(true);
     }
 
-    private void Run(Func<Task> operation) => _ = ObserveAsync(operation);
+    private void Run(Func<Task> operation) => _ = ObserveBusyAsync(operation);
+
+    private async Task ObserveBusyAsync(Func<Task> operation)
+    {
+        BeginBusy();
+        try
+        {
+            await ObserveAsync(operation).ConfigureAwait(true);
+        }
+        finally
+        {
+            EndBusy();
+        }
+    }
 
     private async Task ObserveAsync(Func<Task> operation)
     {
@@ -320,9 +338,23 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     private void QueueSave(ApplicationSettings settings)
     {
         var generation = Interlocked.Increment(ref _saveGeneration);
+        BeginBusy();
         _saveChain = _saveChain
             .ContinueWith(_ => PersistAsync(generation, settings), TaskScheduler.Default)
-            .Unwrap();
+            .Unwrap()
+            .ContinueWith(_ => EndBusy(), TaskScheduler.Default);
+    }
+
+    private void BeginBusy()
+    {
+        Interlocked.Increment(ref _busyOperationCount);
+        OnPropertyChanged(nameof(IsBusy));
+    }
+
+    private void EndBusy()
+    {
+        Interlocked.Decrement(ref _busyOperationCount);
+        OnPropertyChanged(nameof(IsBusy));
     }
 
     private async Task PersistAsync(int generation, ApplicationSettings settings)

@@ -187,6 +187,13 @@
         </Border>
       </Grid>
     </ScrollViewer>
+    <ProgressBar Grid.ColumnSpan="2"
+                 Margin="24,8,24,0"
+                 VerticalAlignment="Top"
+                 IsVisible="{Binding IsBusy}"
+                 IsIndeterminate="True"
+                 Height="4"
+                 AutomationProperties.Name="Saving settings" />
   </Grid>
   <Window.Styles>
     <Style Selector="Button.primary">

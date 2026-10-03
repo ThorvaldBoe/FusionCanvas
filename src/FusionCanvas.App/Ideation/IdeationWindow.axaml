@@ -150,7 +150,7 @@
                       BorderBrush="{DynamicResource ControlBorderBrush}"
                       BorderThickness="1">
                 <Grid ColumnDefinitions="*,Auto,Auto"
-                      RowDefinitions="Auto,Auto"
+                      RowDefinitions="Auto,Auto,Auto"
                       ColumnSpacing="8">
                   <TextBlock Text="{Binding Text}"
                              TextWrapping="Wrap"
@@ -165,7 +165,13 @@
                           IsEnabled="{Binding CanDecide}"
                           Click="OnRejectCandidate"
                           AutomationProperties.Name="Reject idea candidate" />
-                  <TextBlock Grid.Row="1"
+                  <ProgressBar Grid.Row="1"
+                               Grid.ColumnSpan="3"
+                               IsVisible="{Binding IsBusy}"
+                               IsIndeterminate="True"
+                               Height="3"
+                               AutomationProperties.Name="Processing idea candidate" />
+                  <TextBlock Grid.Row="2"
                              Grid.ColumnSpan="3"
                              Text="{Binding Error}"
                              IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}"

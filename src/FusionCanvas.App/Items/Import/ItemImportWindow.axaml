@@ -123,6 +123,12 @@
                 HorizontalAlignment="Right"
                 Spacing="8"
                 Margin="0,14,0,0">
+      <ProgressBar Width="92"
+                   Height="3"
+                   IsVisible="{Binding IsBusy}"
+                   IsIndeterminate="True"
+                   VerticalAlignment="Center"
+                   AutomationProperties.Name="Importing items" />
       <TextBlock Text="{Binding ErrorMessage}"
                  IsVisible="{Binding HasErrorMessage}"
                  VerticalAlignment="Center"

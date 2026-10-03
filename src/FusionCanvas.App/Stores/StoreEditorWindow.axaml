@@ -95,6 +95,10 @@
                      IsVisible="{Binding HasError}"
                      FontSize="12"
                      Foreground="{DynamicResource DangerTextBrush}" />
+          <ProgressBar IsVisible="{Binding IsBusy}"
+                       IsIndeterminate="True"
+                       Height="4"
+                       AutomationProperties.Name="Working with store" />
           <Border AutomationProperties.AutomationId="StoreEditor.TabNavigation"
                   Background="{DynamicResource TabBarBackgroundBrush}"
                   BorderBrush="{DynamicResource TabBorderBrush}"

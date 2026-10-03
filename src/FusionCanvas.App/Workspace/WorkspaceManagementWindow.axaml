@@ -92,6 +92,10 @@
                      IsVisible="{Binding HasError}"
                      FontSize="12"
                      Foreground="{DynamicResource DangerTextBrush}" />
+          <ProgressBar IsVisible="{Binding IsBusy}"
+                       IsIndeterminate="True"
+                       Height="4"
+                       AutomationProperties.Name="Working with workspace" />
 
           <Border IsVisible="{Binding IsTransferRunning}"
                   Background="{DynamicResource PanelSurfaceBrush}"
