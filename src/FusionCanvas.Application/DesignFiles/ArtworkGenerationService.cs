@@ -128,6 +128,13 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
             request.RequireZeroDataRetention, readySelection.Endpoint.EndpointId, readySelection.Options), cancellationToken).ConfigureAwait(false);
         if (dispatch.Failure is not null || dispatch.Result is null)
             return DesignStageResult.Failure(dispatch.Failure?.Message ?? "The image provider returned no artwork.");
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!await IsArtworkContextCurrentAsync(snapshot, request, cancellationToken).ConfigureAwait(false))
+        {
+            return DesignStageResult.Failure("The Design context changed while artwork was generating. The result was discarded; try again.");
+        }
+
         await RecordStageAsync("provider_dispatch", "Succeeded", "The image provider returned artwork.").ConfigureAwait(false);
 
         var result = dispatch.Result;
@@ -142,6 +149,12 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         {
             return DesignStageResult.Failure($"The generated artwork could not be normalized. {exception.Message}");
         }
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!await IsArtworkContextCurrentAsync(snapshot, request, cancellationToken).ConfigureAwait(false))
+        {
+            return DesignStageResult.Failure("The Design context changed while artwork was generating. The result was discarded; try again.");
+        }
+
         await RecordStageAsync("image_normalization", "Succeeded", "Artwork normalization completed.").ConfigureAwait(false);
 
         var now = _clock();
@@ -155,15 +168,35 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
             managed = await _fileStore.SaveAsync($"generated-artwork-{_newId():N}.png", AssetKind.ExportedImage, content, cancellationToken).ConfigureAwait(false);
         }
         await RecordStageAsync("file_storage", "Succeeded", "The normalized artwork file was stored.").ConfigureAwait(false);
-        var assetId = _newId();
-        var asset = new Asset(assetId, item.StoreId, $"{GeneratedArtworkName} - {readyArea.Name}", null, AssetKind.ExportedImage,
-            managed.WorkspaceRelativePath, null, false, false, now, now, _provenanceCodec.Serialize(provenance));
-        var assignment = new DesignSlotAssignment(readyRow.Id, request.DesignAreaId, assetId);
-        var updated = snapshot with
+        WorkspaceSnapshot currentSnapshot;
+        try
         {
-            Assets = [.. snapshot.Assets, asset],
-            AssetLinks = [.. snapshot.AssetLinks, new AssetLink(assetId, WorkspaceEntityKind.Item, item.Id)],
-            DesignSlotAssignments = [.. snapshot.DesignSlotAssignments.Where(value => value.RowId != readyRow.Id || value.DesignAreaId != request.DesignAreaId), assignment]
+            currentSnapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IsArtworkContextCurrent(snapshot, currentSnapshot, request))
+            {
+                var invalidated = new InvalidOperationException("The Design context changed while artwork was generating.");
+                await CleanupGeneratedFileAfterFailureAsync(managed.WorkspaceRelativePath, invalidated).ConfigureAwait(false);
+                return DesignStageResult.Failure($"{invalidated.Message} The result was discarded; try again.");
+            }
+        }
+        catch (Exception exception) when (exception is OperationCanceledException)
+        {
+            await CleanupGeneratedFileAfterFailureAsync(managed.WorkspaceRelativePath, exception).ConfigureAwait(false);
+            throw;
+        }
+
+        var assetId = _newId();
+        var currentItem = currentSnapshot.Items.Single(value => value.Id == request.ItemId);
+        var currentRow = currentSnapshot.DesignVariantRows.Single(value => value.Id == readyRow.Id);
+        var asset = new Asset(assetId, currentItem.StoreId, $"{GeneratedArtworkName} - {readyArea.Name}", null, AssetKind.ExportedImage,
+            managed.WorkspaceRelativePath, null, false, false, now, now, _provenanceCodec.Serialize(provenance));
+        var assignment = new DesignSlotAssignment(currentRow.Id, request.DesignAreaId, assetId);
+        var updated = currentSnapshot with
+        {
+            Assets = [.. currentSnapshot.Assets, asset],
+            AssetLinks = [.. currentSnapshot.AssetLinks, new AssetLink(assetId, WorkspaceEntityKind.Item, currentItem.Id)],
+            DesignSlotAssignments = [.. currentSnapshot.DesignSlotAssignments.Where(value => value.RowId != currentRow.Id || value.DesignAreaId != request.DesignAreaId), assignment]
         };
         try
         {
@@ -184,6 +217,61 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
 
         await RecordStageAsync("workspace_save", "Succeeded", "The artwork asset and design assignment were saved.").ConfigureAwait(false);
         return DesignStageResult.Success(BuildStateAfterSave(updated, item.Id));
+    }
+
+    private async Task<bool> IsArtworkContextCurrentAsync(
+        WorkspaceSnapshot expected,
+        ArtworkGenerationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var current = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return IsArtworkContextCurrent(expected, current, request);
+    }
+
+    private static bool IsArtworkContextCurrent(
+        WorkspaceSnapshot expected,
+        WorkspaceSnapshot current,
+        ArtworkGenerationRequest request)
+    {
+        var expectedItem = expected.Items.SingleOrDefault(value => value.Id == request.ItemId);
+        var currentItem = current.Items.SingleOrDefault(value => value.Id == request.ItemId);
+        if (expectedItem is null || currentItem is null || !Equals(expectedItem, currentItem))
+        {
+            return false;
+        }
+
+        var expectedConfiguration = expected.ItemListingConfigurations.SingleOrDefault(value => value.ItemId == request.ItemId);
+        var currentConfiguration = current.ItemListingConfigurations.SingleOrDefault(value => value.ItemId == request.ItemId);
+        if (!Equals(expectedConfiguration, currentConfiguration))
+        {
+            return false;
+        }
+
+        var expectedRow = expected.DesignVariantRows.SingleOrDefault(value => value.ItemId == request.ItemId && value.IsDefault);
+        var currentRow = current.DesignVariantRows.SingleOrDefault(value => value.ItemId == request.ItemId && value.IsDefault);
+        if (!Equals(expectedRow, currentRow) || expectedRow is null || currentRow is null)
+        {
+            return false;
+        }
+
+        var expectedColors = expected.DesignVariantRowColors.Where(value => value.RowId == expectedRow.Id).ToArray();
+        var currentColors = current.DesignVariantRowColors.Where(value => value.RowId == currentRow.Id).ToArray();
+        if (!expectedColors.SequenceEqual(currentColors))
+        {
+            return false;
+        }
+
+        var expectedAssignment = expected.DesignSlotAssignments.SingleOrDefault(value => value.RowId == expectedRow.Id && value.DesignAreaId == request.DesignAreaId);
+        var currentAssignment = current.DesignSlotAssignments.SingleOrDefault(value => value.RowId == currentRow.Id && value.DesignAreaId == request.DesignAreaId);
+        if (!Equals(expectedAssignment, currentAssignment))
+        {
+            return false;
+        }
+
+        var expectedArea = expectedConfiguration is null ? null : ResolveArea(expected, expectedConfiguration.OfferingId, request.DesignAreaId);
+        var currentArea = currentConfiguration is null ? null : ResolveArea(current, currentConfiguration.OfferingId, request.DesignAreaId);
+        return Equals(expectedArea, currentArea);
     }
 
     private async Task<ManagedWorkspaceFileCleanup.Result> CleanupGeneratedFileAfterFailureAsync(string workspaceRelativePath, Exception primaryException)
