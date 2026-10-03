@@ -1582,7 +1582,9 @@
                       <TextBlock IsVisible="{Binding ListingTool.IsBusy}" Text="Generating mockups…" />
                       <TextBlock Text="{Binding ListingTool.ErrorMessage}"
                                  TextWrapping="Wrap"
-                                 Foreground="{DynamicResource DangerTextBrush}" />
+                                 Foreground="{DynamicResource DangerTextBrush}"
+                                 AutomationProperties.Name="Listing error"
+                                 AutomationProperties.AutomationId="Listing.Error" />
                       <ItemsControl ItemsSource="{Binding ListingTool.Outputs}"
                                     AutomationProperties.Name="Generated mockup outputs"
                                     AutomationProperties.AutomationId="Listing.MockupOutputs">
