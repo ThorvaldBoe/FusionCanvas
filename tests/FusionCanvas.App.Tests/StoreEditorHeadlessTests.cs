@@ -2402,6 +2402,52 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void MockupSourceTable_FiveRowsShareFullWidthSeparatorsAndSelectedRowTreatment()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+
+        var sources = Enumerable.Range(1, 5)
+            .Select(index => new LocalMockupSourceDraftViewModel($"source-{index}.png", []))
+            .ToArray();
+        foreach (var source in sources) viewModel.CatalogSetup.LocalSourceDrafts.Add(source);
+        viewModel.CatalogSetup.SelectLocalSourceCommand.Execute(sources[2]);
+        dialog.UpdateLayout();
+
+        var table = Assert.IsType<Border>(dialog.FindControl<Border>("MockupSourceTableBorder"));
+        var rows = dialog.GetVisualDescendants().OfType<Border>()
+            .Where(border => border.Classes.Contains("mockupTableRow"))
+            .ToArray();
+        Assert.Equal(5, rows.Length);
+        Assert.Equal(new Thickness(1), table.BorderThickness);
+        Assert.All(rows, row =>
+        {
+            Assert.Equal(new Thickness(0, 0, 0, 1), row.BorderThickness);
+            Assert.Equal(rows[0].Bounds.Width, row.Bounds.Width, 1);
+        });
+        Assert.True(rows[0].Bounds.Width > 0);
+        Assert.NotEqual(rows[0].Background?.ToString(), rows[2].Background?.ToString());
+        Assert.Contains("selected", rows[2].Classes);
+
+        var fileButtons = rows.SelectMany(row => row.GetVisualDescendants().OfType<Button>())
+            .Where(button => button.Classes.Contains("mockupTableFile"))
+            .ToArray();
+        Assert.Equal(5, fileButtons.Length);
+        Assert.All(fileButtons, button => Assert.Equal(new Thickness(0), button.BorderThickness));
+
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void MockupPreview_WithSelectedSourceSynchronizesPlacementRectangleAndMappingFields()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
