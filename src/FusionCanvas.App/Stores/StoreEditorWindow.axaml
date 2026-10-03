@@ -988,6 +988,11 @@
                     <TextBlock Text="{Binding CatalogSetup.ReadyMockupTemplateCount, StringFormat='{}{0} ready Mockup Templates'}"
                                FontSize="12"
                                Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock Text="{Binding CatalogSetup.OfferingReadinessError}"
+                               IsVisible="{Binding CatalogSetup.HasOfferingReadinessError}"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource DangerTextBrush}"
+                               AutomationProperties.Name="Offering readiness error" />
                     <ItemsControl ItemsSource="{Binding CatalogSetup.OfferingReadinessGuidance}"
                                   IsVisible="{Binding CatalogSetup.HasOfferingReadinessGuidance}"
                                   AutomationProperties.Name="Offering readiness guidance"
