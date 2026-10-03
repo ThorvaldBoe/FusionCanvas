@@ -608,6 +608,8 @@ public class StoreEditorHeadlessTests
         var readinessSummary = readiness.GetVisualDescendants().OfType<TextBlock>()
             .Single(block => AutomationProperties.GetAutomationId(block) == "Catalog.OfferingReadinessSummary");
         Assert.Equal("Offering setup readiness", AutomationProperties.GetName(readinessSummary));
+        Assert.Contains(readiness.GetVisualDescendants().OfType<ItemsControl>(),
+            control => AutomationProperties.GetAutomationId(control) == "Catalog.OfferingReadinessGuidance");
         Assert.Contains(readiness.GetVisualDescendants().OfType<TextBlock>(),
             block => block.Text?.Contains("Catalog setup", StringComparison.Ordinal) == true ||
                      block.Text?.Contains("Mockup Template", StringComparison.Ordinal) == true);
