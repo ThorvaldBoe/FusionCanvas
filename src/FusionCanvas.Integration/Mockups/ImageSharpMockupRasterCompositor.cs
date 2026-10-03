@@ -42,8 +42,6 @@ public sealed class ImageSharpMockupRasterCompositor : IMockupRasterCompositor
         var scale = Math.Min(widthScale, heightScale);
         var width = Math.Max(1, (int)Math.Round(designImage.Width * scale));
         var height = Math.Max(1, (int)Math.Round(designImage.Height * scale));
-        if (mapping.X < 0 || mapping.Y < 0 || mapping.Width <= 0 || mapping.Height <= 0 || mapping.X + mapping.Width > templateImage.Width || mapping.Y + mapping.Height > templateImage.Height)
-            throw new InvalidOperationException("The template placement is outside the source image bounds.");
 
         cancellationToken.ThrowIfCancellationRequested();
         designImage.Mutate(image => image.Resize(width, height));
