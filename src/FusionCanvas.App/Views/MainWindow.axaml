@@ -1550,7 +1550,8 @@
                                  TextWrapping="Wrap"
                                  Foreground="{DynamicResource WarningTextBrush}" />
                       <ItemsControl ItemsSource="{Binding ListingTool.TemplateDiagnostics}"
-                                    AutomationProperties.Name="Mockup template readiness diagnostics">
+                                    AutomationProperties.Name="Mockup template readiness diagnostics"
+                                    AutomationProperties.AutomationId="Listing.TemplateDiagnostics">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate>
                             <StackPanel Spacing="2" Margin="0,2,0,0">
