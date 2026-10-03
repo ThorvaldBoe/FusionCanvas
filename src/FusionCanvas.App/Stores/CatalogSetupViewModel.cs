@@ -107,6 +107,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private DesignAreaDraftState? _designAreaDraftBaseline;
     private bool _storeEditorAttached = true;
     private OfferingReadinessSummary? _offeringReadiness;
+    private string _offeringReadinessError = string.Empty;
     private long _readinessLoadVersion;
 
     public CatalogSetupViewModel(ICatalogSetupService catalog, IMockupTemplateSetupService mockups, IOfferingManagementService? offeringManagement = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, IAssetFilePicker? filePicker = null, IRasterImageMetadataReader? rasterImageMetadataReader = null)
@@ -637,6 +638,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             FusionCanvas.Application.Catalog.OfferingReadinessStatus.NeedsAttention => "Mockup Templates need attention before they can be used.",
             _ => "Catalog setup is incomplete. Complete the named prerequisites before using mockups."
         };
+    public string OfferingReadinessError => _offeringReadinessError;
+    public bool HasOfferingReadinessError => !string.IsNullOrWhiteSpace(OfferingReadinessError);
     public string OfferingReadinessStatus
     {
         get
@@ -1703,12 +1706,15 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         if (_offeringManagement is null || SelectedOffering is not { } offering)
         {
             _offeringReadiness = null;
+            _offeringReadinessError = string.Empty;
             OnPropertyChanged(nameof(ReadyMockupTemplateCount));
             OnPropertyChanged(nameof(OfferingReadinessIssues));
             OnPropertyChanged(nameof(HasOfferingReadinessGuidance));
             OnPropertyChanged(nameof(OfferingReadinessGuidance));
             OnPropertyChanged(nameof(OfferingReadinessSummary));
             OnPropertyChanged(nameof(OfferingReadinessStatus));
+            OnPropertyChanged(nameof(OfferingReadinessError));
+            OnPropertyChanged(nameof(HasOfferingReadinessError));
             return;
         }
 
@@ -1725,26 +1731,32 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
                 new OfferingContext(offering.StoreId, offering.BlueprintId, offering.Id), cancellationToken).ConfigureAwait(true);
             if (version != Volatile.Read(ref _readinessLoadVersion) || SelectedOffering?.Id != offering.Id) return;
             _offeringReadiness = state.Summary.Readiness;
+            _offeringReadinessError = string.Empty;
             OnPropertyChanged(nameof(ReadyMockupTemplateCount));
             OnPropertyChanged(nameof(OfferingReadinessIssues));
             OnPropertyChanged(nameof(HasOfferingReadinessGuidance));
             OnPropertyChanged(nameof(OfferingReadinessGuidance));
             OnPropertyChanged(nameof(OfferingReadinessSummary));
             OnPropertyChanged(nameof(OfferingReadinessStatus));
+            OnPropertyChanged(nameof(OfferingReadinessError));
+            OnPropertyChanged(nameof(HasOfferingReadinessError));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
-        catch
+        catch (Exception exception)
         {
             if (version != Volatile.Read(ref _readinessLoadVersion) || SelectedOffering?.Id != offering.Id) return;
             _offeringReadiness = null;
+            _offeringReadinessError = $"Offering readiness could not be evaluated. {exception.Message} Try reloading the Offering or checking its catalog records.";
             OnPropertyChanged(nameof(ReadyMockupTemplateCount));
             OnPropertyChanged(nameof(OfferingReadinessIssues));
             OnPropertyChanged(nameof(HasOfferingReadinessGuidance));
             OnPropertyChanged(nameof(OfferingReadinessGuidance));
             OnPropertyChanged(nameof(OfferingReadinessSummary));
             OnPropertyChanged(nameof(OfferingReadinessStatus));
+            OnPropertyChanged(nameof(OfferingReadinessError));
+            OnPropertyChanged(nameof(HasOfferingReadinessError));
         }
     }
 

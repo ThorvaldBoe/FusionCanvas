@@ -80,6 +80,21 @@ public sealed class CatalogSetupViewModelTests
         Assert.Equal([second], viewModel.LocalSourceDrafts);
         Assert.Same(second, viewModel.SelectedLocalSource);
         Assert.Equal(1, viewModel.SelectedLocalSourceCount);
+
+    }
+
+    [Fact]
+    public async Task OfferingReadinessLoadFailureIsVisibleAndDoesNotFabricateBlockers()
+    {
+        var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(
+            referencedByTemplate: false,
+            offeringManagement: new ThrowingOfferingManagementService());
+
+        Assert.True(viewModel.HasOfferingReadinessError);
+        Assert.Contains("Offering readiness could not be evaluated", viewModel.OfferingReadinessError);
+        Assert.Contains("reloading the Offering", viewModel.OfferingReadinessError);
+        Assert.False(viewModel.HasOfferingReadinessGuidance);
+        Assert.Equal(0, viewModel.ReadyMockupTemplateCount);
     }
 
     [Fact]
@@ -1517,6 +1532,21 @@ public sealed class CatalogSetupViewModelTests
     {
         public Task<ProviderCatalogCandidateDescriptor> LoadAsync(OfferingContext context, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("Provider service timed out.");
+    }
+
+    private sealed class ThrowingOfferingManagementService : IOfferingManagementService
+    {
+        private static InvalidOperationException Failure() => new("Workspace context is unavailable.");
+
+        public Task<IReadOnlyList<BlueprintOfferingSetupSummary>> LoadForBlueprintAsync(Guid storeId, Guid blueprintId, CancellationToken cancellationToken = default) => Task.FromException<IReadOnlyList<BlueprintOfferingSetupSummary>>(Failure());
+        public Task<IReadOnlyList<BlueprintOfferingSetupSummary>> LoadForBlueprintAsync(Guid storeId, Guid blueprintId, bool includeArchived = false, CancellationToken cancellationToken = default) => Task.FromException<IReadOnlyList<BlueprintOfferingSetupSummary>>(Failure());
+        public Task<OfferingManagementState> LoadOfferingAsync(OfferingContext context, CancellationToken cancellationToken = default) => Task.FromException<OfferingManagementState>(Failure());
+        public Task<BulkVariantPreview> PreviewBulkVariantsAsync(BulkVariantRequest request, CancellationToken cancellationToken = default) => Task.FromException<BulkVariantPreview>(Failure());
+        public Task<BulkVariantResult> ConfirmBulkVariantsAsync(BulkVariantRequest request, CancellationToken cancellationToken = default) => Task.FromException<BulkVariantResult>(Failure());
+        public Task<FocusedCommandResult> CreateVariantAsync(CreateFocusedVariantRequest request, CancellationToken cancellationToken = default) => Task.FromException<FocusedCommandResult>(Failure());
+        public Task<FocusedCommandResult> CreateDesignAreaAsync(CreateFocusedDesignAreaRequest request, CancellationToken cancellationToken = default) => Task.FromException<FocusedCommandResult>(Failure());
+        public Task<FocusedCommandResult> UpdateDesignAreaAsync(UpdateFocusedDesignAreaRequest request, CancellationToken cancellationToken = default) => Task.FromException<FocusedCommandResult>(Failure());
+        public Task<FocusedCommandResult> CreateMockupTemplateAsync(CreateFocusedMockupTemplateRequest request, CancellationToken cancellationToken = default) => Task.FromException<FocusedCommandResult>(Failure());
     }
 
     private sealed class PendingProviderCatalog : IProviderCatalogCandidateSource
