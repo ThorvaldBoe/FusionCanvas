@@ -1,6 +1,7 @@
 using FusionCanvas.App.Stores;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Domain.Catalog;
+using FusionCanvas.Domain.Mockups;
 
 namespace FusionCanvas.App.Tests;
 
@@ -27,6 +28,36 @@ public sealed class CatalogPresentationModelsTests
         Assert.Equal(variants, card.VariantCount);
         Assert.Equal(areas, card.DesignAreaCount);
         Assert.Equal(templates, card.MockupTemplateCount);
+    }
+
+    [Fact]
+    public void OfferingCardShowsPreciseReadinessAndTemplateGuidance()
+    {
+        var readiness = new OfferingReadinessSummary(
+            2,
+            1,
+            2,
+            1,
+            OfferingReadinessStatus.ReadyForMockupGeneration,
+            [new OfferingReadinessIssue(
+                OfferingReadinessIssueKind.IncompleteMockupTemplate,
+                "Back lifestyle",
+                [MockupTemplateReadinessBlocker.MissingMapping])]);
+        var summary = new BlueprintOfferingSetupSummary(
+            new OfferingContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
+            "Gildan 64000",
+            null,
+            false,
+            new OfferingFulfillmentContext(BlueprintOfferingKind.FixedPrintProvider, "SwiftPOD", false),
+            new OfferingSetupCounts(2, 1, 2),
+            readiness);
+
+        var card = BlueprintOfferingCardViewModel.From(summary);
+
+        Assert.Equal("Ready for mockup generation", card.Status);
+        Assert.Equal(1, card.ReadyMockupTemplateCount);
+        Assert.Contains("Back lifestyle", Assert.Single(card.ReadinessGuidance));
+        Assert.Contains("ready for mockup generation", card.ReadinessSummary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

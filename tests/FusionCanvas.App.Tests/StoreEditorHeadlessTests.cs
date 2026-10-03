@@ -567,6 +567,10 @@ public class StoreEditorHeadlessTests
         AssertEffectivelyVisible(window, "Catalog.OfferingBasics");
         var setup = AssertEffectivelyVisible(window, "Catalog.OfferingSetup");
         AssertEffectivelyVisible(window, "Catalog.OfferingProvider");
+        var readiness = AssertEffectivelyVisible(window, "Catalog.OfferingReadiness");
+        Assert.Contains(readiness.GetVisualDescendants().OfType<TextBlock>(),
+            block => block.Text?.Contains("Catalog setup", StringComparison.Ordinal) == true ||
+                     block.Text?.Contains("Mockup Template", StringComparison.Ordinal) == true);
         var setupPanel = setup.GetVisualAncestors().OfType<Border>()
             .Single(border => border.Classes.Contains("panel"));
         Assert.Equal(12, setupPanel.Padding.Left);

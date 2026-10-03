@@ -12,6 +12,96 @@ public sealed class OfferingManagementServiceTests
     private static readonly DateTimeOffset Now = new(2026, 8, 21, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public async Task OfferingSummaryReportsReadyMockupGenerationWithoutClaimingItemReadiness()
+    {
+        var fixture = Fixture.Create();
+        var template = fixture.Snapshot.MockupTemplates.Single();
+        var area = fixture.Snapshot.OfferingPlaceholders.Single();
+        var color = fixture.Snapshot.OfferingOptionValues.Single();
+        var revision = new MockupTemplateRevision(
+            Guid.NewGuid(), template.Id, template.CurrentRevision, area.Id, Now,
+            "Ready", "provider-front", new MockupImageSpaceMapping(1200, 1200, 100, 100, 700, 800));
+        var binding = new MockupTemplateColorVariant(Guid.NewGuid(), template.Id, color.Id, false, Now, Now);
+        fixture.Snapshot = fixture.Snapshot with
+        {
+            MockupTemplateRevisions = [revision],
+            MockupTemplateColorVariants = [binding]
+        };
+
+        var summary = Assert.Single(await new OfferingManagementService(new MemoryRepository(fixture.Snapshot))
+            .LoadForBlueprintAsync(fixture.Store.Id, fixture.Blueprint.Id, TestContext.Current.CancellationToken));
+
+        Assert.Equal(OfferingReadinessStatus.ReadyForMockupGeneration, summary.Readiness!.Status);
+        Assert.Equal(1, summary.Readiness.ReadyMockupTemplateCount);
+        Assert.Empty(summary.Readiness.Issues);
+    }
+
+    [Fact]
+    public async Task OfferingSummaryNamesEachMissingCatalogPrerequisite()
+    {
+        var fixture = Fixture.Create();
+        fixture.Snapshot = fixture.Snapshot with
+        {
+            OfferingVariants = [],
+            OfferingPlaceholders = [],
+            MockupTemplates = []
+        };
+
+        var summary = Assert.Single(await new OfferingManagementService(new MemoryRepository(fixture.Snapshot))
+            .LoadForBlueprintAsync(fixture.Store.Id, fixture.Blueprint.Id, TestContext.Current.CancellationToken));
+
+        Assert.Equal(OfferingReadinessStatus.Incomplete, summary.Readiness!.Status);
+        Assert.Equal(0, summary.Readiness.ReadyMockupTemplateCount);
+        Assert.Equal(
+            [OfferingReadinessIssueKind.MissingVariants, OfferingReadinessIssueKind.MissingDesignAreas, OfferingReadinessIssueKind.MissingMockupTemplates],
+            summary.Readiness.Issues.Select(value => value.Kind).ToArray());
+    }
+
+    [Fact]
+    public async Task OfferingSummaryRetainsEveryBlockerForEachIncompleteTemplate()
+    {
+        var fixture = Fixture.Create();
+        var first = fixture.Snapshot.MockupTemplates.Single();
+        var second = first with { Id = Guid.NewGuid(), Name = "Back mockup" };
+        fixture.Snapshot = fixture.Snapshot with { MockupTemplates = [first, second] };
+
+        var summary = Assert.Single(await new OfferingManagementService(new MemoryRepository(fixture.Snapshot))
+            .LoadForBlueprintAsync(fixture.Store.Id, fixture.Blueprint.Id, TestContext.Current.CancellationToken));
+
+        Assert.Equal(OfferingReadinessStatus.NeedsAttention, summary.Readiness!.Status);
+        var issues = summary.Readiness.Issues.Where(value => value.Kind == OfferingReadinessIssueKind.IncompleteMockupTemplate).ToArray();
+        Assert.Equal(2, issues.Length);
+        Assert.Contains(issues, value => value.TemplateName == first.Name && value.TemplateBlockers!.Contains(MockupTemplateReadinessBlocker.MissingColors));
+        Assert.Contains(issues, value => value.TemplateName == second.Name && value.TemplateBlockers!.Contains(MockupTemplateReadinessBlocker.MissingMapping));
+    }
+
+    [Fact]
+    public async Task OfferingSummaryIgnoresArchivedSetupRecordsAndDoesNotMutateSnapshot()
+    {
+        var fixture = Fixture.Create();
+        var archivedVariant = fixture.Snapshot.OfferingVariants.Single() with { Id = Guid.NewGuid(), IsArchived = true };
+        var archivedArea = fixture.Snapshot.OfferingPlaceholders.Single() with { Id = Guid.NewGuid(), IsArchived = true };
+        var archivedTemplate = fixture.Snapshot.MockupTemplates.Single() with { Id = Guid.NewGuid(), IsArchived = true };
+        fixture.Snapshot = fixture.Snapshot with
+        {
+            OfferingVariants = [.. fixture.Snapshot.OfferingVariants, archivedVariant],
+            OfferingPlaceholders = [.. fixture.Snapshot.OfferingPlaceholders, archivedArea],
+            MockupTemplates = [.. fixture.Snapshot.MockupTemplates, archivedTemplate]
+        };
+        var snapshotToRead = fixture.Snapshot;
+        var repository = new MemoryRepository(snapshotToRead);
+
+        var summary = Assert.Single(await new OfferingManagementService(repository)
+            .LoadForBlueprintAsync(fixture.Store.Id, fixture.Blueprint.Id, TestContext.Current.CancellationToken));
+
+        Assert.Equal(new OfferingSetupCounts(1, 1, 1), summary.Counts);
+        Assert.Equal(1, summary.Readiness!.ActiveVariantCount);
+        Assert.Equal(1, summary.Readiness.ActiveDesignAreaCount);
+        Assert.Equal(1, summary.Readiness.ActiveMockupTemplateCount);
+        Assert.Same(snapshotToRead, fixture.Snapshot);
+    }
+
+    [Fact]
     public async Task BlueprintListIsIdentityScopedAndNamesTheActualFulfillmentProvider()
     {
         var fixture = Fixture.Create();
