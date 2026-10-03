@@ -19,4 +19,17 @@ public static class WorkflowStages
             WorkflowStage.Listing => "Listing",
             _ => throw new ArgumentOutOfRangeException(nameof(stage), stage, "Unsupported workflow stage.")
         };
+
+    public static int GetPosition(WorkflowStage stage)
+    {
+        for (var index = 0; index < Ordered.Count; index++)
+        {
+            if (Ordered[index] == stage)
+            {
+                return index;
+            }
+        }
+
+        throw new ArgumentOutOfRangeException(nameof(stage), stage, "Unsupported workflow stage.");
+    }
 }

@@ -10,8 +10,8 @@ public static class ItemWorkflowPolicy
 
     public static bool CanMoveAdjacent(WorkflowStage current, WorkflowStage destination)
     {
-        var currentIndex = IndexOf(current);
-        var destinationIndex = IndexOf(destination);
+        var currentIndex = WorkflowStages.GetPosition(current);
+        var destinationIndex = WorkflowStages.GetPosition(destination);
         return Math.Abs(destinationIndex - currentIndex) == 1;
     }
 
@@ -136,13 +136,4 @@ public static class ItemWorkflowPolicy
         };
     }
 
-    private static int IndexOf(WorkflowStage stage) =>
-        stage switch
-        {
-            WorkflowStage.Idea => 0,
-            WorkflowStage.Concept => 1,
-            WorkflowStage.Design => 2,
-            WorkflowStage.Listing => 3,
-            _ => throw new ArgumentOutOfRangeException(nameof(stage), stage, "Unsupported workflow stage.")
-        };
 }
