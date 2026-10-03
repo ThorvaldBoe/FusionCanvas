@@ -1346,6 +1346,7 @@ public class WorkspaceTreeViewModelTests
             snapshot,
             items ?? new ItemManagementService(repository),
             csvExport ?? new ItemCsvExportService(),
+            new WorkspaceBatchRollbackService(repository),
             selection,
             clipboard,
             csvCodec,

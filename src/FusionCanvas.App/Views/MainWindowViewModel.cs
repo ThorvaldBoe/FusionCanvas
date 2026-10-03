@@ -237,7 +237,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
             _groupManagementService,
             workspaceSnapshot,
             _itemManagementService,
-            applicationServices.ItemCsvExport);
+            applicationServices.ItemCsvExport,
+            applicationServices.WorkspaceBatchRollback);
         OpenNavigationContextCommand = new RelayCommand(parameter =>
         {
             if (parameter is NavigationDocumentContext navigationContext)

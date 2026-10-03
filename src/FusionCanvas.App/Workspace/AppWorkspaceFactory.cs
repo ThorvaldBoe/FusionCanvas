@@ -25,6 +25,7 @@ using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.Application.Niches;
 using FusionCanvas.Application.Stores;
+using FusionCanvas.Application.WorkspaceTree;
 using FusionCanvas.Integration.AI;
 using FusionCanvas.Integration.SllGeneration;
 using FusionCanvas.Integration.Mockups;
@@ -134,6 +135,7 @@ public static class AppWorkspaceFactory
             new AiIdeaGenerator(ai, guidanceSource),
             new PersistedSnowcloneCatalog(snowcloneLibrary),
             ideationAccess);
+        var workspaceBatchRollback = new WorkspaceBatchRollbackService(repository);
         var mainWindowServices = new MainWindowApplicationServices(
             storeManagement,
             nicheManagement,
@@ -154,6 +156,7 @@ public static class AppWorkspaceFactory
             designStage,
             sllDocumentCodec,
             nichePopulation,
+            workspaceBatchRollback,
             rasterImageMetadata,
             mockupSourceMetadataAssistance,
             mockupSourceImageContent);
