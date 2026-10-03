@@ -18,6 +18,7 @@ public sealed class OpenRouterClient :
     IAiTextProvider,
     IAiImageGenerationProvider
 {
+    private const int MaximumVisionRequestBytes = 25_000_000;
     public static readonly Uri DefaultBaseAddress = new("https://openrouter.ai/");
     private static readonly TimeSpan MetadataTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan GenerationTimeout = TimeSpan.FromMinutes(5);
@@ -264,6 +265,14 @@ public sealed class OpenRouterClient :
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var imageBytes = request.Messages.SelectMany(message => message.Images).Sum(image => (long)image.Bytes.Length);
+        if (imageBytes > MaximumVisionRequestBytes)
+        {
+            return AiTextResult.Failure(
+                AiTextFailureKind.InvalidRequest,
+                $"The combined image input exceeds the {MaximumVisionRequestBytes}-byte request limit.",
+                request.ModelId);
+        }
         using var timeout = new CancellationTokenSource();
         using var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         timeout.CancelAfter(GenerationTimeout);
@@ -280,7 +289,8 @@ public sealed class OpenRouterClient :
                 GenerationTimeout,
                 MaximumResponseBytes,
                 cancellationToken,
-                timeout.Token).ConfigureAwait(false);
+                timeout.Token,
+                captureRequestBody: !request.Messages.Any(message => message.Images.Count > 0)).ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -512,10 +522,11 @@ public sealed class OpenRouterClient :
         TimeSpan timeout,
         int maximumBodyBytes,
         CancellationToken callerCancellationToken,
-        CancellationToken timeoutCancellationToken)
+        CancellationToken timeoutCancellationToken,
+        bool captureRequestBody = true)
     {
         var capture = _telemetry?.IsCaptureEnabled == true;
-        var requestBody = capture && request.Content is not null
+        var requestBody = capture && captureRequestBody && request.Content is not null
             ? await request.Content.ReadAsStringAsync(requestCancellationToken).ConfigureAwait(false)
             : null;
         var requestDetails = capture ? BuildRequestDetails(request) : null;
@@ -661,7 +672,7 @@ public sealed class OpenRouterClient :
                 new JsonObject
                 {
                     ["role"] = message.Role.ToString().ToLowerInvariant(),
-                    ["content"] = message.Text
+                    ["content"] = BuildMessageContent(message)
                 }).ToArray()),
             ["provider"] = new JsonObject
             {
@@ -699,6 +710,30 @@ public sealed class OpenRouterClient :
         };
 
         return root.ToJsonString();
+    }
+
+    private static JsonNode BuildMessageContent(AiTextMessage message)
+    {
+        if (message.Images.Count == 0)
+            return JsonValue.Create(message.Text)!;
+
+        var content = new JsonArray
+        {
+            new JsonObject { ["type"] = "text", ["text"] = message.Text }
+        };
+        foreach (var image in message.Images)
+        {
+            content.Add(new JsonObject
+            {
+                ["type"] = "image_url",
+                ["image_url"] = new JsonObject
+                {
+                    ["url"] = $"data:{image.MediaType};base64,{Convert.ToBase64String(image.Bytes)}"
+                }
+            });
+        }
+
+        return content;
     }
 
     private static void Add(JsonObject root, string name, int? value)

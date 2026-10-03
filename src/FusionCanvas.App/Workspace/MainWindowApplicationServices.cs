@@ -35,4 +35,6 @@ public sealed record MainWindowApplicationServices(
     IDesignStageService DesignStage,
     ISllDocumentCodec SllDocumentCodec,
     INichePopulationService? NichePopulation,
-    IRasterImageMetadataReader? RasterImageMetadataReader = null);
+    IRasterImageMetadataReader? RasterImageMetadataReader = null,
+    IMockupSourceMetadataAssistanceService? MockupSourceMetadataAssistance = null,
+    IMockupSourceImageContentReader? MockupSourceImageContentReader = null);

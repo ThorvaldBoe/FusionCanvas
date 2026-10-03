@@ -35,7 +35,7 @@
     </Grid>
 
     <Grid Grid.Row="2" RowDefinitions="Auto,*,Auto,Auto" RowSpacing="8">
-      <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+      <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
         <StackPanel Spacing="2">
           <TextBlock Text="Mockup source images" FontSize="16" FontWeight="SemiBold" />
           <TextBlock Text="Select a row to edit its metadata below." FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -45,6 +45,10 @@
         <Button Grid.Column="2" Content="Upload images..." Command="{Binding BrowseLocalSourceCommand}" Classes="primary"
                 AutomationProperties.Name="Upload source images"
                 AutomationProperties.HelpText="Select one or more supported raster images." />
+        <Button Grid.Column="3" Content="Set up metadata with AI" Command="{Binding AssistMockupSourceMetadataCommand}" Classes="secondary"
+              IsEnabled="{Binding CanAssistMockupSourceMetadata}"
+                AutomationProperties.Name="Set up source image metadata with AI"
+                AutomationProperties.HelpText="Use the General AI settings to suggest colors, sizes, and reusable placement for selected source images." />
       </Grid>
       <Border x:Name="MockupSourceTableBorder" Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
       <Grid RowDefinitions="Auto,*">
@@ -75,7 +79,10 @@
                              ToolTip.Tip="{Binding ApplicabilitySummary}"
                              AutomationProperties.Name="Applicability"
                              AutomationProperties.HelpText="{Binding ApplicabilitySummary}" />
-                  <TextBlock Grid.Row="0" Grid.Column="2" MinWidth="80" Text="{Binding StatusLabel}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                  <TextBlock Grid.Row="0" Grid.Column="2" MinWidth="80" Text="{Binding StatusLabel}" VerticalAlignment="Center" FontWeight="SemiBold"
+                             ToolTip.Tip="{Binding AssistanceStatus}"
+                             AutomationProperties.Name="Metadata assistance status"
+                             AutomationProperties.HelpText="{Binding AssistanceStatus}" />
                   <Button Grid.Row="0" Grid.Column="3" MinWidth="80" Content="Archive" Command="{Binding $parent[Window].DataContext.RemoveLocalSourceCommand}" CommandParameter="{Binding}" Classes="secondary" />
                   <TextBlock Grid.Row="1" Grid.ColumnSpan="4" Text="{Binding PreviewReadError}" IsVisible="{Binding HasPreviewReadError}" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource WarningTextBrush}" AutomationProperties.Name="Preview read warning" />
                 </Grid>
@@ -87,13 +94,19 @@
       </Grid>
       </Border>
       <TextBlock Grid.Row="2" IsVisible="{Binding !HasLocalSource}" Text="No source images uploaded yet. Upload an image to begin." Foreground="{DynamicResource SecondaryTextBrush}" />
-      <ItemsControl Grid.Row="3" ItemsSource="{Binding MockupTemplateReadinessMessages}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate>
-            <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
+      <StackPanel Grid.Row="3" Spacing="4">
+        <ItemsControl ItemsSource="{Binding MockupTemplateReadinessMessages}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <TextBlock Text="{Binding}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasMockupSourceMetadataAssistanceStatus}">
+          <TextBlock Text="{Binding MockupSourceMetadataAssistanceStatus}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <Button Content="Cancel" Command="{Binding CancelMockupSourceMetadataCommand}" IsVisible="{Binding IsMockupSourceMetadataAssistanceBusy}" Classes="link" />
+        </StackPanel>
+      </StackPanel>
     </Grid>
 
     <Border Grid.Row="3" Classes="listItem" Padding="12" IsVisible="{Binding HasSelectedLocalSource}" AutomationProperties.AutomationId="Catalog.MockupSelectedImageEditor">

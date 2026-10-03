@@ -45,6 +45,15 @@ public sealed class AiTextGenerationService : IAiTextGenerationService
             return AiTextResult.Failure(kind, string.Join(" ", resolution.Errors), resolution.Profile?.ModelId);
         }
 
+        if (request.Messages.SelectMany(message => message.Images).Any() &&
+            !resolution.Model.InputModalities.Any(modality => string.Equals(modality, "image", StringComparison.OrdinalIgnoreCase)))
+        {
+            return AiTextResult.Failure(
+                AiTextFailureKind.InvalidConfiguration,
+                "The selected model does not support image input.",
+                resolution.Model.Id);
+        }
+
         var credential = await _credentials.ReadAsync(cancellationToken).ConfigureAwait(false);
         if (credential.State == AiCredentialStateKind.NotFound)
         {
@@ -97,7 +106,10 @@ public sealed class AiTextGenerationService : IAiTextGenerationService
         return credential.State switch
         {
             AiCredentialStateKind.Available when !string.IsNullOrWhiteSpace(credential.Secret) =>
-                AiAvailabilityResult.Ready,
+                new(
+                    AiAvailabilityKind.Ready,
+                    AiAvailabilityResult.Ready.Message,
+                    resolution.Model?.InputModalities.Any(modality => string.Equals(modality, "image", StringComparison.OrdinalIgnoreCase)) == true),
             AiCredentialStateKind.NotFound =>
                 new(AiAvailabilityKind.MissingCredential, "Add an OpenRouter API key in AI settings."),
             _ => new(
