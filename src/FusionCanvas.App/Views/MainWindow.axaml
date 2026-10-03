@@ -1581,7 +1581,9 @@
                       <TextBlock Text="{Binding ListingTool.ErrorMessage}"
                                  TextWrapping="Wrap"
                                  Foreground="{DynamicResource DangerTextBrush}" />
-                      <ItemsControl ItemsSource="{Binding ListingTool.Outputs}">
+                      <ItemsControl ItemsSource="{Binding ListingTool.Outputs}"
+                                    AutomationProperties.Name="Generated mockup outputs"
+                                    AutomationProperties.AutomationId="Listing.MockupOutputs">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate>
                             <TextBlock Text="{Binding Name}" Foreground="{DynamicResource StrongTextBrush}" />
