@@ -178,6 +178,45 @@ public class StageToolViewModelsTests
         Assert.Equal("Second item template", template.Name);
     }
 
+    [Fact]
+    public async Task ListingTool_ClearsPriorReadinessWhileNextLoadIsPending()
+    {
+        var firstItemId = Guid.NewGuid();
+        var secondItemId = Guid.NewGuid();
+        var service = new DeferredMockupGenerationService
+        {
+            PendingItemId = secondItemId
+        };
+        service.Add(firstItemId, CreateState(firstItemId, Guid.NewGuid(), "Old template") with
+        {
+            BlockedReason = "Old blocker",
+            Error = "Old error"
+        });
+        service.Add(secondItemId, CreateState(secondItemId, Guid.NewGuid(), "New template"));
+        var vm = new ListingStageToolViewModel(service);
+
+        var firstLoad = vm.LoadAsync(firstItemId, ItemStatus.Draft, canEdit: true, TestContext.Current.CancellationToken);
+        service.Complete(firstItemId);
+        await firstLoad;
+        Assert.Single(vm.Templates);
+        Assert.Equal("Old blocker", vm.BlockedReason);
+
+        var nextLoad = vm.LoadAsync(secondItemId, ItemStatus.Draft, canEdit: true, TestContext.Current.CancellationToken);
+        await service.PendingLoadStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Empty(vm.Templates);
+        Assert.Null(vm.SelectedTemplate);
+        Assert.Empty(vm.TemplateDiagnostics);
+        Assert.False(vm.HasTemplateDiagnostics);
+        Assert.Empty(vm.Outputs);
+        Assert.Null(vm.BlockedReason);
+        Assert.Null(vm.ErrorMessage);
+
+        service.Complete(secondItemId);
+        await nextLoad;
+        Assert.Equal("New template", Assert.Single(vm.Templates).Name);
+    }
+
     private static MockupGenerationState CreateState(Guid itemId, Guid templateId, string templateName) =>
         new(itemId, Guid.NewGuid(), false, string.Empty,
             [new MockupTemplate(templateId, Guid.NewGuid(), null, templateName, null, 1, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)],
@@ -196,6 +235,8 @@ public class StageToolViewModelsTests
         private readonly Dictionary<Guid, (TaskCompletionSource<MockupGenerationState> Completion, MockupGenerationState State)> _loads = [];
 
         public List<Guid> CancelledItemIds { get; } = [];
+        public Guid? PendingItemId { get; init; }
+        public TaskCompletionSource PendingLoadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public void Add(Guid itemId, MockupGenerationState state) =>
             _loads[itemId] = (new(TaskCreationOptions.RunContinuationsAsynchronously), state);
@@ -204,6 +245,7 @@ public class StageToolViewModelsTests
 
         public Task<MockupGenerationState> LoadAsync(Guid itemId, bool isReadOnly, string readOnlyReason, CancellationToken cancellationToken = default)
         {
+            if (itemId == PendingItemId) PendingLoadStarted.TrySetResult();
             cancellationToken.Register(() => CancelledItemIds.Add(itemId));
             return _loads[itemId].Completion.Task;
         }
