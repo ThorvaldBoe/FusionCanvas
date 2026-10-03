@@ -5,5 +5,6 @@ public enum SettingsSection
     General,
     AI,
     Workspace,
+    Terms,
     About
 }

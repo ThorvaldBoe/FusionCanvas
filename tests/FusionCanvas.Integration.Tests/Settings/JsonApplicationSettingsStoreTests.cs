@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Settings;
+using FusionCanvas.Application.TermsConsent;
 using FusionCanvas.Integration.Settings;
 
 namespace FusionCanvas.Integration.Tests.Settings;
@@ -102,7 +103,7 @@ public class JsonApplicationSettingsStoreTests
     {
         using var tempDirectory = new TemporaryDirectory();
         var path = tempDirectory.GetPath("settings.json");
-        await File.WriteAllTextAsync(path, "{\"version\":5,\"darkMode\":true}", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(path, "{\"version\":6,\"darkMode\":true}", TestContext.Current.CancellationToken);
         var store = new JsonApplicationSettingsStore(path);
 
         var result = await store.LoadAsync(TestContext.Current.CancellationToken);
@@ -260,7 +261,7 @@ public class JsonApplicationSettingsStoreTests
         Assert.Equal("idea/model", loaded.Value.Ai.Ideation.CustomProfile.ModelId);
         Assert.Equal("retained/model", loaded.Value.Ai.Concept.CustomProfile.ModelId);
         Assert.Equal("sll/model", loaded.Value.Ai.Sll.CustomProfile.ModelId);
-        Assert.Contains("\"version\": 4", json);
+        Assert.Contains("\"version\": 5", json);
         Assert.DoesNotContain("apiKey", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("secret", json, StringComparison.OrdinalIgnoreCase);
     }
@@ -466,7 +467,55 @@ public class JsonApplicationSettingsStoreTests
 
         Assert.Equal(layout, loaded.Value.WindowLayout);
         Assert.Equal(new WindowGeometrySettings(60, 90, 800, 600), loaded.Value.WindowGeometry!["ideation"]);
-        Assert.Contains("\"version\": 4", json);
+        Assert.Contains("\"version\": 5", json);
+    }
+
+    [Fact]
+    public async Task LoadAsync_MissingConsentFieldRemainsCompatibleAndRequiresConsent()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var path = tempDirectory.GetPath("settings.json");
+        await File.WriteAllTextAsync(path, "{\"version\":4,\"darkMode\":true,\"ai\":{}}", TestContext.Current.CancellationToken);
+
+        var result = await new JsonApplicationSettingsStore(path).LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(result.UsedDefault);
+        Assert.Null(result.Value.TermsConsent);
+        Assert.False(TermsConsentPolicy.IsCurrent(result.Value.TermsConsent));
+    }
+
+    [Fact]
+    public async Task SaveAsync_RoundTripsMinimalConsentRecord()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var store = new JsonApplicationSettingsStore(tempDirectory.GetPath("settings.json"));
+        var record = TermsConsentPolicy.CreateRecord(new DateTimeOffset(2026, 10, 4, 12, 0, 0, TimeSpan.Zero));
+
+        var saved = await store.SaveAsync(
+            new ApplicationSettings(DarkMode: false, Ai: AiConfigurationSettings.Default, TermsConsent: record),
+            TestContext.Current.CancellationToken);
+        var loaded = await store.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(saved.Saved);
+        Assert.Equal(record, loaded.Value.TermsConsent);
+        Assert.True(TermsConsentPolicy.IsCurrent(loaded.Value.TermsConsent));
+    }
+
+    [Fact]
+    public async Task LoadAsync_MalformedConsentFallsBackSafelyWithWarning()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var path = tempDirectory.GetPath("settings.json");
+        await File.WriteAllTextAsync(
+            path,
+            "{\"version\":5,\"darkMode\":false,\"ai\":{},\"termsConsent\":{\"fusionCanvasTermsVersion\":\"draft-0.1\"}}",
+            TestContext.Current.CancellationToken);
+
+        var loaded = await new JsonApplicationSettingsStore(path).LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(loaded.UsedDefault);
+        Assert.Null(loaded.Value.TermsConsent);
+        Assert.Contains("terms acknowledgement", loaded.Warning, StringComparison.OrdinalIgnoreCase);
     }
 
     private sealed class TemporaryDirectory : IDisposable

@@ -10,6 +10,8 @@ using FusionCanvas.Application.Settings;
 using FusionCanvas.Application.Versioning;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Telemetry;
+using FusionCanvas.App.TermsConsent;
+using FusionCanvas.Application.TermsConsent;
 
 namespace FusionCanvas.App.Settings;
 
@@ -90,6 +92,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
                 OnPropertyChanged(nameof(IsGeneralSection));
                 OnPropertyChanged(nameof(IsAiSection));
                 OnPropertyChanged(nameof(IsWorkspaceSection));
+                OnPropertyChanged(nameof(IsTermsSection));
                 OnPropertyChanged(nameof(IsAboutSection));
                 if (value == SettingsSection.AI)
                 {
@@ -103,6 +106,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
 
     public bool IsWorkspaceSection => _selectedSection == SettingsSection.Workspace;
 
+    public bool IsTermsSection => _selectedSection == SettingsSection.Terms;
+
     public bool IsAiSection => _selectedSection == SettingsSection.AI;
 
     public bool IsAboutSection => _selectedSection == SettingsSection.About;
@@ -112,6 +117,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         SettingsSection.General,
         SettingsSection.AI,
         SettingsSection.Workspace,
+        SettingsSection.Terms,
         SettingsSection.About
     };
 
@@ -131,6 +137,12 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     public Guid? ActiveWorkspaceId => _currentSettings.ActiveWorkspaceId;
 
     public Guid? ActiveStoreId => _currentSettings.ActiveStoreId;
+
+    public TermsConsentStatus TermsConsentStatus => TermsConsentStatus.From(_currentSettings.TermsConsent);
+
+    public string TermsConsentSummary => TermsConsentStatus.Summary;
+
+    public bool HasCurrentTermsConsent => TermsConsentStatus.IsCurrent;
 
     public bool ConfirmDiscardCredentialDraft
     {
@@ -182,6 +194,17 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     public ICommand ConfirmDiscardCommand { get; }
     public ICommand CancelDiscardCommand { get; }
     public ICommand CopyDiagnosticsCommand { get; }
+
+    public TermsConsentViewModel CreateTermsConsentViewModel(IExternalLinkLauncher? linkLauncher = null)
+    {
+        var viewModel = new TermsConsentViewModel(
+            _currentSettings,
+            _store,
+            TermsConsentPolicyDocument.Load(),
+            linkLauncher);
+        viewModel.Accepted += OnTermsConsentAccepted;
+        return viewModel;
+    }
 
     public void AttachWorkspaceManagement(WorkspaceManagementViewModel workspaceManagement)
     {
@@ -245,6 +268,14 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         UpdateWorkspaceName(workspace);
         UpdateActiveWorkspace(workspace?.Id);
         Telemetry.SetWorkspace(workspace?.Id, workspace?.Name);
+    }
+
+    private void OnTermsConsentAccepted(ApplicationSettings settings)
+    {
+        _currentSettings = settings;
+        OnPropertyChanged(nameof(TermsConsentStatus));
+        OnPropertyChanged(nameof(TermsConsentSummary));
+        OnPropertyChanged(nameof(HasCurrentTermsConsent));
     }
 
     public void UpdateActiveWorkspace(Guid? workspaceId)
