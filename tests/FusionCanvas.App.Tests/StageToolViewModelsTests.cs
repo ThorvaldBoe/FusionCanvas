@@ -107,6 +107,14 @@ public class StageToolViewModelsTests
 
         var diagnostic = Assert.Single(vm.TemplateDiagnostics);
         Assert.Equal("Front image", diagnostic.TemplateName);
+        Assert.Equal([
+            MockupTemplateReadinessBlocker.MissingImage,
+            MockupTemplateReadinessBlocker.MissingMapping,
+            MockupTemplateReadinessBlocker.MissingSourceApplicability,
+            MockupTemplateReadinessBlocker.InvalidSourceApplicability,
+            MockupTemplateReadinessBlocker.MissingVariantSourceImage,
+            MockupTemplateReadinessBlocker.AmbiguousVariantSourceImages
+        ], diagnostic.Blockers);
         Assert.Contains("Choose a mockup image.", diagnostic.Guidance);
         Assert.Contains("Add a valid design-area placement mapping.", diagnostic.Guidance);
         Assert.Contains("Choose applicability options for each source image.", diagnostic.Guidance);

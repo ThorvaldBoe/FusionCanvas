@@ -96,7 +96,7 @@ public sealed class ListingStageToolViewModel : INotifyPropertyChanged
             foreach (var diagnostic in state.CandidateDiagnostics)
             {
                 var guidance = string.Join(" ", diagnostic.Blockers.Select(MockupTemplateReadinessMessageTranslator.Translate));
-                TemplateDiagnostics.Add(new(diagnostic.TemplateName, guidance));
+                TemplateDiagnostics.Add(new(diagnostic.TemplateName, guidance, diagnostic.Blockers));
             }
             OnPropertyChanged(nameof(HasTemplateDiagnostics));
             SelectedTemplate = state.SelectedTemplateId is Guid selectedId
