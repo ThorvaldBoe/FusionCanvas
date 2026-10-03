@@ -76,6 +76,25 @@ public sealed class OfferingManagementServiceTests
     }
 
     [Fact]
+    public async Task OfferingSummaryOrdersIncompleteTemplateGuidanceByName()
+    {
+        var fixture = Fixture.Create();
+        var first = fixture.Snapshot.MockupTemplates.Single() with { Name = "Zulu mockup" };
+        var second = first with { Id = Guid.NewGuid(), Name = "Alpha mockup" };
+        fixture.Snapshot = fixture.Snapshot with { MockupTemplates = [first, second] };
+
+        var summary = Assert.Single(await new OfferingManagementService(new MemoryRepository(fixture.Snapshot))
+            .LoadForBlueprintAsync(fixture.Store.Id, fixture.Blueprint.Id, TestContext.Current.CancellationToken));
+
+        Assert.Equal(
+            ["Alpha mockup", "Zulu mockup"],
+            summary.Readiness!.Issues
+                .Where(value => value.Kind == OfferingReadinessIssueKind.IncompleteMockupTemplate)
+                .Select(value => value.TemplateName!)
+                .ToArray());
+    }
+
+    [Fact]
     public async Task OfferingSummaryIgnoresArchivedSetupRecordsAndDoesNotMutateSnapshot()
     {
         var fixture = Fixture.Create();
