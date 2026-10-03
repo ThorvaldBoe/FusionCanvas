@@ -2527,6 +2527,9 @@ public class StoreEditorHeadlessTests
         viewModel.CatalogSetup.SelectLocalSourceCommand.Execute(sources[2]);
         dialog.UpdateLayout();
 
+        dialog.Width = dialog.MinWidth;
+        dialog.UpdateLayout();
+
         var table = Assert.IsType<Border>(dialog.FindControl<Border>("MockupSourceTableBorder"));
         var rows = dialog.GetVisualDescendants().OfType<Border>()
             .Where(border => border.Classes.Contains("mockupTableRow"))
@@ -2541,6 +2544,27 @@ public class StoreEditorHeadlessTests
         Assert.True(rows[0].Bounds.Width > 0);
         Assert.NotEqual(rows[0].Background?.ToString(), rows[2].Background?.ToString());
         Assert.Contains("selected", rows[2].Classes);
+
+        var statusHeading = dialog.GetVisualDescendants().OfType<Button>()
+            .Single(button => button.CommandParameter as string == "Status"
+                && button.Command == viewModel.CatalogSetup.SortLocalSourcesCommand);
+        var actionHeading = dialog.GetVisualDescendants().OfType<TextBlock>()
+            .Single(text => IsEffectivelyVisible(text) && text.Text == "Action");
+        var statusCell = rows[0].GetVisualDescendants().OfType<TextBlock>()
+            .Single(text => text.Text == sources[0].StatusLabel);
+        var actionCell = rows[0].GetVisualDescendants().OfType<Button>()
+            .Single(button => button.Content as string == "Archive");
+        var statusHeadingPoint = statusHeading.TranslatePoint(new Point(0, 0), dialog)!.Value;
+        var actionHeadingPoint = actionHeading.TranslatePoint(new Point(0, 0), dialog)!.Value;
+        var statusCellPoint = statusCell.TranslatePoint(new Point(0, 0), dialog)!.Value;
+        var actionCellPoint = actionCell.TranslatePoint(new Point(0, 0), dialog)!.Value;
+
+        Assert.True(actionHeadingPoint.X >= statusHeadingPoint.X + statusHeading.Bounds.Width + 10,
+            "Status and Action headings should remain visibly separate at the minimum dialog width.");
+        // The row viewport can reserve a few pixels for its vertical scrollbar;
+        // allow that gutter while still guarding against column drift.
+        Assert.InRange(Math.Abs(statusHeadingPoint.X - statusCellPoint.X), 0, 10);
+        Assert.InRange(Math.Abs(actionHeadingPoint.X - actionCellPoint.X), 0, 10);
 
         var fileButtons = rows.SelectMany(row => row.GetVisualDescendants().OfType<Button>())
             .Where(button => button.Classes.Contains("mockupTableFile"))
