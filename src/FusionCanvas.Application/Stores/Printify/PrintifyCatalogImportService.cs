@@ -1,5 +1,6 @@
 using System.Text.Json;
 using FusionCanvas.Application.Catalog;
+using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Stores;
@@ -69,14 +70,16 @@ public sealed class PrintifyCatalogImportService(
         }
         catch (InvalidOperationException exception)
         {
+            TechnicalDiagnostics.RecordFailure("Printify catalog import", exception);
             return new(PrintifyCatalogResultKind.UnexpectedResponse, $"Printify catalog data could not be imported safely: {exception.Message}");
         }
         catch (OperationCanceledException)
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            TechnicalDiagnostics.RecordFailure("Printify catalog import", exception);
             return new(PrintifyCatalogResultKind.UnexpectedResponse, "Printify catalog data could not be saved safely. No imported records were committed.");
         }
     }
