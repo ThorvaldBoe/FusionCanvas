@@ -1574,7 +1574,8 @@
                       <Button Content="Apply mockup template"
                               Command="{Binding ListingTool.ApplyCommand}"
                               IsEnabled="{Binding ListingTool.CanApply}"
-                              AutomationProperties.Name="Apply mockup template" />
+                              AutomationProperties.Name="Apply mockup template"
+                              AutomationProperties.AutomationId="Listing.ApplyMockupTemplate" />
                       <TextBlock IsVisible="{Binding ListingTool.IsBusy}" Text="Generating mockups…" />
                       <TextBlock Text="{Binding ListingTool.ErrorMessage}"
                                  TextWrapping="Wrap"

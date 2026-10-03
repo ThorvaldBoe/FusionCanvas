@@ -82,6 +82,21 @@ public class MainWindowConstructionTests
     }
 
     [AvaloniaFact]
+    public void ListingApplyActionHasStableAccessibleIdentity()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Listing);
+        fixture.PumpLayout();
+
+        var apply = fixture.FindControl<Button>(control =>
+            AutomationProperties.GetAutomationId(control) == "Listing.ApplyMockupTemplate");
+
+        Assert.NotNull(apply);
+        Assert.Equal("Apply mockup template", AutomationProperties.GetName(apply));
+    }
+
+    [AvaloniaFact]
     public void OpeningItem_EnablesInspectorAndStatusSelector()
     {
         using var fixture = new MainWindowFixture();
