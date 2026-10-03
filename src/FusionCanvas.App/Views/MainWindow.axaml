@@ -644,37 +644,45 @@
                              FontSize="12"
                              Foreground="{DynamicResource SecondaryTextBrush}" />
 
-                  <Border Padding="14"
-                          Background="{DynamicResource ElevatedSurfaceBrush}"
-                          BorderBrush="{DynamicResource ControlBorderBrush}"
-                          BorderThickness="1"
-                          CornerRadius="6">
-                    <StackPanel Spacing="10">
+                  <Border Padding="{DynamicResource Token.Layout.CardPadding}"
+                          Background="{DynamicResource Token.Color.SurfaceElevated}"
+                          BorderBrush="{DynamicResource Token.Color.Border}"
+                          BorderThickness="{DynamicResource Token.Border.Default}"
+                          CornerRadius="{DynamicResource Token.Radius.Card}"
+                          AutomationProperties.AutomationId="ConceptOverview.Surface">
+                    <StackPanel Spacing="{DynamicResource Token.Spacing.GroupGap}">
                       <TextBlock Text="Overview"
-                                 FontSize="14"
+                                 FontSize="{DynamicResource Token.Typography.SectionHeading}"
                                  FontWeight="SemiBold"
-                                 Foreground="{DynamicResource StrongTextBrush}" />
-                      <StackPanel Spacing="6">
+                                 Foreground="{DynamicResource Token.Color.TextStrong}" />
+                      <StackPanel Spacing="{DynamicResource Token.Spacing.InlineGap}">
                         <TextBlock Text="Working title"
-                                   FontSize="11"
-                                   Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <Grid ColumnDefinitions="*,Auto">
+                                   FontSize="{DynamicResource Token.Typography.Label}"
+                                   Foreground="{DynamicResource Token.Color.TextSecondary}" />
+                        <Grid ColumnDefinitions="*,Auto"
+                              ColumnSpacing="{DynamicResource Token.Spacing.ControlGap}">
                           <TextBox Grid.Column="0"
                                    Text="{Binding ItemInspector.Title}"
                                    IsReadOnly="{Binding !ItemInspector.CanEditShared}"
-                                   MinHeight="32"
+                                   MinHeight="{DynamicResource Token.Control.MinHeight}"
                                    PlaceholderText="Optional working title"
                                    AutomationProperties.Name="Item working title"
                                    LostFocus="OnDetailsFieldLostFocus" />
                           <Border Grid.Column="1"
-                                  Margin="8,0,0,0"
-                                  Background="Transparent"
-                                  ToolTip.Tip="{Binding ItemInspector.OptimizeGuidance}">
-                            <Button Padding="12,6"
-                                    Content="Optimize"
-                                    Command="{Binding ItemInspector.OptimizeCommand}"
-                                    IsEnabled="{Binding ItemInspector.CanOptimize}"
-                                    AutomationProperties.Name="Optimize title" />
+                                  Background="Transparent">
+                            <StackPanel Spacing="{DynamicResource Token.Spacing.CompactGap}"
+                                         ToolTip.Tip="{Binding ItemInspector.OptimizeGuidance}">
+                              <Button Padding="{DynamicResource Token.Control.ButtonPadding}"
+                                      Content="Optimize"
+                                      Command="{Binding ItemInspector.OptimizeCommand}"
+                                      IsEnabled="{Binding ItemInspector.CanOptimize}"
+                                      AutomationProperties.Name="Optimize title" />
+                              <ProgressBar Height="3"
+                                           IsVisible="{Binding ItemInspector.IsOptimizing}"
+                                           IsIndeterminate="True"
+                                           AutomationProperties.Name="Optimizing title"
+                                           ToolTip.Tip="Optimizing the working title…" />
+                            </StackPanel>
                           </Border>
                         </Grid>
                       </StackPanel>

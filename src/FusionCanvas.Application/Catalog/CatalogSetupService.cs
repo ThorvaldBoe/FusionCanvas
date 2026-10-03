@@ -163,6 +163,8 @@ public sealed class CatalogSetupService : ICatalogSetupService
         {
             var check = EnsureWritableStore(snapshot, request.StoreId);
             if (check is not null) return Failure(snapshot, request.StoreId, check);
+            var targetError = GetArchiveTargetError(snapshot, request);
+            if (targetError is not null) return Failure(snapshot, request.StoreId, targetError);
             var dependencyError = GetDependencyError(snapshot, request);
             if (dependencyError is not null) return Failure(snapshot, request.StoreId, dependencyError);
             var updated = request.Kind switch
@@ -577,6 +579,20 @@ public sealed class CatalogSetupService : ICatalogSetupService
         if (!active) return null;
         var blockers = ResolveDependencies(snapshot, request);
         return FormatBlockers(blockers);
+    }
+
+    private static string? GetArchiveTargetError(WorkspaceSnapshot snapshot, ArchiveCatalogRecordRequest request)
+    {
+        if (request.Kind != CatalogRecordKind.Variant) return null;
+
+        var variant = snapshot.OfferingVariants.SingleOrDefault(value => value.Id == request.RecordId);
+        if (variant is null) return "The selected Variant was not found. Refresh the offering and try again.";
+        if (variant.IsArchived) return "The selected Variant is already archived.";
+
+        var offering = snapshot.BlueprintOfferings.SingleOrDefault(value => value.Id == variant.OfferingId);
+        return offering?.StoreId == request.StoreId
+            ? null
+            : "The selected Variant does not belong to this Store.";
     }
 
     private static CatalogArchivePlan BuildArchivePlan(WorkspaceSnapshot snapshot, ArchiveOfferingCascadeRequest request)

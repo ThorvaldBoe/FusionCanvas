@@ -251,6 +251,65 @@ public class WorkspacePackageIntegrationTests
     }
 
     [Fact]
+    public async Task Reader_RefusesOversizedManifestAndReleasesPackageHandle()
+    {
+        using var temp = new TemporaryDirectory();
+        var packagePath = await CreatePackageAsync(temp, CreateSnapshot("Large manifest", "assets/file.png"));
+        await UpdateManifestAsync(
+            packagePath,
+            manifest => manifest with
+            {
+                AppVersion = new string('x', checked((int)ZipWorkspacePackageReader.MaxManifestBytes + 1))
+            });
+
+        var result = await CreatePackageReader().ReadAsync(
+            packagePath,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("The workspace package exceeds the supported resource limits.", result.Error);
+        File.Delete(packagePath);
+    }
+
+    [Fact]
+    public async Task Reader_RefusesArchivesWithTooManyEntries()
+    {
+        using var temp = new TemporaryDirectory();
+        var packagePath = await CreatePackageAsync(temp, CreateSnapshot("Many entries", "assets/file.png"));
+        using (var archive = ZipFile.Open(packagePath, ZipArchiveMode.Update))
+        {
+            while (archive.Entries.Count <= ZipWorkspacePackageReader.MaxArchiveEntryCount)
+            {
+                archive.CreateEntry($"files/filler/{archive.Entries.Count}.bin");
+            }
+        }
+
+        var result = await CreatePackageReader().ReadAsync(
+            packagePath,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("The workspace package exceeds the supported resource limits.", result.Error);
+    }
+
+    [Fact]
+    public async Task Reader_RefusesDecompressionBombLikeEntry()
+    {
+        using var temp = new TemporaryDirectory();
+        var packagePath = await CreatePackageAsync(
+            temp,
+            CreateSnapshot("Compressed", "assets/file.png"),
+            new byte[2_000_000]);
+
+        var result = await CreatePackageReader().ReadAsync(
+            packagePath,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("The workspace package exceeds the supported resource limits.", result.Error);
+    }
+
+    [Fact]
     public async Task Import_UnsupportedFileIsSkippedAndAssetMarkedMissing()
     {
         using var temp = new TemporaryDirectory();

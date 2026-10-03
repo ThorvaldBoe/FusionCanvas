@@ -16,6 +16,27 @@ public sealed class ZipWorkspacePackageReader : IWorkspacePackageReader
 
     public const int CurrentFormatVersion = 1;
 
+    /// <summary>Maximum size of the compressed package on disk.</summary>
+    public const long MaxPackageBytes = 256L * 1024 * 1024;
+
+    /// <summary>Maximum uncompressed size of the JSON manifest.</summary>
+    public const long MaxManifestBytes = 1L * 1024 * 1024;
+
+    /// <summary>Maximum number of ZIP entries, including the manifest and database.</summary>
+    public const int MaxArchiveEntryCount = 10_000;
+
+    /// <summary>Maximum uncompressed size of any one ZIP entry.</summary>
+    public const long MaxEntryUncompressedBytes = 256L * 1024 * 1024;
+
+    /// <summary>Maximum combined uncompressed size of all ZIP entries.</summary>
+    public const long MaxTotalUncompressedBytes = 1L * 1024 * 1024 * 1024;
+
+    /// <summary>Maximum allowed uncompressed-to-compressed ratio for a non-empty entry.</summary>
+    public const long MaxCompressionRatio = 1_000;
+
+    private const string ResourceLimitError =
+        "The workspace package exceeds the supported resource limits.";
+
     public ZipWorkspacePackageReader(Func<string, IWorkspaceRepository> repositoryFactory)
     {
         ArgumentNullException.ThrowIfNull(repositoryFactory);
@@ -40,8 +61,10 @@ public sealed class ZipWorkspacePackageReader : IWorkspacePackageReader
                 FileShare.Read,
                 81920,
                 FileOptions.Asynchronous | FileOptions.SequentialScan);
+            ValidatePackageSize(packageStream.Length);
             archive = new ZipArchive(packageStream, ZipArchiveMode.Read, leaveOpen: false);
-            ValidateArchivePaths(archive);
+            ValidateArchiveResources(archive);
+            var readBudget = new ArchiveReadBudget(MaxTotalUncompressedBytes);
 
             var manifestEntry = archive.GetEntry("manifest.json");
             var databaseEntry = archive.GetEntry("workspace.db");
@@ -50,8 +73,13 @@ public sealed class ZipWorkspacePackageReader : IWorkspacePackageReader
                 return WorkspacePackageReadResult.Failure("The selected file is not a readable FusionCanvas workspace package.");
             }
 
+            if (manifestEntry.Length > MaxManifestBytes)
+            {
+                throw new WorkspacePackageResourceLimitException();
+            }
+
             WorkspacePackageManifest? manifest;
-            await using (var manifestStream = manifestEntry.Open())
+            await using (var manifestStream = OpenBoundedEntryStream(manifestEntry, readBudget))
             {
                 manifest = await JsonSerializer.DeserializeAsync<WorkspacePackageManifest>(
                     manifestStream,
@@ -71,10 +99,11 @@ public sealed class ZipWorkspacePackageReader : IWorkspacePackageReader
             }
 
             ValidateManifestPaths(manifest);
+            ValidateManifestResources(manifest);
             temporaryDirectory = Directory.CreateTempSubdirectory("fusioncanvas-import-");
             var databasePath = Path.Combine(temporaryDirectory.FullName, "workspace.db");
             progress?.Report(new WorkspaceTransferProgress("Reading workspace data", 0, 1));
-            await using (var databaseInput = databaseEntry.Open())
+            await using (var databaseInput = OpenBoundedEntryStream(databaseEntry, readBudget))
             await using (var databaseOutput = new FileStream(
                 databasePath,
                 FileMode.CreateNew,
@@ -115,7 +144,7 @@ public sealed class ZipWorkspacePackageReader : IWorkspacePackageReader
                 restorableFiles.Add(new WorkspacePackageReadEntry(
                     normalizedPath,
                     file.Size,
-                    _ => Task.FromResult(entry.Open())));
+                    _ => Task.FromResult<Stream>(OpenBoundedEntryStream(entry, readBudget))));
             }
 
             var session = new ZipWorkspacePackageReadSession(
@@ -134,6 +163,10 @@ public sealed class ZipWorkspacePackageReader : IWorkspacePackageReader
         catch (OperationCanceledException)
         {
             throw;
+        }
+        catch (WorkspacePackageResourceLimitException)
+        {
+            return WorkspacePackageReadResult.Failure(ResourceLimitError);
         }
         catch (Exception exception) when (exception is InvalidDataException or JsonException or IOException or UnauthorizedAccessException or SqliteException or ArgumentException or InvalidOperationException)
         {
@@ -154,11 +187,53 @@ public sealed class ZipWorkspacePackageReader : IWorkspacePackageReader
         }
     }
 
-    private static void ValidateArchivePaths(ZipArchive archive)
+    private static void ValidatePackageSize(long packageBytes)
     {
+        if (packageBytes < 0 || packageBytes > MaxPackageBytes)
+        {
+            throw new WorkspacePackageResourceLimitException();
+        }
+    }
+
+    private static void ValidateArchiveResources(ZipArchive archive)
+    {
+        if (archive.Entries.Count > MaxArchiveEntryCount)
+        {
+            throw new WorkspacePackageResourceLimitException();
+        }
+
+        long totalUncompressedBytes = 0;
+        var paths = new HashSet<string>(StringComparer.Ordinal);
         foreach (var entry in archive.Entries)
         {
             var path = entry.FullName.Replace('\\', '/');
+            if (!paths.Add(path))
+            {
+                throw new InvalidDataException("The package contains duplicate entries.");
+            }
+
+            if (entry.Length < 0 || entry.CompressedLength < 0 || entry.Length > MaxEntryUncompressedBytes)
+            {
+                throw new WorkspacePackageResourceLimitException();
+            }
+
+            if (entry.Length > 0 &&
+                (entry.CompressedLength == 0 ||
+                 (entry.Length > entry.CompressedLength &&
+                  entry.Length / entry.CompressedLength > MaxCompressionRatio)))
+            {
+                throw new WorkspacePackageResourceLimitException();
+            }
+
+            try
+            {
+                totalUncompressedBytes = checked(totalUncompressedBytes + entry.Length);
+            }
+            catch (OverflowException)
+            {
+                throw new WorkspacePackageResourceLimitException();
+            }
+
             if (path is "manifest.json" or "workspace.db")
             {
                 continue;
@@ -171,6 +246,12 @@ public sealed class ZipWorkspacePackageReader : IWorkspacePackageReader
 
             ManagedWorkspacePath.Normalize(path["files/".Length..]);
         }
+
+        if (totalUncompressedBytes > MaxTotalUncompressedBytes)
+        {
+            throw new WorkspacePackageResourceLimitException();
+        }
+
     }
 
     private static void ValidateManifestPaths(WorkspacePackageManifest manifest)
@@ -185,6 +266,39 @@ public sealed class ZipWorkspacePackageReader : IWorkspacePackageReader
             ManagedWorkspacePath.Normalize(file);
         }
     }
+
+    private static void ValidateManifestResources(WorkspacePackageManifest manifest)
+    {
+        long totalFileBytes = 0;
+        var paths = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var file in manifest.Files)
+        {
+            var normalizedPath = ManagedWorkspacePath.Normalize(file.Path);
+            if (file.Size < 0 || file.Size > MaxEntryUncompressedBytes || !paths.Add(normalizedPath))
+            {
+                throw new WorkspacePackageResourceLimitException();
+            }
+
+            try
+            {
+                totalFileBytes = checked(totalFileBytes + file.Size);
+            }
+            catch (OverflowException)
+            {
+                throw new WorkspacePackageResourceLimitException();
+            }
+        }
+
+        if (totalFileBytes > MaxTotalUncompressedBytes)
+        {
+            throw new WorkspacePackageResourceLimitException();
+        }
+    }
+
+    private static Stream OpenBoundedEntryStream(
+        ZipArchiveEntry entry,
+        ArchiveReadBudget readBudget) =>
+        new BoundedArchiveEntryStream(entry.Open(), entry.Length, readBudget);
 
     private static void TryDeleteDirectory(DirectoryInfo directory)
     {
@@ -228,6 +342,174 @@ public sealed class ZipWorkspacePackageReader : IWorkspacePackageReader
             packageStream.Dispose();
             TryDeleteDirectory(temporaryDirectory);
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class ArchiveReadBudget(long maximumBytes)
+    {
+        private long _remainingBytes = maximumBytes;
+
+        public void Consume(long bytes)
+        {
+            if (bytes <= 0)
+            {
+                return;
+            }
+
+            while (true)
+            {
+                var remaining = Volatile.Read(ref _remainingBytes);
+                if (bytes > remaining ||
+                    Interlocked.CompareExchange(ref _remainingBytes, remaining - bytes, remaining) == remaining)
+                {
+                    if (bytes > remaining)
+                    {
+                        throw new WorkspacePackageResourceLimitException();
+                    }
+
+                    return;
+                }
+            }
+        }
+    }
+
+    private sealed class BoundedArchiveEntryStream(
+        Stream inner,
+        long declaredLength,
+        ArchiveReadBudget readBudget) : Stream
+    {
+        private long _readBytes;
+        private bool _endChecked;
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => declaredLength;
+        public override long Position
+        {
+            get => _readBytes;
+            set => throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) =>
+            Read(buffer.AsSpan(offset, count));
+
+        public override int Read(Span<byte> buffer)
+        {
+            var allowed = GetAllowedCount(buffer.Length);
+            if (allowed == 0)
+            {
+                EnsureEndOfEntry();
+                return 0;
+            }
+
+            var read = inner.Read(buffer[..allowed]);
+            RecordRead(read);
+            return read;
+        }
+
+        public override async ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            var allowed = GetAllowedCount(buffer.Length);
+            if (allowed == 0)
+            {
+                await EnsureEndOfEntryAsync(cancellationToken).ConfigureAwait(false);
+                return 0;
+            }
+
+            var read = await inner.ReadAsync(buffer[..allowed], cancellationToken).ConfigureAwait(false);
+            RecordRead(read);
+            return read;
+        }
+
+        public override int ReadByte()
+        {
+            Span<byte> buffer = stackalloc byte[1];
+            return Read(buffer) == 0 ? -1 : buffer[0];
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                inner.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+
+        public override void Flush() => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        private int GetAllowedCount(int requested)
+        {
+            if (requested == 0)
+            {
+                return 0;
+            }
+
+            var remaining = declaredLength - _readBytes;
+            if (remaining <= 0)
+            {
+                return 0;
+            }
+
+            return (int)Math.Min(remaining, requested);
+        }
+
+        private void RecordRead(int read)
+        {
+            if (read <= 0)
+            {
+                return;
+            }
+
+            _readBytes += read;
+            readBudget.Consume(read);
+        }
+
+        private void EnsureEndOfEntry()
+        {
+            if (_endChecked)
+            {
+                return;
+            }
+
+            Span<byte> buffer = stackalloc byte[1];
+            if (inner.Read(buffer) > 0)
+            {
+                throw new WorkspacePackageResourceLimitException();
+            }
+
+            _endChecked = true;
+        }
+
+        private async ValueTask EnsureEndOfEntryAsync(CancellationToken cancellationToken)
+        {
+            if (_endChecked)
+            {
+                return;
+            }
+
+            var buffer = new byte[1];
+            if (await inner.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false) > 0)
+            {
+                throw new WorkspacePackageResourceLimitException();
+            }
+
+            _endChecked = true;
+        }
+    }
+
+    private sealed class WorkspacePackageResourceLimitException : Exception
+    {
+        public WorkspacePackageResourceLimitException()
+            : base(ResourceLimitError)
+        {
         }
     }
 }

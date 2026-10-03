@@ -37,6 +37,24 @@ public class AssetManagementServiceTests
     }
 
     [Fact]
+    public async Task LoadAsync_ResolvesManagedPathThroughFileStoreBoundary()
+    {
+        var sample = Sample.Create();
+        var repository = new TestRepository(sample.Snapshot);
+        var fileStore = new FakeFileStore
+        {
+            ThrowOnWorkspaceRootRead = true
+        };
+        var service = sample.Service(repository, fileStore);
+
+        var state = await service.LoadAsync(sample.StoreContext);
+
+        var linkedAsset = state.Assets.Single(asset => asset.Id == sample.LinkedAsset.Id);
+        Assert.Equal("resolved/assets/linked.png", linkedAsset.ManagedFilePath);
+        Assert.Contains(sample.LinkedAsset.WorkspaceRelativePath, fileStore.ResolvedPaths);
+    }
+
+    [Fact]
     public async Task LoadAsync_PreservesAssetStoreProbeFailureInsteadOfReportingMissing()
     {
         var sample = Sample.Create();
@@ -261,8 +279,16 @@ public class AssetManagementServiceTests
         private readonly HashSet<string> _existing = [];
         private bool _sourceMissing;
 
-        public string WorkspaceRoot => @"C:\workspace";
-        public string ResolvePath(string workspaceRelativePath) => Path.Combine(WorkspaceRoot, workspaceRelativePath);
+        public bool ThrowOnWorkspaceRootRead { get; init; }
+        public List<string> ResolvedPaths { get; } = [];
+        public string WorkspaceRoot => ThrowOnWorkspaceRootRead
+            ? throw new InvalidOperationException("Application code must not read WorkspaceRoot.")
+            : @"C:\workspace";
+        public string ResolvePath(string workspaceRelativePath)
+        {
+            ResolvedPaths.Add(workspaceRelativePath);
+            return $"resolved/{workspaceRelativePath}";
+        }
         public bool FailDelete { get; init; }
         public Exception? ProbeFailure { get; init; }
         public IReadOnlyList<string> Imports { get; } = new List<string>();

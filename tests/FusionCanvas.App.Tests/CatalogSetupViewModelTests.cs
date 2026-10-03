@@ -13,6 +13,42 @@ namespace FusionCanvas.App.Tests;
 public sealed class CatalogSetupViewModelTests
 {
     [Fact]
+    public async Task LocalSourceSortingUsesVisibleKeysAndPreservesSelectedDraft()
+    {
+        var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: false);
+        viewModel.StartAddTemplateCommand.Execute(null);
+        var zeta = new LocalMockupSourceDraftViewModel("zeta.png", []);
+        var alpha = new LocalMockupSourceDraftViewModel("alpha.png", []);
+        var beta = new LocalMockupSourceDraftViewModel("beta.png", []);
+        alpha.UpdateMetadata([Guid.NewGuid()], new MockupImageSpaceMapping(100, 100, 0, 0, 50, 50), "Navy");
+        beta.UpdateMetadata([Guid.NewGuid()], new MockupImageSpaceMapping(100, 100, 0, 0, 50, 50), "Black");
+        viewModel.LocalSourceDrafts.Add(zeta);
+        viewModel.LocalSourceDrafts.Add(alpha);
+        viewModel.LocalSourceDrafts.Add(beta);
+        viewModel.SelectLocalSourceCommand.Execute(zeta);
+
+        viewModel.SortLocalSourcesCommand.Execute("File");
+        Assert.Equal([zeta, beta, alpha], viewModel.LocalSourceDrafts);
+        Assert.Equal("File ↓", viewModel.FileSortLabel);
+        viewModel.SortLocalSourcesCommand.Execute("File");
+        Assert.Equal([alpha, beta, zeta], viewModel.LocalSourceDrafts);
+
+        viewModel.SortLocalSourcesCommand.Execute("Applicability");
+        Assert.Equal([zeta, beta, alpha], viewModel.LocalSourceDrafts);
+        Assert.Equal("Applicability ↑", viewModel.ApplicabilitySortLabel);
+        viewModel.SortLocalSourcesCommand.Execute("Applicability");
+        Assert.Equal([alpha, beta, zeta], viewModel.LocalSourceDrafts);
+
+        viewModel.SortLocalSourcesCommand.Execute("Status");
+        Assert.Equal([alpha, beta, zeta], viewModel.LocalSourceDrafts);
+        viewModel.SortLocalSourcesCommand.Execute("Status");
+        Assert.Equal([zeta, alpha, beta], viewModel.LocalSourceDrafts);
+        Assert.Equal("Status, sorted descending", viewModel.StatusSortAccessibleName);
+        Assert.Same(zeta, viewModel.SelectedLocalSource);
+        Assert.True(zeta.IsSelected);
+    }
+
+    [Fact]
     public async Task BrowseLocalSourceGetsDimensionsFromMetadataService()
     {
         var now = DateTimeOffset.UtcNow;
@@ -585,6 +621,21 @@ public sealed class CatalogSetupViewModelTests
         Assert.Empty(viewModel.SellableVariantRows);
         var saved = (await repository.LoadAsync(TestContext.Current.CancellationToken)).OfferingVariants.Single(candidate => candidate.Id == variant.Id);
         Assert.True(saved.IsArchived);
+    }
+
+    [Fact]
+    public async Task ArchiveVariantCommandReportsWhenTheSellableVariantRowIsStale()
+    {
+        var (viewModel, _, _, _) = await CreateCatalogWithOptionsAsync();
+        var staleRow = new SellableVariantRowViewModel(Guid.NewGuid(), "Stale", "Black", "M", null, false);
+
+        viewModel.ArchiveVariantCommand.Execute(staleRow);
+        for (var attempt = 0; attempt < 20 && viewModel.IsBusy; attempt++)
+            await Task.Yield();
+
+        Assert.True(viewModel.HasError);
+        Assert.Contains("no longer active", viewModel.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(viewModel.SellableVariantRows);
     }
 
     [Fact]
@@ -1166,7 +1217,12 @@ public sealed class CatalogSetupViewModelTests
     {
         var (viewModel, _, offering) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: true, completeLocalSource: true);
 
-        Assert.Equal("Ready for use", Assert.Single(viewModel.MockupTemplateCards).Status);
+        var card = Assert.Single(viewModel.MockupTemplateCards);
+        Assert.Equal("Black", card.ColorSummary);
+        Assert.Equal("1 compatible Variants", card.VariantSummary);
+        Assert.Equal("Ready for use", card.Status);
+        viewModel.EditTemplateCommand.Execute(card);
+        Assert.Equal("Ready for use", viewModel.MockupTemplateLifecycleLabel);
         await viewModel.LoadForStoreAsync(offering.StoreId, TestContext.Current.CancellationToken);
         viewModel.SelectOffering(offering.Id);
         Assert.Equal("Ready for use", Assert.Single(viewModel.MockupTemplateCards).Status);

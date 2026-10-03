@@ -68,6 +68,35 @@ public sealed class CompositionRootTests
     }
 
     [Fact]
+    public void AcceptedIdeationSpecReconcilesSecureCredentialAvailability()
+    {
+        var root = FindRepositoryRoot();
+        var ideationSpec = File.ReadAllText(Path.Combine(
+            root, "openspec", "specs", "ideation", "spec.md"));
+        var workspaceFactory = File.ReadAllText(Path.Combine(
+            root, "src", "FusionCanvas.App", "Workspace", "AppWorkspaceFactory.cs"));
+
+        Assert.Contains(
+            "Requirement: Ideation availability uses configured secure AI access",
+            ideationSpec,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "securely stored OpenRouter inference credential",
+            ideationSpec,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "the environment value does not enable Ideation",
+            ideationSpec,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "treat a non-empty `FUSIONCANVAS_AI_API_KEY` environment value as placeholder AI access",
+            ideationSpec,
+            StringComparison.Ordinal);
+        Assert.Contains("new ConfiguredIdeationAccessStatus(ai)", workspaceFactory, StringComparison.Ordinal);
+        Assert.DoesNotContain("EnvironmentIdeationAccessStatus", workspaceFactory, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainWindowViewModelReceivesWorkspaceManagementService()
     {
         var root = FindRepositoryRoot();
