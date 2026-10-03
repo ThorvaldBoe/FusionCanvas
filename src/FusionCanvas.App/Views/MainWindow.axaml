@@ -1187,7 +1187,8 @@
                                   DisplayMemberBinding="{Binding Name}"
                                   SelectedItem="{Binding DesignTool.SelectedOffering}"
                                   IsEnabled="{Binding !DesignTool.IsReadOnly}"
-                                  AutomationProperties.Name="Change configuration" />
+                                  AutomationProperties.Name="Change configuration"
+                                  AutomationProperties.AutomationId="Design.ConfigurationSelector" />
 <TextBlock Text="{Binding DesignTool.SelectedOfferingName, StringFormat='Selected: {0}'}"
                                            TextWrapping="Wrap"
                                            FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />

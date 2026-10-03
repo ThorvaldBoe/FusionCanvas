@@ -289,7 +289,9 @@ public class DesignStageToolHeadlessTests
         Assert.Equal(stale.Replacement.Id, stale.ViewModel.DesignTool.SelectedOfferingId);
         Assert.Empty(stale.ViewModel.DesignTool.SelectedColors);
         Assert.Empty(stale.ViewModel.DesignTool.Rows);
-        Assert.True(window.FindControl<ComboBox>("DesignConfigurationComboBox")!.IsFocused);
+        var configuration = window.FindControl<ComboBox>("DesignConfigurationComboBox")!;
+        Assert.True(configuration.IsFocused);
+        Assert.Equal("Design.ConfigurationSelector", AutomationProperties.GetAutomationId(configuration));
     }
 
     [AvaloniaFact]
