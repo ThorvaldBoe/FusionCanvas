@@ -30,8 +30,14 @@ public sealed class LocalMockupSourceDraftViewModel(string path, IReadOnlyList<G
     public string? PreviewReadError { get; } = previewReadError;
     public bool HasPreviewReadError => !string.IsNullOrWhiteSpace(PreviewReadError);
     public string ApplicabilitySummary { get; set; } = string.Empty;
+    public string AssistanceStatus { get; private set; } = string.Empty;
+    public bool HasAssistanceStatus => !string.IsNullOrWhiteSpace(AssistanceStatus);
+    public decimal? AssistanceConfidence { get; private set; }
     public bool IsComplete => OptionValueIds.Count > 0 && Mapping is not null;
-    public string StatusLabel => IsComplete ? "Complete" : "Needs setup";
+    public string StatusLabel => HasAssistanceStatus && AssistanceStatus.StartsWith("Needs", StringComparison.OrdinalIgnoreCase)
+        || (HasAssistanceStatus && AssistanceStatus.Contains("review", StringComparison.OrdinalIgnoreCase))
+        ? "Needs review"
+        : IsComplete ? "Complete" : "Needs setup";
     private bool _isSelected;
     public bool IsSelected { get => _isSelected; set { if (_isSelected == value) return; _isSelected = value; PropertyChanged?.Invoke(this, new(nameof(IsSelected))); } }
     public bool IsAlternateRow { get; private set; }
@@ -57,6 +63,16 @@ public sealed class LocalMockupSourceDraftViewModel(string path, IReadOnlyList<G
         SourceImageId = sourceImageId;
         PropertyChanged?.Invoke(this, new(nameof(IsManaged)));
         PropertyChanged?.Invoke(this, new(nameof(SourceImageId)));
+    }
+
+    public void SetAssistanceStatus(string? status, decimal? confidence)
+    {
+        AssistanceStatus = status ?? string.Empty;
+        AssistanceConfidence = confidence;
+        PropertyChanged?.Invoke(this, new(nameof(AssistanceStatus)));
+        PropertyChanged?.Invoke(this, new(nameof(HasAssistanceStatus)));
+        PropertyChanged?.Invoke(this, new(nameof(AssistanceConfidence)));
+        PropertyChanged?.Invoke(this, new(nameof(StatusLabel)));
     }
 }
 

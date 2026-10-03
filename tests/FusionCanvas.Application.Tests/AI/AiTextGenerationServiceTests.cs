@@ -87,6 +87,42 @@ public class AiTextGenerationServiceTests
     }
 
     [Fact]
+    public async Task GenerateAsync_RejectsImageInputWhenSelectedModelIsTextOnly()
+    {
+        var profile = AiProfileSettings.Empty with { ModelId = "model" };
+        var fixture = new Fixture(AiConfigurationSettings.Default with { General = profile });
+        fixture.Cache.Catalog = new AiModelCatalog(
+            true,
+            DateTimeOffset.UtcNow,
+            [new AiModelDescriptor("model", "Model", null, null, ["text"], ["text"], [], 1000, 100, null, null, true, null)]);
+        fixture.Credentials.Result = AiCredentialReadResult.Available("secret");
+
+        var result = await fixture.Service.GenerateAsync(
+            new AiTextRequest(AiRequestPurpose.General, [new AiTextMessage(AiMessageRole.User, "look", [new AiImageInput("image/png", [1])])]),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(AiTextFailureKind.InvalidConfiguration, result.FailureKind);
+        Assert.Empty(fixture.Provider.TextRequests);
+    }
+
+    [Fact]
+    public async Task Availability_ReportsSelectedModelImageInputCapability()
+    {
+        var profile = AiProfileSettings.Empty with { ModelId = "vision" };
+        var fixture = new Fixture(AiConfigurationSettings.Default with { General = profile });
+        fixture.Cache.Catalog = new AiModelCatalog(
+            true,
+            DateTimeOffset.UtcNow,
+            [new AiModelDescriptor("vision", "Vision", null, null, ["text", "image"], ["text"], [], 1000, 100, null, null, true, null)]);
+        fixture.Credentials.Result = AiCredentialReadResult.Available("secret");
+
+        var result = await fixture.Service.GetAvailabilityAsync(AiRequestPurpose.General, TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsReady);
+        Assert.True(result.SupportsImageInput);
+    }
+
+    [Fact]
     public async Task GenerateAsync_CancellationIsPropagatedWithoutProviderDispatch()
     {
         var fixture = new Fixture(AiConfigurationSettings.Default);

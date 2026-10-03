@@ -2,6 +2,7 @@ using FusionCanvas.App.Commands;
 using FusionCanvas.App.Assets;
 using FusionCanvas.App.Stores;
 using FusionCanvas.Application.Catalog;
+using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Catalog;
@@ -1166,6 +1167,32 @@ public sealed class CatalogSetupViewModelTests
     }
 
     [Fact]
+    public async Task MockupMetadataAssistanceAppliesResultsToDraftWithoutSaving()
+    {
+        var assistance = new RecordingMockupMetadataAssistanceService();
+        var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(
+            referencedByTemplate: false,
+            assistance: assistance);
+        viewModel.StartAddTemplateCommand.Execute(null);
+        assistance.ColorId = viewModel.TemplateColorChoices.Single().Value.Id;
+        assistance.SizeId = viewModel.TemplateAdditionalOptionChoices.Single().Value.Id;
+        var draft = new LocalMockupSourceDraftViewModel("front-black.png", [], imageWidth: 100, imageHeight: 100);
+        viewModel.LocalSourceDrafts.Add(draft);
+        viewModel.SelectLocalSourceCommand.Execute(draft);
+
+        Assert.True(viewModel.AssistMockupSourceMetadataCommand.CanExecute(null));
+        viewModel.AssistMockupSourceMetadataCommand.Execute(null);
+        var command = Assert.IsType<AsyncRelayCommand>(viewModel.AssistMockupSourceMetadataCommand);
+        await command.ExecutionTask!.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(assistance.WasCalled);
+        Assert.Equal([assistance.ColorId, assistance.SizeId], draft.OptionValueIds);
+        Assert.Equal(new MockupImageSpaceMapping(100, 100, 5, 6, 70, 80), draft.Mapping);
+        Assert.Equal("Complete", draft.StatusLabel);
+        Assert.True(viewModel.HasMeaningfulMockupTemplateDraft);
+    }
+
+    [Fact]
     public async Task MockupTemplateDraft_EditModePreservesInvalidDraftAndOfferingSwitchEndsIt()
     {
         var (viewModel, area, offering) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: true);
@@ -1299,6 +1326,36 @@ public sealed class CatalogSetupViewModelTests
         offeringManagement.Complete();
     }
 
+    private sealed class RecordingMockupMetadataAssistanceService : IMockupSourceMetadataAssistanceService
+    {
+        public Guid ColorId { get; set; }
+        public Guid SizeId { get; set; }
+        public bool WasCalled { get; private set; }
+
+        public Task<AiAvailabilityResult> GetAvailabilityAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AiAvailabilityResult(AiAvailabilityKind.Ready, "ready", false));
+
+        public Task<MockupSourceMetadataAssistanceResult> AssistAsync(
+            MockupSourceMetadataAssistanceRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            WasCalled = true;
+            var image = Assert.Single(request.Images);
+            return Task.FromResult(new MockupSourceMetadataAssistanceResult(
+                true,
+                "done",
+                [new MockupSourceMetadataAssistanceItem(
+                    image.Token,
+                    true,
+                    [ColorId, SizeId],
+                    new MockupImageSpaceMapping(100, 100, 5, 6, 70, 80),
+                    0.95m,
+                    "Applied",
+                    null,
+                    false)]));
+        }
+    }
+
     private static async Task<(CatalogSetupViewModel ViewModel, OfferingPlaceholder Area, BlueprintOffering Offering)> CreateCatalogWithDesignAreaAsync(
         bool referencedByTemplate,
         bool storeArchived = false,
@@ -1306,7 +1363,8 @@ public sealed class CatalogSetupViewModelTests
         bool completeLocalSource = false,
         IOfferingManagementService? offeringManagement = null,
         Func<IWorkspaceRepository, IOfferingManagementService>? offeringManagementFactory = null,
-        bool selectOffering = true)
+        bool selectOffering = true,
+        IMockupSourceMetadataAssistanceService? assistance = null)
     {
         var now = DateTimeOffset.UtcNow;
         var snapshot = SampleWorkspace.Create();
@@ -1353,7 +1411,8 @@ public sealed class CatalogSetupViewModelTests
             new CatalogSetupService(repository),
             new MockupTemplateSetupService(repository),
             selectedOfferingManagement,
-            sourceImages: sourceImages);
+            sourceImages: sourceImages,
+            mockupSourceMetadataAssistance: assistance);
         await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
         if (selectOffering) viewModel.SelectOffering(offering.Id);
         return (viewModel, area, offering);

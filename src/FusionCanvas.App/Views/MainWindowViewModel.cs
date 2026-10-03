@@ -184,7 +184,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
             new NullAssetFilePicker(),
             workspaceRepository,
             applicationServices.NichePopulation,
-            applicationServices.RasterImageMetadataReader);
+            applicationServices.RasterImageMetadataReader,
+            applicationServices.MockupSourceMetadataAssistance,
+            applicationServices.MockupSourceImageContentReader);
         StoreManagement.ActiveStoreChanged += (_, store) => Settings.UpdateActiveStore(store?.Id);
         _groupManagementService = applicationServices.GroupManagement;
         _itemManagementService = applicationServices.ItemManagement;

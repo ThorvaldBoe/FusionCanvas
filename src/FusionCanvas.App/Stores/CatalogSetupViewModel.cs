@@ -26,6 +26,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private readonly IProviderCatalogCandidateSource? _providerCatalog;
     private readonly IMockupTemplateSourceImageService? _sourceImages;
     private readonly IRasterImageMetadataReader? _rasterImageMetadataReader;
+    private readonly IMockupSourceMetadataAssistanceService? _mockupSourceMetadataAssistance;
     private IReadOnlyList<MockupTemplateSourceImage> _templateSourceImages = [];
     private IReadOnlyList<MockupTemplateSourceImageOptionValue> _templateSourceConditions = [];
     private IAssetFilePicker _filePicker;
@@ -109,8 +110,12 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private OfferingReadinessSummary? _offeringReadiness;
     private string _offeringReadinessError = string.Empty;
     private long _readinessLoadVersion;
+    private CancellationTokenSource? _mockupSourceMetadataAssistanceCts;
+    private bool _isMockupSourceMetadataAssistanceBusy;
+    private string _mockupSourceMetadataAssistanceStatus = string.Empty;
+    private long _mockupSourceMetadataAssistanceVersion;
 
-    public CatalogSetupViewModel(ICatalogSetupService catalog, IMockupTemplateSetupService mockups, IOfferingManagementService? offeringManagement = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, IAssetFilePicker? filePicker = null, IRasterImageMetadataReader? rasterImageMetadataReader = null)
+    public CatalogSetupViewModel(ICatalogSetupService catalog, IMockupTemplateSetupService mockups, IOfferingManagementService? offeringManagement = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, IAssetFilePicker? filePicker = null, IRasterImageMetadataReader? rasterImageMetadataReader = null, IMockupSourceMetadataAssistanceService? mockupSourceMetadataAssistance = null)
     {
         _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         _mockups = mockups ?? throw new ArgumentNullException(nameof(mockups));
@@ -119,6 +124,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         _sourceImages = sourceImages;
         _filePicker = filePicker ?? new NullAssetFilePicker();
         _rasterImageMetadataReader = rasterImageMetadataReader;
+        _mockupSourceMetadataAssistance = mockupSourceMetadataAssistance;
 
         SaveOfferingCommand = new AsyncRelayCommand(SaveOfferingAsync, CanSaveOffering);
         StartAddPrintProviderCommand = new RelayCommand(_ => IsAddingPrintProvider = true, () => CanEdit && SelectedOffering is not null && !IsProviderNetworkOffering);
@@ -179,6 +185,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         OpenEnlargedPlacementEditorCommand = new RelayCommand(_ => RequestEnlargedPlacementEditor(), () => CanEdit && IsAddingTemplate && HasSelectedLocalSource);
         ReuseMappingCommand = new RelayCommand(parameter => ReuseMapping(parameter as LocalMockupSourceDraftViewModel), () => CanEdit && HasSelectedLocalSource);
         SelectAllTemplateSizesCommand = new RelayCommand(_ => SelectAllTemplateSizes(), () => CanEdit && IsAddingTemplate && TemplateAdditionalOptionChoices.Any(value => IsSizeValue(value.Value)));
+        AssistMockupSourceMetadataCommand = new AsyncRelayCommand(AssistMockupSourceMetadataAsync, CanAssistMockupSourceMetadataCore);
+        CancelMockupSourceMetadataCommand = new RelayCommand(_ => _mockupSourceMetadataAssistanceCts?.Cancel(), () => IsMockupSourceMetadataAssistanceBusy);
         AddTemplateColorCommand = new AsyncRelayCommand(AddTemplateColorAsync, () => CanEdit && SelectedTemplate is not null && SelectedColor is not null);
         ArchiveOptionCommand = new RelayCommand(parameter => RunArchive(parameter, CatalogRecordKind.Option));
         ArchiveOptionValueCommand = new RelayCommand(parameter => RunArchive(parameter, CatalogRecordKind.OptionValue));
@@ -257,6 +265,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ICommand OpenEnlargedPlacementEditorCommand { get; }
     public ICommand ReuseMappingCommand { get; }
     public ICommand SelectAllTemplateSizesCommand { get; }
+    public ICommand AssistMockupSourceMetadataCommand { get; }
+    public ICommand CancelMockupSourceMetadataCommand { get; }
     public IAssetFilePicker FilePicker { get => _filePicker; set => _filePicker = value ?? new NullAssetFilePicker(); }
     public string LocalSourcePath { get => _localSourcePath; private set { if (SetField(ref _localSourcePath, value)) { NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
     public LocalMockupSourceDraftViewModel? SelectedLocalSource { get => _selectedLocalSource; private set { if (SetField(ref _selectedLocalSource, value)) { OnPropertyChanged(nameof(HasSelectedLocalSource)); OnPropertyChanged(nameof(MappingImageWidth)); OnPropertyChanged(nameof(MappingImageHeight)); OnPropertyChanged(nameof(SelectedImagePreviewPath)); RebuildMappedSourceChoices(); NotifyCommands(); } } }
@@ -276,6 +286,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public string? SelectedImagePreviewPath => SelectedLocalSource?.PreviewPath;
     public bool HasSelectedLocalSource => SelectedLocalSource is not null;
     public bool HasLocalSource => LocalSourceDrafts.Count > 0 || !string.IsNullOrWhiteSpace(LocalSourcePath);
+    public bool IsMockupSourceMetadataAssistanceBusy => _isMockupSourceMetadataAssistanceBusy;
+    public bool CanAssistMockupSourceMetadata => CanAssistMockupSourceMetadataCore();
+    public string MockupSourceMetadataAssistanceStatus => _mockupSourceMetadataAssistanceStatus;
+    public bool HasMockupSourceMetadataAssistanceStatus => !string.IsNullOrWhiteSpace(MockupSourceMetadataAssistanceStatus);
 
     private void RequestEnlargedPlacementEditor()
     {
@@ -1289,6 +1303,119 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         NotifyCommands();
     }
 
+    private bool CanAssistMockupSourceMetadataCore() =>
+        CanEdit && IsAddingTemplate && HasSelectedLocalSources && _mockupSourceMetadataAssistance is not null && !IsMockupSourceMetadataAssistanceBusy;
+
+    private async Task AssistMockupSourceMetadataAsync()
+    {
+        if (!CanAssistMockupSourceMetadataCore() || _mockupSourceMetadataAssistance is null) return;
+        CaptureSelectedLocalSource();
+        var version = ++_mockupSourceMetadataAssistanceVersion;
+        _mockupSourceMetadataAssistanceCts?.Cancel();
+        _mockupSourceMetadataAssistanceCts?.Dispose();
+        _mockupSourceMetadataAssistanceCts = new CancellationTokenSource();
+        _isMockupSourceMetadataAssistanceBusy = true;
+        OnPropertyChanged(nameof(IsMockupSourceMetadataAssistanceBusy));
+        SetMockupSourceMetadataAssistanceStatus("Checking General AI settings…");
+        NotifyCommands();
+        try
+        {
+            var availability = await _mockupSourceMetadataAssistance.GetAvailabilityAsync(_mockupSourceMetadataAssistanceCts.Token).ConfigureAwait(true);
+            if (!availability.IsReady)
+            {
+                SetMockupSourceMetadataAssistanceStatus(availability.Message);
+                return;
+            }
+
+            SetMockupSourceMetadataAssistanceStatus("Setting up metadata for selected source images…");
+            var result = await _mockupSourceMetadataAssistance.AssistAsync(BuildMockupSourceMetadataRequest(), _mockupSourceMetadataAssistanceCts.Token).ConfigureAwait(true);
+            if (version != _mockupSourceMetadataAssistanceVersion) return;
+            ApplyMockupSourceMetadataAssistance(result);
+        }
+        catch (OperationCanceledException) when (_mockupSourceMetadataAssistanceCts?.IsCancellationRequested == true)
+        {
+            SetMockupSourceMetadataAssistanceStatus("AI metadata setup cancelled. Existing draft values were kept where no result arrived.");
+        }
+        catch (Exception exception)
+        {
+            SetMockupSourceMetadataAssistanceStatus(exception.Message);
+        }
+        finally
+        {
+            if (version == _mockupSourceMetadataAssistanceVersion)
+            {
+                _isMockupSourceMetadataAssistanceBusy = false;
+                OnPropertyChanged(nameof(IsMockupSourceMetadataAssistanceBusy));
+                NotifyCommands();
+            }
+        }
+    }
+
+    private MockupSourceMetadataAssistanceRequest BuildMockupSourceMetadataRequest()
+    {
+        var values = TemplateColorChoices.Concat(TemplateAdditionalOptionChoices)
+            .Select(choice => new MockupSourceMetadataValue(
+                choice.Value.Id,
+                choice.Label,
+                Options.FirstOrDefault(option => option.Id == choice.Value.OptionId)?.OptionKind ?? OptionKind.Other))
+            .DistinctBy(value => value.Id)
+            .ToArray();
+        var selected = _selectedLocalSources.ToArray();
+        var images = selected.Select(draft => new MockupSourceMetadataImage(
+            SourceToken(draft),
+            draft.DisplayName,
+            draft.Path,
+            draft.ImageWidth,
+            draft.ImageHeight,
+            draft.OptionValueIds,
+            draft.Mapping)).ToArray();
+        var references = LocalSourceDrafts.Select(draft => new MockupSourceMetadataPlacementReference(
+            SourceToken(draft), draft.OptionValueIds, draft.Mapping)).ToArray();
+        return new(
+            images,
+            values,
+            references,
+            SelectedPlaceholder?.Name,
+            SelectedPlaceholder?.Width,
+            SelectedPlaceholder?.Height);
+    }
+
+    private void ApplyMockupSourceMetadataAssistance(MockupSourceMetadataAssistanceResult result)
+    {
+        var values = TemplateColorChoices.Concat(TemplateAdditionalOptionChoices)
+            .Select(choice => new MockupSourceMetadataValue(
+                choice.Value.Id,
+                choice.Label,
+                Options.FirstOrDefault(option => option.Id == choice.Value.OptionId)?.OptionKind ?? OptionKind.Other))
+            .DistinctBy(value => value.Id)
+            .ToDictionary(value => value.Id);
+        foreach (var item in result.Items)
+        {
+            var draft = LocalSourceDrafts.FirstOrDefault(value => string.Equals(SourceToken(value), item.Token, StringComparison.Ordinal));
+            if (draft is null) continue;
+            if (item.Applied)
+            {
+                var labels = item.OptionValueIds.Where(values.ContainsKey).Select(id => values[id].Label).ToArray();
+                draft.UpdateMetadata(item.OptionValueIds, item.Mapping, string.Join(", ", labels));
+            }
+            draft.SetAssistanceStatus(item.Status + (string.IsNullOrWhiteSpace(item.Message) ? string.Empty : $": {item.Message}"), item.Confidence);
+        }
+        RebuildMappedSourceChoices();
+        if (SelectedLocalSource is not null) ActivateLocalSource(SelectedLocalSource);
+        SetMockupSourceMetadataAssistanceStatus(result.Message ?? $"AI metadata setup finished for {result.Items.Count} selected source image{(result.Items.Count == 1 ? string.Empty : "s")}.");
+        NotifyMockupTemplateDraftChanged();
+    }
+
+    private void SetMockupSourceMetadataAssistanceStatus(string status)
+    {
+        _mockupSourceMetadataAssistanceStatus = status;
+        OnPropertyChanged(nameof(MockupSourceMetadataAssistanceStatus));
+        OnPropertyChanged(nameof(HasMockupSourceMetadataAssistanceStatus));
+    }
+
+    private static string SourceToken(LocalMockupSourceDraftViewModel draft) =>
+        draft.SourceImageId?.ToString("N") ?? draft.Path;
+
     private bool IsSizeValue(OfferingOptionValue value) => Options.FirstOrDefault(option => option.Id == value.OptionId)?.OptionKind == OptionKind.Size;
 
     private void RebuildMappedSourceChoices()
@@ -2213,6 +2340,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void ResetTemplateDraft()
     {
+        _mockupSourceMetadataAssistanceCts?.Cancel();
+        _mockupSourceMetadataAssistanceVersion++;
+        _isMockupSourceMetadataAssistanceBusy = false;
+        OnPropertyChanged(nameof(IsMockupSourceMetadataAssistanceBusy));
         EndTemplateDraft();
         TemplateName = string.Empty;
         foreach (var color in TemplateColorChoices) color.IsSelected = false;
@@ -2435,6 +2566,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void NotifyCommands()
     {
+        OnPropertyChanged(nameof(CanAssistMockupSourceMetadata));
         foreach (var command in new ICommand[]
         {
             SaveOfferingCommand, StartAddPrintProviderCommand, CreatePrintProviderCommand, StartAddOptionCommand, ManageOptionCommand, CreateOptionCommand, StartAddOptionValueCommand,
@@ -2445,6 +2577,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             DuplicateTemplateCommand,
             AddTemplateColorCommand, PreviewBulkVariantsCommand, ConfirmBulkVariantsCommand,
             OpenEnlargedPlacementEditorCommand,
+            AssistMockupSourceMetadataCommand, CancelMockupSourceMetadataCommand,
             ConfirmDesignAreaArchiveCommand, CancelDesignAreaArchiveCommand,
             RequestCancelMockupTemplateCommand, ConfirmDiscardMockupTemplateCommand, KeepEditingMockupTemplateCommand,
             RequestCancelDesignAreaCommand, ConfirmDiscardDesignAreaCommand, KeepEditingDesignAreaCommand

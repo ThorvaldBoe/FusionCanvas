@@ -79,6 +79,8 @@ public static class AppWorkspaceFactory
             new ZipWorkspacePackageWriter(packageRepositoryFactory),
             new ZipWorkspacePackageReader(packageRepositoryFactory));
         var rasterImageMetadata = new RasterImageMetadataReader();
+        var mockupSourceImageContent = new LocalMockupSourceImageContentReader();
+        var mockupSourceMetadataAssistance = new MockupSourceMetadataAssistanceService(ai, mockupSourceImageContent);
         var snapshot = StartupTaskRunner.Run(
             token => repository.LoadAsync(token),
             cancellationToken);
@@ -152,7 +154,9 @@ public static class AppWorkspaceFactory
             designStage,
             sllDocumentCodec,
             nichePopulation,
-            rasterImageMetadata);
+            rasterImageMetadata,
+            mockupSourceMetadataAssistance,
+            mockupSourceImageContent);
         return new AppWorkspaceRuntime(
             repository,
             new WorkspaceManagementService(
