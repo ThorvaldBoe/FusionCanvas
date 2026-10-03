@@ -8,8 +8,9 @@
         CanResize="True" WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ApplicationBackgroundBrush}">
   <Window.Styles>
-    <Style Selector="Border.listItem.selected"><Setter Property="Background" Value="{DynamicResource SelectionBackgroundBrush}" /></Style>
+    <Style Selector="Border.listItem"><Setter Property="Background" Value="Transparent" /></Style>
     <Style Selector="Border.listItem:nth-child(even)"><Setter Property="Background" Value="{DynamicResource SelectionSubtleBackgroundBrush}" /></Style>
+    <Style Selector="Border.listItem.selected"><Setter Property="Background" Value="{DynamicResource SelectionBackgroundBrush}" /></Style>
   </Window.Styles>
   <Grid Margin="16" RowDefinitions="Auto,Auto,*,Auto,Auto,Auto" RowSpacing="12">
     <StackPanel Grid.Row="0" Spacing="4">
@@ -46,7 +47,11 @@
           <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="stores:LocalMockupSourceDraftViewModel">
-              <Border Classes="listItem" Classes.selected="{Binding IsSelected}" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+              <Border Classes="listItem" Classes.selected="{Binding IsSelected}" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
+                      Focusable="True" PointerPressed="OnSourceRowPointerPressed" KeyDown="OnSourceRowKeyDown"
+                      AutomationProperties.Name="{Binding DisplayName, StringFormat='Select source image {0}'}"
+                      AutomationProperties.HelpText="Press Enter or Space to select this source image"
+                      AutomationProperties.ItemStatus="{Binding IsSelected, StringFormat='Selected: {0}'}">
                 <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="2*,2*,Auto,Auto" ColumnSpacing="10" RowSpacing="4">
                   <Button Grid.Row="0" Grid.Column="0" Content="{Binding DisplayName}" Command="{Binding $parent[Window].DataContext.SelectLocalSourceCommand}" CommandParameter="{Binding}" HorizontalContentAlignment="Left" Classes="link" />
                   <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ApplicabilitySummary}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" />
