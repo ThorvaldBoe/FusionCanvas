@@ -318,7 +318,7 @@ public class DesignStageToolHeadlessTests
             block => block.Text?.Contains("Mockup Templates need attention", StringComparison.Ordinal) == true);
         Assert.Contains(panel.GetVisualDescendants().OfType<TextBlock>(),
             block => block.Text?.Contains("Front mockup", StringComparison.Ordinal) == true);
-        Assert.True(panel.GetVisualDescendants().OfType<ComboBox>().Any(combo =>
+        Assert.True(window.GetVisualDescendants().OfType<ComboBox>().Any(combo =>
             AutomationProperties.GetName(combo) == "Change configuration"));
     }
 
