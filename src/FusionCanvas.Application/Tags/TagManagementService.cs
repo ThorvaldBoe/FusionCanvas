@@ -11,6 +11,7 @@ public sealed class TagManagementService : ITagManagementService
     private readonly Func<DateTimeOffset> _clock;
     private readonly Func<Guid> _newId;
     private Guid? _activeStoreId;
+    private TagManagementState _lastKnownState = new(null, [], [], false);
 
     public TagManagementService(
         IWorkspaceRepository repository,
@@ -35,18 +36,24 @@ public sealed class TagManagementService : ITagManagementService
     public async Task<TagManagementResult> CreateTagAsync(TagManagementCreateRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var storeError = ValidateActiveStore(snapshot, request.StoreId);
+        var (snapshot, loadError) = await TryLoadSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        if (loadError is not null)
+        {
+            return TagManagementResult.Failure(loadError, _lastKnownState);
+        }
+
+        var current = snapshot!;
+        var storeError = ValidateActiveStore(current, request.StoreId);
         if (storeError is not null)
         {
-            return TagManagementResult.Failure(storeError, BuildState(snapshot, request.StoreId));
+            return TagManagementResult.Failure(storeError, BuildState(current, request.StoreId));
         }
 
         var normalizedName = NormalizeName(request.Name);
-        var nameError = ValidateName(normalizedName, snapshot, request.StoreId, existingTagId: null);
+        var nameError = ValidateName(normalizedName, current, request.StoreId, existingTagId: null);
         if (nameError is not null)
         {
-            return TagManagementResult.Failure(nameError, BuildState(snapshot, request.StoreId));
+            return TagManagementResult.Failure(nameError, BuildState(current, request.StoreId));
         }
 
         string? normalizedColor;
@@ -56,13 +63,17 @@ public sealed class TagManagementService : ITagManagementService
         }
         catch (ArgumentException ex)
         {
-            return TagManagementResult.Failure(ex.Message, BuildState(snapshot, request.StoreId));
+            return TagManagementResult.Failure(ex.Message, BuildState(current, request.StoreId));
         }
 
         var now = _clock();
         var tag = new Tag(_newId(), request.StoreId, normalizedName, NormalizeOptional(request.Description), false, now, now, "{}", normalizedColor);
-        var updated = snapshot with { Tags = [.. snapshot.Tags, tag] };
-        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        var updated = current with { Tags = [.. current.Tags, tag] };
+        var saveError = await TrySaveSnapshotAsync(updated, cancellationToken).ConfigureAwait(false);
+        if (saveError is not null)
+        {
+            return TagManagementResult.Failure(saveError, BuildState(current, request.StoreId));
+        }
 
         _activeStoreId = request.StoreId;
         return TagManagementResult.Success(ToSummary(tag), BuildState(updated, request.StoreId));
@@ -71,18 +82,24 @@ public sealed class TagManagementService : ITagManagementService
     public async Task<TagManagementResult> UpdateTagAsync(TagManagementUpdateRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var existing = snapshot.Tags.SingleOrDefault(tag => tag.Id == request.TagId);
+        var (snapshot, loadError) = await TryLoadSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        if (loadError is not null)
+        {
+            return TagManagementResult.Failure(loadError, _lastKnownState);
+        }
+
+        var current = snapshot!;
+        var existing = current.Tags.SingleOrDefault(tag => tag.Id == request.TagId);
         if (existing is null)
         {
-            return TagManagementResult.Failure("Tag was not found.", BuildState(snapshot, _activeStoreId));
+            return TagManagementResult.Failure("Tag was not found.", BuildState(current, _activeStoreId));
         }
 
         var normalizedName = NormalizeName(request.Name);
-        var nameError = ValidateName(normalizedName, snapshot, existing.StoreId, existing.Id);
+        var nameError = ValidateName(normalizedName, current, existing.StoreId, existing.Id);
         if (nameError is not null)
         {
-            return TagManagementResult.Failure(nameError, BuildState(snapshot, existing.StoreId));
+            return TagManagementResult.Failure(nameError, BuildState(current, existing.StoreId));
         }
 
         string? normalizedColor;
@@ -92,7 +109,7 @@ public sealed class TagManagementService : ITagManagementService
         }
         catch (ArgumentException ex)
         {
-            return TagManagementResult.Failure(ex.Message, BuildState(snapshot, existing.StoreId));
+            return TagManagementResult.Failure(ex.Message, BuildState(current, existing.StoreId));
         }
 
         var updatedTag = existing with
@@ -102,11 +119,15 @@ public sealed class TagManagementService : ITagManagementService
             Color = normalizedColor,
             UpdatedAt = _clock()
         };
-        var updated = snapshot with
+        var updated = current with
         {
-            Tags = snapshot.Tags.Select(tag => tag.Id == updatedTag.Id ? updatedTag : tag).ToArray()
+            Tags = current.Tags.Select(tag => tag.Id == updatedTag.Id ? updatedTag : tag).ToArray()
         };
-        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        var saveError = await TrySaveSnapshotAsync(updated, cancellationToken).ConfigureAwait(false);
+        if (saveError is not null)
+        {
+            return TagManagementResult.Failure(saveError, BuildState(current, existing.StoreId));
+        }
 
         _activeStoreId = existing.StoreId;
         return TagManagementResult.Success(ToSummary(updatedTag), BuildState(updated, existing.StoreId));
@@ -114,19 +135,29 @@ public sealed class TagManagementService : ITagManagementService
 
     public async Task<TagManagementResult> ArchiveTagAsync(Guid tagId, CancellationToken cancellationToken = default)
     {
-        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var existing = snapshot.Tags.SingleOrDefault(tag => tag.Id == tagId);
+        var (snapshot, loadError) = await TryLoadSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        if (loadError is not null)
+        {
+            return TagManagementResult.Failure(loadError, _lastKnownState);
+        }
+
+        var current = snapshot!;
+        var existing = current.Tags.SingleOrDefault(tag => tag.Id == tagId);
         if (existing is null)
         {
-            return TagManagementResult.Failure("Tag was not found.", BuildState(snapshot, _activeStoreId));
+            return TagManagementResult.Failure("Tag was not found.", BuildState(current, _activeStoreId));
         }
 
         var archived = existing with { IsArchived = true, UpdatedAt = _clock() };
-        var updated = snapshot with
+        var updated = current with
         {
-            Tags = snapshot.Tags.Select(tag => tag.Id == archived.Id ? archived : tag).ToArray()
+            Tags = current.Tags.Select(tag => tag.Id == archived.Id ? archived : tag).ToArray()
         };
-        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        var saveError = await TrySaveSnapshotAsync(updated, cancellationToken).ConfigureAwait(false);
+        if (saveError is not null)
+        {
+            return TagManagementResult.Failure(saveError, BuildState(current, existing.StoreId));
+        }
 
         _activeStoreId = existing.StoreId;
         return TagManagementResult.Success(ToSummary(archived), BuildState(updated, existing.StoreId));
@@ -134,29 +165,39 @@ public sealed class TagManagementService : ITagManagementService
 
     public async Task<TagManagementResult> RestoreTagAsync(Guid tagId, CancellationToken cancellationToken = default)
     {
-        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var existing = snapshot.Tags.SingleOrDefault(tag => tag.Id == tagId);
-        if (existing is null)
+        var (snapshot, loadError) = await TryLoadSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        if (loadError is not null)
         {
-            return TagManagementResult.Failure("Tag was not found.", BuildState(snapshot, _activeStoreId));
+            return TagManagementResult.Failure(loadError, _lastKnownState);
         }
 
-        var duplicate = snapshot.Tags.Any(tag =>
+        var current = snapshot!;
+        var existing = current.Tags.SingleOrDefault(tag => tag.Id == tagId);
+        if (existing is null)
+        {
+            return TagManagementResult.Failure("Tag was not found.", BuildState(current, _activeStoreId));
+        }
+
+        var duplicate = current.Tags.Any(tag =>
             tag.Id != existing.Id &&
             tag.StoreId == existing.StoreId &&
             !tag.IsArchived &&
             string.Equals(tag.Name, existing.Name, StringComparison.OrdinalIgnoreCase));
         if (duplicate)
         {
-            return TagManagementResult.Failure("An active tag already uses this name in this store.", BuildState(snapshot, existing.StoreId));
+            return TagManagementResult.Failure("An active tag already uses this name in this store.", BuildState(current, existing.StoreId));
         }
 
         var restored = existing with { IsArchived = false, UpdatedAt = _clock() };
-        var updated = snapshot with
+        var updated = current with
         {
-            Tags = snapshot.Tags.Select(tag => tag.Id == restored.Id ? restored : tag).ToArray()
+            Tags = current.Tags.Select(tag => tag.Id == restored.Id ? restored : tag).ToArray()
         };
-        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        var saveError = await TrySaveSnapshotAsync(updated, cancellationToken).ConfigureAwait(false);
+        if (saveError is not null)
+        {
+            return TagManagementResult.Failure(saveError, BuildState(current, existing.StoreId));
+        }
 
         _activeStoreId = existing.StoreId;
         return TagManagementResult.Success(ToSummary(restored), BuildState(updated, existing.StoreId));
@@ -165,26 +206,36 @@ public sealed class TagManagementService : ITagManagementService
     public async Task<TagManagementResult> DeleteTagAsync(TagManagementDeleteRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var existing = snapshot.Tags.SingleOrDefault(tag => tag.Id == request.TagId);
+        var (snapshot, loadError) = await TryLoadSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        if (loadError is not null)
+        {
+            return TagManagementResult.Failure(loadError, _lastKnownState);
+        }
+
+        var current = snapshot!;
+        var existing = current.Tags.SingleOrDefault(tag => tag.Id == request.TagId);
         if (existing is null)
         {
-            return TagManagementResult.Failure("Tag was not found.", BuildState(snapshot, _activeStoreId));
+            return TagManagementResult.Failure("Tag was not found.", BuildState(current, _activeStoreId));
         }
 
         if (!request.ConfirmPermanentDeletion)
         {
-            return TagManagementResult.Failure("Permanent deletion requires confirmation.", BuildState(snapshot, existing.StoreId));
+            return TagManagementResult.Failure("Permanent deletion requires confirmation.", BuildState(current, existing.StoreId));
         }
 
-        var affectedListingCount = snapshot.ItemTags.Count(link => link.TagId == existing.Id);
+        var affectedListingCount = current.ItemTags.Count(link => link.TagId == existing.Id);
 
-        var updated = snapshot with
+        var updated = current with
         {
-            Tags = snapshot.Tags.Where(tag => tag.Id != existing.Id).ToArray(),
-            ItemTags = snapshot.ItemTags.Where(link => link.TagId != existing.Id).ToArray()
+            Tags = current.Tags.Where(tag => tag.Id != existing.Id).ToArray(),
+            ItemTags = current.ItemTags.Where(link => link.TagId != existing.Id).ToArray()
         };
-        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        var saveError = await TrySaveSnapshotAsync(updated, cancellationToken).ConfigureAwait(false);
+        if (saveError is not null)
+        {
+            return TagManagementResult.Failure(saveError, BuildState(current, existing.StoreId));
+        }
 
         _activeStoreId = existing.StoreId;
         return TagManagementResult.Success(ToSummary(existing), BuildState(updated, existing.StoreId), affectedListingCount);
@@ -193,44 +244,54 @@ public sealed class TagManagementService : ITagManagementService
     public async Task<TagApplicationResult> ApplyTagAsync(ApplyTagRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var listing = snapshot.Items.SingleOrDefault(candidate => candidate.Id == request.ItemId);
+        var (snapshot, loadError) = await TryLoadSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        if (loadError is not null)
+        {
+            return TagApplicationResult.Failure(loadError, _lastKnownState);
+        }
+
+        var current = snapshot!;
+        var listing = current.Items.SingleOrDefault(candidate => candidate.Id == request.ItemId);
         if (listing is null)
         {
-            return TagApplicationResult.Failure("Listing was not found.", BuildState(snapshot, _activeStoreId));
+            return TagApplicationResult.Failure("Listing was not found.", BuildState(current, _activeStoreId));
         }
 
         if (listing.IsArchived)
         {
-            return TagApplicationResult.Failure("Archived listings cannot have tags applied.", BuildState(snapshot, _activeStoreId));
+            return TagApplicationResult.Failure("Archived listings cannot have tags applied.", BuildState(current, _activeStoreId));
         }
 
-        if (IsItemEffectivelyHidden(snapshot, listing))
+        if (IsItemEffectivelyHidden(current, listing))
         {
-            return TagApplicationResult.Failure("Restore the listing or its parent topic before editing tags.", BuildState(snapshot, _activeStoreId));
+            return TagApplicationResult.Failure("Restore the listing or its parent topic before editing tags.", BuildState(current, _activeStoreId));
         }
 
-        var tag = snapshot.Tags.SingleOrDefault(candidate => candidate.Id == request.TagId);
+        var tag = current.Tags.SingleOrDefault(candidate => candidate.Id == request.TagId);
         if (tag is null)
         {
-            return TagApplicationResult.Failure("Tag was not found.", BuildState(snapshot, _activeStoreId));
+            return TagApplicationResult.Failure("Tag was not found.", BuildState(current, _activeStoreId));
         }
 
         if (tag.StoreId != listing.StoreId)
         {
-            return TagApplicationResult.Failure("Tags can only be applied to listings in the same store.", BuildState(snapshot, _activeStoreId));
+            return TagApplicationResult.Failure("Tags can only be applied to listings in the same store.", BuildState(current, _activeStoreId));
         }
 
-        if (snapshot.ItemTags.Any(link => link.ItemId == listing.Id && link.TagId == tag.Id))
+        if (current.ItemTags.Any(link => link.ItemId == listing.Id && link.TagId == tag.Id))
         {
-            return TagApplicationResult.Applied(ToSummary(tag), createdNewTag: false, BuildState(snapshot, tag.StoreId));
+            return TagApplicationResult.Applied(ToSummary(tag), createdNewTag: false, BuildState(current, tag.StoreId));
         }
 
-        var updated = snapshot with
+        var updated = current with
         {
-            ItemTags = [.. snapshot.ItemTags, new ItemTag(listing.Id, tag.Id)]
+            ItemTags = [.. current.ItemTags, new ItemTag(listing.Id, tag.Id)]
         };
-        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        var saveError = await TrySaveSnapshotAsync(updated, cancellationToken).ConfigureAwait(false);
+        if (saveError is not null)
+        {
+            return TagApplicationResult.Failure(saveError, BuildState(current, tag.StoreId));
+        }
 
         _activeStoreId = tag.StoreId;
         return TagApplicationResult.Applied(ToSummary(tag), createdNewTag: false, BuildState(updated, tag.StoreId));
@@ -239,34 +300,44 @@ public sealed class TagManagementService : ITagManagementService
     public async Task<TagManagementResult> RemoveTagAsync(RemoveTagRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var listing = snapshot.Items.SingleOrDefault(candidate => candidate.Id == request.ItemId);
+        var (snapshot, loadError) = await TryLoadSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        if (loadError is not null)
+        {
+            return TagManagementResult.Failure(loadError, _lastKnownState);
+        }
+
+        var current = snapshot!;
+        var listing = current.Items.SingleOrDefault(candidate => candidate.Id == request.ItemId);
         if (listing is null)
         {
-            return TagManagementResult.Failure("Listing was not found.", BuildState(snapshot, _activeStoreId));
+            return TagManagementResult.Failure("Listing was not found.", BuildState(current, _activeStoreId));
         }
 
         if (listing.IsArchived)
         {
-            return TagManagementResult.Failure("Archived listings cannot have tags removed.", BuildState(snapshot, _activeStoreId));
+            return TagManagementResult.Failure("Archived listings cannot have tags removed.", BuildState(current, _activeStoreId));
         }
 
-        if (IsItemEffectivelyHidden(snapshot, listing))
+        if (IsItemEffectivelyHidden(current, listing))
         {
-            return TagManagementResult.Failure("Restore the listing or its parent topic before editing tags.", BuildState(snapshot, _activeStoreId));
+            return TagManagementResult.Failure("Restore the listing or its parent topic before editing tags.", BuildState(current, _activeStoreId));
         }
 
-        var link = snapshot.ItemTags.SingleOrDefault(candidate => candidate.ItemId == request.ItemId && candidate.TagId == request.TagId);
+        var link = current.ItemTags.SingleOrDefault(candidate => candidate.ItemId == request.ItemId && candidate.TagId == request.TagId);
         if (link is null)
         {
-            return TagManagementResult.Success(null, BuildState(snapshot, _activeStoreId));
+            return TagManagementResult.Success(null, BuildState(current, _activeStoreId));
         }
 
-        var updated = snapshot with
+        var updated = current with
         {
-            ItemTags = snapshot.ItemTags.Where(candidate => !(candidate.ItemId == request.ItemId && candidate.TagId == request.TagId)).ToArray()
+            ItemTags = current.ItemTags.Where(candidate => !(candidate.ItemId == request.ItemId && candidate.TagId == request.TagId)).ToArray()
         };
-        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        var saveError = await TrySaveSnapshotAsync(updated, cancellationToken).ConfigureAwait(false);
+        if (saveError is not null)
+        {
+            return TagManagementResult.Failure(saveError, BuildState(current, _activeStoreId));
+        }
 
         return TagManagementResult.Success(null, BuildState(updated, _activeStoreId));
     }
@@ -274,64 +345,78 @@ public sealed class TagManagementService : ITagManagementService
     public async Task<TagApplicationResult> ApplyOrCreateTagAsync(ApplyOrCreateTagRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var listing = snapshot.Items.SingleOrDefault(candidate => candidate.Id == request.ItemId);
+        var (snapshot, loadError) = await TryLoadSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        if (loadError is not null)
+        {
+            return TagApplicationResult.Failure(loadError, _lastKnownState);
+        }
+
+        var current = snapshot!;
+        var listing = current.Items.SingleOrDefault(candidate => candidate.Id == request.ItemId);
         if (listing is null)
         {
-            return TagApplicationResult.Failure("Listing was not found.", BuildState(snapshot, _activeStoreId));
+            return TagApplicationResult.Failure("Listing was not found.", BuildState(current, _activeStoreId));
         }
 
         if (listing.IsArchived)
         {
-            return TagApplicationResult.Failure("Archived listings cannot have tags applied.", BuildState(snapshot, _activeStoreId));
+            return TagApplicationResult.Failure("Archived listings cannot have tags applied.", BuildState(current, _activeStoreId));
         }
 
-        if (IsItemEffectivelyHidden(snapshot, listing))
+        if (IsItemEffectivelyHidden(current, listing))
         {
-            return TagApplicationResult.Failure("Restore the listing or its parent topic before editing tags.", BuildState(snapshot, _activeStoreId));
+            return TagApplicationResult.Failure("Restore the listing or its parent topic before editing tags.", BuildState(current, _activeStoreId));
         }
 
         var normalizedName = NormalizeName(request.Name);
         var formatError = ValidateNameFormat(normalizedName);
         if (formatError is not null)
         {
-            return TagApplicationResult.Failure(formatError, BuildState(snapshot, listing.StoreId));
+            return TagApplicationResult.Failure(formatError, BuildState(current, listing.StoreId));
         }
 
-        var activeMatch = snapshot.Tags.FirstOrDefault(tag =>
+        var activeMatch = current.Tags.FirstOrDefault(tag =>
             tag.StoreId == listing.StoreId &&
             !tag.IsArchived &&
             string.Equals(tag.Name, normalizedName, StringComparison.OrdinalIgnoreCase));
         if (activeMatch is not null)
         {
-            if (snapshot.ItemTags.Any(link => link.ItemId == listing.Id && link.TagId == activeMatch.Id))
+            if (current.ItemTags.Any(link => link.ItemId == listing.Id && link.TagId == activeMatch.Id))
             {
-                return TagApplicationResult.Applied(ToSummary(activeMatch), createdNewTag: false, BuildState(snapshot, listing.StoreId));
+                return TagApplicationResult.Applied(ToSummary(activeMatch), createdNewTag: false, BuildState(current, listing.StoreId));
             }
 
-            var updatedWithLink = snapshot with { ItemTags = [.. snapshot.ItemTags, new ItemTag(listing.Id, activeMatch.Id)] };
-            await _repository.SaveAsync(updatedWithLink, cancellationToken).ConfigureAwait(false);
+            var updatedWithLink = current with { ItemTags = [.. current.ItemTags, new ItemTag(listing.Id, activeMatch.Id)] };
+            var saveError = await TrySaveSnapshotAsync(updatedWithLink, cancellationToken).ConfigureAwait(false);
+            if (saveError is not null)
+            {
+                return TagApplicationResult.Failure(saveError, BuildState(current, listing.StoreId));
+            }
             _activeStoreId = listing.StoreId;
             return TagApplicationResult.Applied(ToSummary(activeMatch), createdNewTag: false, BuildState(updatedWithLink, listing.StoreId));
         }
 
-        var archivedMatch = snapshot.Tags.FirstOrDefault(tag =>
+        var archivedMatch = current.Tags.FirstOrDefault(tag =>
             tag.StoreId == listing.StoreId &&
             tag.IsArchived &&
             string.Equals(tag.Name, normalizedName, StringComparison.OrdinalIgnoreCase));
         if (archivedMatch is not null)
         {
-            return TagApplicationResult.NeedsRestoreConfirmation(ToSummary(archivedMatch), BuildState(snapshot, listing.StoreId));
+            return TagApplicationResult.NeedsRestoreConfirmation(ToSummary(archivedMatch), BuildState(current, listing.StoreId));
         }
 
         var now = _clock();
         var newTag = new Tag(_newId(), listing.StoreId, normalizedName, null, false, now, now, "{}", null);
-        var updated = snapshot with
+        var updated = current with
         {
-            Tags = [.. snapshot.Tags, newTag],
-            ItemTags = [.. snapshot.ItemTags, new ItemTag(listing.Id, newTag.Id)]
+            Tags = [.. current.Tags, newTag],
+            ItemTags = [.. current.ItemTags, new ItemTag(listing.Id, newTag.Id)]
         };
-        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        var createSaveError = await TrySaveSnapshotAsync(updated, cancellationToken).ConfigureAwait(false);
+        if (createSaveError is not null)
+        {
+            return TagApplicationResult.Failure(createSaveError, BuildState(current, listing.StoreId));
+        }
 
         _activeStoreId = listing.StoreId;
         return TagApplicationResult.Applied(ToSummary(newTag), createdNewTag: true, BuildState(updated, listing.StoreId));
@@ -391,7 +476,41 @@ public sealed class TagManagementService : ITagManagementService
                 .ToArray()
             : [];
 
-        return new TagManagementState(_activeStoreId, activeTags, archivedTags, _activeStoreId is not null && activeTags.Length == 0);
+        _lastKnownState = new TagManagementState(_activeStoreId, activeTags, archivedTags, _activeStoreId is not null && activeTags.Length == 0);
+        return _lastKnownState;
+    }
+
+    private async Task<(WorkspaceSnapshot? Snapshot, string? Error)> TryLoadSnapshotAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return (await _repository.LoadAsync(cancellationToken).ConfigureAwait(false), null);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            return (null, $"Unable to load tags: {exception.Message}");
+        }
+    }
+
+    private async Task<string?> TrySaveSnapshotAsync(WorkspaceSnapshot updated, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+            return null;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            return $"Unable to save tag changes: {exception.Message}";
+        }
     }
 
     private static string? ValidateActiveStore(WorkspaceSnapshot snapshot, Guid storeId)
