@@ -52,6 +52,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     private bool _artworkCapabilitiesLoaded;
     private string? _artworkCapabilityMessage;
     private long _artworkAvailabilityGeneration;
+    private long _artworkOperationGeneration;
     private bool _hasStaleConfiguration;
     private bool _canRecoverStaleConfiguration;
     private string? _staleConfigurationDisplayName;
@@ -200,6 +201,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
                 OnPropertyChanged();
                 if (value is not null && !_isApplyingState)
                 {
+                    InvalidateArtworkOperation();
                     Interlocked.Increment(ref _loadGeneration);
                     _ = PersistSelectedOfferingAsync(value.Id);
                 }
@@ -410,6 +412,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             var target = ArtworkTargets.SingleOrDefault(candidate => candidate.Id == value);
             if (!_isApplyingState)
             {
+                InvalidateArtworkOperation();
                 var recommendedTransparency = target?.RecommendsTransparency ?? false;
                 if (_artworkCapabilitiesLoaded && !HasCompatibleArtworkEndpoint(transparentBackground: true))
                 {
@@ -441,6 +444,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             OnPropertyChanged();
             if (!_isApplyingState)
             {
+                InvalidateArtworkOperation();
                 _ = PersistArtworkPreferencesAsync();
             }
         }
@@ -876,7 +880,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         _isDisposed = true;
         Interlocked.Increment(ref _loadGeneration);
         Interlocked.Increment(ref _artworkAvailabilityGeneration);
-        _artworkCts?.Cancel();
+        InvalidateArtworkOperation();
         ClosePreviewDialog();
 
         foreach (var row in Rows)
@@ -901,15 +905,19 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         if (_isDisposed || !CanGenerateArtwork || _aiConfiguration is null || _selectedArtworkTargetId is not Guid targetId)
             return;
 
+        var operationGeneration = Volatile.Read(ref _artworkOperationGeneration);
+        var operationItemId = _itemId;
+        var operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _artworkCts?.Cancel();
         _artworkCts?.Dispose();
-        _artworkCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _artworkCts = operationCts;
         IsArtworkBusy = true;
         ErrorMessage = null;
         try
         {
-            var key = await _aiConfiguration.ReadApiKeyAsync(_artworkCts.Token).ConfigureAwait(true);
+            var key = await _aiConfiguration.ReadApiKeyAsync(operationCts.Token).ConfigureAwait(true);
             var profile = _aiConfiguration.Current.Artwork;
-            var endpoints = await _aiConfiguration.GetArtworkEndpointsAsync(_artworkCts.Token).ConfigureAwait(true);
+            var endpoints = await _aiConfiguration.GetArtworkEndpointsAsync(operationCts.Token).ConfigureAwait(true);
             ApplyArtworkEndpointCapabilities(endpoints);
             if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(profile.ModelId))
             {
@@ -924,15 +932,19 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
 
             var result = await _artworkGenerationService!.GenerateAsync(new ArtworkGenerationRequest(
                 _itemId, targetId, key, profile, _aiConfiguration.AvailableModels, endpoints,
-                TransparentBackground, _aiConfiguration.Current.RequireZeroDataRetention), _artworkCts.Token).ConfigureAwait(true);
+                TransparentBackground, _aiConfiguration.Current.RequireZeroDataRetention), operationCts.Token).ConfigureAwait(true);
+            if (!IsCurrentArtworkOperation(operationGeneration, operationItemId, targetId, operationCts.Token))
+            {
+                return;
+            }
+
             ErrorMessage = result.Error;
             if (result.Succeeded)
             {
                 try
                 {
-                    // LoadAsync cancels the previous artwork operation before starting its own load.
-                    // Do not pass that operation's token here or the successful refresh cancels itself.
-                    await LoadAsync(_itemId, !IsReadOnly, cancellationToken).ConfigureAwait(true);
+                    // LoadAsync invalidates the completed operation before refreshing the view.
+                    await LoadAsync(operationItemId, _canEditContext, cancellationToken).ConfigureAwait(true);
                 }
                 catch (OperationCanceledException)
                 {
@@ -942,17 +954,26 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         }
         catch (OperationCanceledException)
         {
-            ErrorMessage = "Artwork generation cancelled. A dispatched provider request may still incur cost.";
+            if (IsCurrentArtworkOperation(operationGeneration, operationItemId, targetId, operationCts.Token))
+            {
+                ErrorMessage = "Artwork generation cancelled. A dispatched provider request may still incur cost.";
+            }
         }
         catch (Exception exception)
         {
-            ErrorMessage = exception.Message;
+            if (IsCurrentArtworkOperation(operationGeneration, operationItemId, targetId, operationCts.Token))
+            {
+                ErrorMessage = exception.Message;
+            }
         }
         finally
         {
             IsArtworkBusy = false;
-            _artworkCts?.Dispose();
-            _artworkCts = null;
+            if (ReferenceEquals(_artworkCts, operationCts))
+            {
+                _artworkCts = null;
+                operationCts.Dispose();
+            }
         }
     }
 
@@ -964,7 +985,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             return;
         }
 
-        _artworkCts?.Cancel();
+        InvalidateArtworkOperation();
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         _artworkCapabilitiesLoaded = false;
         _artworkEndpoints = [];
@@ -1186,6 +1207,19 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         OnPropertyChanged(nameof(CanUseTransparentBackground));
         GenerateArtworkCommand.NotifyCanExecuteChanged();
     }
+
+    private void InvalidateArtworkOperation()
+    {
+        Interlocked.Increment(ref _artworkOperationGeneration);
+        _artworkCts?.Cancel();
+    }
+
+    private bool IsCurrentArtworkOperation(long generation, Guid itemId, Guid targetId, CancellationToken cancellationToken) =>
+        !_isDisposed
+        && !cancellationToken.IsCancellationRequested
+        && generation == Volatile.Read(ref _artworkOperationGeneration)
+        && itemId == _itemId
+        && targetId == _selectedArtworkTargetId;
 
     private void ClearPendingRecovery()
     {

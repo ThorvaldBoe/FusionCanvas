@@ -159,6 +159,29 @@ public class DesignStageToolViewModelTests
     }
 
     [Fact]
+    public async Task LoadAsync_DiscardsLateArtworkResultFromInvalidatedContext()
+    {
+        var itemId = SampleWorkspace.DesignNodeId;
+        var targetId = Assert.Single(SampleWorkspace.Create().DesignAreas).Id;
+        var designService = new DelayedArtworkPreferenceService(itemId, targetId, Guid.NewGuid(), persistInitialTarget: true);
+        var artworkService = new DelayedArtworkGenerationService();
+        var viewModel = await CreateArtworkReadinessViewModelAsync(
+            conceptComplete: true,
+            includeDefaultRowColor: true,
+            artworkGenerationService: artworkService,
+            designServiceOverride: designService);
+
+        var generation = viewModel.GenerateArtworkAsync(TestContext.Current.CancellationToken);
+        await artworkService.Started.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        await viewModel.LoadAsync(itemId, canEdit: false, TestContext.Current.CancellationToken);
+        artworkService.Complete(DesignStageResult.Failure("late result"));
+        await generation;
+
+        Assert.Null(viewModel.ErrorMessage);
+    }
+
+    [Fact]
     public async Task DisposeWhileSlotPreviewIsLoading_DisposesTheReturnedStream()
     {
         var service = new DelayedArtworkPreferenceService(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
@@ -371,9 +394,26 @@ public class DesignStageToolViewModelTests
             throw new NotSupportedException();
     }
 
+    private sealed class DelayedArtworkGenerationService : IArtworkGenerationService
+    {
+        private readonly TaskCompletionSource<DesignStageResult> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<DesignStageResult> GenerateAsync(ArtworkGenerationRequest request, CancellationToken cancellationToken = default)
+        {
+            Started.TrySetResult();
+            return _completion.Task;
+        }
+
+        public void Complete(DesignStageResult result) => _completion.TrySetResult(result);
+    }
+
     private static async Task<DesignStageToolViewModel> CreateArtworkReadinessViewModelAsync(
         bool conceptComplete,
-        bool includeDefaultRowColor)
+        bool includeDefaultRowColor,
+        IArtworkGenerationService? artworkGenerationService = null,
+        DelayedArtworkPreferenceService? designServiceOverride = null)
     {
         const string modelId = "openai/gpt-5.4-image-2";
         var snapshot = SampleWorkspace.Create();
@@ -395,10 +435,15 @@ public class DesignStageToolViewModelTests
         };
 
         var repository = new InMemoryWorkspaceRepository(snapshot);
-        var designStageService = new DesignStageService(repository, new UnusedWorkspaceFileStore(), new AiImageProvenanceCodec());
-        var preferenceResult = await designStageService.SaveArtworkPreferencesAsync(
-            item.Id, area.Id, transparentBackground: false, TestContext.Current.CancellationToken);
-        Assert.True(preferenceResult.Succeeded);
+        IDesignStageService designStageService = designServiceOverride is not null
+            ? designServiceOverride
+            : new DesignStageService(repository, new UnusedWorkspaceFileStore(), new AiImageProvenanceCodec());
+        if (designServiceOverride is null)
+        {
+            var preferenceResult = await designStageService.SaveArtworkPreferencesAsync(
+                item.Id, area.Id, transparentBackground: false, TestContext.Current.CancellationToken);
+            Assert.True(preferenceResult.Succeeded);
+        }
 
         var endpoint = new AiImageEndpointCapabilities(
             "openai", modelId, false, true, ["png"], [], false, "OpenAI",
@@ -411,10 +456,13 @@ public class DesignStageToolViewModelTests
             },
             [new AiModelDescriptor(modelId, modelId, null, null, ["text"], ["image"], [], 1000, null, null, null, false, null)],
             [endpoint]);
-        var viewModel = new DesignStageToolViewModel(designStageService, new UnusedArtworkGenerationService(), aiConfiguration);
+        var viewModel = new DesignStageToolViewModel(designStageService, artworkGenerationService ?? new UnusedArtworkGenerationService(), aiConfiguration);
         await viewModel.LoadAsync(item.Id, canEdit: true, TestContext.Current.CancellationToken);
 
-        Assert.Equal(area.Id, viewModel.SelectedArtworkTargetId);
+        if (designServiceOverride is null)
+        {
+            Assert.Equal(area.Id, viewModel.SelectedArtworkTargetId);
+        }
         Assert.True(viewModel.HasConfiguration);
         Assert.False(viewModel.IsReadOnly);
         return viewModel;
