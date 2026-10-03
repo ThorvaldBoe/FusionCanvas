@@ -34,11 +34,21 @@ public sealed class LocalMockupSourceDraftViewModel(string path, IReadOnlyList<G
     public string StatusLabel => IsComplete ? "Complete" : "Needs setup";
     private bool _isSelected;
     public bool IsSelected { get => _isSelected; set { if (_isSelected == value) return; _isSelected = value; PropertyChanged?.Invoke(this, new(nameof(IsSelected))); } }
+    public bool IsAlternateRow { get; private set; }
+    internal void SetRowPresentationIndex(int index)
+    {
+        var isAlternate = index % 2 == 1;
+        if (IsAlternateRow == isAlternate) return;
+        IsAlternateRow = isAlternate;
+        PropertyChanged?.Invoke(this, new(nameof(IsAlternateRow)));
+    }
     public void UpdateMetadata(IReadOnlyList<Guid> optionValueIds, MockupImageSpaceMapping? mapping, string summary)
     {
         OptionValueIds = optionValueIds;
         Mapping = mapping;
         ApplicabilitySummary = summary;
+        PropertyChanged?.Invoke(this, new(nameof(ApplicabilitySummary)));
+        PropertyChanged?.Invoke(this, new(nameof(StatusLabel)));
     }
 
     public void MarkManaged(Guid sourceImageId)

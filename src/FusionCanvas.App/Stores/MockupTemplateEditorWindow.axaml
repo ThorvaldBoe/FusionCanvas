@@ -8,9 +8,14 @@
         CanResize="True" WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ApplicationBackgroundBrush}">
   <Window.Styles>
-    <Style Selector="Border.listItem"><Setter Property="Background" Value="Transparent" /></Style>
-    <Style Selector="Border.listItem:nth-child(even)"><Setter Property="Background" Value="{DynamicResource SelectionSubtleBackgroundBrush}" /></Style>
-    <Style Selector="Border.listItem.selected"><Setter Property="Background" Value="{DynamicResource SelectionBackgroundBrush}" /></Style>
+    <Style Selector="Border.mockupTableRow"><Setter Property="Background" Value="{DynamicResource PanelSurfaceBrush}" /></Style>
+    <Style Selector="Border.mockupTableRow.alternate"><Setter Property="Background" Value="{DynamicResource SubtleSurfaceBrush}" /></Style>
+    <Style Selector="Border.mockupTableRow.selected"><Setter Property="Background" Value="{DynamicResource SelectionBackgroundBrush}" /></Style>
+    <Style Selector="Button.mockupTableFile">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+    </Style>
   </Window.Styles>
   <Grid Margin="16" RowDefinitions="Auto,Auto,*,Auto,Auto,Auto" RowSpacing="12">
     <StackPanel Grid.Row="0" Spacing="4">
@@ -38,22 +43,28 @@
         <Button Grid.Column="1" Content="Archive selected" Command="{Binding RemoveLocalSourceCommand}" CommandParameter="{Binding SelectedLocalSource}" Classes="secondary" />
         <Button Grid.Column="2" Content="Upload image..." Command="{Binding BrowseLocalSourceCommand}" Classes="primary" />
       </Grid>
-      <Grid Grid.Row="1" RowDefinitions="Auto,*">
-        <Border Grid.Row="0" Background="{DynamicResource TabBarBackgroundBrush}" Padding="8">
-          <Grid ColumnDefinitions="2*,2*,Auto,Auto"><TextBlock Text="File" FontWeight="Bold"/><TextBlock Grid.Column="1" Text="Applicability" FontWeight="Bold"/><TextBlock Grid.Column="2" Text="Status" FontWeight="Bold"/><TextBlock Grid.Column="3" Text="Action" FontWeight="Bold"/></Grid>
+      <Border x:Name="MockupSourceTableBorder" Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+      <Grid RowDefinitions="Auto,*">
+        <Border Grid.Row="0" Background="{DynamicResource TabBarBackgroundBrush}" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+          <Grid ColumnDefinitions="2*,2*,Auto,Auto">
+            <Button Content="{Binding FileSortLabel}" Command="{Binding SortLocalSourcesCommand}" CommandParameter="File" Classes="link" HorizontalAlignment="Left" FontWeight="Bold" AutomationProperties.Name="{Binding FileSortAccessibleName}" />
+            <Button Grid.Column="1" Content="{Binding ApplicabilitySortLabel}" Command="{Binding SortLocalSourcesCommand}" CommandParameter="Applicability" Classes="link" HorizontalAlignment="Left" FontWeight="Bold" AutomationProperties.Name="{Binding ApplicabilitySortAccessibleName}" />
+            <Button Grid.Column="2" Content="{Binding StatusSortLabel}" Command="{Binding SortLocalSourcesCommand}" CommandParameter="Status" Classes="link" HorizontalAlignment="Left" FontWeight="Bold" AutomationProperties.Name="{Binding StatusSortAccessibleName}" />
+            <TextBlock Grid.Column="3" Text="Action" FontWeight="Bold" />
+          </Grid>
         </Border>
       <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
         <ItemsControl ItemsSource="{Binding LocalSourceDrafts}" AutomationProperties.Name="Mockup source image table">
           <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="stores:LocalMockupSourceDraftViewModel">
-              <Border Classes="listItem" Classes.selected="{Binding IsSelected}" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
+              <Border Classes="mockupTableRow" Classes.alternate="{Binding IsAlternateRow}" Classes.selected="{Binding IsSelected}" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
                       Focusable="True" PointerPressed="OnSourceRowPointerPressed" KeyDown="OnSourceRowKeyDown"
                       AutomationProperties.Name="{Binding DisplayName, StringFormat='Select source image {0}'}"
                       AutomationProperties.HelpText="Press Enter or Space to select this source image"
                       AutomationProperties.ItemStatus="{Binding IsSelected, StringFormat='Selected: {0}'}">
                 <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="2*,2*,Auto,Auto" ColumnSpacing="10" RowSpacing="4">
-                  <Button Grid.Row="0" Grid.Column="0" Content="{Binding DisplayName}" Command="{Binding $parent[Window].DataContext.SelectLocalSourceCommand}" CommandParameter="{Binding}" HorizontalContentAlignment="Left" Classes="link" />
+                  <Button Grid.Row="0" Grid.Column="0" Content="{Binding DisplayName}" Command="{Binding $parent[Window].DataContext.SelectLocalSourceCommand}" CommandParameter="{Binding}" HorizontalContentAlignment="Left" Classes="mockupTableFile" />
                   <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ApplicabilitySummary}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" />
                   <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding StatusLabel}" VerticalAlignment="Center" FontWeight="SemiBold" />
                   <Button Grid.Row="0" Grid.Column="3" Content="Archive" Command="{Binding $parent[Window].DataContext.RemoveLocalSourceCommand}" CommandParameter="{Binding}" Classes="secondary" />
@@ -65,6 +76,7 @@
         </ItemsControl>
       </ScrollViewer>
       </Grid>
+      </Border>
       <TextBlock Grid.Row="2" IsVisible="{Binding !HasLocalSource}" Text="No source images uploaded yet. Upload an image to begin." Foreground="{DynamicResource SecondaryTextBrush}" />
       <ItemsControl Grid.Row="3" ItemsSource="{Binding MockupTemplateReadinessMessages}">
         <ItemsControl.ItemTemplate>
