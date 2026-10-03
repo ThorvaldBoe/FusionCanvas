@@ -6,6 +6,7 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Settings;
 using FusionCanvas.App.Stores;
@@ -2523,6 +2524,8 @@ public class StoreEditorHeadlessTests
         var sources = Enumerable.Range(1, 5)
             .Select(index => new LocalMockupSourceDraftViewModel($"source-{index}.png", []))
             .ToArray();
+        const string longApplicability = "Black, White, Navy, Red, Green, XL, XXL, Front, Back, Sleeve";
+        sources[0].ApplicabilitySummary = longApplicability;
         foreach (var source in sources) viewModel.CatalogSetup.LocalSourceDrafts.Add(source);
         viewModel.CatalogSetup.SelectLocalSourceCommand.Execute(sources[2]);
         dialog.UpdateLayout();
@@ -2552,6 +2555,8 @@ public class StoreEditorHeadlessTests
             .Single(text => IsEffectivelyVisible(text) && text.Text == "Action");
         var statusCell = rows[0].GetVisualDescendants().OfType<TextBlock>()
             .Single(text => text.Text == sources[0].StatusLabel);
+        var applicabilityCell = rows[0].GetVisualDescendants().OfType<TextBlock>()
+            .Single(text => text.Text == longApplicability);
         var actionCell = rows[0].GetVisualDescendants().OfType<Button>()
             .Single(button => button.Content as string == "Archive");
         var statusHeadingPoint = statusHeading.TranslatePoint(new Point(0, 0), dialog)!.Value;
@@ -2565,6 +2570,12 @@ public class StoreEditorHeadlessTests
         // allow that gutter while still guarding against column drift.
         Assert.InRange(Math.Abs(statusHeadingPoint.X - statusCellPoint.X), 0, 10);
         Assert.InRange(Math.Abs(actionHeadingPoint.X - actionCellPoint.X), 0, 10);
+        Assert.Equal(TextWrapping.NoWrap, applicabilityCell.TextWrapping);
+        Assert.Equal(TextTrimming.CharacterEllipsis, applicabilityCell.TextTrimming);
+        Assert.True(applicabilityCell.Focusable);
+        Assert.True(applicabilityCell.IsTabStop);
+        Assert.Equal(longApplicability, ToolTip.GetTip(applicabilityCell));
+        Assert.Equal(longApplicability, AutomationProperties.GetHelpText(applicabilityCell));
 
         var fileButtons = rows.SelectMany(row => row.GetVisualDescendants().OfType<Button>())
             .Where(button => button.Classes.Contains("mockupTableFile"))

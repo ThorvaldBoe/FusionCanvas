@@ -67,7 +67,13 @@
                       AutomationProperties.ItemStatus="{Binding IsSelected, StringFormat='Selected: {0}'}">
                 <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="2*,2*,Auto,Auto" ColumnSpacing="10" RowSpacing="4">
                   <Button Grid.Row="0" Grid.Column="0" Content="{Binding DisplayName}" Command="{Binding $parent[Window].DataContext.SelectLocalSourceCommand}" CommandParameter="{Binding}" HorizontalContentAlignment="Left" Classes="mockupTableFile" />
-                  <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ApplicabilitySummary}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" />
+                  <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ApplicabilitySummary}" VerticalAlignment="Center"
+                             Foreground="{DynamicResource SecondaryTextBrush}"
+                             TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                             Focusable="True" IsTabStop="True"
+                             ToolTip.Tip="{Binding ApplicabilitySummary}"
+                             AutomationProperties.Name="Applicability"
+                             AutomationProperties.HelpText="{Binding ApplicabilitySummary}" />
                   <TextBlock Grid.Row="0" Grid.Column="2" MinWidth="80" Text="{Binding StatusLabel}" VerticalAlignment="Center" FontWeight="SemiBold" />
                   <Button Grid.Row="0" Grid.Column="3" MinWidth="80" Content="Archive" Command="{Binding $parent[Window].DataContext.RemoveLocalSourceCommand}" CommandParameter="{Binding}" Classes="secondary" />
                   <TextBlock Grid.Row="1" Grid.ColumnSpan="4" Text="{Binding PreviewReadError}" IsVisible="{Binding HasPreviewReadError}" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource WarningTextBrush}" AutomationProperties.Name="Preview read warning" />
