@@ -1,35 +1,10 @@
-using System.Text;
+using FusionCanvas.Domain.Text;
 
 namespace FusionCanvas.Domain.Ideation;
 
 public static class RejectionPhraseComparison
 {
-    public static string NormalizeKey(string phrase)
-    {
-        ArgumentNullException.ThrowIfNull(phrase);
-
-        var builder = new StringBuilder(phrase.Length);
-        var pendingWhitespace = false;
-
-        foreach (var character in phrase.Trim())
-        {
-            if (char.IsWhiteSpace(character))
-            {
-                pendingWhitespace = builder.Length > 0;
-                continue;
-            }
-
-            if (pendingWhitespace)
-            {
-                builder.Append(' ');
-                pendingWhitespace = false;
-            }
-
-            builder.Append(char.ToUpperInvariant(character));
-        }
-
-        return builder.ToString();
-    }
+    public static string NormalizeKey(string phrase) => PhraseKeyNormalizer.Normalize(phrase);
 
     public static bool IsWithinScopeDuplicate(IdeationRejection first, IdeationRejection second)
     {

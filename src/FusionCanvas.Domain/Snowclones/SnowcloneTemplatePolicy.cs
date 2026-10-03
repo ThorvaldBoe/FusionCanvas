@@ -1,4 +1,4 @@
-using System.Text;
+using FusionCanvas.Domain.Text;
 
 namespace FusionCanvas.Domain.Snowclones;
 
@@ -80,30 +80,5 @@ public static class SnowcloneTemplatePolicy
             placeholderTokens.Distinct(StringComparer.Ordinal).ToArray());
     }
 
-    public static string CreateDuplicateKey(string phrase)
-    {
-        ArgumentNullException.ThrowIfNull(phrase);
-
-        var builder = new StringBuilder(phrase.Length);
-        var pendingWhitespace = false;
-
-        foreach (var character in phrase.Trim())
-        {
-            if (char.IsWhiteSpace(character))
-            {
-                pendingWhitespace = builder.Length > 0;
-                continue;
-            }
-
-            if (pendingWhitespace)
-            {
-                builder.Append(' ');
-                pendingWhitespace = false;
-            }
-
-            builder.Append(char.ToUpperInvariant(character));
-        }
-
-        return builder.ToString();
-    }
+    public static string CreateDuplicateKey(string phrase) => PhraseKeyNormalizer.Normalize(phrase);
 }
