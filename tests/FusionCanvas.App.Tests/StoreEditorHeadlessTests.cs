@@ -2402,6 +2402,67 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void MockupSourceTable_SortHeadingsRespondToPointerAndKeyboardWithAccessibleDirection()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        var alpha = new LocalMockupSourceDraftViewModel("alpha.png", []);
+        var beta = new LocalMockupSourceDraftViewModel("beta.png", []);
+        var zeta = new LocalMockupSourceDraftViewModel("zeta.png", []);
+        alpha.UpdateMetadata([Guid.NewGuid()], new MockupImageSpaceMapping(100, 100, 0, 0, 50, 50), "Navy");
+        beta.UpdateMetadata([Guid.NewGuid()], new MockupImageSpaceMapping(100, 100, 0, 0, 50, 50), "Black");
+        viewModel.CatalogSetup.LocalSourceDrafts.Add(alpha);
+        viewModel.CatalogSetup.LocalSourceDrafts.Add(beta);
+        viewModel.CatalogSetup.LocalSourceDrafts.Add(zeta);
+        dialog.UpdateLayout();
+
+        var table = dialog.GetVisualDescendants().OfType<ItemsControl>()
+            .Single(control => AutomationProperties.GetName(control) == "Mockup source image table");
+        void AssertRows(params string[] names)
+        {
+            dialog.UpdateLayout();
+            Assert.Equal(names, table.GetVisualDescendants().OfType<Button>()
+                .Select(button => button.Content as string)
+                .Where(name => name is "alpha.png" or "beta.png" or "zeta.png"));
+        }
+
+        foreach (var (column, afterPointer, afterKeyboard) in new[]
+        {
+            ("File", new[] { "zeta.png", "beta.png", "alpha.png" }, new[] { "alpha.png", "beta.png", "zeta.png" }),
+            ("Applicability", new[] { "zeta.png", "beta.png", "alpha.png" }, new[] { "alpha.png", "beta.png", "zeta.png" }),
+            ("Status", new[] { "alpha.png", "beta.png", "zeta.png" }, new[] { "zeta.png", "alpha.png", "beta.png" })
+        })
+        {
+            var heading = dialog.GetVisualDescendants().OfType<Button>()
+                .Single(button => button.CommandParameter as string == column && button.Command == viewModel.CatalogSetup.SortLocalSourcesCommand);
+            var center = heading.TranslatePoint(new Point(heading.Bounds.Width / 2, heading.Bounds.Height / 2), dialog) ?? default;
+            HeadlessWindowExtensions.MouseDown(dialog, center, MouseButton.Left, RawInputModifiers.None);
+            HeadlessWindowExtensions.MouseUp(dialog, center, MouseButton.Left, RawInputModifiers.None);
+            AssertRows(afterPointer);
+            var pointerSortIsAscending = column != "File";
+            Assert.EndsWith(pointerSortIsAscending ? "sorted ascending" : "sorted descending", AutomationProperties.GetName(heading));
+            Assert.EndsWith(pointerSortIsAscending ? "↑" : "↓", heading.Content as string);
+
+            heading.Focus();
+            Assert.True(heading.IsFocused);
+            HeadlessWindowExtensions.KeyPress(dialog, Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, string.Empty);
+            AssertRows(afterKeyboard);
+            Assert.EndsWith(pointerSortIsAscending ? "sorted descending" : "sorted ascending", AutomationProperties.GetName(heading));
+            Assert.EndsWith(pointerSortIsAscending ? "↓" : "↑", heading.Content as string);
+        }
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void MockupSourceTable_FiveRowsShareFullWidthSeparatorsAndSelectedRowTreatment()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
@@ -2413,7 +2474,6 @@ public class StoreEditorHeadlessTests
         viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
-
         var sources = Enumerable.Range(1, 5)
             .Select(index => new LocalMockupSourceDraftViewModel($"source-{index}.png", []))
             .ToArray();
@@ -2441,7 +2501,6 @@ public class StoreEditorHeadlessTests
             .ToArray();
         Assert.Equal(5, fileButtons.Length);
         Assert.All(fileButtons, button => Assert.Equal(new Thickness(0), button.BorderThickness));
-
         dialog.Close();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         window.Close();

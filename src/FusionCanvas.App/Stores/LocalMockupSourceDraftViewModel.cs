@@ -47,6 +47,8 @@ public sealed class LocalMockupSourceDraftViewModel(string path, IReadOnlyList<G
         OptionValueIds = optionValueIds;
         Mapping = mapping;
         ApplicabilitySummary = summary;
+        PropertyChanged?.Invoke(this, new(nameof(ApplicabilitySummary)));
+        PropertyChanged?.Invoke(this, new(nameof(StatusLabel)));
     }
 
     public void MarkManaged(Guid sourceImageId)
