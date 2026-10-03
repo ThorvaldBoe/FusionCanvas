@@ -289,7 +289,9 @@ public class DesignStageToolHeadlessTests
         Assert.Equal(stale.Replacement.Id, stale.ViewModel.DesignTool.SelectedOfferingId);
         Assert.Empty(stale.ViewModel.DesignTool.SelectedColors);
         Assert.Empty(stale.ViewModel.DesignTool.Rows);
-        Assert.True(window.FindControl<ComboBox>("DesignConfigurationComboBox")!.IsFocused);
+        var configuration = window.FindControl<ComboBox>("DesignConfigurationComboBox")!;
+        Assert.True(configuration.IsFocused);
+        Assert.Equal("Design.ConfigurationSelector", AutomationProperties.GetAutomationId(configuration));
     }
 
     [AvaloniaFact]
@@ -816,6 +818,7 @@ public class DesignStageToolHeadlessTests
         Assert.NotNull(importButton);
         Assert.True(importButton.IsVisible);
         Assert.True(importButton.IsEnabled);
+        Assert.Equal("Design.ImportSupportingImage", AutomationProperties.GetAutomationId(importButton));
     }
 
     [AvaloniaFact]
@@ -835,6 +838,9 @@ public class DesignStageToolHeadlessTests
         Assert.NotNull(target);
         Assert.NotNull(transparency);
         Assert.NotNull(generate);
+        Assert.Equal("Design.ArtworkTargetSelector", AutomationProperties.GetAutomationId(target));
+        Assert.Equal("Design.TransparentBackground", AutomationProperties.GetAutomationId(transparency));
+        Assert.Equal("Design.GenerateArtwork", AutomationProperties.GetAutomationId(generate));
         Assert.Equal(2, target!.ItemCount);
         Assert.False(transparency!.IsEnabled);
         Assert.False(generate!.IsEnabled);
@@ -908,7 +914,6 @@ public class DesignStageToolHeadlessTests
         return Assert.IsType<CancellationTokenSource>(field?.GetValue(viewModel));
     }
 }
-
 internal sealed record StaleDesignFixture(
     MainWindowViewModel ViewModel,
     InMemoryWorkspaceRepository Repository,
@@ -924,3 +929,4 @@ internal sealed class DesignWindowScope(MainWindow window) : IDisposable
         Window.Close();
     }
 }
+

@@ -52,6 +52,66 @@ public class MainWindowConstructionTests
     }
 
     [AvaloniaFact]
+    public void ListingDiagnosticsRegionHasStableAccessibleIdentity()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Listing);
+        fixture.PumpLayout();
+
+        var diagnostics = fixture.FindControl<ItemsControl>(control =>
+            AutomationProperties.GetAutomationId(control) == "Listing.TemplateDiagnostics");
+
+        Assert.NotNull(diagnostics);
+        Assert.Equal("Mockup template readiness diagnostics", AutomationProperties.GetName(diagnostics));
+    }
+
+    [AvaloniaFact]
+    public void ListingTemplateSelectorHasStableAccessibleIdentity()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Listing);
+        fixture.PumpLayout();
+
+        var selector = fixture.FindControl<ComboBox>(control =>
+            AutomationProperties.GetAutomationId(control) == "Listing.MockupTemplateSelector");
+
+        Assert.NotNull(selector);
+        Assert.Equal("Mockup template", AutomationProperties.GetName(selector));
+    }
+
+    [AvaloniaFact]
+    public void ListingApplyActionHasStableAccessibleIdentity()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Listing);
+        fixture.PumpLayout();
+
+        var apply = fixture.FindControl<Button>(control =>
+            AutomationProperties.GetAutomationId(control) == "Listing.ApplyMockupTemplate");
+
+        Assert.NotNull(apply);
+        Assert.Equal("Apply mockup template", AutomationProperties.GetName(apply));
+    }
+
+    [AvaloniaFact]
+    public void ListingOutputsRegionHasStableAccessibleIdentity()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Listing);
+        fixture.PumpLayout();
+
+        var outputs = fixture.FindControl<ItemsControl>(control =>
+            AutomationProperties.GetAutomationId(control) == "Listing.MockupOutputs");
+
+        Assert.NotNull(outputs);
+        Assert.Equal("Generated mockup outputs", AutomationProperties.GetName(outputs));
+    }
+
+    [AvaloniaFact]
     public void OpeningItem_EnablesInspectorAndStatusSelector()
     {
         using var fixture = new MainWindowFixture();

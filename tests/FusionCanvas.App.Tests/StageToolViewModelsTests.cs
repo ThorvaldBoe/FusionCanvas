@@ -107,6 +107,14 @@ public class StageToolViewModelsTests
 
         var diagnostic = Assert.Single(vm.TemplateDiagnostics);
         Assert.Equal("Front image", diagnostic.TemplateName);
+        Assert.Equal([
+            MockupTemplateReadinessBlocker.MissingImage,
+            MockupTemplateReadinessBlocker.MissingMapping,
+            MockupTemplateReadinessBlocker.MissingSourceApplicability,
+            MockupTemplateReadinessBlocker.InvalidSourceApplicability,
+            MockupTemplateReadinessBlocker.MissingVariantSourceImage,
+            MockupTemplateReadinessBlocker.AmbiguousVariantSourceImages
+        ], diagnostic.Blockers);
         Assert.Contains("Choose a mockup image.", diagnostic.Guidance);
         Assert.Contains("Add a valid design-area placement mapping.", diagnostic.Guidance);
         Assert.Contains("Choose applicability options for each source image.", diagnostic.Guidance);
@@ -150,6 +158,25 @@ public class StageToolViewModelsTests
         Assert.False(vm.CanApply);
         vm.SelectedTemplate = template;
         Assert.True(vm.CanApply);
+    }
+
+    [Fact]
+    public async Task ListingTool_ReapplyingTemplateReplacesPriorOutputs()
+    {
+        var itemId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        var service = new ApplyingMockupGenerationService(itemId, templateId);
+        var vm = new ListingStageToolViewModel(service);
+
+        await vm.LoadAsync(itemId, ItemStatus.Draft, canEdit: true, TestContext.Current.CancellationToken);
+        await vm.ApplyAsync();
+        var first = Assert.Single(vm.Outputs);
+
+        await vm.ApplyAsync();
+
+        var second = Assert.Single(vm.Outputs);
+        Assert.NotEqual(first.AssetId, second.AssetId);
+        Assert.Equal(2, service.ApplyCalls);
     }
 
     [Fact]
@@ -210,5 +237,29 @@ public class StageToolViewModelsTests
 
         public Task<MockupGenerationResult> ApplyAsync(MockupGenerationRequest request, CancellationToken cancellationToken = default) =>
             Task.FromResult(MockupGenerationResult.Failure("Not used in this test."));
+    }
+
+    private sealed class ApplyingMockupGenerationService(Guid itemId, Guid templateId) : IMockupGenerationService
+    {
+        public int ApplyCalls { get; private set; }
+
+        public Task<MockupGenerationState> LoadAsync(Guid requestedItemId, bool isReadOnly, string readOnlyReason, CancellationToken cancellationToken = default)
+        {
+            Assert.Equal(itemId, requestedItemId);
+            return Task.FromResult(new MockupGenerationState(
+                itemId, Guid.NewGuid(), false, string.Empty,
+                [new MockupTemplate(templateId, Guid.NewGuid(), null, "Flatlay", null, 1, false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)],
+                templateId, [], [], null, null, []));
+        }
+
+        public Task<MockupGenerationResult> ApplyAsync(MockupGenerationRequest request, CancellationToken cancellationToken = default)
+        {
+            ApplyCalls++;
+            return Task.FromResult(new MockupGenerationResult(
+                true,
+                null,
+                [new MockupGenerationOutput(Guid.NewGuid(), $"mockup-{ApplyCalls}", $"mockup-{ApplyCalls}.png", "Black", request.TemplateId, 1, Guid.NewGuid())],
+                []));
+        }
     }
 }

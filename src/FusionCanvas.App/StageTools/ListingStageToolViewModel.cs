@@ -96,7 +96,7 @@ public sealed class ListingStageToolViewModel : INotifyPropertyChanged
             foreach (var diagnostic in state.CandidateDiagnostics)
             {
                 var guidance = string.Join(" ", diagnostic.Blockers.Select(MockupTemplateReadinessMessageTranslator.Translate));
-                TemplateDiagnostics.Add(new(diagnostic.TemplateName, guidance));
+                TemplateDiagnostics.Add(new(diagnostic.TemplateName, guidance, diagnostic.Blockers));
             }
             OnPropertyChanged(nameof(HasTemplateDiagnostics));
             SelectedTemplate = state.SelectedTemplateId is Guid selectedId
@@ -114,10 +114,12 @@ public sealed class ListingStageToolViewModel : INotifyPropertyChanged
         }
     }
 
-    private async Task ApplyAsync()
+    public async Task ApplyAsync()
     {
         if (_service is null || !CanApply || SelectedTemplateId is not Guid templateId) return;
-        IsBusy = true; ErrorMessage = null;
+        IsBusy = true;
+        ErrorMessage = null;
+        Outputs.Clear();
         try
         {
             var result = await _service.ApplyAsync(new(_itemId, templateId)).ConfigureAwait(true);

@@ -1187,7 +1187,8 @@
                                   DisplayMemberBinding="{Binding Name}"
                                   SelectedItem="{Binding DesignTool.SelectedOffering}"
                                   IsEnabled="{Binding !DesignTool.IsReadOnly}"
-                                  AutomationProperties.Name="Change configuration" />
+                                  AutomationProperties.Name="Change configuration"
+                                  AutomationProperties.AutomationId="Design.ConfigurationSelector" />
 <TextBlock Text="{Binding DesignTool.SelectedOfferingName, StringFormat='Selected: {0}'}"
                                            TextWrapping="Wrap"
                                            FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -1411,7 +1412,8 @@
                                 IsEnabled="{Binding !DesignTool.IsReadOnly}"
                                 Click="OnImportSupportingImage"
                                 Classes="storeSecondary"
-                                AutomationProperties.Name="Import supporting image" />
+                                AutomationProperties.Name="Import supporting image"
+                                AutomationProperties.AutomationId="Design.ImportSupportingImage" />
                         <ItemsControl ItemsSource="{Binding DesignTool.SupportingImages}">
                           <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
@@ -1467,16 +1469,19 @@
                                   SelectedValueBinding="{Binding Id}"
                                   DisplayMemberBinding="{Binding Name}"
                                   IsEnabled="{Binding !DesignTool.IsReadOnly}"
-                                  AutomationProperties.Name="Artwork target Design Area" />
+                                  AutomationProperties.Name="Artwork target Design Area"
+                                  AutomationProperties.AutomationId="Design.ArtworkTargetSelector" />
                         <CheckBox Content="Transparent Background"
                                   IsChecked="{Binding DesignTool.TransparentBackground, Mode=TwoWay}"
                                   IsEnabled="{Binding DesignTool.CanUseTransparentBackground}"
-                                  AutomationProperties.Name="Transparent Background" />
+                                  AutomationProperties.Name="Transparent Background"
+                                  AutomationProperties.AutomationId="Design.TransparentBackground" />
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <Button Content="Generate"
                                   Command="{Binding DesignTool.GenerateArtworkCommand}"
                                   IsEnabled="{Binding DesignTool.CanGenerateArtwork}"
-                                  AutomationProperties.Name="Generate Artwork" />
+                                  AutomationProperties.Name="Generate Artwork"
+                                  AutomationProperties.AutomationId="Design.GenerateArtwork" />
                           <Button Content="Cancel"
                                   Command="{Binding DesignTool.CancelArtworkCommand}"
                                   IsVisible="{Binding DesignTool.IsArtworkBusy}"
@@ -1544,13 +1549,15 @@
                       <ComboBox ItemsSource="{Binding ListingTool.Templates}"
                                 SelectedItem="{Binding ListingTool.SelectedTemplate, Mode=TwoWay}"
                                 DisplayMemberBinding="{Binding Name}"
-                                AutomationProperties.Name="Mockup template" />
+                                AutomationProperties.Name="Mockup template"
+                                AutomationProperties.AutomationId="Listing.MockupTemplateSelector" />
                       <TextBlock Text="{Binding ListingTool.BlockedReason}"
                                  IsVisible="{Binding ListingTool.HasBlockedReason}"
                                  TextWrapping="Wrap"
                                  Foreground="{DynamicResource WarningTextBrush}" />
                       <ItemsControl ItemsSource="{Binding ListingTool.TemplateDiagnostics}"
-                                    AutomationProperties.Name="Mockup template readiness diagnostics">
+                                    AutomationProperties.Name="Mockup template readiness diagnostics"
+                                    AutomationProperties.AutomationId="Listing.TemplateDiagnostics">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate>
                             <StackPanel Spacing="2" Margin="0,2,0,0">
@@ -1568,12 +1575,15 @@
                       <Button Content="Apply mockup template"
                               Command="{Binding ListingTool.ApplyCommand}"
                               IsEnabled="{Binding ListingTool.CanApply}"
-                              AutomationProperties.Name="Apply mockup template" />
+                              AutomationProperties.Name="Apply mockup template"
+                              AutomationProperties.AutomationId="Listing.ApplyMockupTemplate" />
                       <TextBlock IsVisible="{Binding ListingTool.IsBusy}" Text="Generating mockups…" />
                       <TextBlock Text="{Binding ListingTool.ErrorMessage}"
                                  TextWrapping="Wrap"
                                  Foreground="{DynamicResource DangerTextBrush}" />
-                      <ItemsControl ItemsSource="{Binding ListingTool.Outputs}">
+                      <ItemsControl ItemsSource="{Binding ListingTool.Outputs}"
+                                    AutomationProperties.Name="Generated mockup outputs"
+                                    AutomationProperties.AutomationId="Listing.MockupOutputs">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate>
                             <TextBlock Text="{Binding Name}" Foreground="{DynamicResource StrongTextBrush}" />
