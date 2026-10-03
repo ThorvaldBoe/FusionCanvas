@@ -839,6 +839,7 @@ public class DesignStageToolHeadlessTests
         Assert.NotNull(generate);
         Assert.Equal("Design.ArtworkTargetSelector", AutomationProperties.GetAutomationId(target));
         Assert.Equal("Design.TransparentBackground", AutomationProperties.GetAutomationId(transparency));
+        Assert.Equal("Design.GenerateArtwork", AutomationProperties.GetAutomationId(generate));
         Assert.Equal(2, target!.ItemCount);
         Assert.False(transparency!.IsEnabled);
         Assert.False(generate!.IsEnabled);
@@ -912,7 +913,6 @@ public class DesignStageToolHeadlessTests
         return Assert.IsType<CancellationTokenSource>(field?.GetValue(viewModel));
     }
 }
-
 internal sealed record StaleDesignFixture(
     MainWindowViewModel ViewModel,
     InMemoryWorkspaceRepository Repository,
@@ -928,3 +928,4 @@ internal sealed class DesignWindowScope(MainWindow window) : IDisposable
         Window.Close();
     }
 }
+

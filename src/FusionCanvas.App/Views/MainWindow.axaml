@@ -1479,7 +1479,8 @@
                           <Button Content="Generate"
                                   Command="{Binding DesignTool.GenerateArtworkCommand}"
                                   IsEnabled="{Binding DesignTool.CanGenerateArtwork}"
-                                  AutomationProperties.Name="Generate Artwork" />
+                                  AutomationProperties.Name="Generate Artwork"
+                                  AutomationProperties.AutomationId="Design.GenerateArtwork" />
                           <Button Content="Cancel"
                                   Command="{Binding DesignTool.CancelArtworkCommand}"
                                   IsVisible="{Binding DesignTool.IsArtworkBusy}"
