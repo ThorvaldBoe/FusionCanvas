@@ -130,6 +130,20 @@ public class MainWindowConstructionTests
     }
 
     [AvaloniaFact]
+    public void DesignErrorRegionHasStableAccessibleIdentity()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Design);
+        fixture.PumpLayout();
+
+        var error = fixture.FindControl<TextBlock>(textBlock =>
+            AutomationProperties.GetAutomationId(textBlock) == "Design.Error");
+
+        Assert.Equal("Design error", AutomationProperties.GetName(error));
+    }
+
+    [AvaloniaFact]
     public void ItemOverviewContext_GroupsHeaderAndOverviewDetailsInOneSurface()
     {
         using var fixture = new MainWindowFixture();
