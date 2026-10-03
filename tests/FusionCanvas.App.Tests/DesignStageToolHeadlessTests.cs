@@ -838,6 +838,7 @@ public class DesignStageToolHeadlessTests
         Assert.NotNull(transparency);
         Assert.NotNull(generate);
         Assert.Equal("Design.ArtworkTargetSelector", AutomationProperties.GetAutomationId(target));
+        Assert.Equal("Design.TransparentBackground", AutomationProperties.GetAutomationId(transparency));
         Assert.Equal(2, target!.ItemCount);
         Assert.False(transparency!.IsEnabled);
         Assert.False(generate!.IsEnabled);

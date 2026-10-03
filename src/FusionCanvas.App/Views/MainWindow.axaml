@@ -1473,7 +1473,8 @@
                         <CheckBox Content="Transparent Background"
                                   IsChecked="{Binding DesignTool.TransparentBackground, Mode=TwoWay}"
                                   IsEnabled="{Binding DesignTool.CanUseTransparentBackground}"
-                                  AutomationProperties.Name="Transparent Background" />
+                                  AutomationProperties.Name="Transparent Background"
+                                  AutomationProperties.AutomationId="Design.TransparentBackground" />
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <Button Content="Generate"
                                   Command="{Binding DesignTool.GenerateArtworkCommand}"
