@@ -685,6 +685,10 @@ public class StoreEditorHeadlessTests
         var manageAreas = Assert.IsType<Button>(FindButton(window, "Manage Design Areas")!);
         var manageTemplates = Assert.IsType<Button>(FindButton(window, "Manage Mockup Templates")!);
 
+        Assert.Equal("Catalog.ManageVariants", AutomationProperties.GetAutomationId(manageVariants));
+        Assert.Equal("Catalog.ManageDesignAreas", AutomationProperties.GetAutomationId(manageAreas));
+        Assert.Equal("Catalog.ManageMockupTemplates", AutomationProperties.GetAutomationId(manageTemplates));
+
         Assert.True(manageVariants.Bounds.Width > 0, "Manage buttons should be laid out.");
         Assert.Equal(manageVariants.Bounds.X, manageAreas.Bounds.X, 0.5);
         Assert.Equal(manageAreas.Bounds.X, manageTemplates.Bounds.X, 0.5);

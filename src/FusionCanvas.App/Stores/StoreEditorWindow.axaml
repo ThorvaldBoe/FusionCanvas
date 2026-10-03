@@ -926,7 +926,9 @@
                     <TextBlock Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" TextAlignment="Right"
                                Text="{Binding CatalogSetup.AvailableVariantCount, StringFormat='{}{0} configured'}"
                                Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <Button Grid.Row="0" Grid.Column="2" Content="Manage Variants" Command="{Binding OpenVariantManagementCommand}" Classes="secondary" HorizontalAlignment="Stretch" />
+                    <Button Grid.Row="0" Grid.Column="2" Content="Manage Variants" Command="{Binding OpenVariantManagementCommand}" Classes="secondary" HorizontalAlignment="Stretch"
+                            AutomationProperties.Name="Manage Variants"
+                            AutomationProperties.AutomationId="Catalog.ManageVariants" />
 
                     <StackPanel Grid.Row="2" Grid.Column="0" Spacing="3">
                       <TextBlock Text="Design Areas" FontWeight="SemiBold" />
@@ -936,7 +938,9 @@
                     <TextBlock Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" TextAlignment="Right"
                                Text="{Binding CatalogSetup.AvailableDesignAreaCount, StringFormat='{}{0} configured'}"
                                Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <Button Grid.Row="2" Grid.Column="2" Content="Manage Design Areas" Command="{Binding OpenDesignAreaManagementCommand}" Classes="secondary" HorizontalAlignment="Stretch" />
+                    <Button Grid.Row="2" Grid.Column="2" Content="Manage Design Areas" Command="{Binding OpenDesignAreaManagementCommand}" Classes="secondary" HorizontalAlignment="Stretch"
+                            AutomationProperties.Name="Manage Design Areas"
+                            AutomationProperties.AutomationId="Catalog.ManageDesignAreas" />
 
                     <StackPanel Grid.Row="4" Grid.Column="0" Spacing="3">
                       <TextBlock Text="Mockup Templates" FontWeight="SemiBold" />
@@ -946,7 +950,9 @@
                     <TextBlock Grid.Row="4" Grid.Column="1" VerticalAlignment="Center" TextAlignment="Right"
                                Text="{Binding CatalogSetup.AvailableTemplateCount, StringFormat='{}{0} configured'}"
                                Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <Button Grid.Row="4" Grid.Column="2" Content="Manage Mockup Templates" Command="{Binding OpenMockupTemplateManagementCommand}" Classes="secondary" HorizontalAlignment="Stretch" />
+                    <Button Grid.Row="4" Grid.Column="2" Content="Manage Mockup Templates" Command="{Binding OpenMockupTemplateManagementCommand}" Classes="secondary" HorizontalAlignment="Stretch"
+                            AutomationProperties.Name="Manage Mockup Templates"
+                            AutomationProperties.AutomationId="Catalog.ManageMockupTemplates" />
                   </Grid>
                 </Border>
                 <Border Classes="panel" Padding="10"
