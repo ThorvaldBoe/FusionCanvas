@@ -606,6 +606,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public int AvailableDesignAreaCount => AvailablePlaceholders.Count();
     public int AvailableTemplateCount => AvailableTemplates.Count();
     public int ReadyMockupTemplateCount => _offeringReadiness?.ReadyMockupTemplateCount ?? 0;
+    public IReadOnlyList<OfferingReadinessIssue> OfferingReadinessIssues => _offeringReadiness?.Issues ?? [];
     public IReadOnlyList<string> OfferingReadinessGuidance => _offeringReadiness?.Issues.Select(OfferingReadinessMessageTranslator.Translate).ToArray() ?? [];
     public bool HasOfferingReadinessGuidance => OfferingReadinessGuidance.Count > 0;
     public string OfferingReadinessSummary => _offeringReadiness is null
@@ -1507,6 +1508,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     {
         _offeringReadiness = state.Summary.Readiness;
         OnPropertyChanged(nameof(ReadyMockupTemplateCount));
+        OnPropertyChanged(nameof(OfferingReadinessIssues));
         OnPropertyChanged(nameof(HasOfferingReadinessGuidance));
         OnPropertyChanged(nameof(OfferingReadinessGuidance));
         OnPropertyChanged(nameof(OfferingReadinessSummary));
@@ -1539,6 +1541,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         {
             _offeringReadiness = null;
             OnPropertyChanged(nameof(ReadyMockupTemplateCount));
+            OnPropertyChanged(nameof(OfferingReadinessIssues));
             OnPropertyChanged(nameof(HasOfferingReadinessGuidance));
             OnPropertyChanged(nameof(OfferingReadinessGuidance));
             OnPropertyChanged(nameof(OfferingReadinessSummary));
@@ -1554,6 +1557,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             if (version != Volatile.Read(ref _readinessLoadVersion) || SelectedOffering?.Id != offering.Id) return;
             _offeringReadiness = state.Summary.Readiness;
             OnPropertyChanged(nameof(ReadyMockupTemplateCount));
+            OnPropertyChanged(nameof(OfferingReadinessIssues));
             OnPropertyChanged(nameof(HasOfferingReadinessGuidance));
             OnPropertyChanged(nameof(OfferingReadinessGuidance));
             OnPropertyChanged(nameof(OfferingReadinessSummary));
@@ -1567,6 +1571,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             if (version != Volatile.Read(ref _readinessLoadVersion) || SelectedOffering?.Id != offering.Id) return;
             _offeringReadiness = null;
             OnPropertyChanged(nameof(ReadyMockupTemplateCount));
+            OnPropertyChanged(nameof(OfferingReadinessIssues));
             OnPropertyChanged(nameof(HasOfferingReadinessGuidance));
             OnPropertyChanged(nameof(OfferingReadinessGuidance));
             OnPropertyChanged(nameof(OfferingReadinessSummary));

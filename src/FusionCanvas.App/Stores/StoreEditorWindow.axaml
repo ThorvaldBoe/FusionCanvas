@@ -972,6 +972,12 @@
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    <Button Content="Open next setup step"
+                            Command="{Binding OpenNextOfferingReadinessStepCommand}"
+                            IsVisible="{Binding CatalogSetup.HasOfferingReadinessGuidance}"
+                            Classes="secondary"
+                            AutomationProperties.Name="Open next offering setup step"
+                            AutomationProperties.AutomationId="Catalog.OpenNextOfferingReadinessStep" />
                   </StackPanel>
                 </Border>
                 </StackPanel>

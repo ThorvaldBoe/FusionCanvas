@@ -348,6 +348,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         OpenVariantManagementCommand = new RelayCommand(_ => OpenOfferingManagement(CatalogEditorLevel.VariantManagement));
         OpenDesignAreaManagementCommand = new RelayCommand(_ => OpenOfferingManagement(CatalogEditorLevel.DesignAreaManagement));
         OpenMockupTemplateManagementCommand = new RelayCommand(_ => OpenOfferingManagement(CatalogEditorLevel.MockupTemplateManagement));
+        OpenNextOfferingReadinessStepCommand = new RelayCommand(_ => OpenNextOfferingReadinessStep());
         OpenProductDetailCommand = new RelayCommand(parameter =>
         {
             if (parameter is StoreProductSummary product)
@@ -1164,6 +1165,7 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand OpenVariantManagementCommand { get; }
     public ICommand OpenDesignAreaManagementCommand { get; }
     public ICommand OpenMockupTemplateManagementCommand { get; }
+    public ICommand OpenNextOfferingReadinessStepCommand { get; }
     public ICommand OpenProductDetailCommand { get; }
     public ICommand OpenOfferingDetailCommand { get; }
     public ICommand StartAddVariantCommand { get; }
@@ -1722,6 +1724,24 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
     private void BackToProducts() => _productCatalogEditor.NavigateCatalog(CatalogEditorLevel.Overview);
     private void BackToProduct() => _productCatalogEditor.NavigateCatalog(CatalogEditorLevel.ProductDetail);
     private void OpenOfferingManagement(CatalogEditorLevel level) => _productCatalogEditor.NavigateCatalog(level);
+
+    private void OpenNextOfferingReadinessStep()
+    {
+        var nextIssue = CatalogSetup?.OfferingReadinessIssues.FirstOrDefault();
+        var level = nextIssue?.Kind switch
+        {
+            OfferingReadinessIssueKind.MissingVariants => CatalogEditorLevel.VariantManagement,
+            OfferingReadinessIssueKind.MissingDesignAreas => CatalogEditorLevel.DesignAreaManagement,
+            OfferingReadinessIssueKind.MissingMockupTemplates => CatalogEditorLevel.MockupTemplateManagement,
+            OfferingReadinessIssueKind.IncompleteMockupTemplate => CatalogEditorLevel.MockupTemplateManagement,
+            _ => (CatalogEditorLevel?)null
+        };
+
+        if (level is CatalogEditorLevel target)
+        {
+            OpenOfferingManagement(target);
+        }
+    }
     private void NavigateOfferingCatalog(CatalogEditorLevel level) => _productCatalogEditor.NavigateCatalog(level);
     private void StartAddVariant() => _productCatalogEditor.StartAddVariant();
     private void StartAddDesignArea() => _productCatalogEditor.StartAddDesignArea();

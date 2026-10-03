@@ -577,6 +577,10 @@ public class StoreEditorHeadlessTests
             .OfType<ItemsControl>()
             .Single(control => AutomationProperties.GetAutomationId(control) == "Catalog.OfferingReadinessGuidance");
         Assert.Equal("Offering readiness guidance", AutomationProperties.GetName(guidance));
+        var nextStep = readiness.GetVisualDescendants()
+            .OfType<Button>()
+            .Single(button => AutomationProperties.GetAutomationId(button) == "Catalog.OpenNextOfferingReadinessStep");
+        Assert.Equal("Open next offering setup step", AutomationProperties.GetName(nextStep));
         var setupPanel = setup.GetVisualAncestors().OfType<Border>()
             .Single(border => border.Classes.Contains("panel"));
         Assert.Equal(12, setupPanel.Padding.Left);
@@ -611,6 +615,25 @@ public class StoreEditorHeadlessTests
             control => AutomationProperties.GetAutomationId(control) == "Catalog.MockupTemplateEditor");
         Assert.Empty(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
 
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void OfferingReadinessActionOpensTheFirstRequiredSetupEditor()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: false);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        window.UpdateLayout();
+
+        Assert.Contains(viewModel.CatalogSetup!.OfferingReadinessIssues,
+            issue => issue.Kind == OfferingReadinessIssueKind.MissingVariants);
+
+        viewModel.OpenNextOfferingReadinessStepCommand.Execute(null);
+
+        Assert.True(viewModel.IsVariantManagement);
         window.Close();
     }
 
