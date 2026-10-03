@@ -76,6 +76,35 @@ public sealed class OfferingManagementServiceTests
     }
 
     [Fact]
+    public async Task OfferingSummaryKeepsDraftBlockersWhenAnotherTemplateIsReady()
+    {
+        var fixture = Fixture.Create();
+        var readyTemplate = fixture.Snapshot.MockupTemplates.Single();
+        var draftTemplate = readyTemplate with { Id = Guid.NewGuid(), Name = "Back draft" };
+        var area = fixture.Snapshot.OfferingPlaceholders.Single();
+        var color = fixture.Snapshot.OfferingOptionValues.Single();
+        var revision = new MockupTemplateRevision(
+            Guid.NewGuid(), readyTemplate.Id, readyTemplate.CurrentRevision, area.Id, Now,
+            "Ready", "provider-front", new MockupImageSpaceMapping(1200, 1200, 100, 100, 700, 800));
+        var binding = new MockupTemplateColorVariant(Guid.NewGuid(), readyTemplate.Id, color.Id, false, Now, Now);
+        fixture.Snapshot = fixture.Snapshot with
+        {
+            MockupTemplates = [readyTemplate, draftTemplate],
+            MockupTemplateRevisions = [revision],
+            MockupTemplateColorVariants = [binding]
+        };
+
+        var summary = Assert.Single(await new OfferingManagementService(new MemoryRepository(fixture.Snapshot))
+            .LoadForBlueprintAsync(fixture.Store.Id, fixture.Blueprint.Id, TestContext.Current.CancellationToken));
+
+        Assert.Equal(OfferingReadinessStatus.ReadyForMockupGeneration, summary.Readiness!.Status);
+        Assert.Equal(1, summary.Readiness.ReadyMockupTemplateCount);
+        var issue = Assert.Single(summary.Readiness.Issues);
+        Assert.Equal("Back draft", issue.TemplateName);
+        Assert.Contains(MockupTemplateReadinessBlocker.MissingMapping, issue.TemplateBlockers!);
+    }
+
+    [Fact]
     public async Task OfferingSummaryOrdersIncompleteTemplateGuidanceByName()
     {
         var fixture = Fixture.Create();
