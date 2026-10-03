@@ -61,7 +61,7 @@ screen:
                   - { id: image-collection-title, kind: text, variant: section-heading, text: Mockup source images }
                   - { id: image-collection-summary, kind: text, variant: supporting, text: 5 images - 3 complete - 2 need setup }
               - { id: archive-image, kind: button, variant: secondary, text: Archive selected, width: content, column: 1, row: 0 }
-              - { id: upload-images, kind: button, variant: primary, text: Upload image..., width: content, column: 2, row: 0 }
+              - { id: upload-images, kind: button, variant: primary, text: Upload images..., width: content, column: 2, row: 0 }
           - id: image-table
             kind: table
             variant: data-table

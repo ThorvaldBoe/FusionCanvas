@@ -13,6 +13,14 @@ public sealed class AvaloniaAssetFilePicker : IAssetFilePicker
         FilePickerFileTypes.All
     ];
 
+    private static readonly IReadOnlyList<FilePickerFileType> RasterImageFilters =
+    [
+        new("Raster images")
+        {
+            Patterns = ["*.png", "*.jpg", "*.jpeg"]
+        }
+    ];
+
     private readonly IStorageProvider _storageProvider;
 
     public AvaloniaAssetFilePicker(IStorageProvider storageProvider)
@@ -35,5 +43,26 @@ public sealed class AvaloniaAssetFilePicker : IAssetFilePicker
         });
 
         return files is { Count: > 0 } ? files[0].TryGetLocalPath() : null;
+    }
+
+    public async Task<IReadOnlyList<string>> PickImportFilesAsync(CancellationToken cancellationToken = default)
+    {
+        if (!_storageProvider.CanOpen)
+        {
+            return [];
+        }
+
+        var files = await _storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Upload mockup source images",
+            AllowMultiple = true,
+            FileTypeFilter = RasterImageFilters
+        });
+
+        return files
+            .Select(file => file.TryGetLocalPath())
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => path!)
+            .ToArray();
     }
 }

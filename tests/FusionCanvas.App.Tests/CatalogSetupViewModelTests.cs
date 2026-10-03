@@ -43,6 +43,76 @@ public sealed class CatalogSetupViewModelTests
     }
 
     [Fact]
+    public async Task BrowseLocalSourcesStagesEachSelectedFileAndSelectsFirstDraft()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Manual tee", null, BlueprintOfferingKind.ProviderNetwork, null, "manual", null, null, false, now, now);
+        var repository = new InMemoryWorkspaceRepository(snapshot with { Blueprints = [blueprint], BlueprintOfferings = [offering] });
+        var metadata = new FixedRasterImageMetadataReader(new RasterImageInfo(1600, 1200));
+        var sourceImages = new RecordingSourceImageService();
+        var viewModel = new CatalogSetupViewModel(
+            new CatalogSetupService(repository),
+            new MockupTemplateSetupService(repository),
+            sourceImages: sourceImages,
+            filePicker: new FixedLocalSourceFilesPicker(["first.png", "second.jpg"]),
+            rasterImageMetadataReader: metadata);
+        await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+        viewModel.SelectOffering(offering.Id);
+        viewModel.StartAddTemplateCommand.Execute(null);
+
+        var command = Assert.IsType<AsyncRelayCommand>(viewModel.BrowseLocalSourceCommand);
+        command.Execute(null);
+        await command.ExecutionTask!;
+
+        Assert.Equal(["first.png", "second.jpg"], viewModel.LocalSourceDrafts.Select(value => value.Path));
+        Assert.Same(viewModel.LocalSourceDrafts[0], viewModel.SelectedLocalSource);
+        Assert.All(viewModel.LocalSourceDrafts, draft =>
+        {
+            Assert.Empty(draft.OptionValueIds);
+            Assert.Null(draft.Mapping);
+            Assert.Equal(1600, draft.ImageWidth);
+            Assert.Equal(1200, draft.ImageHeight);
+        });
+        Assert.Equal(["first.png", "second.jpg"], metadata.ReadPaths);
+    }
+
+    [Fact]
+    public async Task BrowseLocalSourcesRetainsFailedMetadataDraftAlongsideValidDrafts()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = SampleWorkspace.Create();
+        var store = snapshot.Stores.Single();
+        var blueprint = new Blueprint(Guid.NewGuid(), store.Id, "T-shirt", null, false, now, now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, store.Id, "Manual tee", null, BlueprintOfferingKind.ProviderNetwork, null, "manual", null, null, false, now, now);
+        var repository = new InMemoryWorkspaceRepository(snapshot with { Blueprints = [blueprint], BlueprintOfferings = [offering] });
+        var metadata = new SelectiveRasterImageMetadataReader("broken.png");
+        var viewModel = new CatalogSetupViewModel(
+            new CatalogSetupService(repository),
+            new MockupTemplateSetupService(repository),
+            sourceImages: new RecordingSourceImageService(),
+            filePicker: new FixedLocalSourceFilesPicker(["valid.png", "broken.png"]),
+            rasterImageMetadataReader: metadata);
+        await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
+        viewModel.SelectOffering(offering.Id);
+        viewModel.StartAddTemplateCommand.Execute(null);
+
+        var command = Assert.IsType<AsyncRelayCommand>(viewModel.BrowseLocalSourceCommand);
+        command.Execute(null);
+        await command.ExecutionTask!;
+
+        var valid = Assert.Single(viewModel.LocalSourceDrafts, value => value.Path == "valid.png");
+        var failed = Assert.Single(viewModel.LocalSourceDrafts, value => value.Path == "broken.png");
+        Assert.Equal(1600, valid.ImageWidth);
+        Assert.Equal(1200, valid.ImageHeight);
+        Assert.True(failed.HasPreviewReadError);
+        Assert.Contains("Unsupported mockup image format.", failed.PreviewReadError, StringComparison.Ordinal);
+        Assert.Same(valid, viewModel.SelectedLocalSource);
+    }
+
+    [Fact]
     public async Task BrowseLocalSourceReadFailureRetainsFallbackAndExposesDiagnostic()
     {
         var now = DateTimeOffset.UtcNow;
@@ -1184,6 +1254,26 @@ public sealed class CatalogSetupViewModelTests
     {
         public Task<string?> PickImportFileAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<string?>(path);
+
+        public Task<IReadOnlyList<string>> PickImportFilesAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>([path]);
+    }
+
+    private sealed class FixedLocalSourceFilesPicker(IReadOnlyList<string> paths) : IAssetFilePicker
+    {
+        public Task<string?> PickImportFileAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<string?>(paths.FirstOrDefault());
+
+        public Task<IReadOnlyList<string>> PickImportFilesAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(paths);
+    }
+
+    private sealed class SelectiveRasterImageMetadataReader(string failingPath) : IRasterImageMetadataReader
+    {
+        public Task<RasterImageInfo> ReadAsync(string sourcePath, CancellationToken cancellationToken = default) =>
+            sourcePath == failingPath
+                ? Task.FromException<RasterImageInfo>(new InvalidDataException("Unsupported mockup image format."))
+                : Task.FromResult(new RasterImageInfo(1600, 1200));
     }
 
     private sealed class FixedMockupTemplateSourceImageService(MockupTemplateSourceState state) : IMockupTemplateSourceImageService

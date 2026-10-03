@@ -23,7 +23,9 @@ public sealed class ProductionSourceLayoutTests
             }
         }
 
-        Assert.Empty(violations);
+        Assert.True(
+            violations.Count == 0,
+            $"Production files with multiple top-level types:{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
     }
 
     private static IReadOnlyList<string> FindTopLevelTypeNames(IReadOnlyList<string> lines)
@@ -47,8 +49,97 @@ public sealed class ProductionSourceLayoutTests
 
     private static string StripStringsAndComments(string line)
     {
-        var withoutComments = line.Split("//", 2, StringSplitOptions.None)[0];
-        return Regex.Replace(withoutComments, @"""(?:\\.|[^""\\])*""|'(?:\\.|[^'\\])*'", "string", RegexOptions.CultureInvariant);
+        var result = new System.Text.StringBuilder(line.Length);
+        var inString = false;
+        var stringDelimiter = '\0';
+        var escaped = false;
+        var interpolatedString = false;
+        var interpolationDepth = 0;
+        var nestedStringDelimiter = '\0';
+        var nestedStringEscaped = false;
+
+        for (var index = 0; index < line.Length; index++)
+        {
+            var character = line[index];
+            if (inString)
+            {
+                if (interpolationDepth > 0)
+                {
+                    if (nestedStringDelimiter != '\0')
+                    {
+                        if (nestedStringEscaped)
+                        {
+                            nestedStringEscaped = false;
+                        }
+                        else if (character == '\\')
+                        {
+                            nestedStringEscaped = true;
+                        }
+                        else if (character == nestedStringDelimiter)
+                        {
+                            nestedStringDelimiter = '\0';
+                        }
+
+                        result.Append(' ');
+                        continue;
+                    }
+
+                    if (character is '"' or '\'')
+                    {
+                        nestedStringDelimiter = character;
+                    }
+                    else if (character == '{')
+                    {
+                        interpolationDepth++;
+                    }
+                    else if (character == '}')
+                    {
+                        interpolationDepth--;
+                    }
+
+                    result.Append(' ');
+                    continue;
+                }
+
+                if (escaped)
+                {
+                    escaped = false;
+                }
+                else if (character == '\\')
+                {
+                    escaped = true;
+                }
+                else if (interpolatedString && character == '{')
+                {
+                    interpolationDepth = 1;
+                }
+                else if (character == stringDelimiter)
+                {
+                    inString = false;
+                }
+
+                result.Append(' ');
+                continue;
+            }
+
+            if (character == '/' && index + 1 < line.Length && line[index + 1] == '/')
+            {
+                break;
+            }
+
+            if (character is '"' or '\'')
+            {
+                inString = true;
+                stringDelimiter = character;
+                interpolatedString = character == '"' && index > 0 && line[index - 1] == '$';
+                result.Append("string");
+                continue;
+            }
+
+            result.Append(character);
+        }
+
+        return result.ToString();
     }
 
     private static string FindRepositoryRoot()

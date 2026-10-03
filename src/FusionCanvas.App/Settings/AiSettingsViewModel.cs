@@ -102,7 +102,19 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         // Artwork generation can be reached without opening the AI settings pane.
         // Hydrate the catalog first so a persisted Artwork profile is resolved against
         // its model descriptor instead of an empty in-memory catalog.
-        await EnsureLoadedAsync(cancellationToken).ConfigureAwait(true);
+        // Catalog hydration can synchronously raise AvailabilityChanged. Suppress that
+        // notification while this method is itself running from an availability refresh;
+        // otherwise the refresh can re-enter EnsureLoadedAsync before its task assignment
+        // has completed and recursively start another catalog load.
+        _availabilityNotificationSuppressionDepth++;
+        try
+        {
+            await EnsureLoadedAsync(cancellationToken).ConfigureAwait(true);
+        }
+        finally
+        {
+            _availabilityNotificationSuppressionDepth--;
+        }
         if (_catalogProvider is not IAiImageEndpointCatalogProvider provider || string.IsNullOrWhiteSpace(_settings.Artwork.ModelId))
             return [];
         var key = await ReadApiKeyAsync(cancellationToken).ConfigureAwait(false);
@@ -587,7 +599,10 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         _allModels = MergeModelDescriptors(models);
         ApplyModelFilter();
         NotifyReadiness();
-        AvailabilityChanged?.Invoke(this, EventArgs.Empty);
+        if (_availabilityNotificationSuppressionDepth == 0)
+        {
+            AvailabilityChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     private static AiModelDescriptor[] MergeModelDescriptors(IEnumerable<AiModelDescriptor> models) => models
@@ -619,6 +634,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
 
     private IReadOnlyList<AiModelDescriptor> _allModels = [];
     private bool _catalogLoading;
+    private int _availabilityNotificationSuppressionDepth;
 
     private void ApplyModelFilter()
     {

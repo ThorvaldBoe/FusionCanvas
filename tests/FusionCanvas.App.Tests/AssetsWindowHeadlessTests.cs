@@ -151,5 +151,8 @@ public sealed class AssetsWindowHeadlessTests
     private sealed class DeterministicAssetFilePicker(string? path) : IAssetFilePicker
     {
         public Task<string?> PickImportFileAsync(CancellationToken cancellationToken = default) => Task.FromResult(path);
+
+        public Task<IReadOnlyList<string>> PickImportFilesAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>(path is null ? [] : [path]);
     }
 }

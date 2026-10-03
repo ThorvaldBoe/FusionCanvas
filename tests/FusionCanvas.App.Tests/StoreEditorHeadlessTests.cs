@@ -9,6 +9,7 @@ using Avalonia.Layout;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Settings;
 using FusionCanvas.App.Stores;
+using FusionCanvas.App.Commands;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Items;
@@ -27,6 +28,7 @@ using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.Settings;
 using FusionCanvas.Application.Stores.Printify;
 using FusionCanvas.App.Views;
+using FusionCanvas.App.Assets;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Domain.Niches;
@@ -2369,7 +2371,7 @@ public class StoreEditorHeadlessTests
         Assert.Contains(dialog.GetVisualDescendants().OfType<TextBlock>(), text =>
             IsEffectivelyVisible(text) && text.Text == "No source images uploaded yet. Upload an image to begin.");
         Assert.Contains(dialog.GetVisualDescendants().OfType<Button>(), button =>
-            IsEffectivelyVisible(button) && Equals(button.Content, "Upload image..."));
+            IsEffectivelyVisible(button) && Equals(button.Content, "Upload images..."));
 
         dialog.Close();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
@@ -2391,10 +2393,50 @@ public class StoreEditorHeadlessTests
         dialog.UpdateLayout();
 
         var upload = dialog.GetVisualDescendants().OfType<Button>()
-            .Single(button => IsEffectivelyVisible(button) && Equals(button.Content, "Upload image..."));
+            .Single(button => IsEffectivelyVisible(button) && Equals(button.Content, "Upload images..."));
         Assert.True(upload.IsEnabled);
         Assert.Contains(dialog.GetVisualDescendants().OfType<Button>(), button =>
             IsEffectivelyVisible(button) && Equals(button.Content, "Archive selected"));
+
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void MockupSourceUploadButtonStagesMultipleRowsThroughRenderedAction()
+    {
+        var window = CreateEditorWindow(
+            includeNormalizedCatalog: true,
+            useFixedProviderOffering: true,
+            includeOfferingOptions: true,
+            sourceImages: new HeadlessSourceImageService(),
+            rasterImageMetadataReader: new FixedMockupRasterImageMetadataReader());
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.CatalogSetup!.FilePicker = new DeterministicMockupSourceFilePicker(["front-black.png", "front-navy.jpg"]);
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        viewModel.CatalogSetup.StartAddTemplateCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        dialog.UpdateLayout();
+        var upload = dialog.GetVisualDescendants().OfType<Button>()
+            .Single(button => IsEffectivelyVisible(button) && Equals(button.Content, "Upload images..."));
+
+        upload.Focus();
+        HeadlessWindowExtensions.KeyPress(dialog, Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, string.Empty);
+        var command = Assert.IsType<AsyncRelayCommand>(upload.Command);
+        Assert.NotNull(command.ExecutionTask);
+        command.ExecutionTask!.GetAwaiter().GetResult();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        dialog.UpdateLayout();
+
+        Assert.Equal(["front-black.png", "front-navy.jpg"], viewModel.CatalogSetup.LocalSourceDrafts.Select(value => value.Path));
+        Assert.Same(viewModel.CatalogSetup.LocalSourceDrafts[0], viewModel.CatalogSetup.SelectedLocalSource);
+        AssertEffectivelyVisible(dialog, "Catalog.MockupSelectedImageEditor");
 
         dialog.Close();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
@@ -2723,7 +2765,10 @@ public class StoreEditorHeadlessTests
         Store? customStore = null,
         bool primaryArtworkDesignArea = false,
         Niche? customNiche = null,
-        INichePopulationService? nichePopulationService = null)
+        IMockupTemplateSourceImageService? sourceImages = null,
+        INichePopulationService? nichePopulationService = null,
+        IAssetFilePicker? filePicker = null,
+        IRasterImageMetadataReader? rasterImageMetadataReader = null)
     {
         var store = customStore ?? new Store(Guid.NewGuid(), "North Star", null, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog, useFixedProviderOffering, includeOfferingOptions, primaryArtworkDesignArea, customNiche));
@@ -2736,8 +2781,11 @@ public class StoreEditorHeadlessTests
             new MockupTemplateSetupService(repository),
             new OfferingManagementService(repository, providerCatalog),
             providerCatalog,
+            sourceImages: sourceImages,
+            filePicker: filePicker,
             workspaceRepository: repository,
-            nichePopulationService: nichePopulationService);
+            nichePopulationService: nichePopulationService,
+            rasterImageMetadataReader: rasterImageMetadataReader);
         viewModel.LoadAsync(default).GetAwaiter().GetResult();
         var window = new StoreEditorWindow { DataContext = viewModel };
         if (showWindow)
@@ -2841,6 +2889,33 @@ public class StoreEditorHeadlessTests
             Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         }
         Assert.True(predicate());
+    }
+
+    private sealed class HeadlessSourceImageService : IMockupTemplateSourceImageService
+    {
+        public Task<MockupTemplateSourceState> LoadAsync(Guid storeId, Guid templateId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new MockupTemplateSourceState([], [], false));
+
+        public Task<MockupTemplateSetupResult> AddAsync(AddLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<MockupTemplateSetupResult> UpdateAsync(UpdateLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class DeterministicMockupSourceFilePicker(IReadOnlyList<string> paths) : IAssetFilePicker
+    {
+        public Task<string?> PickImportFileAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<string?>(paths.FirstOrDefault());
+
+        public Task<IReadOnlyList<string>> PickImportFilesAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(paths);
+    }
+
+    private sealed class FixedMockupRasterImageMetadataReader : IRasterImageMetadataReader
+    {
+        public Task<RasterImageInfo> ReadAsync(string sourcePath, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new RasterImageInfo(1600, 1200));
     }
 
     private sealed class HeadlessCredentialStore : IStorePrintifyCredentialStore
