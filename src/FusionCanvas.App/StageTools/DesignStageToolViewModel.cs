@@ -996,6 +996,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         IsReadOnly = !canEdit;
         ReadOnlyReason = canEdit ? string.Empty : "Design stage content is read-only while the item is protected or an earlier stage is being reviewed.";
         _itemId = itemId;
+        ClearLoadedStateForReload();
 
         // A target change persists asynchronously from the selection setter. Serialize a
         // subsequent stage load behind that save so immediate navigation cannot reload
@@ -1128,6 +1129,53 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         }
 
         await RefreshArtworkAvailabilityAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    private void ClearLoadedStateForReload()
+    {
+        _isApplyingState = true;
+        try
+        {
+            HasConfiguration = false;
+            HasStaleConfiguration = false;
+            CanRecoverStaleConfiguration = false;
+            StaleConfigurationDisplayName = null;
+            RecoveryGuidance = string.Empty;
+            SelectedOfferingId = null;
+            SelectedOfferingName = null;
+            SelectedBlueprintName = null;
+            ProviderNetworkWarning = null;
+            _selectedOffering = null;
+            OnPropertyChanged(nameof(SelectedOffering));
+            SelectedRecoveryOffering = null;
+            SelectedArtworkTargetId = null;
+            TransparentBackground = false;
+
+            ArtworkTargets.Clear();
+            AvailableOfferings.Clear();
+            RecoveryOfferings.Clear();
+            AvailableColors.Clear();
+            SelectedColors.Clear();
+
+            foreach (var row in Rows)
+            {
+                foreach (var slot in row.Slots)
+                {
+                    slot.Dispose();
+                }
+            }
+            Rows.Clear();
+
+            foreach (var image in SupportingImages)
+            {
+                image.Dispose();
+            }
+            SupportingImages.Clear();
+        }
+        finally
+        {
+            _isApplyingState = false;
+        }
     }
 
     public async Task RefreshArtworkAvailabilityAsync(CancellationToken cancellationToken = default)

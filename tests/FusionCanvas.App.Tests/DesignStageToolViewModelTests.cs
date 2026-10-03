@@ -159,6 +159,41 @@ public class DesignStageToolViewModelTests
     }
 
     [Fact]
+    public async Task LoadAsync_ClearsPriorDesignPresentationWhileNextLoadIsPending()
+    {
+        var itemId = Guid.NewGuid();
+        var firstTargetId = Guid.NewGuid();
+        var selectedTargetId = Guid.NewGuid();
+        var service = new DelayedArtworkPreferenceService(
+            itemId,
+            firstTargetId,
+            selectedTargetId,
+            includeLoadedData: true);
+        var viewModel = new DesignStageToolViewModel(service);
+
+        await viewModel.LoadAsync(itemId, canEdit: true, TestContext.Current.CancellationToken);
+        Assert.True(viewModel.HasConfiguration);
+        Assert.NotEmpty(viewModel.Rows);
+        Assert.NotEmpty(viewModel.SelectedColors);
+
+        service.DeferNextLoad();
+        var reload = viewModel.LoadAsync(itemId, canEdit: true, TestContext.Current.CancellationToken);
+        await service.LoadStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(viewModel.HasConfiguration);
+        Assert.Empty(viewModel.Rows);
+        Assert.Empty(viewModel.SelectedColors);
+        Assert.Empty(viewModel.ArtworkTargets);
+
+        service.CompleteLoad();
+        await reload;
+
+        Assert.True(viewModel.HasConfiguration);
+        Assert.NotEmpty(viewModel.Rows);
+        Assert.NotEmpty(viewModel.SelectedColors);
+    }
+
+    [Fact]
     public async Task LoadAsync_DiscardsLateArtworkResultFromInvalidatedContext()
     {
         var itemId = SampleWorkspace.DesignNodeId;
@@ -221,7 +256,8 @@ public class DesignStageToolViewModelTests
             Guid firstTargetId,
             Guid selectedTargetId,
             bool persistInitialTarget = false,
-            bool? initialTransparency = null)
+            bool? initialTransparency = null,
+            bool includeLoadedData = false)
         {
             _itemId = itemId;
             var now = DateTimeOffset.UtcNow;
@@ -237,16 +273,46 @@ public class DesignStageToolViewModelTests
                 PersistedArtworkTargetId = persistInitialTarget ? firstTargetId : null,
                 PersistedTransparentBackground = initialTransparency,
                 IsDesignTriangleComplete = true,
-                HasDefaultRowWithSelectedColor = true
+                HasDefaultRowWithSelectedColor = true,
+                AvailableColors = includeLoadedData ? ["Black"] : [],
+                SelectedColors = includeLoadedData ? ["Black"] : [],
+                Rows = includeLoadedData
+                    ? [new DesignRowSummary(Guid.NewGuid(), true, 0, ["Black"],
+                        [new DesignSlotSummary(firstTargetId, "Front", null, null, true, false, false)])]
+                    : [],
+                SupportingImages = includeLoadedData
+                    ? [new DesignSlotSummary(firstTargetId, "Front reference", null, null, true, false, false)]
+                    : []
             };
         }
 
         public DesignStageState State { get; private set; }
         public TaskCompletionSource SaveStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource LoadStarted { get; private set; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource PreviewStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private bool _deferNextLoad;
+        private TaskCompletionSource _loadCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public Task<DesignStageState> LoadDesignStageStateAsync(Guid itemId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(State);
+        public async Task<DesignStageState> LoadDesignStageStateAsync(Guid itemId, CancellationToken cancellationToken = default)
+        {
+            if (_deferNextLoad)
+            {
+                _deferNextLoad = false;
+                LoadStarted.TrySetResult();
+                await _loadCompletion.Task.WaitAsync(cancellationToken);
+            }
+
+            return State;
+        }
+
+        public void DeferNextLoad()
+        {
+            _deferNextLoad = true;
+            LoadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _loadCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        public void CompleteLoad() => _loadCompletion.TrySetResult();
 
         public async Task<DesignStageResult> SaveArtworkPreferencesAsync(Guid itemId, Guid? designAreaId, bool transparentBackground, CancellationToken cancellationToken = default)
         {
