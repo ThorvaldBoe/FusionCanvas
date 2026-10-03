@@ -5,8 +5,10 @@ using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Catalog;
+using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.DesignFiles;
+using FusionCanvas.Application.Catalog;
 using System.Text.Json;
 
 namespace FusionCanvas.Application.Tests.DesignFiles;
@@ -31,6 +33,56 @@ public class DesignStageServiceTests
         Assert.True(result.Succeeded);
         Assert.NotNull(result.State);
         Assert.Equal(offeringId, result.State.SelectedOfferingId);
+    }
+
+    [Fact]
+    public async Task LoadDesignStageStateAsync_ReportsIncompleteNormalizedOfferingReadiness()
+    {
+        var snapshot = SeedWithNormalizedOffering(out var itemId, out var offeringId);
+        var state = await New(new InMemoryWorkspaceRepository(snapshot))
+            .LoadDesignStageStateAsync(itemId, TestContext.Current.CancellationToken);
+
+        Assert.Equal(offeringId, state.SelectedOfferingId);
+        Assert.Equal(OfferingReadinessStatus.NeedsAttention, state.SelectedOfferingReadiness!.Status);
+        var issue = Assert.Single(state.SelectedOfferingReadiness.Issues);
+        Assert.Equal(OfferingReadinessIssueKind.IncompleteMockupTemplate, issue.Kind);
+        Assert.Equal("Front mockup", issue.TemplateName);
+        Assert.Contains(MockupTemplateReadinessBlocker.MissingMapping, issue.TemplateBlockers!);
+    }
+
+    [Fact]
+    public async Task LoadDesignStageStateAsync_ReportsReadyNormalizedOfferingWithoutClaimingItemReadiness()
+    {
+        var snapshot = SeedWithNormalizedOffering(out var itemId, out var offeringId);
+        var template = snapshot.MockupTemplates.Single();
+        var area = snapshot.OfferingPlaceholders.Single();
+        var color = snapshot.OfferingOptionValues.Single();
+        var revision = new MockupTemplateRevision(
+            Guid.NewGuid(), template.Id, template.CurrentRevision, area.Id, Now,
+            "Ready", "provider-front", new MockupImageSpaceMapping(1200, 1200, 100, 100, 700, 800));
+        var binding = new MockupTemplateColorVariant(Guid.NewGuid(), template.Id, color.Id, false, Now, Now);
+        snapshot = snapshot with { MockupTemplateRevisions = [revision], MockupTemplateColorVariants = [binding] };
+
+        var state = await New(new InMemoryWorkspaceRepository(snapshot))
+            .LoadDesignStageStateAsync(itemId, TestContext.Current.CancellationToken);
+
+        Assert.Equal(offeringId, state.SelectedOfferingId);
+        Assert.Equal(OfferingReadinessStatus.ReadyForMockupGeneration, state.SelectedOfferingReadiness!.Status);
+        Assert.Equal(1, state.SelectedOfferingReadiness.ReadyMockupTemplateCount);
+        Assert.Empty(state.SelectedOfferingReadiness.Issues);
+    }
+
+    [Fact]
+    public async Task LoadDesignStageStateAsync_LegacyOfferingDoesNotFabricateNormalizedReadiness()
+    {
+        var repository = new InMemoryWorkspaceRepository(SeedWithProduct());
+        var service = New(repository);
+        var (itemId, _) = await AddItemWithConfig(service, repository);
+
+        var state = await service.LoadDesignStageStateAsync(itemId, TestContext.Current.CancellationToken);
+
+        Assert.Null(state.SelectedOfferingReadiness);
+        Assert.NotEmpty(state.AvailablePlaceholders);
     }
 
     [Fact]
@@ -672,6 +724,7 @@ public class DesignStageServiceTests
         Assert.True(state.HasStaleConfiguration);
         Assert.False(state.CanRecoverStaleConfiguration);
         Assert.Contains("published", state.ReadOnlyReason, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(state.SelectedOfferingReadiness);
     }
 
     [Fact]
@@ -894,6 +947,41 @@ public class DesignStageServiceTests
             FulfillmentOfferings = [offering],
             ProductVariants = [variantBlack, variantWhite],
             DesignAreas = [area]
+        };
+    }
+
+    private static WorkspaceSnapshot SeedWithNormalizedOffering(out Guid itemId, out Guid offeringId)
+    {
+        var snapshot = SeedWithProduct();
+        var product = snapshot.StoreProducts.Single();
+        var legacyOffering = snapshot.FulfillmentOfferings.Single();
+        offeringId = legacyOffering.Id;
+        itemId = Guid.NewGuid();
+        var blueprintId = Guid.NewGuid();
+        var blueprint = new Blueprint(blueprintId, StoreId, product.Name, product.Description, false, Now, Now, "{}");
+        var offering = new BlueprintOffering(
+            offeringId, blueprintId, StoreId, "Gildan 64000", null,
+            BlueprintOfferingKind.FixedPrintProvider, null, null, null, null, false, Now, Now, "{}");
+        var option = new OfferingOption(Guid.NewGuid(), offeringId, OptionKind.Color, "Color", 0);
+        var color = new OfferingOptionValue(Guid.NewGuid(), option.Id, offeringId, "Black", 0);
+        var variant = new OfferingVariant(Guid.NewGuid(), offeringId, "Black", [color.Id], false, Now, Now);
+        var area = new OfferingPlaceholder(
+            Guid.NewGuid(), offeringId, "Front", null, "front", "DTG", 3000, 4500,
+            [variant.Id], false, Now, Now, providerReference: "front");
+        var template = new MockupTemplate(Guid.NewGuid(), offeringId, area.Id, "Front mockup", null, 1, false, Now, Now);
+        var item = new Item(itemId, StoreId, null, null, "Item", null, ItemStatus.Draft, WorkflowStage.Design, false, Now, Now, "{}");
+
+        return snapshot with
+        {
+            Items = [item],
+            Blueprints = [blueprint],
+            BlueprintOfferings = [offering],
+            ItemListingConfigurations = [new ItemListingConfiguration(itemId, offeringId)],
+            OfferingOptions = [option],
+            OfferingOptionValues = [color],
+            OfferingVariants = [variant],
+            OfferingPlaceholders = [area],
+            MockupTemplates = [template]
         };
     }
 

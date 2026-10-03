@@ -1,7 +1,7 @@
 using FusionCanvas.App.Mockups;
 using FusionCanvas.Application.Catalog;
 
-namespace FusionCanvas.App.Stores;
+namespace FusionCanvas.App;
 
 internal static class OfferingReadinessMessageTranslator
 {

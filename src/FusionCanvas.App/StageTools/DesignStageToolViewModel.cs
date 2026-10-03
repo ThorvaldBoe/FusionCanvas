@@ -4,10 +4,12 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using Avalonia.Media.Imaging;
 using FusionCanvas.Application.DesignFiles;
+using FusionCanvas.Application.Catalog;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Application.AI;
 using FusionCanvas.App.DocumentWindow;
+using FusionCanvas.App;
 
 namespace FusionCanvas.App.StageTools;
 
@@ -62,6 +64,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     private string _recoveryConfirmationMessage = string.Empty;
     private bool _canEditContext;
     private bool _isDisposed;
+    private OfferingReadinessSummary? _offeringReadiness;
 
     public DesignStageToolViewModel(
         IDesignStageService designStageService,
@@ -489,6 +492,24 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             return "Generation uses the current Concept triangle and does not upload Supporting Images automatically.";
         }
     }
+
+    public int ReadyMockupTemplateCount => _offeringReadiness?.ReadyMockupTemplateCount ?? 0;
+
+    public string OfferingReadinessSummary => _offeringReadiness is null
+        ? "Catalog readiness is not available for this legacy configuration."
+        : _offeringReadiness.Status switch
+        {
+            OfferingReadinessStatus.ReadyForMockupGeneration => $"{ReadyMockupTemplateCount} Mockup Template{(ReadyMockupTemplateCount == 1 ? string.Empty : "s")} ready for mockup generation. Item Colors and Design artwork are still configured separately.",
+            OfferingReadinessStatus.NeedsAttention => "Mockup Templates need attention before they can be used.",
+            _ => "Catalog setup is incomplete. Complete the named prerequisites before continuing."
+        };
+
+    public IReadOnlyList<string> OfferingReadinessGuidance => _offeringReadiness?.Issues
+        .Select(OfferingReadinessMessageTranslator.Translate)
+        .ToArray() ?? [];
+
+    public bool HasOfferingReadinessGuidance => OfferingReadinessGuidance.Count > 0;
+    public bool HasOfferingReadiness => _offeringReadiness is not null;
 
     public bool IsArtworkBusy
     {
@@ -998,6 +1019,12 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         try
         {
             HasStaleConfiguration = state.HasStaleConfiguration;
+            _offeringReadiness = state.SelectedOfferingReadiness;
+            OnPropertyChanged(nameof(OfferingReadinessSummary));
+            OnPropertyChanged(nameof(ReadyMockupTemplateCount));
+            OnPropertyChanged(nameof(OfferingReadinessGuidance));
+            OnPropertyChanged(nameof(HasOfferingReadinessGuidance));
+            OnPropertyChanged(nameof(HasOfferingReadiness));
             _isDesignTriangleComplete = state.IsDesignTriangleComplete;
             _hasDefaultRowWithSelectedColor = state.HasDefaultRowWithSelectedColor;
             CanRecoverStaleConfiguration = canEdit && state.CanRecoverStaleConfiguration;

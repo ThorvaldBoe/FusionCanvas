@@ -7,6 +7,7 @@ using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Mockups;
 using FusionCanvas.App.Settings;
 using FusionCanvas.Application.Catalog;
+using FusionCanvas.App;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.App.Assets;
 using FusionCanvas.Domain.Catalog;

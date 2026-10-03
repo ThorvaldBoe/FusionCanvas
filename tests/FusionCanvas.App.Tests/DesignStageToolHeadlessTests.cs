@@ -17,6 +17,7 @@ using FusionCanvas.App.Views;
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Products;
+using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Workspace;
 
@@ -146,6 +147,42 @@ public class DesignStageToolHeadlessTests
         return MainWindowViewModelFactory.CreateFromSnapshot(snapshot, repo);
     }
 
+    private static MainWindowViewModel CreateNormalizedReadinessDesignViewModel()
+    {
+        var baseSnapshot = SampleWorkspace.Create();
+        var designItem = baseSnapshot.Items.Single(item => item.Id == SampleWorkspace.DesignNodeId);
+        var product = baseSnapshot.StoreProducts.Single();
+        var legacyOffering = baseSnapshot.FulfillmentOfferings.Single();
+        var now = DateTimeOffset.UtcNow;
+        var blueprint = new Blueprint(Guid.Parse("54000000-0000-0000-0000-000000000001"), designItem.StoreId, product.Name, null, false, now, now, "{}");
+        var normalizedOffering = new BlueprintOffering(
+            legacyOffering.Id, blueprint.Id, designItem.StoreId, "Normalized shirt", null,
+            BlueprintOfferingKind.FixedPrintProvider, null, null, null, null, false, now, now, "{}");
+        var option = new OfferingOption(Guid.Parse("55000000-0000-0000-0000-000000000001"), normalizedOffering.Id, OptionKind.Color, "Color", 0);
+        var color = new OfferingOptionValue(Guid.Parse("56000000-0000-0000-0000-000000000001"), option.Id, normalizedOffering.Id, "Black", 0);
+        var variant = new OfferingVariant(Guid.Parse("57000000-0000-0000-0000-000000000001"), normalizedOffering.Id, "Black", [color.Id], false, now, now);
+        var areaId = baseSnapshot.DesignAreas.Single().Id;
+        var placeholder = new OfferingPlaceholder(areaId, normalizedOffering.Id, "Front", null, "front", "DTG", 3000, 4500, [variant.Id], false, now, now, providerReference: "front");
+        var template = new MockupTemplate(Guid.Parse("58000000-0000-0000-0000-000000000001"), normalizedOffering.Id, areaId, "Front mockup", null, 1, false, now, now);
+        var rowId = Guid.Parse("59000000-0000-0000-0000-000000000001");
+        var snapshot = baseSnapshot with
+        {
+            Blueprints = [blueprint],
+            BlueprintOfferings = [normalizedOffering],
+            OfferingOptions = [option],
+            OfferingOptionValues = [color],
+            OfferingVariants = [variant],
+            OfferingPlaceholders = [placeholder],
+            MockupTemplates = [template],
+            ItemListingConfigurations = [new ItemListingConfiguration(designItem.Id, normalizedOffering.Id)],
+            DesignSelectedColors = [new DesignSelectedColor(designItem.Id, "Black")],
+            DesignVariantRows = [new DesignVariantRow(rowId, designItem.Id, true, 0)],
+            DesignVariantRowColors = [new DesignVariantRowColor(rowId, "Black")],
+            DesignSlotAssignments = []
+        };
+        return MainWindowViewModelFactory.CreateFromSnapshot(snapshot, new InMemoryWorkspaceRepository(snapshot));
+    }
+
     private static MainWindow ShowDesignWindow(MainWindowViewModel viewModel)
     {
         var window = new MainWindow { DataContext = viewModel };
@@ -260,6 +297,27 @@ public class DesignStageToolHeadlessTests
         Assert.Contains(stale.Repository.Snapshot.ItemListingConfigurations,
             configuration => configuration.ItemId == SampleWorkspace.DesignNodeId
                 && configuration.OfferingId != stale.Replacement.Id);
+    }
+
+    [AvaloniaFact]
+    public void NormalizedOfferingReadiness_ShowsAccessibleGuidanceBeforeDesignControls()
+    {
+        var vm = CreateNormalizedReadinessDesignViewModel();
+        NavigateToDesign(vm);
+        using var windowScope = new DesignWindowScope(ShowDesignWindow(vm));
+        var window = windowScope.Window;
+
+        var panel = window.GetVisualDescendants()
+            .OfType<Border>()
+            .Single(border => AutomationProperties.GetAutomationId(border) == "Design.OfferingReadiness");
+
+        Assert.True(panel.IsVisible);
+        Assert.Contains(panel.GetVisualDescendants().OfType<TextBlock>(),
+            block => block.Text?.Contains("Mockup Templates need attention", StringComparison.Ordinal) == true);
+        Assert.Contains(panel.GetVisualDescendants().OfType<TextBlock>(),
+            block => block.Text?.Contains("Front mockup", StringComparison.Ordinal) == true);
+        Assert.True(panel.GetVisualDescendants().OfType<ComboBox>().Any(combo =>
+            AutomationProperties.GetName(combo) == "Change configuration"));
     }
 
     [AvaloniaFact]

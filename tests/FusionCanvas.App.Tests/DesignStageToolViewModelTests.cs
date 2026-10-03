@@ -1,6 +1,7 @@
 using FusionCanvas.App.StageTools;
 using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.Application.AI;
+using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.DesignFiles;
 using FusionCanvas.Application.Settings;
 using FusionCanvas.Application.Workspaces;
@@ -8,6 +9,7 @@ using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Products;
+using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Integration.AI;
 
 namespace FusionCanvas.App.Tests;
@@ -63,6 +65,30 @@ public class DesignStageToolViewModelTests
 
         Assert.False(viewModel.CanGenerateArtwork);
         Assert.Contains("product color", viewModel.ArtworkGenerationGuidance, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task LoadAsync_NormalizedOfferingReadinessIsVisibleWithoutReplacingArtworkGuidance()
+    {
+        var readiness = new OfferingReadinessSummary(
+            1,
+            1,
+            1,
+            0,
+            OfferingReadinessStatus.NeedsAttention,
+            [new OfferingReadinessIssue(
+                OfferingReadinessIssueKind.IncompleteMockupTemplate,
+                "Front mockup",
+                [MockupTemplateReadinessBlocker.MissingMapping])]);
+        var service = new DelayedArtworkPreferenceService(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), readiness: readiness);
+        var viewModel = new DesignStageToolViewModel(service);
+
+        await viewModel.LoadAsync(service.ItemId, canEdit: true, TestContext.Current.CancellationToken);
+
+        Assert.True(viewModel.HasOfferingReadiness);
+        Assert.Equal("Mockup Templates need attention before they can be used.", viewModel.OfferingReadinessSummary);
+        Assert.Contains("Front mockup", Assert.Single(viewModel.OfferingReadinessGuidance));
+        Assert.Contains("Design Area", viewModel.ArtworkGenerationGuidance, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -198,7 +224,8 @@ public class DesignStageToolViewModelTests
             Guid firstTargetId,
             Guid selectedTargetId,
             bool persistInitialTarget = false,
-            bool? initialTransparency = null)
+            bool? initialTransparency = null,
+            OfferingReadinessSummary? readiness = null)
         {
             _itemId = itemId;
             var now = DateTimeOffset.UtcNow;
@@ -213,12 +240,14 @@ public class DesignStageToolViewModelTests
                 HasPersistedArtworkTargetPreference = persistInitialTarget,
                 PersistedArtworkTargetId = persistInitialTarget ? firstTargetId : null,
                 PersistedTransparentBackground = initialTransparency,
+                SelectedOfferingReadiness = readiness,
                 IsDesignTriangleComplete = true,
                 HasDefaultRowWithSelectedColor = true
             };
         }
 
         public DesignStageState State { get; private set; }
+        public Guid ItemId => _itemId;
         public TaskCompletionSource SaveStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource PreviewStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
