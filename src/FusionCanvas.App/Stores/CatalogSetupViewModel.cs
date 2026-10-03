@@ -982,6 +982,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
                 TemplateName = string.Empty;
                 LocalSourcePath = string.Empty;
                 LocalSourceDrafts.Clear();
+                RefreshLocalSourceRowPresentation();
                 _archivedLocalSourceDrafts.Clear();
                 return;
             }
@@ -1050,6 +1051,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
             var draft = new LocalMockupSourceDraftViewModel(path, [], imageWidth: dimensions.Width, imageHeight: dimensions.Height, previewReadError: previewReadError);
             LocalSourceDrafts.Add(draft);
+            RefreshLocalSourceRowPresentation();
             SelectLocalSource(draft);
             ApplyLocalSourceSort();
             foreach (var color in TemplateColorChoices) color.IsSelected = false;
@@ -1118,6 +1120,13 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             var currentIndex = LocalSourceDrafts.IndexOf(ordered[index]);
             if (currentIndex != index) LocalSourceDrafts.Move(currentIndex, index);
         }
+        RefreshLocalSourceRowPresentation();
+    }
+
+    private void RefreshLocalSourceRowPresentation()
+    {
+        for (var index = 0; index < LocalSourceDrafts.Count; index++)
+            LocalSourceDrafts[index].SetRowPresentationIndex(index);
     }
 
     private void ReuseMapping(LocalMockupSourceDraftViewModel? source)
@@ -1166,6 +1175,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         if (draft.IsManaged && draft.SourceImageId is not null && !_archivedLocalSourceDrafts.Contains(draft)) _archivedLocalSourceDrafts.Add(draft);
         if (ReferenceEquals(SelectedLocalSource, draft)) SelectedLocalSource = null;
         LocalSourceDrafts.Remove(draft);
+        RefreshLocalSourceRowPresentation();
         RebuildMappedSourceChoices();
         var next = LocalSourceDrafts.LastOrDefault();
         if (next is not null) SelectLocalSource(next);
@@ -1226,6 +1236,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         SelectedPlaceholder = AvailablePlaceholders.FirstOrDefault(value => value.Id == template.TargetPlaceholderId);
         TemplateName = template.Name;
         LocalSourceDrafts.Clear();
+        RefreshLocalSourceRowPresentation();
         MappedSourceChoices.Clear();
         _archivedLocalSourceDrafts.Clear();
         SelectedLocalSource = null;
@@ -1262,6 +1273,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         SelectedPlaceholder = null;
         TemplateName = string.Empty;
         LocalSourceDrafts.Clear();
+        RefreshLocalSourceRowPresentation();
         MappedSourceChoices.Clear();
         _archivedLocalSourceDrafts.Clear();
         SelectedLocalSource = null;
