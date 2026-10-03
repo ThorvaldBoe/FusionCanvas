@@ -29,14 +29,52 @@ jobs:
       - name: Restore
         run: dotnet restore .\FusionCanvas.sln
       - name: Deterministic solution tests
-        run: dotnet test .\FusionCanvas.sln -m:1 --no-restore --nologo --logger "trx;LogFileName=deterministic-tests.trx" --results-directory .\TestResults\ci
+        shell: pwsh
+        run: |
+          $testProjects = dotnet sln .\FusionCanvas.sln list |
+            Where-Object { $_ -match '^\s*tests[\\/].*Tests\.csproj$' } |
+            ForEach-Object { Join-Path (Get-Location) $_.Trim() } |
+            Sort-Object
+
+          if ($testProjects.Count -eq 0) {
+            throw "No deterministic test projects were found in FusionCanvas.sln."
+          }
+
+          $failed = $false
+
+          foreach ($projectPath in $testProjects) {
+            $projectName = [IO.Path]::GetFileNameWithoutExtension($projectPath)
+            $resultsDirectory = Join-Path $env:GITHUB_WORKSPACE "TestResults\ci\$projectName"
+            New-Item -ItemType Directory -Force -Path $resultsDirectory | Out-Null
+
+            Write-Host "=== Testing $projectName ==="
+            dotnet test $projectPath `
+              -m:1 `
+              --no-restore `
+              --nologo `
+              --logger "trx;LogFileName=$projectName.trx" `
+              --results-directory $resultsDirectory `
+              --blame-crash `
+              --blame-crash-dump-type mini
+
+            if ($LASTEXITCODE -ne 0) {
+              $failed = $true
+              Write-Warning "$projectName failed with exit code $LASTEXITCODE. Continuing so all project results are retained."
+            }
+          }
+
+          if ($failed) {
+            throw "One or more deterministic test projects failed. See the per-project TRX results and crash dumps in the artifact."
+          }
 
       - name: Upload deterministic test results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: deterministic-test-results-${{ github.run_number }}
-          path: TestResults/ci/**/*.trx
+          path: |
+            TestResults/ci/**/*.trx
+            TestResults/ci/**/*.dmp
           if-no-files-found: warn
           retention-days: 14
 
@@ -49,7 +87,7 @@ jobs:
           Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "## Deterministic solution tests"
           Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "Result: **$env:JOB_STATUS**"
           Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "Run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "TRX results are available in the workflow artifacts."
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "Per-project TRX results and crash dumps are available in the workflow artifacts."
 
   failure-tracking:
     if: ${{ always() && github.event_name != 'pull_request' }}
