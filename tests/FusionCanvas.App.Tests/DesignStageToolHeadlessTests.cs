@@ -818,6 +818,7 @@ public class DesignStageToolHeadlessTests
         Assert.NotNull(importButton);
         Assert.True(importButton.IsVisible);
         Assert.True(importButton.IsEnabled);
+        Assert.Equal("Design.ImportSupportingImage", AutomationProperties.GetAutomationId(importButton));
     }
 
     [AvaloniaFact]

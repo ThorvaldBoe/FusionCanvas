@@ -1412,7 +1412,8 @@
                                 IsEnabled="{Binding !DesignTool.IsReadOnly}"
                                 Click="OnImportSupportingImage"
                                 Classes="storeSecondary"
-                                AutomationProperties.Name="Import supporting image" />
+                                AutomationProperties.Name="Import supporting image"
+                                AutomationProperties.AutomationId="Design.ImportSupportingImage" />
                         <ItemsControl ItemsSource="{Binding DesignTool.SupportingImages}">
                           <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
