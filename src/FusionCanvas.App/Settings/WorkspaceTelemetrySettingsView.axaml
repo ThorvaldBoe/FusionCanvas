@@ -44,6 +44,10 @@
             <Button Content="Export telemetry" Command="{Binding ExportCommand}" />
             <Button Content="Delete telemetry" Command="{Binding RequestDeleteCommand}" Classes="danger" />
           </StackPanel>
+          <ProgressBar IsVisible="{Binding IsBusy}"
+                       IsIndeterminate="True"
+                       Height="4"
+                       AutomationProperties.Name="Working with telemetry" />
           <TextBox Text="{Binding ResultText, Mode=OneWay}"
                    IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
                    FontFamily="Cascadia Mono,Consolas,Menlo,monospace" FontSize="11" MinHeight="70" MaxHeight="200"

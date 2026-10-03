@@ -27,6 +27,7 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
     private WorkspaceSummary? _pendingDeleteWorkspace;
     private Guid? _activeWorkspaceId;
     private bool _isTransferRunning;
+    private bool _isBusy;
     private double _transferProgress;
     private string? _transferPhase;
     private string? _transferSummary;
@@ -103,17 +104,17 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
 
     public bool ShouldShowNoWorkspaceState => NeedsFirstWorkspace || _activeWorkspaceId is null;
 
-    public bool CanSaveSelectedWorkspace => SelectedWorkspace is not null && !IsCreatingNewWorkspace && !IsTransferRunning;
+    public bool CanSaveSelectedWorkspace => SelectedWorkspace is not null && !IsCreatingNewWorkspace && !IsTransferRunning && !IsBusy;
 
-    public bool CanArchiveSelectedWorkspace => SelectedWorkspace is { IsArchived: false } && !IsCreatingNewWorkspace && !IsTransferRunning;
+    public bool CanArchiveSelectedWorkspace => SelectedWorkspace is { IsArchived: false } && !IsCreatingNewWorkspace && !IsTransferRunning && !IsBusy;
 
-    public bool CanRestoreSelectedWorkspace => SelectedWorkspace is { IsArchived: true } && !IsCreatingNewWorkspace && !IsTransferRunning;
+    public bool CanRestoreSelectedWorkspace => SelectedWorkspace is { IsArchived: true } && !IsCreatingNewWorkspace && !IsTransferRunning && !IsBusy;
 
-    public bool CanDeleteSelectedWorkspace => SelectedWorkspace is not null && !IsCreatingNewWorkspace && !IsTransferRunning;
+    public bool CanDeleteSelectedWorkspace => SelectedWorkspace is not null && !IsCreatingNewWorkspace && !IsTransferRunning && !IsBusy;
 
-    public bool CanExportSelectedWorkspace => SelectedWorkspace is not null && !IsTransferRunning && _transferService is not null;
+    public bool CanExportSelectedWorkspace => SelectedWorkspace is not null && !IsTransferRunning && !IsBusy && _transferService is not null;
 
-    public bool CanImportWorkspace => !IsTransferRunning && _transferService is not null;
+    public bool CanImportWorkspace => !IsTransferRunning && !IsBusy && _transferService is not null;
 
     public bool IsWorkspaceManagementOpen
     {
@@ -213,6 +214,18 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
     }
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
+
+    public bool IsBusy
+    {
+        get => _isBusy;
+        private set
+        {
+            if (SetField(ref _isBusy, value))
+            {
+                RaiseTransferActionState();
+            }
+        }
+    }
 
     public IWorkspacePackagePicker PackagePicker
     {
@@ -648,7 +661,20 @@ public sealed class WorkspaceManagementViewModel : INotifyPropertyChanged
     private static string? EmptyToNull(string value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private void Run(Task task) => _ = ObserveAsync(task);
+    private void Run(Task task) => _ = ObserveBusyAsync(task);
+
+    private async Task ObserveBusyAsync(Task task)
+    {
+        IsBusy = true;
+        try
+        {
+            await ObserveAsync(task).ConfigureAwait(true);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
 
     private async Task ObserveAsync(Task task)
     {

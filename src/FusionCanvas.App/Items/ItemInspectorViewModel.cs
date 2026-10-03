@@ -158,6 +158,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(CanEdit));
                 OnPropertyChanged(nameof(CanEditShared));
                 OnPropertyChanged(nameof(CanEditStage));
+                OnPropertyChanged(nameof(IsWorking));
                 RaiseDirty();
                 RaiseActionProperties();
             }
@@ -165,6 +166,8 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
     }
 
     public bool HasState => _state is not null;
+
+    public bool IsWorking => IsBusy || IsLoadingItem;
 
     public bool IsReadOnly => _state is { IsReadOnly: true };
 
@@ -453,6 +456,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         {
             if (SetField(ref _isBusy, value))
             {
+                OnPropertyChanged(nameof(IsWorking));
                 OnPropertyChanged(nameof(CanEdit));
                 OnPropertyChanged(nameof(CanEditShared));
                 OnPropertyChanged(nameof(CanEditStage));

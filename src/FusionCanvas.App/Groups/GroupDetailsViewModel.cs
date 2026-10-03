@@ -179,18 +179,26 @@ public sealed class GroupDetailsViewModel : INotifyPropertyChanged
 
     public async Task LoadAsync(Guid groupId, Guid storeId, Guid? nicheId, CancellationToken cancellationToken = default)
     {
-        _storeId = storeId;
-        _nicheId = nicheId;
-        var state = await _service.LoadAsync(storeId, nicheId, cancellationToken);
-        ApplyState(state);
-        var group = _activeGroups.Concat(state.ArchivedGroups).SingleOrDefault(candidate => candidate.Id == groupId);
-        if (group is null)
+        IsBusy = true;
+        try
         {
-            Clear();
-            return;
-        }
+            _storeId = storeId;
+            _nicheId = nicheId;
+            var state = await _service.LoadAsync(storeId, nicheId, cancellationToken);
+            ApplyState(state);
+            var group = _activeGroups.Concat(state.ArchivedGroups).SingleOrDefault(candidate => candidate.Id == groupId);
+            if (group is null)
+            {
+                Clear();
+                return;
+            }
 
-        ApplyGroup(group);
+            ApplyGroup(group);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     public void Clear()

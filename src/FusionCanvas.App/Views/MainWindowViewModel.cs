@@ -78,6 +78,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
     private int _isInitializingWorkspace = 1;
     private long _workspaceSwitchGeneration;
     private readonly CommandTaskCoordinator _commandTasks;
+    private int _activeOperationCount;
     private bool _disposed;
 
     public static MainWindowViewModel CreateForDefaultWorkspace(
@@ -582,6 +583,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
 
     public bool ShowStageToolHost =>
         DocumentWindow.HasActiveDocument && !ItemInspector.HasState && !GroupDetails.HasState;
+
+    public bool IsBusy => Volatile.Read(ref _activeOperationCount) > 0;
 
     public bool ShouldShowFirstStorePrompt =>
         !WorkspaceManagement.IsWorkspaceManagementOpen &&
@@ -1372,7 +1375,23 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         OnPropertyChanged(nameof(GroupActionStatus));
     }
 
-    private void Run(Func<CancellationToken, Task> operation) => _commandTasks.Run(operation);
+    private void Run(Func<CancellationToken, Task> operation)
+    {
+        _commandTasks.Run(async cancellationToken =>
+        {
+            Interlocked.Increment(ref _activeOperationCount);
+            OnPropertyChanged(nameof(IsBusy));
+            try
+            {
+                await operation(cancellationToken).ConfigureAwait(true);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _activeOperationCount);
+                OnPropertyChanged(nameof(IsBusy));
+            }
+        });
+    }
 
     private SettingsViewModel CreateSettings(SettingsViewModel? provided)
     {
