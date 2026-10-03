@@ -103,8 +103,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $issueTitle = "CI: deterministic tests failing"
+          $repository = $env:GITHUB_REPOSITORY
           $runUrl = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
-          $existingIssue = gh issue list --state open --limit 100 --json number,title --jq '.[] | select(.title == "CI: deterministic tests failing") | .number' | Select-Object -First 1
+          $existingIssue = gh issue list --repo $repository --state open --limit 100 --json number,title --jq '.[] | select(.title == "CI: deterministic tests failing") | .number' | Select-Object -First 1
           $body = @"
           The scheduled or manually dispatched deterministic solution test baseline failed.
 
@@ -115,10 +116,10 @@ jobs:
           Download the TRX test-result artifact from the run for diagnostics. Keep the workflow failed until the underlying failure is understood and corrected.
           "@
           if ([string]::IsNullOrWhiteSpace($existingIssue)) {
-            gh issue create --title $issueTitle --body $body
+            gh issue create --repo $repository --title $issueTitle --body $body
           }
           else {
-            gh issue comment $existingIssue.Trim() --body $body
+            gh issue comment $existingIssue.Trim() --repo $repository --body $body
           }
 
       - name: Close recovered failure tracking issue
@@ -128,9 +129,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $issueTitle = "CI: deterministic tests failing"
+          $repository = $env:GITHUB_REPOSITORY
           $runUrl = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
-          $existingIssue = gh issue list --state open --limit 100 --json number,title --jq '.[] | select(.title == "CI: deterministic tests failing") | .number' | Select-Object -First 1
+          $existingIssue = gh issue list --repo $repository --state open --limit 100 --json number,title --jq '.[] | select(.title == "CI: deterministic tests failing") | .number' | Select-Object -First 1
           if (-not [string]::IsNullOrWhiteSpace($existingIssue)) {
             $comment = "The deterministic solution test baseline recovered successfully. Run: $runUrl"
-            gh issue close $existingIssue.Trim() --comment $comment
+            gh issue close $existingIssue.Trim() --repo $repository --comment $comment
           }
