@@ -3,6 +3,7 @@ using FusionCanvas.App.Assets;
 using FusionCanvas.App.Stores;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
+using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Domain.Workspace;
@@ -1261,11 +1262,36 @@ public sealed class CatalogSetupViewModelTests
         Assert.Equal("Ready for use", Assert.Single(viewModel.MockupTemplateCards).Status);
     }
 
+    [Fact]
+    public async Task RefreshingSameOfferingClearsStaleReadinessUntilLoadCompletes()
+    {
+        DeferredOfferingManagementService? offeringManagement = null;
+        var (viewModel, _, offering) = await CreateCatalogWithDesignAreaAsync(
+            referencedByTemplate: false,
+            offeringManagementFactory: repository => offeringManagement = new(repository),
+            selectOffering: false);
+        Assert.NotNull(offeringManagement);
+
+        Assert.Equal("Setup incomplete", viewModel.OfferingReadinessStatus);
+
+        viewModel.SelectOffering(offering.Id);
+        await offeringManagement!.SecondLoadStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("Catalog readiness is loading", viewModel.OfferingReadinessStatus);
+        Assert.Equal(0, viewModel.ReadyMockupTemplateCount);
+        Assert.Empty(viewModel.OfferingReadinessGuidance);
+
+        offeringManagement.Complete();
+    }
+
     private static async Task<(CatalogSetupViewModel ViewModel, OfferingPlaceholder Area, BlueprintOffering Offering)> CreateCatalogWithDesignAreaAsync(
         bool referencedByTemplate,
         bool storeArchived = false,
         IMockupTemplateSourceImageService? sourceImages = null,
-        bool completeLocalSource = false)
+        bool completeLocalSource = false,
+        IOfferingManagementService? offeringManagement = null,
+        Func<IWorkspaceRepository, IOfferingManagementService>? offeringManagementFactory = null,
+        bool selectOffering = true)
     {
         var now = DateTimeOffset.UtcNow;
         var snapshot = SampleWorkspace.Create();
@@ -1305,10 +1331,49 @@ public sealed class CatalogSetupViewModelTests
             }
         }
         var repository = new InMemoryWorkspaceRepository(populated);
-        var viewModel = new CatalogSetupViewModel(new CatalogSetupService(repository), new MockupTemplateSetupService(repository), sourceImages: sourceImages);
+        var selectedOfferingManagement = offeringManagement
+            ?? offeringManagementFactory?.Invoke(repository)
+            ?? new OfferingManagementService(repository);
+        var viewModel = new CatalogSetupViewModel(
+            new CatalogSetupService(repository),
+            new MockupTemplateSetupService(repository),
+            selectedOfferingManagement,
+            sourceImages: sourceImages);
         await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
-        viewModel.SelectOffering(offering.Id);
+        if (selectOffering) viewModel.SelectOffering(offering.Id);
         return (viewModel, area, offering);
+    }
+
+    private sealed class DeferredOfferingManagementService : IOfferingManagementService
+    {
+        private readonly IOfferingManagementService _inner;
+        private readonly TaskCompletionSource<OfferingManagementState> _secondLoad = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private OfferingManagementState? _initialState;
+
+        public DeferredOfferingManagementService(IWorkspaceRepository repository) => _inner = new OfferingManagementService(repository);
+        public TaskCompletionSource SecondLoadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<OfferingManagementState> LoadOfferingAsync(OfferingContext context, CancellationToken cancellationToken = default)
+        {
+            if (_initialState is null)
+            {
+                _initialState = await _inner.LoadOfferingAsync(context, cancellationToken);
+                return _initialState;
+            }
+
+            SecondLoadStarted.TrySetResult();
+            return await _secondLoad.Task.WaitAsync(cancellationToken);
+        }
+
+        public void Complete() => _secondLoad.TrySetResult(_initialState!);
+        public Task<IReadOnlyList<BlueprintOfferingSetupSummary>> LoadForBlueprintAsync(Guid storeId, Guid blueprintId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<BlueprintOfferingSetupSummary>> LoadForBlueprintAsync(Guid storeId, Guid blueprintId, bool includeArchived = false, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<BulkVariantPreview> PreviewBulkVariantsAsync(BulkVariantRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<BulkVariantResult> ConfirmBulkVariantsAsync(BulkVariantRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<FocusedCommandResult> CreateVariantAsync(CreateFocusedVariantRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<FocusedCommandResult> CreateDesignAreaAsync(CreateFocusedDesignAreaRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<FocusedCommandResult> UpdateDesignAreaAsync(UpdateFocusedDesignAreaRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<FocusedCommandResult> CreateMockupTemplateAsync(CreateFocusedMockupTemplateRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
     private sealed class StubProviderCatalog(ProviderCatalogCandidateDescriptor descriptor) : IProviderCatalogCandidateSource

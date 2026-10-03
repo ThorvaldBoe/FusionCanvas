@@ -1712,6 +1712,12 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         }
 
         var version = Interlocked.Increment(ref _readinessLoadVersion);
+        _offeringReadiness = null;
+        OnPropertyChanged(nameof(ReadyMockupTemplateCount));
+        OnPropertyChanged(nameof(HasOfferingReadinessGuidance));
+        OnPropertyChanged(nameof(OfferingReadinessGuidance));
+        OnPropertyChanged(nameof(OfferingReadinessSummary));
+        OnPropertyChanged(nameof(OfferingReadinessStatus));
         try
         {
             var state = await _offeringManagement.LoadOfferingAsync(
