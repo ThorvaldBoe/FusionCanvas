@@ -24,7 +24,7 @@ internal static class OfferingReadinessMessageTranslator
         var blockers = issue.TemplateBlockers ?? [];
         var guidance = blockers.Count == 0
             ? "Complete its readiness requirements."
-            : string.Join(" ", blockers.Select(MockupTemplateReadinessMessageTranslator.Translate));
+            : string.Join(Environment.NewLine, blockers.Select(MockupTemplateReadinessMessageTranslator.Translate));
         return $"{name}: {guidance}";
     }
 }

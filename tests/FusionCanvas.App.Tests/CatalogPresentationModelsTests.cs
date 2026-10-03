@@ -42,7 +42,7 @@ public sealed class CatalogPresentationModelsTests
             [new OfferingReadinessIssue(
                 OfferingReadinessIssueKind.IncompleteMockupTemplate,
                 "Back lifestyle",
-                [MockupTemplateReadinessBlocker.MissingMapping])]);
+                [MockupTemplateReadinessBlocker.MissingImage, MockupTemplateReadinessBlocker.MissingMapping])]);
         var summary = new BlueprintOfferingSetupSummary(
             new OfferingContext(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
             "Gildan 64000",
@@ -58,6 +58,7 @@ public sealed class CatalogPresentationModelsTests
         Assert.Equal(1, card.ReadyMockupTemplateCount);
         Assert.Contains("Back lifestyle", Assert.Single(card.ReadinessGuidance));
         Assert.Contains("ready for mockup generation", card.ReadinessSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(Environment.NewLine, Assert.Single(card.ReadinessGuidance));
     }
 
     [Fact]
