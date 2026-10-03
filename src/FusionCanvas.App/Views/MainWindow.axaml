@@ -1492,7 +1492,9 @@
                       <TextBlock IsVisible="{Binding DesignTool.ErrorMessage}"
                                  Text="{Binding DesignTool.ErrorMessage}"
                                  TextWrapping="Wrap"
-                                 Foreground="{DynamicResource DangerTextBrush}" />
+                                 Foreground="{DynamicResource DangerTextBrush}"
+                                 AutomationProperties.Name="Design error"
+                                 AutomationProperties.AutomationId="Design.Error" />
 
                       <!-- Removal confirmation -->
                       <Border IsVisible="{Binding DesignTool.IsRemovalConfirmationVisible}"
