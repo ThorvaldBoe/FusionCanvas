@@ -39,4 +39,5 @@ public sealed record MainWindowApplicationServices(
     IWorkspaceBatchRollbackService WorkspaceBatchRollback,
     IRasterImageMetadataReader? RasterImageMetadataReader = null,
     IMockupSourceMetadataAssistanceService? MockupSourceMetadataAssistance = null,
-    IMockupSourceImageContentReader? MockupSourceImageContentReader = null);
+    IMockupSourceImageContentReader? MockupSourceImageContentReader = null,
+    IMockupPlacementPreviewReader? MockupPlacementPreviewReader = null);

@@ -49,6 +49,9 @@ public partial class MockupTemplateEditorWindow : Window
         if (_viewModel is not null) _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         if (_viewModel is not null) _viewModel.EnlargedPlacementEditorRequested -= OnEnlargedPlacementEditorRequested;
         _viewModel = viewModel;
+        PlacementEditor.PreviewImageStreamFactory = viewModel is null
+            ? null
+            : new Func<string, Stream>(viewModel.OpenPreviewRead);
         if (_viewModel is not null)
         {
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;

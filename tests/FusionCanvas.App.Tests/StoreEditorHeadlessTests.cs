@@ -35,6 +35,7 @@ using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Tests.TestSupport.Drivers;
+using FusionCanvas.Integration.Files;
 
 namespace FusionCanvas.App.Tests;
 
@@ -3209,7 +3210,8 @@ public class StoreEditorHeadlessTests
             workspaceRepository: repository,
             nichePopulationService: nichePopulationService,
             rasterImageMetadataReader: rasterImageMetadataReader,
-            mockupSourceMetadataAssistance: mockupSourceMetadataAssistance);
+            mockupSourceMetadataAssistance: mockupSourceMetadataAssistance,
+            mockupPlacementPreviewReader: new LocalMockupPlacementPreviewReader());
         viewModel.LoadAsync(default).GetAwaiter().GetResult();
         var window = new StoreEditorWindow { DataContext = viewModel };
         if (showWindow)
