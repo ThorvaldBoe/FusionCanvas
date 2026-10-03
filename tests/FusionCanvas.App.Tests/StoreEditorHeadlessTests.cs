@@ -872,7 +872,7 @@ public class StoreEditorHeadlessTests
         Assert.DoesNotContain(
             window.GetVisualDescendants().OfType<ToggleButton>(),
             toggle => IsEffectivelyVisible(toggle) && string.Equals(toggle.Content as string, "Basic", StringComparison.Ordinal));
-        Assert.Equal("Ready", Assert.Single(viewModel.BlueprintOfferingCards).Status);
+        Assert.Equal("Ready for mockup generation", Assert.Single(viewModel.BlueprintOfferingCards).Status);
         viewModel.IsBlueprintBasicsExpanded = true;
         window.UpdateLayout();
         Assert.True(viewModel.IsBlueprintBasicsExpanded);

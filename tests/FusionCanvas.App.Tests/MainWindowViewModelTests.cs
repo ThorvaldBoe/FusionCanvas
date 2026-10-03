@@ -1,5 +1,6 @@
 using System.Reflection;
 using FusionCanvas.App.Stores;
+using FusionCanvas.App.Commands;
 using FusionCanvas.App.Items;
 using FusionCanvas.App.Settings;
 using FusionCanvas.Application.Items;
@@ -43,10 +44,7 @@ public class MainWindowViewModelTests
     public async Task DisposeAsync_WaitsForAdmittedCommandFactoryBeforeDisposingChildren()
     {
         var viewModel = MainWindowViewModelFactory.CreateSample();
-        var waitForCommands = typeof(MainWindowViewModel).GetMethod(
-            "WaitForCommandTasksAsync",
-            BindingFlags.Instance | BindingFlags.NonPublic)!;
-        await ((Task)waitForCommands.Invoke(viewModel, null)!)
+        await GetCommandTasks(viewModel).WaitForTasksAsync()
             .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         var run = typeof(MainWindowViewModel).GetMethod("Run", BindingFlags.Instance | BindingFlags.NonPublic)!;
         var conceptNotifications = 0;
@@ -90,10 +88,7 @@ public class MainWindowViewModelTests
     public async Task DisposeAsync_CancelsAndAwaitsTrackedCommand()
     {
         var viewModel = MainWindowViewModelFactory.CreateSample();
-        var waitForCommands = typeof(MainWindowViewModel).GetMethod(
-            "WaitForCommandTasksAsync",
-            BindingFlags.Instance | BindingFlags.NonPublic)!;
-        await ((Task)waitForCommands.Invoke(viewModel, null)!)
+        await GetCommandTasks(viewModel).WaitForTasksAsync()
             .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         var run = typeof(MainWindowViewModel).GetMethod("Run", BindingFlags.Instance | BindingFlags.NonPublic)!;
         var operationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -130,6 +125,11 @@ public class MainWindowViewModelTests
                 TestContext.Current.CancellationToken);
         }
     }
+
+    private static CommandTaskCoordinator GetCommandTasks(MainWindowViewModel viewModel) =>
+        (CommandTaskCoordinator)typeof(MainWindowViewModel)
+            .GetField("_commandTasks", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(viewModel)!;
 
     [Fact]
     public async Task DisposeAsync_WaitsForInFlightDetailsCommitCommand()
