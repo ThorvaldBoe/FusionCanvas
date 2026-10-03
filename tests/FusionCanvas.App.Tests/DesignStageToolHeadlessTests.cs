@@ -129,7 +129,9 @@ public class DesignStageToolHeadlessTests
                 AssetKind.ExportedImage,
                 "assets/final-artwork.png",
                 "C:\\imports\\final-artwork.png",
-                isMissing: false,
+                // The fixture has no managed workspace file store. Keep the assignment
+                // while marking the backing file missing so loading remains deterministic.
+                isMissing: true,
                 isArchived: false,
                 now,
                 now,
@@ -729,6 +731,8 @@ public class DesignStageToolHeadlessTests
     {
         var vm = CreateConfiguredDesignViewModel(withAssignedArtwork: true);
         NavigateToDesign(vm);
+        await vm.DesignTool.LoadAsync(SampleWorkspace.DesignNodeId, canEdit: true,
+            TestContext.Current.CancellationToken);
         var window = ShowDesignWindow(vm);
 
         try
