@@ -10,12 +10,12 @@ namespace FusionCanvas.Application.SllGeneration;
 
 public sealed class SllGenerationService : ISllGenerationService
 {
-    private readonly IWorkspaceRepository _repository;
+    private readonly IWorkspaceSnapshotReader _repository;
     private readonly IAiTextGenerationService _ai;
     private readonly IDesignTriangleGuidanceSource _guidance;
 
     public SllGenerationService(
-        IWorkspaceRepository repository,
+        IWorkspaceSnapshotReader repository,
         IAiTextGenerationService ai,
         IDesignTriangleGuidanceSource guidance)
     {

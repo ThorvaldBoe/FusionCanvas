@@ -9,12 +9,12 @@ namespace FusionCanvas.Application.ConceptRefinement;
 
 public sealed class ConceptRefinementService : IConceptRefinementService
 {
-    private readonly IWorkspaceRepository _repository;
+    private readonly IWorkspaceSnapshotReader _repository;
     private readonly IAiTextGenerationService _ai;
     private readonly IDesignTriangleGuidanceSource _guidance;
 
     public ConceptRefinementService(
-        IWorkspaceRepository repository,
+        IWorkspaceSnapshotReader repository,
         IAiTextGenerationService ai,
         IDesignTriangleGuidanceSource guidance)
     {
