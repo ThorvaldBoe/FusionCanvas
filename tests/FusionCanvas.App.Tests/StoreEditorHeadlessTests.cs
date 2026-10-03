@@ -157,6 +157,40 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void OfferingContext_SeparatesTabNavigationContextHeaderAndActiveContent()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.BackToOfferingOverviewCommand.Execute(null);
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        var tabNavigation = window.GetVisualDescendants().OfType<Border>()
+            .Single(border => AutomationProperties.GetAutomationId(border) == "StoreEditor.TabNavigation");
+        var tabContent = window.GetVisualDescendants().OfType<Border>()
+            .Single(border => AutomationProperties.GetAutomationId(border) == "StoreEditor.TabContent");
+        var contextHeader = window.GetVisualDescendants().OfType<Border>()
+            .Single(border => AutomationProperties.GetAutomationId(border) == "Catalog.ContextHeader");
+        var backButton = window.GetVisualDescendants().OfType<Button>()
+            .Single(button => IsEffectivelyVisible(button) &&
+                string.Equals(button.Content as string, "‹  Back to Offering overview", StringComparison.Ordinal));
+
+        Assert.True(IsEffectivelyVisible(tabNavigation));
+        Assert.True(IsEffectivelyVisible(tabContent));
+        Assert.True(IsEffectivelyVisible(contextHeader));
+        Assert.True(tabContent.Bounds.Top > tabNavigation.Bounds.Bottom,
+            "The active tab content must be visually separated from the tab navigation band.");
+        Assert.Contains(backButton, contextHeader.GetVisualDescendants());
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public async Task TagDeleteButtonWaitsForImpactCountAndShowsUnknownAfterLookupFailure()
     {
         var storeId = Guid.NewGuid();

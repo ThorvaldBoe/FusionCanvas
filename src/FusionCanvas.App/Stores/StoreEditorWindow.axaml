@@ -95,28 +95,42 @@
                      IsVisible="{Binding HasError}"
                      FontSize="12"
                      Foreground="{DynamicResource DangerTextBrush}" />
-          <StackPanel Orientation="Horizontal"
-                      Spacing="8">
-            <Button Content="Basic info"
-                    Command="{Binding SelectBasicInfoTabCommand}"
-                    Classes="tabButton"
-                    Classes.selected="{Binding IsBasicInfoTabSelected}" />
-            <Button Content="Niches"
-                    Command="{Binding SelectNichesTabCommand}"
-                    Classes="tabButton"
-                    Classes.selected="{Binding IsNichesTabSelected}" />
-            <Button Content="Tags"
-                    Command="{Binding SelectTagsTabCommand}"
-                    Classes="tabButton"
-                    Classes.selected="{Binding IsTagsTabSelected}" />
-            <Button Content="Catalog &amp; mockups"
-                    Command="{Binding SelectProductsTabCommand}"
-                    Classes="tabButton"
-                    Classes.selected="{Binding IsProductsTabSelected}" />
-          </StackPanel>
+          <Border AutomationProperties.AutomationId="StoreEditor.TabNavigation"
+                  Background="{DynamicResource TabBarBackgroundBrush}"
+                  BorderBrush="{DynamicResource TabBorderBrush}"
+                  BorderThickness="1"
+                  CornerRadius="6"
+                  Padding="4">
+            <StackPanel Orientation="Horizontal"
+                        Spacing="8">
+              <Button Content="Basic info"
+                      Command="{Binding SelectBasicInfoTabCommand}"
+                      Classes="tabButton"
+                      Classes.selected="{Binding IsBasicInfoTabSelected}" />
+              <Button Content="Niches"
+                      Command="{Binding SelectNichesTabCommand}"
+                      Classes="tabButton"
+                      Classes.selected="{Binding IsNichesTabSelected}" />
+              <Button Content="Tags"
+                      Command="{Binding SelectTagsTabCommand}"
+                      Classes="tabButton"
+                      Classes.selected="{Binding IsTagsTabSelected}" />
+              <Button Content="Catalog &amp; mockups"
+                      Command="{Binding SelectProductsTabCommand}"
+                      Classes="tabButton"
+                      Classes.selected="{Binding IsProductsTabSelected}" />
+            </StackPanel>
+          </Border>
 
-          <StackPanel IsVisible="{Binding IsBasicInfoTabSelected}"
-                      Spacing="12">
+          <Border AutomationProperties.AutomationId="StoreEditor.TabContent"
+                  Background="{DynamicResource PanelSurfaceBrush}"
+                  BorderBrush="{DynamicResource TabBorderBrush}"
+                  BorderThickness="1"
+                  CornerRadius="6"
+                  Padding="0">
+            <StackPanel Spacing="12">
+              <StackPanel IsVisible="{Binding IsBasicInfoTabSelected}"
+                          Spacing="12">
             <TextBlock Text="Basic info"
                        FontSize="16"
                        FontWeight="SemiBold"
@@ -207,7 +221,7 @@
                     Command="{Binding RestoreStoreCommand}"
                     CommandParameter="{Binding SelectedStore}"
                     Classes="secondary restoreAction" />
-          </StackPanel>
+              </StackPanel>
 
           <Grid IsVisible="{Binding IsNichesTabSelected}"
                 ColumnDefinitions="220,*"
@@ -700,34 +714,41 @@
               </Border>
             </StackPanel>
 
-            <StackPanel IsVisible="{Binding IsOfferingContext}"
-                        Spacing="12">
-              <Button Content="‹  Back to Blueprint"
-                      Command="{Binding BackToProductCommand}"
-                      IsVisible="{Binding IsOfferingDetail}"
-                      Classes="secondary" />
-              <Button Content="‹  Back to Offering overview"
-                      Command="{Binding BackToOfferingOverviewCommand}"
-                      IsVisible="{Binding !IsOfferingDetail}"
-                      Classes="secondary" />
-              <TextBlock Text="{Binding CatalogBreadcrumb}"
-                         FontSize="12"
-                         Foreground="{DynamicResource SecondaryTextBrush}" />
-              <TextBlock Text="{Binding OfferingName}"
-                         IsVisible="{Binding IsCreatingNewOffering}"
-                         FontSize="20"
-                         FontWeight="SemiBold"
-                         Foreground="{DynamicResource StrongTextBrush}" />
-              <TextBlock Text="{Binding CatalogSetup.OfferingName}"
-                         IsVisible="{Binding CatalogSetup.HasSelectedOffering}"
-                         FontSize="20"
-                         FontWeight="SemiBold"
-                         Foreground="{DynamicResource StrongTextBrush}" />
-              <TextBlock Text="{Binding CatalogSetup.OfferingReadinessStatus}"
-                         IsVisible="{Binding CatalogSetup.HasSelectedOffering}"
-                         FontSize="12"
-                         Foreground="{DynamicResource SecondaryTextBrush}"
-                         AutomationProperties.AutomationId="Catalog.OfferingStatus" />
+              <StackPanel IsVisible="{Binding IsOfferingContext}"
+                          Spacing="12">
+                <Border AutomationProperties.AutomationId="Catalog.ContextHeader"
+                        BorderBrush="{DynamicResource SubtleBorderBrush}"
+                        BorderThickness="0,0,0,1"
+                        Padding="0,0,0,12">
+                  <StackPanel Spacing="8">
+                    <Button Content="‹  Back to Blueprint"
+                            Command="{Binding BackToProductCommand}"
+                            IsVisible="{Binding IsOfferingDetail}"
+                            Classes="secondary" />
+                    <Button Content="‹  Back to Offering overview"
+                            Command="{Binding BackToOfferingOverviewCommand}"
+                            IsVisible="{Binding !IsOfferingDetail}"
+                            Classes="secondary" />
+                    <TextBlock Text="{Binding CatalogBreadcrumb}"
+                               FontSize="12"
+                               Foreground="{DynamicResource SecondaryTextBrush}" />
+                    <TextBlock Text="{Binding OfferingName}"
+                               IsVisible="{Binding IsCreatingNewOffering}"
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource StrongTextBrush}" />
+                    <TextBlock Text="{Binding CatalogSetup.OfferingName}"
+                               IsVisible="{Binding CatalogSetup.HasSelectedOffering}"
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource StrongTextBrush}" />
+                    <TextBlock Text="{Binding CatalogSetup.OfferingReadinessStatus}"
+                               IsVisible="{Binding CatalogSetup.HasSelectedOffering}"
+                               FontSize="12"
+                               Foreground="{DynamicResource SecondaryTextBrush}"
+                               AutomationProperties.AutomationId="Catalog.OfferingStatus" />
+                  </StackPanel>
+                </Border>
               <Border IsVisible="{Binding CatalogSetup.IsOfferingContextUnavailable}"
                       Background="{DynamicResource WarningBackgroundBrush}"
                       BorderBrush="{DynamicResource WarningBorderBrush}"
@@ -771,10 +792,10 @@
                       <Button Content="Cancel"
                               Command="{Binding CancelNewOfferingCommand}"
                               Classes="secondary fixedAction" />
-                    </StackPanel>
-                  </StackPanel>
-                </StackPanel>
-              </Border>
+              </StackPanel>
+            </StackPanel>
+            </StackPanel>
+          </Border>
 
               <Border Classes="panel" Padding="12" IsVisible="{Binding IsOfferingDetail}"
                       AutomationProperties.AutomationId="Catalog.OfferingBasics">
@@ -1297,6 +1318,8 @@
                         Command="{Binding KeepEditingCommand}"
                         Classes="secondary fixedDanger" />
               </StackPanel>
+            </StackPanel>
+          </Border>
             </StackPanel>
           </Border>
         </StackPanel>
