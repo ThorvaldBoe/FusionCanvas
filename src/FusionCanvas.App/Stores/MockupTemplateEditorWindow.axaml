@@ -40,7 +40,8 @@
           <TextBlock Text="Mockup source images" FontSize="16" FontWeight="SemiBold" />
           <TextBlock Text="Select a row to edit its metadata below." FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
         </StackPanel>
-        <Button Grid.Column="1" Content="Archive selected" Command="{Binding RemoveLocalSourceCommand}" CommandParameter="{Binding SelectedLocalSource}" Classes="secondary" />
+        <Button Grid.Column="1" Content="{Binding LocalSourceArchiveLabel}" Command="{Binding RemoveLocalSourceCommand}" IsEnabled="{Binding HasSelectedLocalSources}"
+                AutomationProperties.Name="Archive selected source images" AutomationProperties.HelpText="Archive every selected source image." Classes="secondary" />
         <Button Grid.Column="2" Content="Upload images..." Command="{Binding BrowseLocalSourceCommand}" Classes="primary"
                 AutomationProperties.Name="Upload source images"
                 AutomationProperties.HelpText="Select one or more supported raster images." />
@@ -63,7 +64,7 @@
               <Border Classes="mockupTableRow" Classes.alternate="{Binding IsAlternateRow}" Classes.selected="{Binding IsSelected}" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
                       Focusable="True" PointerPressed="OnSourceRowPointerPressed" KeyDown="OnSourceRowKeyDown"
                       AutomationProperties.Name="{Binding DisplayName, StringFormat='Select source image {0}'}"
-                      AutomationProperties.HelpText="Press Enter or Space to select this source image"
+                      AutomationProperties.HelpText="Press Enter or Space to select; hold Ctrl to toggle or Shift to select a range"
                       AutomationProperties.ItemStatus="{Binding IsSelected, StringFormat='Selected: {0}'}">
                 <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="2*,2*,Auto,Auto" ColumnSpacing="10" RowSpacing="4">
                   <Button Grid.Row="0" Grid.Column="0" Content="{Binding DisplayName}" Command="{Binding $parent[Window].DataContext.SelectLocalSourceCommand}" CommandParameter="{Binding}" HorizontalContentAlignment="Left" Classes="mockupTableFile" />

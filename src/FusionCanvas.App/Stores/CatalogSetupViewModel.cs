@@ -62,6 +62,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private string _localSourcePath = string.Empty;
     private LocalMockupSourceDraftViewModel? _selectedLocalSource;
     private LocalMockupSourceDraftViewModel? _selectedMappingSource;
+    private readonly List<LocalMockupSourceDraftViewModel> _selectedLocalSources = [];
+    private LocalMockupSourceDraftViewModel? _localSourceSelectionAnchor;
     private string _localSourceSortColumn = "File";
     private bool _localSourceSortAscending = true;
     private string _error = string.Empty;
@@ -164,7 +166,12 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         KeepEditingMockupTemplateCommand = new RelayCommand(_ => IsMockupTemplateDiscardConfirmationVisible = false, () => IsMockupTemplateDiscardConfirmationVisible);
         CreateTemplateCommand = new AsyncRelayCommand(CreateTemplateAsync, CanCreateTemplate);
         BrowseLocalSourceCommand = new AsyncRelayCommand(BrowseLocalSourceAsync, () => CanEdit && IsAddingTemplate && _sourceImages is not null);
-        RemoveLocalSourceCommand = new RelayCommand(parameter => RemoveLocalSource(parameter as LocalMockupSourceDraftViewModel), () => CanEdit && IsAddingTemplate);
+        RemoveLocalSourceCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is LocalMockupSourceDraftViewModel draft) RemoveLocalSource(draft);
+            else RemoveSelectedLocalSources();
+        },
+            () => CanEdit && IsAddingTemplate);
         SelectLocalSourceCommand = new RelayCommand(parameter => SelectLocalSource(parameter as LocalMockupSourceDraftViewModel), () => CanEdit && IsAddingTemplate);
         SortLocalSourcesCommand = new RelayCommand(parameter => SortLocalSources(parameter as string));
         OpenEnlargedPlacementEditorCommand = new RelayCommand(_ => RequestEnlargedPlacementEditor(), () => CanEdit && IsAddingTemplate && HasSelectedLocalSource);
@@ -251,6 +258,18 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public IAssetFilePicker FilePicker { get => _filePicker; set => _filePicker = value ?? new NullAssetFilePicker(); }
     public string LocalSourcePath { get => _localSourcePath; private set { if (SetField(ref _localSourcePath, value)) { NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
     public LocalMockupSourceDraftViewModel? SelectedLocalSource { get => _selectedLocalSource; private set { if (SetField(ref _selectedLocalSource, value)) { OnPropertyChanged(nameof(HasSelectedLocalSource)); OnPropertyChanged(nameof(MappingImageWidth)); OnPropertyChanged(nameof(MappingImageHeight)); OnPropertyChanged(nameof(SelectedImagePreviewPath)); RebuildMappedSourceChoices(); NotifyCommands(); } } }
+    public IReadOnlyList<LocalMockupSourceDraftViewModel> SelectedLocalSources => _selectedLocalSources;
+    public int SelectedLocalSourceCount => _selectedLocalSources.Count;
+    public bool HasSelectedLocalSources => _selectedLocalSources.Count > 0;
+    public string LocalSourceSelectionSummary => _selectedLocalSources.Count switch
+    {
+        0 => "No source images selected",
+        1 => "1 source image selected",
+        var count => $"{count} source images selected"
+    };
+    public string LocalSourceArchiveLabel => _selectedLocalSources.Count > 0
+        ? $"Archive selected ({_selectedLocalSources.Count})"
+        : "Archive selected";
     public LocalMockupSourceDraftViewModel? SelectedMappingSource { get => _selectedMappingSource; set => SetField(ref _selectedMappingSource, value); }
     public string? SelectedImagePreviewPath => SelectedLocalSource?.PreviewPath;
     public bool HasSelectedLocalSource => SelectedLocalSource is not null;
@@ -1005,6 +1024,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
                 EndTemplateDraft();
                 TemplateName = string.Empty;
                 LocalSourcePath = string.Empty;
+                ClearLocalSourceSelectionState();
                 LocalSourceDrafts.Clear();
                 RefreshLocalSourceRowPresentation();
                 _archivedLocalSourceDrafts.Clear();
@@ -1097,9 +1117,12 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private void SelectLocalSource(LocalMockupSourceDraftViewModel? draft)
     {
-        if (draft is null) return;
+        if (draft is null || !LocalSourceDrafts.Contains(draft)) return;
         CaptureSelectedLocalSource();
         SelectedLocalSource = draft;
+        _selectedLocalSources.Clear();
+        _selectedLocalSources.Add(draft);
+        _localSourceSelectionAnchor = draft;
         foreach (var row in LocalSourceDrafts) row.IsSelected = ReferenceEquals(row, draft);
         foreach (var color in TemplateColorChoices) color.IsSelected = draft.OptionValueIds.Contains(color.Value.Id);
         foreach (var option in TemplateAdditionalOptionChoices) option.IsSelected = draft.OptionValueIds.Contains(option.Value.Id);
@@ -1109,6 +1132,89 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         MappingWidthText = mapping is null ? string.Empty : FormatMapping(mapping.Width);
         MappingHeightText = mapping is null ? string.Empty : FormatMapping(mapping.Height);
         LocalSourcePath = draft.Path;
+        NotifyLocalSourceSelectionChanged();
+    }
+
+    public void SelectLocalSourceWithModifiers(LocalMockupSourceDraftViewModel? draft, bool toggle, bool range)
+    {
+        if (draft is null || !LocalSourceDrafts.Contains(draft)) return;
+
+        if (!toggle && !range)
+        {
+            SelectLocalSource(draft);
+            return;
+        }
+
+        CaptureSelectedLocalSource();
+        var visibleRows = LocalSourceDrafts.ToArray();
+        if (range && _localSourceSelectionAnchor is not null && visibleRows.Contains(_localSourceSelectionAnchor))
+        {
+            var anchorIndex = Array.IndexOf(visibleRows, _localSourceSelectionAnchor);
+            var clickedIndex = Array.IndexOf(visibleRows, draft);
+            var start = Math.Min(anchorIndex, clickedIndex);
+            var end = Math.Max(anchorIndex, clickedIndex);
+            _selectedLocalSources.Clear();
+            _selectedLocalSources.AddRange(visibleRows.Skip(start).Take(end - start + 1));
+        }
+        else if (toggle)
+        {
+            if (!_selectedLocalSources.Remove(draft)) _selectedLocalSources.Add(draft);
+            _localSourceSelectionAnchor ??= draft;
+        }
+        else
+        {
+            _selectedLocalSources.Clear();
+            _selectedLocalSources.Add(draft);
+            _localSourceSelectionAnchor = draft;
+        }
+
+        RefreshLocalSourceSelectionPresentation();
+        var active = _selectedLocalSources.Contains(draft) ? draft : _selectedLocalSources.LastOrDefault();
+        if (active is null) ClearActiveLocalSource();
+        else ActivateLocalSource(active);
+        NotifyLocalSourceSelectionChanged();
+    }
+
+    private void ActivateLocalSource(LocalMockupSourceDraftViewModel draft)
+    {
+        SelectedLocalSource = draft;
+        foreach (var color in TemplateColorChoices) color.IsSelected = draft.OptionValueIds.Contains(color.Value.Id);
+        foreach (var option in TemplateAdditionalOptionChoices) option.IsSelected = draft.OptionValueIds.Contains(option.Value.Id);
+        var mapping = draft.Mapping;
+        MappingXText = mapping is null ? string.Empty : FormatMapping(mapping.X);
+        MappingYText = mapping is null ? string.Empty : FormatMapping(mapping.Y);
+        MappingWidthText = mapping is null ? string.Empty : FormatMapping(mapping.Width);
+        MappingHeightText = mapping is null ? string.Empty : FormatMapping(mapping.Height);
+        LocalSourcePath = draft.Path;
+    }
+
+    private void ClearActiveLocalSource()
+    {
+        SelectedLocalSource = null;
+        SelectedMappingSource = null;
+        LocalSourcePath = string.Empty;
+        MappingXText = string.Empty;
+        MappingYText = string.Empty;
+        MappingWidthText = string.Empty;
+        MappingHeightText = string.Empty;
+        foreach (var color in TemplateColorChoices) color.IsSelected = false;
+        foreach (var option in TemplateAdditionalOptionChoices) option.IsSelected = false;
+    }
+
+    private void RefreshLocalSourceSelectionPresentation()
+    {
+        var selected = _selectedLocalSources.ToHashSet();
+        foreach (var row in LocalSourceDrafts) row.IsSelected = selected.Contains(row);
+    }
+
+    private void NotifyLocalSourceSelectionChanged()
+    {
+        OnPropertyChanged(nameof(SelectedLocalSources));
+        OnPropertyChanged(nameof(SelectedLocalSourceCount));
+        OnPropertyChanged(nameof(HasSelectedLocalSources));
+        OnPropertyChanged(nameof(LocalSourceSelectionSummary));
+        OnPropertyChanged(nameof(LocalSourceArchiveLabel));
+        NotifyCommands();
     }
 
     private void SortLocalSources(string? column)
@@ -1203,16 +1309,70 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     public void RemoveLocalSource(LocalMockupSourceDraftViewModel? draft)
     {
-        if (draft is null) return;
-        if (draft.IsManaged && draft.SourceImageId is not null && !_archivedLocalSourceDrafts.Contains(draft)) _archivedLocalSourceDrafts.Add(draft);
-        if (ReferenceEquals(SelectedLocalSource, draft)) SelectedLocalSource = null;
-        LocalSourceDrafts.Remove(draft);
+        if (draft is null || !LocalSourceDrafts.Contains(draft)) return;
+        if (ReferenceEquals(SelectedLocalSource, draft)) CaptureSelectedLocalSource();
+        RemoveLocalSourceCore(draft);
+        ReconcileLocalSourceSelection();
         RefreshLocalSourceRowPresentation();
         RebuildMappedSourceChoices();
-        var next = LocalSourceDrafts.LastOrDefault();
-        if (next is not null) SelectLocalSource(next);
         OnPropertyChanged(nameof(HasLocalSource));
+        NotifyLocalSourceSelectionChanged();
         NotifyMockupTemplateDraftChanged();
+    }
+
+    private void RemoveSelectedLocalSources()
+    {
+        if (_selectedLocalSources.Count == 0) return;
+        CaptureSelectedLocalSource();
+        foreach (var draft in _selectedLocalSources.ToArray()) RemoveLocalSourceCore(draft);
+        ReconcileLocalSourceSelection();
+        RefreshLocalSourceRowPresentation();
+        RebuildMappedSourceChoices();
+        OnPropertyChanged(nameof(HasLocalSource));
+        NotifyLocalSourceSelectionChanged();
+        NotifyMockupTemplateDraftChanged();
+    }
+
+    private void RemoveLocalSourceCore(LocalMockupSourceDraftViewModel draft)
+    {
+        if (draft.IsManaged && draft.SourceImageId is not null && !_archivedLocalSourceDrafts.Contains(draft))
+            _archivedLocalSourceDrafts.Add(draft);
+        _selectedLocalSources.Remove(draft);
+        if (ReferenceEquals(_localSourceSelectionAnchor, draft)) _localSourceSelectionAnchor = null;
+        draft.IsSelected = false;
+        LocalSourceDrafts.Remove(draft);
+    }
+
+    private void ReconcileLocalSourceSelection()
+    {
+        _selectedLocalSources.RemoveAll(draft => !LocalSourceDrafts.Contains(draft));
+        if (_localSourceSelectionAnchor is not null && !LocalSourceDrafts.Contains(_localSourceSelectionAnchor))
+            _localSourceSelectionAnchor = _selectedLocalSources.LastOrDefault();
+
+        var next = _selectedLocalSources.LastOrDefault() ?? LocalSourceDrafts.LastOrDefault();
+        if (next is null)
+        {
+            _localSourceSelectionAnchor = null;
+            ClearActiveLocalSource();
+            return;
+        }
+
+        if (!_selectedLocalSources.Contains(next))
+        {
+            _selectedLocalSources.Add(next);
+            _localSourceSelectionAnchor = next;
+        }
+        RefreshLocalSourceSelectionPresentation();
+        ActivateLocalSource(next);
+    }
+
+    private void ClearLocalSourceSelectionState()
+    {
+        _selectedLocalSources.Clear();
+        _localSourceSelectionAnchor = null;
+        RefreshLocalSourceSelectionPresentation();
+        if (SelectedLocalSource is not null) ClearActiveLocalSource();
+        NotifyLocalSourceSelectionChanged();
     }
 
     private async Task AddTemplateColorAsync()
@@ -1267,6 +1427,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         SelectedTemplate = template;
         SelectedPlaceholder = AvailablePlaceholders.FirstOrDefault(value => value.Id == template.TargetPlaceholderId);
         TemplateName = template.Name;
+        ClearLocalSourceSelectionState();
         LocalSourceDrafts.Clear();
         RefreshLocalSourceRowPresentation();
         MappedSourceChoices.Clear();
@@ -1304,6 +1465,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         SelectedTemplate = null;
         SelectedPlaceholder = null;
         TemplateName = string.Empty;
+        ClearLocalSourceSelectionState();
         LocalSourceDrafts.Clear();
         RefreshLocalSourceRowPresentation();
         MappedSourceChoices.Clear();
@@ -2032,8 +2194,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         foreach (var color in TemplateColorChoices) color.IsSelected = false;
         foreach (var option in TemplateAdditionalOptionChoices) option.IsSelected = false;
         SelectedTemplate = AvailableTemplates.FirstOrDefault();
+        ClearLocalSourceSelectionState();
         LocalSourceDrafts.Clear();
-        SelectedLocalSource = null;
         LocalSourcePath = string.Empty;
     }
 

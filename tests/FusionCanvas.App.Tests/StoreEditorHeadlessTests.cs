@@ -2740,6 +2740,9 @@ public class StoreEditorHeadlessTests
         var applicability = Assert.IsType<TextBlock>(cells[1]);
         var status = Assert.IsType<TextBlock>(cells[2]);
         var unselectedBackground = row.Background;
+        Assert.Same(catalog.SelectLocalSourceCommand, file.Command);
+        Assert.Same(first, file.CommandParameter);
+        Assert.True(file.Command.CanExecute(file.CommandParameter));
 
         void Click(Control control, Point point)
         {
@@ -2775,6 +2778,65 @@ public class StoreEditorHeadlessTests
         }
 
         Assert.Equal("Select source image first.png", AutomationProperties.GetName(row));
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void MockupSourceTable_ModifierGesturesSelectRangeAndArchiveSelectedRows()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.BackToOfferingOverviewCommand.Execute(null);
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        var catalog = viewModel.CatalogSetup;
+        var sources = Enumerable.Range(1, 4)
+            .Select(index => new LocalMockupSourceDraftViewModel($"multi-{index}.png", []))
+            .ToArray();
+        foreach (var source in sources) catalog.LocalSourceDrafts.Add(source);
+        catalog.SelectLocalSourceCommand.Execute(sources[0]);
+        dialog.UpdateLayout();
+
+        var rows = dialog.GetVisualDescendants().OfType<Border>()
+            .Where(border => border.Classes.Contains("mockupTableRow"))
+            .OrderBy(border => border.TranslatePoint(new Point(0, 0), dialog)!.Value.Y)
+            .ToArray();
+        Assert.Equal(4, rows.Length);
+        void ActivateWithKeyboard(Border row, RawInputModifiers modifiers)
+        {
+            Assert.True(row.Focus());
+            HeadlessWindowExtensions.KeyPress(dialog, Key.Enter, modifiers, PhysicalKey.Enter, string.Empty);
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        }
+
+        ActivateWithKeyboard(rows[1], RawInputModifiers.Control);
+        Assert.Equal([sources[0], sources[1]], catalog.SelectedLocalSources);
+        Assert.Same(sources[1], catalog.SelectedLocalSource);
+
+        ActivateWithKeyboard(rows[2], RawInputModifiers.Shift);
+        Assert.Equal([sources[0], sources[1], sources[2]], catalog.SelectedLocalSources);
+        Assert.Same(sources[2], catalog.SelectedLocalSource);
+        Assert.Equal("3 source images selected", catalog.LocalSourceSelectionSummary);
+
+        var archive = dialog.GetVisualDescendants().OfType<Button>()
+            .Single(button => (button.Content as string)?.StartsWith("Archive selected", StringComparison.Ordinal) == true);
+        Assert.True(archive.IsEnabled);
+        Assert.Equal("Archive selected (3)", archive.Content);
+        Assert.Equal("Selected: True", AutomationProperties.GetItemStatus(rows[0]));
+        Assert.Contains("Ctrl to toggle", AutomationProperties.GetHelpText(rows[0]));
+
+        archive.Command!.Execute(archive.CommandParameter);
+        Assert.Equal([sources[3]], catalog.LocalSourceDrafts);
+        Assert.Same(sources[3], catalog.SelectedLocalSource);
+
         dialog.Close();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         window.Close();
