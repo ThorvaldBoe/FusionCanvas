@@ -121,6 +121,7 @@ public class StageToolViewModelsTests
         Assert.Contains("Remove unavailable applicability options", diagnostic.Guidance);
         Assert.Contains("Configure a matching source image for every compatible Variant.", diagnostic.Guidance);
         Assert.Contains("each compatible Variant matches exactly one image", diagnostic.Guidance);
+        Assert.Contains(Environment.NewLine, diagnostic.Guidance);
         Assert.True(vm.HasBlockedReason);
         Assert.False(vm.CanApply);
     }
