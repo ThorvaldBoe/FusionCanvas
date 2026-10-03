@@ -114,6 +114,26 @@ public sealed class ListingStageToolViewModel : INotifyPropertyChanged
             BlockedReason = state.BlockedReason;
             ErrorMessage = state.Error;
         }
+        catch (OperationCanceledException) when (loadCancellation.IsCancellationRequested)
+        {
+            // A newer Listing load owns the surface, or the caller cancelled it.
+        }
+        catch (Exception exception)
+        {
+            if (loadGeneration != Volatile.Read(ref _loadGeneration)
+                || !ReferenceEquals(Volatile.Read(ref _loadCancellation), loadCancellation))
+            {
+                return;
+            }
+
+            Templates.Clear();
+            TemplateDiagnostics.Clear();
+            Outputs.Clear();
+            SelectedTemplate = null;
+            BlockedReason = null;
+            OnPropertyChanged(nameof(HasTemplateDiagnostics));
+            ErrorMessage = $"Listing readiness could not be loaded. {exception.Message} Try reloading Listing or checking Store settings.";
+        }
         finally
         {
             Interlocked.CompareExchange(ref _loadCancellation, null, loadCancellation);

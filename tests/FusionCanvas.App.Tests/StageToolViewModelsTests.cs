@@ -139,6 +139,22 @@ public class StageToolViewModelsTests
     }
 
     [Fact]
+    public async Task ListingTool_WhenReadinessLoadFails_ShowsRecoveryErrorWithoutClaimingNoTemplates()
+    {
+        var vm = new ListingStageToolViewModel(new ThrowingMockupGenerationService(
+            new InvalidOperationException("Workspace context is unavailable.")));
+
+        await vm.LoadAsync(Guid.NewGuid(), ItemStatus.Draft, canEdit: true, TestContext.Current.CancellationToken);
+
+        Assert.False(vm.HasBlockedReason);
+        Assert.Empty(vm.Templates);
+        Assert.Empty(vm.TemplateDiagnostics);
+        Assert.Contains("Listing readiness could not be loaded", vm.ErrorMessage);
+        Assert.Contains("Workspace context is unavailable", vm.ErrorMessage);
+        Assert.Contains("reloading Listing", vm.ErrorMessage);
+    }
+
+    [Fact]
     public async Task ListingTool_SelectingTemplateEnablesApplyAndUsesNameAsDisplayValue()
     {
         var templateId = Guid.NewGuid();
@@ -252,6 +268,15 @@ public class StageToolViewModelsTests
     private sealed class StubMockupGenerationService(MockupGenerationState state) : IMockupGenerationService
     {
         public Task<MockupGenerationState> LoadAsync(Guid itemId, bool isReadOnly, string readOnlyReason, CancellationToken cancellationToken = default) => Task.FromResult(state);
+
+        public Task<MockupGenerationResult> ApplyAsync(MockupGenerationRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(MockupGenerationResult.Failure("Not used in this test."));
+    }
+
+    private sealed class ThrowingMockupGenerationService(Exception exception) : IMockupGenerationService
+    {
+        public Task<MockupGenerationState> LoadAsync(Guid itemId, bool isReadOnly, string readOnlyReason, CancellationToken cancellationToken = default) =>
+            Task.FromException<MockupGenerationState>(exception);
 
         public Task<MockupGenerationResult> ApplyAsync(MockupGenerationRequest request, CancellationToken cancellationToken = default) =>
             Task.FromResult(MockupGenerationResult.Failure("Not used in this test."));
