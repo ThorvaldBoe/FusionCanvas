@@ -217,6 +217,22 @@ public class DesignStageToolViewModelTests
     }
 
     [Fact]
+    public async Task LoadAsync_ClearsPreviousArtworkError()
+    {
+        var viewModel = await CreateArtworkReadinessViewModelAsync(
+            conceptComplete: true,
+            includeDefaultRowColor: true,
+            artworkGenerationService: new FailingArtworkGenerationService("Previous artwork failed."));
+
+        await viewModel.GenerateArtworkAsync(TestContext.Current.CancellationToken);
+        Assert.Equal("Previous artwork failed.", viewModel.ErrorMessage);
+
+        await viewModel.LoadAsync(SampleWorkspace.DesignNodeId, canEdit: true, TestContext.Current.CancellationToken);
+
+        Assert.Null(viewModel.ErrorMessage);
+    }
+
+    [Fact]
     public async Task DisposeWhileSlotPreviewIsLoading_DisposesTheReturnedStream()
     {
         var service = new DelayedArtworkPreferenceService(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
@@ -473,6 +489,12 @@ public class DesignStageToolViewModelTests
         }
 
         public void Complete(DesignStageResult result) => _completion.TrySetResult(result);
+    }
+
+    private sealed class FailingArtworkGenerationService(string message) : IArtworkGenerationService
+    {
+        public Task<DesignStageResult> GenerateAsync(ArtworkGenerationRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(DesignStageResult.Failure(message));
     }
 
     private static async Task<DesignStageToolViewModel> CreateArtworkReadinessViewModelAsync(

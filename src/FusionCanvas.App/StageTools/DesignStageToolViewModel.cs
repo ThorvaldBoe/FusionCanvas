@@ -554,9 +554,10 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         {
             var result = await _designStageService.RecoverStaleConfigurationAsync(
                 _itemId, replacementOfferingId, cancellationToken).ConfigureAwait(true);
-            ErrorMessage = result.Error;
+            var recoveryError = result.Error;
             ClearPendingRecovery();
             await LoadAsync(_itemId, _canEditContext, cancellationToken).ConfigureAwait(true);
+            ErrorMessage = recoveryError;
         }
         catch (OperationCanceledException)
         {
@@ -564,9 +565,10 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         }
         catch (Exception exception)
         {
-            ErrorMessage = $"The listing configuration could not be recovered. {exception.Message}";
+            var recoveryError = $"The listing configuration could not be recovered. {exception.Message}";
             ClearPendingRecovery();
             await LoadAsync(_itemId, _canEditContext, cancellationToken).ConfigureAwait(true);
+            ErrorMessage = recoveryError;
         }
         finally
         {
@@ -993,6 +995,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         NotifyArtworkCapabilityState();
         _canEditContext = canEdit;
         ClearPendingRecovery();
+        ErrorMessage = null;
         IsReadOnly = !canEdit;
         ReadOnlyReason = canEdit ? string.Empty : "Design stage content is read-only while the item is protected or an earlier stage is being reviewed.";
         _itemId = itemId;
