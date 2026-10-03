@@ -74,6 +74,13 @@ public sealed class ListingStageToolViewModel : INotifyPropertyChanged
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         _itemId = itemId;
         Load(status, canEdit);
+        SelectedTemplate = null;
+        Templates.Clear();
+        TemplateDiagnostics.Clear();
+        OnPropertyChanged(nameof(HasTemplateDiagnostics));
+        Outputs.Clear();
+        BlockedReason = null;
+        ErrorMessage = null;
         try
         {
             if (_service is null)
