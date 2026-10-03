@@ -1544,7 +1544,8 @@
                       <ComboBox ItemsSource="{Binding ListingTool.Templates}"
                                 SelectedItem="{Binding ListingTool.SelectedTemplate, Mode=TwoWay}"
                                 DisplayMemberBinding="{Binding Name}"
-                                AutomationProperties.Name="Mockup template" />
+                                AutomationProperties.Name="Mockup template"
+                                AutomationProperties.AutomationId="Listing.MockupTemplateSelector" />
                       <TextBlock Text="{Binding ListingTool.BlockedReason}"
                                  IsVisible="{Binding ListingTool.HasBlockedReason}"
                                  TextWrapping="Wrap"
