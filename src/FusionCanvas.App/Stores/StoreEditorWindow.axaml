@@ -962,7 +962,8 @@
                                Foreground="{DynamicResource SecondaryTextBrush}" />
                     <ItemsControl ItemsSource="{Binding CatalogSetup.OfferingReadinessGuidance}"
                                   IsVisible="{Binding CatalogSetup.HasOfferingReadinessGuidance}"
-                                  AutomationProperties.Name="Offering readiness guidance">
+                                  AutomationProperties.Name="Offering readiness guidance"
+                                  AutomationProperties.AutomationId="Catalog.OfferingReadinessGuidance">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate>
                           <TextBlock Text="{Binding}"
