@@ -426,28 +426,62 @@ public class TagManagementServiceTests
     }
 
     [Fact]
-    public async Task Mutations_PropagateRepositoryFailuresForUiRollback()
+    public async Task Mutations_TranslateRepositoryFailuresToTypedResultsAndPreserveConfirmedState()
     {
         var store = NewStore();
         var tag = NewTag(store.Id, "evergreen");
         var listing = new Item(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ItemStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
         var link = new ItemTag(listing.Id, tag.Id);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new TagManagementService(new FailingWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [tag], [], [])))
-                .UpdateTagAsync(new TagManagementUpdateRequest(tag.Id, "renamed"), TestContext.Current.CancellationToken));
+        var snapshot = new WorkspaceSnapshot([store], [], [], [listing], [], [], [tag], [link], []);
+        var withoutLink = snapshot with { ItemTags = [] };
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new TagManagementService(new FailingWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [tag], [], [])))
-                .ApplyTagAsync(new ApplyTagRequest(listing.Id, tag.Id), TestContext.Current.CancellationToken));
+        var update = await new TagManagementService(new FailingWorkspaceRepository(snapshot))
+            .UpdateTagAsync(new TagManagementUpdateRequest(tag.Id, "renamed"), TestContext.Current.CancellationToken);
+        var apply = await new TagManagementService(new FailingWorkspaceRepository(withoutLink))
+            .ApplyTagAsync(new ApplyTagRequest(listing.Id, tag.Id), TestContext.Current.CancellationToken);
+        var remove = await new TagManagementService(new FailingWorkspaceRepository(snapshot))
+            .RemoveTagAsync(new RemoveTagRequest(listing.Id, tag.Id), TestContext.Current.CancellationToken);
+        var applyOrCreate = await new TagManagementService(new FailingWorkspaceRepository(withoutLink))
+            .ApplyOrCreateTagAsync(new ApplyOrCreateTagRequest(listing.Id, "fresh"), TestContext.Current.CancellationToken);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new TagManagementService(new FailingWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [tag], [link], [])))
-                .RemoveTagAsync(new RemoveTagRequest(listing.Id, tag.Id), TestContext.Current.CancellationToken));
+        Assert.False(update.Succeeded);
+        Assert.Contains("Simulated persistence failure", update.Error);
+        Assert.Equal(tag.Id, Assert.Single(update.State.ActiveTags).Id);
+        Assert.False(apply.Succeeded);
+        Assert.Contains("Simulated persistence failure", apply.Error);
+        Assert.False(remove.Succeeded);
+        Assert.Contains("Simulated persistence failure", remove.Error);
+        Assert.False(applyOrCreate.Succeeded);
+        Assert.Contains("Simulated persistence failure", applyOrCreate.Error);
+    }
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new TagManagementService(new FailingWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [tag], [], [])))
-                .ApplyOrCreateTagAsync(new ApplyOrCreateTagRequest(listing.Id, "fresh"), TestContext.Current.CancellationToken));
+    [Fact]
+    public async Task Mutations_TranslateRepositoryLoadFailuresToTypedResults()
+    {
+        var store = NewStore();
+        var tag = NewTag(store.Id, "evergreen");
+        var listing = new Item(Guid.NewGuid(), store.Id, null, null, "Shirt", null, ItemStatus.Draft, WorkflowStage.Idea, false, Now, Now, "{}");
+        var repository = new FailingWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [listing], [], [], [tag], [], []), failLoad: true);
+        var service = new TagManagementService(repository);
+
+        var result = await service.UpdateTagAsync(new TagManagementUpdateRequest(tag.Id, "renamed"), TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("Unable to load tags", result.Error);
+        Assert.Empty(result.State.ActiveTags);
+    }
+
+    [Fact]
+    public async Task Mutations_RethrowRepositoryCancellation()
+    {
+        var store = NewStore();
+        var tag = NewTag(store.Id, "evergreen");
+        var repository = new FailingWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [], [], [], [tag], [], []), cancellation: new OperationCanceledException());
+        var service = new TagManagementService(repository);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            service.UpdateTagAsync(new TagManagementUpdateRequest(tag.Id, "renamed"), TestContext.Current.CancellationToken));
     }
 
     private static Store NewStore() =>
@@ -470,12 +504,24 @@ public class TagManagementServiceTests
             Task.FromResult(_snapshot);
     }
 
-    private sealed class FailingWorkspaceRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
+    private sealed class FailingWorkspaceRepository(
+        WorkspaceSnapshot snapshot,
+        bool failLoad = false,
+        OperationCanceledException? cancellation = null) : IWorkspaceRepository
     {
+        private readonly bool _failLoad = failLoad;
+        private readonly OperationCanceledException? _cancellation = cancellation;
+
         public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default) =>
-            Task.FromException(new InvalidOperationException("Simulated persistence failure."));
+            _cancellation is not null
+                ? Task.FromException(_cancellation)
+                : Task.FromException(new InvalidOperationException("Simulated persistence failure."));
 
         public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(snapshot);
+            _cancellation is not null
+                ? Task.FromException<WorkspaceSnapshot>(_cancellation)
+                : _failLoad
+                    ? Task.FromException<WorkspaceSnapshot>(new InvalidOperationException("Simulated load failure."))
+                    : Task.FromResult(snapshot);
     }
 }
