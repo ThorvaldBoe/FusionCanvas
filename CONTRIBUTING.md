@@ -78,12 +78,20 @@ GitHub Actions builds must preserve full Git history so Nerdbank.GitVersioning c
 
 ```yaml
 - name: Checkout
-  uses: actions/checkout@v4
+  uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
   with:
     fetch-depth: 0
 ```
 
 A shallow checkout builds successfully but produces a less useful version.
+
+### CI and release integrity
+
+The `deterministic-tests` job runs on pull requests to `main`, on the daily schedule, and on manual dispatch. The `main` branch requires that job's status check before merging. Pull-request test code receives only a read-only `contents` token; the separate failure-tracking job receives `issues: write` only for scheduled and manual runs.
+
+Repository maintainers own GitHub Actions updates. Each action must use a full commit SHA from its official repository, with the reviewed release version in a comment. Update the SHA and version together in a pull request, review the upstream release and action permissions, and run the deterministic baseline before merging. Do not replace a SHA with a mutable tag.
+
+Release ZIP artifacts require signed provenance attestation binding each published artifact digest to the source commit and release workflow, plus a published SHA-256 digest. A release workflow must enforce this before publishing assets; the current repository has no release workflow. Separate code signing is not required for ZIP distribution, but any future installer or platform package must use the platform's signing requirements before release. The CI test-result artifacts are diagnostics, not release outputs.
 
 ### Release tag convention
 
