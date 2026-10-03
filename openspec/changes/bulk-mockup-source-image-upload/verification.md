@@ -50,3 +50,7 @@ FusionCanvas.App.Tests: 866 passed
 The production-source layout scanner was made string/interpolation-aware so braces in interpolated Snowclone strings are not misread as top-level type declarations. The App test assembly now explicitly serializes Avalonia headless test collections because they share a dispatcher. The AI settings availability refresh also gained a re-entrancy guard so artwork hydration cannot recursively restart catalog loading during an availability notification.
 
 Native OS file-picker rendering was not exercised in the headless lane; the picker boundary is covered by the deterministic plural-picker implementation and staging tests.
+
+## Post-main integration note
+
+After integrating the latest `origin/main`, the upload-focused suite still passes (`54` focused tests, including the rendered upload journey). The expanded App baseline currently has three unrelated failures introduced by the latest main-line refactors: two tests reflect a removed private command-task method, and one design headless fixture no longer creates an assigned slot. Those failures are outside this change's files and prevent claiming a clean post-merge baseline or merging PR #730 until main-line test maintenance is addressed.
