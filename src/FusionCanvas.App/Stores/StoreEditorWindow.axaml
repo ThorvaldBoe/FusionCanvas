@@ -956,7 +956,8 @@
                     <TextBlock Text="{Binding CatalogSetup.OfferingReadinessSummary}"
                                TextWrapping="Wrap"
                                Foreground="{DynamicResource SecondaryTextBrush}"
-                               AutomationProperties.Name="Offering setup readiness" />
+                               AutomationProperties.Name="Offering setup readiness"
+                               AutomationProperties.AutomationId="Catalog.OfferingReadinessSummary" />
                     <TextBlock Text="{Binding CatalogSetup.ReadyMockupTemplateCount, StringFormat='{}{0} ready Mockup Templates'}"
                                FontSize="12"
                                Foreground="{DynamicResource SecondaryTextBrush}" />
