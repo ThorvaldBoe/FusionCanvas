@@ -12,6 +12,7 @@ using FusionCanvas.Application.Catalog.Compatibility;
 using FusionCanvas.Application.Stores;
 using FusionCanvas.Application.SllGeneration;
 using FusionCanvas.Application.Tags;
+using FusionCanvas.Application.WorkspaceTree;
 
 namespace FusionCanvas.App.Workspace;
 
@@ -35,6 +36,7 @@ public sealed record MainWindowApplicationServices(
     IDesignStageService DesignStage,
     ISllDocumentCodec SllDocumentCodec,
     INichePopulationService? NichePopulation,
+    IWorkspaceBatchRollbackService WorkspaceBatchRollback,
     IRasterImageMetadataReader? RasterImageMetadataReader = null,
     IMockupSourceMetadataAssistanceService? MockupSourceMetadataAssistance = null,
     IMockupSourceImageContentReader? MockupSourceImageContentReader = null);
