@@ -144,6 +144,20 @@ public class MainWindowConstructionTests
     }
 
     [AvaloniaFact]
+    public void ListingErrorRegionHasStableAccessibleIdentity()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Listing);
+        fixture.PumpLayout();
+
+        var error = fixture.FindControl<TextBlock>(textBlock =>
+            AutomationProperties.GetAutomationId(textBlock) == "Listing.Error");
+
+        Assert.Equal("Listing error", AutomationProperties.GetName(error));
+    }
+
+    [AvaloniaFact]
     public void ItemOverviewContext_GroupsHeaderAndOverviewDetailsInOneSurface()
     {
         using var fixture = new MainWindowFixture();
