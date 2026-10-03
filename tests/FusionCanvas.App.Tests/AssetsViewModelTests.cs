@@ -279,6 +279,9 @@ public class AssetsViewModelTests
 
         public Task<string?> PickImportFileAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(_path);
+
+        public Task<IReadOnlyList<string>> PickImportFilesAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>(_path is null ? [] : [_path]);
     }
 
     private sealed class DeferredLoadAssetManagementService(IAssetManagementService inner) : IAssetManagementService

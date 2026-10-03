@@ -1019,44 +1019,52 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
 
     private async Task BrowseLocalSourceAsync()
     {
-        var path = await _filePicker.PickImportFileAsync().ConfigureAwait(true);
-        if (!string.IsNullOrWhiteSpace(path))
+        var paths = await _filePicker.PickImportFilesAsync().ConfigureAwait(true);
+        if (paths.Count > 0)
         {
-            var dimensions = (Width: 0, Height: 0);
-            string? previewReadError = null;
-            if (_rasterImageMetadataReader is not null)
+            LocalMockupSourceDraftViewModel? firstDraft = null;
+            foreach (var path in paths.Where(path => !string.IsNullOrWhiteSpace(path)))
             {
-                try
+                var dimensions = (Width: 0, Height: 0);
+                string? previewReadError = null;
+                if (_rasterImageMetadataReader is not null)
                 {
-                    var image = await _rasterImageMetadataReader.ReadAsync(path).ConfigureAwait(true);
-                    dimensions = (image.Width, image.Height);
+                    try
+                    {
+                        var image = await _rasterImageMetadataReader.ReadAsync(path).ConfigureAwait(true);
+                        dimensions = (image.Width, image.Height);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        // Keep zero dimensions as a fallback while preserving the failure for presentation.
+                        dimensions = (0, 0);
+                        previewReadError = string.IsNullOrWhiteSpace(exception.Message)
+                            ? $"Preview dimensions could not be read ({exception.GetType().Name})."
+                            : $"Preview dimensions could not be read: {exception.Message}";
+                    }
                 }
-                catch (OperationCanceledException)
+                else
                 {
-                    throw;
+                    previewReadError = "Preview dimensions could not be read because the image metadata reader is unavailable.";
                 }
-                catch (Exception exception)
-                {
-                    // Keep zero dimensions as a fallback while preserving the failure for presentation.
-                    dimensions = (0, 0);
-                    previewReadError = string.IsNullOrWhiteSpace(exception.Message)
-                        ? $"Preview dimensions could not be read ({exception.GetType().Name})."
-                        : $"Preview dimensions could not be read: {exception.Message}";
-                }
-            }
-            else
-            {
-                previewReadError = "Preview dimensions could not be read because the image metadata reader is unavailable.";
+
+                var draft = new LocalMockupSourceDraftViewModel(path, [], imageWidth: dimensions.Width, imageHeight: dimensions.Height, previewReadError: previewReadError);
+                LocalSourceDrafts.Add(draft);
+                firstDraft ??= draft;
             }
 
-            var draft = new LocalMockupSourceDraftViewModel(path, [], imageWidth: dimensions.Width, imageHeight: dimensions.Height, previewReadError: previewReadError);
-            LocalSourceDrafts.Add(draft);
+            if (firstDraft is null)
+            {
+                return;
+            }
+
             RefreshLocalSourceRowPresentation();
-            SelectLocalSource(draft);
             ApplyLocalSourceSort();
-            foreach (var color in TemplateColorChoices) color.IsSelected = false;
-            MappingXText = MappingYText = MappingWidthText = MappingHeightText = string.Empty;
-            LocalSourcePath = path;
+            SelectLocalSource(firstDraft);
             OnPropertyChanged(nameof(HasLocalSource));
             NotifyMockupTemplateDraftChanged();
         }

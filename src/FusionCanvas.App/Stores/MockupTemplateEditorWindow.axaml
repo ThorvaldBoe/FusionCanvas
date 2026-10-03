@@ -41,7 +41,9 @@
           <TextBlock Text="Select a row to edit its metadata below." FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
         </StackPanel>
         <Button Grid.Column="1" Content="Archive selected" Command="{Binding RemoveLocalSourceCommand}" CommandParameter="{Binding SelectedLocalSource}" Classes="secondary" />
-        <Button Grid.Column="2" Content="Upload image..." Command="{Binding BrowseLocalSourceCommand}" Classes="primary" />
+        <Button Grid.Column="2" Content="Upload images..." Command="{Binding BrowseLocalSourceCommand}" Classes="primary"
+                AutomationProperties.Name="Upload source images"
+                AutomationProperties.HelpText="Select one or more supported raster images." />
       </Grid>
       <Border x:Name="MockupSourceTableBorder" Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
       <Grid RowDefinitions="Auto,*">
