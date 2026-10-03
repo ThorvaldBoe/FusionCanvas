@@ -103,6 +103,39 @@ public partial class MockupTemplateEditorWindow : Window
             _enlargedEditorButton = button;
     }
 
+    private void OnSourceRowPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Border row || !e.GetCurrentPoint(row).Properties.IsLeftButtonPressed || IsFromChildButton(row, e.Source))
+            return;
+
+        row.Focus();
+        SelectSourceRow(row);
+        e.Handled = true;
+    }
+
+    private void OnSourceRowKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (sender is not Border row || !ReferenceEquals(e.Source, row) || e.Key is not (Key.Enter or Key.Space))
+            return;
+
+        SelectSourceRow(row);
+        e.Handled = true;
+    }
+
+    private void SelectSourceRow(Border row)
+    {
+        if (row.DataContext is LocalMockupSourceDraftViewModel source &&
+            _viewModel?.SelectLocalSourceCommand.CanExecute(source) == true)
+            _viewModel.SelectLocalSourceCommand.Execute(source);
+    }
+
+    private static bool IsFromChildButton(Border row, object? source)
+    {
+        if (source is not Visual visual) return false;
+        return visual.GetVisualAncestors().TakeWhile(ancestor => !ReferenceEquals(ancestor, row))
+            .Prepend(visual).OfType<Button>().Any();
+    }
+
     private void OnLayoutUpdated(object? sender, EventArgs e)
     {
         var editor = PlacementEditor;

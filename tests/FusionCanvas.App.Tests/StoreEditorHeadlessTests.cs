@@ -2629,6 +2629,77 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void MockupSourceRow_SelectsFromCellsWhitespaceAndKeyboard_WithoutArchiving()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.BackToOfferingOverviewCommand.Execute(null);
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+        window.UpdateLayout();
+
+        viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        var catalog = viewModel.CatalogSetup;
+        var first = new LocalMockupSourceDraftViewModel("first.png", []);
+        var second = new LocalMockupSourceDraftViewModel("second.png", []);
+        catalog.LocalSourceDrafts.Add(first);
+        catalog.LocalSourceDrafts.Add(second);
+        catalog.SelectLocalSourceCommand.Execute(second);
+        dialog.UpdateLayout();
+
+        var row = dialog.GetVisualDescendants().OfType<Border>()
+            .Single(border => ReferenceEquals(border.DataContext, first) && border.Classes.Contains("mockupTableRow"));
+        var cells = Assert.IsType<Grid>(row.Child).Children;
+        var file = Assert.IsType<Button>(cells[0]);
+        var applicability = Assert.IsType<TextBlock>(cells[1]);
+        var status = Assert.IsType<TextBlock>(cells[2]);
+        var unselectedBackground = row.Background;
+
+        void Click(Control control, Point point)
+        {
+            var position = control.TranslatePoint(point, dialog);
+            Assert.NotNull(position);
+            HeadlessWindowExtensions.MouseDown(dialog, position.Value, MouseButton.Left, RawInputModifiers.None);
+            HeadlessWindowExtensions.MouseUp(dialog, position.Value, MouseButton.Left, RawInputModifiers.None);
+        }
+
+        foreach (var cell in new Control[] { file, applicability, status })
+        {
+            catalog.SelectLocalSourceCommand.Execute(second);
+            Click(cell, new Point(cell.Bounds.Width / 2, cell.Bounds.Height / 2));
+            Assert.Same(first, catalog.SelectedLocalSource);
+            Assert.Contains("selected", row.Classes);
+            Assert.NotEqual(unselectedBackground, row.Background);
+            Assert.Equal(2, catalog.LocalSourceDrafts.Count);
+        }
+
+        catalog.SelectLocalSourceCommand.Execute(second);
+        Click(row, new Point(3, row.Bounds.Height / 2));
+        Assert.Same(first, catalog.SelectedLocalSource);
+        Assert.Equal(2, catalog.LocalSourceDrafts.Count);
+
+        foreach (var (key, physicalKey) in new[] { (Key.Enter, PhysicalKey.Enter), (Key.Space, PhysicalKey.Space) })
+        {
+            catalog.SelectLocalSourceCommand.Execute(second);
+            Assert.True(row.Focus());
+            HeadlessWindowExtensions.KeyPress(dialog, key, RawInputModifiers.None, physicalKey, string.Empty);
+            Assert.Same(first, catalog.SelectedLocalSource);
+            Assert.Contains("selected", row.Classes);
+            Assert.Equal("Selected: True", AutomationProperties.GetItemStatus(row));
+        }
+
+        Assert.Equal("Select source image first.png", AutomationProperties.GetName(row));
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void SelectedSourceEditor_ExposesKeepAspectRatioOption()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
