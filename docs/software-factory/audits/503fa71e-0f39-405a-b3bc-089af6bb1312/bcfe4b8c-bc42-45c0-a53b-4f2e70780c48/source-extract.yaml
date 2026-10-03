@@ -1,0 +1,87 @@
+extract:
+  standard: FusionCanvas UI Standard
+  standard_version: "1.3"
+  extract_definition_version: "1.4"
+  extract_revision: 1
+  repository_revision: c15c7e8eb6b844164df48d01ce82e64ed2a0cee8
+  extracted_at: 2026-10-03T12:00:00+02:00
+  working_tree: modified
+  included_projects:
+    - src/FusionCanvas.App
+  exclusions:
+    - All non-UI QA axes; this is a single-surface UI audit.
+    - Other Store Editor tabs and states except where needed to establish the tab-navigation pattern.
+  discovery_limits:
+    - Visual evidence is based on the supplied screenshot plus Avalonia headless visual-tree inspection; no interactive desktop session was required.
+  surfaces:
+    - surface_id: UI-SURF-STORE-EDITOR-OFFERING-CONTEXT
+      name: Store Editor — Catalog and mockups offering context
+      kind: view
+      owner: src/FusionCanvas.App/Stores
+      source_locations:
+        - src/FusionCanvas.App/Stores/StoreEditorWindow.axaml:82-118
+        - src/FusionCanvas.App/Stores/StoreEditorWindow.axaml:698-740
+        - src/FusionCanvas.App/Stores/StoreManagementViewModel.cs
+      entry_points:
+        - StoreManagementViewModel.SelectProductsTabCommand
+        - StoreManagementViewModel.BackToOfferingOverviewCommand
+        - StoreManagementViewModel.OpenOfferingDetailCommand
+      auditable_patterns:
+        - kind: tabs
+          source_locations:
+            - src/FusionCanvas.App/Stores/StoreEditorWindow.axaml:98-116
+          capabilities:
+            - Four visible tab-selection buttons
+            - Selected state through tabButton.selected class binding
+          notes:
+            - The selected tab is visually distinguishable, but the group is not contained as a distinct navigation band.
+        - kind: contextual_navigation
+          source_locations:
+            - src/FusionCanvas.App/Stores/StoreEditorWindow.axaml:698-710
+          capabilities:
+            - Back to Blueprint
+            - Back to Offering overview
+            - Catalog breadcrumb
+          notes:
+            - Contextual back navigation appears immediately after the tab row inside the same outer stack.
+        - kind: tab_content_boundary
+          source_locations:
+            - src/FusionCanvas.App/Stores/StoreEditorWindow.axaml:82-89
+            - src/FusionCanvas.App/Stores/StoreEditorWindow.axaml:698-740
+          capabilities:
+            - Outer editor surface border
+            - Scrollable content
+          notes:
+            - No inner bounded region separates tab/context navigation from the active offering content.
+      shared_dependencies:
+        themes:
+          - src/FusionCanvas.App/App.axaml
+        resources_and_styles:
+          - src/FusionCanvas.App/App.axaml
+        components:
+          - tabButton style
+          - panel style
+        patterns:
+          - Store Editor tab navigation
+          - Catalog offering context navigation
+        tokens: []
+      discovery: Static inspection of StoreEditorWindow.axaml, StoreManagementViewModel, and StoreEditorHeadlessTests.
+      notes:
+        - The supplied screenshot corresponds to the Catalog and mockups offering-context state.
+
+extensions:
+  - extension_sequence: 2
+    repository_revision: c15c7e8eb6b844164df48d01ce82e64ed2a0cee8
+    working_tree: modified
+    generated_at: 2026-10-03T14:56:00+02:00
+    change_summary:
+      - Added a bounded tab-navigation band around the four tab selectors.
+      - Added a context header boundary around back navigation and offering identity.
+      - Added a bounded active-tab content surface.
+      - Added a focused headless visual-tree regression test.
+    affected_source_items:
+      - UI-SURF-STORE-EDITOR-OFFERING-CONTEXT
+    relationships:
+      - type: supersedes_for_reassessment
+        source_item: UI-SURF-STORE-EDITOR-OFFERING-CONTEXT
+        prior_extract_revision: 1

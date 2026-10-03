@@ -78,6 +78,13 @@ Tabs should be compact and functional:
 - no large decorative tab treatment
 - tab activation updates workflow and navigation context
 
+Tabbed surfaces should also make their composition explicit:
+
+- present the tabs as one coherent navigation group, visually distinct from ordinary command buttons
+- keep contextual back or return navigation separate from the tab row and adjacent to the context it leaves
+- place the active tab's content inside a bounded visual region, using an inset, surface, border, divider, or equivalent treatment so the tab chrome, navigation context, and tab content do not read as one undifferentiated stack
+- make the selected tab's relationship to its content unmistakable, including when the content scrolls or grows
+
 ### Contextual Tooling
 
 The lower document area is a stage tool host.
