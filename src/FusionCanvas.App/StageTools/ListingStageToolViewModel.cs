@@ -114,10 +114,12 @@ public sealed class ListingStageToolViewModel : INotifyPropertyChanged
         }
     }
 
-    private async Task ApplyAsync()
+    public async Task ApplyAsync()
     {
         if (_service is null || !CanApply || SelectedTemplateId is not Guid templateId) return;
-        IsBusy = true; ErrorMessage = null;
+        IsBusy = true;
+        ErrorMessage = null;
+        Outputs.Clear();
         try
         {
             var result = await _service.ApplyAsync(new(_itemId, templateId)).ConfigureAwait(true);
