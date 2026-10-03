@@ -13,6 +13,42 @@ namespace FusionCanvas.App.Tests;
 public sealed class CatalogSetupViewModelTests
 {
     [Fact]
+    public async Task LocalSourceSortingUsesVisibleKeysAndPreservesSelectedDraft()
+    {
+        var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: false);
+        viewModel.StartAddTemplateCommand.Execute(null);
+        var zeta = new LocalMockupSourceDraftViewModel("zeta.png", []);
+        var alpha = new LocalMockupSourceDraftViewModel("alpha.png", []);
+        var beta = new LocalMockupSourceDraftViewModel("beta.png", []);
+        alpha.UpdateMetadata([Guid.NewGuid()], new MockupImageSpaceMapping(100, 100, 0, 0, 50, 50), "Navy");
+        beta.UpdateMetadata([Guid.NewGuid()], new MockupImageSpaceMapping(100, 100, 0, 0, 50, 50), "Black");
+        viewModel.LocalSourceDrafts.Add(zeta);
+        viewModel.LocalSourceDrafts.Add(alpha);
+        viewModel.LocalSourceDrafts.Add(beta);
+        viewModel.SelectLocalSourceCommand.Execute(zeta);
+
+        viewModel.SortLocalSourcesCommand.Execute("File");
+        Assert.Equal([zeta, beta, alpha], viewModel.LocalSourceDrafts);
+        Assert.Equal("File ↓", viewModel.FileSortLabel);
+        viewModel.SortLocalSourcesCommand.Execute("File");
+        Assert.Equal([alpha, beta, zeta], viewModel.LocalSourceDrafts);
+
+        viewModel.SortLocalSourcesCommand.Execute("Applicability");
+        Assert.Equal([zeta, beta, alpha], viewModel.LocalSourceDrafts);
+        Assert.Equal("Applicability ↑", viewModel.ApplicabilitySortLabel);
+        viewModel.SortLocalSourcesCommand.Execute("Applicability");
+        Assert.Equal([alpha, beta, zeta], viewModel.LocalSourceDrafts);
+
+        viewModel.SortLocalSourcesCommand.Execute("Status");
+        Assert.Equal([alpha, beta, zeta], viewModel.LocalSourceDrafts);
+        viewModel.SortLocalSourcesCommand.Execute("Status");
+        Assert.Equal([zeta, alpha, beta], viewModel.LocalSourceDrafts);
+        Assert.Equal("Status, sorted descending", viewModel.StatusSortAccessibleName);
+        Assert.Same(zeta, viewModel.SelectedLocalSource);
+        Assert.True(zeta.IsSelected);
+    }
+
+    [Fact]
     public async Task BrowseLocalSourceGetsDimensionsFromMetadataService()
     {
         var now = DateTimeOffset.UtcNow;

@@ -62,6 +62,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private string _localSourcePath = string.Empty;
     private LocalMockupSourceDraftViewModel? _selectedLocalSource;
     private LocalMockupSourceDraftViewModel? _selectedMappingSource;
+    private string _localSourceSortColumn = "File";
+    private bool _localSourceSortAscending = true;
     private string _error = string.Empty;
     private bool _isBusy;
     private bool _isAddingOption;
@@ -162,6 +164,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         BrowseLocalSourceCommand = new AsyncRelayCommand(BrowseLocalSourceAsync, () => CanEdit && IsAddingTemplate && _sourceImages is not null);
         RemoveLocalSourceCommand = new RelayCommand(parameter => RemoveLocalSource(parameter as LocalMockupSourceDraftViewModel), () => CanEdit && IsAddingTemplate);
         SelectLocalSourceCommand = new RelayCommand(parameter => SelectLocalSource(parameter as LocalMockupSourceDraftViewModel), () => CanEdit && IsAddingTemplate);
+        SortLocalSourcesCommand = new RelayCommand(parameter => SortLocalSources(parameter as string));
         OpenEnlargedPlacementEditorCommand = new RelayCommand(_ => RequestEnlargedPlacementEditor(), () => CanEdit && IsAddingTemplate && HasSelectedLocalSource);
         ReuseMappingCommand = new RelayCommand(parameter => ReuseMapping(parameter as LocalMockupSourceDraftViewModel), () => CanEdit && HasSelectedLocalSource);
         SelectAllTemplateSizesCommand = new RelayCommand(_ => SelectAllTemplateSizes(), () => CanEdit && IsAddingTemplate && TemplateAdditionalOptionChoices.Any(value => IsSizeValue(value.Value)));
@@ -233,6 +236,13 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ICommand BrowseLocalSourceCommand { get; }
     public ICommand RemoveLocalSourceCommand { get; }
     public ICommand SelectLocalSourceCommand { get; }
+    public ICommand SortLocalSourcesCommand { get; }
+    public string FileSortLabel => LocalSourceSortLabel("File");
+    public string ApplicabilitySortLabel => LocalSourceSortLabel("Applicability");
+    public string StatusSortLabel => LocalSourceSortLabel("Status");
+    public string FileSortAccessibleName => LocalSourceSortAccessibleName("File");
+    public string ApplicabilitySortAccessibleName => LocalSourceSortAccessibleName("Applicability");
+    public string StatusSortAccessibleName => LocalSourceSortAccessibleName("Status");
     public ICommand OpenEnlargedPlacementEditorCommand { get; }
     public ICommand ReuseMappingCommand { get; }
     public ICommand SelectAllTemplateSizesCommand { get; }
@@ -1041,6 +1051,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             var draft = new LocalMockupSourceDraftViewModel(path, [], imageWidth: dimensions.Width, imageHeight: dimensions.Height, previewReadError: previewReadError);
             LocalSourceDrafts.Add(draft);
             SelectLocalSource(draft);
+            ApplyLocalSourceSort();
             foreach (var color in TemplateColorChoices) color.IsSelected = false;
             MappingXText = MappingYText = MappingWidthText = MappingHeightText = string.Empty;
             LocalSourcePath = path;
@@ -1064,6 +1075,49 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         MappingWidthText = mapping is null ? string.Empty : FormatMapping(mapping.Width);
         MappingHeightText = mapping is null ? string.Empty : FormatMapping(mapping.Height);
         LocalSourcePath = draft.Path;
+    }
+
+    private void SortLocalSources(string? column)
+    {
+        if (column is not ("File" or "Applicability" or "Status")) return;
+        CaptureSelectedLocalSource();
+        _localSourceSortAscending = column == _localSourceSortColumn ? !_localSourceSortAscending : true;
+        _localSourceSortColumn = column;
+        ApplyLocalSourceSort();
+        OnPropertyChanged(nameof(FileSortLabel));
+        OnPropertyChanged(nameof(ApplicabilitySortLabel));
+        OnPropertyChanged(nameof(StatusSortLabel));
+        OnPropertyChanged(nameof(FileSortAccessibleName));
+        OnPropertyChanged(nameof(ApplicabilitySortAccessibleName));
+        OnPropertyChanged(nameof(StatusSortAccessibleName));
+    }
+
+    private string LocalSourceSortLabel(string column) =>
+        column == _localSourceSortColumn ? $"{column} {(_localSourceSortAscending ? "↑" : "↓")}" : column;
+
+    private string LocalSourceSortAccessibleName(string column) =>
+        column == _localSourceSortColumn
+            ? $"{column}, sorted {(_localSourceSortAscending ? "ascending" : "descending")}"
+            : $"Sort by {column}";
+
+    private void ApplyLocalSourceSort()
+    {
+        Func<LocalMockupSourceDraftViewModel, string> key = _localSourceSortColumn switch
+        {
+            "Applicability" => draft => draft.ApplicabilitySummary,
+            "Status" => draft => draft.StatusLabel,
+            _ => draft => draft.DisplayName
+        };
+        var ordered = (_localSourceSortAscending
+                ? LocalSourceDrafts.OrderBy(key, StringComparer.OrdinalIgnoreCase)
+                : LocalSourceDrafts.OrderByDescending(key, StringComparer.OrdinalIgnoreCase))
+            .ThenBy(draft => draft.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        for (var index = 0; index < ordered.Length; index++)
+        {
+            var currentIndex = LocalSourceDrafts.IndexOf(ordered[index]);
+            if (currentIndex != index) LocalSourceDrafts.Move(currentIndex, index);
+        }
     }
 
     private void ReuseMapping(LocalMockupSourceDraftViewModel? source)
@@ -1101,6 +1155,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         var labels = TemplateColorChoices.Where(value => ids.Contains(value.Value.Id)).Select(value => value.Label)
             .Concat(TemplateAdditionalOptionChoices.Where(value => ids.Contains(value.Value.Id)).Select(value => value.Label));
         SelectedLocalSource.UpdateMetadata(ids, mapping, string.Join(", ", labels));
+        ApplyLocalSourceSort();
         RebuildMappedSourceChoices();
         OnPropertyChanged(nameof(HasLocalSource));
     }
@@ -1901,6 +1956,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             var labels = image.OptionValueIds.Select(id => OptionValues.FirstOrDefault(value => value.Id == id)).Where(value => value is not null).Select(value => ValueLabel(value!));
             LocalSourceDrafts.Add(new LocalMockupSourceDraftViewModel(image.WorkspaceRelativePath, image.OptionValueIds, isManaged: true, image.ImageMapping, image.Dimensions.Width, image.Dimensions.Height, image.Id, image.PreviewPath) { ApplicabilitySummary = string.Join(", ", labels) });
         }
+        ApplyLocalSourceSort();
         if (LocalSourceDrafts.Count > 0) SelectLocalSource(LocalSourceDrafts[0]);
         if (configuredTemplateColorIds.Count > 0)
         {
