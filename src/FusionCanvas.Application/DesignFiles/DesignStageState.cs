@@ -1,5 +1,6 @@
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Catalog;
+using FusionCanvas.Application.Catalog;
 
 namespace FusionCanvas.Application.DesignFiles;
 
@@ -29,6 +30,7 @@ public sealed record DesignStageState(
     public bool IsDesignTriangleComplete { get; init; }
     public bool HasDefaultRowWithSelectedColor { get; init; }
     public bool HasStaleConfiguration { get; init; }
+    public OfferingReadinessSummary? SelectedOfferingReadiness { get; init; }
     public bool CanRecoverStaleConfiguration { get; init; }
     public string? StaleConfigurationDisplayName { get; init; }
     public string RecoveryGuidance { get; init; } = string.Empty;

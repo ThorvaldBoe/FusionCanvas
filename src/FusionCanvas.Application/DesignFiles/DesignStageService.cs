@@ -8,6 +8,7 @@ using FusionCanvas.Domain.Concepts;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Items;
+using FusionCanvas.Application.Catalog;
 
 namespace FusionCanvas.Application.DesignFiles;
 
@@ -930,6 +931,9 @@ public sealed class DesignStageService : IDesignStageService
         var normalizedConfiguredOffering = configOfferingId is Guid normalizedConfiguredOfferingId
             ? normalizedStoreOfferings.SingleOrDefault(offering => offering.Id == normalizedConfiguredOfferingId)
             : null;
+        var selectedOfferingReadiness = normalizedConfiguredOffering is { IsArchived: false }
+            ? OfferingReadinessBuilder.Build(snapshot, normalizedConfiguredOffering)
+            : null;
         var offeringName = configuredOffering?.Name ?? normalizedConfiguredOffering?.Name;
         var staleConfigurationDisplayName = configOfferingId is Guid staleOfferingId
             ? offeringName ?? $"Unavailable offering ({staleOfferingId})"
@@ -1018,6 +1022,7 @@ public sealed class DesignStageService : IDesignStageService
             IsDesignTriangleComplete = isDesignTriangleComplete,
             HasDefaultRowWithSelectedColor = hasDefaultRowWithSelectedColor,
             HasStaleConfiguration = configuredOfferingIsStale,
+            SelectedOfferingReadiness = selectedOfferingReadiness,
             CanRecoverStaleConfiguration = configuredOfferingIsStale
                 && store is { IsArchived: false }
                 && editDecision.IsAllowed

@@ -1204,6 +1204,36 @@
                                    IsVisible="{Binding DesignTool.ProviderNetworkWarning, Converter={x:Static ObjectConverters.IsNotNull}}"
                                    TextWrapping="Wrap"
                                    FontSize="11" Foreground="{DynamicResource WarningTextBrush}" />
+                        <Border IsVisible="{Binding DesignTool.HasOfferingReadiness}"
+                                Padding="10"
+                                Background="{DynamicResource SubtleSurfaceBrush}"
+                                BorderBrush="{DynamicResource SubtleBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                AutomationProperties.AutomationId="Design.OfferingReadiness">
+                          <StackPanel Spacing="4">
+                            <TextBlock Text="Catalog and mockup setup" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding DesignTool.OfferingReadinessSummary}"
+                                       TextWrapping="Wrap"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       AutomationProperties.Name="Design Offering readiness" />
+                            <TextBlock Text="{Binding DesignTool.ReadyMockupTemplateCount, StringFormat='{}{0} ready Mockup Templates'}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource SecondaryTextBrush}" />
+                            <ItemsControl ItemsSource="{Binding DesignTool.OfferingReadinessGuidance}"
+                                          IsVisible="{Binding DesignTool.HasOfferingReadinessGuidance}"
+                                          AutomationProperties.Name="Design Offering readiness guidance">
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                  <TextBlock Text="{Binding}"
+                                             TextWrapping="Wrap"
+                                             Foreground="{DynamicResource WarningTextBrush}" />
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                          </StackPanel>
+                        </Border>
                       </StackPanel>
 
                       <StackPanel IsVisible="{Binding DesignTool.HasStaleConfiguration}"

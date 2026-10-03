@@ -1,6 +1,7 @@
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
+using FusionCanvas.App;
 
 namespace FusionCanvas.App.Stores;
 
