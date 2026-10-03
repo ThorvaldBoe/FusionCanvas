@@ -27,6 +27,16 @@ public class WorkspaceRepositoryContractTests
         Assert.Equal(snapshot, loaded);
     }
 
+    [Fact]
+    public async Task WorkspaceRepositoryContract_IsUsableThroughReadOnlySnapshotReader()
+    {
+        IWorkspaceSnapshotReader reader = new InMemoryWorkspaceRepository();
+
+        var loaded = await reader.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(WorkspaceSnapshot.Empty, loaded);
+    }
+
     private sealed class InMemoryWorkspaceRepository : IWorkspaceRepository
     {
         private WorkspaceSnapshot _snapshot = WorkspaceSnapshot.Empty;
