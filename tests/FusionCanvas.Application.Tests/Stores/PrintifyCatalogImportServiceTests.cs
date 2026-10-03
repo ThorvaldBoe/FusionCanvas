@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using FusionCanvas.Application.Stores;
 using FusionCanvas.Application.Stores.Printify;
@@ -134,6 +135,37 @@ public sealed class PrintifyCatalogImportServiceTests
         Assert.Equal("Printify catalog data could not be saved safely. No imported records were committed.", result.Message);
         Assert.Equal(1, repository.SaveCount);
         Assert.Empty(repository.Snapshot.Blueprints);
+    }
+
+    [Fact]
+    public async Task RecordsTechnicalDiagnosticsWhenRepositorySaveFails()
+    {
+        var store = TestStore();
+        var repository = TestRepository(store);
+        repository.SaveException = new IOException("Persistence failed.");
+        var client = new ClientStub
+        {
+            SelectedResult = new(PrintifyCatalogResultKind.Succeeded, "loaded", SelectedCatalog: [Product("product-a", "Tee")])
+        };
+        var messages = new List<string>();
+        using var listener = new RecordingTraceListener(messages);
+        Trace.Listeners.Add(listener);
+
+        try
+        {
+            var result = await TestService(store, repository, client)
+                .LoadSelectedAsync(new(store.WorkspaceId, store.Id), [68], TestContext.Current.CancellationToken);
+
+            Assert.Equal(PrintifyCatalogResultKind.UnexpectedResponse, result.Kind);
+        }
+        finally
+        {
+            Trace.Listeners.Remove(listener);
+        }
+
+        Assert.Contains(messages, message =>
+            message.Contains("Printify catalog import", StringComparison.Ordinal)
+            && message.Contains(nameof(IOException), StringComparison.Ordinal));
     }
 
     [Fact]
@@ -581,6 +613,19 @@ public sealed class PrintifyCatalogImportServiceTests
             if (SaveException is not null) throw SaveException;
             Snapshot = snapshot;
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingTraceListener(List<string> messages) : TraceListener
+    {
+        public override void Write(string? message)
+        {
+            if (message is not null) messages.Add(message);
+        }
+
+        public override void WriteLine(string? message)
+        {
+            if (message is not null) messages.Add(message);
         }
     }
 }
