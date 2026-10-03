@@ -48,11 +48,11 @@
       <Border x:Name="MockupSourceTableBorder" Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
       <Grid RowDefinitions="Auto,*">
         <Border Grid.Row="0" Background="{DynamicResource TabBarBackgroundBrush}" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
-          <Grid ColumnDefinitions="2*,2*,Auto,Auto">
+          <Grid ColumnDefinitions="2*,2*,Auto,Auto" ColumnSpacing="10">
             <Button Content="{Binding FileSortLabel}" Command="{Binding SortLocalSourcesCommand}" CommandParameter="File" Classes="link" HorizontalAlignment="Left" FontWeight="Bold" AutomationProperties.Name="{Binding FileSortAccessibleName}" />
             <Button Grid.Column="1" Content="{Binding ApplicabilitySortLabel}" Command="{Binding SortLocalSourcesCommand}" CommandParameter="Applicability" Classes="link" HorizontalAlignment="Left" FontWeight="Bold" AutomationProperties.Name="{Binding ApplicabilitySortAccessibleName}" />
-            <Button Grid.Column="2" Content="{Binding StatusSortLabel}" Command="{Binding SortLocalSourcesCommand}" CommandParameter="Status" Classes="link" HorizontalAlignment="Left" FontWeight="Bold" AutomationProperties.Name="{Binding StatusSortAccessibleName}" />
-            <TextBlock Grid.Column="3" Text="Action" FontWeight="Bold" />
+            <Button Grid.Column="2" MinWidth="80" Content="{Binding StatusSortLabel}" Command="{Binding SortLocalSourcesCommand}" CommandParameter="Status" Classes="link" HorizontalAlignment="Left" FontWeight="Bold" AutomationProperties.Name="{Binding StatusSortAccessibleName}" />
+            <TextBlock Grid.Column="3" MinWidth="80" Text="Action" FontWeight="Bold" />
           </Grid>
         </Border>
       <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
@@ -68,8 +68,8 @@
                 <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="2*,2*,Auto,Auto" ColumnSpacing="10" RowSpacing="4">
                   <Button Grid.Row="0" Grid.Column="0" Content="{Binding DisplayName}" Command="{Binding $parent[Window].DataContext.SelectLocalSourceCommand}" CommandParameter="{Binding}" HorizontalContentAlignment="Left" Classes="mockupTableFile" />
                   <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ApplicabilitySummary}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" />
-                  <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding StatusLabel}" VerticalAlignment="Center" FontWeight="SemiBold" />
-                  <Button Grid.Row="0" Grid.Column="3" Content="Archive" Command="{Binding $parent[Window].DataContext.RemoveLocalSourceCommand}" CommandParameter="{Binding}" Classes="secondary" />
+                  <TextBlock Grid.Row="0" Grid.Column="2" MinWidth="80" Text="{Binding StatusLabel}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                  <Button Grid.Row="0" Grid.Column="3" MinWidth="80" Content="Archive" Command="{Binding $parent[Window].DataContext.RemoveLocalSourceCommand}" CommandParameter="{Binding}" Classes="secondary" />
                   <TextBlock Grid.Row="1" Grid.ColumnSpan="4" Text="{Binding PreviewReadError}" IsVisible="{Binding HasPreviewReadError}" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource WarningTextBrush}" AutomationProperties.Name="Preview read warning" />
                 </Grid>
               </Border>
