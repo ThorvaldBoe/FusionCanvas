@@ -22,4 +22,14 @@ public class WorkflowStageTests
         var referencedAssemblies = typeof(WorkflowStage).Assembly.GetReferencedAssemblies().Select(assembly => assembly.Name).ToArray();
         Assert.DoesNotContain("Avalonia", referencedAssemblies);
     }
+
+    [Theory]
+    [InlineData(WorkflowStage.Idea, 0)]
+    [InlineData(WorkflowStage.Concept, 1)]
+    [InlineData(WorkflowStage.Design, 2)]
+    [InlineData(WorkflowStage.Listing, 3)]
+    public void WorkflowStages_ExposeCanonicalPositions(WorkflowStage stage, int expectedPosition)
+    {
+        Assert.Equal(expectedPosition, WorkflowStages.GetPosition(stage));
+    }
 }

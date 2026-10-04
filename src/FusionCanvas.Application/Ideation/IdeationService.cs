@@ -6,6 +6,7 @@ using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Domain.Items;
+using FusionCanvas.Domain.Text;
 using FusionCanvas.Domain.Workspace;
 
 namespace FusionCanvas.Application.Ideation;
@@ -359,7 +360,7 @@ public sealed class IdeationService : IIdeationService
     private static string? NormalizeCandidate(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static string ComparisonKey(string value) => Whitespace.Replace(value.Trim(), " ");
+    private static string ComparisonKey(string value) => PhraseKeyNormalizer.Normalize(value);
 
     private static string FirstSentence(string text)
     {

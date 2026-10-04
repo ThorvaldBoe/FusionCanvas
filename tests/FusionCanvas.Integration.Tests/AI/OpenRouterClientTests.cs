@@ -9,8 +9,10 @@ using FusionCanvas.Integration.Persistence;
 
 namespace FusionCanvas.Integration.Tests.AI;
 
-public class OpenRouterClientTests
+public class OpenRouterClientTests : IDisposable
 {
+    private readonly List<HttpClient> _httpClients = [];
+
     [Fact]
     public async Task ValidateAsync_UsesCurrentKeyEndpointAndRejectsManagementKey()
     {
@@ -374,9 +376,7 @@ public class OpenRouterClientTests
         var handler = new RecordingHandler(
             JsonWithRetryDate((HttpStatusCode)429, retryAt, "{\"error\":{\"message\":\"slow\"}}"),
             JsonWithRetryDate((HttpStatusCode)429, retryAt, "{\"error\":{\"message\":\"slow\"}}"));
-        var client = new OpenRouterClient(
-            new HttpClient(handler) { BaseAddress = OpenRouterClient.DefaultBaseAddress },
-            timeProvider: new FixedTimeProvider(now));
+        var client = CreateClient(handler, timeProvider: new FixedTimeProvider(now));
 
         var exception = await Assert.ThrowsAsync<AiModelCatalogFetchException>(
             () => client.GetModelsAsync("secret", false, TestContext.Current.CancellationToken));
@@ -455,6 +455,59 @@ public class OpenRouterClientTests
     }
 
     [Fact]
+    public async Task GenerateAsync_SerializesImagePartsAndOmitsImageBytesFromTelemetry()
+    {
+        var telemetry = new RecordingTelemetryRecorder();
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK, """{"id":"vision-1","model":"vision","choices":[{"message":{"content":"ok"}}]}"""));
+        var client = new OpenRouterClient(
+            new HttpClient(handler) { BaseAddress = OpenRouterClient.DefaultBaseAddress }, telemetry);
+        var bytes = new byte[] { 1, 2, 3, 4 };
+
+        var result = await client.GenerateAsync(
+            new AiProviderTextRequest(
+                "secret",
+                "vision/model",
+                [new AiTextMessage(AiMessageRole.User, "judge this", [new AiImageInput("image/png", bytes)])],
+                AiProfileSettings.Empty with { ModelId = "vision/model" },
+                true),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        using var body = JsonDocument.Parse(handler.Requests[0].Body!);
+        var content = body.RootElement.GetProperty("messages")[0].GetProperty("content");
+        Assert.Equal(JsonValueKind.Array, content.ValueKind);
+        Assert.Equal("image_url", content[1].GetProperty("type").GetString());
+        Assert.Contains("data:image/png;base64", content[1].GetProperty("image_url").GetProperty("url").GetString());
+        Assert.True(body.RootElement.GetProperty("provider").GetProperty("zdr").GetBoolean());
+        var responseEvent = Assert.Single(telemetry.Records, record => record.Name == "HttpResponse");
+        Assert.Null(responseEvent.RequestBody);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_RejectsCombinedVisionPayloadOverRequestLimit()
+    {
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK, "{}"));
+        var client = CreateClient(handler);
+        var messages = new[]
+        {
+            new AiTextMessage(AiMessageRole.User, "first", [new AiImageInput("image/png", new byte[12_500_000])]),
+            new AiTextMessage(AiMessageRole.User, "second", [new AiImageInput("image/png", new byte[12_500_001])])
+        };
+
+        var result = await client.GenerateAsync(
+            new AiProviderTextRequest(
+                "secret",
+                "vision/model",
+                messages,
+                AiProfileSettings.Empty with { ModelId = "vision/model" },
+                false),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(AiTextFailureKind.InvalidRequest, result.FailureKind);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
     public async Task GenerateAsync_TreatsHostileProviderTextAsBoundedData()
     {
         var hostile = "<script>throw new Error('execute')</script>";
@@ -530,8 +583,7 @@ public class OpenRouterClientTests
         await telemetry.GetSettingsAsync(workspaceId);
         var responseBody = """{"data":{"is_management_key":true,"limit_remaining":12.5}}""";
         var handler = new RecordingHandler(Json(HttpStatusCode.OK, responseBody));
-        var client = new OpenRouterClient(
-            new HttpClient(handler) { BaseAddress = OpenRouterClient.DefaultBaseAddress }, telemetry);
+        var client = CreateClient(handler, telemetry);
 
         var result = await client.ValidateAsync("sensitive-api-key", TestContext.Current.CancellationToken);
         var entry = Assert.Single(await telemetry.ReadAllAsync(workspaceId));
@@ -547,8 +599,7 @@ public class OpenRouterClientTests
     {
         var telemetry = new RecordingTelemetryRecorder();
         var handler = new RecordingHandler(Json(HttpStatusCode.OK, """{"data":{"is_management_key":true}}"""));
-        var client = new OpenRouterClient(
-            new HttpClient(handler) { BaseAddress = OpenRouterClient.DefaultBaseAddress }, telemetry);
+        var client = CreateClient(handler, telemetry);
 
         var result = await client.ValidateAsync("sensitive-api-key", TestContext.Current.CancellationToken);
 
@@ -567,8 +618,7 @@ public class OpenRouterClientTests
         await telemetry.GetSettingsAsync(workspaceId);
         using var cancellation = new CancellationTokenSource();
         var handler = new CancellingHandler(cancellation);
-        var client = new OpenRouterClient(
-            new HttpClient(handler) { BaseAddress = OpenRouterClient.DefaultBaseAddress }, telemetry);
+        var client = CreateClient(handler, telemetry);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.GenerateAsync(
             new AiProviderTextRequest(
@@ -596,11 +646,8 @@ public class OpenRouterClientTests
         using var telemetry = new WorkspaceTelemetryService(new SqliteTelemetryStore(temp.GetPath("telemetry.db")), context);
         await telemetry.SaveSettingsAsync(workspaceId, WorkspaceTelemetrySettings.Default with { DebugModeEnabled = true });
         await telemetry.GetSettingsAsync(workspaceId);
-        var client = new OpenRouterClient(
-            new HttpClient(new ExceptionHandler(new TaskCanceledException("simulated transport cancellation")))
-            {
-                BaseAddress = OpenRouterClient.DefaultBaseAddress
-            },
+        var client = CreateClient(
+            new ExceptionHandler(new TaskCanceledException("simulated transport cancellation")),
             telemetry);
 
         var result = await client.GenerateAsync(
@@ -618,8 +665,23 @@ public class OpenRouterClientTests
         Assert.Equal("Failed", entry.Outcome);
     }
 
-    private static OpenRouterClient CreateClient(HttpMessageHandler handler) =>
-        new(new HttpClient(handler) { BaseAddress = OpenRouterClient.DefaultBaseAddress });
+    private OpenRouterClient CreateClient(
+        HttpMessageHandler handler,
+        ITelemetryRecorder? telemetry = null,
+        TimeProvider? timeProvider = null)
+    {
+        var httpClient = new HttpClient(handler) { BaseAddress = OpenRouterClient.DefaultBaseAddress };
+        _httpClients.Add(httpClient);
+        return new OpenRouterClient(httpClient, telemetry, timeProvider);
+    }
+
+    public void Dispose()
+    {
+        foreach (var httpClient in _httpClients)
+        {
+            httpClient.Dispose();
+        }
+    }
 
     private static HttpResponseMessage Json(HttpStatusCode status, string json) =>
         new(status) { Content = new StringContent(json, Encoding.UTF8, "application/json") };

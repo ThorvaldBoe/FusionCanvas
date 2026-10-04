@@ -1,6 +1,6 @@
 namespace FusionCanvas.Application.AI;
 
-public sealed record AiAvailabilityResult(AiAvailabilityKind Kind, string Message)
+public sealed record AiAvailabilityResult(AiAvailabilityKind Kind, string Message, bool SupportsImageInput = false)
 {
     public bool IsReady => Kind == AiAvailabilityKind.Ready;
 

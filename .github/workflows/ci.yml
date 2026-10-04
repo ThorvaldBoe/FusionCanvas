@@ -16,40 +16,9 @@ permissions:
 
 jobs:
   deterministic-tests:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          fetch-depth: 0
-      - name: Setup .NET
-        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
-        with:
-          dotnet-version: 10.0.x
-      - name: Restore
-        run: dotnet restore .\FusionCanvas.sln
-      - name: Deterministic solution tests
-        run: dotnet test .\FusionCanvas.sln -m:1 --no-restore --nologo --logger "trx;LogFileName=deterministic-tests.trx" --results-directory .\TestResults\ci
-
-      - name: Upload deterministic test results
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: deterministic-test-results-${{ github.run_number }}
-          path: TestResults/ci/**/*.trx
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: Write workflow summary
-        if: always()
-        shell: pwsh
-        env:
-          JOB_STATUS: ${{ job.status }}
-        run: |
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "## Deterministic solution tests"
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "Result: **$env:JOB_STATUS**"
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "Run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "TRX results are available in the workflow artifacts."
+    uses: ./.github/workflows/deterministic-tests.yml
+    permissions:
+      contents: read
 
   failure-tracking:
     if: ${{ always() && github.event_name != 'pull_request' }}
@@ -65,8 +34,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $issueTitle = "CI: deterministic tests failing"
+          $repository = $env:GITHUB_REPOSITORY
           $runUrl = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
-          $existingIssue = gh issue list --state open --limit 100 --json number,title --jq '.[] | select(.title == "CI: deterministic tests failing") | .number' | Select-Object -First 1
+          $existingIssue = gh issue list --repo $repository --state open --limit 100 --json number,title --jq '.[] | select(.title == "CI: deterministic tests failing") | .number' | Select-Object -First 1
           $body = @"
           The scheduled or manually dispatched deterministic solution test baseline failed.
 
@@ -77,10 +47,10 @@ jobs:
           Download the TRX test-result artifact from the run for diagnostics. Keep the workflow failed until the underlying failure is understood and corrected.
           "@
           if ([string]::IsNullOrWhiteSpace($existingIssue)) {
-            gh issue create --title $issueTitle --body $body
+            gh issue create --repo $repository --title $issueTitle --body $body
           }
           else {
-            gh issue comment $existingIssue.Trim() --body $body
+            gh issue comment $existingIssue.Trim() --repo $repository --body $body
           }
 
       - name: Close recovered failure tracking issue
@@ -90,9 +60,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $issueTitle = "CI: deterministic tests failing"
+          $repository = $env:GITHUB_REPOSITORY
           $runUrl = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
-          $existingIssue = gh issue list --state open --limit 100 --json number,title --jq '.[] | select(.title == "CI: deterministic tests failing") | .number' | Select-Object -First 1
+          $existingIssue = gh issue list --repo $repository --state open --limit 100 --json number,title --jq '.[] | select(.title == "CI: deterministic tests failing") | .number' | Select-Object -First 1
           if (-not [string]::IsNullOrWhiteSpace($existingIssue)) {
             $comment = "The deterministic solution test baseline recovered successfully. Run: $runUrl"
-            gh issue close $existingIssue.Trim() --comment $comment
+            gh issue close $existingIssue.Trim() --repo $repository --comment $comment
           }

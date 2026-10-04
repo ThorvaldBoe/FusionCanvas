@@ -122,7 +122,20 @@
 
     <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
       <Button Grid.Column="0" Content="Import…" Command="{Binding ImportCommand}" IsEnabled="{Binding CanImport}" ToolTip.Tip="Choose a file to import" Classes="primary" AutomationProperties.AutomationId="Assets.Import" />
-      <TextBlock Grid.Column="1" Text="Loading…" IsVisible="{Binding IsBusy}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
+      <StackPanel Grid.Column="1"
+                  Orientation="Horizontal"
+                  Spacing="8"
+                  IsVisible="{Binding IsBusy}"
+                  VerticalAlignment="Center">
+        <ProgressBar Width="92"
+                     Height="3"
+                     IsIndeterminate="True"
+                     AutomationProperties.Name="Loading assets" />
+        <TextBlock Text="Loading…"
+                   FontSize="12"
+                   Foreground="{DynamicResource SecondaryTextBrush}"
+                   VerticalAlignment="Center" />
+      </StackPanel>
       <Button Grid.Column="2" Content="Close" Command="{Binding CloseCommand}" Classes="secondary" AutomationProperties.AutomationId="Assets.Close" />
     </Grid>
   </Grid>

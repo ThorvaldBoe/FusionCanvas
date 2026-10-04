@@ -9,11 +9,11 @@ namespace FusionCanvas.Application.TitleOptimization;
 
 public sealed class TitleOptimizationService : ITitleOptimizationService
 {
-    private readonly IWorkspaceRepository _repository;
+    private readonly IWorkspaceSnapshotReader _repository;
     private readonly IAiTextGenerationService _ai;
 
     public TitleOptimizationService(
-        IWorkspaceRepository repository,
+        IWorkspaceSnapshotReader repository,
         IAiTextGenerationService ai)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));

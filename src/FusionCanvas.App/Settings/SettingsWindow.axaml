@@ -108,6 +108,38 @@
           <settings:WorkspaceTelemetrySettingsView DataContext="{Binding Telemetry}" />
         </StackPanel>
 
+        <StackPanel IsVisible="{Binding IsTermsSection}" Spacing="18">
+          <TextBlock Text="Terms and responsible use"
+                     FontSize="20"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource PrimaryTextBrush}" />
+          <Border Padding="14"
+                  Background="{DynamicResource ElevatedSurfaceBrush}"
+                  BorderBrush="{DynamicResource ControlBorderBrush}"
+                  BorderThickness="1"
+                  CornerRadius="6">
+            <StackPanel Spacing="10">
+              <TextBlock Text="App-wide acknowledgement"
+                         FontSize="14"
+                         FontWeight="SemiBold"
+                         Foreground="{DynamicResource StrongTextBrush}" />
+              <TextBlock Text="{Binding TermsConsentSummary}"
+                         TextWrapping="Wrap"
+                         Foreground="{DynamicResource PrimaryTextBrush}" />
+              <TextBlock Text="Provider policies are maintained by Printify and Shopify. Review the current official documents before using connected features."
+                         TextWrapping="Wrap"
+                         FontSize="12"
+                         Foreground="{DynamicResource SecondaryTextBrush}" />
+              <Button Content="Review terms and policies"
+                      Click="OnReviewTerms"
+                      HorizontalAlignment="Left"
+                      MinWidth="190"
+                      AutomationProperties.Name="Review terms and policies"
+                      Classes="primary" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
         <Panel IsVisible="{Binding IsAiSection}">
           <settings:AiSettingsView DataContext="{Binding Ai}" />
         </Panel>
@@ -187,6 +219,13 @@
         </Border>
       </Grid>
     </ScrollViewer>
+    <ProgressBar Grid.ColumnSpan="2"
+                 Margin="24,8,24,0"
+                 VerticalAlignment="Top"
+                 IsVisible="{Binding IsBusy}"
+                 IsIndeterminate="True"
+                 Height="4"
+                 AutomationProperties.Name="Saving settings" />
   </Grid>
   <Window.Styles>
     <Style Selector="Button.primary">

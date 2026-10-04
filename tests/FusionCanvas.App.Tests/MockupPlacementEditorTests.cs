@@ -113,11 +113,11 @@ public sealed class MockupPlacementEditorTests
             var editor = NewEditor();
             editor.ImagePath = imagePath;
             var loadAttempts = 0;
-            editor.PreviewBitmapFactory = path =>
+            editor.PreviewImageStreamFactory = path =>
             {
                 loadAttempts++;
                 Assert.Equal(imagePath, path);
-                Assert.Equal(corruptImageBytes, File.ReadAllBytes(path));
+                Assert.Equal(corruptImageBytes, ReadAllBytes(File.OpenRead(path)));
                 throw new InvalidDataException("The corrupt preview could not be decoded.");
             };
             editor.Measure(new Size(400, 400));
@@ -153,7 +153,7 @@ public sealed class MockupPlacementEditorTests
     {
         var editor = NewEditor();
         editor.ImagePath = "preview.png";
-        editor.PreviewBitmapFactory = _ => throw new InvalidOperationException("Unexpected preview failure.");
+        editor.PreviewImageStreamFactory = _ => throw new InvalidOperationException("Unexpected preview failure.");
         editor.Measure(new Size(400, 400));
         editor.Arrange(new Rect(0, 0, 400, 400));
         using var bitmap = new RenderTargetBitmap(new PixelSize(400, 400));
@@ -280,5 +280,13 @@ public sealed class MockupPlacementEditorTests
         window.Show();
         window.UpdateLayout();
         return window;
+    }
+
+    private static byte[] ReadAllBytes(Stream stream)
+    {
+        using var source = stream;
+        using var memory = new MemoryStream();
+        source.CopyTo(memory);
+        return memory.ToArray();
     }
 }

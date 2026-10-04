@@ -1,4 +1,5 @@
 using FusionCanvas.Domain.Assets;
+using FusionCanvas.Domain.ContentRisk;
 
 namespace FusionCanvas.Domain.Workspace.Transfer;
 
@@ -49,6 +50,15 @@ public static class WorkspaceSnapshotFilter
                 storeIds.Contains(rejection.StoreId) &&
                 nicheIds.Contains(rejection.NicheId) &&
                 (rejection.GroupId is null || groupIds.Contains(rejection.GroupId.Value)))
+            .ToArray();
+
+        var contentRiskReviews = source.ContentRiskReviews
+            .Where(review => review.Target.OwnerKind switch
+            {
+                ContentRiskOwnerKind.Item => itemIds.Contains(review.Target.OwnerId),
+                ContentRiskOwnerKind.Asset => assetIds.Contains(review.Target.OwnerId),
+                _ => false
+            })
             .ToArray();
 
         var storeProducts = source.StoreProducts.Where(value => storeIds.Contains(value.StoreId)).ToArray();
@@ -114,7 +124,8 @@ public static class WorkspaceSnapshotFilter
                 MockupTemplates = mockupTemplates,
                 MockupTemplateColorVariants = mockupTemplateColors,
                 MockupTemplateRevisions = mockupTemplateRevisions,
-                MockupTemplateRevisionColors = mockupTemplateRevisionColors
+                MockupTemplateRevisionColors = mockupTemplateRevisionColors,
+                ContentRiskReviews = contentRiskReviews
             },
             droppedLinks);
     }

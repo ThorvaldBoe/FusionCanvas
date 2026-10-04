@@ -21,6 +21,7 @@
     <AvaloniaResource Include="Assets\FusionCanvasLogo_Square.png" />
     <AvaloniaResource Include="Assets\FusionCanvasLogo_Square_LightBg.png" />
     <AvaloniaResource Include="Assets\FusionCanvasLogo_Square_LightBg.ico" />
+    <AvaloniaResource Include="Assets\Legal\FusionCanvasTermsOfUse.md" />
   </ItemGroup>
 
   <ItemGroup>

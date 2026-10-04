@@ -2,8 +2,12 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Windows.Input;
 using Avalonia.Media.Imaging;
+using FusionCanvas.App.DocumentWindow;
+using FusionCanvas.Application.ContentRisk;
 using FusionCanvas.Application.DesignFiles;
+using FusionCanvas.Domain.ContentRisk;
 using FusionCanvas.Domain.Products;
 
 namespace FusionCanvas.App.StageTools;
@@ -28,7 +32,13 @@ public sealed class DesignSlotViewModel : INotifyPropertyChanged, IDisposable
         CanExport = summary.CanExport;
         IsGenerated = summary.IsGenerated;
         ArtworkWarning = summary.ArtworkWarning;
+        ContentRiskReview = summary.ContentRiskReview;
         IsReadOnly = isReadOnly;
+        ToggleContentRiskDetailsCommand = new RelayCommand(_ =>
+        {
+            IsContentRiskDetailsExpanded = !IsContentRiskDetailsExpanded;
+            OnPropertyChanged(nameof(IsContentRiskDetailsExpanded));
+        });
 
         if (summary.ThumbnailPath is not null && File.Exists(summary.ThumbnailPath))
         {
@@ -58,7 +68,15 @@ public sealed class DesignSlotViewModel : INotifyPropertyChanged, IDisposable
     public bool IsReadOnly { get; }
     public bool IsGenerated { get; }
     public string? ArtworkWarning { get; }
+    public ContentRiskReview? ContentRiskReview { get; }
     public bool HasImage => AssetId is not null;
+    public bool ShowsContentRiskWarning => HasImage;
+    public bool IsContentRiskDetailsExpanded { get; private set; }
+    public string ContentRiskWarningText =>
+        ContentRiskWarningProjection.For(ContentRiskReview is null ? null : [ContentRiskReview]).Summary;
+    public string ContentRiskDetailsText =>
+        ContentRiskWarningProjection.For(ContentRiskReview is null ? null : [ContentRiskReview]).Details;
+    public ICommand ToggleContentRiskDetailsCommand { get; }
     public string ArtworkUploadActionText => HasImage ? "Replace artwork..." : "Browse artwork...";
     public string ArtworkUploadAccessibleName => HasImage
         ? $"Replace final design artwork in {AreaName}"
@@ -68,7 +86,7 @@ public sealed class DesignSlotViewModel : INotifyPropertyChanged, IDisposable
     /// <summary>Bitmap for thumbnail display. May be null when the managed file is missing.</summary>
     public Bitmap? Thumbnail => _thumbnail;
 
-    public bool IsBusy
+        public bool IsBusy
     {
         get => _isBusy;
         set { _isBusy = value; OnPropertyChanged(); }

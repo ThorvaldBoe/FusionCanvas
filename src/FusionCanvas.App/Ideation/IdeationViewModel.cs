@@ -124,6 +124,11 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
 
     public string ScopeLabel => _scope?.DisplayPath ?? string.Empty;
 
+    public bool ShowsContentRiskAwareness => IsOpen;
+
+    public string ContentRiskAwarenessText =>
+        "Before creating customer-visible content, check for possible IP infringement and harmful or inappropriate content. Automated review is advisory and is not legal clearance.";
+
     public bool IsOpen
     {
         get => _isOpen;
@@ -289,6 +294,7 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
         IsDiscardConfirmationVisible = false;
         IsOpen = true;
         OnPropertyChanged(nameof(ScopeLabel));
+        OnPropertyChanged(nameof(ShowsContentRiskAwareness));
         OnPropertyChanged(nameof(HasCandidates));
         OnPropertyChanged(nameof(CanDiscard));
         OnPropertyChanged(nameof(IsRejectionVisible));
@@ -495,6 +501,7 @@ public sealed class IdeationViewModel : INotifyPropertyChanged
         {
             CancelReject();
             IsOpen = false;
+            OnPropertyChanged(nameof(ShowsContentRiskAwareness));
         }
     }
 

@@ -10,6 +10,8 @@ using FusionCanvas.Application.Settings;
 using FusionCanvas.Application.Versioning;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Telemetry;
+using FusionCanvas.App.TermsConsent;
+using FusionCanvas.Application.TermsConsent;
 
 namespace FusionCanvas.App.Settings;
 
@@ -30,6 +32,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     private string _workspaceName = "No workspace";
     private int _saveGeneration;
     private Task _saveChain = Task.CompletedTask;
+    private int _busyOperationCount;
 
     public SettingsViewModel(
         IApplicationSettingsStore store,
@@ -57,6 +60,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
 
         OpenCommand = new RelayCommand(_ => Open());
         Ai = ai ?? CreateOfflineAi(initialSettings.Ai);
+        Ai.PropertyChanged += (_, _) => OnPropertyChanged(nameof(IsBusy));
+        Telemetry.PropertyChanged += (_, _) => OnPropertyChanged(nameof(IsBusy));
         Ai.SettingsChanged += (_, _) =>
         {
             _currentSettings = _currentSettings with { Ai = Ai.Current };
@@ -87,6 +92,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
                 OnPropertyChanged(nameof(IsGeneralSection));
                 OnPropertyChanged(nameof(IsAiSection));
                 OnPropertyChanged(nameof(IsWorkspaceSection));
+                OnPropertyChanged(nameof(IsTermsSection));
                 OnPropertyChanged(nameof(IsAboutSection));
                 if (value == SettingsSection.AI)
                 {
@@ -100,6 +106,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
 
     public bool IsWorkspaceSection => _selectedSection == SettingsSection.Workspace;
 
+    public bool IsTermsSection => _selectedSection == SettingsSection.Terms;
+
     public bool IsAiSection => _selectedSection == SettingsSection.AI;
 
     public bool IsAboutSection => _selectedSection == SettingsSection.About;
@@ -109,6 +117,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         SettingsSection.General,
         SettingsSection.AI,
         SettingsSection.Workspace,
+        SettingsSection.Terms,
         SettingsSection.About
     };
 
@@ -128,6 +137,12 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     public Guid? ActiveWorkspaceId => _currentSettings.ActiveWorkspaceId;
 
     public Guid? ActiveStoreId => _currentSettings.ActiveStoreId;
+
+    public TermsConsentStatus TermsConsentStatus => TermsConsentStatus.From(_currentSettings.TermsConsent);
+
+    public string TermsConsentSummary => TermsConsentStatus.Summary;
+
+    public bool HasCurrentTermsConsent => TermsConsentStatus.IsCurrent;
 
     public bool ConfirmDiscardCredentialDraft
     {
@@ -163,6 +178,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
 
     public bool HasMessage => !string.IsNullOrWhiteSpace(ErrorMessage);
 
+    public bool IsBusy => Volatile.Read(ref _busyOperationCount) > 0 || Ai.IsBusy || Telemetry.IsBusy;
+
     public string WorkspaceName
     {
         get => _workspaceName;
@@ -177,6 +194,17 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     public ICommand ConfirmDiscardCommand { get; }
     public ICommand CancelDiscardCommand { get; }
     public ICommand CopyDiagnosticsCommand { get; }
+
+    public TermsConsentViewModel CreateTermsConsentViewModel(IExternalLinkLauncher? linkLauncher = null)
+    {
+        var viewModel = new TermsConsentViewModel(
+            _currentSettings,
+            _store,
+            TermsConsentPolicyDocument.Load(),
+            linkLauncher);
+        viewModel.Accepted += OnTermsConsentAccepted;
+        return viewModel;
+    }
 
     public void AttachWorkspaceManagement(WorkspaceManagementViewModel workspaceManagement)
     {
@@ -242,6 +270,14 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         Telemetry.SetWorkspace(workspace?.Id, workspace?.Name);
     }
 
+    private void OnTermsConsentAccepted(ApplicationSettings settings)
+    {
+        _currentSettings = settings;
+        OnPropertyChanged(nameof(TermsConsentStatus));
+        OnPropertyChanged(nameof(TermsConsentSummary));
+        OnPropertyChanged(nameof(HasCurrentTermsConsent));
+    }
+
     public void UpdateActiveWorkspace(Guid? workspaceId)
     {
         if (_currentSettings.ActiveWorkspaceId == workspaceId)
@@ -299,7 +335,20 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         await _clipboard.SetTextAsync(DiagnosticsText).ConfigureAwait(true);
     }
 
-    private void Run(Func<Task> operation) => _ = ObserveAsync(operation);
+    private void Run(Func<Task> operation) => _ = ObserveBusyAsync(operation);
+
+    private async Task ObserveBusyAsync(Func<Task> operation)
+    {
+        BeginBusy();
+        try
+        {
+            await ObserveAsync(operation).ConfigureAwait(true);
+        }
+        finally
+        {
+            EndBusy();
+        }
+    }
 
     private async Task ObserveAsync(Func<Task> operation)
     {
@@ -320,9 +369,23 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     private void QueueSave(ApplicationSettings settings)
     {
         var generation = Interlocked.Increment(ref _saveGeneration);
+        BeginBusy();
         _saveChain = _saveChain
             .ContinueWith(_ => PersistAsync(generation, settings), TaskScheduler.Default)
-            .Unwrap();
+            .Unwrap()
+            .ContinueWith(_ => EndBusy(), TaskScheduler.Default);
+    }
+
+    private void BeginBusy()
+    {
+        Interlocked.Increment(ref _busyOperationCount);
+        OnPropertyChanged(nameof(IsBusy));
+    }
+
+    private void EndBusy()
+    {
+        Interlocked.Decrement(ref _busyOperationCount);
+        OnPropertyChanged(nameof(IsBusy));
     }
 
     private async Task PersistAsync(int generation, ApplicationSettings settings)

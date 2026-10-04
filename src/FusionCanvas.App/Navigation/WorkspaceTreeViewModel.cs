@@ -31,6 +31,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged, IAsyncDispo
     private readonly IWorkspaceRepository _repository;
     private readonly IGroupManagementService _groups;
     private readonly IItemManagementService _items;
+    private readonly IWorkspaceBatchRollbackService _batchRollback;
     private readonly WorkspaceTreeSelectionCoordinator _selection;
     private readonly WorkspaceTreeMultiSelection _multiSelection = new();
     private readonly WorkspaceTreeClipboard _clipboard;
@@ -68,6 +69,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged, IAsyncDispo
         WorkspaceSnapshot snapshot,
         IItemManagementService items,
         IItemCsvExportService csvExport,
+        IWorkspaceBatchRollbackService batchRollback,
         WorkspaceTreeSelectionCoordinator? selection = null,
         WorkspaceTreeClipboard? clipboard = null,
         IItemCsvCodec? csvCodec = null,
@@ -77,6 +79,7 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged, IAsyncDispo
         _groups = groups ?? throw new ArgumentNullException(nameof(groups));
         _items = items ?? throw new ArgumentNullException(nameof(items));
         _csvExport = csvExport ?? throw new ArgumentNullException(nameof(csvExport));
+        _batchRollback = batchRollback ?? throw new ArgumentNullException(nameof(batchRollback));
         _csvCodec = csvCodec ?? NullItemCsvCodec.Instance;
         FilePicker = filePicker ?? new NullItemCsvFilePicker();
         _snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
@@ -1031,7 +1034,13 @@ public sealed class WorkspaceTreeViewModel : INotifyPropertyChanged, IAsyncDispo
         var rollbackToken = cancellationToken.IsCancellationRequested ? CancellationToken.None : cancellationToken;
         try
         {
-            await _repository.SaveAsync(originalSnapshot, rollbackToken);
+            var rollback = await _batchRollback.RestoreAsync(originalSnapshot, rollbackToken);
+            if (!rollback.Succeeded)
+            {
+                ErrorMessage = $"The group action failed and could not be restored: {rollback.Error}";
+                return;
+            }
+
             _snapshot = originalSnapshot;
             await ReloadAsync(rollbackToken);
             _multiSelection.Restore(selectedIds, activeId, anchorId);

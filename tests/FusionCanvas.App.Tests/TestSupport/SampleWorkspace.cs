@@ -27,6 +27,7 @@ using FusionCanvas.Application.Products;
 using FusionCanvas.Application.Catalog.Compatibility;
 using FusionCanvas.Application.Stores;
 using FusionCanvas.Application.Tags;
+using FusionCanvas.Application.WorkspaceTree;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Ideation;
@@ -145,7 +146,9 @@ internal static class MainWindowViewModelFactory
                 accessStatus),
             new DesignStageService(repository, fileStore, new AiImageProvenanceCodec()),
             new SllDocumentCodec(),
-            null);
+            null,
+            new WorkspaceBatchRollbackService(repository),
+            MockupPlacementPreviewReader: new LocalMockupPlacementPreviewReader());
 
         return new(
             new WorkflowStageNavigatorViewModel(new WorkflowStageNavigatorService()),

@@ -68,6 +68,46 @@ public sealed class IdeationWindowTests
             Assert.Contains(window.GetVisualDescendants().OfType<ListBox>(), list => AutomationProperties.GetName(list) == "Ideas candidate list");
             Assert.Contains(window.GetVisualDescendants().OfType<Button>(), button => AutomationProperties.GetName(button) == "Generate ideas");
             Assert.Contains(window.GetVisualDescendants().OfType<SpinningWheel>(), wheel => AutomationProperties.GetName(wheel) == "Generating ideas");
+            var awareness = window.GetVisualDescendants().OfType<Border>()
+                .Single(border => AutomationProperties.GetName(border) == "Content risk awareness");
+            Assert.True(awareness.IsEffectivelyVisible);
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text =>
+                text.Text?.Contains("Automated review is advisory", StringComparison.Ordinal) == true);
+        }
+        finally
+        {
+            viewModel.RequestClose();
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void CandidateBusyStateRendersProgressAndReturnsToErrorState()
+    {
+        var viewModel = new IdeationViewModel(new NoOpService(), new AvailableAccess());
+        viewModel.Open(Scope);
+        var candidate = new IdeaCandidateViewModel("A grumpy pug", IdeationMode.Basic);
+        viewModel.Candidates.Add(candidate);
+        var window = new IdeationWindow { DataContext = viewModel };
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+
+            var progress = window.GetVisualDescendants().OfType<ProgressBar>()
+                .Single(bar => AutomationProperties.GetName(bar) == "Processing idea candidate");
+            Assert.False(progress.IsEffectivelyVisible);
+
+            candidate.IsBusy = true;
+            window.UpdateLayout();
+            Assert.True(progress.IsEffectivelyVisible);
+            Assert.True(progress.IsIndeterminate);
+
+            candidate.IsBusy = false;
+            candidate.Error = "Could not process candidate.";
+            window.UpdateLayout();
+            Assert.False(progress.IsEffectivelyVisible);
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == candidate.Error);
         }
         finally
         {

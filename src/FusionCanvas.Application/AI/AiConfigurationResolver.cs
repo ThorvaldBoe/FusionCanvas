@@ -14,7 +14,7 @@ public static class AiConfigurationResolver
             AiRequestPurpose.Ideation => settings.Ideation,
             AiRequestPurpose.Concept => settings.Concept,
             AiRequestPurpose.Sll => settings.Sll,
-            AiRequestPurpose.Title => AiPurposeProfileSettings.InheritGeneral,
+            AiRequestPurpose.Title or AiRequestPurpose.ContentRisk => AiPurposeProfileSettings.InheritGeneral,
             _ => throw new ArgumentOutOfRangeException(nameof(purpose))
         };
 

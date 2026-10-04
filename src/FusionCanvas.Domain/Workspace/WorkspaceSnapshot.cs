@@ -9,6 +9,7 @@ using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
+using FusionCanvas.Domain.ContentRisk;
  
 namespace FusionCanvas.Domain.Workspace;
 
@@ -73,6 +74,8 @@ public sealed record WorkspaceSnapshot(
     public IReadOnlyList<MockupTemplateRevisionSourceImage> MockupTemplateRevisionSourceImages { get; init; } = [];
 
     public IReadOnlyList<MockupTemplateRevisionSourceImageOptionValue> MockupTemplateRevisionSourceImageOptionValues { get; init; } = [];
+
+    public IReadOnlyList<ContentRiskReview> ContentRiskReviews { get; init; } = [];
 
     public WorkspaceSnapshot(
         IReadOnlyList<Store> Stores,

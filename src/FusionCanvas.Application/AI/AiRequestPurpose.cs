@@ -6,5 +6,6 @@ public enum AiRequestPurpose
     Ideation,
     Concept,
     Sll,
-    Title
+    Title,
+    ContentRisk
 }

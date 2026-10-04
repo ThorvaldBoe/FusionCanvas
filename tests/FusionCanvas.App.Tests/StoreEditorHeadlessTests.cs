@@ -35,6 +35,7 @@ using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.App.Tests.TestSupport;
 using FusionCanvas.App.Tests.TestSupport.Drivers;
+using FusionCanvas.Integration.Files;
 
 namespace FusionCanvas.App.Tests;
 
@@ -2479,6 +2480,81 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void MockupSourceTable_ExposesAccessibleAiMetadataActionAndGatesItWithoutSelection()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        dialog.UpdateLayout();
+        var action = dialog.GetVisualDescendants().OfType<Button>()
+            .Single(button => Equals(button.Content, "Set up metadata with AI"));
+
+        Assert.False(action.IsEnabled);
+        Assert.Equal("Set up source image metadata with AI", AutomationProperties.GetName(action));
+        Assert.Contains("General AI", AutomationProperties.GetHelpText(action), StringComparison.Ordinal);
+        Assert.False(viewModel.CatalogSetup.AssistMockupSourceMetadataCommand.CanExecute(null));
+
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task MockupSourceMetadataAction_ShowsBusyCancelAndKeepsDraftOnCancellation()
+    {
+        var assistance = new BlockingMockupMetadataAssistanceService();
+        var window = CreateEditorWindow(
+            includeNormalizedCatalog: true,
+            useFixedProviderOffering: true,
+            includeOfferingOptions: true,
+            mockupSourceMetadataAssistance: assistance);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        var draft = new LocalMockupSourceDraftViewModel("front-black.png", []);
+        viewModel.CatalogSetup.LocalSourceDrafts.Add(draft);
+        viewModel.CatalogSetup.SelectLocalSourceCommand.Execute(draft);
+        dialog.UpdateLayout();
+        var action = dialog.GetVisualDescendants().OfType<Button>()
+            .Single(button => Equals(button.Content, "Set up metadata with AI"));
+        action.Command!.Execute(action.CommandParameter);
+        await assistance.Started.Task.WaitAsync(TestContext.Current.CancellationToken);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        dialog.UpdateLayout();
+
+        Assert.True(viewModel.CatalogSetup.IsMockupSourceMetadataAssistanceBusy);
+        Assert.False(action.IsEnabled);
+        var cancel = dialog.GetVisualDescendants().OfType<Button>()
+            .Single(button => Equals(button.Content, "Cancel")
+                && button.Command == viewModel.CatalogSetup.CancelMockupSourceMetadataCommand);
+        Assert.True(IsEffectivelyVisible(cancel));
+
+        viewModel.CatalogSetup.CancelMockupSourceMetadataCommand.Execute(null);
+        var command = Assert.IsType<AsyncRelayCommand>(action.Command);
+        await command.ExecutionTask!.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.False(viewModel.CatalogSetup.IsMockupSourceMetadataAssistanceBusy);
+        Assert.Contains("cancelled", viewModel.CatalogSetup.MockupSourceMetadataAssistanceStatus, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(draft.OptionValueIds);
+
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void MockupSourceUploadButtonStagesMultipleRowsThroughRenderedAction()
     {
         var window = CreateEditorWindow(
@@ -3115,7 +3191,8 @@ public class StoreEditorHeadlessTests
         IMockupTemplateSourceImageService? sourceImages = null,
         INichePopulationService? nichePopulationService = null,
         IAssetFilePicker? filePicker = null,
-        IRasterImageMetadataReader? rasterImageMetadataReader = null)
+        IRasterImageMetadataReader? rasterImageMetadataReader = null,
+        IMockupSourceMetadataAssistanceService? mockupSourceMetadataAssistance = null)
     {
         var store = customStore ?? new Store(Guid.NewGuid(), "North Star", null, false, Now, Now, "{}");
         var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog, useFixedProviderOffering, includeOfferingOptions, primaryArtworkDesignArea, customNiche));
@@ -3132,7 +3209,9 @@ public class StoreEditorHeadlessTests
             filePicker: filePicker,
             workspaceRepository: repository,
             nichePopulationService: nichePopulationService,
-            rasterImageMetadataReader: rasterImageMetadataReader);
+            rasterImageMetadataReader: rasterImageMetadataReader,
+            mockupSourceMetadataAssistance: mockupSourceMetadataAssistance,
+            mockupPlacementPreviewReader: new LocalMockupPlacementPreviewReader());
         viewModel.LoadAsync(default).GetAwaiter().GetResult();
         var window = new StoreEditorWindow { DataContext = viewModel };
         if (showWindow)
@@ -3236,6 +3315,24 @@ public class StoreEditorHeadlessTests
             Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         }
         Assert.True(predicate());
+    }
+
+    private sealed class BlockingMockupMetadataAssistanceService : IMockupSourceMetadataAssistanceService
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private TaskCompletionSource Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<AiAvailabilityResult> GetAvailabilityAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AiAvailabilityResult(AiAvailabilityKind.Ready, "ready", false));
+
+        public async Task<MockupSourceMetadataAssistanceResult> AssistAsync(
+            MockupSourceMetadataAssistanceRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            Started.TrySetResult();
+            await Completion.Task.WaitAsync(cancellationToken);
+            return new(true, "done", []);
+        }
     }
 
     private sealed class HeadlessSourceImageService : IMockupTemplateSourceImageService
