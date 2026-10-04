@@ -34,6 +34,10 @@ public sealed class TermsConsentWindowTests
             var agree = window.GetVisualDescendants().OfType<Button>().Single(button =>
                 AutomationProperties.GetName(button) == "Agree and continue");
             Assert.False(agree.IsEffectivelyEnabled);
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Assert.True(checkBoxes[0].IsFocused);
+            HeadlessWindowExtensions.KeyPress(window, Key.Tab, RawInputModifiers.None, PhysicalKey.Tab, string.Empty);
+            Assert.True(checkBoxes[1].IsFocused);
 
             foreach (var checkBox in checkBoxes)
             {
@@ -87,6 +91,26 @@ public sealed class TermsConsentWindowTests
             window.AllowClose();
             window.Close();
         }
+    }
+
+    [AvaloniaFact]
+    public void Window_UserCloseRoutesThroughTheQuitDecision()
+    {
+        var viewModel = new TermsConsentViewModel(
+            ApplicationSettings.Default,
+            new TermsConsentService(new RecordingStore()),
+            "Bundled offline policy");
+        var window = new TermsConsentWindow { DataContext = viewModel };
+        var quitRequested = false;
+        viewModel.QuitRequested += () => quitRequested = true;
+
+        window.Show();
+        window.UpdateLayout();
+        window.Close();
+
+        Assert.True(quitRequested);
+        window.AllowClose();
+        window.Close();
     }
 
     [AvaloniaFact]
