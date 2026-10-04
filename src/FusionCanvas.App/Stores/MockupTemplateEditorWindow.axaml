@@ -4,7 +4,7 @@
         x:Class="FusionCanvas.App.Stores.MockupTemplateEditorWindow"
         x:DataType="stores:CatalogSetupViewModel"
         Title="{Binding MockupTemplateEditorDialogTitle}"
-        Width="980" Height="820" MinWidth="700" MinHeight="620"
+         Width="980" Height="900" MinWidth="700" MinHeight="620"
         CanResize="True" WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ApplicationBackgroundBrush}">
   <Window.Styles>
