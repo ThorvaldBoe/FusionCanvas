@@ -1,4 +1,5 @@
 using FusionCanvas.App.TermsConsent;
+using FusionCanvas.App.Commands;
 using FusionCanvas.Application.Settings;
 
 namespace FusionCanvas.App.Tests.TermsConsent;
@@ -58,6 +59,65 @@ public sealed class TermsConsentViewModelTests
     }
 
     [Fact]
+    public async Task RequestQuit_DuringSave_DoesNotRaceThePendingAcceptance()
+    {
+        var saveStarted = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var saveCompletion = new TaskCompletionSource<ApplicationSettingsSaveResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var viewModel = CreateViewModel(new BlockingStore(saveStarted, saveCompletion));
+        var quitRequested = false;
+        viewModel.QuitRequested += () => quitRequested = true;
+        SelectAll(viewModel);
+
+        var command = Assert.IsType<AsyncRelayCommand>(viewModel.AgreeCommand);
+        command.Execute(null);
+        var execution = command.ExecutionTask;
+        Assert.NotNull(execution);
+        await saveStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        try
+        {
+            Assert.True(viewModel.IsSaving);
+            Assert.False(viewModel.QuitCommand.CanExecute(null));
+
+            viewModel.RequestQuit();
+
+            Assert.False(quitRequested);
+        }
+        finally
+        {
+            saveCompletion.TrySetResult(ApplicationSettingsSaveResult.Success);
+            await execution!;
+        }
+    }
+
+    [Fact]
+    public async Task StartupCancellation_CancelsSaveAndPendingSaveWaitCompletes()
+    {
+        using var startupCancellation = new CancellationTokenSource();
+        var saveStarted = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var saveCompletion = new TaskCompletionSource<ApplicationSettingsSaveResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var viewModel = CreateViewModel(
+            new BlockingStore(saveStarted, saveCompletion),
+            startupCancellationToken: startupCancellation.Token);
+        SelectAll(viewModel);
+
+        var command = Assert.IsType<AsyncRelayCommand>(viewModel.AgreeCommand);
+        command.Execute(null);
+        await saveStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(startupCancellation.Token, await saveStarted.Task);
+        startupCancellation.Cancel();
+
+        await viewModel.WaitForPendingSaveAsync().WaitAsync(
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
+
+        Assert.False(viewModel.IsSaving);
+        Assert.False(viewModel.IsCompleted);
+        Assert.Contains("cancelled", viewModel.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void PolicyLinksUseOfficialProviderAddresses()
     {
         var launcher = new RecordingLauncher();
@@ -76,8 +136,14 @@ public sealed class TermsConsentViewModelTests
 
     private static TermsConsentViewModel CreateViewModel(
         IApplicationSettingsStore? store = null,
-        IExternalLinkLauncher? linkLauncher = null) =>
-        new(ApplicationSettings.Default, store ?? new RecordingStore(), "Offline policy text", linkLauncher);
+        IExternalLinkLauncher? linkLauncher = null,
+        CancellationToken startupCancellationToken = default) =>
+        new(
+            ApplicationSettings.Default,
+            store ?? new RecordingStore(),
+            "Offline policy text",
+            linkLauncher,
+            startupCancellationToken);
 
     private static void SelectAll(TermsConsentViewModel viewModel)
     {
@@ -108,6 +174,22 @@ public sealed class TermsConsentViewModelTests
 
         public Task<ApplicationSettingsSaveResult> SaveAsync(ApplicationSettings settings, CancellationToken cancellationToken = default) =>
             Task.FromResult(ApplicationSettingsSaveResult.Failed("The disk is full."));
+    }
+
+    private sealed class BlockingStore(
+        TaskCompletionSource<CancellationToken> saveStarted,
+        TaskCompletionSource<ApplicationSettingsSaveResult> saveCompletion) : IApplicationSettingsStore
+    {
+        public Task<ApplicationSettingsLoadResult> LoadAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(ApplicationSettingsLoadResult.Success(ApplicationSettings.Default));
+
+        public async Task<ApplicationSettingsSaveResult> SaveAsync(
+            ApplicationSettings settings,
+            CancellationToken cancellationToken = default)
+        {
+            saveStarted.TrySetResult(cancellationToken);
+            return await saveCompletion.Task.WaitAsync(cancellationToken);
+        }
     }
 
     private sealed class RecordingLauncher : IExternalLinkLauncher

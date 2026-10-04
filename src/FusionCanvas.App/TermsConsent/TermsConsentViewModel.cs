@@ -12,6 +12,7 @@ public sealed class TermsConsentViewModel : INotifyPropertyChanged
 {
     private readonly IApplicationSettingsStore _store;
     private readonly IExternalLinkLauncher _linkLauncher;
+    private readonly CancellationToken _startupCancellationToken;
     private ApplicationSettings _settings;
     private bool _fusionCanvasTermsSelected;
     private bool _printifyTermsSelected;
@@ -25,17 +26,19 @@ public sealed class TermsConsentViewModel : INotifyPropertyChanged
         ApplicationSettings settings,
         IApplicationSettingsStore store,
         string policyText,
-        IExternalLinkLauncher? linkLauncher = null)
+        IExternalLinkLauncher? linkLauncher = null,
+        CancellationToken startupCancellationToken = default)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _startupCancellationToken = startupCancellationToken;
         PolicyText = string.IsNullOrWhiteSpace(policyText)
             ? throw new ArgumentException("The bundled policy text must not be empty.", nameof(policyText))
             : policyText;
         _linkLauncher = linkLauncher ?? new ProcessExternalLinkLauncher();
 
         AgreeCommand = new AsyncRelayCommand(AcceptAsync, () => CanAgree);
-        QuitCommand = new RelayCommand(_ => RequestQuit());
+        QuitCommand = new RelayCommand(_ => RequestQuit(), () => CanQuit);
         OpenPrintifyTermsCommand = new RelayCommand(_ => Open(TermsConsentPolicy.PrintifyTermsUrl));
         OpenPrintifyIpPolicyCommand = new RelayCommand(_ => Open(TermsConsentPolicy.PrintifyIpPolicyUrl));
         OpenShopifyTermsCommand = new RelayCommand(_ => Open(TermsConsentPolicy.ShopifyTermsUrl));
@@ -96,6 +99,8 @@ public sealed class TermsConsentViewModel : INotifyPropertyChanged
             ShopifyTermsSelected,
             IntellectualPropertySelected);
 
+    public bool CanQuit => !_completed && !IsSaving;
+
     public bool IsSaving
     {
         get => _isSaving;
@@ -104,7 +109,9 @@ public sealed class TermsConsentViewModel : INotifyPropertyChanged
             if (SetField(ref _isSaving, value))
             {
                 OnPropertyChanged(nameof(CanAgree));
+                OnPropertyChanged(nameof(CanQuit));
                 (AgreeCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+                (QuitCommand as RelayCommand)?.NotifyCanExecuteChanged();
             }
         }
     }
@@ -135,11 +142,14 @@ public sealed class TermsConsentViewModel : INotifyPropertyChanged
 
     public void RequestQuit()
     {
-        if (!_completed)
+        if (CanQuit)
         {
             QuitRequested?.Invoke();
         }
     }
+
+    internal Task WaitForPendingSaveAsync() =>
+        (AgreeCommand as AsyncRelayCommand)?.ExecutionTask ?? Task.CompletedTask;
 
     private async Task AcceptAsync()
     {
@@ -156,7 +166,7 @@ public sealed class TermsConsentViewModel : INotifyPropertyChanged
             {
                 TermsConsent = TermsConsentPolicy.CreateRecord(DateTimeOffset.UtcNow)
             };
-            var result = await _store.SaveAsync(updated).ConfigureAwait(true);
+            var result = await _store.SaveAsync(updated, _startupCancellationToken).ConfigureAwait(true);
             if (!result.Saved)
             {
                 ErrorMessage = result.Warning ?? "The acknowledgement could not be saved. Please try again.";
