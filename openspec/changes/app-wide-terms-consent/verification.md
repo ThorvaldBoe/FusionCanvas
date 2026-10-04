@@ -29,7 +29,7 @@ The consent contract, application-settings persistence, startup gate, consent UI
 - `dotnet test .\tests\FusionCanvas.Integration.Tests\FusionCanvas.Integration.Tests.csproj --no-restore -m:1 --filter FullyQualifiedName~JsonApplicationSettingsStore` — passed: 30 persistence tests; existing analyzer warnings remain.
 - `dotnet test .\tests\FusionCanvas.App.Tests\FusionCanvas.App.Tests.csproj --no-restore -m:1 --filter FullyQualifiedName~TermsConsent` — passed: 18 consent/startup/headless tests.
 - `dotnet test .\tests\FusionCanvas.App.Tests\FusionCanvas.App.Tests.csproj --no-build --no-restore -m:1 --filter FullyQualifiedName~BlueprintDetailContext_UsesTheTabContentInset` — passed: 1 Store Editor inset test.
-- `dotnet test .\FusionCanvas.sln -m:1` — passed on the merged checkout; the final count is recorded after this branch's full verification run.
+- `dotnet test .\FusionCanvas.sln -m:1 -p:UseSharedCompilation=false -v minimal` — passed: Domain 279, Application 603, Integration 315, App 935, and UiDescription 29; 2,161 total tests.
 
 ### Scenario coverage mapping
 
