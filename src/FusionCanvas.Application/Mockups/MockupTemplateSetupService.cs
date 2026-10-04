@@ -406,7 +406,25 @@ public sealed class MockupTemplateSetupService : IMockupTemplateSetupService
         var eligibleIds = (state.Readiness ?? []).Where(value => value.Lifecycle == MockupTemplateLifecycle.ReadyForUse).Select(value => value.TemplateId).ToHashSet();
         var diagnostics = candidates
             .Join(state.Readiness ?? [], template => template.Id, readiness => readiness.TemplateId, (template, readiness) =>
-                new MockupTemplateEligibilityDiagnostic(template.Id, template.Name, readiness.Blockers))
+            {
+                var variants = snapshot.OfferingVariants
+                    .Where(value => value.OfferingId == offeringId && !value.IsArchived)
+                    .Where(value => template.TargetPlaceholderId is Guid areaId
+                        && snapshot.OfferingPlaceholders.Any(area => area.Id == areaId && !area.IsArchived && area.VariantIds.Contains(value.Id)))
+                    .ToArray();
+                var images = snapshot.MockupTemplateSourceImages
+                    .Where(value => value.MockupTemplateId == template.Id && !value.IsArchived)
+                    .ToArray();
+                var coverage = MockupTemplateCoveragePlanner.Plan(
+                    template.Id,
+                    template.TargetPlaceholderId,
+                    variants,
+                    images,
+                    snapshot.MockupTemplateSourceImageOptionValues,
+                    snapshot.OfferingOptions,
+                    snapshot.OfferingOptionValues);
+                return new MockupTemplateEligibilityDiagnostic(template.Id, template.Name, readiness.Blockers, coverage);
+            })
             .ToArray();
         if (requestedTemplateId is not null && !eligibleIds.Contains(requestedTemplateId.Value))
         {
