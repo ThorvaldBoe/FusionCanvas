@@ -15,6 +15,62 @@ namespace FusionCanvas.App.Tests;
 public sealed class CatalogSetupViewModelTests
 {
     [Fact]
+    public async Task TemplateColorSearchFiltersCaseInsensitivelyAndRestoresOriginalOrder()
+    {
+        var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: false);
+        viewModel.StartAddTemplateCommand.Execute(null);
+
+        var black = Assert.Single(viewModel.TemplateColorChoices);
+        var forestGreen = new OfferingOptionValue(Guid.NewGuid(), black.Value.OptionId, black.Value.OfferingId, "Forest Green", 1);
+        var lime = new OfferingOptionValue(Guid.NewGuid(), black.Value.OptionId, black.Value.OfferingId, "Lime", 2);
+        viewModel.TemplateColorChoices.Add(new OptionValueChoiceViewModel(forestGreen, "Colors: Forest Green"));
+        viewModel.TemplateColorChoices.Add(new OptionValueChoiceViewModel(lime, "Colors: Lime"));
+
+        viewModel.TemplateColorSearchText = "  GREEN ";
+
+        Assert.Equal(["Colors: Forest Green"], viewModel.FilteredTemplateColorChoices.Select(value => value.Label));
+        Assert.False(viewModel.HasNoMatchingTemplateColors);
+
+        viewModel.TemplateColorSearchText = "   ";
+
+        Assert.Equal(viewModel.TemplateColorChoices, viewModel.FilteredTemplateColorChoices);
+        Assert.False(viewModel.HasNoMatchingTemplateColors);
+    }
+
+    [Fact]
+    public async Task TemplateColorSearchShowsNoMatchStateAndPreservesHiddenSelection()
+    {
+        var (viewModel, area, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: false);
+        viewModel.StartAddTemplateCommand.Execute(null);
+        viewModel.SelectedPlaceholder = area;
+
+        var black = Assert.Single(viewModel.TemplateColorChoices);
+        var lime = new OfferingOptionValue(Guid.NewGuid(), black.Value.OptionId, black.Value.OfferingId, "Lime", 1);
+        var limeChoice = new OptionValueChoiceViewModel(lime, "Colors: Lime");
+        viewModel.TemplateColorChoices.Add(limeChoice);
+        black.IsSelected = true;
+        limeChoice.IsSelected = true;
+
+        viewModel.TemplateColorSearchText = "not-a-color";
+
+        Assert.Empty(viewModel.FilteredTemplateColorChoices);
+        Assert.True(viewModel.HasNoMatchingTemplateColors);
+        Assert.Equal(
+            [black.Value.Id, limeChoice.Value.Id],
+            viewModel.TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id));
+        Assert.DoesNotContain("missing Color", string.Join(" ", viewModel.MockupTemplateReadinessMessages), StringComparison.OrdinalIgnoreCase);
+
+        viewModel.TemplateColorSearchText = "lime";
+        Assert.Same(limeChoice, Assert.Single(viewModel.FilteredTemplateColorChoices));
+        Assert.True(Assert.Single(viewModel.FilteredTemplateColorChoices).IsSelected);
+
+        viewModel.StartAddTemplateCommand.Execute(null);
+
+        Assert.Equal(string.Empty, viewModel.TemplateColorSearchText);
+        Assert.False(viewModel.HasNoMatchingTemplateColors);
+    }
+
+    [Fact]
     public async Task LocalSourceSortingUsesVisibleKeysAndPreservesSelectedDraft()
     {
         var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: false);
