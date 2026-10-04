@@ -133,6 +133,26 @@ public class AiSettingsViewModelTests
     }
 
     [Fact]
+    public async Task EnsureLoaded_MergesFreshTextAndImageDescriptorsByModelId()
+    {
+        const string modelId = "shared/model";
+        var credentials = new CredentialStore { Result = AiCredentialReadResult.Available("secret") };
+        var catalog = new CatalogProvider
+        {
+            Models = [new AiModelDescriptor(modelId, "Shared text", null, null, ["text"], ["text"], [], 1000, null, null, null, true, null)],
+            ImageModels = [new AiModelDescriptor(modelId, "Shared image", null, null, ["text"], ["image"], ["size"], 2000, null, null, null, true, null)]
+        };
+        var vm = Create(credentials, catalogProvider: catalog, catalogCache: new CatalogCache());
+
+        await vm.EnsureLoadedAsync();
+
+        var model = Assert.Single(vm.AvailableModels);
+        Assert.Contains("image", model.OutputModalities);
+        Assert.Contains("size", model.SupportedParameters);
+        Assert.Single(vm.Artwork.Models);
+    }
+
+    [Fact]
     public async Task ValidationFailure_DoesNotLoadCatalog()
     {
         var credentials = new CredentialStore { Result = AiCredentialReadResult.Available("secret") };
@@ -197,6 +217,29 @@ public class AiSettingsViewModelTests
 
         Assert.Equal(0, catalog.Calls);
         Assert.Equal("cached/model", vm.General.Models[0].Id);
+    }
+
+    [Fact]
+    public async Task EnsureLoaded_MergesCachedTextAndImageDescriptorsByModelId()
+    {
+        const string modelId = "shared/model";
+        var text = new AiModelDescriptor(modelId, "Shared text", null, null, ["text"], ["text"], [], 1000, null, null, null, true, null);
+        var image = new AiModelDescriptor(modelId, "Shared image", null, null, ["text"], ["image"], ["size"], 2000, null, null, null, true, null);
+        var credentials = new CredentialStore { Result = AiCredentialReadResult.Available("secret") };
+        var vm = Create(
+            credentials,
+            catalogCache: new CatalogCache
+            {
+                Cached = new AiModelCatalog(true, DateTimeOffset.UtcNow, [text, image])
+            });
+
+        await vm.EnsureLoadedAsync();
+
+        var model = Assert.Single(vm.AvailableModels);
+        Assert.Equal(modelId, model.Id);
+        Assert.Contains("image", model.OutputModalities);
+        Assert.Contains("size", model.SupportedParameters);
+        Assert.Single(vm.Artwork.Models);
     }
 
     [Fact]
@@ -371,10 +414,11 @@ public class AiSettingsViewModelTests
             Task.FromResult(new AiCredentialValidationResult(Kind));
     }
 
-    private sealed class CatalogProvider : IAiModelCatalogProvider, IAiImageEndpointCatalogProvider
+    private sealed class CatalogProvider : IAiModelCatalogProvider, IAiImageModelCatalogProvider, IAiImageEndpointCatalogProvider
     {
         public int Calls { get; private set; }
         public IReadOnlyList<AiModelDescriptor> Models { get; set; } = [];
+        public IReadOnlyList<AiModelDescriptor> ImageModels { get; set; } = [];
         public Exception? Throw { get; set; }
         public TaskCompletionSource<AiModelCatalog>? Pending { get; set; }
         public Task<AiModelCatalog> GetModelsAsync(
@@ -398,6 +442,15 @@ public class AiSettingsViewModelTests
                 DateTimeOffset.UtcNow,
                 Models));
         }
+
+        public Task<AiModelCatalog> GetImageModelsAsync(
+            string apiKey,
+            bool requireZeroDataRetention,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AiModelCatalog(
+                requireZeroDataRetention,
+                DateTimeOffset.UtcNow,
+                ImageModels));
 
         public Task<IReadOnlyList<AiImageEndpointCapabilities>> GetImageEndpointsAsync(
             string apiKey,

@@ -22,13 +22,23 @@
 
 ## Validation Runs
 
-- `dotnet test .\\FusionCanvas.sln --no-restore -m:1 -p:UseSharedCompilation=false -v minimal` — passed all projects: Domain 250, Application 451, Integration 233, App 649, UI description 27; 1,610 tests total, 0 failed.
+- `dotnet test .\\FusionCanvas.sln --no-restore -m:1 -p:UseSharedCompilation=false -v minimal` — passed all projects: Domain 279, Application 599, Integration 313, App 923, UI description 29; 2,143 tests total, 0 failed.
 - Focused raster, provenance, endpoint, SLL/configuration, orchestration, and Design-stage headless suites passed.
 - `openspec validate design-artwork-generation-foundation --strict` — passed.
 
 ## Residual Limitations
 
-- User-reported model-catalog collision, post-generation reload cancellation, and omitted Niche context corrections are implemented. Focused regression tests and the solution test baseline remain outstanding for these follow-up corrections.
+- User-reported model-catalog collision, post-generation reload cancellation, and omitted Niche context corrections are implemented and covered by passing focused regression tests.
+
+## Follow-up correction evidence
+
+The focused regression coverage requested by task 8.4 passes:
+
+| Correction | Evidence | Result |
+| --- | --- | --- |
+| Model-catalog entries with the same model ID are merged across text and image catalogs | `AiSettingsViewModelTests.EnsureLoaded_MergesCachedTextAndImageDescriptorsByModelId`; `AiSettingsViewModelTests.EnsureLoaded_MergesFreshTextAndImageDescriptorsByModelId` | Passed |
+| Successful generation refreshes preferences with the caller cancellation token | `DesignStageToolViewModelTests.GenerateArtworkAsync_RefreshesWithCallerTokenAfterSuccessfulGeneration` | Passed |
+| Niche context and the printable-artwork constraint reach the provider prompt | `ArtworkGenerationServiceTests.GenerateAsync_IncludesNicheContextAndPrintableArtworkConstraintInPrompt` | Passed |
 
 - The bounds-editor follow-up remains explicitly deferred; this change supplies the target selector and consumes existing Design Area bounds.
 - Existing repository analyzer warnings remain outside this change's scope; they do not fail the baseline.
