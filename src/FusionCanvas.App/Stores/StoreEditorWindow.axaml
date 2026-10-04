@@ -131,7 +131,7 @@
                   BorderBrush="{DynamicResource TabBorderBrush}"
                   BorderThickness="1"
                   CornerRadius="6"
-                  Padding="{DynamicResource Token.Layout.PageInset}">
+                  Padding="0">
             <StackPanel Spacing="12">
               <StackPanel IsVisible="{Binding IsBasicInfoTabSelected}"
                           Spacing="12">
@@ -587,18 +587,22 @@
 
             <StackPanel IsVisible="{Binding IsProductDetail}"
                         Spacing="12">
-              <Button Content="‹  Back to Blueprints"
-                      Command="{Binding BackToProductsCommand}"
-                      Classes="secondary" />
-              <TextBlock Text="{Binding CatalogBreadcrumb}"
-                         FontSize="12"
-                         Foreground="{DynamicResource SecondaryTextBrush}" />
-              <TextBlock Text="{Binding ProductName}"
-                         FontSize="20"
-                         FontWeight="SemiBold"
-                         Foreground="{DynamicResource StrongTextBrush}" />
-              <TextBlock Text="{Binding SelectedProductSummary}"
-                         Foreground="{DynamicResource SecondaryTextBrush}" />
+              <StackPanel Spacing="12"
+                          Margin="{DynamicResource Token.Layout.PageInset}"
+                          AutomationProperties.AutomationId="Catalog.BlueprintDetailContext">
+                <Button Content="‹  Back to Blueprints"
+                        Command="{Binding BackToProductsCommand}"
+                        Classes="secondary" />
+                <TextBlock Text="{Binding CatalogBreadcrumb}"
+                           FontSize="12"
+                           Foreground="{DynamicResource SecondaryTextBrush}" />
+                <TextBlock Text="{Binding ProductName}"
+                           FontSize="20"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource StrongTextBrush}" />
+                <TextBlock Text="{Binding SelectedProductSummary}"
+                           Foreground="{DynamicResource SecondaryTextBrush}" />
+              </StackPanel>
               <Border Classes="panel" Padding="12"
                       AutomationProperties.AutomationId="Catalog.BlueprintBasics">
                 <StackPanel Spacing="8">
@@ -723,7 +727,8 @@
                 <Border AutomationProperties.AutomationId="Catalog.ContextHeader"
                         BorderBrush="{DynamicResource SubtleBorderBrush}"
                         BorderThickness="0,0,0,1"
-                        Padding="0,0,0,12">
+                        Padding="0,0,0,12"
+                        Margin="{DynamicResource Token.Layout.PageInset}">
                   <StackPanel Spacing="8">
                     <Button Content="‹  Back to Blueprint"
                             Command="{Binding BackToProductCommand}"
