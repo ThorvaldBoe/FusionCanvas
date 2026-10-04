@@ -41,3 +41,7 @@
 - [x] 6.5 Run `openspec validate --strict` and correct any artifact or delta-spec issues.
 - [x] 6.6 Run `dotnet test .\\FusionCanvas.sln -m:1` and resolve regressions without expanding scope. The updated merged checkout passes the full baseline after the independent mockup source-row hit-testing fix.
 - [x] 6.7 Decide whether the optional real-desktop first-run/link journey adds information beyond deterministic tests; if warranted, run it only with disposable settings/workspace paths and record it as supplemental evidence.
+
+## 7. Audit correction: consent-save shutdown coordination
+
+- [x] 7.1 Fix the startup consent save/quit race by disabling quit and close during save, threading startup cancellation into settings persistence, awaiting any pending save before startup shutdown, and adding deterministic race/cancellation regression coverage for audit finding #802.

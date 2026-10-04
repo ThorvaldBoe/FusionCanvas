@@ -39,11 +39,22 @@ The consent contract, application-settings persistence, startup gate, consent UI
 
 The optional real-desktop journey is not warranted for this module: the first-run decision boundary, focusable controls, provider-link commands, save failure, and visual states are covered deterministically, while native browser behavior is intentionally delegated to the operating system.
 
+## Audit correction evidence
+
+Audit finding #802 is addressed by the startup consent lifecycle correction:
+
+| Finding criterion | Evidence | Result |
+| --- | --- | --- |
+| Quit/close cannot race an in-flight consent save | `TermsConsentViewModelTests.RequestQuit_DuringSave_DoesNotRaceThePendingAcceptance` verifies `QuitCommand` is disabled and `RequestQuit()` emits no shutdown decision while saving | Pass |
+| Startup cancellation reaches the settings save and is awaited before shutdown | `TermsConsentViewModelTests.StartupCancellation_CancelsSaveAndPendingSaveWaitCompletes`; `App.InitializeStartupAsync` passes the startup token and awaits `WaitForPendingSaveAsync()` before shutdown | Pass |
+
+Focused verification after the correction:
+
+- `dotnet test .\tests\FusionCanvas.App.Tests\FusionCanvas.App.Tests.csproj --no-restore -m:1 --filter FullyQualifiedName~TermsConsentViewModelTests` — passed: 6 tests.
+
 ## Release gate
 
 Task 1.1 remains intentionally open: the bundled FusionCanvas terms are marked `draft-0.1` and must receive human/legal approval before release as binding terms. This is the only remaining product/legal gate; the technical implementation and verification tasks are complete.
-
-## Audit correction evidence
 
 Audit finding #803 is addressed by the startup coordinator and rendered consent coverage:
 
@@ -52,6 +63,5 @@ Audit finding #803 is addressed by the startup coordinator and rendered consent 
 | Missing, accepted, and declined startup decisions are covered | `TermsConsentStartupCoordinatorTests` covers the three decision paths and verifies whether the composition result is `null` or accepted settings. | Pass |
 | Rendered checkbox interaction is covered | `TermsConsentWindowTests.Window_ShowsOfflinePolicyFourCheckboxesAndGatedActions` selects each rendered checkbox through headless pointer input and verifies the gated action becomes enabled. | Pass |
 | Keyboard-reachable quit and visible save/error states are covered | `TermsConsentWindowTests` covers keyboard activation of Quit, the visible saving progress bar while persistence is blocked, and the visible persistence error while selections remain checked. | Pass |
-
 
 Audit finding #811 is addressed by the shared `Token.Layout.PageInset` margin on the Blueprint detail context and its focused headless inset assertion.
