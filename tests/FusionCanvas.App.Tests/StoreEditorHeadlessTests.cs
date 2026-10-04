@@ -158,6 +158,30 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void BlueprintDetailContext_UsesTheTabContentInset()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        window.UpdateLayout();
+
+        var tabContent = window.GetVisualDescendants().OfType<Border>()
+            .Single(border => AutomationProperties.GetAutomationId(border) == "StoreEditor.TabContent");
+        var backButton = window.GetVisualDescendants().OfType<Button>()
+            .Single(button => IsEffectivelyVisible(button) &&
+                string.Equals(button.Content as string, "‹  Back to Blueprints", StringComparison.Ordinal));
+        var backOrigin = backButton.TranslatePoint(new Point(0, 0), tabContent);
+
+        Assert.Equal(24, tabContent.Padding.Left);
+        Assert.True(backOrigin is { } point && point.X >= tabContent.Padding.Left,
+            "The Blueprint detail context must share the positive inset of the active tab content.");
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void OfferingContext_SeparatesTabNavigationContextHeaderAndActiveContent()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);

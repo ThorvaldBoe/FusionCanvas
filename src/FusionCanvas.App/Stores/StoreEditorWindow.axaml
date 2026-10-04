@@ -131,7 +131,7 @@
                   BorderBrush="{DynamicResource TabBorderBrush}"
                   BorderThickness="1"
                   CornerRadius="6"
-                  Padding="0">
+                  Padding="{DynamicResource Token.Layout.PageInset}">
             <StackPanel Spacing="12">
               <StackPanel IsVisible="{Binding IsBasicInfoTabSelected}"
                           Spacing="12">
