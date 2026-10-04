@@ -152,6 +152,7 @@ public partial class App : Avalonia.Application
         var acceptedSettings = await decision.Task.ConfigureAwait(true);
         if (acceptedSettings is null)
         {
+            await consentViewModel.WaitForPendingSaveAsync().ConfigureAwait(true);
             consentWindow.AllowClose();
             if (consentWindow.IsVisible)
             {

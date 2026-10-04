@@ -1,8 +1,5 @@
-# listing-mockup-template-diagnostics Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change listing-mockup-template-diagnostics. Update Purpose after archive.
-## Requirements
 ### Requirement: Listing explains why mockup template selection is empty
 The Listing mockup tool SHALL preserve the ready-only template selector and SHALL present actionable diagnostics when no ready template is available. The diagnostics SHALL distinguish an Offering with no active templates from an Offering whose active templates are Draft, identify each affected template by name, list every current readiness blocker using creator-facing guidance, and summarize missing or ambiguous Variant coverage when source-image resolution is the blocker.
 
@@ -36,4 +33,5 @@ The Listing diagnostics SHALL reuse the authoritative Mockup Template readiness 
 - **WHEN** an active template has one or more readiness blockers
 - **THEN** the template remains excluded from the selector and Apply action
 - **AND** the displayed diagnostics reflect the same blockers and coverage results used by the eligibility gate
+
 
