@@ -14,5 +14,7 @@
 
 - `openspec validate --all --strict`: passed, 76/76 items.
 - Focused search tests: passed, 3/3 tests in the `TemplateColorSearch` filter.
-- Full baseline `dotnet test .\FusionCanvas.sln`: 2,141 tests passed and 1 existing unrelated headless test failed: `StoreEditorHeadlessTests.MockupSourceRow_SelectsFromCellsWhitespaceAndKeyboard_WithoutArchiving`. The failure reproduces when isolated and concerns source-row pointer selection (`first.png` expected, `second.png` selected); it does not touch the changed search state or controls.
+- Follow-up editor regression tests: passed, 8/8 tests covering source-row hit testing, selected-source layout, long Color lists, and Color search behavior.
+- Full baseline `dotnet test .\FusionCanvas.sln`: passed, 2,142 tests passed and 0 failed after the follow-up dialog sizing fix in PR #820. The merged fix increased the Mockup Template editor's default height from 820 to 900 so the source table remains interactive when the Color search controls are present.
+- CI deterministic suite for PR #820: passed.
 - Scope review: Color eligibility, canonical selection consumers, additional options, save/readiness logic, read-only checkbox behavior, and persistence models were left unchanged. No Appium journey was added because this is a low-risk deterministic local presentation interaction covered by view-model and Avalonia headless tests.
