@@ -5,4 +5,5 @@ namespace FusionCanvas.Application.Mockups;
 public sealed record MockupTemplateEligibilityDiagnostic(
     Guid TemplateId,
     string TemplateName,
-    IReadOnlyList<MockupTemplateReadinessBlocker> Blockers);
+    IReadOnlyList<MockupTemplateReadinessBlocker> Blockers,
+    MockupTemplateCoveragePlan? CoveragePlan = null);

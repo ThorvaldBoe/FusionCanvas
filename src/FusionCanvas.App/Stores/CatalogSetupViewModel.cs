@@ -115,6 +115,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private bool _isMockupSourceMetadataAssistanceBusy;
     private string _mockupSourceMetadataAssistanceStatus = string.Empty;
     private long _mockupSourceMetadataAssistanceVersion;
+    private MockupTemplateCoveragePlan? _coveragePlan;
+    private MockupTemplateCoverageGroupingStrategy _coverageGroupingStrategy = MockupTemplateCoverageGroupingStrategy.ColorFirst;
+    private MockupTemplateCoverageRequirement? _selectedCoverageRequirement;
 
     public CatalogSetupViewModel(ICatalogSetupService catalog, IMockupTemplateSetupService mockups, IOfferingManagementService? offeringManagement = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, IAssetFilePicker? filePicker = null, IRasterImageMetadataReader? rasterImageMetadataReader = null, IMockupSourceMetadataAssistanceService? mockupSourceMetadataAssistance = null, IMockupPlacementPreviewReader? mockupPlacementPreviewReader = null)
     {
@@ -176,6 +179,18 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         KeepEditingMockupTemplateCommand = new RelayCommand(_ => IsMockupTemplateDiscardConfirmationVisible = false, () => IsMockupTemplateDiscardConfirmationVisible);
         CreateTemplateCommand = new AsyncRelayCommand(CreateTemplateAsync, CanCreateTemplate);
         BrowseLocalSourceCommand = new AsyncRelayCommand(BrowseLocalSourceAsync, () => CanEdit && IsAddingTemplate && _sourceImages is not null);
+        GenerateCoveragePlanCommand = new AsyncRelayCommand(GenerateCoveragePlanAsync, () => CanEdit && IsAddingTemplate && SelectedTemplate is not null && _sourceImages is not null);
+        SelectCoverageRequirementCommand = new RelayCommand(SelectCoverageRequirement, () => CanEdit && IsAddingTemplate);
+        AddCoverageRequirementImageCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is MockupTemplateCoverageRequirement requirement) SelectedCoverageRequirement = requirement;
+            if (BrowseLocalSourceCommand.CanExecute(null)) BrowseLocalSourceCommand.Execute(null);
+        }, () => CanEdit && IsAddingTemplate && _sourceImages is not null && CoveragePlan is not null && !IsCoveragePlanStale);
+        AssignExistingCoverageImageCommand = new RelayCommand(parameter =>
+        {
+            SelectCoverageRequirement(parameter);
+            AssignExistingCoverageImage();
+        }, () => CanEdit && IsAddingTemplate && HasSelectedLocalSource && SelectedLocalSource?.IsManaged == true && _sourceImages is not null && CoveragePlan is not null && !IsCoveragePlanStale);
         RemoveLocalSourceCommand = new RelayCommand(parameter =>
         {
             if (parameter is LocalMockupSourceDraftViewModel draft) RemoveLocalSource(draft);
@@ -253,8 +268,13 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ObservableCollection<OptionValueChoiceViewModel> TemplateAdditionalOptionChoices { get; } = [];
     public ObservableCollection<LocalMockupSourceDraftViewModel> LocalSourceDrafts { get; } = [];
     public ObservableCollection<LocalMockupSourceDraftViewModel> MappedSourceChoices { get; } = [];
+    public IReadOnlyList<MockupTemplateCoverageGroupingStrategy> CoverageGroupingStrategies { get; } = Enum.GetValues<MockupTemplateCoverageGroupingStrategy>();
     private readonly List<LocalMockupSourceDraftViewModel> _archivedLocalSourceDrafts = [];
     public ICommand BrowseLocalSourceCommand { get; }
+    public ICommand GenerateCoveragePlanCommand { get; }
+    public ICommand SelectCoverageRequirementCommand { get; }
+    public ICommand AddCoverageRequirementImageCommand { get; }
+    public ICommand AssignExistingCoverageImageCommand { get; }
     public ICommand RemoveLocalSourceCommand { get; }
     public ICommand SelectLocalSourceCommand { get; }
     public ICommand SortLocalSourcesCommand { get; }
@@ -271,7 +291,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ICommand CancelMockupSourceMetadataCommand { get; }
     public IAssetFilePicker FilePicker { get => _filePicker; set => _filePicker = value ?? new NullAssetFilePicker(); }
     public string LocalSourcePath { get => _localSourcePath; private set { if (SetField(ref _localSourcePath, value)) { NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
-    public LocalMockupSourceDraftViewModel? SelectedLocalSource { get => _selectedLocalSource; private set { if (SetField(ref _selectedLocalSource, value)) { OnPropertyChanged(nameof(HasSelectedLocalSource)); OnPropertyChanged(nameof(MappingImageWidth)); OnPropertyChanged(nameof(MappingImageHeight)); OnPropertyChanged(nameof(SelectedImagePreviewPath)); RebuildMappedSourceChoices(); NotifyCommands(); } } }
+    public LocalMockupSourceDraftViewModel? SelectedLocalSource { get => _selectedLocalSource; private set { if (SetField(ref _selectedLocalSource, value)) { OnPropertyChanged(nameof(HasSelectedLocalSource)); OnPropertyChanged(nameof(CanAssignExistingCoverageImage)); OnPropertyChanged(nameof(MappingImageWidth)); OnPropertyChanged(nameof(MappingImageHeight)); OnPropertyChanged(nameof(SelectedImagePreviewPath)); RebuildMappedSourceChoices(); NotifyCommands(); } } }
     public IReadOnlyList<LocalMockupSourceDraftViewModel> SelectedLocalSources => _selectedLocalSources;
     public int SelectedLocalSourceCount => _selectedLocalSources.Count;
     public bool HasSelectedLocalSources => _selectedLocalSources.Count > 0;
@@ -296,6 +316,48 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public bool CanAssistMockupSourceMetadata => CanAssistMockupSourceMetadataCore();
     public string MockupSourceMetadataAssistanceStatus => _mockupSourceMetadataAssistanceStatus;
     public bool HasMockupSourceMetadataAssistanceStatus => !string.IsNullOrWhiteSpace(MockupSourceMetadataAssistanceStatus);
+    public MockupTemplateCoveragePlan? CoveragePlan
+    {
+        get => _coveragePlan;
+        private set
+        {
+            if (!SetField(ref _coveragePlan, value)) return;
+            OnPropertyChanged(nameof(CoverageRequirements));
+            OnPropertyChanged(nameof(CoverageSummary));
+            OnPropertyChanged(nameof(IncompleteCoverageSummary));
+            OnPropertyChanged(nameof(HasIncompleteCoverageSummary));
+            OnPropertyChanged(nameof(HasCoveragePlan));
+            OnPropertyChanged(nameof(HasCoverageRequirements));
+            OnPropertyChanged(nameof(IsCoveragePlanComplete));
+            OnPropertyChanged(nameof(IsCoveragePlanStale));
+            NotifyCommands();
+        }
+    }
+    public IReadOnlyList<MockupTemplateCoverageRequirement> CoverageRequirements => CoveragePlan?.Requirements ?? [];
+    public bool HasCoveragePlan => CoveragePlan is not null;
+    public bool HasCoverageRequirements => CoverageRequirements.Count > 0;
+    public bool CanAssignExistingCoverageImage => HasSelectedLocalSource && SelectedLocalSource?.IsManaged == true;
+    public bool IsCoveragePlanComplete => CoveragePlan?.IsComplete == true && !IsCoveragePlanStale;
+    public bool IsCoveragePlanStale => CoveragePlan is not null && CoveragePlan.IsStaleAgainst(CurrentCoverageContext());
+    public string CoverageSummary => CoveragePlan is null
+        ? "Generate a coverage plan to see which compatible Variants still need mockup images."
+        : IsCoveragePlanStale
+            ? $"{CoveragePlan.Summary} Refresh required because the catalog context changed."
+            : CoveragePlan.Summary;
+    public string IncompleteCoverageSummary => CoveragePlan?.IncompleteSourceImageIds.Count > 0
+        ? $"{CoveragePlan.IncompleteSourceImageIds.Count} active source row{(CoveragePlan.IncompleteSourceImageIds.Count == 1 ? string.Empty : "s")} still need applicability or mapping setup."
+        : string.Empty;
+    public bool HasIncompleteCoverageSummary => !string.IsNullOrWhiteSpace(IncompleteCoverageSummary);
+    public MockupTemplateCoverageGroupingStrategy CoverageGroupingStrategy
+    {
+        get => _coverageGroupingStrategy;
+        set { if (SetField(ref _coverageGroupingStrategy, value)) OnPropertyChanged(nameof(CoverageSummary)); }
+    }
+    public MockupTemplateCoverageRequirement? SelectedCoverageRequirement
+    {
+        get => _selectedCoverageRequirement;
+        private set => SetField(ref _selectedCoverageRequirement, value);
+    }
 
     private void RequestEnlargedPlacementEditor()
     {
@@ -400,6 +462,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             NotifyMockupTemplateDraftChanged();
             OnPropertyChanged(nameof(IsEditingDesignArea));
             OnPropertyChanged(nameof(DesignAreaEditorDialogTitle));
+            OnPropertyChanged(nameof(IsCoveragePlanStale));
+            OnPropertyChanged(nameof(CoverageSummary));
             NotifyCommands();
         }
     }
@@ -1134,6 +1198,11 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             RefreshLocalSourceRowPresentation();
             ApplyLocalSourceSort();
             SelectLocalSource(firstDraft);
+            if (SelectedCoverageRequirement is { } requirement)
+            {
+                ApplyCoverageApplicability(requirement, firstDraft);
+                SelectLocalSource(firstDraft);
+            }
             OnPropertyChanged(nameof(HasLocalSource));
             NotifyMockupTemplateDraftChanged();
         }
@@ -1158,6 +1227,59 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         MappingHeightText = mapping is null ? string.Empty : FormatMapping(mapping.Height);
         LocalSourcePath = draft.Path;
         NotifyLocalSourceSelectionChanged();
+    }
+
+    private void SelectCoverageRequirement(object? parameter)
+    {
+        if (parameter is not MockupTemplateCoverageRequirement requirement || IsCoveragePlanStale) return;
+        SelectedCoverageRequirement = requirement;
+        ApplyCoverageApplicability(requirement, SelectedLocalSource);
+        NotifyCommands();
+    }
+
+    private void ApplyCoverageApplicability(MockupTemplateCoverageRequirement requirement, LocalMockupSourceDraftViewModel? draft)
+    {
+        var ids = requirement.Applicability.Select(value => value.Id).ToArray();
+        foreach (var choice in TemplateColorChoices) choice.IsSelected = ids.Contains(choice.Value.Id);
+        foreach (var choice in TemplateAdditionalOptionChoices) choice.IsSelected = ids.Contains(choice.Value.Id);
+        if (draft is not null)
+        {
+            draft.UpdateMetadata(ids, draft.Mapping, string.Join(", ", ids.Select(id => OptionValues.FirstOrDefault(value => value.Id == id)).Where(value => value is not null).Select(value => ValueLabel(value!))));
+        }
+        NotifyMockupTemplateDraftChanged();
+    }
+
+    private void AssignExistingCoverageImage()
+    {
+        if (SelectedCoverageRequirement is not { } requirement || SelectedLocalSource is not { IsManaged: true } draft) return;
+        ApplyCoverageApplicability(requirement, draft);
+        ErrorMessage = string.Empty;
+        SelectLocalSource(draft);
+    }
+
+    private async Task GenerateCoveragePlanAsync()
+    {
+        if (_sourceImages is null || SelectedOffering is null || SelectedTemplate is null) return;
+        IsBusy = true;
+        ErrorMessage = string.Empty;
+        try
+        {
+            CoveragePlan = await _sourceImages.PlanAsync(SelectedOffering.StoreId, SelectedTemplate.Id, CoverageGroupingStrategy).ConfigureAwait(true);
+            if (CoveragePlan is null) ErrorMessage = "Coverage planning is unavailable for this Mockup Template.";
+        }
+        catch (Exception exception) { ErrorMessage = exception.Message; }
+        finally { IsBusy = false; }
+    }
+
+    private MockupTemplateCoverageContext CurrentCoverageContext()
+    {
+        var variantIds = SelectedPlaceholder?.VariantIds.Where(id => AvailableVariants.Any(value => value.Id == id)).ToArray() ?? [];
+        var optionValueIds = AvailableVariants
+            .Where(value => variantIds.Contains(value.Id))
+            .SelectMany(value => value.OptionValueIds)
+            .Distinct()
+            .ToArray();
+        return new(SelectedTemplate?.Id ?? Guid.Empty, SelectedPlaceholder?.Id, variantIds, optionValueIds);
     }
 
     public void SelectLocalSourceWithModifiers(LocalMockupSourceDraftViewModel? draft, bool toggle, bool range)
@@ -1572,6 +1694,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         _archivedLocalSourceDrafts.Clear();
         SelectedLocalSource = null;
         LocalSourcePath = string.Empty;
+        CoveragePlan = null;
+        SelectedCoverageRequirement = null;
         var revision = TemplateRevisions.SingleOrDefault(value => value.MockupTemplateId == template.Id && value.RevisionNumber == template.CurrentRevision);
         SelectedProviderMockup = ProviderMockupCandidates.FirstOrDefault(value => value.ProviderReference == revision?.ProviderMockupReference);
         if (revision?.ImageMapping is { } mapping)
@@ -1610,6 +1734,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         _archivedLocalSourceDrafts.Clear();
         SelectedLocalSource = null;
         LocalSourcePath = string.Empty;
+        CoveragePlan = null;
+        SelectedCoverageRequirement = null;
         foreach (var color in TemplateColorChoices) color.IsSelected = false;
         foreach (var option in TemplateAdditionalOptionChoices) option.IsSelected = false;
         _mockupTemplateDraftBaseline = CurrentMockupTemplateDraftState();
@@ -2010,6 +2136,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(AvailableVariantCount));
         OnPropertyChanged(nameof(AvailableDesignAreaCount));
         OnPropertyChanged(nameof(AvailableTemplateCount));
+        OnPropertyChanged(nameof(IsCoveragePlanStale));
+        OnPropertyChanged(nameof(CoverageSummary));
         OnPropertyChanged(nameof(ReadyMockupTemplateCount));
         OnPropertyChanged(nameof(HasOfferingReadinessGuidance));
         OnPropertyChanged(nameof(OfferingReadinessGuidance));
@@ -2358,6 +2486,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         ClearLocalSourceSelectionState();
         LocalSourceDrafts.Clear();
         LocalSourcePath = string.Empty;
+        CoveragePlan = null;
+        SelectedCoverageRequirement = null;
     }
 
     private async Task LoadLocalSourceDraftsAsync(Guid templateId)
@@ -2369,6 +2499,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             .ToHashSet();
         var state = await _sourceImages.LoadAsync(SelectedOffering.StoreId, templateId).ConfigureAwait(true);
         if (!IsAddingTemplate || SelectedTemplate?.Id != templateId) return;
+        CoveragePlan = state.CoveragePlan;
         foreach (var image in state.Images)
         {
             var labels = image.OptionValueIds.Select(id => OptionValues.FirstOrDefault(value => value.Id == id)).Where(value => value is not null).Select(value => ValueLabel(value!));
@@ -2581,6 +2712,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             StartAddVariantCommand, StartBulkVariantsCommand, CreateVariantCommand, StartAddPlaceholderCommand,
             CreatePlaceholderCommand, SetDefaultPlaceholderCommand, StartAddTemplateCommand, CreateTemplateCommand,
             DuplicateTemplateCommand,
+            GenerateCoveragePlanCommand, SelectCoverageRequirementCommand, AddCoverageRequirementImageCommand, AssignExistingCoverageImageCommand,
             AddTemplateColorCommand, PreviewBulkVariantsCommand, ConfirmBulkVariantsCommand,
             OpenEnlargedPlacementEditorCommand,
             AssistMockupSourceMetadataCommand, CancelMockupSourceMetadataCommand,

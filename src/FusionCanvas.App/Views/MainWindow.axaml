@@ -1632,6 +1632,7 @@
                             <StackPanel Spacing="2" Margin="0,2,0,0">
                               <TextBlock Text="{Binding TemplateName, StringFormat='{}{0}'}" FontWeight="SemiBold" />
                               <TextBlock Text="{Binding Guidance}" TextWrapping="Wrap" Foreground="{DynamicResource WarningTextBrush}" />
+                              <TextBlock Text="{Binding CoverageSummary}" IsVisible="{Binding HasCoverageSummary}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
                             </StackPanel>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>

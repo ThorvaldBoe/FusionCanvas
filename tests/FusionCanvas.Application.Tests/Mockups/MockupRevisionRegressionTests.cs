@@ -144,6 +144,39 @@ public sealed class MockupRevisionRegressionTests
         Assert.Equal("resolved/assets/source.png", Assert.Single(result.Images).PreviewPath);
     }
 
+    [Fact]
+    public async Task LoadReturnsDerivedCoveragePlanWithoutCreatingPlaceholderRows()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprint = new Blueprint(Guid.NewGuid(), storeId, "Tee", null, false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, storeId, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "network", null, null, false, Now, Now);
+        var option = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
+        var black = new OfferingOptionValue(Guid.NewGuid(), option.Id, offering.Id, "Black", 0);
+        var variant = new OfferingVariant(Guid.NewGuid(), offering.Id, "Black", [black.Id], false, Now, Now);
+        var area = new OfferingPlaceholder(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 100, 100, [variant.Id], false, Now, Now);
+        var template = new MockupTemplate(Guid.NewGuid(), offering.Id, area.Id, "Front", null, 1, false, Now, Now);
+        var snapshot = new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [new Store(storeId, "Store", null, false, Now, Now, "{}")], [], [], [], [], [], [], [], [])
+        {
+            Blueprints = [blueprint],
+            BlueprintOfferings = [offering],
+            OfferingOptions = [option],
+            OfferingOptionValues = [black],
+            OfferingVariants = [variant],
+            OfferingPlaceholders = [area],
+            MockupTemplates = [template]
+        };
+        var repository = new MemoryRepository(snapshot);
+        var service = new MockupTemplateSourceImageService(repository, new FakeFiles(), new FakeMetadata(), new MockupTemplateSetupService(repository), () => Now, Guid.NewGuid);
+
+        var result = await service.LoadAsync(storeId, template.Id, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(result.CoveragePlan);
+        Assert.Equal(1, result.CoveragePlan!.MissingCount);
+        Assert.Single(result.CoveragePlan.Requirements);
+        Assert.Empty(repository.Snapshot.MockupTemplateSourceImages);
+        Assert.Empty(repository.Snapshot.MockupTemplateSourceImageOptionValues);
+    }
+
     private sealed class MemoryRepository(WorkspaceSnapshot initial) : IWorkspaceRepository
     {
         public WorkspaceSnapshot Snapshot { get; private set; } = initial;

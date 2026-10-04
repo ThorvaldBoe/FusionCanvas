@@ -1,5 +1,6 @@
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Assets;
+using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Domain.Workspace;
 
@@ -39,10 +40,28 @@ public sealed class MockupTemplateSourceImageService : IMockupTemplateSourceImag
         if (offering is null) return new([], [], false, "Mockup Template does not belong to the selected Store.");
         var images = snapshot.MockupTemplateSourceImages.Where(value => value.MockupTemplateId == templateId && !value.IsArchived).ToArray();
         var summaries = images.Select(image => ToSummary(snapshot, image)).ToArray();
-        var variants = snapshot.OfferingVariants.Where(value => value.OfferingId == offering.Id && !value.IsArchived && snapshot.OfferingPlaceholders.Any(area => area.Id == template.TargetPlaceholderId && area.VariantIds.Contains(value.Id))).ToArray();
+        var variants = snapshot.OfferingVariants.Where(value => value.OfferingId == offering.Id && !value.IsArchived && snapshot.OfferingPlaceholders.Any(area => area.Id == template.TargetPlaceholderId && !area.IsArchived && area.VariantIds.Contains(value.Id))).ToArray();
         var resolutions = MockupTemplateSourcePolicy.Resolve(variants, images, snapshot.MockupTemplateSourceImageOptionValues, snapshot.OfferingOptionValues)
             .Select(value => new MockupTemplateSourceReadiness(value.VariantId, value.Kind, value.SourceImageIds)).ToArray();
-        return new(summaries, resolutions, MockupTemplateReadinessEvaluator.Evaluate(snapshot, template).IsReadyForUse, null);
+        var plan = BuildCoveragePlan(snapshot, template, variants, images);
+        return new(summaries, resolutions, MockupTemplateReadinessEvaluator.Evaluate(snapshot, template).IsReadyForUse, null, plan);
+    }
+
+    public async Task<MockupTemplateCoveragePlan?> PlanAsync(
+        Guid storeId,
+        Guid templateId,
+        MockupTemplateCoverageGroupingStrategy groupingStrategy = MockupTemplateCoverageGroupingStrategy.ColorFirst,
+        CancellationToken cancellationToken = default)
+    {
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var template = snapshot.MockupTemplates.SingleOrDefault(value => value.Id == templateId && !value.IsArchived);
+        var offering = template is null
+            ? null
+            : snapshot.BlueprintOfferings.SingleOrDefault(value => value.Id == template.BlueprintOfferingId && value.StoreId == storeId && !value.IsArchived);
+        if (template is null || offering is null) return null;
+        var variants = snapshot.OfferingVariants.Where(value => value.OfferingId == offering.Id && !value.IsArchived && snapshot.OfferingPlaceholders.Any(area => area.Id == template.TargetPlaceholderId && !area.IsArchived && area.VariantIds.Contains(value.Id))).ToArray();
+        var images = snapshot.MockupTemplateSourceImages.Where(value => value.MockupTemplateId == templateId && !value.IsArchived).ToArray();
+        return BuildCoveragePlan(snapshot, template, variants, images, groupingStrategy);
     }
 
     public async Task<MockupTemplateSetupResult> AddAsync(AddLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default)
@@ -167,6 +186,22 @@ public sealed class MockupTemplateSourceImageService : IMockupTemplateSourceImag
         var dimensions = new RasterImageInfo(image.ImageWidth, image.ImageHeight);
         return new(image.Id, asset.Id, asset.Name, asset.WorkspaceRelativePath, dimensions, image.ImageMapping, conditions, _fileStore.ResolvePath(asset.WorkspaceRelativePath));
     }
+
+    private static MockupTemplateCoveragePlan BuildCoveragePlan(
+        WorkspaceSnapshot snapshot,
+        MockupTemplate template,
+        IReadOnlyList<OfferingVariant> variants,
+        IReadOnlyList<MockupTemplateSourceImage> images,
+        MockupTemplateCoverageGroupingStrategy groupingStrategy = MockupTemplateCoverageGroupingStrategy.ColorFirst) =>
+        MockupTemplateCoveragePlanner.Plan(
+            template.Id,
+            template.TargetPlaceholderId,
+            variants,
+            images,
+            snapshot.MockupTemplateSourceImageOptionValues,
+            snapshot.OfferingOptions,
+            snapshot.OfferingOptionValues,
+            groupingStrategy);
 
     private (MockupTemplateRevisionSourceImage[] Images, MockupTemplateRevisionSourceImageOptionValue[] Conditions) SnapshotActiveSourceImages(
         IReadOnlyList<MockupTemplateSourceImage> images,

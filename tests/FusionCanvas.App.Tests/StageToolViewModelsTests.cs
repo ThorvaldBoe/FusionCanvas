@@ -127,6 +127,24 @@ public class StageToolViewModelsTests
     }
 
     [Fact]
+    public async Task ListingTool_ShowsCoverageSummaryAlongsideReadinessBlockers()
+    {
+        var coverage = new MockupTemplateCoveragePlan(
+            Guid.NewGuid(), Guid.NewGuid(), MockupTemplateCoverageGroupingStrategy.ColorFirst, "context",
+            [new("black", MockupTemplateCoverageStatus.Missing, [Guid.NewGuid()], ["Black / M"], [], [], "Assign a source image.")], [], true);
+        var vm = new ListingStageToolViewModel(new StubMockupGenerationService(new MockupGenerationState(
+            Guid.NewGuid(), Guid.NewGuid(), false, string.Empty, [], null, [], ["Black"],
+            "No ready Mockup Templates are available.", null,
+            [new MockupTemplateEligibilityDiagnostic(Guid.NewGuid(), "Front image", [MockupTemplateReadinessBlocker.MissingVariantSourceImage], coverage)])));
+
+        await vm.LoadAsync(Guid.NewGuid(), ItemStatus.Draft, canEdit: true, TestContext.Current.CancellationToken);
+
+        var diagnostic = Assert.Single(vm.TemplateDiagnostics);
+        Assert.Equal("0/1 Variants covered; 1 missing, 0 ambiguous, 0 incomplete.", diagnostic.CoverageSummary);
+        Assert.True(diagnostic.HasCoverageSummary);
+    }
+
+    [Fact]
     public async Task ListingTool_DistinguishesOfferingWithNoTemplates()
     {
         var vm = new ListingStageToolViewModel(new StubMockupGenerationService(new MockupGenerationState(
