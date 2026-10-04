@@ -669,6 +669,31 @@
                                Height="4"
                                AutomationProperties.Name="Working with item" />
 
+                  <Border IsVisible="{Binding ItemInspector.ShowsContentRiskWarning}"
+                          Padding="12"
+                          Background="{DynamicResource Token.Color.SurfaceElevated}"
+                          BorderBrush="{DynamicResource Token.Color.Border}"
+                          BorderThickness="1"
+                          CornerRadius="6"
+                          AutomationProperties.Name="Content risk awareness">
+                    <StackPanel Spacing="6">
+                      <TextBlock Text="Review content risk before publishing"
+                                 FontWeight="SemiBold"
+                                 Foreground="{DynamicResource Token.Color.TextStrong}" />
+                      <TextBlock Text="{Binding ItemInspector.ContentRiskWarningText}"
+                                 TextWrapping="Wrap"
+                                 Foreground="{DynamicResource Token.Color.TextSecondary}" />
+                      <Button Content="View review details"
+                              Command="{Binding ItemInspector.ToggleContentRiskDetailsCommand}"
+                              HorizontalAlignment="Left"
+                              AutomationProperties.Name="View content risk review details" />
+                      <TextBlock IsVisible="{Binding ItemInspector.IsContentRiskDetailsExpanded}"
+                                 Text="{Binding ItemInspector.ContentRiskDetailsText}"
+                                 TextWrapping="Wrap"
+                                 Foreground="{DynamicResource Token.Color.TextSecondary}" />
+                    </StackPanel>
+                  </Border>
+
                   <Border Padding="{DynamicResource Token.Layout.CardPadding}"
                           Background="{DynamicResource Token.Color.SurfaceElevated}"
                           BorderBrush="{DynamicResource Token.Color.Border}"
@@ -1404,6 +1429,32 @@
                                             <TextBlock Text="{Binding PlaceholderDetails}" FontSize="9"
                                                        TextWrapping="Wrap"
                                                        Foreground="{DynamicResource MutedTextBrush}" />
+                                            <Border IsVisible="{Binding ShowsContentRiskWarning}"
+                                                    Padding="5"
+                                                    Background="{DynamicResource PanelSurfaceBrush}"
+                                                    BorderBrush="{DynamicResource ControlBorderBrush}"
+                                                    BorderThickness="1">
+                                              <StackPanel Spacing="3">
+                                                <TextBlock Text="Content risk review"
+                                                           FontSize="9"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource WarningTextBrush}" />
+                                                <TextBlock Text="{Binding ContentRiskWarningText}"
+                                                           TextWrapping="Wrap"
+                                                           FontSize="8"
+                                                           Foreground="{DynamicResource SecondaryTextBrush}" />
+                                                <Button Content="View review details"
+                                                        Command="{Binding ToggleContentRiskDetailsCommand}"
+                                                        FontSize="8"
+                                                        Classes="miniButton"
+                                                        AutomationProperties.Name="View content risk review details" />
+                                                <TextBlock Text="{Binding ContentRiskDetailsText}"
+                                                           IsVisible="{Binding IsContentRiskDetailsExpanded}"
+                                                           TextWrapping="Wrap"
+                                                           FontSize="8"
+                                                           Foreground="{DynamicResource SecondaryTextBrush}" />
+                                              </StackPanel>
+                                            </Border>
                                             <Border IsVisible="{Binding HasImage}" Width="80" Height="60"
                                                     Background="{DynamicResource PanelSurfaceBrush}" CornerRadius="4">
 <Image Source="{Binding Thumbnail}" Stretch="Uniform" />
@@ -1499,6 +1550,32 @@
                                              IsVisible="{Binding ArtworkWarning, Converter={x:Static ObjectConverters.IsNotNull}}"
                                              TextWrapping="Wrap" FontSize="9"
                                              Foreground="{DynamicResource WarningTextBrush}" />
+                                  <Border IsVisible="{Binding ShowsContentRiskWarning}"
+                                          Padding="5"
+                                          Background="{DynamicResource PanelSurfaceBrush}"
+                                          BorderBrush="{DynamicResource ControlBorderBrush}"
+                                          BorderThickness="1">
+                                    <StackPanel Spacing="3">
+                                      <TextBlock Text="Content risk review"
+                                                 FontSize="9"
+                                                 FontWeight="SemiBold"
+                                                 Foreground="{DynamicResource WarningTextBrush}" />
+                                      <TextBlock Text="{Binding ContentRiskWarningText}"
+                                                 TextWrapping="Wrap"
+                                                 FontSize="8"
+                                                 Foreground="{DynamicResource SecondaryTextBrush}" />
+                                      <Button Content="View review details"
+                                              Command="{Binding ToggleContentRiskDetailsCommand}"
+                                              FontSize="8"
+                                              Classes="miniButton"
+                                              AutomationProperties.Name="View content risk review details" />
+                                      <TextBlock Text="{Binding ContentRiskDetailsText}"
+                                                 IsVisible="{Binding IsContentRiskDetailsExpanded}"
+                                                 TextWrapping="Wrap"
+                                                 FontSize="8"
+                                                 Foreground="{DynamicResource SecondaryTextBrush}" />
+                                    </StackPanel>
+                                  </Border>
                                   <StackPanel Orientation="Horizontal" Spacing="2">
                                     <Button Content="View" Click="OnViewSupportingImage"
                                             Tag="{Binding .}"

@@ -2,12 +2,14 @@ using System.Text.Json;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.ContentRisk;
 using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Concepts;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.ContentRisk;
 
 namespace FusionCanvas.Application.DesignFiles;
 
@@ -22,6 +24,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
     private readonly ITelemetryRecorder? _telemetry;
     private readonly Func<DateTimeOffset> _clock;
     private readonly Func<Guid> _newId;
+    private readonly IContentRiskReviewService? _contentRiskReviews;
 
     public ArtworkGenerationService(
         IWorkspaceRepository repository,
@@ -31,7 +34,8 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         IRasterArtworkNormalizer normalizer,
         Func<DateTimeOffset>? clock = null,
         Func<Guid>? newId = null,
-        ITelemetryRecorder? telemetry = null)
+        ITelemetryRecorder? telemetry = null,
+        IContentRiskReviewService? contentRiskReviews = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _fileStore = fileStore ?? throw new ArgumentNullException(nameof(fileStore));
@@ -41,6 +45,7 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         _telemetry = telemetry;
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _newId = newId ?? Guid.NewGuid;
+        _contentRiskReviews = contentRiskReviews;
     }
 
     public async Task<DesignStageResult> GenerateAsync(ArtworkGenerationRequest request, CancellationToken cancellationToken = default)
@@ -192,11 +197,14 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         var asset = new Asset(assetId, currentItem.StoreId, $"{GeneratedArtworkName} - {readyArea.Name}", null, AssetKind.ExportedImage,
             managed.WorkspaceRelativePath, null, false, false, now, now, _provenanceCodec.Serialize(provenance));
         var assignment = new DesignSlotAssignment(currentRow.Id, request.DesignAreaId, assetId);
+        var reviewTarget = new ContentRiskReviewTarget(assetId, ContentRiskOwnerKind.Asset, ContentRiskContentKind.Image, "design.asset");
+        var review = ContentRiskReview.Unreviewed(reviewTarget, ContentRiskFingerprint.ForImage(reviewTarget, normalized.PngBytes));
         var updated = currentSnapshot with
         {
             Assets = [.. currentSnapshot.Assets, asset],
             AssetLinks = [.. currentSnapshot.AssetLinks, new AssetLink(assetId, WorkspaceEntityKind.Item, currentItem.Id)],
-            DesignSlotAssignments = [.. currentSnapshot.DesignSlotAssignments.Where(value => value.RowId != currentRow.Id || value.DesignAreaId != request.DesignAreaId), assignment]
+            DesignSlotAssignments = [.. currentSnapshot.DesignSlotAssignments.Where(value => value.RowId != currentRow.Id || value.DesignAreaId != request.DesignAreaId), assignment],
+            ContentRiskReviews = [.. currentSnapshot.ContentRiskReviews.Where(existing => existing.Target != reviewTarget), review]
         };
         try
         {
@@ -216,6 +224,17 @@ public sealed class ArtworkGenerationService : IArtworkGenerationService
         }
 
         await RecordStageAsync("workspace_save", "Succeeded", "The artwork asset and design assignment were saved.").ConfigureAwait(false);
+        if (_contentRiskReviews is not null)
+        {
+            try
+            {
+                await _contentRiskReviews.ReviewImageAsync(reviewTarget, "image/png", normalized.PngBytes, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // The persisted Unreviewed state remains visible when advisory review cannot run.
+            }
+        }
         return DesignStageResult.Success(BuildStateAfterSave(updated, item.Id));
     }
 

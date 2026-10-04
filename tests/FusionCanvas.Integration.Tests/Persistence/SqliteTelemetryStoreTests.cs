@@ -28,7 +28,7 @@ public sealed class SqliteTelemetryStoreTests
         versionCommand.CommandText = "PRAGMA user_version;";
 
         Assert.Equal(WorkspaceTelemetrySettings.Default, settings);
-        Assert.Equal(19L, (long)(await versionCommand.ExecuteScalarAsync(TestContext.Current.CancellationToken))!);
+        Assert.Equal(SqliteWorkspaceRepository.CurrentSchemaVersion, (long)(await versionCommand.ExecuteScalarAsync(TestContext.Current.CancellationToken))!);
     }
 
     [Fact]

@@ -8,6 +8,7 @@ using FusionCanvas.Domain.Items;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.TitleOptimization;
+using FusionCanvas.Application.ContentRisk;
 
 namespace FusionCanvas.App.Items;
 
@@ -96,6 +97,11 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
         RequestDeleteCommand = new RelayCommand(_ => DeleteConfirmationVisible = true, () => CanDelete);
         ConfirmDeleteCommand = new RelayCommand(_ => Run(ConfirmDeleteAsync));
         CancelDeleteCommand = new RelayCommand(_ => DeleteConfirmationVisible = false);
+        ToggleContentRiskDetailsCommand = new RelayCommand(_ =>
+        {
+            IsContentRiskDetailsExpanded = !IsContentRiskDetailsExpanded;
+            OnPropertyChanged(nameof(IsContentRiskDetailsExpanded));
+        });
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -126,6 +132,8 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(AvailableTagNames));
                 OnPropertyChanged(nameof(HasTags));
                 OnPropertyChanged(nameof(HasAssets));
+                OnPropertyChanged(nameof(ShowsContentRiskWarning));
+                OnPropertyChanged(nameof(ContentRiskDetailsText));
                 OnPropertyChanged(nameof(HasCreativeFields));
                 OnPropertyChanged(nameof(CanEdit));
                 OnPropertyChanged(nameof(CanEditShared));
@@ -224,6 +232,17 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
     public bool HasTags => Tags.Count > 0;
 
     public bool HasAssets => Assets.Count > 0;
+
+    public bool ShowsContentRiskWarning => HasState;
+
+    public bool IsContentRiskDetailsExpanded { get; private set; }
+
+    public string ContentRiskWarningText => ContentRiskWarningProjection.For(_state?.ContentRiskReviews).Summary;
+
+    public string ContentRiskDetailsText
+    {
+        get => ContentRiskWarningProjection.For(_state?.ContentRiskReviews).Details;
+    }
 
     public string Title
     {
@@ -516,6 +535,7 @@ public sealed class ItemInspectorViewModel : INotifyPropertyChanged
     public ICommand RequestDeleteCommand { get; }
     public ICommand ConfirmDeleteCommand { get; }
     public ICommand CancelDeleteCommand { get; }
+    public ICommand ToggleContentRiskDetailsCommand { get; }
     public ICommand OptimizeCommand { get; }
     public ICommand SetIdeaRatingCommand { get; }
 

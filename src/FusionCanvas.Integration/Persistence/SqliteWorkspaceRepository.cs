@@ -11,6 +11,7 @@ using FusionCanvas.Domain.Ideation;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Mockups;
+using FusionCanvas.Domain.ContentRisk;
 using Microsoft.Data.Sqlite;
 using FusionCanvas.Application.Workspaces;
 using System.Text.Json;
@@ -32,7 +33,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
 
-        foreach (var table in new[] { "mockup_template_revision_source_image_values", "mockup_template_revision_source_images", "mockup_template_source_image_values", "mockup_template_source_images", "mockup_template_revision_colors", "mockup_template_revisions", "mockup_template_colors", "mockup_templates", "placeholder_variants", "offering_placeholders", "offering_variant_values", "offering_variants", "offering_option_values", "offering_options", "blueprint_offerings", "print_providers", "catalog_blueprints", "design_slot_assignments", "design_variant_row_colors", "design_variant_rows", "design_selected_colors", "item_listing_configuration", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
+        foreach (var table in new[] { "content_risk_reviews", "mockup_template_revision_source_image_values", "mockup_template_revision_source_images", "mockup_template_source_image_values", "mockup_template_source_images", "mockup_template_revision_colors", "mockup_template_revisions", "mockup_template_colors", "mockup_templates", "placeholder_variants", "offering_placeholders", "offering_variant_values", "offering_variants", "offering_option_values", "offering_options", "blueprint_offerings", "print_providers", "catalog_blueprints", "design_slot_assignments", "design_variant_row_colors", "design_variant_rows", "design_selected_colors", "item_listing_configuration", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
         {
             await ExecuteAsync(connection, transaction, $"DELETE FROM {QuoteIdentifier(table)};", cancellationToken);
         }
@@ -144,6 +145,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await InsertAssetLinkAsync(connection, transaction, assetLink, cancellationToken);
         }
 
+        foreach (var review in snapshot.ContentRiskReviews)
+        {
+            await InsertContentRiskReviewAsync(connection, transaction, review, cancellationToken);
+        }
+
         foreach (var config in snapshot.ItemListingConfigurations)
         {
             await InsertItemListingConfigurationAsync(connection, transaction, config, cancellationToken);
@@ -222,6 +228,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             ,MockupTemplateSourceImageOptionValues = await LoadMockupTemplateSourceImageOptionValuesAsync(connection, cancellationToken)
             ,MockupTemplateRevisionSourceImages = await LoadMockupTemplateRevisionSourceImagesAsync(connection, cancellationToken)
             ,MockupTemplateRevisionSourceImageOptionValues = await LoadMockupTemplateRevisionSourceImageOptionValuesAsync(connection, cancellationToken)
+            ,ContentRiskReviews = await LoadContentRiskReviewsAsync(connection, cancellationToken)
         };
     }
 
@@ -563,6 +570,22 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 singleton_id INTEGER PRIMARY KEY CHECK(singleton_id = 1),
                 starter_initialized INTEGER NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS content_risk_reviews (
+                owner_id TEXT NOT NULL,
+                owner_kind INTEGER NOT NULL,
+                content_kind INTEGER NOT NULL,
+                role TEXT NOT NULL,
+                fingerprint TEXT NOT NULL,
+                state INTEGER NOT NULL,
+                findings_json TEXT NOT NULL,
+                analyzer_id TEXT NULL,
+                checked_at TEXT NULL,
+                input_units INTEGER NULL,
+                reported_cost TEXT NULL,
+                review_version INTEGER NOT NULL,
+                PRIMARY KEY (owner_id, owner_kind, content_kind, role)
+            );
             """;
 
         await ExecuteAsync(connection, null, sql, cancellationToken);
@@ -620,6 +643,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         await ApplyMigrationAsync(17, () => MigrateToVersion17Async(connection, cancellationToken));
         await ApplyMigrationAsync(18, () => MigrateToVersion18Async(connection, cancellationToken));
         await ApplyMigrationAsync(19, () => MigrateToVersion19Async(connection, cancellationToken));
+        await ApplyMigrationAsync(20, () => MigrateToVersion20Async(connection, cancellationToken));
 
         await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
     }
@@ -652,6 +676,25 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 ON telemetry_entries(workspace_id, occurred_at DESC, id);
             CREATE INDEX IF NOT EXISTS ix_telemetry_workspace_area_time
                 ON telemetry_entries(workspace_id, area, occurred_at DESC, id);
+            """, cancellationToken);
+
+    private static Task MigrateToVersion20Async(SqliteConnection connection, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, null, """
+            CREATE TABLE IF NOT EXISTS content_risk_reviews (
+                owner_id TEXT NOT NULL,
+                owner_kind INTEGER NOT NULL,
+                content_kind INTEGER NOT NULL,
+                role TEXT NOT NULL,
+                fingerprint TEXT NOT NULL,
+                state INTEGER NOT NULL,
+                findings_json TEXT NOT NULL,
+                analyzer_id TEXT NULL,
+                checked_at TEXT NULL,
+                input_units INTEGER NULL,
+                reported_cost TEXT NULL,
+                review_version INTEGER NOT NULL,
+                PRIMARY KEY (owner_id, owner_kind, content_kind, role)
+            );
             """, cancellationToken);
 
     private static async Task MigrateToVersion13Async(SqliteConnection connection, CancellationToken cancellationToken)
@@ -1575,6 +1618,34 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     private static Task InsertAssetLinkAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, AssetLink assetLink, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, "INSERT INTO asset_links (asset_id, entity_kind, entity_id) VALUES ($asset_id, $entity_kind, $entity_id);", cancellationToken, ("$asset_id", assetLink.AssetId.ToString()), ("$entity_kind", (int)assetLink.EntityKind), ("$entity_id", assetLink.EntityId.ToString()));
 
+    private static Task InsertContentRiskReviewAsync(
+        SqliteConnection connection,
+        System.Data.Common.DbTransaction transaction,
+        ContentRiskReview review,
+        CancellationToken cancellationToken)
+    {
+        var findings = review.Findings
+            .Select(finding => new PersistedContentRiskFinding(finding.Category, finding.Severity, finding.Explanation, finding.Evidence));
+        return ExecuteAsync(connection, transaction, """
+            INSERT INTO content_risk_reviews
+                (owner_id, owner_kind, content_kind, role, fingerprint, state, findings_json, analyzer_id, checked_at, input_units, reported_cost, review_version)
+            VALUES
+                ($owner_id, $owner_kind, $content_kind, $role, $fingerprint, $state, $findings_json, $analyzer_id, $checked_at, $input_units, $reported_cost, $review_version);
+            """, cancellationToken,
+            ("$owner_id", review.Target.OwnerId.ToString()),
+            ("$owner_kind", (int)review.Target.OwnerKind),
+            ("$content_kind", (int)review.Target.ContentKind),
+            ("$role", review.Target.Role),
+            ("$fingerprint", review.Fingerprint),
+            ("$state", (int)review.State),
+            ("$findings_json", JsonSerializer.Serialize(findings)),
+            ("$analyzer_id", review.Provenance?.AnalyzerId),
+            ("$checked_at", review.Provenance?.CheckedAt.ToString("O")),
+            ("$input_units", review.Provenance?.InputUnits),
+            ("$reported_cost", review.Provenance?.ReportedCost?.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            ("$review_version", 1));
+    }
+
     private static Task InsertStoreProductAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, StoreProduct product, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
             INSERT INTO product_blueprints (id, store_id, name, description, external_product_id, created_at, updated_at, metadata_json)
@@ -1991,6 +2062,83 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         return assetLinks;
     }
 
+    private static async Task<IReadOnlyList<ContentRiskReview>> LoadContentRiskReviewsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var reviews = new List<ContentRiskReview>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM content_risk_reviews ORDER BY owner_id, role;", cancellationToken))
+        {
+            try
+            {
+                var target = new ContentRiskReviewTarget(
+                    ReadGuid(reader, "owner_id"),
+                    (ContentRiskOwnerKind)ReadInt(reader, "owner_kind"),
+                    (ContentRiskContentKind)ReadInt(reader, "content_kind"),
+                    ReadString(reader, "role"));
+                var fingerprint = ReadString(reader, "fingerprint");
+                var provenance = LoadContentRiskProvenance(reader);
+                var version = ReadInt(reader, "review_version");
+
+                var review = version != 1
+                    ? ContentRiskReview.ReviewUnavailable(target, fingerprint, provenance)
+                    : (ContentRiskReviewState)ReadInt(reader, "state") switch
+                    {
+                        ContentRiskReviewState.Unreviewed => ContentRiskReview.Unreviewed(target, fingerprint),
+                        ContentRiskReviewState.ReviewUnavailable => ContentRiskReview.ReviewUnavailable(target, fingerprint, provenance),
+                        ContentRiskReviewState.NoObviousSignalDetected when provenance is not null =>
+                            ContentRiskReview.NoObviousSignalDetected(target, fingerprint, provenance),
+                        ContentRiskReviewState.PotentialRisk when provenance is not null =>
+                            CreatePotentialRiskOrUnavailable(target, fingerprint, provenance, ReadString(reader, "findings_json")),
+                        _ => ContentRiskReview.ReviewUnavailable(target, fingerprint, provenance)
+                    };
+                reviews.Add(review);
+            }
+            catch (Exception exception) when (exception is ArgumentException or FormatException or JsonException or InvalidOperationException)
+            {
+                // A damaged or future review must never prevent the workspace from loading.
+            }
+        }
+
+        return reviews;
+    }
+
+    private static ContentRiskReview CreatePotentialRiskOrUnavailable(
+        ContentRiskReviewTarget target,
+        string fingerprint,
+        ContentRiskReviewProvenance provenance,
+        string findingsJson)
+    {
+        var findings = JsonSerializer.Deserialize<List<PersistedContentRiskFinding>>(findingsJson)
+            ?? throw new JsonException("Content-risk findings were empty.");
+        var typed = findings
+            .Select(finding => new ContentRiskFinding(finding.Category, finding.Severity, finding.Explanation, finding.Evidence))
+            .ToArray();
+        return typed.Length == 0
+            ? ContentRiskReview.ReviewUnavailable(target, fingerprint, provenance)
+            : ContentRiskReview.PotentialRisk(target, fingerprint, typed, provenance);
+    }
+
+    private static ContentRiskReviewProvenance? LoadContentRiskProvenance(SqliteDataReader reader)
+    {
+        var analyzerId = ReadNullableString(reader, "analyzer_id");
+        var checkedAt = ReadNullableString(reader, "checked_at");
+        if (analyzerId is null || checkedAt is null)
+        {
+            return null;
+        }
+
+        return new ContentRiskReviewProvenance(
+            analyzerId,
+            DateTimeOffset.Parse(checkedAt, System.Globalization.CultureInfo.InvariantCulture),
+            ReadNullableInt64(reader, "input_units"),
+            ReadNullableDecimal(reader, "reported_cost"));
+    }
+
+    private sealed record PersistedContentRiskFinding(
+        ContentRiskCategory Category,
+        ContentRiskSeverity Severity,
+        string Explanation,
+        string? Evidence);
+
     private static async Task<IReadOnlyList<StoreProduct>> LoadStoreProductsAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
         var products = new List<StoreProduct>();
@@ -2169,6 +2317,18 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     {
         var ordinal = reader.GetOrdinal(name);
         return reader.IsDBNull(ordinal) ? null : reader.GetInt32(ordinal);
+    }
+
+    private static long? ReadNullableInt64(SqliteDataReader reader, string name)
+    {
+        var ordinal = reader.GetOrdinal(name);
+        return reader.IsDBNull(ordinal) ? null : reader.GetInt64(ordinal);
+    }
+
+    private static decimal? ReadNullableDecimal(SqliteDataReader reader, string name)
+    {
+        var value = ReadNullableString(reader, name);
+        return value is null ? null : decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private static bool ReadBool(SqliteDataReader reader, string name) => ReadInt(reader, name) == 1;

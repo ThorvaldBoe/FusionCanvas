@@ -6,6 +6,8 @@ using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.DesignFiles;
+using FusionCanvas.Application.ContentRisk;
+using FusionCanvas.Domain.ContentRisk;
 
 namespace FusionCanvas.Application.Tests.DesignFiles;
 
@@ -93,7 +95,8 @@ public class DesignFileServiceTests
         var fileStore = new FakeFileStore();
         var assetId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
         var importedAt = new DateTimeOffset(2026, 9, 30, 12, 34, 56, TimeSpan.Zero);
-        var service = new DesignFileService(repository, fileStore, () => importedAt, () => assetId);
+        var reviewService = new RecordingContentRiskReviewService();
+        var service = new DesignFileService(repository, fileStore, () => importedAt, () => assetId, reviewService);
 
         var result = await service.ImportAsync(sample.Item.Id, sample.SourcePngPath, TestContext.Current.CancellationToken);
 
@@ -105,6 +108,10 @@ public class DesignFileServiceTests
         Assert.Equal(importedAt, persisted.CreatedAt);
         Assert.Equal(importedAt, persisted.UpdatedAt);
         Assert.Equal(sample.Item.Id, repository.Snapshot.AssetLinks.Single(link => link.AssetId == persisted.Id).EntityId);
+        var review = Assert.Single(repository.Snapshot.ContentRiskReviews);
+        Assert.Equal(assetId, review.Target.OwnerId);
+        Assert.Equal(ContentRiskReviewState.Unreviewed, review.State);
+        Assert.Equal(assetId, reviewService.ImageTargets.Single().OwnerId);
     }
 
     [Fact]
@@ -255,6 +262,26 @@ public class DesignFileServiceTests
         }
 
         public Task ExportCopyAsync(string workspaceRelativePath, string destinationPath, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class RecordingContentRiskReviewService : IContentRiskReviewService
+    {
+        public List<ContentRiskReviewTarget> ImageTargets { get; } = [];
+
+        public Task<ContentRiskReview> ReviewTextAsync(ContentRiskReviewTarget target, string text, CancellationToken cancellationToken = default) =>
+            Task.FromResult(ContentRiskReview.Unreviewed(target, ContentRiskFingerprint.ForText(target, text)));
+
+        public Task<ContentRiskReview> ReviewImageAsync(ContentRiskReviewTarget target, string mediaType, byte[] imageBytes, CancellationToken cancellationToken = default)
+        {
+            ImageTargets.Add(target);
+            return Task.FromResult(ContentRiskReview.Unreviewed(target, ContentRiskFingerprint.ForImage(target, imageBytes)));
+        }
+
+        public Task<ContentRiskReview> EnsureUnreviewedAsync(ContentRiskReviewTarget target, string fingerprint, CancellationToken cancellationToken = default) =>
+            Task.FromResult(ContentRiskReview.Unreviewed(target, fingerprint));
+
+        public Task<ContentRiskReview?> FindAsync(ContentRiskReviewTarget target, string fingerprint, CancellationToken cancellationToken = default) =>
+            Task.FromResult<ContentRiskReview?>(null);
     }
 
     private sealed record Sample(WorkspaceSnapshot Snapshot, Item Item, Asset PngAsset, string SourcePngPath)

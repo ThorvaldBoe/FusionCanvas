@@ -5,6 +5,8 @@ using FusionCanvas.Domain.Tags;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Groups;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.ContentRisk;
+using FusionCanvas.Domain.ContentRisk;
 
 namespace FusionCanvas.Application.Items;
 
@@ -13,15 +15,18 @@ public sealed class ItemInspectorService : IItemInspectorService
     private readonly IWorkspaceRepository _repository;
     private readonly Func<DateTimeOffset> _clock;
     private readonly Func<Guid> _newId;
+    private readonly IContentRiskReviewService? _contentRiskReviews;
 
     public ItemInspectorService(
         IWorkspaceRepository repository,
         Func<DateTimeOffset>? clock = null,
-        Func<Guid>? newId = null)
+        Func<Guid>? newId = null,
+        IContentRiskReviewService? contentRiskReviews = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _newId = newId ?? Guid.NewGuid;
+        _contentRiskReviews = contentRiskReviews;
     }
 
     public async Task<ItemInspectorState?> LoadAsync(Guid itemId, CancellationToken cancellationToken = default)
@@ -87,6 +92,9 @@ public sealed class ItemInspectorService : IItemInspectorService
             UpdatedAt = _clock()
         };
 
+        var reviewTargets = BuildChangedContentRiskTargets(existing, changed, metadata);
+        var reviews = ApplyUnreviewedReviews(snapshot.ContentRiskReviews, reviewTargets);
+
         var updated = snapshot with
         {
             Items = snapshot.Items.Select(candidate => candidate.Id == existing.Id ? changed : candidate).ToArray(),
@@ -94,7 +102,8 @@ public sealed class ItemInspectorService : IItemInspectorService
                 ? [.. snapshot.Tags, .. createdTags]
                 : snapshot.Tags,
             ItemTags = [.. snapshot.ItemTags.Where(link => link.ItemId != existing.Id),
-                           .. resolvedTagIds.Select(tagId => new ItemTag(existing.Id, tagId))]
+                           .. resolvedTagIds.Select(tagId => new ItemTag(existing.Id, tagId))],
+            ContentRiskReviews = reviews
         };
 
         try
@@ -105,6 +114,8 @@ public sealed class ItemInspectorService : IItemInspectorService
         {
             return ItemInspectorSaveResult.Failure($"The inspector change could not be saved. {exception.Message}");
         }
+
+        await ReviewChangedTextAsync(reviewTargets, cancellationToken).ConfigureAwait(false);
 
         return ItemInspectorSaveResult.Success(FindAndBuildState(updated, existing.Id)!);
     }
@@ -178,6 +189,9 @@ public sealed class ItemInspectorService : IItemInspectorService
             UpdatedAt = _clock()
         };
 
+        var reviewTargets = BuildChangedContentRiskTargets(existing, changed, metadata);
+        var reviews = ApplyUnreviewedReviews(snapshot.ContentRiskReviews, reviewTargets);
+
         var updated = snapshot with
         {
             Items = snapshot.Items.Select(candidate => candidate.Id == existing.Id ? changed : candidate).ToArray(),
@@ -185,7 +199,8 @@ public sealed class ItemInspectorService : IItemInspectorService
                 ? [.. snapshot.Tags, .. createdTags]
                 : snapshot.Tags,
             ItemTags = [.. snapshot.ItemTags.Where(link => link.ItemId != existing.Id),
-                           .. resolvedTagIds.Select(tagId => new ItemTag(existing.Id, tagId))]
+                           .. resolvedTagIds.Select(tagId => new ItemTag(existing.Id, tagId))],
+            ContentRiskReviews = reviews
         };
 
         try
@@ -197,7 +212,78 @@ public sealed class ItemInspectorService : IItemInspectorService
             return ItemInspectorSaveResult.Failure($"The item change could not be saved. {exception.Message}");
         }
 
+        await ReviewChangedTextAsync(reviewTargets, cancellationToken).ConfigureAwait(false);
+
         return ItemInspectorSaveResult.Success(FindAndBuildState(updated, existing.Id)!);
+    }
+
+    private async Task ReviewChangedTextAsync(
+        IReadOnlyList<(ContentRiskReviewTarget Target, string? Text)> targets,
+        CancellationToken cancellationToken)
+    {
+        if (_contentRiskReviews is null)
+        {
+            return;
+        }
+
+        foreach (var (target, text) in targets)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                continue;
+            }
+
+            try
+            {
+                await _contentRiskReviews.ReviewTextAsync(target, text, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // The saved Unreviewed state remains visible when advisory review cannot run.
+            }
+        }
+    }
+
+    private static IReadOnlyList<(ContentRiskReviewTarget Target, string? Text)> BuildChangedContentRiskTargets(
+        Item existing,
+        Item changed,
+        IReadOnlyDictionary<string, string> changedMetadata)
+    {
+        var previous = ItemMetadataCodec.ParseMetadata(existing.MetadataJson);
+        var candidates = new List<(ContentRiskReviewTarget Target, string? Text)>();
+        AddIfChanged("listing.title", existing.Name, changed.Name, ContentRiskContentKind.Text);
+        AddIfChanged(ItemMetadataCodec.PhraseKey, previous.GetValueOrDefault(ItemMetadataCodec.PhraseKey), changedMetadata.GetValueOrDefault(ItemMetadataCodec.PhraseKey), ContentRiskContentKind.Text, "concept.phrase");
+        AddIfChanged(ItemMetadataCodec.GraphicDirectionKey, previous.GetValueOrDefault(ItemMetadataCodec.GraphicDirectionKey), changedMetadata.GetValueOrDefault(ItemMetadataCodec.GraphicDirectionKey), ContentRiskContentKind.Text, "concept.graphic");
+        return candidates;
+
+        void AddIfChanged(string role, string? before, string? after, ContentRiskContentKind contentKind, string? persistedRole = null)
+        {
+            if (string.Equals(before, after, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            candidates.Add((
+                new ContentRiskReviewTarget(changed.Id, ContentRiskOwnerKind.Item, contentKind, persistedRole ?? role),
+                string.IsNullOrWhiteSpace(after) ? null : after.Trim()));
+        }
+    }
+
+    private static IReadOnlyList<ContentRiskReview> ApplyUnreviewedReviews(
+        IReadOnlyList<ContentRiskReview> existing,
+        IReadOnlyList<(ContentRiskReviewTarget Target, string? Text)> targets)
+    {
+        var targetKeys = targets.Select(value => value.Target).ToHashSet();
+        var retained = existing.Where(review => !targetKeys.Contains(review.Target)).ToList();
+        foreach (var (target, text) in targets)
+        {
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                retained.Add(ContentRiskReview.Unreviewed(target, ContentRiskFingerprint.ForText(target, text)));
+            }
+        }
+
+        return retained;
     }
 
     private static void ApplyStagePayload(Dictionary<string, string> metadata, ItemStageSavePayload payload, WorkflowStage currentStage)
@@ -365,7 +451,10 @@ public sealed class ItemInspectorService : IItemInspectorService
             string.IsNullOrWhiteSpace(sll) ? null : sll)
         {
             IdeaRating = ideaRating,
-            IsSllStale = !string.IsNullOrWhiteSpace(sll) && !string.Equals(sllFingerprint, currentFingerprint, StringComparison.Ordinal)
+            IsSllStale = !string.IsNullOrWhiteSpace(sll) && !string.Equals(sllFingerprint, currentFingerprint, StringComparison.Ordinal),
+            ContentRiskReviews = snapshot.ContentRiskReviews
+                .Where(review => review.Target.OwnerKind == FusionCanvas.Domain.ContentRisk.ContentRiskOwnerKind.Item && review.Target.OwnerId == listing.Id)
+                .ToArray()
         };
     }
 

@@ -10,7 +10,7 @@
          MinHeight="500"
          WindowStartupLocation="CenterOwner"
          Background="{DynamicResource ElevatedSurfaceBrush}">
-  <Grid RowDefinitions="Auto,Auto,*,Auto"
+  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto"
         Margin="22"
         RowSpacing="14">
     <StackPanel Grid.Row="0" Spacing="4">
@@ -24,7 +24,19 @@
                  AutomationProperties.Name="Ideation scope" />
     </StackPanel>
 
-    <Grid Grid.Row="1"
+    <Border Grid.Row="1"
+            Padding="12"
+            Background="{DynamicResource PanelSurfaceBrush}"
+            BorderBrush="{DynamicResource ControlBorderBrush}"
+            BorderThickness="1"
+            IsVisible="{Binding ShowsContentRiskAwareness}"
+            AutomationProperties.Name="Content risk awareness">
+      <TextBlock Text="{Binding ContentRiskAwarenessText}"
+                 TextWrapping="Wrap"
+                 Foreground="{DynamicResource SecondaryTextBrush}" />
+    </Border>
+
+    <Grid Grid.Row="2"
           RowDefinitions="Auto,Auto,Auto,Auto"
           ColumnDefinitions="*,160"
           ColumnSpacing="12"
@@ -124,7 +136,7 @@
       </StackPanel>
     </Grid>
 
-    <Border Grid.Row="2"
+    <Border Grid.Row="3"
             Padding="12"
             Background="{DynamicResource PanelSurfaceBrush}"
             BorderBrush="{DynamicResource ControlBorderBrush}"
@@ -185,7 +197,7 @@
       </Grid>
     </Border>
 
-    <Grid Grid.Row="3" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+    <Grid Grid.Row="4" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
       <Button Grid.Column="1"
               Content="Clear all"
               IsEnabled="{Binding CanDiscard}"

@@ -24,6 +24,7 @@ using FusionCanvas.Application.Catalog.Compatibility;
 using FusionCanvas.Application.Items.Import;
 using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.Application.Niches;
+using FusionCanvas.Application.ContentRisk;
 using FusionCanvas.Application.Stores;
 using FusionCanvas.Application.WorkspaceTree;
 using FusionCanvas.Integration.AI;
@@ -70,6 +71,7 @@ public static class AppWorkspaceFactory
     {
         ArgumentNullException.ThrowIfNull(ai);
         var repository = new SqliteWorkspaceRepository(databasePath);
+        var contentRiskReviews = new ContentRiskReviewService(repository, new ConfiguredAiContentRiskAnalyzer(ai));
         Func<string, IWorkspaceRepository> packageRepositoryFactory =
             static path => new SqliteWorkspaceRepository(path, useConnectionPooling: false);
         var snowcloneRepository = new SqliteSnowcloneRepository(databasePath);
@@ -90,7 +92,7 @@ public static class AppWorkspaceFactory
         var groupManagement = new GroupManagementService(repository);
         var assetManagement = new AssetManagementService(repository, fileStore);
         var tagManagement = new TagManagementService(repository);
-        var itemInspector = new ItemInspectorService(repository);
+        var itemInspector = new ItemInspectorService(repository, contentRiskReviews: contentRiskReviews);
         var storeManagement = new StoreManagementService(
             repository,
             new FusionCanvas.Integration.Stores.StoreContextMapper(),
@@ -106,7 +108,7 @@ public static class AppWorkspaceFactory
         var itemCsvExport = new ItemCsvExportService();
         var itemCsvImport = new ItemCsvImportService(repository);
         var aiImageProvenanceCodec = new AiImageProvenanceCodec();
-        var designStage = new DesignStageService(repository, fileStore, aiImageProvenanceCodec);
+        var designStage = new DesignStageService(repository, fileStore, aiImageProvenanceCodec, contentRiskReviews: contentRiskReviews);
         var sllDocumentCodec = new SllDocumentCodec();
         var nichePopulation = new NichePopulationService(ai);
         var ideationAccess = new ConfiguredIdeationAccessStatus(ai);
@@ -192,7 +194,7 @@ public static class AppWorkspaceFactory
             sllDocumentCodec,
             new MockupGenerationService(repository, fileStore, mockupTemplateSetup, new ImageSharpMockupRasterCompositor()),
             mainWindowServices,
-            artworkProvider is null ? null : new ArtworkGenerationService(repository, fileStore, aiImageProvenanceCodec, artworkProvider, new ImageSharpArtworkNormalizer(), telemetry: telemetry));
+            artworkProvider is null ? null : new ArtworkGenerationService(repository, fileStore, aiImageProvenanceCodec, artworkProvider, new ImageSharpArtworkNormalizer(), telemetry: telemetry, contentRiskReviews: contentRiskReviews));
     }
 
     private static string DefaultDatabasePath()
