@@ -40,4 +40,4 @@ The optional real-desktop journey is not warranted for this module: the first-ru
 
 ## Release gate
 
-Task 1.1 remains intentionally open: the bundled FusionCanvas terms are marked `draft-0.1` and must receive human/legal approval before release as binding terms. This is the only remaining product/legal gate; the technical implementation and verification tasks are complete.
+Task 1.1 is complete for the requested product decision: the user-approved wording is bundled as FusionCanvas terms version `0.1` without a draft marker. This records product-owner approval; any separate legal-counsel review remains outside the implementation evidence.

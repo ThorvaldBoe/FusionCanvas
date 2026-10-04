@@ -2,7 +2,7 @@ namespace FusionCanvas.Application.TermsConsent;
 
 public static class TermsConsentPolicy
 {
-    public const string FusionCanvasTermsVersion = "draft-0.1";
+    public const string FusionCanvasTermsVersion = "0.1";
     public const string AcknowledgementPolicyVersion = "2026-10-04";
 
     public const string PrintifyTermsUrl = "https://printify.com/terms-of-service/";
