@@ -39,7 +39,7 @@
                        FontWeight="SemiBold"
                        FontSize="{DynamicResource Token.Typography.SectionHeading}"
                        Foreground="{DynamicResource Token.Color.TextStrong}" />
-            <TextBlock Text="The bundled FusionCanvas policy is readable offline. It is a product draft pending human/legal approval and is not legal advice."
+            <TextBlock Text="The bundled FusionCanvas policy is readable offline. It is not legal advice."
                        TextWrapping="Wrap"
                        FontSize="{DynamicResource Token.Typography.Caption}"
                        Foreground="{DynamicResource Token.Color.TextSecondary}" />

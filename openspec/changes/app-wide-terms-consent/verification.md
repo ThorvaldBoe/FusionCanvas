@@ -2,7 +2,7 @@
 
 ## Evidence status
 
-The consent contract, application-settings persistence, startup gate, consent UI, and Settings review surface are implemented. The architecture and UI audit corrections are implemented: acceptance persistence is owned by `TermsConsentService`, the startup decision is isolated behind `TermsConsentStartupCoordinator`, and the consent surface uses semantic design tokens. The merged checkout has a clean deterministic baseline; the only remaining release gate is human/legal approval of the draft policy wording.
+The consent contract, application-settings persistence, startup gate, consent UI, and Settings review surface are implemented. The architecture and UI audit corrections are implemented: acceptance persistence is owned by `TermsConsentService`, the startup decision is isolated behind `TermsConsentStartupCoordinator`, and the consent surface uses semantic design tokens. The product-owner-approved policy is bundled as version `0.1` without a draft marker; separate legal-counsel review remains external to this implementation evidence.
 
 ## Acceptance criteria
 
@@ -29,7 +29,7 @@ The consent contract, application-settings persistence, startup gate, consent UI
 - `dotnet test .\tests\FusionCanvas.Integration.Tests\FusionCanvas.Integration.Tests.csproj --no-restore -m:1 --filter FullyQualifiedName~JsonApplicationSettingsStore` — passed: 30 persistence tests; existing analyzer warnings remain.
 - `dotnet test .\tests\FusionCanvas.App.Tests\FusionCanvas.App.Tests.csproj --no-restore -m:1 --filter FullyQualifiedName~TermsConsent` — passed: 18 consent/startup/headless tests.
 - `dotnet test .\tests\FusionCanvas.App.Tests\FusionCanvas.App.Tests.csproj --no-build --no-restore -m:1 --filter FullyQualifiedName~BlueprintDetailContext_UsesTheTabContentInset` — passed: 1 Store Editor inset test.
-- `dotnet test .\FusionCanvas.sln -m:1 -p:UseSharedCompilation=false -v minimal` — passed: Domain 279, Application 603, Integration 315, App 935, and UiDescription 29; 2,161 total tests.
+- `dotnet test .\FusionCanvas.sln -m:1 -p:UseSharedCompilation=false -v minimal` — passed: Domain 284, Application 603, Integration 315, App 942, and UiDescription 29; 2,173 total tests.
 
 ### Scenario coverage mapping
 
@@ -54,7 +54,7 @@ Focused verification after the correction:
 
 ## Release gate
 
-Task 1.1 remains intentionally open: the bundled FusionCanvas terms are marked `draft-0.1` and must receive human/legal approval before release as binding terms. This is the only remaining product/legal gate; the technical implementation and verification tasks are complete.
+Task 1.1 is complete for the requested product decision: the user-approved wording is bundled as FusionCanvas terms version `0.1` without a draft marker. This records product-owner approval; any separate legal-counsel review remains outside the implementation evidence.
 
 Audit finding #803 is addressed by the startup coordinator and rendered consent coverage:
 

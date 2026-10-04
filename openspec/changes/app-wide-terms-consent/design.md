@@ -71,11 +71,11 @@ When the FusionCanvas terms version or acknowledgement-policy version changes, t
 
 ### 6. Bundle only FusionCanvas-owned policy text
 
-The FusionCanvas terms document will be maintained as a versioned application resource and displayed locally. Provider documents remain external links to their official pages. The initial FusionCanvas document must be human-approved before release as binding terms; until then, the content should be treated as a product/legal review gate rather than silently invented legal language.
+The FusionCanvas terms document is maintained as a versioned application resource and displayed locally. Provider documents remain external links to their official pages. The initial FusionCanvas document is approved by the product owner as version 0.1; it retains explicit non-legal-advice and user-responsibility boundaries, while separate legal-counsel review remains external.
 
 ## Risks / Trade-offs
 
-- [Legal wording is incomplete or inaccurate] → Treat approval of the FusionCanvas terms text and effective version as a release gate; do not present unreviewed draft text as authoritative legal advice.
+- [Legal wording is incomplete or inaccurate] → Keep the approved text concise, retain the non-legal-advice boundary, and seek separate legal counsel when legal review is required.
 - [Provider terms change without the app knowing] → Link to canonical provider pages, display a clear “review the current terms” notice, and version only FusionCanvas-controlled content in this module.
 - [Users experience the gate as friction] → Keep the form focused, provide concise summaries plus expandable full text, support keyboard navigation, and show it only on first launch or policy-version changes.
 - [Consent blocks access to local work] → Provide a clear Quit action, keep existing data untouched, and never delete, migrate, or export workspace data as part of the consent flow.
@@ -103,7 +103,7 @@ Rollback is safe at the data level because the new settings field is nullable an
 - **App startup:** update `App`, `AppServicesFactory`, or a dedicated startup coordinator so settings/consent are resolved before normal `AppServices` and `MainWindow` composition. Avoid creating a second startup path for UI tests; provide deterministic injection or an explicit accepted-consent test state.
 - **App UI:** add a focused consent window/view model under a cohesive `Legal` or `TermsConsent` folder. Use compiled bindings, a scrollable local policy region, explicit checkbox labels, provider links, an error/progress state, keyboard focus, `Agree and continue`, and `Quit`.
 - **Settings UI:** add a read-only acknowledgement summary and policy-document links. Reopening the first-run gate or changing accepted state must have one clear owner in the consent capability.
-- **Content:** add a versioned bundled FusionCanvas Terms of Use and Responsible Use Policy resource after human/legal wording approval.
+- **Content:** maintain the product-owner-approved version 0.1 bundled FusionCanvas Terms of Use and Responsible Use Policy resource.
 
 ### State and algorithms
 
@@ -138,5 +138,4 @@ Rollback is safe at the data level because the new settings field is nullable an
 
 ## Open Questions
 
-- The exact FusionCanvas Terms of Use and Responsible Use Policy wording and effective version require human/legal approval before release.
 - The product owner should confirm the final official provider URLs at implementation time, because provider policy navigation can change independently of FusionCanvas releases.

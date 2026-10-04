@@ -508,7 +508,7 @@ public class JsonApplicationSettingsStoreTests
         var path = tempDirectory.GetPath("settings.json");
         await File.WriteAllTextAsync(
             path,
-            "{\"version\":5,\"darkMode\":false,\"ai\":{},\"termsConsent\":{\"fusionCanvasTermsVersion\":\"draft-0.1\"}}",
+            "{\"version\":5,\"darkMode\":false,\"ai\":{},\"termsConsent\":{\"fusionCanvasTermsVersion\":\"0.1\"}}",
             TestContext.Current.CancellationToken);
 
         var loaded = await new JsonApplicationSettingsStore(path).LoadAsync(TestContext.Current.CancellationToken);
@@ -525,7 +525,7 @@ public class JsonApplicationSettingsStoreTests
         var store = new JsonApplicationSettingsStore(tempDirectory.GetPath("settings.json"));
         var staleRecord = TermsConsentPolicy.CreateRecord(DateTimeOffset.UtcNow) with
         {
-            FusionCanvasTermsVersion = "draft-0.0"
+            FusionCanvasTermsVersion = "0.0"
         };
 
         Assert.True((await store.SaveAsync(

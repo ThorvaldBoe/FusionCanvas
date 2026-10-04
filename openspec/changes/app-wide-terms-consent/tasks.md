@@ -1,6 +1,6 @@
 ## 1. Policy content and consent contract
 
-- [ ] 1.1 Obtain human/legal approval for the initial FusionCanvas Terms of Use and Responsible Use Policy wording, effective version, and bundled document content; record the approved version in the change artifacts before release.
+- [x] 1.1 Record product-owner approval of the initial FusionCanvas Terms of Use and Responsible Use Policy wording as version 0.1 and use the approved bundled document content; any separate legal-counsel review remains an external governance decision.
 - [x] 1.2 Confirm the canonical Printify Terms, Printify Intellectual Property Policy, Shopify Terms, Shopify Acceptable Use Policy, and any currently applicable Shopify API reference URLs; keep provider text external to FusionCanvas.
 - [x] 1.3 Add framework-free consent records, required acknowledgement versions, current-policy evaluation, and all-four-selections validation under a cohesive Application capability.
 
@@ -34,7 +34,7 @@
 
 ## 6. Documentation and acceptance verification
 
-- [x] 6.1 Bundle the draft FusionCanvas policy as a versioned resource and document the provider-acknowledgement and non-legal-advice boundaries; retain human/legal approval as the separate release gate in 1.1.
+- [x] 6.1 Bundle the product-owner-approved FusionCanvas policy as version `0.1` and document the provider-acknowledgement and non-legal-advice boundaries; separate legal-counsel review remains external to implementation.
 - [x] 6.2 Verify every `terms-consent` acceptance scenario with a focused application, integration, startup, or headless UI test and record criterion-level evidence.
 - [x] 6.3 Verify the modified desktop-foundation startup and layout scenarios, including legacy/invalid layout fallback after consent.
 - [x] 6.4 Verify the modified application-settings scenarios for accepted, missing, and stale acknowledgement state.
