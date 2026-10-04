@@ -87,11 +87,11 @@ A shallow checkout builds successfully but produces a less useful version.
 
 ### CI and release integrity
 
-The `deterministic-tests` job runs on pull requests to `main`, on the daily schedule, and on manual dispatch. The `main` branch requires that job's status check before merging. Pull-request test code receives only a read-only `contents` token; the separate failure-tracking job receives `issues: write` only for scheduled and manual runs.
+The reusable `deterministic-tests` workflow runs on pull requests to `main`, on the daily schedule, and on manual dispatch. The `main` branch requires that job's status check before merging. Pull-request test code receives only a read-only `contents` token; the separate failure-tracking job receives `issues: write` only for scheduled and manual runs.
 
 Repository maintainers own GitHub Actions updates. Each action must use a full commit SHA from its official repository, with the reviewed release version in a comment. Update the SHA and version together in a pull request, review the upstream release and action permissions, and run the deterministic baseline before merging. Do not replace a SHA with a mutable tag.
 
-Release ZIP artifacts require signed provenance attestation binding each published artifact digest to the source commit and release workflow, plus a published SHA-256 digest. A release workflow must enforce this before publishing assets; the current repository has no release workflow. Separate code signing is not required for ZIP distribution, but any future installer or platform package must use the platform's signing requirements before release. The CI test-result artifacts are diagnostics, not release outputs.
+The `Windows package` workflow runs after every merge to `main` and on manual dispatch. It waits for the reusable deterministic test gate, publishes a self-contained `win-x64` ZIP named from Nerdbank.GitVersioning's canonical package SemVer, writes a SHA-256 checksum, and creates a signed GitHub artifact attestation. These are downloadable candidate artifacts, not GitHub Releases or installers. Separate code signing is not required for ZIP distribution, but any future installer or platform package must use the platform's signing requirements before release. The CI test-result artifacts are diagnostics, not release outputs.
 
 ### Release tag convention
 
@@ -103,7 +103,7 @@ vMajor.Minor.Build
 
 Example: `v0.4.127`.
 
-The Git tag, application version, release title, and artifact filename use the same `Major.Minor.Build` value:
+Stable releases use the same `Major.Minor.Build` value for the Git tag, application version, release title, and release artifact filename:
 
 ```text
 Application version: 0.4.127
@@ -112,4 +112,4 @@ Release title:       FusionCanvas 0.4.127
 Artifact:            FusionCanvas-0.4.127-win-x64.zip
 ```
 
-Creating the complete GitHub release workflow is outside the scope of the versioning module; this convention documents the intended alignment.
+Creating the GitHub Release, installer, and automatic-update workflows remains outside this package module; this convention documents the intended alignment.
