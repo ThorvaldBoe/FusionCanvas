@@ -1,5 +1,6 @@
 using FusionCanvas.App.TermsConsent;
 using FusionCanvas.Application.Settings;
+using FusionCanvas.Application.TermsConsent;
 
 namespace FusionCanvas.App.Tests.TermsConsent;
 
@@ -77,7 +78,11 @@ public sealed class TermsConsentViewModelTests
     private static TermsConsentViewModel CreateViewModel(
         IApplicationSettingsStore? store = null,
         IExternalLinkLauncher? linkLauncher = null) =>
-        new(ApplicationSettings.Default, store ?? new RecordingStore(), "Offline policy text", linkLauncher);
+        new(
+            ApplicationSettings.Default,
+            new TermsConsentService(store ?? new RecordingStore()),
+            "Offline policy text",
+            linkLauncher);
 
     private static void SelectAll(TermsConsentViewModel viewModel)
     {

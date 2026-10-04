@@ -3,14 +3,14 @@ using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using FusionCanvas.App.Commands;
 using FusionCanvas.App.DocumentWindow;
-using FusionCanvas.Application.Settings;
 using FusionCanvas.Application.TermsConsent;
+using FusionCanvas.Application.Settings;
 
 namespace FusionCanvas.App.TermsConsent;
 
 public sealed class TermsConsentViewModel : INotifyPropertyChanged
 {
-    private readonly IApplicationSettingsStore _store;
+    private readonly TermsConsentService _consentService;
     private readonly IExternalLinkLauncher _linkLauncher;
     private ApplicationSettings _settings;
     private bool _fusionCanvasTermsSelected;
@@ -23,12 +23,12 @@ public sealed class TermsConsentViewModel : INotifyPropertyChanged
 
     public TermsConsentViewModel(
         ApplicationSettings settings,
-        IApplicationSettingsStore store,
+        TermsConsentService consentService,
         string policyText,
         IExternalLinkLauncher? linkLauncher = null)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _consentService = consentService ?? throw new ArgumentNullException(nameof(consentService));
         PolicyText = string.IsNullOrWhiteSpace(policyText)
             ? throw new ArgumentException("The bundled policy text must not be empty.", nameof(policyText))
             : policyText;
@@ -152,17 +152,19 @@ public sealed class TermsConsentViewModel : INotifyPropertyChanged
         IsSaving = true;
         try
         {
-            var updated = _settings with
-            {
-                TermsConsent = TermsConsentPolicy.CreateRecord(DateTimeOffset.UtcNow)
-            };
-            var result = await _store.SaveAsync(updated).ConfigureAwait(true);
+            var result = await _consentService.AcceptAsync(
+                _settings,
+                FusionCanvasTermsSelected,
+                PrintifyTermsSelected,
+                ShopifyTermsSelected,
+                IntellectualPropertySelected).ConfigureAwait(true);
             if (!result.Saved)
             {
                 ErrorMessage = result.Warning ?? "The acknowledgement could not be saved. Please try again.";
                 return;
             }
 
+            var updated = result.Settings!;
             _settings = updated;
             _completed = true;
             Accepted?.Invoke(updated);

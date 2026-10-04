@@ -96,12 +96,13 @@ public partial class App : Avalonia.Application
         try
         {
             var settingsStore = AppSettingsFactory.CreateStore();
+            var termsConsentService = new TermsConsentService(settingsStore);
             var load = await settingsStore.LoadAsync(startupCancellation?.Token ?? default).ConfigureAwait(true);
             if (TermsConsentStartupGate.RequiresConsent(load.Value))
             {
                 var consentViewModel = new TermsConsentViewModel(
                     load.Value,
-                    settingsStore,
+                    termsConsentService,
                     TermsConsentPolicyDocument.Load());
                 var decision = new TaskCompletionSource<ApplicationSettings?>(
                     TaskCreationOptions.RunContinuationsAsynchronously);

@@ -6,6 +6,7 @@ using FusionCanvas.Application.Telemetry;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.Integration.Persistence;
 using FusionCanvas.Application.Settings;
+using FusionCanvas.Application.TermsConsent;
 
 namespace FusionCanvas.App;
 
@@ -60,7 +61,8 @@ public static class AppServicesFactory
             new AssemblyApplicationVersionProvider(),
             AvaloniaClipboardService.Instance,
             telemetry,
-            telemetryContext);
+            telemetryContext,
+            new TermsConsentService(settingsStore));
         var textService = new AiTextGenerationService(aiSettings, credentials, catalogCache, openRouter);
         var services = new AppServices(
             httpClient,
