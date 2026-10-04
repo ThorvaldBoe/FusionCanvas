@@ -19,7 +19,7 @@
 - `dotnet build .\FusionCanvas.sln --no-restore -m:1` — passed with pre-existing analyzer warnings.
 - `dotnet test .\tests\FusionCanvas.Application.Tests\FusionCanvas.Application.Tests.csproj --no-restore --filter FullyQualifiedName~MockupOutputInvalidationServiceTests` — passed (2).
 - `dotnet test .\tests\FusionCanvas.App.Tests\FusionCanvas.App.Tests.csproj --no-restore --filter FullyQualifiedName~StageToolViewModelsTests` — passed (12).
-- `dotnet test .\FusionCanvas.sln --no-restore -m:1 --logger "console;verbosity=minimal"` — passed (2,076 tests; Domain 265, Application 572, Integration 304, App 906, UI description 29).
+- `dotnet test .\FusionCanvas.sln --no-build --no-restore -m:1 --logger "console;verbosity=minimal"` — passed (2,142 tests; Domain 279, Application 600, Integration 313, App 921, UI description 29).
 
 ## Desktop coverage decision
 
