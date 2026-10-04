@@ -18,6 +18,7 @@ namespace FusionCanvas.App.Settings;
 public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryStore
 {
     private readonly IApplicationSettingsStore _store;
+    private readonly TermsConsentService _termsConsentService;
     private readonly IApplicationThemeController _themeController;
     private readonly IApplicationVersionProvider _versionProvider;
     private readonly IClipboardService _clipboard;
@@ -43,9 +44,11 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         IApplicationVersionProvider? versionProvider = null,
         IClipboardService? clipboard = null,
         ITelemetryService? telemetryService = null,
-        ITelemetryWorkspaceContext? telemetryWorkspaceContext = null)
+        ITelemetryWorkspaceContext? telemetryWorkspaceContext = null,
+        TermsConsentService? termsConsentService = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _termsConsentService = termsConsentService ?? new TermsConsentService(_store);
         _themeController = themeController ?? throw new ArgumentNullException(nameof(themeController));
         _versionProvider = versionProvider ?? UnknownApplicationVersionProvider.Instance;
         _clipboard = clipboard ?? NullClipboardService.Instance;
@@ -199,7 +202,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     {
         var viewModel = new TermsConsentViewModel(
             _currentSettings,
-            _store,
+            _termsConsentService,
             TermsConsentPolicyDocument.Load(),
             linkLauncher);
         viewModel.Accepted += OnTermsConsentAccepted;

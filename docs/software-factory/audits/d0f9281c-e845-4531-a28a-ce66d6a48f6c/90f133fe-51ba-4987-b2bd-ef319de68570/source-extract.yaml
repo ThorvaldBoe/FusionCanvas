@@ -1,0 +1,46 @@
+extract:
+  identity: UI-EXTRACT-001
+  audit_id: d0f9281c-e845-4531-a28a-ce66d6a48f6c
+  audit_run_id: 90f133fe-51ba-4987-b2bd-ef319de68570
+  standard: FC-UI
+  standard_version: "1.3"
+  extract_definition_version: "1.4"
+  extract_revision: 1
+  repository_revision: 70c1e1c3da564a51bd8ae6544e5a699e7b6842d7
+  working_tree_state: dirty-after-consent-commit
+  extracted_at: 2026-10-04T00:00:00+02:00
+  included_projects: [FusionCanvas.App]
+  exclusions: [test-only surfaces, unrelated views]
+  discovery_limits: [runtime scaling, screen-reader announcements, and real desktop focus behavior not measured]
+surfaces:
+  - surface_id: UI-SURF-terms-consent-dialog
+    name: Terms and responsible-use consent dialog
+    kind: dialog
+    owner: FusionCanvas.App.TermsConsent
+    source_locations: [src/FusionCanvas.App/TermsConsent/TermsConsentWindow.axaml, src/FusionCanvas.App/TermsConsent/TermsConsentWindow.axaml.cs]
+    auditable_patterns: [heading, explanatory copy, required checkboxes, external policy-link buttons, disabled primary action, error message, cancel action]
+    shared_dependencies: [src/FusionCanvas.App/DesignSystem/DesignTokens.axaml, Avalonia theme resources]
+    discovery: static XAML and startup registration in App.axaml.cs
+  - surface_id: UI-SURF-settings-terms
+    name: Settings terms and responsible-use section
+    kind: panel
+    owner: FusionCanvas.App.Settings
+    source_locations: [src/FusionCanvas.App/Settings/SettingsWindow.axaml, src/FusionCanvas.App/Settings/SettingsViewModel.cs]
+    auditable_patterns: [section navigation, status summary, review action]
+    shared_dependencies: [DesignTokens.axaml, Settings navigation]
+    discovery: static XAML and SettingsViewModel section state
+extensions:
+  - extension_revision: 2
+    source_revision: worktree-consent-audit-fixes
+    working_tree_state: dirty
+    standard_version: "1.3"
+    extract_definition_version: "1.4"
+    generated_at: 2026-10-04T12:05:00+02:00
+    change_summary: Consent dialog migrated from raw layout, typography, state, and button values to shared semantic design tokens.
+    changes:
+      - surface_id: UI-SURF-terms-consent-dialog
+        extract_entry_id: UI-ENTRY-003
+        prior_extract_entry_id: UI-ENTRY-001
+        change_type: CHANGED
+        source_locations: [src/FusionCanvas.App/TermsConsent/TermsConsentWindow.axaml, src/FusionCanvas.App/DesignSystem/DesignTokens.axaml]
+        shared_dependencies: [Token.Layout.PageInset, Token.Layout.CardPadding, Token.Spacing.SectionGap, Token.Typography.Title, Token.Color.*, Token.Control.PolicyTextMinHeight, Token.Control.PolicyTextMaxHeight]
