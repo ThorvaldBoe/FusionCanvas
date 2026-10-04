@@ -35,6 +35,36 @@ FusionCanvas SHALL provide focused management of Mockup Templates for one Bluepr
 - **THEN** FusionCanvas shows a blocked empty state explaining that a Design Area is required
 - **AND** provides a route back to Design Area management without fabricating a target
 
+### Requirement: Mockup Template Color applicability choices are searchable
+FusionCanvas SHALL provide a transient search text box for eligible Color applicability choices in the focused Mockup Template editor. As the user types, visible choices SHALL be filtered by case-insensitive substring matching against each choice's displayed label, while the underlying eligible choice set and selection state remain unchanged.
+
+#### Scenario: User searches Color applicability choices
+- **WHEN** the user enters text in the Color search box
+- **THEN** the editor shows only eligible Color choices whose displayed labels contain the query using case-insensitive substring matching
+- **AND** the remaining choices retain their existing order
+
+#### Scenario: User clears the Color search
+- **WHEN** the Color search query is empty or contains only whitespace
+- **THEN** the editor shows every eligible Color choice in its existing order
+- **AND** each choice retains its prior selected or unselected state
+
+#### Scenario: Search has no matching Colors
+- **WHEN** the Color search query matches no eligible Color choice
+- **THEN** the editor shows no Color checkboxes
+- **AND** it displays clear guidance that no Colors match the search
+- **AND** the editor continues to allow the user to edit or clear the query
+
+#### Scenario: Hidden selected Colors remain part of the draft
+- **WHEN** a selected Color is hidden by the active search query
+- **THEN** the Color remains selected in the underlying draft
+- **AND** saving, readiness evaluation, dirty-state tracking, and source-image applicability continue to include that selected Color
+- **AND** clearing the query shows the Color again as selected
+
+#### Scenario: Color search is not persisted
+- **WHEN** the user closes the Mockup Template editor and later opens a Mockup Template editor session
+- **THEN** the Color search query starts empty
+- **AND** persisted template configuration contains no Color search text
+
 ### Requirement: Each template revision owns an image-space Design Area mapping
 FusionCanvas SHALL store the mapping of the selected Design Area into the specific mockup image as revisioned template configuration with image-space X, Y, width, and height values. The mapping SHALL be editable through a visual placement rectangle, while numeric values remain visible and editable as supporting technical controls.
 
