@@ -3,12 +3,14 @@ using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Catalog;
+using FusionCanvas.Domain.ContentRisk;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Concepts;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Catalog;
+using FusionCanvas.Application.ContentRisk;
 
 namespace FusionCanvas.Application.DesignFiles;
 
@@ -19,19 +21,22 @@ public sealed class DesignStageService : IDesignStageService
     private readonly IAiImageProvenanceCodec _provenanceCodec;
     private readonly Func<DateTimeOffset> _clock;
     private readonly Func<Guid> _newId;
+    private readonly IContentRiskReviewService? _contentRiskReviews;
 
     public DesignStageService(
         IWorkspaceRepository repository,
         IWorkspaceFileStore fileStore,
         IAiImageProvenanceCodec provenanceCodec,
         Func<DateTimeOffset>? clock = null,
-        Func<Guid>? newId = null)
+        Func<Guid>? newId = null,
+        IContentRiskReviewService? contentRiskReviews = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _fileStore = fileStore ?? throw new ArgumentNullException(nameof(fileStore));
         _provenanceCodec = provenanceCodec ?? throw new ArgumentNullException(nameof(provenanceCodec));
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _newId = newId ?? Guid.NewGuid;
+        _contentRiskReviews = contentRiskReviews;
     }
 
     public async Task<DesignStageState> LoadDesignStageStateAsync(Guid itemId, CancellationToken cancellationToken = default)
@@ -716,6 +721,20 @@ public sealed class DesignStageService : IDesignStageService
             return DesignStageResult.Failure($"The slot image could not be imported. {exception.Message}", BuildState(snapshot, item.Id));
         }
 
+        byte[] managedBytes;
+        try
+        {
+            await using var importedStream = await _fileStore.OpenReadAsync(imported.WorkspaceRelativePath, cancellationToken).ConfigureAwait(false);
+            using var buffer = new MemoryStream();
+            await importedStream.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
+            managedBytes = buffer.ToArray();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            await ManagedWorkspaceFileCleanup.TryDeleteAsync(_fileStore, imported.WorkspaceRelativePath).ConfigureAwait(false);
+            return DesignStageResult.Failure($"The slot image could not be reviewed. {exception.Message}", BuildState(snapshot, item.Id));
+        }
+
         var assetId = _newId();
         var now = _clock();
         var asset = new Asset(
@@ -732,6 +751,8 @@ public sealed class DesignStageService : IDesignStageService
             now,
             "{}");
         var link = new AssetLink(assetId, WorkspaceEntityKind.Item, item.Id);
+        var reviewTarget = new ContentRiskReviewTarget(assetId, ContentRiskOwnerKind.Asset, ContentRiskContentKind.Image, "design.asset");
+        var review = ContentRiskReview.Unreviewed(reviewTarget, ContentRiskFingerprint.ForImage(reviewTarget, managedBytes));
 
         // Update slot assignment with new asset and remove old asset if replacing
         var updatedAssignments = snapshot.DesignSlotAssignments
@@ -758,7 +779,8 @@ public sealed class DesignStageService : IDesignStageService
         {
             DesignSlotAssignments = updatedAssignments,
             Assets = updatedAssets,
-            AssetLinks = updatedLinks
+            AssetLinks = updatedLinks,
+            ContentRiskReviews = [.. snapshot.ContentRiskReviews.Where(existing => existing.Target != reviewTarget && (oldAssetId is null || existing.Target.OwnerId != oldAssetId)), review]
         };
 
         try
@@ -787,6 +809,18 @@ public sealed class DesignStageService : IDesignStageService
             if (oldAsset is not null && !preserveGenerated)
             {
                 _fileStore.TryDelete(oldAsset.WorkspaceRelativePath);
+            }
+        }
+
+        if (_contentRiskReviews is not null)
+        {
+            try
+            {
+                await _contentRiskReviews.ReviewImageAsync(reviewTarget, "image/png", managedBytes, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // The persisted Unreviewed state remains visible when advisory review cannot run.
             }
         }
 
@@ -919,7 +953,13 @@ public sealed class DesignStageService : IDesignStageService
                         Position = normalizedPlaceholder?.Position ?? area.Position,
                         DecorationMethod = normalizedPlaceholder?.DecorationMethod ?? area.DecorationMethod,
                         Width = normalizedPlaceholder?.Width ?? area.Width,
-                        Height = normalizedPlaceholder?.Height ?? area.Height
+                        Height = normalizedPlaceholder?.Height ?? area.Height,
+                        ContentRiskReview = assignment?.AssetId is Guid assignedAssetId
+                            ? snapshot.ContentRiskReviews.FirstOrDefault(review =>
+                                review.Target.OwnerKind == ContentRiskOwnerKind.Asset
+                                && review.Target.OwnerId == assignedAssetId
+                                && review.Target.Role == "design.asset")
+                            : null
                     };
                 }).ToArray();
 
@@ -1131,7 +1171,11 @@ public sealed class DesignStageService : IDesignStageService
                 IsGenerated = a.Kind == AssetKind.ExportedImage,
                 ArtworkWarning = a.Kind == AssetKind.ExportedImage && _provenanceCodec.TryDeserialize(a.MetadataJson, out var generatedProvenance)
                     ? generatedProvenance!.Warnings?.FirstOrDefault()
-                    : null
+                    : null,
+                ContentRiskReview = snapshot.ContentRiskReviews.FirstOrDefault(review =>
+                    review.Target.OwnerKind == ContentRiskOwnerKind.Asset
+                    && review.Target.OwnerId == a.Id
+                    && review.Target.Role == "design.asset")
             })
             .ToArray();
     }

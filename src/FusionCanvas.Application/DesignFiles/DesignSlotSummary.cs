@@ -1,5 +1,6 @@
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Catalog;
+using FusionCanvas.Domain.ContentRisk;
 
 namespace FusionCanvas.Application.DesignFiles;
 
@@ -20,6 +21,7 @@ public sealed record DesignSlotSummary(
     public int? Height { get; init; }
     public bool IsGenerated { get; init; }
     public string? ArtworkWarning { get; init; }
+    public ContentRiskReview? ContentRiskReview { get; init; }
 }
 
 /// <summary>Summary of a design variant row for the UI.</summary>

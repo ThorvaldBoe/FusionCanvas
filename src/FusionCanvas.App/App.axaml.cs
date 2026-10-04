@@ -6,8 +6,11 @@ using Avalonia.Threading;
 using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Settings;
 using FusionCanvas.App.Stores;
+using FusionCanvas.App.TermsConsent;
 using FusionCanvas.App.Versioning;
 using FusionCanvas.App.Views;
+using FusionCanvas.Application.Settings;
+using FusionCanvas.Application.TermsConsent;
 
 namespace FusionCanvas.App;
 
@@ -39,7 +42,7 @@ public partial class App : Avalonia.Application
             desktop.ShutdownRequested += OnShutdownRequested;
             desktop.MainWindow = splash;
             splash.Show();
-            Dispatcher.UIThread.Post(() => InitializeMainWindow(desktop, splash));
+            Dispatcher.UIThread.Post(() => _ = InitializeStartupAsync(desktop, splash));
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -82,6 +85,93 @@ public partial class App : Avalonia.Application
                 desktop.ShutdownRequested -= OnShutdownRequested;
                 startupCancellation?.Dispose();
             }
+        }
+    }
+
+    private async Task InitializeStartupAsync(
+        IClassicDesktopStyleApplicationLifetime desktop,
+        SplashWindow splash)
+    {
+        var startupCancellation = _startupCancellation;
+        try
+        {
+            var settingsStore = AppSettingsFactory.CreateStore();
+            var load = await settingsStore.LoadAsync(startupCancellation?.Token ?? default).ConfigureAwait(true);
+            if (TermsConsentStartupGate.RequiresConsent(load.Value))
+            {
+                var consentViewModel = new TermsConsentViewModel(
+                    load.Value,
+                    settingsStore,
+                    TermsConsentPolicyDocument.Load());
+                var decision = new TaskCompletionSource<ApplicationSettings?>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                using var cancellationRegistration = startupCancellation?.Token.Register(
+                    () => decision.TrySetResult(null));
+                consentViewModel.Accepted += settings => decision.TrySetResult(settings);
+                consentViewModel.QuitRequested += () => decision.TrySetResult(null);
+                var consentWindow = new TermsConsentWindow { DataContext = consentViewModel };
+                consentWindow.Show(splash);
+
+                var acceptedSettings = await decision.Task.ConfigureAwait(true);
+                if (acceptedSettings is null)
+                {
+                    splash.Close();
+                    desktop.Shutdown();
+                    return;
+                }
+
+                InitializeMainWindow(desktop, settingsStore, acceptedSettings, load.Warning);
+                splash.Close();
+                return;
+            }
+
+            InitializeMainWindow(desktop, settingsStore, load.Value, load.Warning);
+            splash.Close();
+        }
+        catch (OperationCanceledException) when (startupCancellation?.IsCancellationRequested == true)
+        {
+            splash.Close();
+        }
+        catch (Exception exception)
+        {
+            Trace.TraceError("Application startup failed: {0}", exception);
+            splash.Close();
+            desktop.Shutdown();
+        }
+        finally
+        {
+            if (ReferenceEquals(_startupCancellation, startupCancellation))
+            {
+                _startupCancellation = null;
+                desktop.ShutdownRequested -= OnShutdownRequested;
+                startupCancellation?.Dispose();
+            }
+        }
+    }
+
+    private void InitializeMainWindow(
+        IClassicDesktopStyleApplicationLifetime desktop,
+        IApplicationSettingsStore settingsStore,
+        ApplicationSettings settings,
+        string? loadWarning)
+    {
+        var startupCancellation = _startupCancellation;
+        try
+        {
+            _services = AppServicesFactory.Create(
+                settingsStore,
+                startupCancellation?.Token ?? default,
+                settings,
+                loadWarning);
+            var mainWindow = new MainWindow(_services, startupCancellation?.Token ?? default);
+            mainWindow.Closing += OnWindowClosing;
+            desktop.MainWindow = mainWindow;
+            mainWindow.Show();
+        }
+        catch (OperationCanceledException) when (startupCancellation?.IsCancellationRequested == true)
+        {
+            _services?.Dispose();
+            _services = null;
         }
     }
 

@@ -1,0 +1,142 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:terms="clr-namespace:FusionCanvas.App.TermsConsent"
+        x:Class="FusionCanvas.App.TermsConsent.TermsConsentWindow"
+        x:DataType="terms:TermsConsentViewModel"
+        Title="FusionCanvas terms and responsible use"
+        Width="820"
+        Height="720"
+        MinWidth="680"
+        MinHeight="560"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ApplicationBackgroundBrush}">
+  <Grid RowDefinitions="Auto,*,Auto,Auto" Margin="24">
+    <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,16">
+      <TextBlock Text="Before you start using FusionCanvas"
+                 FontSize="24"
+                 FontWeight="SemiBold"
+                 Foreground="{DynamicResource StrongTextBrush}" />
+      <TextBlock Text="Please review the local policy and confirm each responsibility that applies to provider-connected work."
+                 TextWrapping="Wrap"
+                 Foreground="{DynamicResource SecondaryTextBrush}" />
+      <TextBlock Text="FusionCanvas policy version {Binding TermsVersion}; acknowledgement policy {Binding PolicyVersion}."
+                 FontSize="12"
+                 Foreground="{DynamicResource SecondaryTextBrush}" />
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+      <StackPanel Spacing="14">
+        <Border Padding="14"
+                Background="{DynamicResource ElevatedSurfaceBrush}"
+                BorderBrush="{DynamicResource ControlBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+          <StackPanel Spacing="8">
+            <TextBlock Text="FusionCanvas Terms of Use and Responsible Use Policy"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource StrongTextBrush}" />
+            <TextBlock Text="The bundled FusionCanvas policy is readable offline. It is a product draft pending human/legal approval and is not legal advice."
+                       TextWrapping="Wrap"
+                       FontSize="12"
+                       Foreground="{DynamicResource SecondaryTextBrush}" />
+            <TextBox Text="{Binding PolicyText}"
+                     IsReadOnly="True"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     MinHeight="150"
+                     MaxHeight="230"
+                     FontSize="12"
+                     Background="{DynamicResource PanelSurfaceBrush}"
+                     BorderBrush="{DynamicResource ControlBorderBrush}" />
+          </StackPanel>
+        </Border>
+
+        <StackPanel Spacing="8">
+          <TextBlock Text="Required acknowledgements"
+                     FontSize="16"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource StrongTextBrush}" />
+          <CheckBox x:Name="FusionCanvasTermsCheckBox"
+                    IsChecked="{Binding FusionCanvasTermsSelected, Mode=TwoWay}"
+                    AutomationProperties.Name="I have read and agree to the FusionCanvas Terms of Use and Responsible Use Policy"
+                    Content="I have read and agree to the FusionCanvas Terms of Use and Responsible Use Policy." />
+          <CheckBox IsChecked="{Binding PrintifyTermsSelected, Mode=TwoWay}"
+                    AutomationProperties.Name="I understand and will comply with Printify terms and policies"
+                    Content="I understand that Printify's current terms and policies apply when I use Printify-connected features, and I will comply with them." />
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="28,0,0,4">
+            <Button Content="Printify Terms"
+                    Command="{Binding OpenPrintifyTermsCommand}"
+                    AutomationProperties.Name="Open official Printify terms" />
+            <Button Content="Printify IP Policy"
+                    Command="{Binding OpenPrintifyIpPolicyCommand}"
+                    AutomationProperties.Name="Open official Printify intellectual property policy" />
+          </StackPanel>
+          <CheckBox IsChecked="{Binding ShopifyTermsSelected, Mode=TwoWay}"
+                    AutomationProperties.Name="I understand and will comply with Shopify terms and policies"
+                    Content="I understand that Shopify's current terms and policies apply when I use Shopify-connected features, and I will comply with them." />
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="28,0,0,4">
+            <Button Content="Shopify Terms"
+                    Command="{Binding OpenShopifyTermsCommand}"
+                    AutomationProperties.Name="Open official Shopify terms" />
+            <Button Content="Shopify Acceptable Use"
+                    Command="{Binding OpenShopifyAupCommand}"
+                    AutomationProperties.Name="Open official Shopify acceptable use policy" />
+            <Button Content="Shopify API Terms"
+                    Command="{Binding OpenShopifyApiTermsCommand}"
+                    AutomationProperties.Name="Open official Shopify API terms" />
+          </StackPanel>
+          <CheckBox IsChecked="{Binding IntellectualPropertySelected, Mode=TwoWay}"
+                    AutomationProperties.Name="I am responsible for rights licenses permissions trademarks and intellectual property"
+                    Content="I am responsible for having the rights, licences, permissions, and authorizations for my content, brands, trademarks, and other intellectual property." />
+        </StackPanel>
+
+        <Border Padding="12"
+                Background="{DynamicResource WarningBackgroundBrush}"
+                BorderBrush="{DynamicResource WarningBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+          <TextBlock Text="FusionCanvas does not provide legal advice, verify ownership, or guarantee non-infringement. Checking these boxes does not accept Printify or Shopify agreements on your behalf; you remain responsible for reviewing and accepting the provider terms that apply to your accounts and use. Provider links are external and may require internet access."
+                     TextWrapping="Wrap"
+                     FontSize="12" />
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+
+    <TextBlock Grid.Row="2"
+               Margin="0,12,0,8"
+               IsVisible="{Binding HasError}"
+               Text="{Binding ErrorMessage}"
+               TextWrapping="Wrap"
+               Foreground="{DynamicResource DangerTextBrush}"
+               AutomationProperties.Name="Consent error" />
+
+    <Grid Grid.Row="3" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+      <ProgressBar Grid.Column="0"
+                   IsVisible="{Binding IsSaving}"
+                   IsIndeterminate="True"
+                   VerticalAlignment="Center"
+                   Height="4"
+                   AutomationProperties.Name="Saving acknowledgement" />
+      <Button Grid.Column="1"
+              Content="Quit FusionCanvas"
+              Command="{Binding QuitCommand}"
+              AutomationProperties.Name="Quit FusionCanvas" />
+      <Button Grid.Column="2"
+              Content="Agree and continue"
+              Command="{Binding AgreeCommand}"
+              IsEnabled="{Binding CanAgree}"
+              Classes="primary"
+              AutomationProperties.Name="Agree and continue" />
+    </Grid>
+  </Grid>
+  <Window.Styles>
+    <Style Selector="Button.primary">
+      <Setter Property="Padding" Value="12,8" />
+      <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource CommandForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CommandBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+  </Window.Styles>
+</Window>

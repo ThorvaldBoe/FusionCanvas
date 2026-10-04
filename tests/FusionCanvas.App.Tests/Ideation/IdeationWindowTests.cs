@@ -68,6 +68,11 @@ public sealed class IdeationWindowTests
             Assert.Contains(window.GetVisualDescendants().OfType<ListBox>(), list => AutomationProperties.GetName(list) == "Ideas candidate list");
             Assert.Contains(window.GetVisualDescendants().OfType<Button>(), button => AutomationProperties.GetName(button) == "Generate ideas");
             Assert.Contains(window.GetVisualDescendants().OfType<SpinningWheel>(), wheel => AutomationProperties.GetName(wheel) == "Generating ideas");
+            var awareness = window.GetVisualDescendants().OfType<Border>()
+                .Single(border => AutomationProperties.GetName(border) == "Content risk awareness");
+            Assert.True(awareness.IsEffectivelyVisible);
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text =>
+                text.Text?.Contains("Automated review is advisory", StringComparison.Ordinal) == true);
         }
         finally
         {

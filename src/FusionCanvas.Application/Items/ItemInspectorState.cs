@@ -1,5 +1,6 @@
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Items;
+using FusionCanvas.Domain.ContentRisk;
 
 namespace FusionCanvas.Application.Items;
 
@@ -22,5 +23,6 @@ public sealed record ItemInspectorState(
 {
     public int IdeaRating { get; init; }
     public bool IsSllStale { get; init; }
+    public IReadOnlyList<ContentRiskReview> ContentRiskReviews { get; init; } = [];
     public bool IsReadOnly => !IsEffectivelyActive;
 }

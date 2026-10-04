@@ -8,6 +8,8 @@ using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Items;
+using FusionCanvas.Application.ContentRisk;
+using FusionCanvas.Domain.ContentRisk;
 
 namespace FusionCanvas.Application.Tests.Items;
 
@@ -110,6 +112,69 @@ public class ItemInspectorServiceTests
         Assert.Contains("\"phrase\":\"phrase one phrase two\"", persisted.MetadataJson);
         Assert.Contains("\"graphicDirection\":\"Graphic direction\"", persisted.MetadataJson);
         Assert.Equal(1, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task Save_CreatesAdvisoryReviewAndRemovesClearedContentReview()
+    {
+        var sample = Sample.Create();
+        var phraseTarget = new ContentRiskReviewTarget(
+            sample.Item.Id,
+            ContentRiskOwnerKind.Item,
+            ContentRiskContentKind.Text,
+            "concept.phrase");
+        var existingReview = ContentRiskReview.NoObviousSignalDetected(
+            phraseTarget,
+            ContentRiskFingerprint.ForText(phraseTarget, "phrase-value"),
+            new ContentRiskReviewProvenance("test", sample.Now));
+        var repository = new TestRepository(sample.Snapshot with { ContentRiskReviews = [existingReview] });
+        var reviewService = new RecordingContentRiskReviewService();
+        var service = new ItemInspectorService(repository, contentRiskReviews: reviewService);
+
+        var result = await service.SaveAsync(new(
+            sample.Item.Id,
+            "New title",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            []));
+
+        Assert.True(result.Succeeded);
+        Assert.Contains(repository.Snapshot.ContentRiskReviews, review =>
+            review.Target.Role == "listing.title" && review.State == ContentRiskReviewState.Unreviewed);
+        Assert.DoesNotContain(repository.Snapshot.ContentRiskReviews, review => review.Target == phraseTarget);
+        Assert.Equal("listing.title", reviewService.TextTargets.Single().Role);
+    }
+
+    [Fact]
+    public async Task Save_WorkingOnlyIdeaDoesNotCreateCustomerFacingReview()
+    {
+        var sample = Sample.Create();
+        var item = sample.Item with
+        {
+            MetadataJson = "{\"idea\":\"working idea\"}"
+        };
+        var repository = new TestRepository(sample.Snapshot with { Items = [item] });
+        var reviewService = new RecordingContentRiskReviewService();
+        var service = new ItemInspectorService(repository, contentRiskReviews: reviewService);
+
+        var result = await service.SaveAsync(new(
+            item.Id,
+            item.Name,
+            item.Description,
+            "updated working idea",
+            null,
+            null,
+            null,
+            null,
+            []));
+
+        Assert.True(result.Succeeded);
+        Assert.Empty(repository.Snapshot.ContentRiskReviews);
+        Assert.Empty(reviewService.TextTargets);
     }
 
     [Fact]
@@ -498,6 +563,26 @@ public class ItemInspectorServiceTests
         Assert.Equal("phrase", reloaded.Creative.Phrase);
         Assert.Equal("graphic", reloaded.Creative.GraphicDirection);
         Assert.Equal("notes", reloaded.Notes);
+    }
+
+    private sealed class RecordingContentRiskReviewService : IContentRiskReviewService
+    {
+        public List<ContentRiskReviewTarget> TextTargets { get; } = [];
+
+        public Task<ContentRiskReview> ReviewTextAsync(ContentRiskReviewTarget target, string text, CancellationToken cancellationToken = default)
+        {
+            TextTargets.Add(target);
+            return Task.FromResult(ContentRiskReview.Unreviewed(target, ContentRiskFingerprint.ForText(target, text)));
+        }
+
+        public Task<ContentRiskReview> ReviewImageAsync(ContentRiskReviewTarget target, string mediaType, byte[] imageBytes, CancellationToken cancellationToken = default) =>
+            Task.FromResult(ContentRiskReview.Unreviewed(target, ContentRiskFingerprint.ForImage(target, imageBytes)));
+
+        public Task<ContentRiskReview> EnsureUnreviewedAsync(ContentRiskReviewTarget target, string fingerprint, CancellationToken cancellationToken = default) =>
+            Task.FromResult(ContentRiskReview.Unreviewed(target, fingerprint));
+
+        public Task<ContentRiskReview?> FindAsync(ContentRiskReviewTarget target, string fingerprint, CancellationToken cancellationToken = default) =>
+            Task.FromResult<ContentRiskReview?>(null);
     }
 
     private sealed class TestRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository

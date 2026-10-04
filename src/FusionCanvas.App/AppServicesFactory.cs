@@ -5,6 +5,7 @@ using FusionCanvas.Integration.AI;
 using FusionCanvas.Application.Telemetry;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.Integration.Persistence;
+using FusionCanvas.Application.Settings;
 
 namespace FusionCanvas.App;
 
@@ -18,12 +19,14 @@ public static class AppServicesFactory
 
     public static AppServices Create(
         FusionCanvas.Application.Settings.IApplicationSettingsStore settingsStore,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ApplicationSettings? initialSettings = null,
+        string? loadWarning = null)
     {
         ArgumentNullException.ThrowIfNull(settingsStore);
-        var load = StartupTaskRunner.Run(
-            token => settingsStore.LoadAsync(token),
-            cancellationToken);
+        var load = initialSettings is null
+            ? StartupTaskRunner.Run(token => settingsStore.LoadAsync(token), cancellationToken)
+            : new ApplicationSettingsLoadResult(initialSettings, UsedDefault: false, loadWarning);
         var settingsPath =
             (settingsStore as FusionCanvas.Integration.Settings.JsonApplicationSettingsStore)?.SettingsPath;
         var settingsDirectory = settingsPath is null

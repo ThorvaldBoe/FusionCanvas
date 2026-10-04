@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using FusionCanvas.Application.AI;
+using FusionCanvas.Application.TermsConsent;
 
 namespace FusionCanvas.Application.Settings;
 
@@ -9,7 +10,8 @@ public sealed record ApplicationSettings(
     WindowLayoutSettings? WindowLayout = null,
     Guid? ActiveWorkspaceId = null,
     ImmutableDictionary<string, WindowGeometrySettings>? WindowGeometry = null,
-    Guid? ActiveStoreId = null)
+    Guid? ActiveStoreId = null,
+    TermsConsentRecord? TermsConsent = null)
 {
     public ApplicationSettings(bool DarkMode)
         : this(DarkMode, AiConfigurationSettings.Default, null, null, null)

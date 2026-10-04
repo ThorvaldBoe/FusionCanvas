@@ -1,7 +1,9 @@
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Items;
+using FusionCanvas.Domain.ContentRisk;
 using FusionCanvas.Application.Workspaces;
+using FusionCanvas.Application.ContentRisk;
 
 namespace FusionCanvas.Application.DesignFiles;
 
@@ -11,17 +13,20 @@ public sealed class DesignFileService : IDesignFileService
     private readonly IWorkspaceFileStore _fileStore;
     private readonly Func<DateTimeOffset> _clock;
     private readonly Func<Guid> _newId;
+    private readonly IContentRiskReviewService? _contentRiskReviews;
 
     public DesignFileService(
         IWorkspaceRepository repository,
         IWorkspaceFileStore fileStore,
         Func<DateTimeOffset>? clock = null,
-        Func<Guid>? newId = null)
+        Func<Guid>? newId = null,
+        IContentRiskReviewService? contentRiskReviews = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _fileStore = fileStore ?? throw new ArgumentNullException(nameof(fileStore));
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _newId = newId ?? Guid.NewGuid;
+        _contentRiskReviews = contentRiskReviews;
     }
 
     public async Task<IReadOnlyList<DesignFileSummary>> ListForItemAsync(Guid itemId, CancellationToken cancellationToken = default)
@@ -69,6 +74,20 @@ public sealed class DesignFileService : IDesignFileService
             return DesignFileImportResult.Failure($"The Design file could not be imported. {exception.Message}");
         }
 
+        byte[] managedBytes;
+        try
+        {
+            await using var importedStream = await _fileStore.OpenReadAsync(imported.WorkspaceRelativePath, cancellationToken).ConfigureAwait(false);
+            using var buffer = new MemoryStream();
+            await importedStream.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
+            managedBytes = buffer.ToArray();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            await ManagedWorkspaceFileCleanup.TryDeleteAsync(_fileStore, imported.WorkspaceRelativePath).ConfigureAwait(false);
+            return DesignFileImportResult.Failure($"The imported Design file could not be reviewed. {exception.Message}");
+        }
+
         var assetId = _newId();
         var now = _clock();
         var asset = new Asset(
@@ -85,11 +104,14 @@ public sealed class DesignFileService : IDesignFileService
             now,
             "{}");
         var link = new AssetLink(assetId, WorkspaceEntityKind.Item, itemId);
+        var reviewTarget = new ContentRiskReviewTarget(assetId, ContentRiskOwnerKind.Asset, ContentRiskContentKind.Image, "design.asset");
+        var review = ContentRiskReview.Unreviewed(reviewTarget, ContentRiskFingerprint.ForImage(reviewTarget, managedBytes));
 
         var updated = snapshot with
         {
             Assets = [.. snapshot.Assets, asset],
-            AssetLinks = [.. snapshot.AssetLinks, link]
+            AssetLinks = [.. snapshot.AssetLinks, link],
+            ContentRiskReviews = [.. snapshot.ContentRiskReviews.Where(existing => existing.Target != reviewTarget), review]
         };
 
         try
@@ -107,6 +129,18 @@ public sealed class DesignFileService : IDesignFileService
 
             return DesignFileImportResult.Failure(
                 $"The Design file record could not be persisted. {exception.Message}{ManagedWorkspaceFileCleanup.FailureMessage(cleanup)}");
+        }
+
+        if (_contentRiskReviews is not null)
+        {
+            try
+            {
+                await _contentRiskReviews.ReviewImageAsync(reviewTarget, "image/png", managedBytes, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // The persisted Unreviewed state remains visible when advisory review cannot run.
+            }
         }
 
         return DesignFileImportResult.Success(ToSummary(asset));

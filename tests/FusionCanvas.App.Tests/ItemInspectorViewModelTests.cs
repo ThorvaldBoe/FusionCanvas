@@ -6,6 +6,7 @@ using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
+using FusionCanvas.Domain.ContentRisk;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Tags;
@@ -16,6 +17,39 @@ namespace FusionCanvas.App.Tests;
 
 public class ItemInspectorViewModelTests
 {
+    [Fact]
+    public async Task Load_ShowsAdvisoryWarningAndProgressivelyDisclosedFindingDetails()
+    {
+        var sample = Sample.Create();
+        var target = new ContentRiskReviewTarget(
+            sample.Item.Id,
+            ContentRiskOwnerKind.Item,
+            ContentRiskContentKind.Text,
+            "concept.phrase");
+        var review = ContentRiskReview.PotentialRisk(
+            target,
+            ContentRiskFingerprint.ForText(target, "phrase-value"),
+            [new ContentRiskFinding(
+                ContentRiskCategory.IpRisk,
+                ContentRiskSeverity.Medium,
+                "The phrase may resemble protected wording.",
+                "phrase")],
+            new ContentRiskReviewProvenance("test", sample.Now));
+        sample.Repository.Set(sample.Snapshot with { ContentRiskReviews = [review] });
+
+        var viewModel = sample.CreateViewModel();
+        await viewModel.LoadAsync(sample.Item.Id);
+
+        Assert.True(viewModel.ShowsContentRiskWarning);
+        Assert.Contains("advisory", viewModel.ContentRiskWarningText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("1 advisory finding", viewModel.ContentRiskDetailsText);
+        Assert.False(viewModel.IsContentRiskDetailsExpanded);
+
+        viewModel.ToggleContentRiskDetailsCommand.Execute(null);
+
+        Assert.True(viewModel.IsContentRiskDetailsExpanded);
+    }
+
     [Fact]
     public async Task Load_PopulatesFieldsFromStateAndClearsDirty()
     {

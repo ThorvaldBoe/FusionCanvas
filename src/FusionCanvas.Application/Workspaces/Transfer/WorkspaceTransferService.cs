@@ -294,7 +294,8 @@ public sealed class WorkspaceTransferService(
             MockupTemplates = [.. live.MockupTemplates, .. imported.MockupTemplates],
             MockupTemplateColorVariants = [.. live.MockupTemplateColorVariants, .. imported.MockupTemplateColorVariants],
             MockupTemplateRevisions = [.. live.MockupTemplateRevisions, .. imported.MockupTemplateRevisions],
-            MockupTemplateRevisionColors = [.. live.MockupTemplateRevisionColors, .. imported.MockupTemplateRevisionColors]
+            MockupTemplateRevisionColors = [.. live.MockupTemplateRevisionColors, .. imported.MockupTemplateRevisionColors],
+            ContentRiskReviews = [.. live.ContentRiskReviews, .. imported.ContentRiskReviews]
         };
 
     internal static IReadOnlyDictionary<string, int> CountEntities(WorkspaceSnapshot snapshot) =>
@@ -315,7 +316,8 @@ public sealed class WorkspaceTransferService(
             ["blueprintOfferings"] = snapshot.BlueprintOfferings.Count,
             ["offeringVariants"] = snapshot.OfferingVariants.Count,
             ["designAreas"] = snapshot.OfferingPlaceholders.Count,
-            ["mockupTemplates"] = snapshot.MockupTemplates.Count
+            ["mockupTemplates"] = snapshot.MockupTemplates.Count,
+            ["contentRiskReviews"] = snapshot.ContentRiskReviews.Count
         };
 
     private static IReadOnlyList<string> BuildWarnings(

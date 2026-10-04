@@ -3,12 +3,13 @@ using System.Text.Json;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Settings;
 using FusionCanvas.Application.Telemetry;
+using FusionCanvas.Application.TermsConsent;
 
 namespace FusionCanvas.Integration.Settings;
 
 public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
 {
-    private const int SupportedVersion = 4;
+    private const int SupportedVersion = 5;
 
     private static readonly JsonSerializerOptions WriteOptions = new()
     {
@@ -98,10 +99,11 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
             {
                 var noAiLayout = TryReadWindowLayout(root, out var noAiLayoutWarning);
                 var noAiGeometry = TryReadWindowGeometry(version, root, out var noAiGeometryWarning);
+                var noAiConsent = TryReadTermsConsent(root, out var noAiConsentWarning);
                 return new ApplicationSettingsLoadResult(
-                    new ApplicationSettings(darkMode, AiConfigurationSettings.Default, noAiLayout, activeWorkspaceId, noAiGeometry, TryReadGuid(root, "activeStoreId")),
+                    new ApplicationSettings(darkMode, AiConfigurationSettings.Default, noAiLayout, activeWorkspaceId, noAiGeometry, TryReadGuid(root, "activeStoreId"), noAiConsent),
                     UsedDefault: false,
-                    CombineWarnings(noAiLayoutWarning, noAiGeometryWarning));
+                    CombineWarnings(CombineWarnings(noAiLayoutWarning, noAiGeometryWarning), noAiConsentWarning));
             }
 
             AiConfigurationSettings aiSettings;
@@ -122,8 +124,10 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
             var geometry = TryReadWindowGeometry(version, root, out var geometryWarning);
             warning = CombineWarnings(warning, layoutWarning);
             warning = CombineWarnings(warning, geometryWarning);
+            var consent = TryReadTermsConsent(root, out var consentWarning);
+            warning = CombineWarnings(warning, consentWarning);
             return new ApplicationSettingsLoadResult(
-                new ApplicationSettings(darkMode, aiSettings, layout, activeWorkspaceId, geometry, TryReadGuid(root, "activeStoreId")),
+                new ApplicationSettings(darkMode, aiSettings, layout, activeWorkspaceId, geometry, TryReadGuid(root, "activeStoreId"), consent),
                 UsedDefault: false,
                 warning);
         }
@@ -155,6 +159,7 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
                         WindowLayout = settings.WindowLayout,
                         ActiveWorkspaceId = settings.ActiveWorkspaceId,
                         ActiveStoreId = settings.ActiveStoreId,
+                        TermsConsent = settings.TermsConsent,
                         WindowGeometry = settings.WindowGeometry is { Count: > 0 } geo
                             ? geo.ToDictionary(p => p.Key, p => p.Value)
                             : null
@@ -313,6 +318,35 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
         return false;
     }
 
+    private static TermsConsentRecord? TryReadTermsConsent(JsonElement root, out string? warning)
+    {
+        warning = null;
+        if (!TryGetProperty(root, "termsConsent", out var element))
+        {
+            return null;
+        }
+
+        if (element.ValueKind != JsonValueKind.Object ||
+            !TryGetProperty(element, "fusionCanvasTermsVersion", out var termsVersion) ||
+            termsVersion.ValueKind != JsonValueKind.String ||
+            string.IsNullOrWhiteSpace(termsVersion.GetString()) ||
+            !TryGetProperty(element, "acknowledgementPolicyVersion", out var policyVersion) ||
+            policyVersion.ValueKind != JsonValueKind.String ||
+            string.IsNullOrWhiteSpace(policyVersion.GetString()) ||
+            !TryGetProperty(element, "acceptedAtUtc", out var acceptedAt) ||
+            acceptedAt.ValueKind != JsonValueKind.String ||
+            !DateTimeOffset.TryParse(acceptedAt.GetString(), out var acceptedAtUtc))
+        {
+            warning = "The saved terms acknowledgement was invalid and must be completed again.";
+            return null;
+        }
+
+        return new TermsConsentRecord(
+            termsVersion.GetString()!,
+            policyVersion.GetString()!,
+            acceptedAtUtc.ToUniversalTime());
+    }
+
     private static bool TryGetInt32(JsonElement element, string name, out int value)
     {
         value = default;
@@ -359,5 +393,6 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
         public Guid? ActiveWorkspaceId { get; set; }
         public Guid? ActiveStoreId { get; set; }
         public Dictionary<string, WindowGeometrySettings>? WindowGeometry { get; set; }
+        public TermsConsentRecord? TermsConsent { get; set; }
     }
 }
