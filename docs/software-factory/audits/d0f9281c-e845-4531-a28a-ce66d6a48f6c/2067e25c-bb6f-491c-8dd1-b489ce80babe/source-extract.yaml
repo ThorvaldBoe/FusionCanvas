@@ -1,0 +1,94 @@
+extract:
+  identity: ARCH-EXTRACT-001
+  audit_id: d0f9281c-e845-4531-a28a-ce66d6a48f6c
+  audit_run_id: 2067e25c-bb6f-491c-8dd1-b489ce80babe
+  standard: FC-ARCH
+  standard_version: "2.0.0"
+  extract_definition_version: "2.0"
+  extract_revision: 1
+  repository_revision: 70c1e1c3da564a51bd8ae6544e5a699e7b6842d7
+  working_tree_state: dirty-after-consent-commit
+  extracted_at: 2026-10-04T00:00:00+02:00
+  included_projects: [FusionCanvas.App, FusionCanvas.Application, FusionCanvas.Integration, tests]
+  exclusions: [unrelated current-tree content-risk changes, build output, package caches]
+  discovery_limits: [full solution baseline is not buildable in the current worktree; runtime desktop lifecycle not re-exercised]
+items:
+  - item_id: ARCH-ITEM-app-terms-consent-vm
+    extract_entry_id: ARCH-ENTRY-001
+    project: FusionCanvas.App
+    fully_qualified_type: FusionCanvas.App.TermsConsent.TermsConsentViewModel
+    type_kind: class
+    source_files: [src/FusionCanvas.App/TermsConsent/TermsConsentViewModel.cs]
+    declared_role: ViewModel
+    architectural_signals: [async command, application settings store dependency, external-link adapter, event]
+    direct_relationships: [TermsConsentWindow, App startup gate, SettingsViewModel, IApplicationSettingsStore]
+  - item_id: ARCH-ITEM-app-terms-consent-window
+    extract_entry_id: ARCH-ENTRY-002
+    project: FusionCanvas.App
+    fully_qualified_type: FusionCanvas.App.TermsConsent.TermsConsentWindow
+    type_kind: class
+    source_files: [src/FusionCanvas.App/TermsConsent/TermsConsentWindow.axaml, src/FusionCanvas.App/TermsConsent/TermsConsentWindow.axaml.cs]
+    declared_role: dialog
+    architectural_signals: [Avalonia view, compiled binding, code-behind close behavior]
+    direct_relationships: [TermsConsentViewModel, App startup gate]
+  - item_id: ARCH-ITEM-app-startup
+    extract_entry_id: ARCH-ENTRY-003
+    project: FusionCanvas.App
+    fully_qualified_type: FusionCanvas.App.App
+    type_kind: class
+    source_files: [src/FusionCanvas.App/App.axaml.cs]
+    declared_role: composition root / lifecycle owner
+    architectural_signals: [startup async lifecycle, settings load, consent gate, window construction]
+    direct_relationships: [AppServicesFactory, TermsConsentStartupGate, TermsConsentWindow]
+  - item_id: ARCH-ITEM-application-policy
+    extract_entry_id: ARCH-ENTRY-004
+    project: FusionCanvas.Application
+    fully_qualified_type: FusionCanvas.Application.TermsConsent.TermsConsentPolicy
+    type_kind: class
+    source_files: [src/FusionCanvas.Application/TermsConsent/TermsConsentPolicy.cs]
+    declared_role: application policy / record factory
+    architectural_signals: [versioned policy, provider URLs, consent record]
+    direct_relationships: [ApplicationSettings]
+  - item_id: ARCH-ITEM-integration-settings
+    extract_entry_id: ARCH-ENTRY-005
+    project: FusionCanvas.Integration
+    fully_qualified_type: FusionCanvas.Integration.Settings.JsonApplicationSettingsStore
+    type_kind: class
+    source_files: [src/FusionCanvas.Integration/Settings/JsonApplicationSettingsStore.cs]
+    declared_role: persistence adapter
+    architectural_signals: [JSON persistence, schema version 5, tolerant read]
+    direct_relationships: [IApplicationSettingsStore, ApplicationSettings]
+  - item_id: ARCH-ITEM-tests
+    extract_entry_id: ARCH-ENTRY-006
+    project: tests
+    fully_qualified_type: consent focused test types
+    type_kind: test group
+    source_files: [tests/FusionCanvas.App.Tests/TermsConsent/TermsConsentViewModelTests.cs, tests/FusionCanvas.App.Tests/TermsConsent/TermsConsentWindowTests.cs, tests/FusionCanvas.App.Tests/TermsConsent/TermsConsentStartupGateTests.cs, tests/FusionCanvas.App.Tests/TermsConsent/TermsConsentSettingsTests.cs]
+    declared_role: test evidence
+    architectural_signals: [headless UI coverage, deterministic fake settings store]
+    direct_relationships: [TermsConsentViewModel, TermsConsentWindow, startup gate]
+extensions:
+  - extension_revision: 2
+    source_revision: worktree-consent-audit-fixes
+    working_tree_state: dirty
+    standard_version: "2.0.0"
+    extract_definition_version: "2.0"
+    generated_at: 2026-10-04T12:05:00+02:00
+    change_summary: TermsConsentViewModel now depends on Application TermsConsentService; service owns acknowledgement validation, record creation, and settings persistence.
+    changes:
+      - item_id: ARCH-ITEM-app-terms-consent-vm
+        extract_entry_id: ARCH-ENTRY-007
+        prior_extract_entry_id: ARCH-ENTRY-001
+        change_type: CHANGED
+        source_files: [src/FusionCanvas.App/TermsConsent/TermsConsentViewModel.cs]
+        architectural_signals: [async command, Application service dependency, external-link adapter, event]
+      - item_id: ARCH-ITEM-application-terms-consent-service
+        extract_entry_id: ARCH-ENTRY-008
+        change_type: ADDED
+        project: FusionCanvas.Application
+        fully_qualified_type: FusionCanvas.Application.TermsConsent.TermsConsentService
+        type_kind: class
+        source_files: [src/FusionCanvas.Application/TermsConsent/TermsConsentService.cs]
+        declared_role: application use-case/service
+        architectural_signals: [acknowledgement validation, versioned record creation, settings persistence]
+        direct_relationships: [IApplicationSettingsStore, TermsConsentViewModel, SettingsViewModel, App]

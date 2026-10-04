@@ -82,6 +82,22 @@ public class MainWindowConstructionTests
     }
 
     [AvaloniaFact]
+    public void ListingMockupGalleryExposesInspectableOutputActions()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Listing);
+        fixture.PumpLayout();
+
+        var gallery = fixture.FindControl<ItemsControl>(control =>
+            AutomationProperties.GetAutomationId(control) == "Listing.MockupOutputs");
+
+        Assert.NotNull(gallery);
+        Assert.Equal("Generated mockup outputs", AutomationProperties.GetName(gallery));
+        Assert.NotNull(fixture.FindControl<TextBlock>(control => control.Text == "No mockups yet. Apply a template to generate mockups for review."));
+    }
+
+    [AvaloniaFact]
     public void ListingApplyActionHasStableAccessibleIdentity()
     {
         using var fixture = new MainWindowFixture();

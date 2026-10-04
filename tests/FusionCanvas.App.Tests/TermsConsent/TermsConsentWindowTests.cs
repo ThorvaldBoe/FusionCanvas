@@ -4,6 +4,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.VisualTree;
 using FusionCanvas.App.TermsConsent;
 using FusionCanvas.Application.Settings;
+using FusionCanvas.Application.TermsConsent;
 
 namespace FusionCanvas.App.Tests.TermsConsent;
 
@@ -14,7 +15,7 @@ public sealed class TermsConsentWindowTests
     {
         var viewModel = new TermsConsentViewModel(
             ApplicationSettings.Default,
-            new RecordingStore(),
+            new TermsConsentService(new RecordingStore()),
             "Bundled offline policy");
         var window = new TermsConsentWindow { DataContext = viewModel };
 

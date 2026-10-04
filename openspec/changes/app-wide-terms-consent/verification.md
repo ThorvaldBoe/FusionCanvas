@@ -2,7 +2,7 @@
 
 ## Evidence status
 
-The implementation is complete for the consent contract, application-settings persistence, startup gate, consent UI, and Settings review surface. Deterministic test execution is currently blocked by unrelated dirty-worktree changes in `src/FusionCanvas.Integration/Persistence/SqliteWorkspaceRepository.cs`, which reference missing `InsertContentRiskReviewAsync` and `LoadContentRiskReviewsAsync` methods. The affected Integration/App projects cannot compile until that pre-existing work is completed or reverted by its owner.
+The implementation is complete for the consent contract, application-settings persistence, startup gate, consent UI, and Settings review surface. The architecture and UI audit corrections are implemented: acceptance persistence is now owned by `TermsConsentService`, and the consent surface uses semantic design tokens. The isolated full solution baseline is clean.
 
 ## Acceptance criteria
 
@@ -16,7 +16,7 @@ The implementation is complete for the consent contract, application-settings pe
 | Provider acknowledgement is honest | Consent copy states provider terms remain the user's responsibility and that FusionCanvas does not accept agreements on the user's behalf. | Implemented by XAML and bundled policy copy. |
 | Consent is minimal and versioned | `TermsConsentRecord` stores only terms version, acknowledgement-policy version, and UTC timestamp. | Implemented; integration round-trip/malformed/missing tests added. |
 | Missing/stale consent is required | `TermsConsentPolicy.IsCurrent` rejects missing or mismatched versions. | Implemented; application tests added. |
-| Save failure retains the form | `TermsConsentViewModel` keeps selections, reports the save warning, and raises `Accepted` only after success. | Implemented; focused App test added. |
+| Save failure retains the form | `TermsConsentViewModel` keeps selections, reports the save warning, and raises `Accepted` only after success. | Implemented; focused App test passed. |
 | Offline FusionCanvas policy remains readable | `FusionCanvasTermsOfUse.md` is an Avalonia resource loaded locally; provider links are explicitly external. | Implemented. |
 | Settings reviews current state | `SettingsSection.Terms`, `TermsConsentSummary`, and the review route use `SettingsViewModel.CreateTermsConsentViewModel`, preserving one persistence owner. | Implemented; Settings tests added. |
 | Existing layout behavior remains after consent | Normal startup still creates the existing `MainWindow` and passes the loaded settings through `AppServicesFactory`. | Implemented; covered by the full solution baseline. |

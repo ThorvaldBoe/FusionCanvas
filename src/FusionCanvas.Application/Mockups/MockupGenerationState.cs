@@ -11,7 +11,8 @@ public sealed record MockupGenerationState(
     IReadOnlyList<string> SelectedColors,
     string? BlockedReason,
     string? Error,
-    IReadOnlyList<MockupTemplateEligibilityDiagnostic>? TemplateDiagnostics = null)
+    IReadOnlyList<MockupTemplateEligibilityDiagnostic>? TemplateDiagnostics = null,
+    string? Notice = null)
 {
     public IReadOnlyList<MockupTemplateEligibilityDiagnostic> CandidateDiagnostics => TemplateDiagnostics ?? [];
 }

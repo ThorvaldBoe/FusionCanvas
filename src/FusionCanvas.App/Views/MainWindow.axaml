@@ -1723,6 +1723,13 @@
                               IsEnabled="{Binding ListingTool.CanApply}"
                               AutomationProperties.Name="Apply mockup template"
                               AutomationProperties.AutomationId="Listing.ApplyMockupTemplate" />
+                      <TextBlock IsVisible="{Binding ListingTool.IsBusy}" Text="Generating mockups…" />
+                      <TextBlock Text="{Binding ListingTool.StaleMessage}"
+                                 IsVisible="{Binding ListingTool.HasStaleMessage}"
+                                 TextWrapping="Wrap"
+                                 Foreground="{DynamicResource WarningTextBrush}"
+                                 AutomationProperties.Name="Mockup freshness notice"
+                                 AutomationProperties.AutomationId="Listing.MockupStaleNotice" />
                       <StackPanel Orientation="Horizontal"
                                   Spacing="8"
                                   IsVisible="{Binding ListingTool.IsBusy}">
@@ -1738,12 +1745,89 @@
                                  Foreground="{DynamicResource DangerTextBrush}"
                                  AutomationProperties.Name="Listing error"
                                  AutomationProperties.AutomationId="Listing.Error" />
+                      <TextBlock Text="{Binding ListingTool.FeedbackMessage}"
+                                 IsVisible="{Binding ListingTool.HasFeedback}"
+                                 TextWrapping="Wrap"
+                                 Foreground="{DynamicResource StrongTextBrush}"
+                                 AutomationProperties.Name="Listing feedback"
+                                 AutomationProperties.AutomationId="Listing.Feedback" />
+                      <TextBlock Text="No mockups yet. Apply a template to generate mockups for review."
+                                 IsVisible="{Binding ListingTool.IsEmpty}"
+                                 TextWrapping="Wrap"
+                                 Foreground="{DynamicResource SecondaryTextBrush}"
+                                 AutomationProperties.Name="No generated mockups" />
                       <ItemsControl ItemsSource="{Binding ListingTool.Outputs}"
                                     AutomationProperties.Name="Generated mockup outputs"
                                     AutomationProperties.AutomationId="Listing.MockupOutputs">
                         <ItemsControl.ItemTemplate>
-                          <DataTemplate>
-                            <TextBlock Text="{Binding Name}" Foreground="{DynamicResource StrongTextBrush}" />
+                          <DataTemplate x:DataType="stageTools:MockupOutputViewModel">
+                            <Border Margin="0,4,0,0"
+                                    Padding="8"
+                                    Background="{DynamicResource ElevatedSurfaceBrush}"
+                                    BorderBrush="{DynamicResource ControlBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="5">
+                              <Grid ColumnDefinitions="96,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto">
+                                <Border Grid.RowSpan="3"
+                                        Width="88"
+                                        Height="88"
+                                        Background="{DynamicResource ApplicationBackgroundBrush}"
+                                        CornerRadius="4"
+                                        HorizontalAlignment="Left">
+                                  <Image Source="{Binding Thumbnail}"
+                                         IsVisible="{Binding !IsMissing}"
+                                         Stretch="Uniform"
+                                         Margin="4" />
+                                </Border>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Name}"
+                                           TextWrapping="Wrap"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource StrongTextBrush}" />
+                                <TextBlock Grid.Row="1" Grid.Column="1"
+                                           Text="{Binding ColorValue, StringFormat='Color: {0}'}"
+                                           Foreground="{DynamicResource SecondaryTextBrush}" />
+                                <TextBlock Grid.Row="2" Grid.Column="1"
+                                           Text="{Binding TemplateLabel}"
+                                           Foreground="{DynamicResource SecondaryTextBrush}" />
+                                <TextBlock Grid.Column="1" Grid.RowSpan="3"
+                                           Text="Preview unavailable — the managed mockup file is missing."
+                                           IsVisible="{Binding IsMissing}"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource WarningTextBrush}"
+                                           VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="2" Grid.RowSpan="3"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center"
+                                            Spacing="4">
+                                  <Button Content="View"
+                                          Command="{Binding PreviewCommand}"
+                                          AutomationProperties.Name="View mockup"
+                                          AutomationProperties.AutomationId="Listing.MockupPreview" />
+                                  <Button Content="Download"
+                                          Command="{Binding SaveCopyCommand}"
+                                          AutomationProperties.Name="Download mockup"
+                                          AutomationProperties.AutomationId="Listing.MockupDownload" />
+                                  <Button Content="Delete"
+                                          Command="{Binding RequestRemoveCommand}"
+                                          AutomationProperties.Name="Delete mockup"
+                                          AutomationProperties.AutomationId="Listing.MockupRemove" />
+                                </StackPanel>
+                                <Border Grid.Column="1" Grid.ColumnSpan="2" Grid.Row="3"
+                                        Margin="0,8,0,0"
+                                        IsVisible="{Binding IsRemovalConfirmationVisible}"
+                                        Background="{DynamicResource ElevatedSurfaceBrush}"
+                                        Padding="6">
+                                  <StackPanel Spacing="5">
+                                    <TextBlock Text="{Binding RemovalPromptMessage}" TextWrapping="Wrap" />
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                      <Button Content="Confirm delete" Command="{Binding ConfirmRemoveCommand}" />
+                                      <Button Content="Cancel" Command="{Binding CancelRemoveCommand}" />
+                                    </StackPanel>
+                                  </StackPanel>
+                                </Border>
+                              </Grid>
+                            </Border>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>

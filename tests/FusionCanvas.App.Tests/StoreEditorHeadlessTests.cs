@@ -3082,6 +3082,70 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void MockupTemplateColorSearchFiltersChoicesAndShowsNoMatchGuidance()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        var catalog = viewModel.CatalogSetup;
+        var black = Assert.Single(catalog.TemplateColorChoices);
+        var forestGreen = new OfferingOptionValue(Guid.NewGuid(), black.Value.OptionId, black.Value.OfferingId, "Forest Green", 1);
+        var lime = new OfferingOptionValue(Guid.NewGuid(), black.Value.OptionId, black.Value.OfferingId, "Lime", 2);
+        catalog.TemplateColorChoices.Add(new OptionValueChoiceViewModel(forestGreen, "Colors: Forest Green"));
+        catalog.TemplateColorChoices.Add(new OptionValueChoiceViewModel(lime, "Colors: Lime"));
+        var source = new LocalMockupSourceDraftViewModel(
+            "color-search.png",
+            [],
+            mapping: new MockupImageSpaceMapping(1000, 1000, 100, 100, 500, 600),
+            imageWidth: 1000,
+            imageHeight: 1000);
+        catalog.LocalSourceDrafts.Add(source);
+        catalog.SelectLocalSourceCommand.Execute(source);
+        dialog.UpdateLayout();
+
+        var search = AssertEffectivelyVisible(dialog, "Catalog.MockupColorSearch");
+        var searchBox = Assert.IsType<TextBox>(search);
+        Assert.Equal("Search Colors", searchBox.PlaceholderText);
+        searchBox.Text = "lime";
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        dialog.UpdateLayout();
+
+        var colorScrollViewer = dialog.FindControl<ScrollViewer>("ColorChoicesScrollViewer");
+        Assert.NotNull(colorScrollViewer);
+        var visibleColorLabels = colorScrollViewer!.GetVisualDescendants()
+            .OfType<CheckBox>()
+            .Where(IsEffectivelyVisible)
+            .Select(value => value.Content as string ?? string.Empty)
+            .ToArray();
+        Assert.Equal(["Colors: Lime"], visibleColorLabels);
+        Assert.Equal("lime", catalog.TemplateColorSearchText);
+
+        searchBox.Text = "unavailable";
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        dialog.UpdateLayout();
+        var noResults = AssertEffectivelyVisible(dialog, "Catalog.MockupColorSearchNoResults");
+        Assert.Contains("No Colors match", (noResults as TextBlock)?.Text ?? string.Empty, StringComparison.Ordinal);
+        Assert.True(searchBox.IsEnabled);
+
+        searchBox.Text = string.Empty;
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        dialog.UpdateLayout();
+        Assert.Equal(3, colorScrollViewer.GetVisualDescendants().OfType<CheckBox>().Count(IsEffectivelyVisible));
+
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void DesignAreaArchiveCommand_OpensConfirmationWithoutMutationAndCancelRestoresFocus()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);

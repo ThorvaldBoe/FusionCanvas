@@ -1,0 +1,38 @@
+extract:
+  identity: UX-EXTRACT-001
+  audit_id: d0f9281c-e845-4531-a28a-ce66d6a48f6c
+  audit_run_id: f4618aa7-7db6-47dc-8185-1edf084ffbf4
+  standard: FC-UX
+  standard_version: "1.1"
+  extract_definition_version: "1.2"
+  extract_revision: 1
+  repository_revision: 70c1e1c3da564a51bd8ae6544e5a699e7b6842d7
+  working_tree_state: dirty-after-consent-commit
+  extracted_at: 2026-10-04T00:00:00+02:00
+  included_projects: [FusionCanvas.App, FusionCanvas.Application, FusionCanvas.Integration, tests]
+  exclusions: [unrelated product workflows]
+  discovery_limits: [real desktop focus and external-link behavior not exercised]
+workflows:
+  - workflow_id: WF-terms-first-launch
+    name: Accept first-launch terms and responsible-use acknowledgements
+    goal: Start the app after acknowledging FusionCanvas and provider policies.
+    starting_conditions: [no current consent record, or stale consent record]
+    expected_outcome: [consent is saved and the main window opens]
+    journeys: [JOURNEY-fresh-install-to-app]
+    views_and_entry_points: [TermsConsentWindow, App.InitializeStartupAsync]
+    interactions: [read FusionCanvas terms, select required acknowledgements, open official policy links as needed, click Agree and continue]
+    states_and_transitions: [loading, incomplete, complete, saving, save-error, accepted]
+    persistence_and_consequences: [writes local application settings; releases startup gate]
+    source_locations: [src/FusionCanvas.App/App.axaml.cs, src/FusionCanvas.App/TermsConsent/TermsConsentWindow.axaml, src/FusionCanvas.App/TermsConsent/TermsConsentViewModel.cs]
+    tests: [tests/FusionCanvas.App.Tests/TermsConsent/TermsConsentWindowTests.cs, tests/FusionCanvas.App.Tests/TermsConsent/TermsConsentViewModelTests.cs]
+  - workflow_id: WF-terms-settings-review
+    name: Review terms from Settings
+    goal: Inspect the current acknowledgement status and reopen the policy dialog.
+    starting_conditions: [main window is running]
+    expected_outcome: [status is understandable and review dialog opens]
+    views_and_entry_points: [SettingsWindow, SettingsViewModel]
+    interactions: [open Terms and responsible use, review status, click Review terms and policies]
+    states_and_transitions: [current, missing, stale, review-dialog]
+    persistence_and_consequences: [may update the local consent record]
+    source_locations: [src/FusionCanvas.App/Settings/SettingsWindow.axaml, src/FusionCanvas.App/Settings/SettingsViewModel.cs]
+    tests: [tests/FusionCanvas.App.Tests/TermsConsent/TermsConsentSettingsTests.cs]

@@ -27,6 +27,7 @@ internal sealed class MainWindowWindowCoordinator
     private AssetsWindow? _assetsWindow;
     private IdeationWindow? _ideationWindow;
     private Window? _designPreviewWindow;
+    private Window? _mockupPreviewWindow;
 
     public MainWindowWindowCoordinator(Window owner, Control workspaceTreeControl)
     {
@@ -247,6 +248,31 @@ internal sealed class MainWindowWindowCoordinator
         if (!designTool.ShowPreviewDialog && _designPreviewWindow is not null)
         {
             _designPreviewWindow.Close();
+        }
+    }
+
+    public void SyncMockupPreviewWindow(ListingStageToolViewModel listingTool)
+    {
+        if (listingTool.ShowPreviewDialog && _mockupPreviewWindow is null)
+        {
+            _mockupPreviewWindow = new MockupPreviewWindow { DataContext = listingTool };
+            if (_settings is not null)
+            {
+                WindowGeometryRegistrar.Register(_mockupPreviewWindow, _settings, WindowLayoutKeys.MockupPreview, _mockupPreviewWindow.MinWidth, _mockupPreviewWindow.MinHeight);
+            }
+
+            _mockupPreviewWindow.Closed += (_, _) =>
+            {
+                _mockupPreviewWindow = null;
+                listingTool.ClosePreviewDialog();
+            };
+            _mockupPreviewWindow.Show(_owner);
+            return;
+        }
+
+        if (!listingTool.ShowPreviewDialog && _mockupPreviewWindow is not null)
+        {
+            _mockupPreviewWindow.Close();
         }
     }
 

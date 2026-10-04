@@ -62,6 +62,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private string _artworkFormat = string.Empty;
     private string _artworkBackground = string.Empty;
     private string _templateName = string.Empty;
+    private string _templateColorSearchText = string.Empty;
     private string _localSourcePath = string.Empty;
     private LocalMockupSourceDraftViewModel? _selectedLocalSource;
     private LocalMockupSourceDraftViewModel? _selectedMappingSource;
@@ -127,6 +128,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         _rasterImageMetadataReader = rasterImageMetadataReader;
         _mockupSourceMetadataAssistance = mockupSourceMetadataAssistance;
         _mockupPlacementPreviewReader = mockupPlacementPreviewReader;
+        TemplateColorChoices.CollectionChanged += (_, _) => RefreshFilteredTemplateColorChoices();
 
         SaveOfferingCommand = new AsyncRelayCommand(SaveOfferingAsync, CanSaveOffering);
         StartAddPrintProviderCommand = new RelayCommand(_ => IsAddingPrintProvider = true, () => CanEdit && SelectedOffering is not null && !IsProviderNetworkOffering);
@@ -250,6 +252,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ObservableCollection<BulkVariantCandidate> BulkPreviewCandidates { get; } = [];
     public ObservableCollection<ProviderMockupCandidateDescriptor> ProviderMockupCandidates { get; } = [];
     public ObservableCollection<OptionValueChoiceViewModel> TemplateColorChoices { get; } = [];
+    public ObservableCollection<OptionValueChoiceViewModel> FilteredTemplateColorChoices { get; } = [];
     public ObservableCollection<OptionValueChoiceViewModel> TemplateAdditionalOptionChoices { get; } = [];
     public ObservableCollection<LocalMockupSourceDraftViewModel> LocalSourceDrafts { get; } = [];
     public ObservableCollection<LocalMockupSourceDraftViewModel> MappedSourceChoices { get; } = [];
@@ -559,6 +562,16 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         }
     }
     public string TemplateName { get => _templateName; set { if (SetField(ref _templateName, value)) { NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
+    public string TemplateColorSearchText
+    {
+        get => _templateColorSearchText;
+        set
+        {
+            if (!SetField(ref _templateColorSearchText, value ?? string.Empty)) return;
+            RefreshFilteredTemplateColorChoices();
+        }
+    }
+    public bool HasNoMatchingTemplateColors => !string.IsNullOrWhiteSpace(TemplateColorSearchText) && FilteredTemplateColorChoices.Count == 0;
     public OptionKind SelectedOptionKind { get => _selectedOptionKind; set => SetField(ref _selectedOptionKind, value); }
 
     public bool IsAddingOption { get => _isAddingOption; private set { if (SetField(ref _isAddingOption, value)) NotifyCommands(); } }
@@ -1565,6 +1578,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         SelectedTemplate = template;
         SelectedPlaceholder = AvailablePlaceholders.FirstOrDefault(value => value.Id == template.TargetPlaceholderId);
         TemplateName = template.Name;
+        TemplateColorSearchText = string.Empty;
         ClearLocalSourceSelectionState();
         LocalSourceDrafts.Clear();
         RefreshLocalSourceRowPresentation();
@@ -1603,6 +1617,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         SelectedTemplate = null;
         SelectedPlaceholder = null;
         TemplateName = string.Empty;
+        TemplateColorSearchText = string.Empty;
         ClearLocalSourceSelectionState();
         LocalSourceDrafts.Clear();
         RefreshLocalSourceRowPresentation();
@@ -2181,6 +2196,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             .ToArray();
         foreach (var choice in templateColors) choice.PropertyChanged += ChoiceSelectionChanged;
         Replace(TemplateColorChoices, templateColors);
+        RefreshFilteredTemplateColorChoices();
 
         var selectedTemplateOptionIds = TemplateAdditionalOptionChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).ToHashSet();
         var colorOptionIds = Options.Where(value => value.OfferingId == SelectedOffering?.Id && value.OptionKind == OptionKind.Color).Select(value => value.Id).ToHashSet();
@@ -2201,6 +2217,16 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             NotifyDesignAreaDraftChanged();
             NotifyCommands();
         }
+    }
+
+    private void RefreshFilteredTemplateColorChoices()
+    {
+        var query = TemplateColorSearchText.Trim();
+        var filtered = string.IsNullOrEmpty(query)
+            ? TemplateColorChoices
+            : TemplateColorChoices.Where(value => value.Label.Contains(query, StringComparison.OrdinalIgnoreCase));
+        Replace(FilteredTemplateColorChoices, filtered);
+        OnPropertyChanged(nameof(HasNoMatchingTemplateColors));
     }
 
     private string ValueLabel(OfferingOptionValue value)
@@ -2412,6 +2438,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     {
         IsMockupTemplateDiscardConfirmationVisible = false;
         IsAddingTemplate = false;
+        TemplateColorSearchText = string.Empty;
         _mockupTemplateDraftBaseline = null;
         OnPropertyChanged(nameof(HasMeaningfulMockupTemplateDraft));
     }

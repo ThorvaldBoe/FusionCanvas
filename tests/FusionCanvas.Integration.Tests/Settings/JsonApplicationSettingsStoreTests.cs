@@ -518,6 +518,43 @@ public class JsonApplicationSettingsStoreTests
         Assert.Contains("terms acknowledgement", loaded.Warning, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task LoadAsync_StaleConsentRecordRemainsReadableButRequiresConsent()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var store = new JsonApplicationSettingsStore(tempDirectory.GetPath("settings.json"));
+        var staleRecord = TermsConsentPolicy.CreateRecord(DateTimeOffset.UtcNow) with
+        {
+            FusionCanvasTermsVersion = "draft-0.0"
+        };
+
+        Assert.True((await store.SaveAsync(
+            new ApplicationSettings(
+                DarkMode: false,
+                Ai: AiConfigurationSettings.Default,
+                TermsConsent: staleRecord),
+            TestContext.Current.CancellationToken)).Saved);
+
+        var loaded = await store.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(staleRecord, loaded.Value.TermsConsent);
+        Assert.False(TermsConsentPolicy.IsCurrent(loaded.Value.TermsConsent));
+    }
+
+    [Fact]
+    public async Task SaveAsync_WhenSettingsDirectoryCannotBeCreatedReturnsFailure()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var blockedParent = tempDirectory.GetPath("blocked-parent");
+        await File.WriteAllTextAsync(blockedParent, "not a directory", TestContext.Current.CancellationToken);
+        var store = new JsonApplicationSettingsStore(Path.Combine(blockedParent, "settings.json"));
+
+        var result = await store.SaveAsync(ApplicationSettings.Default, TestContext.Current.CancellationToken);
+
+        Assert.False(result.Saved);
+        Assert.Contains("saved", result.Warning, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class TemporaryDirectory : IDisposable
     {
         private readonly DirectoryInfo _directory = Directory.CreateTempSubdirectory();

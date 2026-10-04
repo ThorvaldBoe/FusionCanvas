@@ -1,0 +1,24 @@
+extract:
+  identity: VVT-EXTRACT-001
+  audit_id: d0f9281c-e845-4531-a28a-ce66d6a48f6c
+  audit_run_id: c43470b1-826b-4d34-882a-803741cb5d2a
+  standard: FC-VVT
+  standard_version: "1.1"
+  extract_definition_version: "1.2"
+  extract_revision: 1
+  repository_revision: 70c1e1c3da564a51bd8ae6544e5a699e7b6842d7
+  working_tree_state: dirty-after-consent-commit
+  extracted_at: 2026-10-04T00:00:00+02:00
+  included_projects: [openspec/changes/app-wide-terms-consent, FusionCanvas.App, FusionCanvas.Application]
+  exclusions: [subjective user-outcome data not available, unrelated product decisions]
+  discovery_limits: [human/legal approval and observed release outcomes are unavailable]
+decisions:
+  - decision_id: VVT-DEC-responsible-use-gate
+    name: Require app-wide acknowledgement before first use
+    scope: Gate normal app startup until the user acknowledges FusionCanvas responsible-use terms and relevant provider policies.
+    decision_state: PROPOSED
+    accepted_direction_sources: [openspec/changes/app-wide-terms-consent/proposal.md, openspec/changes/app-wide-terms-consent/specs/app-wide-terms-consent/spec.md]
+    implementation_sources: [src/FusionCanvas.App/App.axaml.cs, src/FusionCanvas.App/TermsConsent/TermsConsentWindow.axaml, src/FusionCanvas.App/Settings/SettingsWindow.axaml]
+    relevant_criteria: [artist-led creation, trust and transparency, safety and IP responsibility, quality before convenience]
+    tradeoffs: [stronger responsible-use acknowledgement versus startup friction and draft-policy release risk]
+    unresolved_questions: [human/legal approval of draft terms, whether consent must be revocable/resettable, whether provider checkbox wording is sufficiently clear]

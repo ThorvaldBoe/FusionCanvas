@@ -1,6 +1,7 @@
 using FusionCanvas.App.TermsConsent;
 using FusionCanvas.App.Commands;
 using FusionCanvas.Application.Settings;
+using FusionCanvas.Application.TermsConsent;
 
 namespace FusionCanvas.App.Tests.TermsConsent;
 
@@ -140,7 +141,7 @@ public sealed class TermsConsentViewModelTests
         CancellationToken startupCancellationToken = default) =>
         new(
             ApplicationSettings.Default,
-            store ?? new RecordingStore(),
+            new TermsConsentService(store ?? new RecordingStore()),
             "Offline policy text",
             linkLauncher,
             startupCancellationToken);

@@ -42,6 +42,7 @@ public partial class MainWindow : Window
     private volatile bool _dispatcherCallbacksDisabled;
     private FusionCanvas.Application.Items.Import.IItemCsvCodec? _itemCsvImportCodec;
     private DesignStageToolViewModel? _subscribedDesignTool;
+    private ListingStageToolViewModel? _subscribedListingTool;
 
     public MainWindow()
     {
@@ -49,7 +50,7 @@ public partial class MainWindow : Window
         _windowCoordinator = new MainWindowWindowCoordinator(this, WorkspaceTreeControl);
         WorkspaceTreeControl.AddHandler(PointerPressedEvent, OnWorkspaceTreePointerPressed, RoutingStrategies.Tunnel);
         WorkspaceTreeControl.AddHandler(KeyDownEvent, OnWorkspaceTreeKeyDown, RoutingStrategies.Tunnel);
-        DataContextChanged += OnDesignToolDataContextChanged;
+        DataContextChanged += OnStageToolDataContextChanged;
         InitializeWindowLayout(null);
     }
 
@@ -60,7 +61,7 @@ public partial class MainWindow : Window
         _windowCoordinator = new MainWindowWindowCoordinator(this, WorkspaceTreeControl);
         WorkspaceTreeControl.AddHandler(PointerPressedEvent, OnWorkspaceTreePointerPressed, RoutingStrategies.Tunnel);
         WorkspaceTreeControl.AddHandler(KeyDownEvent, OnWorkspaceTreeKeyDown, RoutingStrategies.Tunnel);
-        DataContextChanged += OnDesignToolDataContextChanged;
+        DataContextChanged += OnStageToolDataContextChanged;
         InitializeWindowLayout(services.Settings);
         var viewModel = MainWindowViewModel.CreateForDefaultWorkspace(
             services.Settings,
@@ -74,6 +75,7 @@ public partial class MainWindow : Window
         viewModel.WorkspaceManagement.PackagePicker = new AvaloniaWorkspacePackagePicker(StorageProvider);
         viewModel.Settings.Telemetry.SetExportFilePicker(new AvaloniaTelemetryExportFilePicker(StorageProvider));
         viewModel.WorkspaceTree.FilePicker = new FusionCanvas.App.Items.AvaloniaItemCsvFilePicker(StorageProvider);
+        viewModel.ListingTool.FilePicker = new AvaloniaMockupFilePicker(StorageProvider);
         viewModel.WorkspaceTree.CsvCodec = services.ItemCsvExportCodec;
         viewModel.StoreManagement.PropertyChanged += (_, args) =>
         {
@@ -144,17 +146,28 @@ public partial class MainWindow : Window
         _windowCoordinator.SyncTelemetryDebugWindow(viewModel.Settings.Telemetry);
     }
 
-    private void OnDesignToolDataContextChanged(object? sender, EventArgs e)
+    private void OnStageToolDataContextChanged(object? sender, EventArgs e)
     {
         if (_subscribedDesignTool is not null)
         {
             _subscribedDesignTool.PropertyChanged -= OnDesignToolPropertyChanged;
         }
 
+        if (_subscribedListingTool is not null)
+        {
+            _subscribedListingTool.PropertyChanged -= OnListingToolPropertyChanged;
+        }
+
         _subscribedDesignTool = (DataContext as MainWindowViewModel)?.DesignTool;
         if (_subscribedDesignTool is not null)
         {
             _subscribedDesignTool.PropertyChanged += OnDesignToolPropertyChanged;
+        }
+
+        _subscribedListingTool = (DataContext as MainWindowViewModel)?.ListingTool;
+        if (_subscribedListingTool is not null)
+        {
+            _subscribedListingTool.PropertyChanged += OnListingToolPropertyChanged;
         }
     }
 
@@ -173,6 +186,15 @@ public partial class MainWindow : Window
             && designTool.IsRecoveryConfirmationVisible)
         {
             PostToDispatcher(() => ConfirmConfigurationRecoveryButton.Focus(), DispatcherPriority.Background);
+        }
+    }
+
+    private void OnListingToolPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (sender is ListingStageToolViewModel listingTool
+            && args.PropertyName == nameof(ListingStageToolViewModel.ShowPreviewDialog))
+        {
+            PostToDispatcher(() => _windowCoordinator.SyncMockupPreviewWindow(listingTool), DispatcherPriority.Background);
         }
     }
 

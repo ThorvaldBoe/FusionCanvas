@@ -8,7 +8,7 @@
 
 - [x] 2.1 Extend `ApplicationSettings` with an optional versioned consent record and preserve compatibility for settings files that predate the field.
 - [x] 2.2 Extend `JsonApplicationSettingsStore` serialization/deserialization and failure handling for consent state without storing unnecessary personal data.
-- [ ] 2.3 Add isolated integration tests for missing, current, stale, malformed, round-tripped, and save-failure consent settings.
+- [x] 2.3 Add isolated integration tests for missing, current, stale, malformed, round-tripped, and save-failure consent settings.
 
 ## 3. Startup enforcement
 
@@ -23,6 +23,8 @@
 - [x] 4.3 Persist consent only after all controls are selected and a settings save succeeds; keep the surface open with an actionable error when persistence fails.
 - [x] 4.4 Add deterministic App tests for view-model validation, command state, policy presentation, link commands, save failure, and selection retention.
 - [x] 4.5 Add Avalonia headless view tests for visual-tree construction, compiled bindings, checkbox gating, keyboard-reachable actions, focusable links, and visible error/progress states.
+- [x] 4.6 Keep consent acceptance orchestration in the Application layer so the ViewModel only manages presentation state and result rendering.
+- [x] 4.7 Use the shared semantic design tokens for consent-surface layout, typography, control spacing, state colors, and button styling.
 
 ## 5. Settings review surface
 
