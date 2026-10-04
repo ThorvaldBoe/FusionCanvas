@@ -2,7 +2,7 @@
 
 ## Evidence status
 
-The implementation is complete for the consent contract, application-settings persistence, startup gate, consent UI, and Settings review surface. The architecture and UI audit corrections are implemented: acceptance persistence is now owned by `TermsConsentService`, and the consent surface uses semantic design tokens. Consent-focused verification is clean. The current merged checkout's full solution baseline remains blocked by an unrelated pre-existing mockup-source headless test failure.
+The implementation is complete for the consent contract, application-settings persistence, startup gate, consent UI, and Settings review surface. The architecture and UI audit corrections are implemented: acceptance persistence is now owned by `TermsConsentService`, and the consent surface uses semantic design tokens. Consent-focused verification and the current merged-checkout full solution baseline are clean.
 
 ## Acceptance criteria
 
@@ -28,7 +28,7 @@ The implementation is complete for the consent contract, application-settings pe
 - `dotnet test .\tests\FusionCanvas.Application.Tests\FusionCanvas.Application.Tests.csproj --no-restore -m:1 --filter FullyQualifiedName~TermsConsent` — passed: 2 service tests; existing analyzer warnings remain.
 - `dotnet test .\tests\FusionCanvas.Integration.Tests\FusionCanvas.Integration.Tests.csproj --no-restore -m:1 --filter FullyQualifiedName~JsonApplicationSettingsStore` — passed: 30 persistence tests; existing analyzer warnings remain.
 - `dotnet test .\tests\FusionCanvas.App.Tests\FusionCanvas.App.Tests.csproj --no-restore -m:1 --filter FullyQualifiedName~TermsConsent` — passed: 10 consent/headless tests.
-- `dotnet test .\FusionCanvas.sln -m:1` — current merged-checkout attempt: Domain 279, Application 603, Integration 315, and UiDescription 29 passed; App had 926 passed and 1 failed. The failure is `StoreEditorHeadlessTests.MockupSourceRow_SelectsFromCellsWhitespaceAndKeyboard_WithoutArchiving` in the mockup-template surface, which is outside this change's scope and predates the consent implementation. The prior isolated consent worktree baseline passed 2,118 tests.
+- `dotnet test .\FusionCanvas.sln -m:1` — passed: Domain 279, Application 603, Integration 315, App 927, UiDescription 29; 2,153 total tests.
 
 ### Scenario coverage mapping
 

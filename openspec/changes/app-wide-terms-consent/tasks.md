@@ -39,5 +39,5 @@
 - [x] 6.3 Verify the modified desktop-foundation startup and layout scenarios, including legacy/invalid layout fallback after consent.
 - [x] 6.4 Verify the modified application-settings scenarios for accepted, missing, and stale acknowledgement state.
 - [x] 6.5 Run `openspec validate --strict` and correct any artifact or delta-spec issues.
-- [ ] 6.6 Run `dotnet test .\\FusionCanvas.sln -m:1` and resolve regressions without expanding scope. The current merged checkout is blocked by the unrelated pre-existing `StoreEditorHeadlessTests.MockupSourceRow_SelectsFromCellsWhitespaceAndKeyboard_WithoutArchiving` failure; consent-focused and prior isolated baselines pass.
+- [x] 6.6 Run `dotnet test .\\FusionCanvas.sln -m:1` and resolve regressions without expanding scope. The updated merged checkout passes the full baseline after the independent mockup source-row hit-testing fix.
 - [x] 6.7 Decide whether the optional real-desktop first-run/link journey adds information beyond deterministic tests; if warranted, run it only with disposable settings/workspace paths and record it as supplemental evidence.
