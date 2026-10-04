@@ -15,7 +15,7 @@ This is the current implementation checkpoint for issue #731. Remaining unchecke
 | Build | PASS | `dotnet build .\FusionCanvas.sln -m:1 --no-restore` — 0 errors. |
 | Focused deterministic tests | PASS | Domain planner: 5 passed; application revision/coverage regression: 7 passed; exemplar view-model tests: 2 passed; focused editor/Listing/headless coverage and diagnostic tests: 19 passed in the final targeted run; prior App stage/layout/catalog selection set: 29 passed. |
 | OpenSpec validation | PASS | `openspec validate mockup-template-coverage-planning --strict`. |
-| Full solution test baseline | BLOCKED BY EXISTING FAILURE | `dotnet test .\FusionCanvas.sln -m:1 --no-restore`: Domain 278 passed, Application 587 passed, Integration 309 passed, App 925 passed/1 failed, UI description 29 passed. The remaining failure is the unrelated pre-existing `ProductionSourceLayoutTests.ProductionFiles_ContainAtMostOneTopLevelType` in `src\FusionCanvas.App\TermsConsent\ExternalLinkLauncher.cs`. |
+| Full solution test baseline | PASS | `dotnet test .\FusionCanvas.sln -m:1 --no-restore`: Domain 278 passed, Application 587 passed, Integration 309 passed, App 926 passed, UI description 29 passed. The baseline layout failure was resolved by placing `IExternalLinkLauncher` in its own source file. |
 
 ## Criterion-level scenario evidence
 

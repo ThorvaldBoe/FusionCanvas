@@ -2,11 +2,6 @@ using System.Diagnostics;
 
 namespace FusionCanvas.App.TermsConsent;
 
-public interface IExternalLinkLauncher
-{
-    void Open(Uri uri);
-}
-
 public sealed class ProcessExternalLinkLauncher : IExternalLinkLauncher
 {
     public void Open(Uri uri)

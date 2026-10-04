@@ -33,6 +33,6 @@
 - [x] 5.1 Add or update any focused tests needed to cover every acceptance scenario in both delta specs, including partial saves and persisted reload behavior.
 - [x] 5.2 Reviewed the implementation against the proposal, delta specs, design, and task list; no scope or behavior contradiction requires artifact changes.
 - [x] 5.3 Run `openspec validate --strict` and resolve all validation findings for this change.
-- [ ] 5.4 Run `dotnet test .\\FusionCanvas.sln -m:1` and record criterion-level evidence for each acceptance scenario, including any supplemental real-desktop scenario-pack result.
+- [x] 5.4 Run `dotnet test .\\FusionCanvas.sln -m:1` and record criterion-level evidence for each acceptance scenario, including any supplemental real-desktop scenario-pack result.
 
 
