@@ -9,6 +9,7 @@ using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Catalog;
+using FusionCanvas.Application.Mockups;
 
 namespace FusionCanvas.Application.DesignFiles;
 
@@ -19,19 +20,22 @@ public sealed class DesignStageService : IDesignStageService
     private readonly IAiImageProvenanceCodec _provenanceCodec;
     private readonly Func<DateTimeOffset> _clock;
     private readonly Func<Guid> _newId;
+    private readonly IMockupOutputInvalidationService? _mockupInvalidation;
 
     public DesignStageService(
         IWorkspaceRepository repository,
         IWorkspaceFileStore fileStore,
         IAiImageProvenanceCodec provenanceCodec,
         Func<DateTimeOffset>? clock = null,
-        Func<Guid>? newId = null)
+        Func<Guid>? newId = null,
+        IMockupOutputInvalidationService? mockupInvalidation = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _fileStore = fileStore ?? throw new ArgumentNullException(nameof(fileStore));
         _provenanceCodec = provenanceCodec ?? throw new ArgumentNullException(nameof(provenanceCodec));
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
         _newId = newId ?? Guid.NewGuid;
+        _mockupInvalidation = mockupInvalidation;
     }
 
     public async Task<DesignStageState> LoadDesignStageStateAsync(Guid itemId, CancellationToken cancellationToken = default)
@@ -68,8 +72,7 @@ public sealed class DesignStageService : IDesignStageService
 
         var updated = ReplaceConfiguration(snapshot, item, offeringId);
 
-        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
-        return DesignStageResult.Success(BuildState(updated, itemId));
+        return await SaveDesignMutationAsync(updated, itemId, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<DesignStageResult> RecoverStaleConfigurationAsync(Guid itemId, Guid offeringId, CancellationToken cancellationToken = default)
@@ -106,8 +109,7 @@ public sealed class DesignStageService : IDesignStageService
         }
 
         var updated = ReplaceConfiguration(snapshot, item, offeringId);
-        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
-        return DesignStageResult.Success(BuildState(updated, itemId));
+        return await SaveDesignMutationAsync(updated, itemId, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<DesignStageResult> SaveArtworkPreferencesAsync(Guid itemId, Guid? designAreaId, bool transparentBackground, CancellationToken cancellationToken = default)
@@ -145,8 +147,7 @@ public sealed class DesignStageService : IDesignStageService
         {
             Items = [.. snapshot.Items.Where(value => value.Id != itemId), updatedItem]
         };
-        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
-        return DesignStageResult.Success(BuildState(updated, itemId));
+        return await SaveDesignMutationAsync(updated, itemId, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<DesignStageResult> AddSelectedColorAsync(Guid itemId, string colorValue, CancellationToken cancellationToken = default)
@@ -240,8 +241,7 @@ public sealed class DesignStageService : IDesignStageService
         // Validate partition
         DesignStagePolicy.ValidatePartition(itemId, updated.DesignSelectedColors, updated.DesignVariantRows, updated.DesignVariantRowColors);
 
-        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
-        return DesignStageResult.Success(BuildState(updated, itemId));
+        return await SaveDesignMutationAsync(updated, itemId, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<DesignStageResult> RemoveSelectedColorAsync(Guid itemId, string colorValue, CancellationToken cancellationToken = default)
@@ -283,8 +283,7 @@ public sealed class DesignStageService : IDesignStageService
             DesignStagePolicy.ValidatePartition(itemId, updated.DesignSelectedColors, updated.DesignVariantRows, updated.DesignVariantRowColors);
         }
 
-        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
-        return DesignStageResult.Success(BuildState(updated, itemId));
+        return await SaveDesignMutationAsync(updated, itemId, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<DesignStageResult> MakeSpecificForColorAsync(Guid itemId, string colorValue, CancellationToken cancellationToken = default)
@@ -363,8 +362,7 @@ public sealed class DesignStageService : IDesignStageService
 
         DesignStagePolicy.ValidatePartition(itemId, updated.DesignSelectedColors, updated.DesignVariantRows, updated.DesignVariantRowColors);
 
-        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
-        return DesignStageResult.Success(BuildState(updated, itemId));
+        return await SaveDesignMutationAsync(updated, itemId, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<DesignStageResult> RemoveSpecificRowAsync(Guid itemId, Guid rowId, CancellationToken cancellationToken = default)
@@ -515,6 +513,8 @@ public sealed class DesignStageService : IDesignStageService
             {
                 _fileStore.TryDelete(oldAsset.WorkspaceRelativePath);
             }
+
+            await InvalidateMockupsAsync(itemId, new HashSet<Guid> { assetId.Value }, false, cancellationToken).ConfigureAwait(false);
         }
 
         return DesignStageResult.Success(BuildState(updated, itemId));
@@ -790,7 +790,43 @@ public sealed class DesignStageService : IDesignStageService
             }
         }
 
+        await InvalidateMockupsAsync(
+            item.Id,
+            oldAssetId is Guid previousAssetId ? new HashSet<Guid> { previousAssetId } : null,
+            oldAssetId is null,
+            cancellationToken).ConfigureAwait(false);
+
         return DesignStageResult.Success(BuildState(updated, item.Id));
+    }
+
+    private async Task<DesignStageResult> SaveDesignMutationAsync(
+        WorkspaceSnapshot updated,
+        Guid itemId,
+        CancellationToken cancellationToken)
+    {
+        await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        await InvalidateMockupsAsync(itemId, null, true, cancellationToken).ConfigureAwait(false);
+        return DesignStageResult.Success(BuildState(updated, itemId));
+    }
+
+    private async Task InvalidateMockupsAsync(
+        Guid itemId,
+        IReadOnlySet<Guid>? sourceDesignAssetIds,
+        bool invalidateAll,
+        CancellationToken cancellationToken)
+    {
+        if (_mockupInvalidation is null)
+        {
+            return;
+        }
+
+        var result = await _mockupInvalidation
+            .InvalidateAsync(itemId, sourceDesignAssetIds, invalidateAll, cancellationToken)
+            .ConfigureAwait(false);
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException(result.Error ?? "Generated mockups could not be invalidated.");
+        }
     }
 
     private DesignStageState BuildState(WorkspaceSnapshot snapshot, Guid itemId)

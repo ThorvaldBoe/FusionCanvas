@@ -11,6 +11,7 @@ internal static class WindowLayoutKeys
     public const string SnowcloneLibrary = "snowcloneLibrary";
     public const string RejectedPhrases = "rejectedPhrases";
     public const string DesignPreview = "designPreview";
+    public const string MockupPreview = "mockupPreview";
     public const string ItemImport = "itemImport";
     public const string OptionValueManagement = "optionValueManagement";
     public const string AddVariant = "addVariant";
