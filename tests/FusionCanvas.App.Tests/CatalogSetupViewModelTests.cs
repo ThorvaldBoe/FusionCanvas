@@ -1342,6 +1342,46 @@ public sealed class CatalogSetupViewModelTests
         Assert.Equal(failureMessage, await error.Task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken));
         Assert.True(viewModel.IsAddingTemplate);
         Assert.False(viewModel.IsBusy);
+        Assert.Equal(MockupTemplateCoverageViewState.Error, viewModel.CoverageState);
+        Assert.Equal(failureMessage, viewModel.CoverageError);
+        Assert.Contains(failureMessage, viewModel.CoverageStateHelp);
+    }
+
+    [Fact]
+    public async Task MockupTemplateDraft_NoTargetDesignAreaIsExplicitCoverageState()
+    {
+        var state = new MockupTemplateSourceState([], [], false, CoveragePlan: new(
+            Guid.NewGuid(), null, MockupTemplateCoverageGroupingStrategy.ColorFirst, "context", [], [], false));
+        var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(
+            referencedByTemplate: true,
+            sourceImages: new FixedMockupTemplateSourceImageService(state));
+
+        viewModel.EditTemplateCommand.Execute(Assert.Single(viewModel.MockupTemplateCards));
+        await Task.Yield();
+
+        Assert.Equal(MockupTemplateCoverageViewState.NoTargetDesignArea, viewModel.CoverageState);
+        Assert.Equal("No target Design Area", viewModel.CoverageStateLabel);
+        Assert.Contains("Choose an active target Design Area", viewModel.CoverageStateHelp);
+        Assert.True(viewModel.HasCoveragePanel);
+    }
+
+    [Fact]
+    public async Task MockupTemplateDraft_StaleCoveragePlanRequiresExplicitRefresh()
+    {
+        var state = new MockupTemplateSourceState([], [], false, CoveragePlan: new(
+            Guid.NewGuid(), Guid.NewGuid(), MockupTemplateCoverageGroupingStrategy.ColorFirst, "stale-context",
+            [new("black", MockupTemplateCoverageStatus.Missing, [Guid.NewGuid()], ["Black / S"], [], [], "Assign a source image.")], [], true));
+        var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(
+            referencedByTemplate: true,
+            sourceImages: new FixedMockupTemplateSourceImageService(state));
+
+        viewModel.EditTemplateCommand.Execute(Assert.Single(viewModel.MockupTemplateCards));
+        await Task.Yield();
+
+        Assert.Equal(MockupTemplateCoverageViewState.Stale, viewModel.CoverageState);
+        Assert.True(viewModel.IsCoveragePlanStale);
+        Assert.Contains("Refresh", viewModel.CoverageStateHelp);
+        Assert.False(viewModel.AddCoverageRequirementImageCommand.CanExecute(viewModel.CoverageRequirements.Single()));
     }
 
     [Fact]

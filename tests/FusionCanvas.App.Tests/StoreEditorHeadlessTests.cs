@@ -2272,11 +2272,14 @@ public class StoreEditorHeadlessTests
             [new("black", MockupTemplateCoverageStatus.Missing, [Guid.NewGuid()], ["Black / S"], [], [], "Assign a source image.")],
             [],
             true);
+        var sourceImageService = new HeadlessSourceImageService(new MockupTemplateSourceState([], [], false, CoveragePlan: plan));
         var window = CreateEditorWindow(
             includeNormalizedCatalog: true,
             useFixedProviderOffering: true,
             includeOfferingOptions: true,
-            sourceImages: new HeadlessSourceImageService(new MockupTemplateSourceState([], [], false, CoveragePlan: plan)));
+            sourceImages: sourceImageService,
+            filePicker: new DeterministicMockupSourceFilePicker(["planned.png"]),
+            rasterImageMetadataReader: new FixedMockupRasterImageMetadataReader());
         var viewModel = (StoreManagementViewModel)window.DataContext!;
         viewModel.SelectProductsTabCommand.Execute(null);
         viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
@@ -2291,12 +2294,59 @@ public class StoreEditorHeadlessTests
 
         var panel = AssertEffectivelyVisible(dialog, "Catalog.MockupCoveragePanel");
         Assert.Contains(panel.GetVisualDescendants().OfType<TextBlock>(), text => text.Text?.Contains("Variants covered", StringComparison.Ordinal) == true);
+        var coverageState = panel.GetVisualDescendants().OfType<TextBlock>().Single(text => AutomationProperties.GetName(text) == "Mockup coverage state");
+        Assert.Equal("Coverage plan is stale", coverageState.Text);
+        Assert.Contains(panel.GetVisualDescendants().OfType<TextBlock>(), text =>
+            AutomationProperties.GetHelpText(text)?.Contains("current mockup coverage state", StringComparison.Ordinal) == true);
         var grouping = panel.GetVisualDescendants().OfType<ComboBox>().Single(control => AutomationProperties.GetName(control) == "Coverage grouping strategy");
         var exemplar = panel.GetVisualDescendants().OfType<ComboBox>().Single(control => AutomationProperties.GetName(control) == "Coverage exemplar");
         Assert.True(grouping.IsEnabled);
         Assert.True(exemplar.IsEnabled);
         Assert.Contains(panel.GetVisualDescendants().OfType<Button>(), button => AutomationProperties.GetName(button) == "Refresh mockup coverage plan");
-        Assert.Contains(panel.GetVisualDescendants().OfType<Button>(), button => AutomationProperties.GetName(button) == "Add mockup image for coverage requirement");
+        var addImage = panel.GetVisualDescendants().OfType<Button>().Single(button =>
+            AutomationProperties.GetName(button) == "Add mockup image for coverage requirement");
+
+        var catalog = viewModel.CatalogSetup!;
+        catalog.FilePicker = new DeterministicMockupSourceFilePicker(["planned.png"]);
+        var activeVariantIds = catalog.SelectedPlaceholder!.VariantIds
+            .Where(id => catalog.AvailableVariants.Any(variant => variant.Id == id))
+            .ToArray();
+        var activeOptionValueIds = catalog.AvailableVariants
+            .Where(variant => activeVariantIds.Contains(variant.Id))
+            .SelectMany(variant => variant.OptionValueIds)
+            .Distinct()
+            .ToArray();
+        var context = new MockupTemplateCoverageContext(
+            catalog.SelectedTemplate!.Id,
+            catalog.SelectedPlaceholder.Id,
+            activeVariantIds,
+            activeOptionValueIds);
+        sourceImageService.PlannedCoverage = plan with
+        {
+            TemplateId = catalog.SelectedTemplate.Id,
+            TargetDesignAreaId = catalog.SelectedPlaceholder.Id,
+            ContextFingerprint = context.Fingerprint
+        };
+        var refresh = Assert.IsType<AsyncRelayCommand>(catalog.GenerateCoveragePlanCommand);
+        refresh.Execute(null);
+        await refresh.ExecutionTask!;
+        dialog.UpdateLayout();
+        Assert.False(catalog.IsCoveragePlanStale);
+
+        addImage = panel.GetVisualDescendants().OfType<Button>().Single(button =>
+            AutomationProperties.GetName(button) == "Add mockup image for coverage requirement");
+        Assert.NotNull(addImage.Command);
+        Assert.True(addImage.Command!.CanExecute(addImage.CommandParameter));
+        addImage.Command.Execute(addImage.CommandParameter);
+        var browse = Assert.IsType<AsyncRelayCommand>(catalog.BrowseLocalSourceCommand);
+        await browse.ExecutionTask!;
+        await WaitForAsync(() => catalog.LocalSourceDrafts.Any(draft => draft.Path == "planned.png"));
+        Assert.Equal("planned.png", catalog.SelectedLocalSource?.Path);
+
+        dialog.Width = dialog.MinWidth;
+        dialog.UpdateLayout();
+        Assert.True(panel.Bounds.Width <= dialog.Bounds.Width + 0.5,
+            "The coverage panel should remain within the supported narrow editor width.");
 
         dialog.Close();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
@@ -3379,8 +3429,13 @@ public class StoreEditorHeadlessTests
 
     private sealed class HeadlessSourceImageService(MockupTemplateSourceState? state = null) : IMockupTemplateSourceImageService
     {
+        public MockupTemplateCoveragePlan? PlannedCoverage { get; set; }
+
         public Task<MockupTemplateSourceState> LoadAsync(Guid storeId, Guid templateId, CancellationToken cancellationToken = default) =>
             Task.FromResult(state ?? new MockupTemplateSourceState([], [], false));
+
+        public Task<MockupTemplateCoveragePlan?> PlanAsync(Guid storeId, Guid templateId, MockupTemplateCoverageGroupingStrategy groupingStrategy = MockupTemplateCoverageGroupingStrategy.ColorFirst, CancellationToken cancellationToken = default) =>
+            Task.FromResult(PlannedCoverage ?? state?.CoveragePlan);
 
         public Task<MockupTemplateSetupResult> AddAsync(AddLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();

@@ -54,11 +54,16 @@
                 AutomationProperties.HelpText="Use the General AI settings to suggest colors, sizes, and reusable placement for selected source images." />
       </Grid>
       <Border Grid.Row="1" Padding="10" Background="{DynamicResource SubtleSurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-              IsVisible="{Binding HasCoveragePlan}" AutomationProperties.AutomationId="Catalog.MockupCoveragePanel">
+              IsVisible="{Binding HasCoveragePanel}" AutomationProperties.AutomationId="Catalog.MockupCoveragePanel">
         <StackPanel Spacing="6">
           <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
             <StackPanel Spacing="2">
               <TextBlock Text="Coverage planning" FontSize="14" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding CoverageStateLabel}" FontWeight="SemiBold"
+                         IsVisible="{Binding HasCoverageStatus}" AutomationProperties.Name="Mockup coverage state" />
+              <TextBlock Text="{Binding CoverageStateHelp}" TextWrapping="Wrap"
+                         IsVisible="{Binding HasCoverageStatus}" Foreground="{DynamicResource SecondaryTextBrush}"
+                         AutomationProperties.HelpText="Explains the current mockup coverage state and next action." />
               <TextBlock Text="{Binding CoverageSummary}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}"
                          AutomationProperties.Name="Mockup coverage summary" />
               <TextBlock Text="{Binding IncompleteCoverageSummary}" IsVisible="{Binding HasIncompleteCoverageSummary}"

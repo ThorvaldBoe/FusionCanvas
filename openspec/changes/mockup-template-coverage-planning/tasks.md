@@ -14,24 +14,24 @@
 
 ## 3. Store editor coverage workflow
 
-- [ ] 3.1 Add focused-editor coverage state and view-model projection for loading, no target Design Area, complete, missing, ambiguous, incomplete, stale, archived/read-only, and recoverable-error states.
-- [ ] 3.2 Add grouping selection, Generate coverage plan, explicit refresh, and requirement selection commands while preserving existing draft save/discard/cancel behavior.
-- [ ] 3.3 Add Add mockup image and Assign existing image actions with Template context and requirement applicability prefilled; retain the selected-row mapping editor.
+- [x] 3.1 Add focused-editor coverage state and view-model projection for loading, no target Design Area, complete, missing, ambiguous, incomplete, stale, archived/read-only, and recoverable-error states.
+- [x] 3.2 Add grouping selection, Generate coverage plan, explicit refresh, and requirement selection commands while preserving existing draft save/discard/cancel behavior.
+- [x] 3.3 Add Add mockup image and Assign existing image actions with Template context and requirement applicability prefilled; retain the selected-row mapping editor.
 - [x] 3.4 Add exemplar selection and confirmation feedback for applicability and mapping defaults, including clear correction guidance for incompatible dimensions.
-- [ ] 3.5 Add coverage-panel bindings and presentation states with progressive disclosure, accessible names/help text, keyboard traversal, focus placement/return, and supported narrow sizing.
-- [ ] 3.6 Add view-model tests and deterministic Avalonia headless tests for coverage states, commands, draft preservation, stale refresh, bindings, routed actions, accessibility, focus behavior, and narrow layout.
+- [x] 3.5 Add coverage-panel bindings and presentation states with progressive disclosure, accessible names/help text, keyboard traversal, focus placement/return, and supported narrow sizing.
+- [x] 3.6 Add view-model tests and deterministic Avalonia headless tests for coverage states, commands, draft preservation, stale refresh, bindings, routed actions, accessibility, focus behavior, and narrow layout.
 
 ## 4. Listing diagnostics and bulk-upload seam
 
 - [x] 4.1 Extend the Listing diagnostic result and translator/view model with authoritative resolved/missing counts and grouped affected Variant guidance for source-resolution blockers.
 - [x] 4.2 Render the Listing coverage summary as ordinary accessible text and controls while keeping repair actions in Store settings and ready-only eligibility unchanged.
 - [x] 4.3 Define the application-facing coverage requirement/result contract that the separate bulk-upload workflow can consume without introducing a second compatibility calculation.
-- [ ] 4.4 Add Listing application and headless binding tests for configured Draft templates, affected Variant guidance, ready-template transition, unavailable diagnostics, and presentation-only behavior.
+- [x] 4.4 Add Listing application and headless binding tests for configured Draft templates, affected Variant guidance, ready-template transition, unavailable diagnostics, and presentation-only behavior.
 
 ## 5. Verification and artifact reconciliation
 
-- [ ] 5.1 Add or update any focused tests needed to cover every acceptance scenario in both delta specs, including partial saves and persisted reload behavior.
-- [ ] 5.2 If implementation decisions alter scope or behavior, reconcile proposal, delta specs, design, and this task list before final validation; do not leave contradictory artifacts.
+- [x] 5.1 Add or update any focused tests needed to cover every acceptance scenario in both delta specs, including partial saves and persisted reload behavior.
+- [x] 5.2 Reviewed the implementation against the proposal, delta specs, design, and task list; no scope or behavior contradiction requires artifact changes.
 - [x] 5.3 Run `openspec validate --strict` and resolve all validation findings for this change.
 - [ ] 5.4 Run `dotnet test .\\FusionCanvas.sln -m:1` and record criterion-level evidence for each acceptance scenario, including any supplemental real-desktop scenario-pack result.
 

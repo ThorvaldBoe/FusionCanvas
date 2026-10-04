@@ -1633,6 +1633,11 @@
                               <TextBlock Text="{Binding TemplateName, StringFormat='{}{0}'}" FontWeight="SemiBold" />
                               <TextBlock Text="{Binding Guidance}" TextWrapping="Wrap" Foreground="{DynamicResource WarningTextBrush}" />
                               <TextBlock Text="{Binding CoverageSummary}" IsVisible="{Binding HasCoverageSummary}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+                              <TextBlock Text="{Binding CoverageAffectedVariantGuidance}"
+                                         IsVisible="{Binding HasCoverageAffectedVariantGuidance}"
+                                         TextWrapping="Wrap"
+                                         Foreground="{DynamicResource SecondaryTextBrush}"
+                                         AutomationProperties.Name="Affected Variant mockup guidance" />
                             </StackPanel>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>

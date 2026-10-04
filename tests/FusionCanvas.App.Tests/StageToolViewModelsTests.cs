@@ -142,6 +142,10 @@ public class StageToolViewModelsTests
         var diagnostic = Assert.Single(vm.TemplateDiagnostics);
         Assert.Equal("0/1 Variants covered; 1 missing, 0 ambiguous, 0 incomplete.", diagnostic.CoverageSummary);
         Assert.True(diagnostic.HasCoverageSummary);
+        Assert.Equal("Black / M: Assign a source image.", diagnostic.CoverageAffectedVariantGuidance);
+        Assert.True(diagnostic.HasCoverageAffectedVariantGuidance);
+        Assert.True(vm.HasBlockedReason);
+        Assert.False(vm.CanApply);
     }
 
     [Fact]
@@ -188,6 +192,8 @@ public class StageToolViewModelsTests
         Assert.Equal("Flatlay no 1", template.Name);
         Assert.Equal(templateId, vm.SelectedTemplateId);
         Assert.True(vm.CanApply);
+        Assert.Empty(vm.TemplateDiagnostics);
+        Assert.False(vm.HasTemplateDiagnostics);
 
         vm.SelectedTemplate = null;
         Assert.False(vm.CanApply);

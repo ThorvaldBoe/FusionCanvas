@@ -71,6 +71,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private bool _localSourceSortAscending = true;
     private string _error = string.Empty;
     private bool _isBusy;
+    private bool _isCoverageLoading;
+    private bool _isReadOnly;
+    private string _coverageError = string.Empty;
     private bool _isAddingOption;
     private bool _isAddingPrintProvider;
     private bool _isAddingOptionValue;
@@ -331,6 +334,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(HasCoverageRequirements));
             OnPropertyChanged(nameof(IsCoveragePlanComplete));
             OnPropertyChanged(nameof(IsCoveragePlanStale));
+            NotifyCoveragePresentation();
             NotifyCommands();
         }
     }
@@ -360,6 +364,72 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public bool HasExemplarMappingSummary => SelectedCoverageExemplar is not null;
     public bool IsCoveragePlanComplete => CoveragePlan?.IsComplete == true && !IsCoveragePlanStale;
     public bool IsCoveragePlanStale => CoveragePlan is not null && CoveragePlan.IsStaleAgainst(CurrentCoverageContext());
+    public bool IsCoverageLoading
+    {
+        get => _isCoverageLoading;
+        private set
+        {
+            if (!SetField(ref _isCoverageLoading, value)) return;
+            NotifyCoveragePresentation();
+            NotifyCommands();
+        }
+    }
+    public string CoverageError
+    {
+        get => _coverageError;
+        private set
+        {
+            if (!SetField(ref _coverageError, value)) return;
+            OnPropertyChanged(nameof(HasCoverageError));
+            NotifyCoveragePresentation();
+        }
+    }
+    public bool HasCoverageError => !string.IsNullOrWhiteSpace(CoverageError);
+    public bool HasCoveragePanel => HasCoveragePlan || IsCoverageLoading || HasCoverageError;
+    public MockupTemplateCoverageViewState CoverageState
+    {
+        get
+        {
+            if (!IsAddingTemplate || _sourceImages is null || SelectedTemplate is null) return MockupTemplateCoverageViewState.Unavailable;
+            if (IsCoverageLoading) return MockupTemplateCoverageViewState.Loading;
+            if (HasCoverageError) return MockupTemplateCoverageViewState.Error;
+            if (IsReadOnly || SelectedOffering?.IsArchived == true) return MockupTemplateCoverageViewState.ReadOnly;
+            if (CoveragePlan is null) return MockupTemplateCoverageViewState.Unavailable;
+            if (!CoveragePlan.HasTargetDesignArea) return MockupTemplateCoverageViewState.NoTargetDesignArea;
+            if (IsCoveragePlanStale) return MockupTemplateCoverageViewState.Stale;
+            if (CoveragePlan.IsComplete) return MockupTemplateCoverageViewState.Complete;
+            if (CoveragePlan.AmbiguousCount > 0) return MockupTemplateCoverageViewState.Ambiguous;
+            if (CoveragePlan.IncompleteCount > 0) return MockupTemplateCoverageViewState.Incomplete;
+            return MockupTemplateCoverageViewState.Missing;
+        }
+    }
+    public bool HasCoverageStatus => CoverageState != MockupTemplateCoverageViewState.Unavailable;
+    public string CoverageStateLabel => CoverageState switch
+    {
+        MockupTemplateCoverageViewState.Loading => "Loading coverage plan",
+        MockupTemplateCoverageViewState.NoTargetDesignArea => "No target Design Area",
+        MockupTemplateCoverageViewState.Complete => "Coverage complete",
+        MockupTemplateCoverageViewState.Missing => "Coverage needs images",
+        MockupTemplateCoverageViewState.Ambiguous => "Coverage needs disambiguation",
+        MockupTemplateCoverageViewState.Incomplete => "Coverage needs setup",
+        MockupTemplateCoverageViewState.Stale => "Coverage plan is stale",
+        MockupTemplateCoverageViewState.ReadOnly => "Coverage is read-only",
+        MockupTemplateCoverageViewState.Error => "Coverage plan could not be loaded",
+        _ => "Coverage planning is unavailable"
+    };
+    public string CoverageStateHelp => CoverageState switch
+    {
+        MockupTemplateCoverageViewState.Loading => "Loading current source images and compatible Variants.",
+        MockupTemplateCoverageViewState.NoTargetDesignArea => "Choose an active target Design Area before planning coverage.",
+        MockupTemplateCoverageViewState.Complete => "Every compatible Variant resolves to exactly one usable source image.",
+        MockupTemplateCoverageViewState.Missing => "Assign or add a source image for each missing requirement.",
+        MockupTemplateCoverageViewState.Ambiguous => "Some Variants match more than one source image. Narrow their applicability or archive the extra row.",
+        MockupTemplateCoverageViewState.Incomplete => "Complete applicability and placement mapping for the affected source rows.",
+        MockupTemplateCoverageViewState.Stale => "The catalog context changed. Refresh the plan before applying new requirement defaults.",
+        MockupTemplateCoverageViewState.ReadOnly => "This Store or Mockup Template is archived, so coverage changes are disabled.",
+        MockupTemplateCoverageViewState.Error => CoverageError,
+        _ => "Generate a coverage plan to see which compatible Variants still need mockup images."
+    };
     public string CoverageSummary => CoveragePlan is null
         ? "Generate a coverage plan to see which compatible Variants still need mockup images."
         : IsCoveragePlanStale
@@ -654,9 +724,9 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public bool IsAddingVariant { get => _isAddingVariant; private set { if (SetField(ref _isAddingVariant, value)) NotifyCommands(); } }
     public bool IsAddingBulkVariants { get => _isAddingBulkVariants; private set { if (SetField(ref _isAddingBulkVariants, value)) NotifyCommands(); } }
     public bool IsAddingPlaceholder { get => _isAddingPlaceholder; private set { if (SetField(ref _isAddingPlaceholder, value)) { OnPropertyChanged(nameof(IsEditingDesignArea)); OnPropertyChanged(nameof(DesignAreaEditorDialogTitle)); NotifyDesignAreaDraftChanged(); NotifyCommands(); } } }
-    public bool IsAddingTemplate { get => _isAddingTemplate; private set { if (SetField(ref _isAddingTemplate, value)) { OnPropertyChanged(nameof(IsEditingMockupTemplate)); OnPropertyChanged(nameof(MockupTemplateEditorDialogTitle)); NotifyMockupTemplateDraftChanged(); NotifyCommands(); } } }
+    public bool IsAddingTemplate { get => _isAddingTemplate; private set { if (SetField(ref _isAddingTemplate, value)) { OnPropertyChanged(nameof(IsEditingMockupTemplate)); OnPropertyChanged(nameof(MockupTemplateEditorDialogTitle)); NotifyMockupTemplateDraftChanged(); NotifyCoveragePresentation(); NotifyCommands(); } } }
     public bool IsAvailable { get; private set; }
-    public bool IsReadOnly { get; private set; }
+    public bool IsReadOnly { get => _isReadOnly; private set { if (SetField(ref _isReadOnly, value)) { OnPropertyChanged(nameof(CanEdit)); NotifyCoveragePresentation(); NotifyCommands(); } } }
     public bool CanEdit => _storeEditorAttached && IsAvailable && !IsReadOnly && !IsBusy && SelectedOffering?.IsArchived != true;
     public bool IsBusy { get => _isBusy; private set { if (SetField(ref _isBusy, value)) { OnPropertyChanged(nameof(CanEdit)); OnPropertyChanged(nameof(CanKeepAspectRatio)); NotifyCommands(); } } }
     public string ErrorMessage { get => _error; private set { if (SetField(ref _error, value)) OnPropertyChanged(nameof(HasError)); } }
@@ -1320,14 +1390,28 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     {
         if (_sourceImages is null || SelectedOffering is null || SelectedTemplate is null) return;
         IsBusy = true;
+        IsCoverageLoading = true;
+        CoverageError = string.Empty;
         ErrorMessage = string.Empty;
         try
         {
             CoveragePlan = await _sourceImages.PlanAsync(SelectedOffering.StoreId, SelectedTemplate.Id, CoverageGroupingStrategy).ConfigureAwait(true);
-            if (CoveragePlan is null) ErrorMessage = "Coverage planning is unavailable for this Mockup Template.";
+            if (CoveragePlan is null)
+            {
+                CoverageError = "Coverage planning is unavailable for this Mockup Template.";
+                ErrorMessage = CoverageError;
+            }
         }
-        catch (Exception exception) { ErrorMessage = exception.Message; }
-        finally { IsBusy = false; }
+        catch (Exception exception)
+        {
+            CoverageError = exception.Message;
+            ErrorMessage = exception.Message;
+        }
+        finally
+        {
+            IsCoverageLoading = false;
+            IsBusy = false;
+        }
     }
 
     private MockupTemplateCoverageContext CurrentCoverageContext()
@@ -1754,6 +1838,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         SelectedLocalSource = null;
         LocalSourcePath = string.Empty;
         CoveragePlan = null;
+        CoverageError = string.Empty;
+        IsCoverageLoading = false;
         SelectedCoverageRequirement = null;
         SelectedCoverageExemplar = null;
         var revision = TemplateRevisions.SingleOrDefault(value => value.MockupTemplateId == template.Id && value.RevisionNumber == template.CurrentRevision);
@@ -1795,6 +1881,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         SelectedLocalSource = null;
         LocalSourcePath = string.Empty;
         CoveragePlan = null;
+        CoverageError = string.Empty;
+        IsCoverageLoading = false;
         SelectedCoverageRequirement = null;
         SelectedCoverageExemplar = null;
         foreach (var color in TemplateColorChoices) color.IsSelected = false;
@@ -2555,32 +2643,47 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private async Task LoadLocalSourceDraftsAsync(Guid templateId)
     {
         if (_sourceImages is null || SelectedOffering is null) return;
-        var configuredTemplateColorIds = TemplateColorChoices
-            .Where(value => value.IsSelected)
-            .Select(value => value.Value.Id)
-            .ToHashSet();
-        var state = await _sourceImages.LoadAsync(SelectedOffering.StoreId, templateId).ConfigureAwait(true);
-        if (!IsAddingTemplate || SelectedTemplate?.Id != templateId) return;
-        CoveragePlan = state.CoveragePlan;
-        foreach (var image in state.Images)
+        IsCoverageLoading = true;
+        CoverageError = string.Empty;
+        try
         {
-            var labels = image.OptionValueIds.Select(id => OptionValues.FirstOrDefault(value => value.Id == id)).Where(value => value is not null).Select(value => ValueLabel(value!));
-            LocalSourceDrafts.Add(new LocalMockupSourceDraftViewModel(image.WorkspaceRelativePath, image.OptionValueIds, isManaged: true, image.ImageMapping, image.Dimensions.Width, image.Dimensions.Height, image.Id, image.PreviewPath) { ApplicabilitySummary = string.Join(", ", labels) });
+            var configuredTemplateColorIds = TemplateColorChoices
+                .Where(value => value.IsSelected)
+                .Select(value => value.Value.Id)
+                .ToHashSet();
+            var state = await _sourceImages.LoadAsync(SelectedOffering.StoreId, templateId).ConfigureAwait(true);
+            if (!IsAddingTemplate || SelectedTemplate?.Id != templateId) return;
+            CoveragePlan = state.CoveragePlan;
+            if (!string.IsNullOrWhiteSpace(state.Error))
+            {
+                CoverageError = state.Error;
+                ErrorMessage = state.Error;
+            }
+            foreach (var image in state.Images)
+            {
+                var labels = image.OptionValueIds.Select(id => OptionValues.FirstOrDefault(value => value.Id == id)).Where(value => value is not null).Select(value => ValueLabel(value!));
+                LocalSourceDrafts.Add(new LocalMockupSourceDraftViewModel(image.WorkspaceRelativePath, image.OptionValueIds, isManaged: true, image.ImageMapping, image.Dimensions.Width, image.Dimensions.Height, image.Id, image.PreviewPath) { ApplicabilitySummary = string.Join(", ", labels) });
+            }
+            ApplyLocalSourceSort();
+            OnPropertyChanged(nameof(CoverageExemplarChoices));
+            if (LocalSourceDrafts.Count > 0) SelectLocalSource(LocalSourceDrafts[0]);
+            if (configuredTemplateColorIds.Count > 0)
+            {
+                foreach (var color in TemplateColorChoices)
+                    color.IsSelected = configuredTemplateColorIds.Contains(color.Value.Id);
+            }
+            RebuildMappedSourceChoices();
+            OnPropertyChanged(nameof(HasLocalSource));
+            if (IsAddingTemplate && SelectedTemplate?.Id == templateId)
+            {
+                _mockupTemplateDraftBaseline = CurrentMockupTemplateDraftState();
+                OnPropertyChanged(nameof(HasMeaningfulMockupTemplateDraft));
+            }
         }
-        ApplyLocalSourceSort();
-        OnPropertyChanged(nameof(CoverageExemplarChoices));
-        if (LocalSourceDrafts.Count > 0) SelectLocalSource(LocalSourceDrafts[0]);
-        if (configuredTemplateColorIds.Count > 0)
+        finally
         {
-            foreach (var color in TemplateColorChoices)
-                color.IsSelected = configuredTemplateColorIds.Contains(color.Value.Id);
-        }
-        RebuildMappedSourceChoices();
-        OnPropertyChanged(nameof(HasLocalSource));
-        if (IsAddingTemplate && SelectedTemplate?.Id == templateId)
-        {
-            _mockupTemplateDraftBaseline = CurrentMockupTemplateDraftState();
-            OnPropertyChanged(nameof(HasMeaningfulMockupTemplateDraft));
+            if (IsAddingTemplate && SelectedTemplate?.Id == templateId)
+                IsCoverageLoading = false;
         }
     }
 
@@ -2598,7 +2701,11 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         catch (Exception exception)
         {
             if (IsAddingTemplate && SelectedTemplate?.Id == templateId)
+            {
+                CoverageError = exception.Message;
                 ErrorMessage = exception.Message;
+                IsCoverageLoading = false;
+            }
         }
     }
 
@@ -2791,6 +2898,15 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
                 case RelayCommand relayCommand: relayCommand.NotifyCanExecuteChanged(); break;
             }
         }
+    }
+
+    private void NotifyCoveragePresentation()
+    {
+        OnPropertyChanged(nameof(CoverageState));
+        OnPropertyChanged(nameof(CoverageStateLabel));
+        OnPropertyChanged(nameof(CoverageStateHelp));
+        OnPropertyChanged(nameof(HasCoverageStatus));
+        OnPropertyChanged(nameof(HasCoveragePanel));
     }
 
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
