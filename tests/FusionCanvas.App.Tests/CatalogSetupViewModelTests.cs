@@ -166,6 +166,82 @@ public sealed class CatalogSetupViewModelTests
     }
 
     [Fact]
+    public async Task CoverageExemplarPrefillsSafeApplicabilityAndMatchingMapping()
+    {
+        var (viewModel, area, _) = await CreateCatalogWithDesignAreaAsync(
+            referencedByTemplate: false,
+            sourceImages: new RecordingSourceImageService(),
+            filePicker: new FixedLocalSourceFilePicker("new-source.png"),
+            rasterImageMetadataReader: new FixedRasterImageMetadataReader(new RasterImageInfo(1600, 1200)));
+        viewModel.StartAddTemplateCommand.Execute(null);
+        var color = viewModel.TemplateColorChoices.Single().Value;
+        var size = viewModel.TemplateAdditionalOptionChoices.Single().Value;
+        var mapping = new MockupImageSpaceMapping(1600, 1200, 100, 120, 900, 700);
+        var exemplar = new LocalMockupSourceDraftViewModel("managed-exemplar.png", [color.Id, size.Id], isManaged: true, mapping, 1600, 1200, Guid.NewGuid());
+        viewModel.LocalSourceDrafts.Add(exemplar);
+        viewModel.SelectedCoverageExemplar = exemplar;
+        var requirement = new MockupTemplateCoverageRequirement(
+            "black",
+            MockupTemplateCoverageStatus.Missing,
+            [area.VariantIds.Single()],
+            ["Black / S"],
+            [new MockupTemplateCoverageOptionValue(color.Id, OptionKind.Color, "Black")],
+            [],
+            "Missing");
+        viewModel.SelectCoverageRequirementCommand.Execute(requirement);
+        var command = Assert.IsType<AsyncRelayCommand>(viewModel.BrowseLocalSourceCommand);
+        command.Execute(null);
+        await command.ExecutionTask!;
+
+        var uploaded = Assert.Single(viewModel.LocalSourceDrafts, value => value.Path == "new-source.png");
+        Assert.Equal([color.Id, size.Id], uploaded.OptionValueIds);
+        Assert.Equal(1600, uploaded.ImageWidth);
+        Assert.Equal(1200, uploaded.ImageHeight);
+        Assert.Equal("Mapping reused from exemplar", uploaded.AssistanceStatus);
+        Assert.Equal(mapping, uploaded.Mapping);
+    }
+
+    [Fact]
+    public async Task CoverageExemplarSurfacesMappingReviewWhenDimensionsDiffer()
+    {
+        var (viewModel, area, _) = await CreateCatalogWithDesignAreaAsync(
+            referencedByTemplate: false,
+            sourceImages: new RecordingSourceImageService(),
+            filePicker: new FixedLocalSourceFilePicker("new-source.png"),
+            rasterImageMetadataReader: new FixedRasterImageMetadataReader(new RasterImageInfo(800, 600)));
+        viewModel.StartAddTemplateCommand.Execute(null);
+        var color = viewModel.TemplateColorChoices.Single().Value;
+        var size = viewModel.TemplateAdditionalOptionChoices.Single().Value;
+        var exemplar = new LocalMockupSourceDraftViewModel(
+            "managed-exemplar.png",
+            [color.Id, size.Id],
+            isManaged: true,
+            new MockupImageSpaceMapping(1600, 1200, 100, 120, 900, 700),
+            1600,
+            1200,
+            Guid.NewGuid());
+        viewModel.LocalSourceDrafts.Add(exemplar);
+        viewModel.SelectedCoverageExemplar = exemplar;
+        viewModel.SelectCoverageRequirementCommand.Execute(new MockupTemplateCoverageRequirement(
+            "black",
+            MockupTemplateCoverageStatus.Missing,
+            [area.VariantIds.Single()],
+            ["Black / S"],
+            [new MockupTemplateCoverageOptionValue(color.Id, OptionKind.Color, "Black")],
+            [],
+            "Missing"));
+        var command = Assert.IsType<AsyncRelayCommand>(viewModel.BrowseLocalSourceCommand);
+        command.Execute(null);
+        await command.ExecutionTask!;
+
+        var uploaded = Assert.Single(viewModel.LocalSourceDrafts, value => value.Path == "new-source.png");
+        Assert.Equal([color.Id, size.Id], uploaded.OptionValueIds);
+        Assert.Null(uploaded.Mapping);
+        Assert.Equal("Needs mapping review", uploaded.AssistanceStatus);
+        Assert.Equal("Mapping reuse is offered only for matching 1600 × 1200 pixel images.", viewModel.ExemplarMappingSummary);
+    }
+
+    [Fact]
     public async Task BrowseLocalSourcesRetainsFailedMetadataDraftAlongsideValidDrafts()
     {
         var now = DateTimeOffset.UtcNow;
@@ -1364,7 +1440,9 @@ public sealed class CatalogSetupViewModelTests
         IOfferingManagementService? offeringManagement = null,
         Func<IWorkspaceRepository, IOfferingManagementService>? offeringManagementFactory = null,
         bool selectOffering = true,
-        IMockupSourceMetadataAssistanceService? assistance = null)
+        IMockupSourceMetadataAssistanceService? assistance = null,
+        IAssetFilePicker? filePicker = null,
+        IRasterImageMetadataReader? rasterImageMetadataReader = null)
     {
         var now = DateTimeOffset.UtcNow;
         var snapshot = SampleWorkspace.Create();
@@ -1412,6 +1490,8 @@ public sealed class CatalogSetupViewModelTests
             new MockupTemplateSetupService(repository),
             selectedOfferingManagement,
             sourceImages: sourceImages,
+            filePicker: filePicker,
+            rasterImageMetadataReader: rasterImageMetadataReader,
             mockupSourceMetadataAssistance: assistance);
         await viewModel.LoadForStoreAsync(store.Id, TestContext.Current.CancellationToken);
         if (selectOffering) viewModel.SelectOffering(offering.Id);

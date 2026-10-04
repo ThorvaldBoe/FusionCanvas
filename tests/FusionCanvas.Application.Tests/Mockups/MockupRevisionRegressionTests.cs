@@ -177,6 +177,76 @@ public sealed class MockupRevisionRegressionTests
         Assert.Empty(repository.Snapshot.MockupTemplateSourceImageOptionValues);
     }
 
+    [Fact]
+    public async Task AssignExistingReusesManagedAssetAndCreatesTargetRevision()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprint = new Blueprint(Guid.NewGuid(), storeId, "Tee", null, false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, storeId, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "network", null, null, false, Now, Now);
+        var option = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
+        var black = new OfferingOptionValue(Guid.NewGuid(), option.Id, offering.Id, "Black", 0);
+        var sourceTemplate = new MockupTemplate(Guid.NewGuid(), offering.Id, null, "Source", null, 1, false, Now, Now);
+        var targetTemplate = new MockupTemplate(Guid.NewGuid(), offering.Id, null, "Target", null, 1, false, Now, Now);
+        var asset = new Asset(Guid.NewGuid(), storeId, "front.png", null, AssetKind.MockupImage, "assets/front.png", "front.png", false, false, Now, Now, "{}");
+        var mapping = new MockupImageSpaceMapping(100, 100, 10, 12, 60, 70);
+        var sourceImage = new MockupTemplateSourceImage(Guid.NewGuid(), sourceTemplate.Id, asset.Id, mapping, false, Now, Now, 100, 100);
+        var snapshot = new WorkspaceSnapshot(
+            [WorkspaceSnapshot.DefaultWorkspace(Now)],
+            [new Store(storeId, "Store", null, false, Now, Now, "{}")],
+            [], [], [], [asset], [], [], [],
+            [new AssetLink(asset.Id, WorkspaceEntityKind.Store, storeId)])
+        {
+            Blueprints = [blueprint],
+            BlueprintOfferings = [offering],
+            OfferingOptions = [option],
+            OfferingOptionValues = [black],
+            MockupTemplates = [sourceTemplate, targetTemplate],
+            MockupTemplateSourceImages = [sourceImage],
+            MockupTemplateSourceImageOptionValues = [new(sourceImage.Id, black.Id)]
+        };
+        var repository = new MemoryRepository(snapshot);
+        var service = new MockupTemplateSourceImageService(repository, new FakeFiles(), new FakeMetadata(), new MockupTemplateSetupService(repository), () => Now, Guid.NewGuid);
+
+        var result = await service.AssignExistingAsync(new AssignExistingMockupTemplateSourceRequest(storeId, targetTemplate.Id, sourceImage.Id, [black.Id]));
+
+        Assert.True(result.Succeeded);
+        var assigned = Assert.Single(repository.Snapshot.MockupTemplateSourceImages, value => value.MockupTemplateId == targetTemplate.Id);
+        Assert.Equal(asset.Id, assigned.SourceAssetId);
+        Assert.Equal(mapping, assigned.ImageMapping);
+        Assert.Contains(repository.Snapshot.MockupTemplateSourceImageOptionValues, value => value.SourceImageId == assigned.Id && value.OptionValueId == black.Id);
+        Assert.Single(repository.Snapshot.Assets);
+        Assert.Equal(2, repository.Snapshot.MockupTemplates.Single(value => value.Id == targetTemplate.Id).CurrentRevision);
+        Assert.Contains(repository.Snapshot.MockupTemplateRevisions, value => value.MockupTemplateId == targetTemplate.Id && value.RevisionNumber == 2);
+    }
+
+    [Fact]
+    public async Task AssignExistingCanSkipMappingWithoutCreatingAnotherAsset()
+    {
+        var storeId = Guid.NewGuid();
+        var blueprint = new Blueprint(Guid.NewGuid(), storeId, "Tee", null, false, Now, Now);
+        var offering = new BlueprintOffering(Guid.NewGuid(), blueprint.Id, storeId, "Tee", null, BlueprintOfferingKind.ProviderNetwork, null, "network", null, null, false, Now, Now);
+        var option = new OfferingOption(Guid.NewGuid(), offering.Id, OptionKind.Color, "Color", 0);
+        var black = new OfferingOptionValue(Guid.NewGuid(), option.Id, offering.Id, "Black", 0);
+        var sourceTemplate = new MockupTemplate(Guid.NewGuid(), offering.Id, null, "Source", null, 1, false, Now, Now);
+        var targetTemplate = new MockupTemplate(Guid.NewGuid(), offering.Id, null, "Target", null, 1, false, Now, Now);
+        var asset = new Asset(Guid.NewGuid(), storeId, "front.png", null, AssetKind.MockupImage, "assets/front.png", "front.png", false, false, Now, Now, "{}");
+        var sourceImage = new MockupTemplateSourceImage(Guid.NewGuid(), sourceTemplate.Id, asset.Id, new(100, 100, 0, 0, 100, 100), false, Now, Now, 100, 100);
+        var snapshot = new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [new Store(storeId, "Store", null, false, Now, Now, "{}")], [], [], [], [asset], [], [], [], [new AssetLink(asset.Id, WorkspaceEntityKind.Store, storeId)])
+        {
+            Blueprints = [blueprint], BlueprintOfferings = [offering], OfferingOptions = [option], OfferingOptionValues = [black],
+            MockupTemplates = [sourceTemplate, targetTemplate], MockupTemplateSourceImages = [sourceImage]
+        };
+        var repository = new MemoryRepository(snapshot);
+        var service = new MockupTemplateSourceImageService(repository, new FakeFiles(), new FakeMetadata(), new MockupTemplateSetupService(repository), () => Now, Guid.NewGuid);
+
+        var result = await service.AssignExistingAsync(new AssignExistingMockupTemplateSourceRequest(storeId, targetTemplate.Id, sourceImage.Id, [black.Id], ReuseMapping: false));
+
+        Assert.True(result.Succeeded);
+        var assigned = Assert.Single(repository.Snapshot.MockupTemplateSourceImages, value => value.MockupTemplateId == targetTemplate.Id);
+        Assert.Null(assigned.ImageMapping);
+        Assert.Single(repository.Snapshot.Assets);
+    }
+
     private sealed class MemoryRepository(WorkspaceSnapshot initial) : IWorkspaceRepository
     {
         public WorkspaceSnapshot Snapshot { get; private set; } = initial;

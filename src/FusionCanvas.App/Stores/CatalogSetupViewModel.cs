@@ -118,6 +118,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private MockupTemplateCoveragePlan? _coveragePlan;
     private MockupTemplateCoverageGroupingStrategy _coverageGroupingStrategy = MockupTemplateCoverageGroupingStrategy.ColorFirst;
     private MockupTemplateCoverageRequirement? _selectedCoverageRequirement;
+    private LocalMockupSourceDraftViewModel? _selectedCoverageExemplar;
 
     public CatalogSetupViewModel(ICatalogSetupService catalog, IMockupTemplateSetupService mockups, IOfferingManagementService? offeringManagement = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, IAssetFilePicker? filePicker = null, IRasterImageMetadataReader? rasterImageMetadataReader = null, IMockupSourceMetadataAssistanceService? mockupSourceMetadataAssistance = null, IMockupPlacementPreviewReader? mockupPlacementPreviewReader = null)
     {
@@ -337,6 +338,26 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public bool HasCoveragePlan => CoveragePlan is not null;
     public bool HasCoverageRequirements => CoverageRequirements.Count > 0;
     public bool CanAssignExistingCoverageImage => HasSelectedLocalSource && SelectedLocalSource?.IsManaged == true;
+    public IEnumerable<LocalMockupSourceDraftViewModel> CoverageExemplarChoices => LocalSourceDrafts.Where(value => value.IsManaged);
+    public LocalMockupSourceDraftViewModel? SelectedCoverageExemplar
+    {
+        get => _selectedCoverageExemplar;
+        set
+        {
+            if (!SetField(ref _selectedCoverageExemplar, value)) return;
+            OnPropertyChanged(nameof(ExemplarMappingSummary));
+            OnPropertyChanged(nameof(HasExemplarMappingSummary));
+            if (SelectedCoverageRequirement is { } requirement && SelectedLocalSource is { IsManaged: false } draft)
+                ApplyCoverageApplicability(requirement, draft, reuseExemplarMapping: true);
+            NotifyCommands();
+        }
+    }
+    public string ExemplarMappingSummary => SelectedCoverageExemplar is null
+        ? "Optional: choose a managed source image to reuse safe applicability and placement defaults."
+        : SelectedCoverageExemplar.Mapping is { } mapping
+            ? $"Mapping reuse is offered only for matching {mapping.ImageWidth} × {mapping.ImageHeight} pixel images."
+            : "This exemplar has no placement mapping; uploaded images will need explicit placement.";
+    public bool HasExemplarMappingSummary => SelectedCoverageExemplar is not null;
     public bool IsCoveragePlanComplete => CoveragePlan?.IsComplete == true && !IsCoveragePlanStale;
     public bool IsCoveragePlanStale => CoveragePlan is not null && CoveragePlan.IsStaleAgainst(CurrentCoverageContext());
     public string CoverageSummary => CoveragePlan is null
@@ -1200,10 +1221,15 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             SelectLocalSource(firstDraft);
             if (SelectedCoverageRequirement is { } requirement)
             {
-                ApplyCoverageApplicability(requirement, firstDraft);
-                SelectLocalSource(firstDraft);
+                ApplyCoverageApplicability(requirement, firstDraft, reuseExemplarMapping: true);
+                var mapping = firstDraft.Mapping;
+                MappingXText = mapping is null ? string.Empty : FormatMapping(mapping.X);
+                MappingYText = mapping is null ? string.Empty : FormatMapping(mapping.Y);
+                MappingWidthText = mapping is null ? string.Empty : FormatMapping(mapping.Width);
+                MappingHeightText = mapping is null ? string.Empty : FormatMapping(mapping.Height);
             }
             OnPropertyChanged(nameof(HasLocalSource));
+            OnPropertyChanged(nameof(CoverageExemplarChoices));
             NotifyMockupTemplateDraftChanged();
         }
     }
@@ -1237,14 +1263,47 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         NotifyCommands();
     }
 
-    private void ApplyCoverageApplicability(MockupTemplateCoverageRequirement requirement, LocalMockupSourceDraftViewModel? draft)
+    private void ApplyCoverageApplicability(MockupTemplateCoverageRequirement requirement, LocalMockupSourceDraftViewModel? draft, bool reuseExemplarMapping = false)
     {
-        var ids = requirement.Applicability.Select(value => value.Id).ToArray();
+        var ids = requirement.Applicability.Select(value => value.Id).ToHashSet();
+        if (SelectedCoverageExemplar is { } exemplar)
+        {
+            var variants = requirement.VariantIds
+                .Select(id => AvailableVariants.FirstOrDefault(value => value.Id == id))
+                .Where(value => value is not null)
+                .ToArray();
+            foreach (var optionValueId in exemplar.OptionValueIds)
+            {
+                var optionValue = OptionValues.FirstOrDefault(value => value.Id == optionValueId);
+                if (optionValue is not null
+                    && optionValue.OptionId is var optionId
+                    && AvailableOptions.FirstOrDefault(value => value.Id == optionId)?.OptionKind != OptionKind.Color
+                    && variants.Length > 0
+                    && variants.All(value => value!.OptionValueIds.Contains(optionValueId)))
+                {
+                    ids.Add(optionValueId);
+                }
+            }
+        }
+        var mapping = draft?.Mapping;
+        if (reuseExemplarMapping && draft is not null && mapping is null && SelectedCoverageExemplar?.Mapping is { } exemplarMapping)
+        {
+            if (draft.ImageWidth == exemplarMapping.ImageWidth && draft.ImageHeight == exemplarMapping.ImageHeight)
+            {
+                mapping = exemplarMapping;
+                draft.SetAssistanceStatus("Mapping reused from exemplar", null);
+            }
+            else
+            {
+                draft.SetAssistanceStatus("Needs mapping review", null);
+            }
+        }
+        var selectedIds = ids.ToArray();
         foreach (var choice in TemplateColorChoices) choice.IsSelected = ids.Contains(choice.Value.Id);
         foreach (var choice in TemplateAdditionalOptionChoices) choice.IsSelected = ids.Contains(choice.Value.Id);
         if (draft is not null)
         {
-            draft.UpdateMetadata(ids, draft.Mapping, string.Join(", ", ids.Select(id => OptionValues.FirstOrDefault(value => value.Id == id)).Where(value => value is not null).Select(value => ValueLabel(value!))));
+            draft.UpdateMetadata(selectedIds, mapping, string.Join(", ", selectedIds.Select(id => OptionValues.FirstOrDefault(value => value.Id == id)).Where(value => value is not null).Select(value => ValueLabel(value!))));
         }
         NotifyMockupTemplateDraftChanged();
     }
@@ -1696,6 +1755,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         LocalSourcePath = string.Empty;
         CoveragePlan = null;
         SelectedCoverageRequirement = null;
+        SelectedCoverageExemplar = null;
         var revision = TemplateRevisions.SingleOrDefault(value => value.MockupTemplateId == template.Id && value.RevisionNumber == template.CurrentRevision);
         SelectedProviderMockup = ProviderMockupCandidates.FirstOrDefault(value => value.ProviderReference == revision?.ProviderMockupReference);
         if (revision?.ImageMapping is { } mapping)
@@ -1736,6 +1796,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         LocalSourcePath = string.Empty;
         CoveragePlan = null;
         SelectedCoverageRequirement = null;
+        SelectedCoverageExemplar = null;
         foreach (var color in TemplateColorChoices) color.IsSelected = false;
         foreach (var option in TemplateAdditionalOptionChoices) option.IsSelected = false;
         _mockupTemplateDraftBaseline = CurrentMockupTemplateDraftState();
@@ -2488,6 +2549,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         LocalSourcePath = string.Empty;
         CoveragePlan = null;
         SelectedCoverageRequirement = null;
+        SelectedCoverageExemplar = null;
     }
 
     private async Task LoadLocalSourceDraftsAsync(Guid templateId)
@@ -2506,6 +2568,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             LocalSourceDrafts.Add(new LocalMockupSourceDraftViewModel(image.WorkspaceRelativePath, image.OptionValueIds, isManaged: true, image.ImageMapping, image.Dimensions.Width, image.Dimensions.Height, image.Id, image.PreviewPath) { ApplicabilitySummary = string.Join(", ", labels) });
         }
         ApplyLocalSourceSort();
+        OnPropertyChanged(nameof(CoverageExemplarChoices));
         if (LocalSourceDrafts.Count > 0) SelectLocalSource(LocalSourceDrafts[0]);
         if (configuredTemplateColorIds.Count > 0)
         {

@@ -70,6 +70,15 @@
             <Button Grid.Column="2" Content="Refresh plan" Command="{Binding GenerateCoveragePlanCommand}" Classes="secondary"
                     AutomationProperties.Name="Refresh mockup coverage plan" />
           </Grid>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="Optional exemplar" VerticalAlignment="Center" />
+            <ComboBox Width="220" ItemsSource="{Binding CoverageExemplarChoices}"
+                      SelectedItem="{Binding SelectedCoverageExemplar, Mode=TwoWay}"
+                      DisplayMemberBinding="{Binding DisplayName}" IsEnabled="{Binding CanEdit}"
+                      AutomationProperties.Name="Coverage exemplar" />
+            <TextBlock Text="{Binding ExemplarMappingSummary}" IsVisible="{Binding HasExemplarMappingSummary}"
+                       TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" />
+          </StackPanel>
           <ItemsControl ItemsSource="{Binding CoverageRequirements}" AutomationProperties.Name="Mockup coverage requirements">
             <ItemsControl.ItemTemplate>
               <DataTemplate>

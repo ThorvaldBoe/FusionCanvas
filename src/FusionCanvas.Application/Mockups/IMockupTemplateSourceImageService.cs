@@ -9,4 +9,8 @@ public interface IMockupTemplateSourceImageService
         => Task.FromResult<MockupTemplateCoveragePlan?>(null);
     Task<MockupTemplateSetupResult> AddAsync(AddLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default);
     Task<MockupTemplateSetupResult> UpdateAsync(UpdateLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default);
+    Task<MockupTemplateSetupResult> AssignExistingAsync(AssignExistingMockupTemplateSourceRequest request, CancellationToken cancellationToken = default)
+        => Task.FromResult(MockupTemplateSetupResult.Failure(
+            "Existing managed-image assignment is unavailable in this runtime.",
+            new(request.StoreId, false, [], [], [])));
 }

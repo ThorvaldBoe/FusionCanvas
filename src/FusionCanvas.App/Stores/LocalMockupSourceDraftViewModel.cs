@@ -53,7 +53,10 @@ public sealed class LocalMockupSourceDraftViewModel(string path, IReadOnlyList<G
         OptionValueIds = optionValueIds;
         Mapping = mapping;
         ApplicabilitySummary = summary;
+        PropertyChanged?.Invoke(this, new(nameof(OptionValueIds)));
+        PropertyChanged?.Invoke(this, new(nameof(Mapping)));
         PropertyChanged?.Invoke(this, new(nameof(ApplicabilitySummary)));
+        PropertyChanged?.Invoke(this, new(nameof(IsComplete)));
         PropertyChanged?.Invoke(this, new(nameof(StatusLabel)));
     }
 

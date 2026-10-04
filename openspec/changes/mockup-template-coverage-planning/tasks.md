@@ -8,16 +8,16 @@
 ## 2. Application coverage and assignment services
 
 - [x] 2.1 Extend the existing source-image application boundary with a read/plan operation that returns derived requirements without creating empty source-image or Asset records.
-- [ ] 2.2 Add requirement assignment commands for upload and existing managed-image selection, reusing current ownership, applicability, managed-file, mapping, and revision services.
-- [ ] 2.3 Implement exemplar-derived applicability defaults and dimension-safe mapping reuse; reject or surface incompatible mappings as explicit incomplete state.
-- [ ] 2.4 Add application tests for plan generation, grouping, assignment prefill, exact-one ambiguity, archived/incomplete rows, stale context, revision preservation, and the no-placeholder invariant.
+- [x] 2.2 Add requirement assignment commands for upload and existing managed-image selection, reusing current ownership, applicability, managed-file, mapping, and revision services.
+- [x] 2.3 Implement exemplar-derived applicability defaults and dimension-safe mapping reuse; reject or surface incompatible mappings as explicit incomplete state.
+- [x] 2.4 Add application tests for plan generation, grouping, assignment prefill, exact-one ambiguity, archived/incomplete rows, stale context, revision preservation, and the no-placeholder invariant.
 
 ## 3. Store editor coverage workflow
 
 - [ ] 3.1 Add focused-editor coverage state and view-model projection for loading, no target Design Area, complete, missing, ambiguous, incomplete, stale, archived/read-only, and recoverable-error states.
 - [ ] 3.2 Add grouping selection, Generate coverage plan, explicit refresh, and requirement selection commands while preserving existing draft save/discard/cancel behavior.
 - [ ] 3.3 Add Add mockup image and Assign existing image actions with Template context and requirement applicability prefilled; retain the selected-row mapping editor.
-- [ ] 3.4 Add exemplar selection and confirmation feedback for applicability and mapping defaults, including clear correction guidance for incompatible dimensions.
+- [x] 3.4 Add exemplar selection and confirmation feedback for applicability and mapping defaults, including clear correction guidance for incompatible dimensions.
 - [ ] 3.5 Add coverage-panel bindings and presentation states with progressive disclosure, accessible names/help text, keyboard traversal, focus placement/return, and supported narrow sizing.
 - [ ] 3.6 Add view-model tests and deterministic Avalonia headless tests for coverage states, commands, draft preservation, stale refresh, bindings, routed actions, accessibility, focus behavior, and narrow layout.
 
@@ -25,7 +25,7 @@
 
 - [x] 4.1 Extend the Listing diagnostic result and translator/view model with authoritative resolved/missing counts and grouped affected Variant guidance for source-resolution blockers.
 - [x] 4.2 Render the Listing coverage summary as ordinary accessible text and controls while keeping repair actions in Store settings and ready-only eligibility unchanged.
-- [ ] 4.3 Define the application-facing coverage requirement/result contract that the separate bulk-upload workflow can consume without introducing a second compatibility calculation.
+- [x] 4.3 Define the application-facing coverage requirement/result contract that the separate bulk-upload workflow can consume without introducing a second compatibility calculation.
 - [ ] 4.4 Add Listing application and headless binding tests for configured Draft templates, affected Variant guidance, ready-template transition, unavailable diagnostics, and presentation-only behavior.
 
 ## 5. Verification and artifact reconciliation

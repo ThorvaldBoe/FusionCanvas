@@ -179,6 +179,85 @@ public sealed class MockupTemplateSourceImageService : IMockupTemplateSourceImag
         return MockupTemplateSetupResult.Success(await LoadForStoreAsync(request.StoreId, cancellationToken));
     }
 
+    public async Task<MockupTemplateSetupResult> AssignExistingAsync(
+        AssignExistingMockupTemplateSourceRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var store = snapshot.Stores.SingleOrDefault(value => value.Id == request.StoreId);
+        var template = snapshot.MockupTemplates.SingleOrDefault(value => value.Id == request.TemplateId);
+        var offering = template is null
+            ? null
+            : snapshot.BlueprintOfferings.SingleOrDefault(value => value.Id == template.BlueprintOfferingId && value.StoreId == request.StoreId);
+        var sourceImage = snapshot.MockupTemplateSourceImages.SingleOrDefault(value => value.Id == request.ExistingSourceImageId && !value.IsArchived);
+        var sourceTemplate = sourceImage is null
+            ? null
+            : snapshot.MockupTemplates.SingleOrDefault(value => value.Id == sourceImage.MockupTemplateId && !value.IsArchived);
+        var sourceOffering = sourceTemplate is null
+            ? null
+            : snapshot.BlueprintOfferings.SingleOrDefault(value => value.Id == sourceTemplate.BlueprintOfferingId && value.StoreId == request.StoreId && !value.IsArchived);
+        var sourceAsset = sourceImage is null
+            ? null
+            : snapshot.Assets.SingleOrDefault(value => value.Id == sourceImage.SourceAssetId);
+
+        if (store is null || template is null || offering is null || sourceImage is null || sourceOffering is null || sourceAsset is null)
+            return MockupTemplateSetupResult.Failure("The existing managed source image is not available in the selected Store.", await LoadForStoreAsync(request.StoreId, cancellationToken));
+        if (store.IsArchived || template.IsArchived || offering.IsArchived || sourceAsset.IsArchived || sourceAsset.IsMissing || sourceAsset.Kind != AssetKind.MockupImage)
+            return MockupTemplateSetupResult.Failure("Archived or unavailable managed images cannot be assigned.", await LoadForStoreAsync(request.StoreId, cancellationToken));
+
+        var ids = request.OptionValueIds?.Distinct().ToArray() ?? [];
+        if (ids.Any(id => snapshot.OfferingOptionValues.All(value => value.Id != id || value.OfferingId != offering.Id || value.IsArchived)))
+            return MockupTemplateSetupResult.Failure("Select active Option Values from this Offering.", await LoadForStoreAsync(request.StoreId, cancellationToken));
+
+        var mapping = request.ReuseMapping ? sourceImage.ImageMapping : null;
+        var targetImage = snapshot.MockupTemplateSourceImages
+            .SingleOrDefault(value => value.MockupTemplateId == template.Id && !value.IsArchived && value.SourceAssetId == sourceImage.SourceAssetId);
+        if (targetImage is not null)
+        {
+            return await UpdateAsync(
+                new UpdateLocalMockupTemplateSourceRequest(request.StoreId, template.Id, targetImage.Id, ids, mapping),
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        var now = _clock();
+        var image = new MockupTemplateSourceImage(
+            _newId(),
+            template.Id,
+            sourceImage.SourceAssetId,
+            mapping,
+            false,
+            now,
+            now,
+            sourceImage.ImageWidth,
+            sourceImage.ImageHeight);
+        var conditions = ids.Select(id => new MockupTemplateSourceImageOptionValue(image.Id, id)).ToArray();
+        var nextImages = snapshot.MockupTemplateSourceImages.Append(image).ToArray();
+        var nextConditions = snapshot.MockupTemplateSourceImageOptionValues.Concat(conditions).ToArray();
+        var revisionNumber = template.CurrentRevision + 1;
+        var revision = new MockupTemplateRevision(_newId(), template.Id, revisionNumber, template.TargetPlaceholderId, now, "Existing managed source image assigned");
+        var revisionData = SnapshotActiveSourceImages(nextImages, nextConditions, template.Id, revision.Id);
+        var updated = snapshot with
+        {
+            MockupTemplates = snapshot.MockupTemplates.Select(value => value.Id == template.Id ? value with { CurrentRevision = revisionNumber, UpdatedAt = now } : value).ToArray(),
+            MockupTemplateSourceImages = nextImages,
+            MockupTemplateSourceImageOptionValues = nextConditions,
+            MockupTemplateRevisions = [.. snapshot.MockupTemplateRevisions, revision],
+            MockupTemplateRevisionSourceImages = [.. snapshot.MockupTemplateRevisionSourceImages, .. revisionData.Images],
+            MockupTemplateRevisionSourceImageOptionValues = [.. snapshot.MockupTemplateRevisionSourceImageOptionValues, .. revisionData.Conditions]
+        };
+        try
+        {
+            await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return MockupTemplateSetupResult.Failure($"The existing source image could not be assigned. {exception.Message}", await LoadForStoreAsync(request.StoreId, cancellationToken));
+        }
+
+        return MockupTemplateSetupResult.Success(await LoadForStoreAsync(request.StoreId, cancellationToken));
+    }
+
     private MockupTemplateSourceImageSummary ToSummary(WorkspaceSnapshot snapshot, MockupTemplateSourceImage image)
     {
         var asset = snapshot.Assets.Single(value => value.Id == image.SourceAssetId);

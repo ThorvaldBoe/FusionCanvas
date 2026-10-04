@@ -2262,6 +2262,48 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public async Task MockupCoveragePanel_ExposesGroupingExemplarAndAccessibleActions()
+    {
+        var plan = new MockupTemplateCoveragePlan(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            MockupTemplateCoverageGroupingStrategy.ColorFirst,
+            "context",
+            [new("black", MockupTemplateCoverageStatus.Missing, [Guid.NewGuid()], ["Black / S"], [], [], "Assign a source image.")],
+            [],
+            true);
+        var window = CreateEditorWindow(
+            includeNormalizedCatalog: true,
+            useFixedProviderOffering: true,
+            includeOfferingOptions: true,
+            sourceImages: new HeadlessSourceImageService(new MockupTemplateSourceState([], [], false, CoveragePlan: plan)));
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        viewModel.CatalogSetup!.EditTemplateCommand.Execute(Assert.Single(viewModel.CatalogSetup.MockupTemplateCards));
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        await WaitForAsync(() => dialog.GetVisualDescendants().OfType<Control>().Any(control =>
+            AutomationProperties.GetAutomationId(control) == "Catalog.MockupCoveragePanel" && IsEffectivelyVisible(control)));
+        dialog.UpdateLayout();
+
+        var panel = AssertEffectivelyVisible(dialog, "Catalog.MockupCoveragePanel");
+        Assert.Contains(panel.GetVisualDescendants().OfType<TextBlock>(), text => text.Text?.Contains("Variants covered", StringComparison.Ordinal) == true);
+        var grouping = panel.GetVisualDescendants().OfType<ComboBox>().Single(control => AutomationProperties.GetName(control) == "Coverage grouping strategy");
+        var exemplar = panel.GetVisualDescendants().OfType<ComboBox>().Single(control => AutomationProperties.GetName(control) == "Coverage exemplar");
+        Assert.True(grouping.IsEnabled);
+        Assert.True(exemplar.IsEnabled);
+        Assert.Contains(panel.GetVisualDescendants().OfType<Button>(), button => AutomationProperties.GetName(button) == "Refresh mockup coverage plan");
+        Assert.Contains(panel.GetVisualDescendants().OfType<Button>(), button => AutomationProperties.GetName(button) == "Add mockup image for coverage requirement");
+
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void MockupTemplateRequest_WhenStoreEditorIsNotVisible_DoesNotRegisterOrphanedDialog()
     {
         var window = CreateEditorWindow(
@@ -3335,10 +3377,10 @@ public class StoreEditorHeadlessTests
         }
     }
 
-    private sealed class HeadlessSourceImageService : IMockupTemplateSourceImageService
+    private sealed class HeadlessSourceImageService(MockupTemplateSourceState? state = null) : IMockupTemplateSourceImageService
     {
         public Task<MockupTemplateSourceState> LoadAsync(Guid storeId, Guid templateId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new MockupTemplateSourceState([], [], false));
+            Task.FromResult(state ?? new MockupTemplateSourceState([], [], false));
 
         public Task<MockupTemplateSetupResult> AddAsync(AddLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
