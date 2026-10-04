@@ -178,7 +178,7 @@ public class StageToolViewModelsTests
     }
 
     [Fact]
-    public async Task ListingTool_ReapplyingTemplateReplacesPriorOutputs()
+    public async Task ListingTool_ReapplyingTemplateRetainsPriorOutputsForReview()
     {
         var itemId = Guid.NewGuid();
         var templateId = Guid.NewGuid();
@@ -191,8 +191,8 @@ public class StageToolViewModelsTests
 
         await vm.ApplyAsync();
 
-        var second = Assert.Single(vm.Outputs);
-        Assert.NotEqual(first.AssetId, second.AssetId);
+        Assert.Equal(2, vm.Outputs.Count);
+        Assert.NotEqual(first.AssetId, vm.Outputs[1].AssetId);
         Assert.Equal(2, service.ApplyCalls);
     }
 
