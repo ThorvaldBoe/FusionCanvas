@@ -243,6 +243,29 @@ public class DesignStageToolViewModelTests
     }
 
     [Fact]
+    public async Task GenerateArtworkAsync_RefreshesWithCallerTokenAfterSuccessfulGeneration()
+    {
+        var itemId = SampleWorkspace.DesignNodeId;
+        var targetId = Assert.Single(SampleWorkspace.Create().DesignAreas).Id;
+        var designService = new DelayedArtworkPreferenceService(
+            itemId,
+            targetId,
+            Guid.NewGuid(),
+            persistInitialTarget: true,
+            throwIfLoadCancelled: true);
+        var viewModel = await CreateArtworkReadinessViewModelAsync(
+            conceptComplete: true,
+            includeDefaultRowColor: true,
+            artworkGenerationService: new SuccessfulArtworkGenerationService(designService.State),
+            designServiceOverride: designService);
+
+        await viewModel.GenerateArtworkAsync(TestContext.Current.CancellationToken);
+
+        Assert.Null(viewModel.ErrorMessage);
+        Assert.True(designService.LoadCount >= 2);
+    }
+
+    [Fact]
     public async Task LoadAsync_ClearsPreviousArtworkError()
     {
         var viewModel = await CreateArtworkReadinessViewModelAsync(
@@ -300,9 +323,11 @@ public class DesignStageToolViewModelTests
             bool persistInitialTarget = false,
             bool? initialTransparency = null,
             bool includeLoadedData = false,
-            OfferingReadinessSummary? readiness = null)
+            OfferingReadinessSummary? readiness = null,
+            bool throwIfLoadCancelled = false)
         {
             _itemId = itemId;
+            ThrowIfLoadCancelled = throwIfLoadCancelled;
             var now = DateTimeOffset.UtcNow;
             var offeringId = Guid.NewGuid();
             State = new DesignStageState(itemId, false, string.Empty, offeringId, "Configured offering", null, null, [], [], [], [], [])
@@ -332,6 +357,8 @@ public class DesignStageToolViewModelTests
 
         public DesignStageState State { get; private set; }
         public Guid ItemId => _itemId;
+        public bool ThrowIfLoadCancelled { get; }
+        public int LoadCount { get; private set; }
         public TaskCompletionSource SaveStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource LoadStarted { get; private set; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource PreviewStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -340,6 +367,12 @@ public class DesignStageToolViewModelTests
 
         public async Task<DesignStageState> LoadDesignStageStateAsync(Guid itemId, CancellationToken cancellationToken = default)
         {
+            LoadCount++;
+            if (ThrowIfLoadCancelled)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
             if (_deferNextLoad)
             {
                 _deferNextLoad = false;
@@ -518,6 +551,12 @@ public class DesignStageToolViewModelTests
         }
 
         public void Complete(DesignStageResult result) => _completion.TrySetResult(result);
+    }
+
+    private sealed class SuccessfulArtworkGenerationService(DesignStageState state) : IArtworkGenerationService
+    {
+        public Task<DesignStageResult> GenerateAsync(ArtworkGenerationRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(DesignStageResult.Success(state));
     }
 
     private sealed class FailingArtworkGenerationService(string message) : IArtworkGenerationService
