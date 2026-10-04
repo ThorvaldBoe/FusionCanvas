@@ -34,7 +34,7 @@
 
 ## 6. Documentation and acceptance verification
 
-- [x] 6.1 Bundle the draft FusionCanvas policy as a versioned resource and document the provider-acknowledgement and non-legal-advice boundaries; retain human/legal approval as the separate release gate in 1.1.
+- [x] 6.1 Bundle the product-owner-approved FusionCanvas policy as version `0.1` and document the provider-acknowledgement and non-legal-advice boundaries; separate legal-counsel review remains external to implementation.
 - [x] 6.2 Verify every `terms-consent` acceptance scenario with a focused application, integration, startup, or headless UI test and record criterion-level evidence.
 - [x] 6.3 Verify the modified desktop-foundation startup and layout scenarios, including legacy/invalid layout fallback after consent.
 - [x] 6.4 Verify the modified application-settings scenarios for accepted, missing, and stale acknowledgement state.
