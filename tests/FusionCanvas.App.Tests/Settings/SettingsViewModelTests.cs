@@ -112,11 +112,31 @@ public class SettingsViewModelTests
         var vm = new SettingsViewModel(new FailingStore(), theme, ApplicationSettings.Default, loadWarning: null);
 
         vm.IsDarkMode = true;
-        await vm.FlushAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => vm.FlushAsync());
 
         Assert.True(theme.Calls[^1]);
         Assert.NotNull(vm.ErrorMessage);
         Assert.True(vm.HasMessage);
+    }
+
+    [Fact]
+    public async Task Flush_WhenSaveFails_RetainsPendingSettingsForRetry()
+    {
+        var store = new RecoveringStore();
+        var vm = new SettingsViewModel(store, new FakeThemeController(), ApplicationSettings.Default, loadWarning: null);
+
+        vm.IsDarkMode = true;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => vm.FlushAsync());
+
+        Assert.True(vm.IsDarkMode);
+        Assert.Equal(1, store.SaveAttempts);
+        Assert.False(store.LastSaved.DarkMode);
+
+        await vm.FlushAsync();
+
+        Assert.Equal(2, store.SaveAttempts);
+        Assert.True(store.LastSaved.DarkMode);
     }
 
     [Fact]
@@ -290,6 +310,27 @@ public class SettingsViewModelTests
 
         public Task<ApplicationSettingsSaveResult> SaveAsync(ApplicationSettings settings, CancellationToken cancellationToken = default)
             => Task.FromResult(ApplicationSettingsSaveResult.Failed("The disk is full."));
+    }
+
+    private sealed class RecoveringStore : IApplicationSettingsStore
+    {
+        public int SaveAttempts { get; private set; }
+        public ApplicationSettings LastSaved { get; private set; } = ApplicationSettings.Default;
+
+        public Task<ApplicationSettingsLoadResult> LoadAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(ApplicationSettingsLoadResult.Success(LastSaved));
+
+        public Task<ApplicationSettingsSaveResult> SaveAsync(ApplicationSettings settings, CancellationToken cancellationToken = default)
+        {
+            SaveAttempts++;
+            if (SaveAttempts == 1)
+            {
+                return Task.FromResult(ApplicationSettingsSaveResult.Failed("The disk is full."));
+            }
+
+            LastSaved = settings;
+            return Task.FromResult(ApplicationSettingsSaveResult.Success);
+        }
     }
 
     private sealed class GatedStore : IApplicationSettingsStore
