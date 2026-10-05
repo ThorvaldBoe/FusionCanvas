@@ -1,0 +1,39 @@
+extract:
+  identity: SEC-EXTRACT-001
+  audit_id: d0f9281c-e845-4531-a28a-ce66d6a48f6c
+  audit_run_id: cf66e03f-375a-49b9-8cf0-d3b6f64d4e3f
+  standard: FC-SEC
+  standard_version: "1.0"
+  extract_definition_version: "1.2"
+  extract_revision: 1
+  repository_revision: 70c1e1c3da564a51bd8ae6544e5a699e7b6842d7
+  working_tree_state: dirty-after-consent-commit
+  extracted_at: 2026-10-04T00:00:00+02:00
+  included_projects: [FusionCanvas.App, FusionCanvas.Application, FusionCanvas.Integration, tests]
+  exclusions: [unrelated provider/auth flows, build output]
+  discovery_limits: [full solution baseline blocked; provider contracts and live OS link behavior not exercised]
+security_surfaces:
+  - surface_id: SEC-SURF-local-consent-persistence
+    intended_outcome: Persist only the consent policy versions and UTC acceptance time locally.
+    entry_points: [TermsConsentViewModel.AcceptAsync, JsonApplicationSettingsStore.SaveAsync, TryReadTermsConsent]
+    assets: [application settings JSON, consent metadata]
+    boundaries: [App to Application settings port, Integration JSON file]
+    controls: [versioned schema, tolerant malformed-read warning, no user identity or content payload]
+    evidence: [src/FusionCanvas.Application/TermsConsent/TermsConsentPolicy.cs, src/FusionCanvas.Integration/Settings/JsonApplicationSettingsStore.cs]
+  - surface_id: SEC-SURF-external-policy-links
+    intended_outcome: Open fixed official policy URLs from the consent dialog.
+    entry_points: [TermsConsentViewModel.Open, ExternalLinkLauncher]
+    assets: [fixed provider policy URLs]
+    boundaries: [desktop process launch]
+    controls: [URLs are application constants in the audited revision]
+    evidence: [src/FusionCanvas.Application/TermsConsent/TermsConsentPolicy.cs, src/FusionCanvas.App/TermsConsent/ExternalLinkLauncher.cs]
+privacy_flows:
+  - privacy_flow_id: PRIV-FLOW-consent-metadata
+    data_category: consent policy versions and acceptance timestamp
+    purpose: remember whether the user accepted the current policy revision
+    lifecycle: [created on acceptance, serialized to local application settings, read at startup, displayed as status]
+    external_destinations: []
+    retention_and_deletion: UNKNOWN
+    user_controls: [review current status, reopen dialog]
+    minimization: confirmed minimal metadata; no identity, IP, workspace content, or provider credentials
+    evidence: [src/FusionCanvas.Application/ApplicationSettings.cs, src/FusionCanvas.Integration/Settings/JsonApplicationSettingsStore.cs, src/FusionCanvas.App/Settings/SettingsWindow.axaml]

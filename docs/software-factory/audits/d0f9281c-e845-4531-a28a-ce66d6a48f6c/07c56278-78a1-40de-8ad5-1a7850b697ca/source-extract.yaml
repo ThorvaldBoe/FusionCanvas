@@ -1,0 +1,42 @@
+extract:
+  identity: FUNC-EXTRACT-001
+  audit_id: d0f9281c-e845-4531-a28a-ce66d6a48f6c
+  audit_run_id: 07c56278-78a1-40de-8ad5-1a7850b697ca
+  standard: FC-FUNC
+  standard_version: "1.2"
+  extract_definition_version: "1.2"
+  extract_revision: 1
+  repository_revision: 70c1e1c3da564a51bd8ae6544e5a699e7b6842d7
+  working_tree_state: dirty-after-consent-commit
+  extracted_at: 2026-10-04T00:00:00+02:00
+  included_projects: [FusionCanvas.App, FusionCanvas.Application, FusionCanvas.Integration, tests]
+  exclusions: [unrelated content-risk implementation, build output]
+  discovery_limits: [full solution test baseline blocked by unrelated missing types]
+capabilities:
+  - capability_id: CAP-terms-consent-gate
+    name: Require first-run responsible-use consent
+    status: PROPOSED
+    openspec: openspec/changes/app-wide-terms-consent/specs/app-wide-terms-consent/spec.md
+    entry_points: [src/FusionCanvas.App/App.axaml.cs, src/FusionCanvas.App/TermsConsent/TermsConsentStartupGate.cs]
+    expected_outcome: [new user sees the consent dialog, incomplete selections cannot continue, accepted consent allows normal startup]
+    states: [new, loading, dialog, validation-disabled, accepted, load-failure]
+    dependencies: [application settings load/save, TermsConsentPolicy, TermsConsentWindow]
+    tests: [tests/FusionCanvas.App.Tests/TermsConsent/TermsConsentStartupGateTests.cs, tests/FusionCanvas.App.Tests/TermsConsent/TermsConsentViewModelTests.cs]
+  - capability_id: CAP-terms-consent-persistence
+    name: Persist and reload consent record
+    status: PROPOSED
+    openspec: openspec/changes/app-wide-terms-consent/specs/app-wide-terms-consent/spec.md
+    entry_points: [src/FusionCanvas.App/TermsConsent/TermsConsentViewModel.cs, src/FusionCanvas.Integration/Settings/JsonApplicationSettingsStore.cs]
+    expected_outcome: [accepted record stores policy versions and UTC timestamp, current record bypasses gate, stale/malformed record requires consent]
+    states: [missing, current, stale, malformed, save-failure]
+    dependencies: [JSON settings schema version 5]
+    tests: [tests/FusionCanvas.App.Tests/TermsConsent/TermsConsentSettingsTests.cs, tests/FusionCanvas.App.Tests/TermsConsent/TermsConsentViewModelTests.cs]
+  - capability_id: CAP-terms-consent-review
+    name: Review terms from Settings
+    status: PROPOSED
+    openspec: openspec/changes/app-wide-terms-consent/specs/app-wide-terms-consent/spec.md
+    entry_points: [src/FusionCanvas.App/Settings/SettingsViewModel.cs, src/FusionCanvas.App/Settings/SettingsWindow.axaml]
+    expected_outcome: [user can see consent status and reopen the terms dialog]
+    states: [current, missing, stale, review-dialog]
+    dependencies: [Settings navigation, external policy links]
+    tests: [tests/FusionCanvas.App.Tests/TermsConsent/TermsConsentSettingsTests.cs]

@@ -108,7 +108,8 @@ public static class AppWorkspaceFactory
         var itemCsvExport = new ItemCsvExportService();
         var itemCsvImport = new ItemCsvImportService(repository);
         var aiImageProvenanceCodec = new AiImageProvenanceCodec();
-        var designStage = new DesignStageService(repository, fileStore, aiImageProvenanceCodec, contentRiskReviews: contentRiskReviews);
+        var mockupInvalidation = new MockupOutputInvalidationService(repository, fileStore);
+        var designStage = new DesignStageService(repository, fileStore, aiImageProvenanceCodec, contentRiskReviews: contentRiskReviews, mockupInvalidation: mockupInvalidation);
         var sllDocumentCodec = new SllDocumentCodec();
         var nichePopulation = new NichePopulationService(ai);
         var ideationAccess = new ConfiguredIdeationAccessStatus(ai);
@@ -192,7 +193,7 @@ public static class AppWorkspaceFactory
             productSupplierSetup,
             itemCsvImport,
             sllDocumentCodec,
-            new MockupGenerationService(repository, fileStore, mockupTemplateSetup, new ImageSharpMockupRasterCompositor()),
+            new MockupGenerationService(repository, fileStore, mockupTemplateSetup, new ImageSharpMockupRasterCompositor(), invalidation: mockupInvalidation),
             mainWindowServices,
             artworkProvider is null ? null : new ArtworkGenerationService(repository, fileStore, aiImageProvenanceCodec, artworkProvider, new ImageSharpArtworkNormalizer(), telemetry: telemetry, contentRiskReviews: contentRiskReviews));
     }

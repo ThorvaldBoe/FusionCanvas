@@ -158,6 +158,32 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void BlueprintDetailContext_UsesTheTabContentInset()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        window.UpdateLayout();
+
+        var tabContent = window.GetVisualDescendants().OfType<Border>()
+            .Single(border => AutomationProperties.GetAutomationId(border) == "StoreEditor.TabContent");
+        var context = window.GetVisualDescendants().OfType<StackPanel>()
+            .Single(panel => AutomationProperties.GetAutomationId(panel) == "Catalog.BlueprintDetailContext");
+        var backButton = window.GetVisualDescendants().OfType<Button>()
+            .Single(button => IsEffectivelyVisible(button) &&
+                string.Equals(button.Content as string, "‹  Back to Blueprints", StringComparison.Ordinal));
+        var backOrigin = backButton.TranslatePoint(new Point(0, 0), tabContent);
+
+        Assert.Equal(24, context.Margin.Left);
+        Assert.True(backOrigin is { } point && point.X >= context.Margin.Left,
+            "The Blueprint detail context must share a positive inset from the active tab content boundary.");
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void OfferingContext_SeparatesTabNavigationContextHeaderAndActiveContent()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
@@ -2262,6 +2288,98 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public async Task MockupCoveragePanel_ExposesGroupingExemplarAndAccessibleActions()
+    {
+        var plan = new MockupTemplateCoveragePlan(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            MockupTemplateCoverageGroupingStrategy.ColorFirst,
+            "context",
+            [new("black", MockupTemplateCoverageStatus.Missing, [Guid.NewGuid()], ["Black / S"], [], [], "Assign a source image.")],
+            [],
+            true);
+        var sourceImageService = new HeadlessSourceImageService(new MockupTemplateSourceState([], [], false, CoveragePlan: plan));
+        var window = CreateEditorWindow(
+            includeNormalizedCatalog: true,
+            useFixedProviderOffering: true,
+            includeOfferingOptions: true,
+            sourceImages: sourceImageService,
+            filePicker: new DeterministicMockupSourceFilePicker(["planned.png"]),
+            rasterImageMetadataReader: new FixedMockupRasterImageMetadataReader());
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        viewModel.CatalogSetup!.EditTemplateCommand.Execute(Assert.Single(viewModel.CatalogSetup.MockupTemplateCards));
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        await WaitForAsync(() => dialog.GetVisualDescendants().OfType<Control>().Any(control =>
+            AutomationProperties.GetAutomationId(control) == "Catalog.MockupCoveragePanel" && IsEffectivelyVisible(control)));
+        dialog.UpdateLayout();
+
+        var panel = AssertEffectivelyVisible(dialog, "Catalog.MockupCoveragePanel");
+        Assert.Contains(panel.GetVisualDescendants().OfType<TextBlock>(), text => text.Text?.Contains("Variants covered", StringComparison.Ordinal) == true);
+        var coverageState = panel.GetVisualDescendants().OfType<TextBlock>().Single(text => AutomationProperties.GetName(text) == "Mockup coverage state");
+        Assert.Equal("Coverage plan is stale", coverageState.Text);
+        Assert.Contains(panel.GetVisualDescendants().OfType<TextBlock>(), text =>
+            AutomationProperties.GetHelpText(text)?.Contains("current mockup coverage state", StringComparison.Ordinal) == true);
+        var grouping = panel.GetVisualDescendants().OfType<ComboBox>().Single(control => AutomationProperties.GetName(control) == "Coverage grouping strategy");
+        var exemplar = panel.GetVisualDescendants().OfType<ComboBox>().Single(control => AutomationProperties.GetName(control) == "Coverage exemplar");
+        Assert.True(grouping.IsEnabled);
+        Assert.True(exemplar.IsEnabled);
+        Assert.Contains(panel.GetVisualDescendants().OfType<Button>(), button => AutomationProperties.GetName(button) == "Refresh mockup coverage plan");
+        var addImage = panel.GetVisualDescendants().OfType<Button>().Single(button =>
+            AutomationProperties.GetName(button) == "Add mockup image for coverage requirement");
+
+        var catalog = viewModel.CatalogSetup!;
+        catalog.FilePicker = new DeterministicMockupSourceFilePicker(["planned.png"]);
+        var activeVariantIds = catalog.SelectedPlaceholder!.VariantIds
+            .Where(id => catalog.AvailableVariants.Any(variant => variant.Id == id))
+            .ToArray();
+        var activeOptionValueIds = catalog.AvailableVariants
+            .Where(variant => activeVariantIds.Contains(variant.Id))
+            .SelectMany(variant => variant.OptionValueIds)
+            .Distinct()
+            .ToArray();
+        var context = new MockupTemplateCoverageContext(
+            catalog.SelectedTemplate!.Id,
+            catalog.SelectedPlaceholder.Id,
+            activeVariantIds,
+            activeOptionValueIds);
+        sourceImageService.PlannedCoverage = plan with
+        {
+            TemplateId = catalog.SelectedTemplate.Id,
+            TargetDesignAreaId = catalog.SelectedPlaceholder.Id,
+            ContextFingerprint = context.Fingerprint
+        };
+        var refresh = Assert.IsType<AsyncRelayCommand>(catalog.GenerateCoveragePlanCommand);
+        refresh.Execute(null);
+        await refresh.ExecutionTask!;
+        dialog.UpdateLayout();
+        Assert.False(catalog.IsCoveragePlanStale);
+
+        addImage = panel.GetVisualDescendants().OfType<Button>().Single(button =>
+            AutomationProperties.GetName(button) == "Add mockup image for coverage requirement");
+        Assert.NotNull(addImage.Command);
+        Assert.True(addImage.Command!.CanExecute(addImage.CommandParameter));
+        addImage.Command.Execute(addImage.CommandParameter);
+        var browse = Assert.IsType<AsyncRelayCommand>(catalog.BrowseLocalSourceCommand);
+        await browse.ExecutionTask!;
+        await WaitForAsync(() => catalog.LocalSourceDrafts.Any(draft => draft.Path == "planned.png"));
+        Assert.Equal("planned.png", catalog.SelectedLocalSource?.Path);
+
+        dialog.Width = dialog.MinWidth;
+        dialog.UpdateLayout();
+        Assert.True(panel.Bounds.Width <= dialog.Bounds.Width + 0.5,
+            "The coverage panel should remain within the supported narrow editor width.");
+
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void MockupTemplateRequest_WhenStoreEditorIsNotVisible_DoesNotRegisterOrphanedDialog()
     {
         var window = CreateEditorWindow(
@@ -3082,6 +3200,70 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void MockupTemplateColorSearchFiltersChoicesAndShowsNoMatchGuidance()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        viewModel.CatalogSetup!.StartAddTemplateCommand.Execute(null);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        var dialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        var catalog = viewModel.CatalogSetup;
+        var black = Assert.Single(catalog.TemplateColorChoices);
+        var forestGreen = new OfferingOptionValue(Guid.NewGuid(), black.Value.OptionId, black.Value.OfferingId, "Forest Green", 1);
+        var lime = new OfferingOptionValue(Guid.NewGuid(), black.Value.OptionId, black.Value.OfferingId, "Lime", 2);
+        catalog.TemplateColorChoices.Add(new OptionValueChoiceViewModel(forestGreen, "Colors: Forest Green"));
+        catalog.TemplateColorChoices.Add(new OptionValueChoiceViewModel(lime, "Colors: Lime"));
+        var source = new LocalMockupSourceDraftViewModel(
+            "color-search.png",
+            [],
+            mapping: new MockupImageSpaceMapping(1000, 1000, 100, 100, 500, 600),
+            imageWidth: 1000,
+            imageHeight: 1000);
+        catalog.LocalSourceDrafts.Add(source);
+        catalog.SelectLocalSourceCommand.Execute(source);
+        dialog.UpdateLayout();
+
+        var search = AssertEffectivelyVisible(dialog, "Catalog.MockupColorSearch");
+        var searchBox = Assert.IsType<TextBox>(search);
+        Assert.Equal("Search Colors", searchBox.PlaceholderText);
+        searchBox.Text = "lime";
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        dialog.UpdateLayout();
+
+        var colorScrollViewer = dialog.FindControl<ScrollViewer>("ColorChoicesScrollViewer");
+        Assert.NotNull(colorScrollViewer);
+        var visibleColorLabels = colorScrollViewer!.GetVisualDescendants()
+            .OfType<CheckBox>()
+            .Where(IsEffectivelyVisible)
+            .Select(value => value.Content as string ?? string.Empty)
+            .ToArray();
+        Assert.Equal(["Colors: Lime"], visibleColorLabels);
+        Assert.Equal("lime", catalog.TemplateColorSearchText);
+
+        searchBox.Text = "unavailable";
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        dialog.UpdateLayout();
+        var noResults = AssertEffectivelyVisible(dialog, "Catalog.MockupColorSearchNoResults");
+        Assert.Contains("No Colors match", (noResults as TextBlock)?.Text ?? string.Empty, StringComparison.Ordinal);
+        Assert.True(searchBox.IsEnabled);
+
+        searchBox.Text = string.Empty;
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        dialog.UpdateLayout();
+        Assert.Equal(3, colorScrollViewer.GetVisualDescendants().OfType<CheckBox>().Count(IsEffectivelyVisible));
+
+        dialog.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void DesignAreaArchiveCommand_OpensConfirmationWithoutMutationAndCancelRestoresFocus()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
@@ -3335,10 +3517,15 @@ public class StoreEditorHeadlessTests
         }
     }
 
-    private sealed class HeadlessSourceImageService : IMockupTemplateSourceImageService
+    private sealed class HeadlessSourceImageService(MockupTemplateSourceState? state = null) : IMockupTemplateSourceImageService
     {
+        public MockupTemplateCoveragePlan? PlannedCoverage { get; set; }
+
         public Task<MockupTemplateSourceState> LoadAsync(Guid storeId, Guid templateId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new MockupTemplateSourceState([], [], false));
+            Task.FromResult(state ?? new MockupTemplateSourceState([], [], false));
+
+        public Task<MockupTemplateCoveragePlan?> PlanAsync(Guid storeId, Guid templateId, MockupTemplateCoverageGroupingStrategy groupingStrategy = MockupTemplateCoverageGroupingStrategy.ColorFirst, CancellationToken cancellationToken = default) =>
+            Task.FromResult(PlannedCoverage ?? state?.CoveragePlan);
 
         public Task<MockupTemplateSetupResult> AddAsync(AddLocalMockupTemplateSourceRequest request, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();

@@ -6,6 +6,7 @@ using FusionCanvas.Application.Telemetry;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.Integration.Persistence;
 using FusionCanvas.Application.Settings;
+using FusionCanvas.Application.TermsConsent;
 using FusionCanvas.Application.Updates;
 using FusionCanvas.Integration.Updates;
 using FusionCanvas.App.Updates;
@@ -65,7 +66,8 @@ public static class AppServicesFactory
             new AssemblyApplicationVersionProvider(),
             AvaloniaClipboardService.Instance,
             telemetry,
-            telemetryContext);
+            telemetryContext,
+            new TermsConsentService(settingsStore));
         var updateHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         updateHttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("FusionCanvas-UpdateClient/1.0");
         settings.ReplaceUpdateService(CreateUpdateService(updateHttpClient, settings, requestShutdown));

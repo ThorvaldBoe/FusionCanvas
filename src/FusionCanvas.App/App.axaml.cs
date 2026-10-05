@@ -96,36 +96,22 @@ public partial class App : Avalonia.Application
         try
         {
             var settingsStore = AppSettingsFactory.CreateStore();
+            var termsConsentService = new TermsConsentService(settingsStore);
             var load = await settingsStore.LoadAsync(startupCancellation?.Token ?? default).ConfigureAwait(true);
-            if (TermsConsentStartupGate.RequiresConsent(load.Value))
+            var acceptedSettings = await TermsConsentStartupCoordinator.ResolveAsync(
+                load.Value,
+                termsConsentService,
+                TermsConsentPolicyDocument.Load(),
+                viewModel => ShowConsentAsync(splash, viewModel, startupCancellation?.Token ?? default))
+                .ConfigureAwait(true);
+            if (acceptedSettings is null)
             {
-                var consentViewModel = new TermsConsentViewModel(
-                    load.Value,
-                    settingsStore,
-                    TermsConsentPolicyDocument.Load());
-                var decision = new TaskCompletionSource<ApplicationSettings?>(
-                    TaskCreationOptions.RunContinuationsAsynchronously);
-                using var cancellationRegistration = startupCancellation?.Token.Register(
-                    () => decision.TrySetResult(null));
-                consentViewModel.Accepted += settings => decision.TrySetResult(settings);
-                consentViewModel.QuitRequested += () => decision.TrySetResult(null);
-                var consentWindow = new TermsConsentWindow { DataContext = consentViewModel };
-                consentWindow.Show(splash);
-
-                var acceptedSettings = await decision.Task.ConfigureAwait(true);
-                if (acceptedSettings is null)
-                {
-                    splash.Close();
-                    desktop.Shutdown();
-                    return;
-                }
-
-                InitializeMainWindow(desktop, settingsStore, acceptedSettings, load.Warning);
                 splash.Close();
+                desktop.Shutdown();
                 return;
             }
 
-            InitializeMainWindow(desktop, settingsStore, load.Value, load.Warning);
+            InitializeMainWindow(desktop, settingsStore, acceptedSettings, load.Warning);
             splash.Close();
         }
         catch (OperationCanceledException) when (startupCancellation?.IsCancellationRequested == true)
@@ -147,6 +133,34 @@ public partial class App : Avalonia.Application
                 startupCancellation?.Dispose();
             }
         }
+    }
+
+    private static async Task<ApplicationSettings?> ShowConsentAsync(
+        SplashWindow splash,
+        TermsConsentViewModel consentViewModel,
+        CancellationToken startupCancellationToken)
+    {
+        var decision = new TaskCompletionSource<ApplicationSettings?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cancellationRegistration = startupCancellationToken.Register(
+            () => decision.TrySetResult(null));
+        consentViewModel.Accepted += settings => decision.TrySetResult(settings);
+        consentViewModel.QuitRequested += () => decision.TrySetResult(null);
+        var consentWindow = new TermsConsentWindow { DataContext = consentViewModel };
+        consentWindow.Show(splash);
+
+        var acceptedSettings = await decision.Task.ConfigureAwait(true);
+        if (acceptedSettings is null)
+        {
+            await consentViewModel.WaitForPendingSaveAsync().ConfigureAwait(true);
+            consentWindow.AllowClose();
+            if (consentWindow.IsVisible)
+            {
+                consentWindow.Close();
+            }
+        }
+
+        return acceptedSettings;
     }
 
     private void InitializeMainWindow(

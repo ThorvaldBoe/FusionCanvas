@@ -37,5 +37,5 @@ The module does not add automated infringement detection, legal advice, provider
 - **Application layer:** consent value objects, acknowledgement state, version invalidation rules, and an application-facing persistence contract.
 - **Integration layer:** backward-compatible JSON application-settings persistence for the acknowledgement record and bundled policy content/resource access.
 - **Testing:** application policy tests, isolated settings-store tests, Avalonia headless view tests, startup composition tests, and the solution baseline.
-- **Documentation/legal content:** a short, versioned FusionCanvas Terms of Use and Responsible Use Policy must be reviewed before implementation is treated as legally authoritative. Third-party policy text remains owned by and linked to Printify and Shopify.
+- **Documentation/legal content:** the initial FusionCanvas Terms of Use and Responsible Use Policy is bundled as product-owner-approved version 0.1. Third-party policy text remains owned by and linked to Printify and Shopify; separate legal-counsel review is external to this implementation.
 - **Compatibility:** existing installations with no acknowledgement record will require the gate once; existing workspaces and workspace packages remain unchanged.

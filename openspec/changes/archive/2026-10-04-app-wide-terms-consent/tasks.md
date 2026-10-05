@@ -1,6 +1,6 @@
 ## 1. Policy content and consent contract
 
-- [ ] 1.1 Obtain human/legal approval for the initial FusionCanvas Terms of Use and Responsible Use Policy wording, effective version, and bundled document content; record the approved version in the change artifacts before release.
+- [x] 1.1 Record product-owner approval of the initial FusionCanvas Terms of Use and Responsible Use Policy wording as version 0.1 and use the approved bundled document content; any separate legal-counsel review remains an external governance decision.
 - [x] 1.2 Confirm the canonical Printify Terms, Printify Intellectual Property Policy, Shopify Terms, Shopify Acceptable Use Policy, and any currently applicable Shopify API reference URLs; keep provider text external to FusionCanvas.
 - [x] 1.3 Add framework-free consent records, required acknowledgement versions, current-policy evaluation, and all-four-selections validation under a cohesive Application capability.
 
@@ -8,7 +8,7 @@
 
 - [x] 2.1 Extend `ApplicationSettings` with an optional versioned consent record and preserve compatibility for settings files that predate the field.
 - [x] 2.2 Extend `JsonApplicationSettingsStore` serialization/deserialization and failure handling for consent state without storing unnecessary personal data.
-- [ ] 2.3 Add isolated integration tests for missing, current, stale, malformed, round-tripped, and save-failure consent settings.
+- [x] 2.3 Add isolated integration tests for missing, current, stale, malformed, round-tripped, and save-failure consent settings.
 
 ## 3. Startup enforcement
 
@@ -23,6 +23,8 @@
 - [x] 4.3 Persist consent only after all controls are selected and a settings save succeeds; keep the surface open with an actionable error when persistence fails.
 - [x] 4.4 Add deterministic App tests for view-model validation, command state, policy presentation, link commands, save failure, and selection retention.
 - [x] 4.5 Add Avalonia headless view tests for visual-tree construction, compiled bindings, checkbox gating, keyboard-reachable actions, focusable links, and visible error/progress states.
+- [x] 4.6 Keep consent acceptance orchestration in the Application layer so the ViewModel only manages presentation state and result rendering.
+- [x] 4.7 Use the shared semantic design tokens for consent-surface layout, typography, control spacing, state colors, and button styling.
 
 ## 5. Settings review surface
 
@@ -32,10 +34,14 @@
 
 ## 6. Documentation and acceptance verification
 
-- [ ] 6.1 Add the approved FusionCanvas policy as a versioned bundled resource and document the provider-acknowledgement and non-legal-advice boundaries.
-- [ ] 6.2 Verify every `terms-consent` acceptance scenario with a focused application, integration, startup, or headless UI test and record criterion-level evidence.
-- [ ] 6.3 Verify the modified desktop-foundation startup and layout scenarios, including legacy/invalid layout fallback after consent.
-- [ ] 6.4 Verify the modified application-settings scenarios for accepted, missing, and stale acknowledgement state.
+- [x] 6.1 Bundle the product-owner-approved FusionCanvas policy as version `0.1` and document the provider-acknowledgement and non-legal-advice boundaries; separate legal-counsel review remains external to implementation.
+- [x] 6.2 Verify every `terms-consent` acceptance scenario with a focused application, integration, startup, or headless UI test and record criterion-level evidence.
+- [x] 6.3 Verify the modified desktop-foundation startup and layout scenarios, including legacy/invalid layout fallback after consent.
+- [x] 6.4 Verify the modified application-settings scenarios for accepted, missing, and stale acknowledgement state.
 - [x] 6.5 Run `openspec validate --strict` and correct any artifact or delta-spec issues.
-- [ ] 6.6 Run `dotnet test .\\FusionCanvas.sln -m:1` and resolve regressions without expanding scope.
+- [x] 6.6 Run `dotnet test .\\FusionCanvas.sln -m:1` and resolve regressions without expanding scope. The updated merged checkout passes the full baseline after the independent mockup source-row hit-testing fix.
 - [x] 6.7 Decide whether the optional real-desktop first-run/link journey adds information beyond deterministic tests; if warranted, run it only with disposable settings/workspace paths and record it as supplemental evidence.
+
+## 7. Audit correction: consent-save shutdown coordination
+
+- [x] 7.1 Fix the startup consent save/quit race by disabling quit and close during save, threading startup cancellation into settings persistence, awaiting any pending save before startup shutdown, and adding deterministic race/cancellation regression coverage for audit finding #802.

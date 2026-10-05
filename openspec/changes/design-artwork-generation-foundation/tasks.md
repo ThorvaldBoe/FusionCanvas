@@ -58,4 +58,4 @@
 - [x] 8.1 Merge duplicate text/image catalog descriptors by model ID, including cached catalogs, so image capability remains visible to saved Artwork profile resolution.
 - [x] 8.2 Reload Design with the caller's cancellation token after generation instead of the internally cancelled artwork-operation token.
 - [x] 8.3 Include current Item Niche context in the prompt and explicitly constrain output to flat printable artwork without product mockups.
-- [ ] 8.4 Add focused regression coverage for catalog merging, post-generation refresh, and niche prompt context; run the solution verification baseline.
+- [x] 8.4 Add focused regression coverage for catalog merging, post-generation refresh, and niche prompt context; run the solution verification baseline.

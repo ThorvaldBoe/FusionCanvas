@@ -4,6 +4,7 @@ using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Items;
+using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Workspace;
@@ -61,6 +62,44 @@ public sealed class ArtworkGenerationServiceTests
         }
 
         Assert.False(Assert.IsType<MemoryStream>(files.SavedContent).CanRead);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_IncludesNicheContextAndPrintableArtworkConstraintInPrompt()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(Guid.NewGuid(), "Store", null, false, now, now, "{}");
+        var niche = new Niche(Guid.NewGuid(), store.Id, "Coffee culture", "Specialty coffee fans", false, now, now,
+            """{"audience":"Coffee enthusiasts","visualStyleGuidance":"Warm hand-drawn linework"}""");
+        var product = new StoreProduct(Guid.NewGuid(), store.Id, "Shirt", null, null, now, now, "{}");
+        var offering = new FulfillmentOffering(Guid.NewGuid(), product.Id, "Provider", null, FulfillmentKind.FixedProvider, "Provider", null, now, now, "{}");
+        var area = new DesignArea(Guid.NewGuid(), offering.Id, "Front", null, "front", "DTG", 1200, 1400, null, now, now, "{}");
+        var item = new Item(Guid.NewGuid(), store.Id, niche.Id, null, "Fox", null, ItemStatus.Draft, WorkflowStage.Design, false, now, now,
+            "{\"idea\":\"fox\",\"concept.idea\":\"clever fox\",\"phrase\":\"RUN WITH PURPOSE\",\"graphicDirection\":\"bold fox\"}");
+        var row = new DesignVariantRow(Guid.NewGuid(), item.Id, true, 0);
+        var repository = new Repo(new WorkspaceSnapshot([store], [niche], [], [item], [], [], [], [], [])
+        {
+            StoreProducts = [product],
+            FulfillmentOfferings = [offering],
+            DesignAreas = [area],
+            ItemListingConfigurations = [new(item.Id, offering.Id)],
+            DesignVariantRows = [row],
+            DesignVariantRowColors = [new(row.Id, "Black")]
+        });
+        var provider = new Provider();
+        var service = new ArtworkGenerationService(repository, new Files(), new TestAiImageProvenanceCodec(), provider, new Normalizer(), () => now, Guid.NewGuid);
+        var model = new AiModelDescriptor("image/model", "Image", null, null, ["text"], ["image"], [], 1000, null, null, null, true, null);
+        var request = new ArtworkGenerationRequest(item.Id, area.Id, "secret", AiProfileSettings.Empty with { ModelId = model.Id }, [model],
+            [new AiImageEndpointCapabilities("endpoint", model.Id, true, true, ["png"], [new(1200, 1400)], true)], false);
+
+        var result = await service.GenerateAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Error);
+        var prompt = provider.LastRequest!.Prompt;
+        Assert.Contains("Coffee culture", prompt, StringComparison.Ordinal);
+        Assert.Contains("Coffee enthusiasts", prompt, StringComparison.Ordinal);
+        Assert.Contains("flat printable artwork image only", prompt, StringComparison.Ordinal);
+        Assert.Contains("Do not show it applied to a mug, shirt, garment, person, product, or in a product photograph or mockup.", prompt, StringComparison.Ordinal);
     }
 
     [Fact]

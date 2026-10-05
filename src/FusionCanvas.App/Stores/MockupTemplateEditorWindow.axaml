@@ -4,7 +4,7 @@
         x:Class="FusionCanvas.App.Stores.MockupTemplateEditorWindow"
         x:DataType="stores:CatalogSetupViewModel"
         Title="{Binding MockupTemplateEditorDialogTitle}"
-        Width="980" Height="820" MinWidth="700" MinHeight="620"
+         Width="980" Height="900" MinWidth="700" MinHeight="620"
         CanResize="True" WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ApplicationBackgroundBrush}">
   <Window.Styles>
@@ -35,7 +35,8 @@
     </Grid>
 
     <Grid Grid.Row="2" RowDefinitions="Auto,*,Auto,Auto" RowSpacing="8">
-      <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+      <StackPanel Grid.Row="0" Spacing="8">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
         <StackPanel Spacing="2">
           <TextBlock Text="Mockup source images" FontSize="16" FontWeight="SemiBold" />
           <TextBlock Text="Select a row to edit its metadata below." FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
@@ -45,11 +46,68 @@
         <Button Grid.Column="2" Content="Upload images..." Command="{Binding BrowseLocalSourceCommand}" Classes="primary"
                 AutomationProperties.Name="Upload source images"
                 AutomationProperties.HelpText="Select one or more supported raster images." />
-        <Button Grid.Column="3" Content="Set up metadata with AI" Command="{Binding AssistMockupSourceMetadataCommand}" Classes="secondary"
+        <Button Grid.Column="3" Content="Plan coverage" Command="{Binding GenerateCoveragePlanCommand}" Classes="secondary"
+                AutomationProperties.Name="Generate mockup coverage plan" />
+        <Button Grid.Column="4" Content="Set up metadata with AI" Command="{Binding AssistMockupSourceMetadataCommand}" Classes="secondary"
               IsEnabled="{Binding CanAssistMockupSourceMetadata}"
                 AutomationProperties.Name="Set up source image metadata with AI"
                 AutomationProperties.HelpText="Use the General AI settings to suggest colors, sizes, and reusable placement for selected source images." />
       </Grid>
+      <Border Grid.Row="1" Padding="10" Background="{DynamicResource SubtleSurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+              IsVisible="{Binding HasCoveragePanel}" AutomationProperties.AutomationId="Catalog.MockupCoveragePanel">
+        <StackPanel Spacing="6">
+          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+            <StackPanel Spacing="2">
+              <TextBlock Text="Coverage planning" FontSize="14" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding CoverageStateLabel}" FontWeight="SemiBold"
+                         IsVisible="{Binding HasCoverageStatus}" AutomationProperties.Name="Mockup coverage state" />
+              <TextBlock Text="{Binding CoverageStateHelp}" TextWrapping="Wrap"
+                         IsVisible="{Binding HasCoverageStatus}" Foreground="{DynamicResource SecondaryTextBrush}"
+                         AutomationProperties.HelpText="Explains the current mockup coverage state and next action." />
+              <TextBlock Text="{Binding CoverageSummary}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}"
+                         AutomationProperties.Name="Mockup coverage summary" />
+              <TextBlock Text="{Binding IncompleteCoverageSummary}" IsVisible="{Binding HasIncompleteCoverageSummary}"
+                         TextWrapping="Wrap" Foreground="{DynamicResource WarningTextBrush}" />
+            </StackPanel>
+            <ComboBox Grid.Column="1" Width="150" ItemsSource="{Binding CoverageGroupingStrategies}"
+                      SelectedItem="{Binding CoverageGroupingStrategy, Mode=TwoWay}" IsEnabled="{Binding CanEdit}"
+                      AutomationProperties.Name="Coverage grouping strategy" />
+            <Button Grid.Column="2" Content="Refresh plan" Command="{Binding GenerateCoveragePlanCommand}" Classes="secondary"
+                    AutomationProperties.Name="Refresh mockup coverage plan" />
+          </Grid>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="Optional exemplar" VerticalAlignment="Center" />
+            <ComboBox Width="220" ItemsSource="{Binding CoverageExemplarChoices}"
+                      SelectedItem="{Binding SelectedCoverageExemplar, Mode=TwoWay}"
+                      DisplayMemberBinding="{Binding DisplayName}" IsEnabled="{Binding CanEdit}"
+                      AutomationProperties.Name="Coverage exemplar" />
+            <TextBlock Text="{Binding ExemplarMappingSummary}" IsVisible="{Binding HasExemplarMappingSummary}"
+                       TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" />
+          </StackPanel>
+          <ItemsControl ItemsSource="{Binding CoverageRequirements}" AutomationProperties.Name="Mockup coverage requirements">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Padding="6" Margin="0,2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                  <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                    <StackPanel Spacing="1">
+                      <TextBlock Text="{Binding VariantSummary}" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding Explanation}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" Text="{Binding Status}" VerticalAlignment="Center" />
+                    <Button Grid.Column="2" Content="Add mockup image" Command="{Binding $parent[Window].DataContext.AddCoverageRequirementImageCommand}"
+                            CommandParameter="{Binding}" IsVisible="{Binding IsActionable}" Classes="link"
+                            AutomationProperties.Name="Add mockup image for coverage requirement" />
+                    <Button Grid.Column="3" Content="Use selected image" Command="{Binding $parent[Window].DataContext.AssignExistingCoverageImageCommand}"
+                            CommandParameter="{Binding}" IsVisible="{Binding IsActionable}" IsEnabled="{Binding $parent[Window].DataContext.CanAssignExistingCoverageImage}"
+                            Classes="secondary" AutomationProperties.Name="Assign selected managed image to coverage requirement" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+      </StackPanel>
       <Border x:Name="MockupSourceTableBorder" Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
       <Grid RowDefinitions="Auto,*">
         <Border Grid.Row="0" Background="{DynamicResource TabBarBackgroundBrush}" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
@@ -142,12 +200,18 @@
         <StackPanel Grid.Column="1" Spacing="8">
           <TextBlock Text="Image metadata" FontSize="16" FontWeight="SemiBold" />
           <TextBlock Text="Color (choose one or more)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+          <TextBox Text="{Binding TemplateColorSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                   PlaceholderText="Search Colors"
+                   Classes="field"
+                   AutomationProperties.AutomationId="Catalog.MockupColorSearch"
+                   AutomationProperties.Name="Search Colors"
+                   AutomationProperties.HelpText="Filter Color applicability choices as you type." />
           <ScrollViewer x:Name="ColorChoicesScrollViewer"
                         AutomationProperties.AutomationId="Catalog.MockupColorChoices"
                         MaxHeight="240"
                         VerticalScrollBarVisibility="Auto"
                         HorizontalScrollBarVisibility="Disabled">
-            <ItemsControl ItemsSource="{Binding TemplateColorChoices}">
+            <ItemsControl ItemsSource="{Binding FilteredTemplateColorChoices}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="stores:OptionValueChoiceViewModel">
                   <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" IsEnabled="{Binding $parent[Window].DataContext.CanEdit}" />
@@ -155,6 +219,12 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
           </ScrollViewer>
+          <TextBlock Text="No Colors match this search. Clear or change the query."
+                     IsVisible="{Binding HasNoMatchingTemplateColors}"
+                     TextWrapping="Wrap"
+                     FontSize="12"
+                     Foreground="{DynamicResource SecondaryTextBrush}"
+                     AutomationProperties.AutomationId="Catalog.MockupColorSearchNoResults" />
           <StackPanel Orientation="Horizontal" Spacing="8">
             <TextBlock Text="Size and other options" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
             <Button Content="Select all" Command="{Binding SelectAllTemplateSizesCommand}" Classes="link" Padding="0" />

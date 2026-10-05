@@ -35,6 +35,36 @@ FusionCanvas SHALL provide focused management of Mockup Templates for one Bluepr
 - **THEN** FusionCanvas shows a blocked empty state explaining that a Design Area is required
 - **AND** provides a route back to Design Area management without fabricating a target
 
+### Requirement: Mockup Template Color applicability choices are searchable
+FusionCanvas SHALL provide a transient search text box for eligible Color applicability choices in the focused Mockup Template editor. As the user types, visible choices SHALL be filtered by case-insensitive substring matching against each choice's displayed label, while the underlying eligible choice set and selection state remain unchanged.
+
+#### Scenario: User searches Color applicability choices
+- **WHEN** the user enters text in the Color search box
+- **THEN** the editor shows only eligible Color choices whose displayed labels contain the query using case-insensitive substring matching
+- **AND** the remaining choices retain their existing order
+
+#### Scenario: User clears the Color search
+- **WHEN** the Color search query is empty or contains only whitespace
+- **THEN** the editor shows every eligible Color choice in its existing order
+- **AND** each choice retains its prior selected or unselected state
+
+#### Scenario: Search has no matching Colors
+- **WHEN** the Color search query matches no eligible Color choice
+- **THEN** the editor shows no Color checkboxes
+- **AND** it displays clear guidance that no Colors match the search
+- **AND** the editor continues to allow the user to edit or clear the query
+
+#### Scenario: Hidden selected Colors remain part of the draft
+- **WHEN** a selected Color is hidden by the active search query
+- **THEN** the Color remains selected in the underlying draft
+- **AND** saving, readiness evaluation, dirty-state tracking, and source-image applicability continue to include that selected Color
+- **AND** clearing the query shows the Color again as selected
+
+#### Scenario: Color search is not persisted
+- **WHEN** the user closes the Mockup Template editor and later opens a Mockup Template editor session
+- **THEN** the Color search query starts empty
+- **AND** persisted template configuration contains no Color search text
+
 ### Requirement: Each template revision owns an image-space Design Area mapping
 FusionCanvas SHALL store the mapping of the selected Design Area into the specific mockup image as revisioned template configuration with image-space X, Y, width, and height values. The mapping SHALL be editable through a visual placement rectangle, while numeric values remain visible and editable as supporting technical controls.
 
@@ -88,3 +118,28 @@ FusionCanvas SHALL keep new or edited Mockup Template state as a draft until exp
 - **WHEN** Mockup Template management is opened for an archived Store
 - **THEN** FusionCanvas presents templates and mapping data read-only
 - **AND** disables image selection, mapping edits, and lifecycle mutations
+
+### Requirement: Mockup Template source-image table supports transient multi-selection
+The Mockup Template source-image table SHALL support selecting one or more visible local source-image rows for the duration of the draft. A plain click or Enter/Space SHALL replace the selection with the activated row. Ctrl-click or Ctrl+Enter/Space SHALL toggle the activated row. Shift-click or Shift+Enter/Space SHALL select the inclusive visible range from the selection anchor to the activated row. The most recently activated selected row SHALL remain the active row for the existing source-image detail editor.
+
+#### Scenario: User selects multiple source images
+- **WHEN** the user activates a source-image row with Ctrl and then activates another row with Ctrl
+- **THEN** both rows are visibly selected
+- **AND** the most recently activated row remains the active detail-editor row
+- **AND** the selected count is visible and exposed to assistive technology
+
+#### Scenario: User selects a contiguous range
+- **WHEN** the user activates an anchor row and then activates another visible row with Shift
+- **THEN** every visible source-image row between the anchor and activated row is selected
+- **AND** the active detail-editor row is the activated row
+
+#### Scenario: User archives selected source images
+- **WHEN** one or more source-image rows are selected and the user invokes Archive selected
+- **THEN** every selected row is removed or queued for archive using the existing source-image save workflow
+- **AND** unselected rows remain visible and unmodified
+- **AND** the remaining selected or visible row becomes active, or the detail editor becomes empty when none remain
+
+#### Scenario: User uses keyboard multi-selection
+- **WHEN** a focused source-image row receives Enter or Space with the documented Ctrl or Shift modifier
+- **THEN** the table applies the same selection rule as the corresponding pointer gesture
+- **AND** the row exposes its current selected state through its accessible item status

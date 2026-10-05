@@ -6,4 +6,4 @@ User feedback after generation exposed three gaps that were not apparent from th
 - A successful generated asset was persisted, but the post-save Design reload reused the generation cancellation token. Since loading cancels the prior artwork operation, the UI reported an interrupted refresh even though save had succeeded. The success path should be verified through the refreshed presentation state, not only through persistence assertions.
 - Niche fields existed in Store settings but were not part of the image prompt. Prompt-context review should trace Item relationships through the complete generation path, and artwork prompts should state clearly that the result is printable artwork rather than a product mockup.
 
-The code corrections compile. Focused regression tests and the required solution test baseline remain outstanding.
+The code corrections compile. Focused regression coverage for catalog merging, post-generation refresh, and niche prompt context passes, as does the full solution baseline.

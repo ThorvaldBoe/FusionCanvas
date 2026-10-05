@@ -19,6 +19,7 @@ internal static class ItemMetadataCodec
     public const string ArtworkTargetIdKey = "design.artworkTargetId";
     public const string ArtworkTargetPreferenceKey = "design.artworkTargetPreference";
     public const string ArtworkTransparentBackgroundKey = "design.transparentBackground";
+    public const string MockupInvalidationNoticeKey = "listing.mockups.invalidatedNotice";
     public const string InheritedFromPrefix = "inheritedFrom:";
 
     public static string NormalizeName(string? value) => value?.Trim() ?? string.Empty;

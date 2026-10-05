@@ -10,6 +10,7 @@ using Avalonia.VisualTree;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App.Navigation;
 using FusionCanvas.App.Views;
+using FusionCanvas.App.StageTools;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.TitleOptimization;
 using FusionCanvas.Application.Workspaces;
@@ -17,6 +18,7 @@ using FusionCanvas.Application.WorkspaceTree;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Groups;
+using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Integration.Persistence;
 using FusionCanvas.App.Tests.TestSupport;
 
@@ -67,6 +69,29 @@ public class MainWindowConstructionTests
     }
 
     [AvaloniaFact]
+    public void ListingDiagnosticsBindAffectedVariantGuidanceAsOrdinaryText()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Listing);
+        fixture.ViewModel.ListingTool.TemplateDiagnostics.Add(new MockupTemplateDiagnosticViewModel(
+            "Draft front",
+            "Choose a mockup image.",
+            [MockupTemplateReadinessBlocker.MissingVariantSourceImage],
+            new MockupTemplateCoveragePlan(
+                Guid.NewGuid(), Guid.NewGuid(), MockupTemplateCoverageGroupingStrategy.ColorFirst, "context",
+                [new("black", MockupTemplateCoverageStatus.Missing, [Guid.NewGuid()], ["Black / M"], [], [], "Assign a source image.")],
+                [],
+                true)));
+        fixture.PumpLayout();
+
+        var guidance = fixture.FindControl<TextBlock>(textBlock =>
+            AutomationProperties.GetName(textBlock) == "Affected Variant mockup guidance");
+
+        Assert.Equal("Black / M: Assign a source image.", guidance.Text);
+    }
+
+    [AvaloniaFact]
     public void ListingTemplateSelectorHasStableAccessibleIdentity()
     {
         using var fixture = new MainWindowFixture();
@@ -79,6 +104,22 @@ public class MainWindowConstructionTests
 
         Assert.NotNull(selector);
         Assert.Equal("Mockup template", AutomationProperties.GetName(selector));
+    }
+
+    [AvaloniaFact]
+    public void ListingMockupGalleryExposesInspectableOutputActions()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Listing);
+        fixture.PumpLayout();
+
+        var gallery = fixture.FindControl<ItemsControl>(control =>
+            AutomationProperties.GetAutomationId(control) == "Listing.MockupOutputs");
+
+        Assert.NotNull(gallery);
+        Assert.Equal("Generated mockup outputs", AutomationProperties.GetName(gallery));
+        Assert.NotNull(fixture.FindControl<TextBlock>(control => control.Text == "No mockups yet. Apply a template to generate mockups for review."));
     }
 
     [AvaloniaFact]

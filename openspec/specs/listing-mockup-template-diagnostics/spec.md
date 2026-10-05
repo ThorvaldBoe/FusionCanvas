@@ -4,7 +4,7 @@
 TBD - created by archiving change listing-mockup-template-diagnostics. Update Purpose after archive.
 ## Requirements
 ### Requirement: Listing explains why mockup template selection is empty
-The Listing mockup tool SHALL preserve the ready-only template selector and SHALL present actionable diagnostics when no ready template is available. The diagnostics SHALL distinguish an Offering with no active templates from an Offering whose active templates are Draft, identify each affected template by name, and list every current readiness blocker using creator-facing guidance.
+The Listing mockup tool SHALL preserve the ready-only template selector and SHALL present actionable diagnostics when no ready template is available. The diagnostics SHALL distinguish an Offering with no active templates from an Offering whose active templates are Draft, identify each affected template by name, list every current readiness blocker using creator-facing guidance, and summarize missing or ambiguous Variant coverage when source-image resolution is the blocker.
 
 #### Scenario: No mockup templates are configured
 - **WHEN** an editable Item has an active Offering and selected Colors but that Offering has no active Mockup Templates
@@ -16,6 +16,7 @@ The Listing mockup tool SHALL preserve the ready-only template selector and SHAL
 - **WHEN** an editable Item has an active Offering but all active Mockup Templates are Draft
 - **THEN** the Listing tool keeps the selector empty and generation unavailable
 - **AND** shows each active template name with every current missing or invalid readiness requirement
+- **AND** when coverage is incomplete, shows the affected Variant names or grouped applicability requirements and resolved/missing counts
 - **AND** directs the creator to Store settings to complete the named template
 
 #### Scenario: A template becomes ready
@@ -29,10 +30,10 @@ The Listing mockup tool SHALL preserve the ready-only template selector and SHAL
 - **AND** does not claim that no templates are configured
 
 ### Requirement: Listing readiness diagnostics remain presentation-only
-The Listing diagnostics SHALL reuse the authoritative Mockup Template readiness result and SHALL NOT change persistence, readiness rules, template eligibility, or the Store editor's draft behavior. The diagnostics SHALL remain available to keyboard and assistive-technology users through ordinary text and controls.
+The Listing diagnostics SHALL reuse the authoritative Mockup Template readiness and source-resolution results and SHALL NOT change persistence, readiness rules, template eligibility, or the Store editor's draft behavior. The diagnostics SHALL remain available to keyboard and assistive-technology users through ordinary text and controls.
 
 #### Scenario: Diagnostic state does not weaken eligibility
 - **WHEN** an active template has one or more readiness blockers
 - **THEN** the template remains excluded from the selector and Apply action
-- **AND** the displayed diagnostics reflect the same blockers used by the eligibility gate
+- **AND** the displayed diagnostics reflect the same blockers and coverage results used by the eligibility gate
 

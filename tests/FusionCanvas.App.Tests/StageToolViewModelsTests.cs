@@ -127,6 +127,28 @@ public class StageToolViewModelsTests
     }
 
     [Fact]
+    public async Task ListingTool_ShowsCoverageSummaryAlongsideReadinessBlockers()
+    {
+        var coverage = new MockupTemplateCoveragePlan(
+            Guid.NewGuid(), Guid.NewGuid(), MockupTemplateCoverageGroupingStrategy.ColorFirst, "context",
+            [new("black", MockupTemplateCoverageStatus.Missing, [Guid.NewGuid()], ["Black / M"], [], [], "Assign a source image.")], [], true);
+        var vm = new ListingStageToolViewModel(new StubMockupGenerationService(new MockupGenerationState(
+            Guid.NewGuid(), Guid.NewGuid(), false, string.Empty, [], null, [], ["Black"],
+            "No ready Mockup Templates are available.", null,
+            [new MockupTemplateEligibilityDiagnostic(Guid.NewGuid(), "Front image", [MockupTemplateReadinessBlocker.MissingVariantSourceImage], coverage)])));
+
+        await vm.LoadAsync(Guid.NewGuid(), ItemStatus.Draft, canEdit: true, TestContext.Current.CancellationToken);
+
+        var diagnostic = Assert.Single(vm.TemplateDiagnostics);
+        Assert.Equal("0/1 Variants covered; 1 missing, 0 ambiguous, 0 incomplete.", diagnostic.CoverageSummary);
+        Assert.True(diagnostic.HasCoverageSummary);
+        Assert.Equal("Black / M: Assign a source image.", diagnostic.CoverageAffectedVariantGuidance);
+        Assert.True(diagnostic.HasCoverageAffectedVariantGuidance);
+        Assert.True(vm.HasBlockedReason);
+        Assert.False(vm.CanApply);
+    }
+
+    [Fact]
     public async Task ListingTool_DistinguishesOfferingWithNoTemplates()
     {
         var vm = new ListingStageToolViewModel(new StubMockupGenerationService(new MockupGenerationState(
@@ -170,6 +192,8 @@ public class StageToolViewModelsTests
         Assert.Equal("Flatlay no 1", template.Name);
         Assert.Equal(templateId, vm.SelectedTemplateId);
         Assert.True(vm.CanApply);
+        Assert.Empty(vm.TemplateDiagnostics);
+        Assert.False(vm.HasTemplateDiagnostics);
 
         vm.SelectedTemplate = null;
         Assert.False(vm.CanApply);
@@ -178,7 +202,7 @@ public class StageToolViewModelsTests
     }
 
     [Fact]
-    public async Task ListingTool_ReapplyingTemplateReplacesPriorOutputs()
+    public async Task ListingTool_ReapplyingTemplateRetainsPriorOutputsForReview()
     {
         var itemId = Guid.NewGuid();
         var templateId = Guid.NewGuid();
@@ -191,8 +215,8 @@ public class StageToolViewModelsTests
 
         await vm.ApplyAsync();
 
-        var second = Assert.Single(vm.Outputs);
-        Assert.NotEqual(first.AssetId, second.AssetId);
+        Assert.Equal(2, vm.Outputs.Count);
+        Assert.NotEqual(first.AssetId, vm.Outputs[1].AssetId);
         Assert.Equal(2, service.ApplyCalls);
     }
 
