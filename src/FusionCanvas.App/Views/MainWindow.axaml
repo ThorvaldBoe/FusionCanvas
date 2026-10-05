@@ -52,7 +52,7 @@
       <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
         <Grid x:Name="NavigationHeader"
               Grid.Row="0"
-              ColumnDefinitions="Auto,*,Auto"
+              ColumnDefinitions="Auto,*,Auto,Auto"
               ColumnSpacing="8"
               Margin="0,0,0,18">
           <TextBlock Grid.Column="0"
@@ -81,6 +81,14 @@
             </Grid>
           </Border>
           <Button Grid.Column="2"
+                  IsVisible="{Binding Settings.Updates.IsUpdateActionVisible}"
+                  Content="{Binding Settings.Updates.UpdateActionText}"
+                  ToolTip.Tip="Download the available FusionCanvas update"
+                  Command="{Binding Settings.Updates.UpdateCommand}"
+                  Classes="updateButton"
+                  AutomationProperties.Name="Update available"
+                  AutomationProperties.AutomationId="Updates.Available" />
+          <Button Grid.Column="3"
                   Content="⚙"
                   ToolTip.Tip="Settings"
                   Command="{Binding Settings.OpenCommand}"
@@ -2358,6 +2366,14 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.updateButton">
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentSoftForegroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentSoftBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="FontSize" Value="12" />
     </Style>
     <Style Selector="TextBlock.ideaRatingStar">
       <Setter Property="FontSize" Value="20" />

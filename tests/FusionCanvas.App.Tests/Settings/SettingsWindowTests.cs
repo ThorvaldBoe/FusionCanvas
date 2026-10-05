@@ -8,6 +8,7 @@ using FusionCanvas.App.Versioning;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.Application.Settings;
 using FusionCanvas.Application.Versioning;
+using FusionCanvas.Application.Updates;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Application.Workspaces;
 
@@ -264,9 +265,64 @@ public class SettingsWindowTests
         finally { window.Close(); }
     }
 
+    [AvaloniaFact]
+    public async Task AboutSection_ShowsUpdateCheckAndInstallControls()
+    {
+        var updateService = new FakeUpdateService
+        {
+            CheckResult = new UpdateCheckResult(UpdateCheckStatus.UpdateAvailable, new UpdateManifest(
+                1,
+                "0.3.0",
+                UpdatePlatform.WindowsX64,
+                new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-Setup.exe"),
+                new string('A', 64),
+                new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0")))
+        };
+        var settings = new SettingsViewModel(
+            new InMemoryApplicationSettingsStore(),
+            new AvaloniaApplicationThemeController(),
+            ApplicationSettings.Default,
+            loadWarning: null,
+            updateService: updateService);
+        settings.OpenCommand.Execute(null);
+        settings.SelectedSection = SettingsSection.About;
+        var window = new SettingsWindow { DataContext = settings };
+
+        try
+        {
+            window.Show();
+            PumpLayout(window);
+            var checkButton = FindControl<Button>(window, b => (b.Content as string) == "Check for updates" && b.IsVisible);
+            Assert.NotNull(checkButton);
+
+            checkButton!.Command!.Execute(null);
+            await ((FusionCanvas.App.Commands.AsyncRelayCommand)settings.Updates.CheckCommand).ExecutionTask!
+                .WaitAsync(TimeSpan.FromSeconds(3));
+            PumpLayout(window);
+
+            var downloadButton = FindControl<Button>(window, b => (b.Content as string) == "Download update" && b.IsVisible);
+            Assert.NotNull(downloadButton);
+            Assert.Contains("0.3.0", settings.Updates.StatusMessage);
+        }
+        finally { window.Close(); }
+    }
+
     private sealed class ConstantVersionProvider(ApplicationVersionInfo info) : IApplicationVersionProvider
     {
         public ApplicationVersionInfo GetVersion() => info;
+    }
+
+    private sealed class FakeUpdateService : IUpdateService
+    {
+        public UpdateCheckResult CheckResult { get; set; } = new(UpdateCheckStatus.UpToDate, null);
+
+        public Task<UpdateCheckResult> CheckForUpdateAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(CheckResult);
+
+        public Task<VerifiedUpdatePackage> DownloadAsync(UpdateManifest manifest, IProgress<UpdateDownloadProgress>? progress = null, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new VerifiedUpdatePackage(manifest, "C:\\Temp\\setup.exe"));
+
+        public Task ApplyAsync(VerifiedUpdatePackage package, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private static SettingsViewModel NewSettingsViewModel(WorkspaceManagementViewModel? management = null)

@@ -138,6 +138,7 @@ public partial class MainWindow : Window
             }
         };
         DataContext = viewModel;
+        viewModel.Settings.Updates.StartBackgroundCheck();
         _windowCoordinator.SyncSettingsWindow(viewModel.Settings);
         _windowCoordinator.SyncWorkspaceManagementWindow(viewModel.WorkspaceManagement);
         _windowCoordinator.SyncStoreEditorWindow(viewModel.StoreManagement);

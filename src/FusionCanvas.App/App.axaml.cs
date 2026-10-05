@@ -53,7 +53,7 @@ public partial class App : Avalonia.Application
         var startupCancellation = _startupCancellation;
         try
         {
-            _services = AppServicesFactory.Create(startupCancellation?.Token ?? default);
+            _services = AppServicesFactory.Create(startupCancellation?.Token ?? default, () => desktop.Shutdown());
             var mainWindow = new MainWindow(_services, startupCancellation?.Token ?? default);
             if (IsUiTestMode())
             {
@@ -176,7 +176,8 @@ public partial class App : Avalonia.Application
                 settingsStore,
                 startupCancellation?.Token ?? default,
                 settings,
-                loadWarning);
+                loadWarning,
+                () => desktop.Shutdown());
             var mainWindow = new MainWindow(_services, startupCancellation?.Token ?? default);
             mainWindow.Closing += OnWindowClosing;
             desktop.MainWindow = mainWindow;
