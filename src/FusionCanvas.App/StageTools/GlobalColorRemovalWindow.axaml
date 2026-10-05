@@ -1,0 +1,95 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:stageTools="using:FusionCanvas.App.StageTools"
+        x:Class="FusionCanvas.App.StageTools.GlobalColorRemovalWindow"
+        x:DataType="stageTools:GlobalColorRemovalViewModel"
+        Title="Remove Color"
+        Width="900"
+        Height="720"
+        MinWidth="560"
+        MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ApplicationBackgroundBrush}"
+        CanResize="True">
+  <Grid RowDefinitions="Auto,*,Auto" Margin="16" RowSpacing="12">
+    <StackPanel Spacing="3">
+      <TextBlock Text="Remove a color globally" FontSize="18" FontWeight="SemiBold"
+                 Foreground="{DynamicResource StrongTextBrush}" />
+      <TextBlock Text="{Binding SourceName, StringFormat='Source: {0}'}"
+                 Foreground="{DynamicResource SecondaryTextBrush}" />
+      <TextBlock Text="Matching colors will be removed everywhere in the image, including artwork details."
+                 TextWrapping="Wrap" FontSize="11"
+                 Foreground="{DynamicResource WarningTextBrush}" />
+    </StackPanel>
+
+    <Grid Grid.Row="1" ColumnDefinitions="*,260" ColumnSpacing="16">
+      <Border Background="{DynamicResource ElevatedSurfaceBrush}"
+              BorderBrush="{DynamicResource ControlBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="6"
+              Padding="8">
+        <Image x:Name="PreviewImage"
+               Source="{Binding DisplayBitmap}"
+               Stretch="Uniform"
+               Focusable="True"
+               PointerPressed="OnPreviewPointerPressed"
+               AutomationProperties.Name="Color removal image preview" />
+      </Border>
+
+      <StackPanel Grid.Column="1" Spacing="10">
+        <TextBlock Text="Pick a color" FontWeight="SemiBold"
+                   Foreground="{DynamicResource StrongTextBrush}" />
+        <TextBlock Text="Click a visible pixel in the preview, or enter a color directly."
+                   TextWrapping="Wrap" FontSize="11"
+                   Foreground="{DynamicResource SecondaryTextBrush}" />
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <TextBox Text="{Binding PickedColorHex, Mode=TwoWay}"
+          PlaceholderText="#RRGGBB"
+                   Width="120"
+                   AutomationProperties.Name="Selected color hex value" />
+          <Button Content="Use color"
+                  Click="OnUseHexColorClick"
+                  IsEnabled="{Binding CanUseHexColor}"
+                  AutomationProperties.Name="Use entered color" />
+        </StackPanel>
+        <TextBlock Text="Tolerance" FontWeight="SemiBold"
+                   Foreground="{DynamicResource StrongTextBrush}" />
+        <Slider Minimum="0" Maximum="100" TickFrequency="5"
+                Value="{Binding TolerancePercent, Mode=TwoWay}"
+                AutomationProperties.Name="Color tolerance" />
+        <TextBlock Text="{Binding TolerancePercent, StringFormat='Tolerance: {0:0}%'}"
+                   Foreground="{DynamicResource SecondaryTextBrush}" />
+        <TextBlock Text="{Binding StatusMessage}"
+                   TextWrapping="Wrap"
+                   AutomationProperties.Name="Color removal status" />
+        <TextBlock Text="{Binding WarningMessage}"
+                   IsVisible="{Binding HasPickedColor}"
+                   TextWrapping="Wrap"
+                   FontSize="11"
+                   Foreground="{DynamicResource WarningTextBrush}" />
+        <TextBlock Text="{Binding ErrorMessage}"
+                   IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource DangerTextBrush}"
+                   AutomationProperties.Name="Color removal error" />
+        <ProgressBar IsVisible="{Binding IsBusy}"
+                     IsIndeterminate="True"
+                     Height="4"
+                     AutomationProperties.Name="Updating color removal preview" />
+      </StackPanel>
+    </Grid>
+
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="Cancel"
+              Click="OnCancelClick"
+              MinWidth="90"
+              AutomationProperties.Name="Cancel color removal" />
+      <Button Content="Apply"
+              Click="OnApplyClick"
+              IsEnabled="{Binding CanApply}"
+              MinWidth="90"
+              Classes="storeAction"
+              AutomationProperties.Name="Apply global color removal" />
+    </StackPanel>
+  </Grid>
+</Window>

@@ -209,7 +209,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         DesignTool = new DesignStageToolViewModel(
             applicationServices.DesignStage,
             artworkGenerationService,
-            Settings.Ai);
+            Settings.Ai,
+            applicationServices.GlobalColorRemoval);
         ListingTool = new ListingStageToolViewModel(mockupGenerationService);
         Ideation = new IdeationViewModel(_ideationService, _ideationAccessStatus, snowcloneLibrary, rejectedPhrases);
         ConceptRefinement = new ConceptRefinementSessionViewModel(

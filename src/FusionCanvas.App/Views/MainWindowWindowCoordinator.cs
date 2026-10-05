@@ -27,6 +27,7 @@ internal sealed class MainWindowWindowCoordinator
     private AssetsWindow? _assetsWindow;
     private IdeationWindow? _ideationWindow;
     private Window? _designPreviewWindow;
+    private Window? _globalColorRemovalWindow;
     private Window? _mockupPreviewWindow;
 
     public MainWindowWindowCoordinator(Window owner, Control workspaceTreeControl)
@@ -248,6 +249,35 @@ internal sealed class MainWindowWindowCoordinator
         if (!designTool.ShowPreviewDialog && _designPreviewWindow is not null)
         {
             _designPreviewWindow.Close();
+        }
+    }
+
+    public void SyncGlobalColorRemovalWindow(DesignStageToolViewModel designTool)
+    {
+        if (designTool.ShowColorRemovalDialog && designTool.ColorRemoval is { } editor && _globalColorRemovalWindow is null)
+        {
+            var window = new GlobalColorRemovalWindow { DataContext = editor };
+            _globalColorRemovalWindow = window;
+            window.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(_globalColorRemovalWindow, window))
+                {
+                    _globalColorRemovalWindow = null;
+                }
+
+                designTool.CloseColorRemovalDialog();
+                if (CanFocusOwner(_owner))
+                {
+                    _owner.Activate();
+                }
+            };
+            window.Show(_owner);
+            return;
+        }
+
+        if (!designTool.ShowColorRemovalDialog && _globalColorRemovalWindow is not null)
+        {
+            _globalColorRemovalWindow.Close();
         }
     }
 

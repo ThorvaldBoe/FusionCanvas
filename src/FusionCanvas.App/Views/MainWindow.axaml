@@ -1593,6 +1593,11 @@
                                             Tag="{Binding .}"
                                             IsEnabled="{Binding CanExport}"
                                             FontSize="10" Classes="miniButton" />
+                                    <Button Content="Remove color" Click="OnRemoveColorFromSupportingImage"
+                                            Tag="{Binding .}"
+                                            IsEnabled="{Binding CanRemoveColor}"
+                                            FontSize="10" Classes="miniButton"
+                                            AutomationProperties.Name="Remove a color globally" />
                                     <Button Content="Remove" IsEnabled="{Binding !IsReadOnly}"
                                             Tag="{Binding .}"
                                             Click="OnRemoveSupportingImage"
