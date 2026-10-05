@@ -38,6 +38,34 @@ public sealed class UpdateServiceTests
         Assert.Equal(UpdateCheckStatus.Unsupported, result.Status);
     }
 
+    [Theory]
+    [InlineData("0.2.0")]
+    [InlineData("0.1.9")]
+    public async Task Download_RejectsStaleManifest(string version)
+    {
+        var service = CreateService("0.2.0", Manifest(version));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.DownloadAsync(Manifest(version)));
+    }
+
+    [Fact]
+    public async Task Apply_RejectsStalePackageWithoutLaunchingInstaller()
+    {
+        var launcher = new RecordingLauncher();
+        var service = new UpdateService(
+            new ConstantVersionProvider("0.3.0"),
+            new ConstantSource(Manifest("0.4.0")),
+            new RecordingDownloader(),
+            launcher,
+            new RecordingLifecycle(),
+            UpdatePlatform.WindowsX64);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ApplyAsync(new VerifiedUpdatePackage(Manifest("0.3.0"), "C:\\Temp\\FusionCanvas-Setup.exe")));
+
+        Assert.Null(launcher.InstallerPath);
+    }
+
     [Fact]
     public async Task Apply_FlushesSchedulesInstallerAndRequestsShutdown()
     {
@@ -59,6 +87,27 @@ public sealed class UpdateServiceTests
         Assert.Equal(package.InstallerPath, launcher.InstallerPath);
     }
 
+    [Fact]
+    public async Task Apply_WhenFlushFails_DoesNotScheduleInstallerOrRequestShutdown()
+    {
+        var lifecycle = new RecordingLifecycle { FlushException = new InvalidOperationException("settings could not be saved") };
+        var launcher = new RecordingLauncher();
+        var service = new UpdateService(
+            new ConstantVersionProvider("0.2.0"),
+            new ConstantSource(Manifest("0.3.0")),
+            new RecordingDownloader(),
+            launcher,
+            lifecycle,
+            UpdatePlatform.WindowsX64);
+        var package = new VerifiedUpdatePackage(Manifest("0.3.0"), "C:\\Temp\\FusionCanvas-Setup.exe");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.ApplyAsync(package));
+
+        Assert.Equal(new[] { "flush" }, lifecycle.Events);
+        Assert.Null(launcher.InstallerPath);
+        Assert.Equal(0, launcher.ProcessId);
+    }
+
     private static UpdateService CreateService(string current, UpdateManifest manifest) => new(
         new ConstantVersionProvider(current),
         new ConstantSource(manifest),
@@ -68,12 +117,13 @@ public sealed class UpdateServiceTests
         UpdatePlatform.WindowsX64);
 
     private static UpdateManifest Manifest(string version) => new(
-        1,
+        UpdateManifestValidator.CurrentSchemaVersion,
         version,
         UpdatePlatform.WindowsX64,
-        new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v" + version + "/FusionCanvas-Setup.exe"),
+        new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v" + version + "/FusionCanvas-" + version + "-win-x64-Setup.exe"),
         new string('A', 64),
-        new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v" + version));
+        new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v" + version),
+        new string('B', 64));
 
     private sealed class ConstantVersionProvider(string version) : IApplicationVersionProvider
     {
@@ -107,7 +157,14 @@ public sealed class UpdateServiceTests
     private sealed class RecordingLifecycle : IUpdateApplicationLifecycle
     {
         public List<string> Events { get; } = new();
-        public Task FlushAsync(CancellationToken cancellationToken = default) { Events.Add("flush"); return Task.CompletedTask; }
+        public Exception? FlushException { get; init; }
+
+        public Task FlushAsync(CancellationToken cancellationToken = default)
+        {
+            Events.Add("flush");
+            return FlushException is null ? Task.CompletedTask : Task.FromException(FlushException);
+        }
+
         public Task RequestShutdownAsync(CancellationToken cancellationToken = default) { Events.Add("shutdown"); return Task.CompletedTask; }
     }
 }

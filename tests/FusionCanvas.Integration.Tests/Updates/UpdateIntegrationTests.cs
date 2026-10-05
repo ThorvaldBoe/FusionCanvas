@@ -13,7 +13,7 @@ public sealed class UpdateIntegrationTests
     public async Task GitHubUpdateSource_DeserializesManifest()
     {
         var json = """
-        {"schemaVersion":1,"productVersion":"0.3.0","platform":"win-x64","installerUri":"https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-Setup.exe","sha256":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","releaseUri":"https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0"}
+        {"schemaVersion":2,"productVersion":"0.3.0","platform":"win-x64","installerUri":"https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe","sha256":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","releaseUri":"https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0","publisherCertificateSha256":"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"}
         """;
         using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
@@ -24,6 +24,46 @@ public sealed class UpdateIntegrationTests
         Assert.NotNull(manifest);
         Assert.Equal("0.3.0", manifest.ProductVersion);
         Assert.Equal(UpdatePlatform.WindowsX64, manifest.Platform);
+    }
+
+    [Fact]
+    public async Task GitHubUpdateSource_FollowsOneCanonicalRedirect()
+    {
+        var json = ManifestJson();
+        using var client = new HttpClient(new SequenceHandler(
+        [
+            new HttpResponseMessage(HttpStatusCode.Redirect)
+            {
+                Headers = { Location = new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/latest.json") }
+            },
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            }
+        ]));
+
+        var manifest = await new GitHubUpdateSource(client).GetLatestAsync();
+
+        Assert.NotNull(manifest);
+        Assert.Equal("0.3.0", manifest.ProductVersion);
+    }
+
+    [Fact]
+    public async Task GitHubUpdateSource_RejectsSecondRedirect()
+    {
+        using var client = new HttpClient(new SequenceHandler(
+        [
+            new HttpResponseMessage(HttpStatusCode.Redirect)
+            {
+                Headers = { Location = new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/latest.json") }
+            },
+            new HttpResponseMessage(HttpStatusCode.Redirect)
+            {
+                Headers = { Location = new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/latest.json") }
+            }
+        ]));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new GitHubUpdateSource(client).GetLatestAsync());
     }
 
     [Fact]
@@ -73,7 +113,7 @@ public sealed class UpdateIntegrationTests
 
         try
         {
-            var package = await new UpdatePackageDownloader(client, directory).DownloadAndVerifyAsync(manifest);
+            var package = await new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory).DownloadAndVerifyAsync(manifest);
 
             Assert.True(File.Exists(package.InstallerPath));
             Assert.Equal(bytes, await File.ReadAllBytesAsync(package.InstallerPath));
@@ -100,7 +140,7 @@ public sealed class UpdateIntegrationTests
         try
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                new UpdatePackageDownloader(client, directory).DownloadAndVerifyAsync(manifest));
+                new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory).DownloadAndVerifyAsync(manifest));
             Assert.Empty(Directory.EnumerateFiles(directory));
         }
         finally
@@ -158,7 +198,33 @@ public sealed class UpdateIntegrationTests
         try
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                new UpdatePackageDownloader(client, directory).DownloadAndVerifyAsync(manifest));
+                new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory).DownloadAndVerifyAsync(manifest));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Downloader_RejectsPublisherVerificationFailureAndCleansUp()
+    {
+        var bytes = Encoding.UTF8.GetBytes("installer bytes");
+        var manifest = Manifest(Convert.ToHexString(SHA256.HashData(bytes)));
+        using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(bytes)
+        });
+        var directory = Path.Combine(Path.GetTempPath(), "FusionCanvasUpdateTests", Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                new UpdatePackageDownloader(client, new RejectingAuthenticityVerifier(), directory).DownloadAndVerifyAsync(manifest));
+            Assert.Empty(Directory.EnumerateFiles(directory));
         }
         finally
         {
@@ -170,12 +236,17 @@ public sealed class UpdateIntegrationTests
     }
 
     private static UpdateManifest Manifest(string hash) => new(
-        1,
+        UpdateManifestValidator.CurrentSchemaVersion,
         "0.3.0",
         UpdatePlatform.WindowsX64,
-        new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-Setup.exe"),
+        new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe"),
         hash,
-        new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0"));
+        new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0"),
+        new string('B', 64));
+
+    private static string ManifestJson() => """
+    {"schemaVersion":2,"productVersion":"0.3.0","platform":"win-x64","installerUri":"https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe","sha256":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","releaseUri":"https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0","publisherCertificateSha256":"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"}
+    """;
 
     private static HttpClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> handler) =>
         new(new DelegateHandler(handler));
@@ -270,5 +341,28 @@ public sealed class UpdateIntegrationTests
         public override void SetLength(long value) => throw new NotSupportedException();
 
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    private sealed class SequenceHandler(params HttpResponseMessage[] responses) : HttpMessageHandler
+    {
+        private int _index;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var index = Interlocked.Increment(ref _index) - 1;
+            return Task.FromResult(responses[index]);
+        }
+    }
+
+    private sealed class AcceptingAuthenticityVerifier : IInstallerAuthenticityVerifier
+    {
+        public Task VerifyAsync(string installerPath, UpdateManifest manifest, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+    }
+
+    private sealed class RejectingAuthenticityVerifier : IInstallerAuthenticityVerifier
+    {
+        public Task VerifyAsync(string installerPath, UpdateManifest manifest, CancellationToken cancellationToken = default) =>
+            Task.FromException(new InvalidOperationException("signature rejected"));
     }
 }

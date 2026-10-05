@@ -76,8 +76,12 @@ jobs:
 
       - name: Build installer, checksum, and release manifest
         id: release-assets
+        env:
+          WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.FUSIONCANVAS_WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
+          WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.FUSIONCANVAS_WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
           $publishDirectory = Join-Path $env:GITHUB_WORKSPACE "artifacts\publish"
           $version = (dotnet msbuild .\src\FusionCanvas.App\FusionCanvas.App.csproj -target:GetBuildVersion -getProperty:NuGetPackageVersion -nologo | Out-String).Trim()
           $tagVersion = $env:GITHUB_REF_NAME.Substring(1)
@@ -92,16 +96,29 @@ jobs:
           $iconPath = Join-Path $env:GITHUB_WORKSPACE "src\FusionCanvas.App\Assets\FusionCanvasLogo_Square_LightBg.ico"
           & "${{ steps.nsis.outputs.makensis }}" "/DAPP_VERSION=$version" "/DFILE_VERSION=$fileVersion" "/DPUBLISH_DIRECTORY=$publishDirectory" "/DOUTFILE=$installerPath" "/DICON_PATH=$iconPath" ".\installer\FusionCanvas.nsi"
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $installerPath -PathType Leaf)) { throw "NSIS did not produce the expected installer." }
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_CERTIFICATE_BASE64) -or [string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_CERTIFICATE_PASSWORD)) {
+            throw "Windows signing secrets are required before a stable release can be published."
+          }
+          $certificatePath = Join-Path $env:RUNNER_TEMP "fusioncanvas-signing.pfx"
+          [IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:WINDOWS_SIGNING_CERTIFICATE_BASE64))
+          $signTool = Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter "signtool.exe" -Recurse | Sort-Object FullName | Select-Object -Last 1
+          if ($null -eq $signTool) { throw "The Windows SDK signing tool was not found." }
+          & $signTool.FullName sign /fd SHA256 /f $certificatePath /p $env:WINDOWS_SIGNING_CERTIFICATE_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $installerPath
+          if ($LASTEXITCODE -ne 0) { throw "Authenticode signing failed." }
+          $signature = Get-AuthenticodeSignature -FilePath $installerPath
+          if ($signature.Status -ne "Valid" -or $null -eq $signature.SignerCertificate) { throw "The signed installer did not pass Windows Authenticode validation." }
+          $publisherCertificateSha256 = $signature.SignerCertificate.GetCertHashString([Security.Cryptography.HashAlgorithmName]::SHA256).ToLowerInvariant()
           $checksum = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
           $checksumName = "$installerName.sha256"
           "$checksum  $installerName" | Set-Content -LiteralPath (Join-Path $artifactDirectory $checksumName) -Encoding ascii -NoNewline
           $manifest = [ordered]@{
-            schemaVersion = 1
+            schemaVersion = 2
             productVersion = $version
             platform = "win-x64"
             installerUri = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:GITHUB_REF_NAME/$installerName"
             sha256 = $checksum
             releaseUri = "https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$env:GITHUB_REF_NAME"
+            publisherCertificateSha256 = $publisherCertificateSha256
           }
           $manifestName = "latest.json"
           $manifest | ConvertTo-Json -Compress | Set-Content -LiteralPath (Join-Path $artifactDirectory $manifestName) -Encoding utf8
@@ -110,11 +127,15 @@ jobs:
           "checksum=$checksumName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "manifest=$manifestName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
-      - name: Smoke test installer
+      - name: Verify release trust policy in a disposable install
         shell: pwsh
         run: |
-          $installDirectory = Join-Path $env:RUNNER_TEMP "FusionCanvas-InstallerSmoke\install"
-          .\tools\installer\Test-FusionCanvasInstaller.ps1 -InstallerPath "artifacts\${{ steps.release-assets.outputs.installer }}" -InstallDirectory $installDirectory -ExpectedVersion "${{ steps.release-assets.outputs.version }}" -AllowLocalUserDataMutation
+          $installDirectory = Join-Path $env:RUNNER_TEMP "FusionCanvas-ReleaseTrustSmoke\install"
+          .\tools\updates\Test-FusionCanvasRelease.ps1 `
+            -ManifestPath "artifacts\${{ steps.release-assets.outputs.manifest }}" `
+            -InstallerPath "artifacts\${{ steps.release-assets.outputs.installer }}" `
+            -ExpectedVersion "${{ steps.release-assets.outputs.version }}" `
+            -InstallDirectory $installDirectory
 
       - name: Attest installer provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2

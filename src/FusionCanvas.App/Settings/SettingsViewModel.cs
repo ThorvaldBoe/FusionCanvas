@@ -33,7 +33,10 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     private string? _errorMessage;
     private string _workspaceName = "No workspace";
     private int _saveGeneration;
-    private Task _saveChain = Task.CompletedTask;
+    private readonly object _saveGate = new();
+    private ApplicationSettings? _pendingSettings;
+    private bool _retryPendingSave;
+    private Task<SaveAttempt> _saveChain = Task.FromResult(SaveAttempt.Success);
     private int _busyOperationCount;
 
     public SettingsViewModel(
@@ -236,15 +239,21 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
 
     public async Task FlushAsync()
     {
-        try
+        Task<SaveAttempt> save;
+        lock (_saveGate)
         {
-            await _saveChain.ConfigureAwait(false);
+            if (_retryPendingSave && _pendingSettings is { } pendingSettings)
+            {
+                QueueSaveCore(pendingSettings);
+            }
+
+            save = _saveChain;
         }
-        catch (OperationCanceledException)
+
+        var attempt = await save.ConfigureAwait(false);
+        if (!attempt.Succeeded)
         {
-        }
-        catch
-        {
+            throw new InvalidOperationException(attempt.Warning ?? "The application settings could not be saved and may not survive restart.");
         }
     }
 
@@ -383,12 +392,21 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
 
     private void QueueSave(ApplicationSettings settings)
     {
+        lock (_saveGate)
+        {
+            QueueSaveCore(settings);
+        }
+    }
+
+    private void QueueSaveCore(ApplicationSettings settings)
+    {
         var generation = Interlocked.Increment(ref _saveGeneration);
+        _pendingSettings = settings;
+        _retryPendingSave = false;
         BeginBusy();
         _saveChain = _saveChain
-            .ContinueWith(_ => PersistAsync(generation, settings), TaskScheduler.Default)
-            .Unwrap()
-            .ContinueWith(_ => EndBusy(), TaskScheduler.Default);
+            .ContinueWith(_ => PersistAndEndBusyAsync(generation, settings), TaskScheduler.Default)
+            .Unwrap();
     }
 
     private void BeginBusy()
@@ -403,20 +421,54 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         OnPropertyChanged(nameof(IsBusy));
     }
 
-    private async Task PersistAsync(int generation, ApplicationSettings settings)
+    private async Task<SaveAttempt> PersistAndEndBusyAsync(int generation, ApplicationSettings settings)
+    {
+        try
+        {
+            return await PersistAsync(generation, settings).ConfigureAwait(false);
+        }
+        finally
+        {
+            EndBusy();
+        }
+    }
+
+    private async Task<SaveAttempt> PersistAsync(int generation, ApplicationSettings settings)
     {
         if (generation != Volatile.Read(ref _saveGeneration))
         {
-            return;
+            return SaveAttempt.Skipped;
         }
 
         try
         {
             var result = await _store.SaveAsync(settings).ConfigureAwait(false);
-            if (generation == Volatile.Read(ref _saveGeneration))
+            var isCurrent = false;
+            lock (_saveGate)
+            {
+                if (generation == Volatile.Read(ref _saveGeneration))
+                {
+                    isCurrent = true;
+                    if (result.Saved)
+                    {
+                        _pendingSettings = null;
+                        _retryPendingSave = false;
+                    }
+                    else
+                    {
+                        _retryPendingSave = true;
+                    }
+                }
+            }
+
+            if (isCurrent)
             {
                 SetMessage(result.Saved ? null : result.Warning);
             }
+
+            return result.Saved
+                ? SaveAttempt.Success
+                : new SaveAttempt(false, result.Warning);
         }
         catch (OperationCanceledException)
         {
@@ -424,10 +476,22 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         }
         catch
         {
-            if (generation == Volatile.Read(ref _saveGeneration))
+            var isCurrent = false;
+            lock (_saveGate)
+            {
+                if (generation == Volatile.Read(ref _saveGeneration))
+                {
+                    isCurrent = true;
+                    _retryPendingSave = true;
+                }
+            }
+
+            if (isCurrent)
             {
                 SetMessage("The application settings could not be saved and may not survive restart.");
             }
+
+            return new SaveAttempt(false, "The application settings could not be saved and may not survive restart.");
         }
     }
 
@@ -509,5 +573,12 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
             Task.FromResult<AiModelCatalog?>(null);
         public Task SaveAsync(AiModelCatalog catalog, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
+    }
+
+    private readonly record struct SaveAttempt(bool Succeeded, string? Warning)
+    {
+        public static SaveAttempt Success { get; } = new(true, null);
+
+        public static SaveAttempt Skipped { get; } = new(true, null);
     }
 }
