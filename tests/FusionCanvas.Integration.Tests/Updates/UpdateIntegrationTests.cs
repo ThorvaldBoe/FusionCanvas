@@ -166,7 +166,7 @@ public sealed class UpdateIntegrationTests
 
         try
         {
-            var download = new UpdatePackageDownloader(client, directory)
+            var download = new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory)
                 .DownloadAndVerifyAsync(manifest, cancellationToken: cancellation.Token);
 
             await contentStream.FirstRead.Task.WaitAsync(TimeSpan.FromSeconds(3));
