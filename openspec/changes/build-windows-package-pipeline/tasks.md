@@ -14,4 +14,4 @@
 
 - [x] 3.1 Document candidate artifact behavior and remaining installer/release/update scope.
 - [x] 3.2 Run local build/test and strict OpenSpec validation.
-- [ ] 3.3 Verify the hosted Windows workflow after merge.
+- [x] 3.3 Verify the hosted Windows workflow after merge.
