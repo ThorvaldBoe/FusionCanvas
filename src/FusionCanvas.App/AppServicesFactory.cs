@@ -6,6 +6,10 @@ using FusionCanvas.Application.Telemetry;
 using FusionCanvas.App.Workspace;
 using FusionCanvas.Integration.Persistence;
 using FusionCanvas.Application.Settings;
+using FusionCanvas.Application.Updates;
+using FusionCanvas.Integration.Updates;
+using FusionCanvas.App.Updates;
+using System.Runtime.InteropServices;
 
 namespace FusionCanvas.App;
 
@@ -14,14 +18,15 @@ public static class AppServicesFactory
     public static AppServices Create()
         => Create(AppSettingsFactory.CreateStore());
 
-    public static AppServices Create(CancellationToken cancellationToken) =>
-        Create(AppSettingsFactory.CreateStore(), cancellationToken);
+    public static AppServices Create(CancellationToken cancellationToken, Action? requestShutdown = null) =>
+        Create(AppSettingsFactory.CreateStore(), cancellationToken, requestShutdown: requestShutdown);
 
     public static AppServices Create(
         FusionCanvas.Application.Settings.IApplicationSettingsStore settingsStore,
         CancellationToken cancellationToken = default,
         ApplicationSettings? initialSettings = null,
-        string? loadWarning = null)
+        string? loadWarning = null,
+        Action? requestShutdown = null)
     {
         ArgumentNullException.ThrowIfNull(settingsStore);
         var load = initialSettings is null
@@ -61,6 +66,9 @@ public static class AppServicesFactory
             AvaloniaClipboardService.Instance,
             telemetry,
             telemetryContext);
+        var updateHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        updateHttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("FusionCanvas-UpdateClient/1.0");
+        settings.ReplaceUpdateService(CreateUpdateService(updateHttpClient, settings, requestShutdown));
         var textService = new AiTextGenerationService(aiSettings, credentials, catalogCache, openRouter);
         var services = new AppServices(
             httpClient,
@@ -70,7 +78,8 @@ public static class AppServicesFactory
             openRouter,
             new FusionCanvas.Integration.Items.ItemCsvCodec(),
             new FusionCanvas.Integration.Items.Import.ItemCsvCodec(),
-            telemetry);
+            telemetry,
+            updateHttpClient);
         var printifyClient = FusionCanvas.Integration.Stores.Printify.PrintifyCredentialVerifier.CreateHttpClient();
         var printifyCatalogClient = FusionCanvas.Integration.Stores.Printify.PrintifyCatalogClient.CreateHttpClient();
         services.ConfigurePrintify(printifyClient,
@@ -79,5 +88,26 @@ public static class AppServicesFactory
             new FusionCanvas.Integration.Stores.Printify.PrintifyCatalogClient(printifyCatalogClient, telemetry),
             printifyCatalogClient);
         return services;
+    }
+
+    private static IUpdateService CreateUpdateService(
+        HttpClient updateHttpClient,
+        SettingsViewModel settings,
+        Action? requestShutdown)
+    {
+        if (!OperatingSystem.IsWindows() || RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        {
+            return new DisabledUpdateService();
+        }
+
+        return new UpdateService(
+            new AssemblyApplicationVersionProvider(),
+            new GitHubUpdateSource(updateHttpClient),
+            new UpdatePackageDownloader(updateHttpClient),
+            new WindowsInstallerLauncher(),
+            new AppUpdateApplicationLifecycle(
+                settings.FlushAsync,
+                requestShutdown ?? (() => { })),
+            UpdatePlatform.WindowsX64);
     }
 }

@@ -13,6 +13,7 @@ public sealed class AppServices : IDisposable
     private bool _disposed;
     private HttpClient? _printifyHttpClient;
     private HttpClient? _printifyCatalogHttpClient;
+    private readonly HttpClient? _updateHttpClient;
     private readonly IDisposable? _telemetryLifetime;
 
     public FusionCanvas.Application.Stores.Printify.IStorePrintifyCredentialStore? PrintifyCredentials { get; private set; }
@@ -40,7 +41,8 @@ public sealed class AppServices : IDisposable
         IAiImageGenerationProvider aiImageGeneration,
         IItemCsvCodec itemCsvExportCodec,
         ImportItemCsvCodec itemCsvImportCodec,
-        ITelemetryService? telemetry = null)
+        ITelemetryService? telemetry = null,
+        HttpClient? updateHttpClient = null)
     {
         _httpClient = httpClient;
         SettingsStore = settingsStore;
@@ -51,6 +53,7 @@ public sealed class AppServices : IDisposable
         ItemCsvImportCodec = itemCsvImportCodec;
         Telemetry = telemetry;
         _telemetryLifetime = telemetry as IDisposable;
+        _updateHttpClient = updateHttpClient;
     }
 
     public IApplicationSettingsStore SettingsStore { get; }
@@ -76,6 +79,7 @@ public sealed class AppServices : IDisposable
         _httpClient.Dispose();
         _printifyHttpClient?.Dispose();
         _printifyCatalogHttpClient?.Dispose();
+        _updateHttpClient?.Dispose();
         _telemetryLifetime?.Dispose();
     }
 }

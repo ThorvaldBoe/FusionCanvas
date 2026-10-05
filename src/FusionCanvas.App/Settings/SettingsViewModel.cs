@@ -12,6 +12,7 @@ using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Telemetry;
 using FusionCanvas.App.TermsConsent;
 using FusionCanvas.Application.TermsConsent;
+using FusionCanvas.Application.Updates;
 
 namespace FusionCanvas.App.Settings;
 
@@ -43,7 +44,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         IApplicationVersionProvider? versionProvider = null,
         IClipboardService? clipboard = null,
         ITelemetryService? telemetryService = null,
-        ITelemetryWorkspaceContext? telemetryWorkspaceContext = null)
+        ITelemetryWorkspaceContext? telemetryWorkspaceContext = null,
+        IUpdateService? updateService = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _themeController = themeController ?? throw new ArgumentNullException(nameof(themeController));
@@ -57,6 +59,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         _themeController.ApplyDarkMode(_isDarkMode);
         Version = _versionProvider.GetVersion();
         DiagnosticsText = ApplicationVersionDiagnostics.Format(Version, ApplicationVersionDiagnostics.BuildPlatformString());
+        Updates = new UpdateViewModel(updateService ?? new DisabledUpdateService());
 
         OpenCommand = new RelayCommand(_ => Open());
         Ai = ai ?? CreateOfflineAi(initialSettings.Ai);
@@ -128,6 +131,13 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     public AiSettingsViewModel Ai { get; }
 
     public WorkspaceTelemetrySettingsViewModel Telemetry { get; }
+
+    public UpdateViewModel Updates { get; }
+
+    internal void ReplaceUpdateService(IUpdateService service)
+    {
+        Updates.ReplaceService(service);
+    }
 
     public WindowLayoutSettings? WindowLayout => _currentSettings.WindowLayout;
 
@@ -234,6 +244,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         {
         }
     }
+
+    public void Dispose() => Updates.Dispose();
 
     public void UpdateWindowLayout(WindowLayoutSettings? layout)
     {

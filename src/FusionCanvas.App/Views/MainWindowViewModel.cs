@@ -315,6 +315,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
 
         _disposed = true;
         _commandTasks.Dispose();
+        Settings.Dispose();
         Settings.Ai.SettingsChanged -= OnAiConfigurationChanged;
         Settings.Ai.AvailabilityChanged -= OnAiConfigurationChanged;
         try
