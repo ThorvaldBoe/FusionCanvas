@@ -277,7 +277,7 @@ public class SettingsWindowTests
                 new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe"),
                 new string('A', 64),
                 new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0"),
-                new string('B', 64)))
+                PublisherCertificateSha256: new string('B', 64)))
         };
         var settings = new SettingsViewModel(
             new InMemoryApplicationSettingsStore(),
