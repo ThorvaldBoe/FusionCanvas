@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Interactivity;
@@ -54,6 +55,13 @@ public sealed class GlobalColorRemovalTests
             window.Show();
             window.UpdateLayout();
 
+            Assert.Equal(900, window.Width);
+            Assert.Equal(720, window.Height);
+            Assert.Equal(560, window.MinWidth);
+            Assert.Equal(480, window.MinHeight);
+            var layout = Assert.IsType<Grid>(window.Content);
+            Assert.Equal(new Thickness(24), layout.Margin);
+            Assert.Equal(14, layout.RowSpacing);
             Assert.NotNull(window.GetVisualDescendants().OfType<AvaloniaImage>().SingleOrDefault(image => image.Source is Bitmap));
             Assert.Single(window.GetVisualDescendants().OfType<Slider>());
             Assert.Contains(window.GetVisualDescendants().OfType<Button>(), button => Equals(button.Content, "Apply"));

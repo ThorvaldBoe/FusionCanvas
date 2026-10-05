@@ -4,30 +4,37 @@
         x:Class="FusionCanvas.App.StageTools.GlobalColorRemovalWindow"
         x:DataType="stageTools:GlobalColorRemovalViewModel"
         Title="Remove Color"
-        Width="900"
-        Height="720"
-        MinWidth="560"
-        MinHeight="480"
+        Width="{DynamicResource Token.Window.ToolWidth}"
+        Height="{DynamicResource Token.Window.ToolHeight}"
+        MinWidth="{DynamicResource Token.Window.ToolMinWidth}"
+        MinHeight="{DynamicResource Token.Window.ToolMinHeight}"
         WindowStartupLocation="CenterOwner"
-        Background="{DynamicResource ApplicationBackgroundBrush}"
+        Background="{DynamicResource Token.Color.WindowBackground}"
         CanResize="True">
-  <Grid RowDefinitions="Auto,*,Auto" Margin="16" RowSpacing="12">
-    <StackPanel Spacing="3">
-      <TextBlock Text="Remove a color globally" FontSize="18" FontWeight="SemiBold"
-                 Foreground="{DynamicResource StrongTextBrush}" />
+  <Grid RowDefinitions="Auto,*,Auto"
+        Margin="{DynamicResource Token.Layout.PageInset}"
+        RowSpacing="{DynamicResource Token.Spacing.SectionGap}">
+    <StackPanel Spacing="{DynamicResource Token.Spacing.CompactGap}">
+      <TextBlock Text="Remove a color globally"
+                 FontSize="{DynamicResource Token.Typography.ToolTitle}"
+                 FontWeight="SemiBold"
+                 Foreground="{DynamicResource Token.Color.TextStrong}" />
       <TextBlock Text="{Binding SourceName, StringFormat='Source: {0}'}"
-                 Foreground="{DynamicResource SecondaryTextBrush}" />
+                 Foreground="{DynamicResource Token.Color.TextSecondary}" />
       <TextBlock Text="Matching colors will be removed everywhere in the image, including artwork details."
-                 TextWrapping="Wrap" FontSize="11"
-                 Foreground="{DynamicResource WarningTextBrush}" />
+                 TextWrapping="Wrap"
+                 FontSize="{DynamicResource Token.Typography.Helper}"
+                 Foreground="{DynamicResource Token.Color.Warning}" />
     </StackPanel>
 
-    <Grid Grid.Row="1" ColumnDefinitions="*,260" ColumnSpacing="16">
-      <Border Background="{DynamicResource ElevatedSurfaceBrush}"
-              BorderBrush="{DynamicResource ControlBorderBrush}"
-              BorderThickness="1"
-              CornerRadius="6"
-              Padding="8">
+    <Grid Grid.Row="1"
+          ColumnDefinitions="*,260"
+          ColumnSpacing="{DynamicResource Token.Spacing.ToolPanelGap}">
+      <Border Background="{DynamicResource Token.Color.SurfaceElevated}"
+              BorderBrush="{DynamicResource Token.Color.Border}"
+              BorderThickness="{DynamicResource Token.Border.Default}"
+              CornerRadius="{DynamicResource Token.Radius.Card}"
+              Padding="{DynamicResource Token.Layout.PreviewPadding}">
         <Image x:Name="PreviewImage"
                Source="{Binding DisplayBitmap}"
                Stretch="Uniform"
@@ -36,60 +43,83 @@
                AutomationProperties.Name="Color removal image preview" />
       </Border>
 
-      <StackPanel Grid.Column="1" Spacing="10">
-        <TextBlock Text="Pick a color" FontWeight="SemiBold"
-                   Foreground="{DynamicResource StrongTextBrush}" />
+      <StackPanel Grid.Column="1" Spacing="{DynamicResource Token.Spacing.GroupGap}">
+        <TextBlock Text="Pick a color"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource Token.Color.TextStrong}" />
         <TextBlock Text="Click a visible pixel in the preview, or enter a color directly."
-                   TextWrapping="Wrap" FontSize="11"
-                   Foreground="{DynamicResource SecondaryTextBrush}" />
-        <StackPanel Orientation="Horizontal" Spacing="6">
+                   TextWrapping="Wrap"
+                   FontSize="{DynamicResource Token.Typography.Helper}"
+                   Foreground="{DynamicResource Token.Color.TextSecondary}" />
+        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Token.Spacing.InlineGap}">
           <TextBox Text="{Binding PickedColorHex, Mode=TwoWay}"
-          PlaceholderText="#RRGGBB"
-                   Width="120"
+                   PlaceholderText="#RRGGBB"
+                   Width="{DynamicResource Token.Control.ColorInputWidth}"
                    AutomationProperties.Name="Selected color hex value" />
           <Button Content="Use color"
                   Click="OnUseHexColorClick"
                   IsEnabled="{Binding CanUseHexColor}"
                   AutomationProperties.Name="Use entered color" />
         </StackPanel>
-        <TextBlock Text="Tolerance" FontWeight="SemiBold"
-                   Foreground="{DynamicResource StrongTextBrush}" />
+        <TextBlock Text="Tolerance"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource Token.Color.TextStrong}" />
         <Slider Minimum="0" Maximum="100" TickFrequency="5"
                 Value="{Binding TolerancePercent, Mode=TwoWay}"
                 AutomationProperties.Name="Color tolerance" />
         <TextBlock Text="{Binding TolerancePercent, StringFormat='Tolerance: {0:0}%'}"
-                   Foreground="{DynamicResource SecondaryTextBrush}" />
+                   Foreground="{DynamicResource Token.Color.TextSecondary}" />
         <TextBlock Text="{Binding StatusMessage}"
                    TextWrapping="Wrap"
                    AutomationProperties.Name="Color removal status" />
         <TextBlock Text="{Binding WarningMessage}"
                    IsVisible="{Binding HasPickedColor}"
                    TextWrapping="Wrap"
-                   FontSize="11"
-                   Foreground="{DynamicResource WarningTextBrush}" />
+                   FontSize="{DynamicResource Token.Typography.Helper}"
+                   Foreground="{DynamicResource Token.Color.Warning}" />
         <TextBlock Text="{Binding ErrorMessage}"
                    IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}"
                    TextWrapping="Wrap"
-                   Foreground="{DynamicResource DangerTextBrush}"
+                   Foreground="{DynamicResource Token.Color.Error}"
                    AutomationProperties.Name="Color removal error" />
         <ProgressBar IsVisible="{Binding IsBusy}"
                      IsIndeterminate="True"
-                     Height="4"
+                     Height="{DynamicResource Token.Control.ProgressHeight}"
                      AutomationProperties.Name="Updating color removal preview" />
       </StackPanel>
     </Grid>
 
-    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+    <StackPanel Grid.Row="2"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="{DynamicResource Token.Spacing.ControlGap}">
       <Button Content="Cancel"
               Click="OnCancelClick"
-              MinWidth="90"
+              MinWidth="{DynamicResource Token.Control.ActionMinWidth}"
+              Classes="secondary"
               AutomationProperties.Name="Cancel color removal" />
       <Button Content="Apply"
               Click="OnApplyClick"
               IsEnabled="{Binding CanApply}"
-              MinWidth="90"
-              Classes="storeAction"
+              MinWidth="{DynamicResource Token.Control.ActionMinWidth}"
+              Classes="primary"
               AutomationProperties.Name="Apply global color removal" />
     </StackPanel>
   </Grid>
+  <Window.Styles>
+    <Style Selector="Button.primary">
+      <Setter Property="Padding" Value="{DynamicResource Token.Control.ButtonPadding}" />
+      <Setter Property="Background" Value="{DynamicResource Token.Color.AccentStrong}" />
+      <Setter Property="Foreground" Value="{DynamicResource Token.Color.OnAccent}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Token.Color.AccentStrong}" />
+      <Setter Property="BorderThickness" Value="{DynamicResource Token.Border.Default}" />
+    </Style>
+    <Style Selector="Button.secondary">
+      <Setter Property="Padding" Value="{DynamicResource Token.Control.ButtonPadding}" />
+      <Setter Property="Background" Value="{DynamicResource Token.Color.SurfaceElevated}" />
+      <Setter Property="Foreground" Value="{DynamicResource Token.Color.TextSecondary}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Token.Color.Border}" />
+      <Setter Property="BorderThickness" Value="{DynamicResource Token.Border.Default}" />
+    </Style>
+  </Window.Styles>
 </Window>
