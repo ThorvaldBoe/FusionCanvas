@@ -11,6 +11,15 @@ public sealed class ImageSharpGlobalColorRemovalProcessor : IGlobalColorRemovalP
     private const long MaximumDecodedPixels = 40L * 1000 * 1000;
     private const double MaximumRgbDistance = 441.6729559300637;
 
+    public async Task ValidateAsync(
+        Stream source,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        using var image = await LoadAsync(source, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<GlobalColorRemovalRasterPreview> PreviewAsync(
         Stream source,
         GlobalColorRemovalParameters parameters,

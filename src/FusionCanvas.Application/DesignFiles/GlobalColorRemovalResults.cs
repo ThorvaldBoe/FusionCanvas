@@ -1,5 +1,17 @@
 namespace FusionCanvas.Application.DesignFiles;
 
+public sealed record GlobalColorRemovalAvailabilityResult(
+    bool Available,
+    string? Reason)
+{
+    public static GlobalColorRemovalAvailabilityResult Success() => new(true, null);
+
+    public static GlobalColorRemovalAvailabilityResult Failure(string reason) =>
+        new(false, string.IsNullOrWhiteSpace(reason)
+            ? "Global color removal is unavailable for this image."
+            : reason);
+}
+
 public sealed record GlobalColorRemovalSourceResult(
     bool Succeeded,
     string? Error,

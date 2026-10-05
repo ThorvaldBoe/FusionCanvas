@@ -1597,6 +1597,8 @@
                                             Tag="{Binding .}"
                                             IsEnabled="{Binding CanRemoveColor}"
                                             FontSize="10" Classes="miniButton"
+                                            ToolTip.Tip="{Binding ColorRemovalAvailabilityMessage}"
+                                            ToolTip.ShowOnDisabled="True"
                                             AutomationProperties.Name="Remove a color globally" />
                                     <Button Content="Remove" IsEnabled="{Binding !IsReadOnly}"
                                             Tag="{Binding .}"

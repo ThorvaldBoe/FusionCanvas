@@ -26,6 +26,14 @@ Apply now receives a linked cancellation token owned by the view model. Cancel, 
 
 - `GlobalColorRemovalTests.ClosingWindow_CancelsInProgressApply` — pass with a blocking service double; the Apply token is cancelled and no successful result is produced.
 
+## Defect revalidation: Issue #846
+
+The Design-stage action now validates each managed image through the application service and ImageSharp processor before enabling color removal. Malformed, unsupported, missing, and read-only sources remain disabled, and the validation failure is exposed through the disabled action's tooltip.
+
+- `GlobalColorRemovalServiceTests.CheckAvailabilityAsync_ReturnsActionableFailureWhenRasterValidationFails` — pass.
+- `ImageSharpGlobalColorRemovalProcessorTests.ValidateAsync_RejectsMalformedAndUnsupportedRasterPayload` — pass.
+- `GlobalColorRemovalTests.DesignSlot_DisablesColorRemovalWithValidationReason` — pass.
+
 ## Commands
 
 - `openspec validate global-color-removal --type change --strict --no-interactive` — passed.

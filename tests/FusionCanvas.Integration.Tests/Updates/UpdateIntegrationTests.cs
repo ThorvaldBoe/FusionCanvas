@@ -153,6 +153,39 @@ public sealed class UpdateIntegrationTests
     }
 
     [Fact]
+    public async Task Downloader_CancellationCleansUpPartialFile()
+    {
+        var manifest = Manifest(new string('A', 64));
+        var contentStream = new PartiallyBlockingStream();
+        using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StreamContent(contentStream)
+        });
+        using var cancellation = new CancellationTokenSource();
+        var directory = Path.Combine(Path.GetTempPath(), "FusionCanvasUpdateTests", Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            var download = new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory)
+                .DownloadAndVerifyAsync(manifest, cancellationToken: cancellation.Token);
+
+            await contentStream.FirstRead.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            await WaitForPartialFileAsync(directory);
+            cancellation.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => download);
+            Assert.Empty(Directory.EnumerateFiles(directory));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Downloader_RejectsDeclaredOversizedContent()
     {
         var manifest = Manifest(new string('A', 64));
@@ -218,6 +251,21 @@ public sealed class UpdateIntegrationTests
     private static HttpClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> handler) =>
         new(new DelegateHandler(handler));
 
+    private static async Task WaitForPartialFileAsync(string directory)
+    {
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            if (Directory.EnumerateFiles(directory).Any())
+            {
+                return;
+            }
+
+            await Task.Delay(10);
+        }
+
+        Assert.Fail("The downloader did not create a partial file before cancellation.");
+    }
+
     private sealed class DelegateHandler(Func<HttpRequestMessage, HttpResponseMessage> handler) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
@@ -246,6 +294,53 @@ public sealed class UpdateIntegrationTests
             computedLength = length;
             return true;
         }
+    }
+
+    private sealed class PartiallyBlockingStream : Stream
+    {
+        private bool _hasReturnedBytes;
+
+        public TaskCompletionSource<bool> FirstRead { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => 1;
+
+        public override long Position
+        {
+            get => 0;
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush() => throw new NotSupportedException();
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override int Read(Span<byte> buffer) => throw new NotSupportedException();
+
+        public override async ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            if (!_hasReturnedBytes)
+            {
+                _hasReturnedBytes = true;
+                buffer.Span[0] = 1;
+                FirstRead.TrySetResult(true);
+                return 1;
+            }
+
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return 0;
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     private sealed class SequenceHandler(params HttpResponseMessage[] responses) : HttpMessageHandler

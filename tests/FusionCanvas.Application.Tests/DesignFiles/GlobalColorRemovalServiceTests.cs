@@ -46,6 +46,29 @@ public sealed class GlobalColorRemovalServiceTests
     }
 
     [Fact]
+    public async Task CheckAvailabilityAsync_ReturnsActionableFailureWhenRasterValidationFails()
+    {
+        var fixture = Fixture.Create();
+        var processor = new StubProcessor
+        {
+            ValidationFailure = new InvalidDataException("The selected file is not a supported raster image.")
+        };
+        var service = new GlobalColorRemovalService(
+            new MemoryRepository(fixture.Snapshot),
+            new MemoryFiles(),
+            new MemoryFiles(),
+            processor);
+
+        var result = await service.CheckAvailabilityAsync(
+            fixture.Item.Id,
+            fixture.SourceAsset.Id,
+            TestContext.Current.CancellationToken);
+
+        Assert.False(result.Available);
+        Assert.Contains("supported raster image", result.Reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ApplyAsync_RejectsWhenAllVisibleArtworkWouldBeRemoved()
     {
         var fixture = Fixture.Create();
@@ -166,6 +189,12 @@ public sealed class GlobalColorRemovalServiceTests
     private sealed class StubProcessor : IGlobalColorRemovalProcessor
     {
         public GlobalColorRemovalRasterResult ApplyResult { get; init; } = new([], 1, 1, 0, 0);
+        public Exception? ValidationFailure { get; init; }
+
+        public Task ValidateAsync(Stream source, CancellationToken cancellationToken = default) =>
+            ValidationFailure is null
+                ? Task.CompletedTask
+                : Task.FromException(ValidationFailure);
 
         public Task<GlobalColorRemovalRasterPreview> PreviewAsync(Stream source, GlobalColorRemovalParameters parameters, CancellationToken cancellationToken = default) =>
             Task.FromResult(new GlobalColorRemovalRasterPreview([], 1, 1, 0, 0));

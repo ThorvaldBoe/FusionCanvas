@@ -15,6 +15,7 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
     private VerifiedUpdatePackage? _package;
     private UpdatePresentationStatus _status = UpdatePresentationStatus.NotChecked;
     private string? _errorMessage;
+    private bool _downloadRetryAvailable;
     private bool _backgroundCheckStarted;
     private bool _disposed;
 
@@ -58,15 +59,21 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
 
     public bool IsChecking => Status == UpdatePresentationStatus.Checking;
 
+    public bool IsCancelVisible => IsChecking || IsDownloading;
+
     public bool IsCheckButtonVisible => !IsChecking;
 
     public bool IsUpdateAvailable => Status == UpdatePresentationStatus.UpdateAvailable;
+
+    public bool IsDownloadRetryAvailable => Status == UpdatePresentationStatus.Error && _downloadRetryAvailable;
+
+    public bool IsDownloadCommandVisible => IsUpdateAvailable || IsDownloadRetryAvailable;
 
     public bool IsDownloading => Status == UpdatePresentationStatus.Downloading;
 
     public bool IsReadyToInstall => Status == UpdatePresentationStatus.ReadyToInstall;
 
-    public bool HasError => Status == UpdatePresentationStatus.Error;
+    public bool HasError => Status == UpdatePresentationStatus.Error || !string.IsNullOrWhiteSpace(ErrorMessage);
 
     public bool IsUpToDate => Status == UpdatePresentationStatus.UpToDate;
 
@@ -86,7 +93,7 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
         UpdatePresentationStatus.UpToDate => "FusionCanvas is up to date.",
         UpdatePresentationStatus.UpdateAvailable => $"Version {_manifest?.ProductVersion} is available.",
         UpdatePresentationStatus.Downloading => $"Downloading version {_manifest?.ProductVersion}…",
-        UpdatePresentationStatus.ReadyToInstall => $"Version {_manifest?.ProductVersion} is ready. FusionCanvas will close and restart to install it.",
+        UpdatePresentationStatus.ReadyToInstall => ErrorMessage ?? $"Version {_manifest?.ProductVersion} is ready. FusionCanvas will close and restart to install it.",
         UpdatePresentationStatus.Installing => "Preparing the update…",
         UpdatePresentationStatus.Unsupported => "No compatible update is available for this installation.",
         UpdatePresentationStatus.Error => ErrorMessage ?? "The update check failed. Try again.",
@@ -133,7 +140,7 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
         and not UpdatePresentationStatus.Downloading
         and not UpdatePresentationStatus.Installing;
 
-    private bool CanDownload() => !_disposed && Status == UpdatePresentationStatus.UpdateAvailable && _manifest is not null;
+    private bool CanDownload() => !_disposed && (Status == UpdatePresentationStatus.UpdateAvailable || IsDownloadRetryAvailable) && _manifest is not null;
 
     private bool CanInstall() => !_disposed && Status == UpdatePresentationStatus.ReadyToInstall && _package is not null;
 
@@ -151,6 +158,7 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
         _operationCancellation = cancellation;
         _manifest = null;
         _package = null;
+        _downloadRetryAvailable = false;
         ErrorMessage = null;
         Status = UpdatePresentationStatus.Checking;
         NotifyCommands();
@@ -182,7 +190,7 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
         }
         catch (Exception exception)
         {
-            ErrorMessage = exception.Message;
+            ErrorMessage = UpdateErrorMessageProvider.ForCheck(exception);
             Status = UpdatePresentationStatus.Error;
         }
         finally
@@ -208,6 +216,7 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
         CancelOperation();
         var cancellation = new CancellationTokenSource();
         _operationCancellation = cancellation;
+        _downloadRetryAvailable = false;
         ErrorMessage = null;
         Status = UpdatePresentationStatus.Downloading;
         NotifyCommands();
@@ -224,7 +233,8 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
         }
         catch (Exception exception)
         {
-            ErrorMessage = exception.Message;
+            _downloadRetryAvailable = true;
+            ErrorMessage = UpdateErrorMessageProvider.ForDownload(exception);
             Status = UpdatePresentationStatus.Error;
         }
         finally
@@ -258,7 +268,7 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
         }
         catch (Exception exception)
         {
-            ErrorMessage = exception.Message;
+            ErrorMessage = UpdateErrorMessageProvider.ForInstall(exception);
             Status = UpdatePresentationStatus.ReadyToInstall;
             NotifyCommands();
             NotifyStateProperties();
@@ -294,8 +304,11 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
     {
         OnPropertyChanged(nameof(IsUpdateActionVisible));
         OnPropertyChanged(nameof(IsChecking));
+        OnPropertyChanged(nameof(IsCancelVisible));
         OnPropertyChanged(nameof(IsCheckButtonVisible));
         OnPropertyChanged(nameof(IsUpdateAvailable));
+        OnPropertyChanged(nameof(IsDownloadRetryAvailable));
+        OnPropertyChanged(nameof(IsDownloadCommandVisible));
         OnPropertyChanged(nameof(IsDownloading));
         OnPropertyChanged(nameof(IsReadyToInstall));
         OnPropertyChanged(nameof(HasError));
