@@ -59,6 +59,8 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
 
     public bool IsChecking => Status == UpdatePresentationStatus.Checking;
 
+    public bool IsCancelVisible => IsChecking || IsDownloading;
+
     public bool IsCheckButtonVisible => !IsChecking;
 
     public bool IsUpdateAvailable => Status == UpdatePresentationStatus.UpdateAvailable;
@@ -302,6 +304,7 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
     {
         OnPropertyChanged(nameof(IsUpdateActionVisible));
         OnPropertyChanged(nameof(IsChecking));
+        OnPropertyChanged(nameof(IsCancelVisible));
         OnPropertyChanged(nameof(IsCheckButtonVisible));
         OnPropertyChanged(nameof(IsUpdateAvailable));
         OnPropertyChanged(nameof(IsDownloadRetryAvailable));

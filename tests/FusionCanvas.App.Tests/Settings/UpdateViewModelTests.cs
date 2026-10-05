@@ -185,7 +185,6 @@ public sealed class UpdateViewModelTests
                 DownloadStarted.TrySetResult(true);
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             }
-
             if (DownloadException is not null)
             {
                 throw DownloadException;
