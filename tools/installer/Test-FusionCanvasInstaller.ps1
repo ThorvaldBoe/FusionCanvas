@@ -79,7 +79,8 @@ try {
     [IO.File]::WriteAllText($sentinelPath, "preserve-$ExpectedVersion")
 
     $componentSelection = '/COMPONENTS="Start Menu shortcut,Desktop shortcut"'
-    Invoke-Installer -Executable $InstallerPath -Arguments @('/S', "/D=$InstallDirectory", $componentSelection)
+    $installerArguments = @('/S', $componentSelection, "/D=$InstallDirectory")
+    Invoke-Installer -Executable $InstallerPath -Arguments $installerArguments
 
     if (-not (Test-Path -LiteralPath $applicationPath -PathType Leaf)) {
         throw "Fresh installation did not place FusionCanvas.App.exe in '$InstallDirectory'."
@@ -94,7 +95,7 @@ try {
         throw "Fresh installation did not create the selected desktop shortcut."
     }
 
-    Invoke-Installer -Executable $InstallerPath -Arguments @('/S', "/D=$InstallDirectory", $componentSelection)
+    Invoke-Installer -Executable $InstallerPath -Arguments $installerArguments
     if (-not (Test-Path -LiteralPath $applicationPath -PathType Leaf)) {
         throw "Upgrade rerun did not leave the application installed."
     }
@@ -107,7 +108,7 @@ try {
     $stub = Start-Process -FilePath $processStub -ArgumentList '/t', '60' -PassThru
     try {
         Start-Sleep -Milliseconds 500
-        Invoke-InstallerExpectFailure -Executable $InstallerPath -Arguments @('/S', "/D=$InstallDirectory", $componentSelection)
+        Invoke-InstallerExpectFailure -Executable $InstallerPath -Arguments $installerArguments
     }
     finally {
         if (-not $stub.HasExited) {
