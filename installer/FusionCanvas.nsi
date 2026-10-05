@@ -125,13 +125,13 @@ install_failed:
 install_complete:
 SectionEnd
 
-Section /o "Start Menu shortcut" SEC_START_MENU
+Section "Start Menu shortcut" SEC_START_MENU
   SetShellVarContext current
   CreateDirectory "$SMPROGRAMS\FusionCanvas"
   CreateShortCut "$SMPROGRAMS\FusionCanvas\FusionCanvas.lnk" "$INSTDIR\${PRODUCT_EXE}"
 SectionEnd
 
-Section /o "Desktop shortcut" SEC_DESKTOP
+Section "Desktop shortcut" SEC_DESKTOP
   SetShellVarContext current
   CreateShortCut "$DESKTOP\FusionCanvas.lnk" "$INSTDIR\${PRODUCT_EXE}"
 SectionEnd

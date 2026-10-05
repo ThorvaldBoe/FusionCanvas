@@ -23,9 +23,9 @@ function Invoke-Installer {
         [string[]]$Arguments
     )
 
-    $process = Start-Process -FilePath $Executable -ArgumentList $Arguments -Wait -PassThru
-    if ($process.ExitCode -ne 0) {
-        throw "Installer command '$Executable $($Arguments -join ' ')' failed with exit code $($process.ExitCode)."
+    & $Executable @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Installer command '$Executable $($Arguments -join ' ')' failed with exit code $LASTEXITCODE."
     }
 }
 
@@ -38,8 +38,8 @@ function Invoke-InstallerExpectFailure {
         [string[]]$Arguments
     )
 
-    $process = Start-Process -FilePath $Executable -ArgumentList $Arguments -Wait -PassThru
-    if ($process.ExitCode -eq 0) {
+    & $Executable @Arguments
+    if ($LASTEXITCODE -eq 0) {
         throw "Installer command was expected to fail but returned success."
     }
 }
@@ -78,8 +78,7 @@ try {
     }
     [IO.File]::WriteAllText($sentinelPath, "preserve-$ExpectedVersion")
 
-    $componentSelection = '/COMPONENTS="Start Menu shortcut,Desktop shortcut"'
-    $installerArguments = @('/S', $componentSelection, "/D=$InstallDirectory")
+    $installerArguments = @('/S', "/D=$InstallDirectory")
     Invoke-Installer -Executable $InstallerPath -Arguments $installerArguments
 
     if (-not (Test-Path -LiteralPath $applicationPath -PathType Leaf)) {
