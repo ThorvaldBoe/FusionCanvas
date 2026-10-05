@@ -6,4 +6,5 @@ public sealed record UpdateManifest(
     string Platform,
     Uri InstallerUri,
     string Sha256,
-    Uri ReleaseUri);
+    Uri ReleaseUri,
+    string PublisherCertificateSha256);

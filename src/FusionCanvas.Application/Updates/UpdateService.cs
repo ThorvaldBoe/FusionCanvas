@@ -52,24 +52,26 @@ public sealed class UpdateService : IUpdateService
             : new UpdateCheckResult(UpdateCheckStatus.UpToDate, null);
     }
 
-    public Task<VerifiedUpdatePackage> DownloadAsync(
+    public async Task<VerifiedUpdatePackage> DownloadAsync(
         UpdateManifest manifest,
         IProgress<UpdateDownloadProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(manifest);
-        if (!UpdateManifestValidator.IsSupported(manifest, _platform))
+        if (!UpdateManifestValidator.IsSupported(manifest, _platform)
+            || !IsNewerThanCurrent(manifest))
         {
             throw new InvalidOperationException("The update manifest is not supported by this application.");
         }
 
-        return _downloader.DownloadAndVerifyAsync(manifest, progress, cancellationToken);
+        return await _downloader.DownloadAndVerifyAsync(manifest, progress, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task ApplyAsync(VerifiedUpdatePackage package, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(package);
         if (!UpdateManifestValidator.IsSupported(package.Manifest, _platform)
+            || !IsNewerThanCurrent(package.Manifest)
             || string.IsNullOrWhiteSpace(package.InstallerPath))
         {
             throw new InvalidOperationException("The verified update package is not valid.");
@@ -79,4 +81,9 @@ public sealed class UpdateService : IUpdateService
         await _launcher.ScheduleAfterExitAsync(package.InstallerPath, Environment.ProcessId, cancellationToken).ConfigureAwait(false);
         await _lifecycle.RequestShutdownAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    private bool IsNewerThanCurrent(UpdateManifest manifest) =>
+        StableProductVersion.TryParse(_versionProvider.GetVersion().ProductVersion, out var current)
+        && StableProductVersion.TryParse(manifest.ProductVersion, out var available)
+        && available.CompareTo(current) > 0;
 }

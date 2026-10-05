@@ -7,8 +7,6 @@ namespace FusionCanvas.Integration.Updates;
 public sealed class GitHubUpdateSource : IUpdateSource
 {
     private const int MaximumManifestBytes = 64 * 1024;
-    private static readonly Uri LatestManifestUri = new(
-        "https://github.com/ThorvaldBoe/FusionCanvas/releases/latest/download/latest.json");
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _httpClient;
 
@@ -19,7 +17,7 @@ public sealed class GitHubUpdateSource : IUpdateSource
 
     public async Task<UpdateManifest?> GetLatestAsync(CancellationToken cancellationToken = default)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, LatestManifestUri);
+        using var request = new HttpRequestMessage(HttpMethod.Get, UpdateManifestValidator.DiscoveryUri);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
@@ -29,13 +27,19 @@ public sealed class GitHubUpdateSource : IUpdateSource
             return null;
         }
 
-        response.EnsureSuccessStatusCode();
-        if (response.Content.Headers.ContentLength is > MaximumManifestBytes)
+        using var finalResponse = await FollowExpectedRedirectAsync(response, cancellationToken).ConfigureAwait(false);
+        if (finalResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        finalResponse.EnsureSuccessStatusCode();
+        if (finalResponse.Content.Headers.ContentLength is > MaximumManifestBytes)
         {
             throw new InvalidOperationException("The update manifest is larger than the supported response limit.");
         }
 
-        await using var content = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        await using var content = await finalResponse.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var manifest = new MemoryStream();
         var buffer = new byte[8 * 1024];
         int read;
@@ -50,5 +54,36 @@ public sealed class GitHubUpdateSource : IUpdateSource
         }
 
         return JsonSerializer.Deserialize<UpdateManifest>(manifest.ToArray(), JsonOptions);
+    }
+
+    private async Task<HttpResponseMessage> FollowExpectedRedirectAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
+        if ((int)response.StatusCode is < 300 or > 399)
+        {
+            return response;
+        }
+
+        var location = response.Headers.Location;
+        if (!UpdateManifestValidator.IsCanonicalManifestRedirect(location))
+        {
+            throw new InvalidOperationException("The update manifest redirect is not trusted.");
+        }
+
+        using var redirectedRequest = new HttpRequestMessage(HttpMethod.Get, location);
+        redirectedRequest.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        var redirectedResponse = await _httpClient.SendAsync(
+            redirectedRequest,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken).ConfigureAwait(false);
+
+        if ((int)redirectedResponse.StatusCode is >= 300 and <= 399)
+        {
+            redirectedResponse.Dispose();
+            throw new InvalidOperationException("The update manifest used more than one redirect.");
+        }
+
+        return redirectedResponse;
     }
 }

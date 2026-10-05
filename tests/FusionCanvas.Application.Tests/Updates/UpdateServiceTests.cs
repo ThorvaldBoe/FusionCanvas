@@ -38,6 +38,34 @@ public sealed class UpdateServiceTests
         Assert.Equal(UpdateCheckStatus.Unsupported, result.Status);
     }
 
+    [Theory]
+    [InlineData("0.2.0")]
+    [InlineData("0.1.9")]
+    public async Task Download_RejectsStaleManifest(string version)
+    {
+        var service = CreateService("0.2.0", Manifest(version));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.DownloadAsync(Manifest(version)));
+    }
+
+    [Fact]
+    public async Task Apply_RejectsStalePackageWithoutLaunchingInstaller()
+    {
+        var launcher = new RecordingLauncher();
+        var service = new UpdateService(
+            new ConstantVersionProvider("0.3.0"),
+            new ConstantSource(Manifest("0.4.0")),
+            new RecordingDownloader(),
+            launcher,
+            new RecordingLifecycle(),
+            UpdatePlatform.WindowsX64);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ApplyAsync(new VerifiedUpdatePackage(Manifest("0.3.0"), "C:\\Temp\\FusionCanvas-Setup.exe")));
+
+        Assert.Null(launcher.InstallerPath);
+    }
+
     [Fact]
     public async Task Apply_FlushesSchedulesInstallerAndRequestsShutdown()
     {
@@ -68,12 +96,13 @@ public sealed class UpdateServiceTests
         UpdatePlatform.WindowsX64);
 
     private static UpdateManifest Manifest(string version) => new(
-        1,
+        UpdateManifestValidator.CurrentSchemaVersion,
         version,
         UpdatePlatform.WindowsX64,
-        new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v" + version + "/FusionCanvas-Setup.exe"),
+        new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v" + version + "/FusionCanvas-" + version + "-win-x64-Setup.exe"),
         new string('A', 64),
-        new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v" + version));
+        new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v" + version),
+        new string('B', 64));
 
     private sealed class ConstantVersionProvider(string version) : IApplicationVersionProvider
     {
