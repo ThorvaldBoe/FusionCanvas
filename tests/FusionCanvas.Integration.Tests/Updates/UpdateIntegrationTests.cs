@@ -140,7 +140,11 @@ public sealed class UpdateIntegrationTests
         try
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory).DownloadAndVerifyAsync(manifest));
+                new UpdatePackageDownloader(
+                    httpClient: client,
+                    authenticityVerifier: new AcceptingAuthenticityVerifier(),
+                    downloadDirectory: directory)
+                    .DownloadAndVerifyAsync(manifest));
             Assert.Empty(Directory.EnumerateFiles(directory));
         }
         finally
@@ -198,7 +202,11 @@ public sealed class UpdateIntegrationTests
         try
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory).DownloadAndVerifyAsync(manifest));
+                new UpdatePackageDownloader(
+                    httpClient: client,
+                    authenticityVerifier: new AcceptingAuthenticityVerifier(),
+                    downloadDirectory: directory)
+                    .DownloadAndVerifyAsync(manifest));
         }
         finally
         {

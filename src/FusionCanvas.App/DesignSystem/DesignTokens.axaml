@@ -170,9 +170,11 @@
   <x:Double x:Key="Token.Spacing.InlineGap">6</x:Double>
   <x:Double x:Key="Token.Spacing.CompactGap">4</x:Double>
   <x:Double x:Key="Token.Spacing.CardPadding">14</x:Double>
+  <x:Double x:Key="Token.Spacing.ToolPanelGap">14</x:Double>
   <Thickness x:Key="Token.Layout.CompactPadding">4</Thickness>
   <Thickness x:Key="Token.Layout.PageInset">24</Thickness>
   <Thickness x:Key="Token.Layout.CardPadding">14</Thickness>
+  <Thickness x:Key="Token.Layout.PreviewPadding">8</Thickness>
   <Thickness x:Key="Token.Layout.IndentedContent">28,0,0,0</Thickness>
   <Thickness x:Key="Token.Layout.ValidationMessage">0,14,0,8</Thickness>
 
@@ -184,6 +186,7 @@
   <x:Double x:Key="Token.Typography.Helper">11</x:Double>
   <x:Double x:Key="Token.Typography.Validation">12</x:Double>
   <x:Double x:Key="Token.Typography.Numeric">13</x:Double>
+  <x:Double x:Key="Token.Typography.ToolTitle">18</x:Double>
 
   <CornerRadius x:Key="Token.Radius.Control">4</CornerRadius>
   <CornerRadius x:Key="Token.Radius.Card">6</CornerRadius>
@@ -193,6 +196,8 @@
   <x:Double x:Key="Token.Control.MinHeight">32</x:Double>
   <x:Double x:Key="Token.Control.CompactHeight">28</x:Double>
   <x:Double x:Key="Token.Control.ProgressHeight">4</x:Double>
+  <x:Double x:Key="Token.Control.ActionMinWidth">90</x:Double>
+  <x:Double x:Key="Token.Control.ColorInputWidth">120</x:Double>
   <x:Double x:Key="Token.Control.PolicyTextMinHeight">150</x:Double>
   <x:Double x:Key="Token.Control.PolicyTextMaxHeight">230</x:Double>
   <Thickness x:Key="Token.Control.ButtonPadding">12,6</Thickness>
@@ -213,4 +218,9 @@
   <Thickness x:Key="Token.Border.Disabled">1</Thickness>
   <Thickness x:Key="Token.Border.Validation">1</Thickness>
   <Thickness x:Key="Token.Border.Destructive">1</Thickness>
+
+  <x:Double x:Key="Token.Window.ToolWidth">900</x:Double>
+  <x:Double x:Key="Token.Window.ToolHeight">720</x:Double>
+  <x:Double x:Key="Token.Window.ToolMinWidth">560</x:Double>
+  <x:Double x:Key="Token.Window.ToolMinHeight">480</x:Double>
 </ResourceDictionary>
