@@ -87,6 +87,27 @@ public sealed class UpdateServiceTests
         Assert.Equal(package.InstallerPath, launcher.InstallerPath);
     }
 
+    [Fact]
+    public async Task Apply_WhenFlushFails_DoesNotScheduleInstallerOrRequestShutdown()
+    {
+        var lifecycle = new RecordingLifecycle { FlushException = new InvalidOperationException("settings could not be saved") };
+        var launcher = new RecordingLauncher();
+        var service = new UpdateService(
+            new ConstantVersionProvider("0.2.0"),
+            new ConstantSource(Manifest("0.3.0")),
+            new RecordingDownloader(),
+            launcher,
+            lifecycle,
+            UpdatePlatform.WindowsX64);
+        var package = new VerifiedUpdatePackage(Manifest("0.3.0"), "C:\\Temp\\FusionCanvas-Setup.exe");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.ApplyAsync(package));
+
+        Assert.Equal(new[] { "flush" }, lifecycle.Events);
+        Assert.Null(launcher.InstallerPath);
+        Assert.Equal(0, launcher.ProcessId);
+    }
+
     private static UpdateService CreateService(string current, UpdateManifest manifest) => new(
         new ConstantVersionProvider(current),
         new ConstantSource(manifest),
@@ -136,7 +157,14 @@ public sealed class UpdateServiceTests
     private sealed class RecordingLifecycle : IUpdateApplicationLifecycle
     {
         public List<string> Events { get; } = new();
-        public Task FlushAsync(CancellationToken cancellationToken = default) { Events.Add("flush"); return Task.CompletedTask; }
+        public Exception? FlushException { get; init; }
+
+        public Task FlushAsync(CancellationToken cancellationToken = default)
+        {
+            Events.Add("flush");
+            return FlushException is null ? Task.CompletedTask : Task.FromException(FlushException);
+        }
+
         public Task RequestShutdownAsync(CancellationToken cancellationToken = default) { Events.Add("shutdown"); return Task.CompletedTask; }
     }
 }
