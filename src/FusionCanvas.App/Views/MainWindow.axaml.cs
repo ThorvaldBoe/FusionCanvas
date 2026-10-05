@@ -182,6 +182,10 @@ public partial class MainWindow : Window
         {
             PostToDispatcher(() => _windowCoordinator.SyncDesignPreviewWindow(designTool), DispatcherPriority.Background);
         }
+        else if (args.PropertyName == nameof(DesignStageToolViewModel.ShowColorRemovalDialog))
+        {
+            PostToDispatcher(() => _windowCoordinator.SyncGlobalColorRemovalWindow(designTool), DispatcherPriority.Background);
+        }
         else if (args.PropertyName == nameof(DesignStageToolViewModel.IsRecoveryConfirmationVisible)
             && designTool.IsRecoveryConfirmationVisible)
         {
@@ -858,6 +862,17 @@ public partial class MainWindow : Window
         if (slot?.AssetId is null)
             return;
         vm.DesignTool.PreviewSupportingImage(slot.AssetId.Value, slot.ThumbnailPath);
+    }
+
+    private async void OnRemoveColorFromSupportingImage(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm)
+            return;
+        var slot = FindSupportingImageViewModel(sender);
+        if (slot?.AssetId is not Guid assetId)
+            return;
+
+        await vm.DesignTool.OpenColorRemovalAsync(assetId, slot.AreaName);
     }
 
     private async void OnRemoveSupportingImage(object? sender, RoutedEventArgs e)

@@ -110,6 +110,12 @@ public static class AppWorkspaceFactory
         var aiImageProvenanceCodec = new AiImageProvenanceCodec();
         var mockupInvalidation = new MockupOutputInvalidationService(repository, fileStore);
         var designStage = new DesignStageService(repository, fileStore, aiImageProvenanceCodec, contentRiskReviews: contentRiskReviews, mockupInvalidation: mockupInvalidation);
+        var globalColorRemoval = new GlobalColorRemovalService(
+            repository,
+            fileStore,
+            fileStore,
+            new ImageSharpGlobalColorRemovalProcessor(),
+            contentRiskReviews);
         var sllDocumentCodec = new SllDocumentCodec();
         var nichePopulation = new NichePopulationService(ai);
         var ideationAccess = new ConfiguredIdeationAccessStatus(ai);
@@ -164,7 +170,8 @@ public static class AppWorkspaceFactory
             rasterImageMetadata,
             mockupSourceMetadataAssistance,
             mockupSourceImageContent,
-            mockupPlacementPreviewReader);
+            mockupPlacementPreviewReader,
+            globalColorRemoval);
         return new AppWorkspaceRuntime(
             repository,
             new WorkspaceManagementService(

@@ -66,6 +66,7 @@ public sealed class DesignSlotViewModel : INotifyPropertyChanged, IDisposable
     public bool CanPreview { get; }
     public bool CanExport { get; }
     public bool IsReadOnly { get; }
+    public bool CanRemoveColor => HasImage && !IsMissing && CanPreview && !IsReadOnly;
     public bool IsGenerated { get; }
     public string? ArtworkWarning { get; }
     public ContentRiskReview? ContentRiskReview { get; }

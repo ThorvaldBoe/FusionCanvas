@@ -27,6 +27,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     private bool _hasDefaultRowWithSelectedColor;
     private string _configPrompt = "Select a listing configuration to begin.";
     private bool _showPreviewDialog;
+    private bool _showColorRemovalDialog;
+    private GlobalColorRemovalViewModel? _colorRemoval;
     private Guid _previewAssetId;
     private Stream? _previewStream;
     private Bitmap? _previewBitmap;
@@ -66,15 +68,18 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     private bool _canEditContext;
     private bool _isDisposed;
     private OfferingReadinessSummary? _offeringReadiness;
+    private readonly IGlobalColorRemovalService? _globalColorRemovalService;
 
     public DesignStageToolViewModel(
         IDesignStageService designStageService,
         IArtworkGenerationService? artworkGenerationService = null,
-        IAiConfigurationProvider? aiConfiguration = null)
+        IAiConfigurationProvider? aiConfiguration = null,
+        IGlobalColorRemovalService? globalColorRemovalService = null)
     {
         _designStageService = designStageService ?? throw new ArgumentNullException(nameof(designStageService));
         _artworkGenerationService = artworkGenerationService;
         _aiConfiguration = aiConfiguration;
+        _globalColorRemovalService = globalColorRemovalService;
         GenerateArtworkCommand = new RelayCommand(_ => _ = GenerateArtworkAsync(), () => CanGenerateArtwork);
         CancelArtworkCommand = new RelayCommand(_ => _artworkCts?.Cancel(), () => IsArtworkBusy);
     }
@@ -317,6 +322,58 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     {
         get => _previewStream;
         private set { _previewStream = value; OnPropertyChanged(); }
+    }
+
+    public bool ShowColorRemovalDialog
+    {
+        get => _showColorRemovalDialog;
+        private set { _showColorRemovalDialog = value; OnPropertyChanged(); }
+    }
+
+    public GlobalColorRemovalViewModel? ColorRemoval => _colorRemoval;
+
+    public async Task OpenColorRemovalAsync(Guid assetId, string sourceName, CancellationToken cancellationToken = default)
+    {
+        if (_globalColorRemovalService is null || _isDisposed || IsReadOnly || assetId == Guid.Empty)
+        {
+            ErrorMessage = "Global color removal is unavailable for this image.";
+            return;
+        }
+
+        CloseColorRemovalDialog();
+        var editor = new GlobalColorRemovalViewModel(
+            _globalColorRemovalService,
+            _itemId,
+            assetId,
+            sourceName,
+            IsReadOnly);
+        var source = await editor.LoadAsync(cancellationToken).ConfigureAwait(true);
+        if (!source.Succeeded)
+        {
+            editor.Dispose();
+            ErrorMessage = source.Error;
+            return;
+        }
+
+        editor.Applied += OnColorRemovalApplied;
+        _colorRemoval = editor;
+        ShowColorRemovalDialog = true;
+        OnPropertyChanged(nameof(ColorRemoval));
+    }
+
+    public void CloseColorRemovalDialog()
+    {
+        ShowColorRemovalDialog = false;
+        if (_colorRemoval is null)
+        {
+            return;
+        }
+
+        _colorRemoval.Applied -= OnColorRemovalApplied;
+        _colorRemoval.Cancel();
+        _colorRemoval.Dispose();
+        _colorRemoval = null;
+        OnPropertyChanged(nameof(ColorRemoval));
     }
 
     // --- Removal confirmation ---
@@ -905,6 +962,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         Interlocked.Increment(ref _artworkAvailabilityGeneration);
         InvalidateArtworkOperation();
         ClosePreviewDialog();
+        CloseColorRemovalDialog();
 
         foreach (var row in Rows)
         {
@@ -921,6 +979,24 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         }
 
         SupportingImages.Clear();
+    }
+
+    private async void OnColorRemovalApplied(object? sender, GlobalColorRemovalApplyResult result)
+    {
+        if (!result.Succeeded || _isDisposed)
+        {
+            return;
+        }
+
+        ErrorMessage = null;
+        try
+        {
+            await LoadAsync(_itemId, _canEditContext).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            ErrorMessage = "The transparent image was created, but the Design view refresh was interrupted. Reopen the Item to see it.";
+        }
     }
 
     public async Task GenerateArtworkAsync(CancellationToken cancellationToken = default)

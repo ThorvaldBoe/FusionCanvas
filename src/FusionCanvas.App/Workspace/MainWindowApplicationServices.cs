@@ -40,4 +40,5 @@ public sealed record MainWindowApplicationServices(
     IRasterImageMetadataReader? RasterImageMetadataReader = null,
     IMockupSourceMetadataAssistanceService? MockupSourceMetadataAssistance = null,
     IMockupSourceImageContentReader? MockupSourceImageContentReader = null,
-    IMockupPlacementPreviewReader? MockupPlacementPreviewReader = null);
+    IMockupPlacementPreviewReader? MockupPlacementPreviewReader = null,
+    IGlobalColorRemovalService? GlobalColorRemoval = null);
