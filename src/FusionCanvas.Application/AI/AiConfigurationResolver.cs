@@ -32,9 +32,10 @@ public static class AiConfigurationResolver
     public static AiConfigurationResolution Resolve(
         AiConfigurationSettings settings,
         AiRequestPurpose purpose,
-        IReadOnlyList<AiModelDescriptor> models)
+        IReadOnlyList<AiModelDescriptor> models,
+        IReadOnlyList<AiModelEndpointDescriptor>? endpoints = null)
     {
-        return ResolveProfile(settings, ProfileFor(settings, purpose), models);
+        return ResolveProfile(settings, ProfileFor(settings, purpose), models, endpoints);
     }
 
     public static AiConfigurationResolution ResolveArtwork(
@@ -63,7 +64,8 @@ public static class AiConfigurationResolver
     private static AiConfigurationResolution ResolveProfile(
         AiConfigurationSettings settings,
         AiProfileSettings profile,
-        IReadOnlyList<AiModelDescriptor> models)
+        IReadOnlyList<AiModelDescriptor> models,
+        IReadOnlyList<AiModelEndpointDescriptor>? endpoints = null)
     {
         if (string.IsNullOrWhiteSpace(profile.ModelId))
         {
@@ -88,6 +90,77 @@ public static class AiConfigurationResolver
             return new(AiConfigurationAvailability.InvalidParameters, profile, model, errors);
         }
 
-        return new(AiConfigurationAvailability.Ready, AiParameterRegistry.Effective(profile, model), model, []);
+        var effective = AiParameterRegistry.Effective(profile, model);
+        var routing = ResolveRouting(settings, effective, model, endpoints);
+        if (!routing.IsReady)
+        {
+            return new(
+                AiConfigurationAvailability.RoutingUnavailable,
+                effective,
+                model,
+                routing.Errors)
+            {
+                Routing = routing
+            };
+        }
+
+        return new(AiConfigurationAvailability.Ready, effective, model, [])
+        {
+            Routing = routing
+        };
+    }
+
+    private static AiRoutingResolution ResolveRouting(
+        AiConfigurationSettings settings,
+        AiProfileSettings profile,
+        AiModelDescriptor model,
+        IReadOnlyList<AiModelEndpointDescriptor>? endpoints)
+    {
+        var policy = profile.Routing ?? AiRoutingPolicy.Automatic;
+        if (!Enum.IsDefined(policy.Mode))
+        {
+            return new(AiRoutingAvailability.Invalid, policy, null, ["The selected routing policy is invalid."]);
+        }
+
+        if (policy.Mode == AiRoutingMode.Automatic)
+        {
+            return AiRoutingResolution.Automatic(policy);
+        }
+
+        if (policy.Mode == AiRoutingMode.SpecificProvider && string.IsNullOrWhiteSpace(policy.ProviderId))
+        {
+            return new(AiRoutingAvailability.MissingProvider, policy, null, ["Select a provider for this profile."]);
+        }
+
+        if (policy.Mode == AiRoutingMode.ExactEndpoint && string.IsNullOrWhiteSpace(policy.EndpointId))
+        {
+            return new(AiRoutingAvailability.MissingEndpoint, policy, null, ["Select an exact endpoint for this profile."]);
+        }
+
+        if (endpoints is null)
+        {
+            // A saved strict route can be dispatched without a local catalog. The
+            // Integration layer remains authoritative when OpenRouter evaluates it.
+            return AiRoutingResolution.Automatic(policy);
+        }
+
+        var candidates = endpoints
+            .Where(endpoint => string.Equals(endpoint.ModelId, model.Id, StringComparison.Ordinal))
+            .Where(endpoint => !settings.RequireZeroDataRetention || endpoint.ZeroDataRetentionCompatible)
+            .ToArray();
+        if (policy.Mode == AiRoutingMode.SpecificProvider)
+        {
+            var provider = candidates.FirstOrDefault(endpoint =>
+                string.Equals(endpoint.ProviderId, policy.ProviderId, StringComparison.OrdinalIgnoreCase));
+            return provider is null
+                ? new(AiRoutingAvailability.ProviderUnavailable, policy, null, ["The selected provider is unavailable or incompatible with the active privacy policy."])
+                : new(AiRoutingAvailability.Ready, policy, provider, []);
+        }
+
+        var endpoint = candidates.FirstOrDefault(candidate =>
+            string.Equals(candidate.EndpointId, policy.EndpointId, StringComparison.Ordinal));
+        return endpoint is null
+            ? new(AiRoutingAvailability.EndpointUnavailable, policy, null, ["The selected endpoint is unavailable or incompatible with the active privacy and parameter requirements."])
+            : new(AiRoutingAvailability.Ready, policy, endpoint, []);
     }
 }

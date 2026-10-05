@@ -194,6 +194,45 @@ public class AiSettingsViewTests
         }
     }
 
+    [AvaloniaFact]
+    public void ProfileEditor_RendersTransparentRoutingChoices()
+    {
+        var viewModel = new AiProfileEditorViewModel(AiProfileSettings.Empty)
+        {
+            ModelId = "model",
+            Models = [Descriptor("model", true)]
+        };
+        viewModel.SetEndpoints([
+            new AiModelEndpointDescriptor("model", "deepinfra", "DeepInfra", "deepinfra/turbo", "Turbo", 8192, 2048, ["temperature"], true, 0.1m, 0.2m, 100, 50)
+        ]);
+        var window = new Window { Content = new AiProfileEditorView { DataContext = viewModel } };
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+            var routing = window.GetVisualDescendants().OfType<Expander>()
+                .Single(expander => Equals(expander.Header, "Provider routing"));
+            routing.IsExpanded = true;
+            viewModel.RoutingMode = AiRoutingMode.ExactEndpoint;
+            viewModel.EndpointId = "deepinfra/turbo";
+            window.UpdateLayout();
+
+            Assert.Equal("Only this endpoint is requested; failure is shown instead of silent fallback.", viewModel.RoutingExplanation);
+            Assert.Contains("deepinfra/turbo", window.GetVisualDescendants().OfType<ComboBox>().SelectMany(box => box.Items.OfType<string>()));
+            Assert.Contains("DeepInfra", viewModel.EndpointSummary);
+
+            viewModel.SetEndpoints([new AiModelEndpointDescriptor(
+                "model", "deepinfra", "DeepInfra", "deepinfra/turbo", "Turbo", 8192, 2048,
+                ["temperature"], true, 0.1m, 0.2m, 100, 50, true)]);
+            Assert.True(viewModel.EndpointMetadataStale);
+            Assert.Contains("previous refresh", viewModel.EndpointMetadataStatus, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
     private static AiModelDescriptor Descriptor(string id, bool zdr) =>
         new(id, id, null, null, ["text"], ["text"], [], 1000, null, null, null, zdr, null);
 

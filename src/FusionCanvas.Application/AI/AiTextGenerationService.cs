@@ -39,10 +39,17 @@ public sealed class AiTextGenerationService : IAiTextGenerationService
         var resolution = AiConfigurationResolver.Resolve(settings, request.Purpose, catalog?.Models ?? []);
         if (!resolution.IsReady || resolution.Profile is null || resolution.Model is null)
         {
-            var kind = resolution.Availability == AiConfigurationAvailability.MissingModel
-                ? AiTextFailureKind.NotConfigured
-                : AiTextFailureKind.InvalidConfiguration;
-            return AiTextResult.Failure(kind, string.Join(" ", resolution.Errors), resolution.Profile?.ModelId);
+            var kind = resolution.Availability switch
+            {
+                AiConfigurationAvailability.MissingModel => AiTextFailureKind.NotConfigured,
+                AiConfigurationAvailability.RoutingUnavailable => AiTextFailureKind.NoEligibleProvider,
+                _ => AiTextFailureKind.InvalidConfiguration
+            };
+            return AiTextResult.Failure(
+                kind,
+                string.Join(" ", resolution.Errors),
+                resolution.Profile?.ModelId,
+                routing: resolution.Profile?.Routing);
         }
 
         if (request.Messages.SelectMany(message => message.Images).Any() &&
@@ -51,13 +58,18 @@ public sealed class AiTextGenerationService : IAiTextGenerationService
             return AiTextResult.Failure(
                 AiTextFailureKind.InvalidConfiguration,
                 "The selected model does not support image input.",
-                resolution.Model.Id);
+                resolution.Model.Id,
+                routing: resolution.Profile.Routing);
         }
 
         var credential = await _credentials.ReadAsync(cancellationToken).ConfigureAwait(false);
         if (credential.State == AiCredentialStateKind.NotFound)
         {
-            return AiTextResult.Failure(AiTextFailureKind.NotConfigured, "Add an OpenRouter API key in AI settings.", resolution.Model.Id);
+            return AiTextResult.Failure(
+                AiTextFailureKind.NotConfigured,
+                "Add an OpenRouter API key in AI settings.",
+                resolution.Model.Id,
+                routing: resolution.Profile.Routing);
         }
 
         if (credential.State != AiCredentialStateKind.Available || string.IsNullOrWhiteSpace(credential.Secret))
@@ -65,7 +77,8 @@ public sealed class AiTextGenerationService : IAiTextGenerationService
             return AiTextResult.Failure(
                 AiTextFailureKind.CredentialUnavailable,
                 credential.Message ?? "The saved OpenRouter credential is unavailable.",
-                resolution.Model.Id);
+                resolution.Model.Id,
+                routing: resolution.Profile.Routing);
         }
 
         return await _provider.GenerateAsync(
@@ -74,7 +87,8 @@ public sealed class AiTextGenerationService : IAiTextGenerationService
                 resolution.Model.Id,
                 request.Messages,
                 resolution.Profile,
-                settings.RequireZeroDataRetention),
+                settings.RequireZeroDataRetention,
+                resolution.Profile.Routing),
             cancellationToken).ConfigureAwait(false);
     }
 

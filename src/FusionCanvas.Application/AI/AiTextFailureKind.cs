@@ -11,6 +11,7 @@ public enum AiTextFailureKind
     RateLimited,
     Blocked,
     NoEligibleProvider,
+    RouteNotFulfilled,
     ModelUnavailable,
     NetworkFailure,
     Timeout,

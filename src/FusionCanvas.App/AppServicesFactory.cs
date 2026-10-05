@@ -45,6 +45,7 @@ public static class AppServicesFactory
             new SqliteTelemetryStore(AppWorkspaceFactory.ResolveDefaultDatabasePath()),
             telemetryContext);
         var catalogCache = new JsonAiModelCatalogCache(Path.Combine(settingsDirectory, "ai-cache"));
+        var endpointCache = new JsonAiModelEndpointCatalogCache(Path.Combine(settingsDirectory, "ai-cache"));
         var httpClient = new HttpClient
         {
             BaseAddress = OpenRouterClient.DefaultBaseAddress,
@@ -56,7 +57,9 @@ public static class AppServicesFactory
             credentials,
             openRouter,
             openRouter,
-            catalogCache);
+            catalogCache,
+            openRouter,
+            endpointCache);
         var settings = new SettingsViewModel(
             settingsStore,
             new AvaloniaApplicationThemeController(),

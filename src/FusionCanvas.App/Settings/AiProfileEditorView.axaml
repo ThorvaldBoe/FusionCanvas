@@ -9,6 +9,42 @@
               SelectedItem="{Binding ModelId, Mode=TwoWay}"
               MinWidth="320"
               HorizontalAlignment="Stretch" />
+    <Expander Header="Provider routing" IsVisible="{Binding HasSelectedModel}">
+      <StackPanel Spacing="7" Margin="0,8,0,0">
+        <TextBlock Text="Choose the model and the route separately."
+                   FontSize="11"
+                   Foreground="{DynamicResource SecondaryTextBrush}" />
+        <ComboBox ItemsSource="{Binding RoutingModes}"
+                  SelectedItem="{Binding RoutingMode, Mode=TwoWay}" />
+        <TextBlock Text="{Binding RoutingExplanation}"
+                   TextWrapping="Wrap"
+                   FontSize="11"
+                   Foreground="{DynamicResource SecondaryTextBrush}" />
+        <StackPanel IsVisible="{Binding IsProviderRouting}" Spacing="4">
+          <TextBlock Text="Provider" FontSize="12" />
+          <ComboBox ItemsSource="{Binding ProviderIds}"
+                    SelectedItem="{Binding ProviderId, Mode=TwoWay}"
+                    PlaceholderText="Load endpoint information first" />
+        </StackPanel>
+        <StackPanel IsVisible="{Binding IsExactEndpointRouting}" Spacing="4">
+          <TextBlock Text="Exact endpoint" FontSize="12" />
+          <ComboBox ItemsSource="{Binding EndpointIds}"
+                    SelectedItem="{Binding EndpointId, Mode=TwoWay}"
+                    PlaceholderText="Load endpoint information first" />
+        </StackPanel>
+        <TextBlock Text="{Binding EndpointSummary}"
+                   TextWrapping="Wrap"
+                   FontSize="11"
+                   Foreground="{DynamicResource SecondaryTextBrush}" />
+        <TextBlock Text="{Binding EndpointMetadataStatus}"
+                   TextWrapping="Wrap"
+                   FontSize="11"
+                   Foreground="{DynamicResource SecondaryTextBrush}" />
+        <Button Content="Load endpoint information"
+                Command="{Binding LoadEndpointsCommand}"
+                HorizontalAlignment="Left" />
+      </StackPanel>
+    </Expander>
     <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
       <StackPanel Grid.Column="0" Spacing="4" IsVisible="{Binding SupportsMaxCompletionTokens}">
         <TextBlock Text="Maximum output tokens" FontSize="12" />

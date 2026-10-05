@@ -455,6 +455,59 @@ public class OpenRouterClientTests : IDisposable
     }
 
     [Fact]
+    public async Task GetEndpointsAsync_ParsesProviderVariantCapabilitiesAndPrivacy()
+    {
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK, """
+            {"endpoints":[
+              {"provider_id":"deepinfra","provider_name":"DeepInfra","name":"deepinfra/turbo","model_name":"Turbo","context_length":8192,"max_completion_tokens":2048,"supported_parameters":["temperature"],"is_zdr":true,"pricing":{"prompt":"0.1","completion":"0.2"},"latency_last_30m":123.4,"throughput_last_30m":45.6},
+              {"provider_id":"other","provider_name":"Other","name":"other/default","is_zdr":false}
+            ]}
+            """));
+
+        var catalog = await CreateClient(handler).GetEndpointsAsync(
+            "secret", "vendor/model", true, TestContext.Current.CancellationToken);
+
+        var endpoint = Assert.Single(catalog.Endpoints);
+        Assert.Equal("deepinfra", endpoint.ProviderId);
+        Assert.Equal("deepinfra/turbo", endpoint.EndpointId);
+        Assert.Equal(8192, endpoint.ContextLength);
+        Assert.Equal(2048, endpoint.MaxCompletionTokens);
+        Assert.Equal(123.4, endpoint.LatencyMilliseconds);
+        Assert.Equal(45.6, endpoint.ThroughputTokensPerSecond);
+        Assert.Equal("/api/v1/models/vendor/model/endpoints", handler.Requests[0].Uri.AbsolutePath);
+        Assert.Equal("Bearer", handler.Requests[0].Scheme);
+    }
+
+    [Theory]
+    [InlineData(AiRoutingMode.Automatic, null, null, false, false)]
+    [InlineData(AiRoutingMode.SpecificProvider, "deepinfra", null, false, true)]
+    [InlineData(AiRoutingMode.ExactEndpoint, "deepinfra", "deepinfra/turbo", true, true)]
+    public async Task GenerateAsync_TranslatesRoutingModeWithoutWeakeningZdr(
+        AiRoutingMode mode,
+        string? providerId,
+        string? endpointId,
+        bool expectOrder,
+        bool expectNoFallback)
+    {
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK, """{"id":"gen","model":"vendor/model","choices":[{"message":{"content":"ok"},"finish_reason":"stop"}]}"""));
+        var policy = new AiRoutingPolicy(mode, providerId, endpointId);
+        var profile = AiProfileSettings.Empty with { ModelId = "vendor/model", Routing = policy };
+
+        var result = await CreateClient(handler).GenerateAsync(
+            new AiProviderTextRequest("secret", "vendor/model", [new(AiMessageRole.User, "hello")], profile, true, policy),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        using var body = JsonDocument.Parse(handler.Requests[0].Body!);
+        var provider = body.RootElement.GetProperty("provider");
+        Assert.True(provider.GetProperty("require_parameters").GetBoolean());
+        Assert.True(provider.GetProperty("zdr").GetBoolean());
+        Assert.Equal(expectNoFallback, provider.TryGetProperty("allow_fallbacks", out var fallback) && !fallback.GetBoolean());
+        Assert.Equal(expectOrder, provider.TryGetProperty("order", out var order) && order[0].GetString() == endpointId);
+        Assert.Equal(mode == AiRoutingMode.SpecificProvider, provider.TryGetProperty("only", out var only) && only[0].GetString() == providerId);
+    }
+
+    [Fact]
     public async Task GenerateAsync_SerializesImagePartsAndOmitsImageBytesFromTelemetry()
     {
         var telemetry = new RecordingTelemetryRecorder();
@@ -553,6 +606,32 @@ public class OpenRouterClientTests : IDisposable
             TestContext.Current.CancellationToken);
 
         Assert.Equal(expected, result.FailureKind);
+        Assert.Single(handler.Requests);
+        Assert.DoesNotContain("secret", result.Message);
+        Assert.DoesNotContain("prompt", result.Message);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_StrictRouteFailureIsActionableAndDoesNotRetry()
+    {
+        var handler = new RecordingHandler(Json(HttpStatusCode.ServiceUnavailable, """{"error":{"message":"route unavailable"}}"""));
+        var policy = AiRoutingPolicy.ForEndpoint("deepinfra/turbo", "deepinfra");
+        var profile = AiProfileSettings.Empty with { ModelId = "vendor/model", Routing = policy };
+
+        var result = await CreateClient(handler).GenerateAsync(
+            new AiProviderTextRequest(
+                "secret",
+                "vendor/model",
+                [new(AiMessageRole.User, "prompt")],
+                profile,
+                true,
+                policy),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(AiTextFailureKind.RouteNotFulfilled, result.FailureKind);
+        Assert.Equal(AiRoutingMode.ExactEndpoint, result.RoutingReceipt.RoutingMode);
+        Assert.Equal("deepinfra/turbo", result.RoutingReceipt.RequestedEndpoint);
+        Assert.Null(result.RoutingReceipt.ActualEndpoint);
         Assert.Single(handler.Requests);
         Assert.DoesNotContain("secret", result.Message);
         Assert.DoesNotContain("prompt", result.Message);

@@ -5,4 +5,5 @@ public sealed record AiProviderTextRequest(
     string ModelId,
     IReadOnlyList<AiTextMessage> Messages,
     AiProfileSettings Profile,
-    bool RequireZeroDataRetention);
+    bool RequireZeroDataRetention,
+    AiRoutingPolicy? Routing = null);

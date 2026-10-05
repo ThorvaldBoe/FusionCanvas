@@ -12,6 +12,8 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
     private readonly IAiCredentialValidator _validator;
     private readonly IAiModelCatalogProvider _catalogProvider;
     private readonly IAiModelCatalogCache _catalogCache;
+    private readonly IAiModelEndpointCatalogProvider? _endpointProvider;
+    private readonly IAiModelEndpointCatalogCache? _endpointCache;
     private readonly object _loadGate = new();
     private AiConfigurationSettings _settings;
     private bool _busy;
@@ -33,13 +35,17 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         IAiCredentialStore credentials,
         IAiCredentialValidator validator,
         IAiModelCatalogProvider catalogProvider,
-        IAiModelCatalogCache catalogCache)
+        IAiModelCatalogCache catalogCache,
+        IAiModelEndpointCatalogProvider? endpointProvider = null,
+        IAiModelEndpointCatalogCache? endpointCache = null)
     {
         _settings = settings;
         _credentials = credentials;
         _validator = validator;
         _catalogProvider = catalogProvider;
         _catalogCache = catalogCache;
+        _endpointProvider = endpointProvider;
+        _endpointCache = endpointCache;
         _ideationUseGeneral = settings.Ideation.UseGeneral;
         _conceptUseGeneral = settings.Concept.UseGeneral;
         _sllUseGeneral = settings.Sll.UseGeneral;
@@ -49,6 +55,11 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         Concept = new AiProfileEditorViewModel(settings.Concept.CustomProfile);
         Sll = new AiProfileEditorViewModel(settings.Sll.CustomProfile);
         Artwork = new AiProfileEditorViewModel(settings.Artwork);
+        General.LoadEndpointsCommand = new AsyncRelayCommand(() => LoadEndpointsAsync(General), () => HasCredential && !IsBusy && General.HasSelectedModel);
+        Ideation.LoadEndpointsCommand = new AsyncRelayCommand(() => LoadEndpointsAsync(Ideation), () => HasCredential && !IsBusy && Ideation.HasSelectedModel);
+        Concept.LoadEndpointsCommand = new AsyncRelayCommand(() => LoadEndpointsAsync(Concept), () => HasCredential && !IsBusy && Concept.HasSelectedModel);
+        Sll.LoadEndpointsCommand = new AsyncRelayCommand(() => LoadEndpointsAsync(Sll), () => HasCredential && !IsBusy && Sll.HasSelectedModel);
+        Artwork.LoadEndpointsCommand = new AsyncRelayCommand(() => LoadEndpointsAsync(Artwork), () => HasCredential && !IsBusy && Artwork.HasSelectedModel);
         General.SettingsChanged += (_, _) => ApplyProfiles();
         Ideation.SettingsChanged += (_, _) => ApplyProfiles();
         Concept.SettingsChanged += (_, _) => ApplyProfiles();
@@ -79,6 +90,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
     public AiProfileEditorViewModel Sll { get; }
     public AiProfileEditorViewModel Artwork { get; }
     public IReadOnlyList<AiModelDescriptor> AvailableModels => _allModels;
+    public bool EndpointRoutingAvailable => _endpointProvider is not null;
     public string ArtworkReadiness => ArtworkAvailability(_settings, _allModels);
     public string GeneralReadiness => Readiness(AiRequestPurpose.General);
     public string IdeationReadiness => IdeationUseGeneral
@@ -735,6 +747,71 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
         RefreshModelsCommand.NotifyCanExecuteChanged();
         RemoveCredentialCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(CanSaveCredential));
+        OnPropertyChanged(nameof(EndpointRoutingAvailable));
+    }
+
+    private async Task LoadEndpointsAsync(AiProfileEditorViewModel profile, CancellationToken cancellationToken = default)
+    {
+        if (_endpointProvider is null || string.IsNullOrWhiteSpace(profile.ModelId))
+        {
+            Message = "Endpoint information is unavailable in this session.";
+            return;
+        }
+
+        var credential = await _credentials.ReadAsync(cancellationToken).ConfigureAwait(true);
+        if (credential.State != AiCredentialStateKind.Available || string.IsNullOrWhiteSpace(credential.Secret))
+        {
+            Message = credential.Message ?? "Save an OpenRouter API key before loading endpoint information.";
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            var catalog = await _endpointProvider.GetEndpointsAsync(
+                credential.Secret,
+                profile.ModelId,
+                RequireZeroDataRetention,
+                cancellationToken).ConfigureAwait(true);
+            profile.SetEndpoints(catalog.Endpoints);
+            if (_endpointCache is not null)
+            {
+                try
+                {
+                    await _endpointCache.SaveAsync(catalog, cancellationToken).ConfigureAwait(true);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    Message = "Endpoint choices were loaded but could not be cached; refresh them again after restart.";
+                }
+            }
+            Message = catalog.Endpoints.Count == 0
+                ? "OpenRouter returned no eligible endpoints for this model and privacy setting."
+                : null;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (AiModelCatalogFetchException exception)
+        {
+            var cached = _endpointCache is null
+                ? null
+                : await _endpointCache.LoadAsync(profile.ModelId, RequireZeroDataRetention, cancellationToken).ConfigureAwait(true);
+            if (cached is not null)
+            {
+                profile.SetEndpoints(cached.Endpoints);
+                Message = "Live endpoint information is unavailable; cached choices are marked stale until refreshed.";
+            }
+            else
+            {
+                Message = exception.Message;
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private string Readiness(AiRequestPurpose purpose)
@@ -746,6 +823,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
             AiConfigurationAvailability.MissingModel => "Select a model",
             AiConfigurationAvailability.ModelUnavailable => "Selected model is unavailable",
             AiConfigurationAvailability.PrivacyIncompatible => "Selected model is incompatible with ZDR",
+            AiConfigurationAvailability.RoutingUnavailable => "Selected provider or endpoint is unavailable",
             _ => resolution.Errors.FirstOrDefault() ?? "Review profile parameters"
         };
     }
@@ -759,6 +837,7 @@ public sealed class AiSettingsViewModel : INotifyPropertyChanged, IAiConfigurati
             AiConfigurationAvailability.MissingModel => "Select an image model",
             AiConfigurationAvailability.ModelUnavailable => "Selected image model is unavailable",
             AiConfigurationAvailability.PrivacyIncompatible => "Selected image model is incompatible with ZDR",
+            AiConfigurationAvailability.RoutingUnavailable => "Selected provider or endpoint is unavailable",
             _ => resolution.Errors.FirstOrDefault() ?? "Review Artwork settings"
         };
     }

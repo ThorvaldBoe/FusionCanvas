@@ -15,6 +15,8 @@ public sealed record AiProfileSettings(
     string[] StopSequences,
     AiReasoningSettings Reasoning)
 {
+    public AiRoutingPolicy Routing { get; init; } = AiRoutingPolicy.Automatic;
+
     public static AiProfileSettings Empty { get; } = new(
         ModelId: null,
         MaxCompletionTokens: null,

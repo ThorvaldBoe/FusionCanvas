@@ -6,5 +6,7 @@ public sealed record AiConfigurationResolution(
     AiModelDescriptor? Model,
     IReadOnlyList<string> Errors)
 {
+    public AiRoutingResolution Routing { get; init; } = AiRoutingResolution.Automatic();
+
     public bool IsReady => Availability == AiConfigurationAvailability.Ready;
 }

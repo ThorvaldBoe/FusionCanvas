@@ -103,7 +103,7 @@ public class JsonApplicationSettingsStoreTests
     {
         using var tempDirectory = new TemporaryDirectory();
         var path = tempDirectory.GetPath("settings.json");
-        await File.WriteAllTextAsync(path, "{\"version\":6,\"darkMode\":true}", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(path, "{\"version\":7,\"darkMode\":true}", TestContext.Current.CancellationToken);
         var store = new JsonApplicationSettingsStore(path);
 
         var result = await store.LoadAsync(TestContext.Current.CancellationToken);
@@ -147,6 +147,7 @@ public class JsonApplicationSettingsStoreTests
         Assert.False(result.UsedDefault);
         Assert.Null(result.Value.ActiveStoreId);
         Assert.Null(result.Warning);
+        Assert.True(result.Value.Ai.General.Routing.IsAutomatic);
     }
 
     [Fact]
@@ -236,7 +237,8 @@ public class JsonApplicationSettingsStoreTests
             RepetitionPenalty = 1.1,
             Seed = 42,
             StopSequences = ["END"],
-            Reasoning = new AiReasoningSettings(AiReasoningMode.Effort, "high")
+            Reasoning = new AiReasoningSettings(AiReasoningMode.Effort, "high"),
+            Routing = AiRoutingPolicy.ForEndpoint("openai/chat", "openai")
         };
         var ai = new AiConfigurationSettings(
             false,
@@ -258,10 +260,13 @@ public class JsonApplicationSettingsStoreTests
         Assert.Equal(123, loaded.Value.Ai.General.MaxCompletionTokens);
         Assert.Equal("high", loaded.Value.Ai.General.Reasoning.Effort);
         Assert.Equal(["END"], loaded.Value.Ai.General.StopSequences);
+        Assert.Equal(AiRoutingMode.ExactEndpoint, loaded.Value.Ai.General.Routing.Mode);
+        Assert.Equal("openai", loaded.Value.Ai.General.Routing.ProviderId);
+        Assert.Equal("openai/chat", loaded.Value.Ai.General.Routing.EndpointId);
         Assert.Equal("idea/model", loaded.Value.Ai.Ideation.CustomProfile.ModelId);
         Assert.Equal("retained/model", loaded.Value.Ai.Concept.CustomProfile.ModelId);
         Assert.Equal("sll/model", loaded.Value.Ai.Sll.CustomProfile.ModelId);
-        Assert.Contains("\"version\": 5", json);
+        Assert.Contains("\"version\": 6", json);
         Assert.DoesNotContain("apiKey", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("secret", json, StringComparison.OrdinalIgnoreCase);
     }
@@ -467,7 +472,7 @@ public class JsonApplicationSettingsStoreTests
 
         Assert.Equal(layout, loaded.Value.WindowLayout);
         Assert.Equal(new WindowGeometrySettings(60, 90, 800, 600), loaded.Value.WindowGeometry!["ideation"]);
-        Assert.Contains("\"version\": 5", json);
+        Assert.Contains("\"version\": 6", json);
     }
 
     [Fact]
