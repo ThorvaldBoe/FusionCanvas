@@ -47,6 +47,13 @@ FusionCanvas SHALL download the candidate installer only after explicit user act
 - **AND** it reports an actionable failure with retry or cancellation
 - **AND** the existing installation remains unchanged
 
+#### Scenario: User cancels an active installer download
+- **WHEN** installer bytes are actively downloading in the About/settings update surface
+- **THEN** the surface shows a clearly labeled, enabled `Cancel` action
+- **WHEN** the user activates `Cancel`
+- **THEN** the download stops and any partial installer file is removed
+- **AND** the surface returns to the retryable available-update state
+
 ### Requirement: Applying an update preserves user control and data
 The update flow SHALL require an explicit final install action, SHALL flush pending application settings before handing off to the NSIS installer, SHALL close FusionCanvas before installer launch, and SHALL rely on the installer contract to preserve `%LOCALAPPDATA%\FusionCanvas` user data.
 

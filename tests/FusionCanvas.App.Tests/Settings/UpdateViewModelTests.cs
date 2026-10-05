@@ -41,6 +41,34 @@ public sealed class UpdateViewModelTests
         Assert.True(vm.CheckCommand.CanExecute(null));
     }
 
+    [Fact]
+    public async Task DownloadCancellation_ReturnsToAvailableWithoutError()
+    {
+        var service = new FakeUpdateService
+        {
+            CheckResult = new UpdateCheckResult(UpdateCheckStatus.UpdateAvailable, Manifest("0.3.0")),
+            BlockDownload = true
+        };
+        var vm = new UpdateViewModel(service);
+
+        vm.CheckCommand.Execute(null);
+        await ((AsyncRelayCommand)vm.CheckCommand).ExecutionTask!.WaitAsync(TimeSpan.FromSeconds(3));
+        vm.UpdateCommand.Execute(null);
+        await service.DownloadStarted.Task.WaitAsync(TimeSpan.FromSeconds(3));
+
+        Assert.Equal(UpdatePresentationStatus.Downloading, vm.Status);
+        Assert.True(vm.IsCancelVisible);
+        Assert.True(vm.CancelCommand.CanExecute(null));
+
+        vm.CancelCommand.Execute(null);
+        await ((AsyncRelayCommand)vm.UpdateCommand).ExecutionTask!.WaitAsync(TimeSpan.FromSeconds(3));
+
+        Assert.Equal(UpdatePresentationStatus.UpdateAvailable, vm.Status);
+        Assert.Null(vm.ErrorMessage);
+        Assert.False(vm.IsCancelVisible);
+        Assert.True(vm.UpdateCommand.CanExecute(null));
+    }
+
     private static UpdateManifest Manifest(string version) => new(
         1, version, UpdatePlatform.WindowsX64,
         new Uri("https://example.test/setup.exe"), new string('A', 64), new Uri("https://example.test/release"));
@@ -50,12 +78,22 @@ public sealed class UpdateViewModelTests
         public UpdateCheckResult CheckResult { get; set; } = new(UpdateCheckStatus.UpToDate, null);
         public VerifiedUpdatePackage? Package { get; set; }
         public Exception? Exception { get; set; }
+        public bool BlockDownload { get; set; }
+        public TaskCompletionSource<bool> DownloadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Task<UpdateCheckResult> CheckForUpdateAsync(CancellationToken cancellationToken = default) =>
             Exception is null ? Task.FromResult(CheckResult) : Task.FromException<UpdateCheckResult>(Exception);
 
-        public Task<VerifiedUpdatePackage> DownloadAsync(UpdateManifest manifest, IProgress<UpdateDownloadProgress>? progress = null, CancellationToken cancellationToken = default) =>
-            Package is not null ? Task.FromResult(Package) : Task.FromException<VerifiedUpdatePackage>(new InvalidOperationException());
+        public async Task<VerifiedUpdatePackage> DownloadAsync(UpdateManifest manifest, IProgress<UpdateDownloadProgress>? progress = null, CancellationToken cancellationToken = default)
+        {
+            if (BlockDownload)
+            {
+                DownloadStarted.TrySetResult(true);
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+
+            return Package ?? throw new InvalidOperationException();
+        }
 
         public Task ApplyAsync(VerifiedUpdatePackage package, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
