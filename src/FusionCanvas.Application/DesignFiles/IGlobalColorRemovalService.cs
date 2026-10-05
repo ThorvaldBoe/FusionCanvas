@@ -2,6 +2,11 @@ namespace FusionCanvas.Application.DesignFiles;
 
 public interface IGlobalColorRemovalService
 {
+    Task<GlobalColorRemovalAvailabilityResult> CheckAvailabilityAsync(
+        Guid itemId,
+        Guid assetId,
+        CancellationToken cancellationToken = default);
+
     Task<GlobalColorRemovalSourceResult> OpenSourcePreviewAsync(
         Guid itemId,
         Guid assetId,

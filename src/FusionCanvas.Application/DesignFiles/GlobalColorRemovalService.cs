@@ -36,6 +36,30 @@ public sealed class GlobalColorRemovalService : IGlobalColorRemovalService
         _newId = newId ?? Guid.NewGuid;
     }
 
+    public async Task<GlobalColorRemovalAvailabilityResult> CheckAvailabilityAsync(
+        Guid itemId,
+        Guid assetId,
+        CancellationToken cancellationToken = default)
+    {
+        var source = await ResolveSourceAsync(itemId, assetId, cancellationToken).ConfigureAwait(false);
+        if (!source.Succeeded)
+        {
+            return GlobalColorRemovalAvailabilityResult.Failure(source.Error!);
+        }
+
+        try
+        {
+            await using var stream = await _fileStore.OpenReadAsync(source.Asset!.WorkspaceRelativePath, cancellationToken).ConfigureAwait(false);
+            await _processor.ValidateAsync(stream, cancellationToken).ConfigureAwait(false);
+            return GlobalColorRemovalAvailabilityResult.Success();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return GlobalColorRemovalAvailabilityResult.Failure(
+                $"Global color removal is unavailable for this image. {exception.Message}");
+        }
+    }
+
     public async Task<GlobalColorRemovalSourceResult> OpenSourcePreviewAsync(
         Guid itemId,
         Guid assetId,

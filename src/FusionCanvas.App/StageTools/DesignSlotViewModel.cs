@@ -15,6 +15,8 @@ namespace FusionCanvas.App.StageTools;
 public sealed class DesignSlotViewModel : INotifyPropertyChanged, IDisposable
 {
     private bool _isBusy;
+    private bool _canRemoveColor;
+    private string? _colorRemovalUnavailableReason;
     private Bitmap? _thumbnail;
 
     public DesignSlotViewModel(DesignSlotSummary summary, bool isReadOnly)
@@ -30,6 +32,7 @@ public sealed class DesignSlotViewModel : INotifyPropertyChanged, IDisposable
         IsMissing = summary.IsMissing;
         CanPreview = summary.CanPreview;
         CanExport = summary.CanExport;
+        _canRemoveColor = HasImage && !IsMissing && summary.CanPreview && !isReadOnly;
         IsGenerated = summary.IsGenerated;
         ArtworkWarning = summary.ArtworkWarning;
         ContentRiskReview = summary.ContentRiskReview;
@@ -66,7 +69,10 @@ public sealed class DesignSlotViewModel : INotifyPropertyChanged, IDisposable
     public bool CanPreview { get; }
     public bool CanExport { get; }
     public bool IsReadOnly { get; }
-    public bool CanRemoveColor => HasImage && !IsMissing && CanPreview && !IsReadOnly;
+    public bool CanRemoveColor => _canRemoveColor;
+    public string ColorRemovalAvailabilityMessage => CanRemoveColor
+        ? "Remove a color globally"
+        : _colorRemovalUnavailableReason ?? "Global color removal is unavailable for this image.";
     public bool IsGenerated { get; }
     public string? ArtworkWarning { get; }
     public ContentRiskReview? ContentRiskReview { get; }
@@ -86,6 +92,20 @@ public sealed class DesignSlotViewModel : INotifyPropertyChanged, IDisposable
 
     /// <summary>Bitmap for thumbnail display. May be null when the managed file is missing.</summary>
     public Bitmap? Thumbnail => _thumbnail;
+
+    public void SetColorRemovalAvailability(bool available, string? reason = null)
+    {
+        var nextReason = available ? null : reason;
+        if (_canRemoveColor == available && string.Equals(_colorRemovalUnavailableReason, nextReason, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _canRemoveColor = available;
+        _colorRemovalUnavailableReason = nextReason;
+        OnPropertyChanged(nameof(CanRemoveColor));
+        OnPropertyChanged(nameof(ColorRemovalAvailabilityMessage));
+    }
 
         public bool IsBusy
     {

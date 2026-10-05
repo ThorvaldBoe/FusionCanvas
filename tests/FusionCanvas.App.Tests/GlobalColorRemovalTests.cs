@@ -75,11 +75,27 @@ public sealed class GlobalColorRemovalTests
         }
     }
 
+    [Fact]
+    public void DesignSlot_DisablesColorRemovalWithValidationReason()
+    {
+        var slot = new DesignSlotViewModel(
+            new DesignSlotSummary(Guid.NewGuid(), "Reference", Guid.NewGuid(), null, false, true, true),
+            isReadOnly: false);
+
+        slot.SetColorRemovalAvailability(false, "Global color removal is unavailable for this image. The selected file is not a supported raster image.");
+
+        Assert.False(slot.CanRemoveColor);
+        Assert.Contains("supported raster image", slot.ColorRemovalAvailabilityMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class StubGlobalColorRemovalService : IGlobalColorRemovalService
     {
         public int PreviewCalls { get; private set; }
         public int ApplyCalls { get; private set; }
         public double LastTolerance { get; private set; }
+
+        public Task<GlobalColorRemovalAvailabilityResult> CheckAvailabilityAsync(Guid itemId, Guid assetId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(GlobalColorRemovalAvailabilityResult.Success());
 
         public Task<GlobalColorRemovalSourceResult> OpenSourcePreviewAsync(Guid itemId, Guid assetId, CancellationToken cancellationToken = default) =>
             Task.FromResult(GlobalColorRemovalSourceResult.Success(assetId, "design.png", PngBytes()));

@@ -20,6 +20,14 @@ The global color-removal module is implemented and verified. The source image is
 | Invalid raster handling | `ImageSharpGlobalColorRemovalProcessorTests.PreviewAsync_RejectsMalformedRasterPayload`; bounded decode/PNG output checks in the ImageSharp processor | Pass |
 | Appium decision | No Appium journey is warranted: the module adds no native file picker or OS-specific seam; deterministic Application/Integration tests and Avalonia headless tests cover the meaningful boundaries | Recorded decision |
 
+## Defect revalidation: Issue #846
+
+The Design-stage action now validates each managed image through the application service and ImageSharp processor before enabling color removal. Malformed, unsupported, missing, and read-only sources remain disabled, and the validation failure is exposed through the disabled action's tooltip.
+
+- `GlobalColorRemovalServiceTests.CheckAvailabilityAsync_ReturnsActionableFailureWhenRasterValidationFails` — pass.
+- `ImageSharpGlobalColorRemovalProcessorTests.ValidateAsync_RejectsMalformedAndUnsupportedRasterPayload` — pass.
+- `GlobalColorRemovalTests.DesignSlot_DisablesColorRemovalWithValidationReason` — pass.
+
 ## Commands
 
 - `openspec validate global-color-removal --type change --strict --no-interactive` — passed.

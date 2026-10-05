@@ -1226,7 +1226,17 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             SupportingImages.Clear();
             foreach (var img in state.SupportingImages)
             {
-                SupportingImages.Add(new DesignSlotViewModel(img, IsReadOnly));
+                var viewModel = new DesignSlotViewModel(img, IsReadOnly);
+                PrepareColorRemovalAvailability(viewModel);
+                SupportingImages.Add(viewModel);
+            }
+
+            foreach (var row in Rows)
+            {
+                foreach (var slot in row.Slots)
+                {
+                    PrepareColorRemovalAvailability(slot);
+                }
             }
         }
         finally
@@ -1234,7 +1244,53 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             _isApplyingState = false;
         }
 
+        await RefreshColorRemovalAvailabilityAsync(loadGeneration, cancellationToken).ConfigureAwait(true);
         await RefreshArtworkAvailabilityAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    private void PrepareColorRemovalAvailability(DesignSlotViewModel slot)
+    {
+        if (_globalColorRemovalService is null)
+        {
+            return;
+        }
+
+        slot.SetColorRemovalAvailability(
+            false,
+            slot.HasImage
+                ? "Checking whether this image is a supported readable raster..."
+                : "Global color removal requires an image.");
+    }
+
+    private async Task RefreshColorRemovalAvailabilityAsync(long loadGeneration, CancellationToken cancellationToken)
+    {
+        if (_globalColorRemovalService is null)
+        {
+            return;
+        }
+
+        var slots = Rows.SelectMany(row => row.Slots)
+            .Concat(SupportingImages)
+            .Where(slot => slot.AssetId is not null)
+            .ToArray();
+        foreach (var slot in slots)
+        {
+            if (_isDisposed || loadGeneration != Volatile.Read(ref _loadGeneration))
+            {
+                return;
+            }
+
+            var result = await _globalColorRemovalService.CheckAvailabilityAsync(
+                _itemId,
+                slot.AssetId!.Value,
+                cancellationToken).ConfigureAwait(true);
+            if (_isDisposed || loadGeneration != Volatile.Read(ref _loadGeneration))
+            {
+                return;
+            }
+
+            slot.SetColorRemovalAvailability(result.Available, result.Reason);
+        }
     }
 
     private void ClearLoadedStateForReload()
