@@ -12,6 +12,7 @@ public sealed class GlobalColorRemovalViewModel : INotifyPropertyChanged, IDispo
     private readonly Guid _assetId;
     private readonly CancellationTokenSource _lifetimeCts = new();
     private CancellationTokenSource? _previewCts;
+    private CancellationTokenSource? _applyCts;
     private Stream? _sourceStream;
     private Stream? _overlayStream;
     private Bitmap? _sourceBitmap;
@@ -268,6 +269,8 @@ public sealed class GlobalColorRemovalViewModel : INotifyPropertyChanged, IDispo
             return GlobalColorRemovalApplyResult.Failure(StatusMessage);
         }
 
+        var applyCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetimeCts.Token);
+        _applyCts = applyCts;
         IsBusy = true;
         ErrorMessage = null;
         try
@@ -276,7 +279,7 @@ public sealed class GlobalColorRemovalViewModel : INotifyPropertyChanged, IDispo
                 _itemId,
                 _assetId,
                 new GlobalColorRemovalParameters(color, _tolerancePercent / 100d),
-                cancellationToken).ConfigureAwait(true);
+                applyCts.Token).ConfigureAwait(true);
             if (!result.Succeeded)
             {
                 ErrorMessage = result.Error;
@@ -286,7 +289,7 @@ public sealed class GlobalColorRemovalViewModel : INotifyPropertyChanged, IDispo
             Applied?.Invoke(this, result);
             return result;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (applyCts.IsCancellationRequested)
         {
             ErrorMessage = "Color removal was cancelled.";
             return GlobalColorRemovalApplyResult.Failure(ErrorMessage);
@@ -298,6 +301,12 @@ public sealed class GlobalColorRemovalViewModel : INotifyPropertyChanged, IDispo
         }
         finally
         {
+            if (ReferenceEquals(_applyCts, applyCts))
+            {
+                _applyCts = null;
+            }
+
+            applyCts.Dispose();
             IsBusy = false;
         }
     }
@@ -305,6 +314,7 @@ public sealed class GlobalColorRemovalViewModel : INotifyPropertyChanged, IDispo
     public void Cancel()
     {
         _previewCts?.Cancel();
+        _applyCts?.Cancel();
         ErrorMessage = null;
     }
 
@@ -318,6 +328,7 @@ public sealed class GlobalColorRemovalViewModel : INotifyPropertyChanged, IDispo
         _disposed = true;
         _previewCts?.Cancel();
         _previewCts?.Dispose();
+        _applyCts?.Cancel();
         _lifetimeCts.Cancel();
         _lifetimeCts.Dispose();
         OverlayBitmap = null;
