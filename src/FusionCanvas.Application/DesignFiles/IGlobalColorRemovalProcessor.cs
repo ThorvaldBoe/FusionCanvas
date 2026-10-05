@@ -2,6 +2,10 @@ namespace FusionCanvas.Application.DesignFiles;
 
 public interface IGlobalColorRemovalProcessor
 {
+    Task ValidateAsync(
+        Stream source,
+        CancellationToken cancellationToken = default);
+
     Task<GlobalColorRemovalRasterPreview> PreviewAsync(
         Stream source,
         GlobalColorRemovalParameters parameters,

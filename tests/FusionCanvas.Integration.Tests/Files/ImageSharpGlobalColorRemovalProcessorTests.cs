@@ -69,4 +69,18 @@ public sealed class ImageSharpGlobalColorRemovalProcessorTests
             new GlobalColorRemovalParameters(new(0, 0, 0), 0),
             TestContext.Current.CancellationToken));
     }
+
+    [Fact]
+    public async Task ValidateAsync_RejectsMalformedAndUnsupportedRasterPayload()
+    {
+        var processor = new ImageSharpGlobalColorRemovalProcessor();
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => processor.ValidateAsync(
+            new MemoryStream("not an image"u8.ToArray()),
+            TestContext.Current.CancellationToken));
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => processor.ValidateAsync(
+            new MemoryStream([0, 1, 2, 3, 4, 5, 6, 7]),
+            TestContext.Current.CancellationToken));
+    }
 }
