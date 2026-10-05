@@ -319,7 +319,8 @@ public class SettingsWindowTests
                 UpdatePlatform.WindowsX64,
                 new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-Setup.exe"),
                 new string('A', 64),
-                new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0"))),
+                new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0"),
+                new string('B', 64))),
             BlockDownload = true
         };
         var settings = new SettingsViewModel(

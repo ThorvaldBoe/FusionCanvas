@@ -188,7 +188,7 @@
                             AutomationProperties.AutomationId="Updates.Cancel" />
                     <Button Content="Download update"
                             Command="{Binding Updates.UpdateCommand}"
-                            IsVisible="{Binding Updates.IsUpdateAvailable}"
+                            IsVisible="{Binding Updates.IsDownloadCommandVisible}"
                             Classes="primary"
                             AutomationProperties.AutomationId="Updates.Download" />
                     <Button Content="Install update"
