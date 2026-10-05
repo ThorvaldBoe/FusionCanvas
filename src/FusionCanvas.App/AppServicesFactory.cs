@@ -68,7 +68,10 @@ public static class AppServicesFactory
             telemetry,
             telemetryContext,
             new TermsConsentService(settingsStore));
-        var updateHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        var updateHttpClient = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
         updateHttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("FusionCanvas-UpdateClient/1.0");
         settings.ReplaceUpdateService(CreateUpdateService(updateHttpClient, settings, requestShutdown));
         var textService = new AiTextGenerationService(aiSettings, credentials, catalogCache, openRouter);
@@ -105,7 +108,7 @@ public static class AppServicesFactory
         return new UpdateService(
             new AssemblyApplicationVersionProvider(),
             new GitHubUpdateSource(updateHttpClient),
-            new UpdatePackageDownloader(updateHttpClient),
+            new UpdatePackageDownloader(updateHttpClient, new WindowsInstallerAuthenticodeVerifier()),
             new WindowsInstallerLauncher(),
             new AppUpdateApplicationLifecycle(
                 settings.FlushAsync,

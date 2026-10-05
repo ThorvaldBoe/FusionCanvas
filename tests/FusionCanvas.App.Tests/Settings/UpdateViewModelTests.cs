@@ -42,8 +42,13 @@ public sealed class UpdateViewModelTests
     }
 
     private static UpdateManifest Manifest(string version) => new(
-        1, version, UpdatePlatform.WindowsX64,
-        new Uri("https://example.test/setup.exe"), new string('A', 64), new Uri("https://example.test/release"));
+        UpdateManifestValidator.CurrentSchemaVersion,
+        version,
+        UpdatePlatform.WindowsX64,
+        new Uri($"https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v{version}/FusionCanvas-{version}-win-x64-Setup.exe"),
+        new string('A', 64),
+        new Uri($"https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v{version}"),
+        new string('B', 64));
 
     private sealed class FakeUpdateService : IUpdateService
     {

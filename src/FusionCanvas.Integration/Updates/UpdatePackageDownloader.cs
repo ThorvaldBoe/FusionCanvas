@@ -7,11 +7,16 @@ public sealed class UpdatePackageDownloader : IUpdatePackageDownloader
 {
     private const long MaximumInstallerBytes = 250L * 1024 * 1024;
     private readonly HttpClient _httpClient;
+    private readonly IInstallerAuthenticityVerifier _authenticityVerifier;
     private readonly string _downloadDirectory;
 
-    public UpdatePackageDownloader(HttpClient httpClient, string? downloadDirectory = null)
+    public UpdatePackageDownloader(
+        HttpClient httpClient,
+        IInstallerAuthenticityVerifier authenticityVerifier,
+        string? downloadDirectory = null)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        _authenticityVerifier = authenticityVerifier ?? throw new ArgumentNullException(nameof(authenticityVerifier));
         _downloadDirectory = downloadDirectory ?? Path.Combine(Path.GetTempPath(), "FusionCanvas", "updates");
     }
 
@@ -76,6 +81,7 @@ public sealed class UpdatePackageDownloader : IUpdatePackageDownloader
                 }
             }
 
+            await _authenticityVerifier.VerifyAsync(temporaryPath, manifest, cancellationToken).ConfigureAwait(false);
             File.Move(temporaryPath, installerPath, overwrite: true);
             return new VerifiedUpdatePackage(manifest, installerPath);
         }
