@@ -24,6 +24,7 @@
 - [x] 4.2 Add the update presentation coordinator/view model and expose a compact `Update available` button beside Settings in `MainWindow`, hidden when no compatible update is available.
 - [x] 4.3 Extend the About/settings surface with manual check, checking, up-to-date, available, downloading, ready-to-install, cancellation, and actionable failure states; require an explicit final install action.
 - [x] 4.4 Add focused view-model tests and Avalonia headless tests for update-button visibility, accessible labeling, async state transitions, retry/cancel behavior, ready-to-install confirmation, and settings/About bindings.
+- [x] 4.5 Expose the cancellation action while an installer download is active and add headless UI, view-model, and integration cleanup regression coverage.
 
 ## 5. Verification and acceptance evidence
 

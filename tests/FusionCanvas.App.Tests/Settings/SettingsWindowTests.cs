@@ -308,6 +308,64 @@ public class SettingsWindowTests
         finally { window.Close(); }
     }
 
+    [AvaloniaFact]
+    public async Task AboutSection_ShowsEnabledCancelDuringDownloadAndReturnsToAvailable()
+    {
+        var updateService = new FakeUpdateService
+        {
+            CheckResult = new UpdateCheckResult(UpdateCheckStatus.UpdateAvailable, new UpdateManifest(
+                1,
+                "0.3.0",
+                UpdatePlatform.WindowsX64,
+                new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-Setup.exe"),
+                new string('A', 64),
+                new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0"))),
+            BlockDownload = true
+        };
+        var settings = new SettingsViewModel(
+            new InMemoryApplicationSettingsStore(),
+            new AvaloniaApplicationThemeController(),
+            ApplicationSettings.Default,
+            loadWarning: null,
+            updateService: updateService);
+        settings.OpenCommand.Execute(null);
+        settings.SelectedSection = SettingsSection.About;
+        var window = new SettingsWindow { DataContext = settings };
+
+        try
+        {
+            window.Show();
+            PumpLayout(window);
+
+            var checkButton = FindControl<Button>(window, b => (b.Content as string) == "Check for updates" && b.IsVisible);
+            Assert.NotNull(checkButton);
+            checkButton!.Command!.Execute(null);
+            await ((FusionCanvas.App.Commands.AsyncRelayCommand)settings.Updates.CheckCommand).ExecutionTask!
+                .WaitAsync(TimeSpan.FromSeconds(3));
+
+            var downloadButton = FindControl<Button>(window, b => (b.Content as string) == "Download update" && b.IsVisible);
+            Assert.NotNull(downloadButton);
+            downloadButton!.Command!.Execute(null);
+            await updateService.DownloadStarted.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            PumpLayout(window);
+
+            var cancelButton = FindControl<Button>(window, b =>
+                (b.Content as string) == "Cancel" && b.IsVisible);
+            Assert.NotNull(cancelButton);
+            Assert.True(cancelButton!.Command?.CanExecute(null));
+
+            cancelButton.Command!.Execute(null);
+            await ((FusionCanvas.App.Commands.AsyncRelayCommand)settings.Updates.UpdateCommand).ExecutionTask!
+                .WaitAsync(TimeSpan.FromSeconds(3));
+            PumpLayout(window);
+
+            Assert.Equal(UpdatePresentationStatus.UpdateAvailable, settings.Updates.Status);
+            Assert.Null(FindControl<Button>(window, b => (b.Content as string) == "Cancel" && b.IsVisible));
+            Assert.NotNull(FindControl<Button>(window, b => (b.Content as string) == "Download update" && b.IsVisible));
+        }
+        finally { window.Close(); }
+    }
+
     private sealed class ConstantVersionProvider(ApplicationVersionInfo info) : IApplicationVersionProvider
     {
         public ApplicationVersionInfo GetVersion() => info;
@@ -316,12 +374,22 @@ public class SettingsWindowTests
     private sealed class FakeUpdateService : IUpdateService
     {
         public UpdateCheckResult CheckResult { get; set; } = new(UpdateCheckStatus.UpToDate, null);
+        public bool BlockDownload { get; set; }
+        public TaskCompletionSource<bool> DownloadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Task<UpdateCheckResult> CheckForUpdateAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(CheckResult);
 
-        public Task<VerifiedUpdatePackage> DownloadAsync(UpdateManifest manifest, IProgress<UpdateDownloadProgress>? progress = null, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new VerifiedUpdatePackage(manifest, "C:\\Temp\\setup.exe"));
+        public async Task<VerifiedUpdatePackage> DownloadAsync(UpdateManifest manifest, IProgress<UpdateDownloadProgress>? progress = null, CancellationToken cancellationToken = default)
+        {
+            if (BlockDownload)
+            {
+                DownloadStarted.TrySetResult(true);
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+
+            return new VerifiedUpdatePackage(manifest, "C:\\Temp\\setup.exe");
+        }
 
         public Task ApplyAsync(VerifiedUpdatePackage package, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
