@@ -23,9 +23,9 @@ function Invoke-Installer {
         [string[]]$Arguments
     )
 
-    & $Executable @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "Installer command '$Executable $($Arguments -join ' ')' failed with exit code $LASTEXITCODE."
+    $process = Start-Process -FilePath $Executable -ArgumentList $Arguments -Wait -PassThru
+    if ($process.ExitCode -ne 0) {
+        throw "Installer command '$Executable $($Arguments -join ' ')' failed with exit code $($process.ExitCode)."
     }
 }
 
@@ -38,8 +38,8 @@ function Invoke-InstallerExpectFailure {
         [string[]]$Arguments
     )
 
-    & $Executable @Arguments
-    if ($LASTEXITCODE -eq 0) {
+    $process = Start-Process -FilePath $Executable -ArgumentList $Arguments -Wait -PassThru
+    if ($process.ExitCode -eq 0) {
         throw "Installer command was expected to fail but returned success."
     }
 }
