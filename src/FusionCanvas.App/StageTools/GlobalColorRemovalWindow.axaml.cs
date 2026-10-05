@@ -63,6 +63,16 @@ public partial class GlobalColorRemovalWindow : Window
         await viewModel.PickColorAtAsync(x, y);
     }
 
+    protected override void OnClosed(EventArgs e)
+    {
+        if (DataContext is GlobalColorRemovalViewModel viewModel)
+        {
+            viewModel.Cancel();
+        }
+
+        base.OnClosed(e);
+    }
+
     private static bool TryGetImagePixel(
         Avalonia.Point point,
         double controlWidth,

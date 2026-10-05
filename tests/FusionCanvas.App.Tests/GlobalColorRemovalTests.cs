@@ -83,6 +83,35 @@ public sealed class GlobalColorRemovalTests
         }
     }
 
+    [AvaloniaFact]
+    public async Task ClosingWindow_CancelsInProgressApply()
+    {
+        var service = new StubGlobalColorRemovalService { BlockApply = true };
+        using var viewModel = new GlobalColorRemovalViewModel(service, Guid.NewGuid(), Guid.NewGuid(), "design.png");
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+        viewModel.PickedColorHex = "#000000";
+        await viewModel.UseHexColorAsync(TestContext.Current.CancellationToken);
+
+        var window = new GlobalColorRemovalWindow { DataContext = viewModel };
+        try
+        {
+            window.Show();
+            var applyTask = viewModel.ApplyAsync(TestContext.Current.CancellationToken);
+            await service.ApplyStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+            window.Close();
+
+            var result = await applyTask;
+            Assert.False(result.Succeeded);
+            Assert.True(service.LastApplyToken.IsCancellationRequested);
+            Assert.Contains("cancelled", viewModel.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
     [Fact]
     public void DesignSlot_DisablesColorRemovalWithValidationReason()
     {
@@ -101,6 +130,9 @@ public sealed class GlobalColorRemovalTests
         public int PreviewCalls { get; private set; }
         public int ApplyCalls { get; private set; }
         public double LastTolerance { get; private set; }
+        public bool BlockApply { get; init; }
+        public TaskCompletionSource<bool> ApplyStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public CancellationToken LastApplyToken { get; private set; }
 
         public Task<GlobalColorRemovalAvailabilityResult> CheckAvailabilityAsync(Guid itemId, Guid assetId, CancellationToken cancellationToken = default) =>
             Task.FromResult(GlobalColorRemovalAvailabilityResult.Success());
@@ -121,9 +153,21 @@ public sealed class GlobalColorRemovalTests
         public Task<GlobalColorRemovalApplyResult> ApplyAsync(Guid itemId, Guid assetId, GlobalColorRemovalParameters parameters, CancellationToken cancellationToken = default)
         {
             ApplyCalls++;
-            return Task.FromResult(GlobalColorRemovalApplyResult.Success(
+            LastApplyToken = cancellationToken;
+            return ApplyCoreAsync(cancellationToken);
+        }
+
+        private async Task<GlobalColorRemovalApplyResult> ApplyCoreAsync(CancellationToken cancellationToken)
+        {
+            if (BlockApply)
+            {
+                ApplyStarted.TrySetResult(true);
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+
+            return GlobalColorRemovalApplyResult.Success(
                 new GlobalColorRemovalDerivedAsset(Guid.NewGuid(), "derived.png", "assets/derived.png"),
-                1));
+                1);
         }
 
         private static byte[] PngBytes()

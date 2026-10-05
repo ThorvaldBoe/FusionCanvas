@@ -20,6 +20,12 @@ The global color-removal module is implemented and verified. The source image is
 | Invalid raster handling | `ImageSharpGlobalColorRemovalProcessorTests.PreviewAsync_RejectsMalformedRasterPayload`; bounded decode/PNG output checks in the ImageSharp processor | Pass |
 | Appium decision | No Appium journey is warranted: the module adds no native file picker or OS-specific seam; deterministic Application/Integration tests and Avalonia headless tests cover the meaningful boundaries | Recorded decision |
 
+## Defect revalidation: Issue #845
+
+Apply now receives a linked cancellation token owned by the view model. Cancel, window close, and disposal cancel the in-progress Apply before it can report success; the existing application service cancellation path therefore leaves the repository and file store unchanged.
+
+- `GlobalColorRemovalTests.ClosingWindow_CancelsInProgressApply` — pass with a blocking service double; the Apply token is cancelled and no successful result is produced.
+
 ## Defect revalidation: Issue #846
 
 The Design-stage action now validates each managed image through the application service and ImageSharp processor before enabling color removal. Malformed, unsupported, missing, and read-only sources remain disabled, and the validation failure is exposed through the disabled action's tooltip.
