@@ -25,5 +25,5 @@
 - [x] 4.3 Run focused installer checks and map every windows-installer scenario to concrete evidence in `verification.md`.
 - [x] 4.4 Run `openspec validate build-nsis-windows-installer --strict`.
 - [x] 4.5 Run the baseline `dotnet test .\FusionCanvas.sln` and record any environment limitation separately from installer evidence.
-- [ ] 4.6 Verify the hosted Windows installer workflow after merge and record artifact, checksum, attestation, and smoke-check results.
+- [x] 4.6 Verify the hosted Windows installer workflow after merge and record artifact, checksum, attestation, and smoke-check results.
 
