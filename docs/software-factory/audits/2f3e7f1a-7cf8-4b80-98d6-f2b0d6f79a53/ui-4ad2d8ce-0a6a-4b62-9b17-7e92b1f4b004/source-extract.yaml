@@ -1,0 +1,18 @@
+extract:
+  identity: UI-EXTRACT-001
+  audit_id: 2f3e7f1a-7cf8-4b80-98d6-f2b0d6f79a53
+  audit_run_id: ui-4ad2d8ce-0a6a-4b62-9b17-7e92b1f4b004
+  standard: FC-UI
+  standard_version: "1.3"
+  extract_definition_version: "1.4"
+  extract_revision: 1
+  repository_revision: 239aed6
+  working_tree_state: clean-source-scope
+  included_projects: [tests]
+  exclusions: [Avalonia views and resources; unchanged]
+items:
+  - item_id: UI-ITEM-no-view-change
+    extract_entry_id: UI-ENTRY-001
+    source_files: [tests/FusionCanvas.App.Tests/FusionCanvas.App.Tests.csproj, tests/FusionCanvas.UITests/FusionCanvas.UITests.csproj]
+    declared_role: test configuration only
+    visual_signals: [no view or resource change]

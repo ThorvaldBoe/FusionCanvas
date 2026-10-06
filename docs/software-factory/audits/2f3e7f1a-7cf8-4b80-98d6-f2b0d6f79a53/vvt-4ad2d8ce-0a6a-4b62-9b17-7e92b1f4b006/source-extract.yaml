@@ -1,0 +1,18 @@
+extract:
+  identity: VVT-EXTRACT-001
+  audit_id: 2f3e7f1a-7cf8-4b80-98d6-f2b0d6f79a53
+  audit_run_id: vvt-4ad2d8ce-0a6a-4b62-9b17-7e92b1f4b006
+  standard: FC-VVT
+  standard_version: "1.1"
+  extract_definition_version: "1.2"
+  extract_revision: 1
+  repository_revision: 239aed6
+  working_tree_state: clean-source-scope
+  included_projects: [tests]
+  exclusions: [product and visual direction; unchanged]
+items:
+  - item_id: VVT-ITEM-no-product-change
+    extract_entry_id: VVT-ENTRY-001
+    source_files: [tests/FusionCanvas.App.Tests/FusionCanvas.App.Tests.csproj, tests/FusionCanvas.UITests/FusionCanvas.UITests.csproj]
+    declared_role: test configuration only
+    values_signals: [no product or taste change]
