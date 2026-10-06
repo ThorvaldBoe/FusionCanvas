@@ -21,10 +21,17 @@ public sealed class ImageSharpMockupRasterCompositor : IMockupRasterCompositor
         _maximumDecodedPixels = maximumDecodedPixels;
     }
 
-    public async Task<Stream> ComposeAsync(Stream template, Stream design, MockupImageSpaceMapping mapping, CancellationToken cancellationToken = default)
+    public async Task<Stream> ComposeAsync(
+        Stream template,
+        Stream design,
+        MockupImageSpaceMapping mapping,
+        int maximumLongEdgePixels = MockupOutputResolutionPolicy.DefaultMaximumLongEdgePixels,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(design);
+        ArgumentNullException.ThrowIfNull(mapping);
+        var policy = new MockupOutputResolutionPolicy(maximumLongEdgePixels);
 
         await EnsureDecodedPixelLimitAsync(template, "template", cancellationToken).ConfigureAwait(false);
         using var templateImage = await Image.LoadAsync<Rgba32>(template, cancellationToken).ConfigureAwait(false);
@@ -33,12 +40,18 @@ public sealed class ImageSharpMockupRasterCompositor : IMockupRasterCompositor
         if (templateImage.Width != mapping.ImageWidth || templateImage.Height != mapping.ImageHeight)
             throw new InvalidOperationException("The template image dimensions do not match its saved mapping.");
 
+        var outputDimensions = policy.CalculateOutputDimensions(templateImage.Width, templateImage.Height);
+        var outputMapping = policy.ScaleMapping(mapping);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (outputDimensions.Width != templateImage.Width || outputDimensions.Height != templateImage.Height)
+            templateImage.Mutate(image => image.Resize(outputDimensions.Width, outputDimensions.Height));
+
         await EnsureDecodedPixelLimitAsync(design, "design", cancellationToken).ConfigureAwait(false);
         using var designImage = await Image.LoadAsync<Rgba32>(design, cancellationToken).ConfigureAwait(false);
         EnsureDecodedPixelLimit(designImage.Width, designImage.Height, "design");
 
-        var widthScale = mapping.Width / (double)designImage.Width;
-        var heightScale = mapping.Height / (double)designImage.Height;
+        var widthScale = outputMapping.Width / (double)designImage.Width;
+        var heightScale = outputMapping.Height / (double)designImage.Height;
         var scale = Math.Min(widthScale, heightScale);
         var width = Math.Max(1, (int)Math.Round(designImage.Width * scale));
         var height = Math.Max(1, (int)Math.Round(designImage.Height * scale));
@@ -46,8 +59,8 @@ public sealed class ImageSharpMockupRasterCompositor : IMockupRasterCompositor
         cancellationToken.ThrowIfCancellationRequested();
         designImage.Mutate(image => image.Resize(width, height));
         cancellationToken.ThrowIfCancellationRequested();
-        var x = mapping.X + (mapping.Width - width) / 2;
-        var y = mapping.Y + (mapping.Height - height) / 2;
+        var x = outputMapping.X + (outputMapping.Width - width) / 2;
+        var y = outputMapping.Y + (outputMapping.Height - height) / 2;
         cancellationToken.ThrowIfCancellationRequested();
         templateImage.Mutate(image => image.DrawImage(designImage, new Point(x, y), 1f));
         cancellationToken.ThrowIfCancellationRequested();

@@ -1034,6 +1034,12 @@ public class StoreEditorHeadlessTests
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         var templateDialog = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
         templateDialog.UpdateLayout();
+        var resolutionBox = templateDialog.GetVisualDescendants().OfType<TextBox>()
+            .Single(control => AutomationProperties.GetName(control) == "Maximum mockup long edge in pixels");
+        Assert.Equal("2000", resolutionBox.Text);
+        Assert.Contains("Store-wide", AutomationProperties.GetHelpText(resolutionBox) ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains(templateDialog.GetVisualDescendants().OfType<TextBlock>(), text =>
+            IsEffectivelyVisible(text) && text.Text?.Contains("Existing mockups are unchanged", StringComparison.Ordinal) == true);
         Assert.DoesNotContain(templateDialog.GetVisualDescendants().OfType<Control>(), control =>
             AutomationProperties.GetAutomationId(control) is "Catalog.MockupPreviewRegion" or "Catalog.MockupConfigurationRegion");
         Assert.Contains(templateDialog.GetVisualDescendants().OfType<TextBlock>(), text =>

@@ -8,6 +8,33 @@ namespace FusionCanvas.Integration.Tests.Mockups;
 public sealed class ImageSharpMockupRasterCompositorTests
 {
     [Fact]
+    public async Task ComposeAsync_DownscalesLongEdgeAndMappingTogether()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var template = new Image<Rgba32>(4000, 3000, Color.DarkBlue);
+        using var design = new Image<Rgba32>(20, 10, Color.White);
+        await using var templateStream = new MemoryStream();
+        await using var designStream = new MemoryStream();
+        await template.SaveAsPngAsync(templateStream, cancellationToken);
+        await design.SaveAsPngAsync(designStream, cancellationToken);
+        templateStream.Position = 0;
+        designStream.Position = 0;
+
+        var compositor = new ImageSharpMockupRasterCompositor();
+        await using var result = await compositor.ComposeAsync(
+            templateStream,
+            designStream,
+            new MockupImageSpaceMapping(4000, 3000, 1000, 750, 2000, 1500),
+            maximumLongEdgePixels: 2000,
+            cancellationToken: cancellationToken);
+
+        using var output = await Image.LoadAsync<Rgba32>(result, cancellationToken);
+        Assert.Equal(2000, output.Width);
+        Assert.Equal(1500, output.Height);
+        Assert.Equal(new Rgba32(255, 255, 255, 255), output[1000, 750]);
+    }
+
+    [Fact]
     public async Task ComposeAsync_PreservesTemplateDimensionsAndFitsDesignInMapping()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -25,7 +52,7 @@ public sealed class ImageSharpMockupRasterCompositorTests
             templateStream,
             designStream,
             new MockupImageSpaceMapping(100, 80, 10, 10, 40, 20),
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         using var output = await Image.LoadAsync<Rgba32>(result, cancellationToken);
         Assert.Equal(100, output.Width);
@@ -52,7 +79,7 @@ public sealed class ImageSharpMockupRasterCompositorTests
             templateStream,
             designStream,
             new MockupImageSpaceMapping(3, 2, 0, 0, 1, 1),
-            cancellationToken));
+            cancellationToken: cancellationToken));
     }
 
     [Fact]
@@ -74,6 +101,6 @@ public sealed class ImageSharpMockupRasterCompositorTests
             templateStream,
             designStream,
             new MockupImageSpaceMapping(2, 2, 0, 0, 1, 1),
-            cancellationToken));
+            cancellationToken: cancellationToken));
     }
 }

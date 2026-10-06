@@ -59,9 +59,11 @@ public sealed class MockupGenerationService : IMockupGenerationService
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
         var item = snapshot.Items.SingleOrDefault(value => value.Id == request.ItemId);
         var config = snapshot.ItemListingConfigurations.SingleOrDefault(value => value.ItemId == request.ItemId);
+        var store = item is null ? null : snapshot.Stores.SingleOrDefault(value => value.Id == item.StoreId);
         var template = snapshot.MockupTemplates.SingleOrDefault(value => value.Id == request.TemplateId && !value.IsArchived);
-        if (item is null || config is null || template is null || template.BlueprintOfferingId != config.OfferingId)
+        if (item is null || store is null || config is null || template is null || template.BlueprintOfferingId != config.OfferingId)
             return MockupGenerationResult.Failure("Select a ready Mockup Template for the Item's active Offering.");
+        var resolutionPolicy = MockupOutputResolutionSettingsService.ReadPolicy(store.MetadataJson);
 
         var eligible = await _templates.GetEligibleTemplatesAsync(item.StoreId, config.OfferingId, request.TemplateId, cancellationToken).ConfigureAwait(false);
         if (!eligible.Succeeded || eligible.Templates.Count == 0) return MockupGenerationResult.Failure(eligible.Error ?? "The selected Mockup Template is not ready.");
@@ -121,12 +123,23 @@ public sealed class MockupGenerationService : IMockupGenerationService
                 {
                     await using var templateStream = await _fileStore.OpenReadAsync(sourceAsset.WorkspaceRelativePath, cancellationToken).ConfigureAwait(false);
                     await using var designStream = await _fileStore.OpenReadAsync(designAsset.WorkspaceRelativePath, cancellationToken).ConfigureAwait(false);
-                    await using var output = await _compositor.ComposeAsync(templateStream, designStream, source.ImageMapping, cancellationToken).ConfigureAwait(false);
+                    await using var output = await _compositor.ComposeAsync(templateStream, designStream, source.ImageMapping, resolutionPolicy.MaximumLongEdgePixels, cancellationToken).ConfigureAwait(false);
                     managed = await _fileStore.SaveAsync($"{SafeFileNamePart(item.Name)}-{SafeFileNamePart(color)}-mockup.png", AssetKind.MockupImage, output, cancellationToken).ConfigureAwait(false);
                     var now = _clock();
                     var assetId = _newId();
+                    var outputDimensions = resolutionPolicy.CalculateOutputDimensions(source.ImageWidth, source.ImageHeight);
                     var asset = new Asset(assetId, item.StoreId, managed.Name, null, AssetKind.MockupImage, managed.WorkspaceRelativePath, null, false, false, now, now,
-                        JsonSerializer.Serialize(new { itemId = item.Id, color, templateId = template.Id, templateRevision = revision.RevisionNumber, designAssetId = designAsset.Id }));
+                        JsonSerializer.Serialize(new
+                        {
+                            itemId = item.Id,
+                            color,
+                            templateId = template.Id,
+                            templateRevision = revision.RevisionNumber,
+                            designAssetId = designAsset.Id,
+                            renderedWidth = outputDimensions.Width,
+                            renderedHeight = outputDimensions.Height,
+                            maximumLongEdgePixels = resolutionPolicy.MaximumLongEdgePixels
+                        }));
                     var updated = snapshot with { Assets = [.. snapshot.Assets, asset], AssetLinks = [.. snapshot.AssetLinks, new AssetLink(asset.Id, WorkspaceEntityKind.Item, item.Id)] };
                     if (results.Count == 0)
                     {

@@ -697,6 +697,26 @@ public sealed class CatalogSetupViewModelTests
     }
 
     [Fact]
+    public void MaximumMockupLongEdgeRequiresPositiveWholeNumber()
+    {
+        var viewModel = new CatalogSetupViewModel(
+            new CatalogSetupService(new InMemoryWorkspaceRepository(SampleWorkspace.Create())),
+            new MockupTemplateSetupService(new InMemoryWorkspaceRepository(SampleWorkspace.Create())));
+
+        Assert.Equal("2000", viewModel.MaximumMockupLongEdgeText);
+        Assert.False(viewModel.HasMaximumMockupLongEdgeValidationMessage);
+
+        viewModel.MaximumMockupLongEdgeText = "1200.5";
+
+        Assert.True(viewModel.HasMaximumMockupLongEdgeValidationMessage);
+        Assert.Contains("positive whole number", viewModel.MaximumMockupLongEdgeValidationMessage, StringComparison.OrdinalIgnoreCase);
+
+        viewModel.MaximumMockupLongEdgeText = "1200";
+
+        Assert.False(viewModel.HasMaximumMockupLongEdgeValidationMessage);
+    }
+
+    [Fact]
     public void DesignAreaPhysicalSizeIsUnavailableWithoutDpiAndDerivedWhenProvided()
     {
         var viewModel = new CatalogSetupViewModel(
