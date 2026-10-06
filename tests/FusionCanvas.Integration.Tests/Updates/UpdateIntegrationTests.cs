@@ -350,7 +350,6 @@ public sealed class UpdateIntegrationTests
 
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
-
     private sealed class SequenceHandler(params HttpResponseMessage[] responses) : HttpMessageHandler
     {
         private int _index;
