@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows.Input;
 using FusionCanvas.Application.AI;
 
 namespace FusionCanvas.App.Settings;
@@ -8,6 +9,7 @@ public sealed class AiProfileEditorViewModel : INotifyPropertyChanged
 {
     private AiProfileSettings _settings;
     private IReadOnlyList<AiModelDescriptor> _models = [];
+    private IReadOnlyList<AiModelEndpointDescriptor> _endpoints = [];
 
     public AiProfileEditorViewModel(AiProfileSettings settings)
     {
@@ -16,6 +18,67 @@ public sealed class AiProfileEditorViewModel : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler? SettingsChanged;
+
+    public ICommand? LoadEndpointsCommand { get; set; }
+
+    public IReadOnlyList<AiRoutingMode> RoutingModes { get; } =
+        [AiRoutingMode.Automatic, AiRoutingMode.SpecificProvider, AiRoutingMode.ExactEndpoint];
+
+    public IReadOnlyList<AiModelEndpointDescriptor> Endpoints
+    {
+        get => _endpoints;
+        private set
+        {
+            _endpoints = value ?? [];
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ProviderIds));
+            OnPropertyChanged(nameof(EndpointIds));
+            OnPropertyChanged(nameof(SelectedEndpoint));
+            OnPropertyChanged(nameof(EndpointMetadataAvailable));
+            OnPropertyChanged(nameof(EndpointMetadataStale));
+            OnPropertyChanged(nameof(EndpointMetadataStatus));
+            OnPropertyChanged(nameof(EndpointSummary));
+        }
+    }
+
+    public IReadOnlyList<string> ProviderIds => Endpoints
+        .Select(endpoint => endpoint.ProviderId)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    public IReadOnlyList<string> EndpointIds => Endpoints
+        .Where(endpoint => RoutingMode != AiRoutingMode.SpecificProvider ||
+            string.Equals(endpoint.ProviderId, ProviderId, StringComparison.OrdinalIgnoreCase))
+        .Select(endpoint => endpoint.EndpointId)
+        .Distinct(StringComparer.Ordinal)
+        .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    public bool EndpointMetadataAvailable => Endpoints.Count > 0;
+    public bool EndpointMetadataStale => Endpoints.Any(endpoint => endpoint.IsStale);
+    public string EndpointMetadataStatus => EndpointMetadataStale
+        ? "Endpoint information is from a previous refresh. Refresh before relying on current capabilities."
+        : EndpointMetadataAvailable
+            ? "Endpoint information is current for the last successful refresh."
+            : "Endpoint information is unavailable; refresh to choose one.";
+
+    public bool IsProviderRouting => RoutingMode == AiRoutingMode.SpecificProvider;
+    public bool IsExactEndpointRouting => RoutingMode == AiRoutingMode.ExactEndpoint;
+
+    public string RoutingExplanation => RoutingMode switch
+    {
+        AiRoutingMode.Automatic => "OpenRouter may choose different providers and use fallback endpoints.",
+        AiRoutingMode.SpecificProvider => "The selected supplier is fixed, but its endpoint variant may still differ.",
+        AiRoutingMode.ExactEndpoint => "Only this endpoint is requested; failure is shown instead of silent fallback.",
+        _ => "Choose how OpenRouter should route this profile."
+    };
+
+    public string EndpointSummary => SelectedEndpoint is { } endpoint
+        ? $"{endpoint.ProviderName} · {endpoint.EndpointId} · {endpoint.ContextLength?.ToString() ?? "?"} context"
+        : EndpointMetadataAvailable
+            ? "Choose a provider or endpoint."
+            : "Endpoint information is unavailable; refresh to choose one.";
 
     public IReadOnlyList<AiReasoningMode> ReasoningModes
     {
@@ -44,7 +107,9 @@ public sealed class AiProfileEditorViewModel : INotifyPropertyChanged
             OnPropertyChanged();
             OnPropertyChanged(nameof(ModelIds));
             OnPropertyChanged(nameof(SelectedModel));
+            OnPropertyChanged(nameof(HasSelectedModel));
             OnPropertyChanged(nameof(SupportsReasoning));
+            NotifyRouting();
             NotifyCapabilities();
         }
     }
@@ -54,7 +119,59 @@ public sealed class AiProfileEditorViewModel : INotifyPropertyChanged
     public AiModelDescriptor? SelectedModel =>
         Models.FirstOrDefault(model => string.Equals(model.Id, ModelId, StringComparison.Ordinal));
 
+    public bool HasSelectedModel => SelectedModel is not null;
+
     public bool SupportsReasoning => SelectedModel?.Reasoning is not null;
+    public AiRoutingMode RoutingMode
+    {
+        get => (_settings.Routing ?? AiRoutingPolicy.Automatic).Mode;
+        set
+        {
+            var current = _settings.Routing ?? AiRoutingPolicy.Automatic;
+            if (current.Mode == value) return;
+            Update(_settings with
+            {
+                Routing = value switch
+                {
+                    AiRoutingMode.Automatic => AiRoutingPolicy.Automatic,
+                    AiRoutingMode.SpecificProvider => AiRoutingPolicy.ForProvider(current.ProviderId ?? ProviderIds.FirstOrDefault() ?? string.Empty),
+                    AiRoutingMode.ExactEndpoint => AiRoutingPolicy.ForEndpoint(current.EndpointId ?? EndpointIds.FirstOrDefault() ?? string.Empty, current.ProviderId),
+                    _ => AiRoutingPolicy.Automatic
+                }
+            });
+            NotifyRouting();
+        }
+    }
+
+    public string? ProviderId
+    {
+        get => (_settings.Routing ?? AiRoutingPolicy.Automatic).ProviderId;
+        set
+        {
+            var policy = _settings.Routing ?? AiRoutingPolicy.Automatic;
+            Update(_settings with { Routing = policy with { ProviderId = EmptyToNull(value) } });
+            OnPropertyChanged(nameof(EndpointIds));
+            OnPropertyChanged(nameof(SelectedEndpoint));
+            OnPropertyChanged(nameof(EndpointSummary));
+        }
+    }
+
+    public string? EndpointId
+    {
+        get => (_settings.Routing ?? AiRoutingPolicy.Automatic).EndpointId;
+        set
+        {
+            var policy = _settings.Routing ?? AiRoutingPolicy.Automatic;
+            Update(_settings with { Routing = policy with { EndpointId = EmptyToNull(value) } });
+            OnPropertyChanged(nameof(SelectedEndpoint));
+            OnPropertyChanged(nameof(EndpointSummary));
+        }
+    }
+
+    public AiModelEndpointDescriptor? SelectedEndpoint =>
+        Endpoints.FirstOrDefault(endpoint => string.Equals(endpoint.EndpointId, EndpointId, StringComparison.Ordinal));
+
+    public AiProfileSettings Snapshot => _settings with { Routing = _settings.Routing ?? AiRoutingPolicy.Automatic };
     public IReadOnlyList<string> ReasoningEfforts => SelectedModel?.Reasoning?.SupportedEfforts ?? [];
     public bool IsReasoningEffort => ReasoningMode == AiReasoningMode.Effort;
     public bool IsReasoningTokenBudget => ReasoningMode == AiReasoningMode.TokenBudget;
@@ -185,7 +302,11 @@ public sealed class AiProfileEditorViewModel : INotifyPropertyChanged
         });
     }
 
-    public AiProfileSettings Snapshot => _settings;
+    public void SetEndpoints(IReadOnlyList<AiModelEndpointDescriptor> endpoints)
+    {
+        Endpoints = endpoints;
+        NotifyRouting();
+    }
 
     public void Replace(AiProfileSettings settings)
     {
@@ -223,7 +344,9 @@ public sealed class AiProfileEditorViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ReasoningEffort));
         OnPropertyChanged(nameof(ReasoningTokenBudget));
         OnPropertyChanged(nameof(SelectedModel));
+        OnPropertyChanged(nameof(HasSelectedModel));
         OnPropertyChanged(nameof(SupportsReasoning));
+        NotifyRouting();
         NotifyCapabilities();
     }
 
@@ -249,6 +372,20 @@ public sealed class AiProfileEditorViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(SupportsSeed));
         OnPropertyChanged(nameof(SupportsStop));
         OnPropertyChanged(nameof(HasAdditionalParameters));
+    }
+
+    private void NotifyRouting()
+    {
+        OnPropertyChanged(nameof(RoutingMode));
+        OnPropertyChanged(nameof(ProviderId));
+        OnPropertyChanged(nameof(EndpointId));
+        OnPropertyChanged(nameof(IsProviderRouting));
+        OnPropertyChanged(nameof(IsExactEndpointRouting));
+        OnPropertyChanged(nameof(RoutingExplanation));
+        OnPropertyChanged(nameof(ProviderIds));
+        OnPropertyChanged(nameof(EndpointIds));
+        OnPropertyChanged(nameof(SelectedEndpoint));
+        OnPropertyChanged(nameof(EndpointSummary));
     }
 
     private static string? EmptyToNull(string? value) =>

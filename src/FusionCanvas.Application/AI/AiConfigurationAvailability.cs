@@ -6,5 +6,6 @@ public enum AiConfigurationAvailability
     MissingModel,
     ModelUnavailable,
     PrivacyIncompatible,
-    InvalidParameters
+    InvalidParameters,
+    RoutingUnavailable
 }

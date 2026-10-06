@@ -13,6 +13,7 @@ namespace FusionCanvas.Integration.AI;
 public sealed class OpenRouterClient :
     IAiCredentialValidator,
     IAiModelCatalogProvider,
+    IAiModelEndpointCatalogProvider,
     IAiImageModelCatalogProvider,
     IAiImageEndpointCatalogProvider,
     IAiTextProvider,
@@ -154,6 +155,58 @@ public sealed class OpenRouterClient :
         }
     }
 
+    public async Task<AiModelEndpointCatalog> GetEndpointsAsync(
+        string apiKey,
+        string modelId,
+        bool requireZeroDataRetention,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(modelId) || !modelId.Contains('/'))
+        {
+            throw new AiModelCatalogFetchException(
+                AiModelCatalogFailureKind.InvalidResponse,
+                "OpenRouter endpoint discovery requires a qualified model ID.");
+        }
+
+        try
+        {
+            var path = "api/v1/models/" + string.Join('/', modelId.Split('/').Select(Uri.EscapeDataString)) + "/endpoints";
+            using var response = await SendGetAsync(path, apiKey, cancellationToken).ConfigureAwait(false);
+            EnsureCatalogSuccess(response);
+            using var json = await ReadJsonAsync(response, cancellationToken).ConfigureAwait(false);
+            var data = json.RootElement.TryGetProperty("endpoints", out var endpoints)
+                && endpoints.ValueKind == JsonValueKind.Array
+                ? endpoints
+                : RequiredArray(json.RootElement, "data");
+            var parsed = data.EnumerateArray()
+                .Select(item => ParseModelEndpoint(item, modelId))
+                .OfType<AiModelEndpointDescriptor>()
+                .Where(endpoint => !requireZeroDataRetention || endpoint.ZeroDataRetentionCompatible)
+                .ToArray();
+            return new AiModelEndpointCatalog(modelId, requireZeroDataRetention, DateTimeOffset.UtcNow, parsed);
+        }
+        catch (AiModelCatalogFetchException)
+        {
+            throw;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new AiModelCatalogFetchException(AiModelCatalogFailureKind.NetworkOrService, "OpenRouter endpoint data could not be loaded.");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (HttpRequestException)
+        {
+            throw new AiModelCatalogFetchException(AiModelCatalogFailureKind.NetworkOrService, "OpenRouter endpoint data could not be loaded.");
+        }
+        catch (Exception exception) when (exception is IOException or JsonException or InvalidDataException or InvalidOperationException)
+        {
+            throw new AiModelCatalogFetchException(AiModelCatalogFailureKind.InvalidResponse, "OpenRouter returned invalid endpoint data.");
+        }
+    }
+
     private async Task<IReadOnlyCollection<string>> GetZdrModelIdsAsync(
         bool requireZeroDataRetention,
         CancellationToken cancellationToken)
@@ -271,7 +324,8 @@ public sealed class OpenRouterClient :
             return AiTextResult.Failure(
                 AiTextFailureKind.InvalidRequest,
                 $"The combined image input exceeds the {MaximumVisionRequestBytes}-byte request limit.",
-                request.ModelId);
+                request.ModelId,
+                routing: request.Routing ?? request.Profile.Routing);
         }
         using var timeout = new CancellationTokenSource();
         using var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
@@ -294,11 +348,15 @@ public sealed class OpenRouterClient :
 
             if (!response.IsSuccessStatusCode)
             {
-                return await ParseFailureAsync(response, request.ModelId, requestCancellation.Token).ConfigureAwait(false);
+                return await ParseFailureAsync(
+                    response,
+                    request.ModelId,
+                    request.Routing ?? request.Profile.Routing,
+                    requestCancellation.Token).ConfigureAwait(false);
             }
 
             using var json = await ReadJsonAsync(response, requestCancellation.Token).ConfigureAwait(false);
-            return ParseSuccess(json.RootElement, request.ModelId);
+            return ParseSuccess(json.RootElement, request);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -309,21 +367,24 @@ public sealed class OpenRouterClient :
             return AiTextResult.Failure(
                 AiTextFailureKind.Timeout,
                 "The generation request timed out; retrying could create additional usage.",
-                request.ModelId);
+                request.ModelId,
+                routing: request.Routing ?? request.Profile.Routing);
         }
         catch (HttpRequestException)
         {
             return AiTextResult.Failure(
                 AiTextFailureKind.NetworkFailure,
                 "The generation connection failed; retrying could create additional usage.",
-                request.ModelId);
+                request.ModelId,
+                routing: request.Routing ?? request.Profile.Routing);
         }
         catch (Exception exception) when (exception is IOException or JsonException or InvalidDataException)
         {
             return AiTextResult.Failure(
                 AiTextFailureKind.InvalidProviderResponse,
                 "OpenRouter returned an invalid response.",
-                request.ModelId);
+                request.ModelId,
+                routing: request.Routing ?? request.Profile.Routing);
         }
     }
 
@@ -685,6 +746,20 @@ public sealed class OpenRouterClient :
             ((JsonObject)root["provider"]!)["zdr"] = true;
         }
 
+        var routing = request.Routing ?? profile.Routing ?? AiRoutingPolicy.Automatic;
+        var provider = (JsonObject)root["provider"]!;
+        switch (routing.Mode)
+        {
+            case AiRoutingMode.SpecificProvider when !string.IsNullOrWhiteSpace(routing.ProviderId):
+                provider["only"] = new JsonArray(JsonValue.Create(routing.ProviderId));
+                provider["allow_fallbacks"] = false;
+                break;
+            case AiRoutingMode.ExactEndpoint when !string.IsNullOrWhiteSpace(routing.EndpointId):
+                provider["order"] = new JsonArray(JsonValue.Create(routing.EndpointId));
+                provider["allow_fallbacks"] = false;
+                break;
+        }
+
         Add(root, "max_completion_tokens", profile.MaxCompletionTokens);
         Add(root, "temperature", profile.Temperature);
         Add(root, "top_p", profile.TopP);
@@ -799,6 +874,45 @@ public sealed class OpenRouterClient :
             zdrModelIds.Contains(id), null);
     }
 
+    private static AiModelEndpointDescriptor? ParseModelEndpoint(JsonElement item, string modelId)
+    {
+        var providerId = ReadString(item, "provider_id") ??
+                         ReadString(item, "provider_slug") ??
+                         ReadString(item, "provider_tag") ??
+                         ReadString(item, "provider_name");
+        var providerName = ReadString(item, "provider_name") ?? providerId;
+        var endpointId = ReadString(item, "name") ??
+                         ReadString(item, "endpoint_id") ??
+                         ReadString(item, "id") ??
+                         ReadString(item, "provider_tag") ??
+                         providerId;
+        if (string.IsNullOrWhiteSpace(providerId) || string.IsNullOrWhiteSpace(providerName) || string.IsNullOrWhiteSpace(endpointId))
+        {
+            return null;
+        }
+
+        var supportedElement = ReadObject(item, "supported_parameters");
+        var supported = supportedElement.ValueKind == JsonValueKind.Object
+            ? supportedElement.EnumerateObject().Select(property => property.Name).Take(128).ToArray()
+            : ReadStrings(item, "supported_parameters");
+        var performance = ReadObject(item, "performance");
+        var pricing = ReadObject(item, "pricing");
+        return new AiModelEndpointDescriptor(
+            modelId,
+            Bound(providerId, 256)!,
+            Bound(providerName, MaximumDisplayText)!,
+            Bound(endpointId, 256)!,
+            Bound(ReadString(item, "model_name") ?? ReadString(item, "variant")),
+            ReadInt32(item, "context_length"),
+            ReadInt32(item, "max_completion_tokens") ?? ReadInt32(item, "max_output_tokens"),
+            supported,
+            ReadBoolean(item, "is_zdr") || ReadBoolean(item, "zdr") || ReadBoolean(item, "zero_data_retention"),
+            ReadDecimal(pricing, "prompt"),
+            ReadDecimal(pricing, "completion"),
+            ReadDouble(item, "latency_last_30m") ?? ReadDouble(performance, "latency"),
+            ReadDouble(item, "throughput_last_30m") ?? ReadDouble(performance, "throughput"));
+    }
+
     private static AiImageEndpointCapabilities? ParseImageEndpoint(
         JsonElement item,
         string modelId,
@@ -911,7 +1025,7 @@ public sealed class OpenRouterClient :
             ReadBoolean(reasoning, "supports_token_budget"));
     }
 
-    private static AiTextResult ParseSuccess(JsonElement root, string requestedModel)
+    private static AiTextResult ParseSuccess(JsonElement root, AiProviderTextRequest request)
     {
         var choices = RequiredArray(root, "choices");
         if (choices.GetArrayLength() == 0)
@@ -933,8 +1047,9 @@ public sealed class OpenRouterClient :
             return AiTextResult.Failure(
                 AiTextFailureKind.IncompleteGeneration,
                 "OpenRouter reported an incomplete generation.",
-                requestedModel,
-                partialText: Bound(text));
+                request.ModelId,
+                partialText: Bound(text),
+                routing: request.Routing ?? request.Profile.Routing);
         }
 
         var usageElement = ReadObject(root, "usage");
@@ -948,17 +1063,20 @@ public sealed class OpenRouterClient :
         var metadata = ReadObject(root, "openrouter_metadata");
         return AiTextResult.Success(
             text,
-            requestedModel,
+            request.ModelId,
             ReadString(root, "model"),
             ReadString(metadata, "provider_name"),
             finishReason,
             usage,
-            ReadString(root, "id"));
+            ReadString(root, "id"),
+            request.Routing ?? request.Profile.Routing,
+            ReadString(metadata, "endpoint") ?? ReadString(metadata, "endpoint_name"));
     }
 
     private async Task<AiTextResult> ParseFailureAsync(
         HttpResponseMessage response,
         string requestedModel,
+        AiRoutingPolicy? routing,
         CancellationToken cancellationToken)
     {
         try
@@ -982,11 +1100,17 @@ public sealed class OpenRouterClient :
             HttpStatusCode.ServiceUnavailable => AiTextFailureKind.NoEligibleProvider,
             _ => AiTextFailureKind.ProviderFailure
         };
+        if (routing?.Mode is AiRoutingMode.SpecificProvider or AiRoutingMode.ExactEndpoint &&
+            kind is AiTextFailureKind.NoEligibleProvider or AiTextFailureKind.ModelUnavailable or AiTextFailureKind.ProviderFailure)
+        {
+            kind = AiTextFailureKind.RouteNotFulfilled;
+        }
         return AiTextResult.Failure(
             kind,
             SafeFailureMessage(kind),
             requestedModel,
-            ReadRetryAfter(response));
+            ReadRetryAfter(response),
+            routing: routing);
     }
 
     private static string SafeFailureMessage(AiTextFailureKind kind) => kind switch
@@ -997,6 +1121,7 @@ public sealed class OpenRouterClient :
         AiTextFailureKind.Blocked => "OpenRouter blocked the request or denied permission.",
         AiTextFailureKind.ModelUnavailable => "The selected model is unavailable.",
         AiTextFailureKind.NoEligibleProvider => "No OpenRouter provider satisfies the request.",
+        AiTextFailureKind.RouteNotFulfilled => "The selected provider or endpoint could not fulfill the request; retrying with another route is your choice.",
         _ => "OpenRouter could not complete the request."
     };
 
@@ -1077,6 +1202,25 @@ public sealed class OpenRouterClient :
         element.TryGetInt32(out var value)
             ? value
             : null;
+
+    private static double? ReadDouble(JsonElement parent, string name)
+    {
+        if (parent.ValueKind != JsonValueKind.Object || !parent.TryGetProperty(name, out var element))
+        {
+            return null;
+        }
+
+        if (element.ValueKind == JsonValueKind.Number && element.TryGetDouble(out var number) && double.IsFinite(number))
+        {
+            return number;
+        }
+
+        return element.ValueKind == JsonValueKind.String &&
+               double.TryParse(element.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var text) &&
+               double.IsFinite(text)
+            ? text
+            : null;
+    }
 
     private static decimal? ReadDecimal(JsonElement parent, string name)
     {

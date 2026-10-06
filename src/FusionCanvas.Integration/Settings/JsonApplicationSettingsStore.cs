@@ -9,7 +9,7 @@ namespace FusionCanvas.Integration.Settings;
 
 public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
 {
-    private const int SupportedVersion = 5;
+    private const int SupportedVersion = 6;
 
     private static readonly JsonSerializerOptions WriteOptions = new()
     {
@@ -221,7 +221,15 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
                 Reasoning = settings.Reasoning is null ||
                     !Enum.IsDefined(settings.Reasoning.Mode)
                     ? AiReasoningSettings.ProviderDefault
-                    : settings.Reasoning
+                    : settings.Reasoning,
+                Routing = settings.Routing is null ||
+                    !Enum.IsDefined(settings.Routing.Mode)
+                    ? AiRoutingPolicy.Automatic
+                    : settings.Routing with
+                    {
+                        ProviderId = string.IsNullOrWhiteSpace(settings.Routing.ProviderId) ? null : settings.Routing.ProviderId.Trim(),
+                        EndpointId = string.IsNullOrWhiteSpace(settings.Routing.EndpointId) ? null : settings.Routing.EndpointId.Trim()
+                    }
         };
 
     private static WindowLayoutSettings? TryReadWindowLayout(JsonElement root, out string? warning)

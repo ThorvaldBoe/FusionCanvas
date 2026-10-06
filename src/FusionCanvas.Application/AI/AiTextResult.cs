@@ -14,6 +14,8 @@ public sealed record AiTextResult(
     TimeSpan? RetryAfter,
     string? PartialText)
 {
+    public AiGenerationReceipt RoutingReceipt { get; init; } = AiGenerationReceipt.Unavailable;
+
     public static AiTextResult Success(
         string text,
         string requestedModel,
@@ -21,14 +23,34 @@ public sealed record AiTextResult(
         string? provider = null,
         string? finishReason = null,
         AiTextUsage? usage = null,
-        string? generationId = null) =>
-        new(true, text, requestedModel, actualModel, provider, finishReason, usage, generationId, null, null, null, null);
+        string? generationId = null,
+        AiRoutingPolicy? routing = null,
+        string? actualEndpoint = null) =>
+        new(true, text, requestedModel, actualModel, provider, finishReason, usage, generationId, null, null, null, null)
+        {
+            RoutingReceipt = new(
+                requestedModel,
+                routing?.Mode ?? AiRoutingMode.Automatic,
+                routing?.ProviderId,
+                routing?.EndpointId,
+                actualModel,
+                provider,
+                actualEndpoint,
+                finishReason,
+                usage,
+                usage?.Cost,
+                generationId)
+        };
 
     public static AiTextResult Failure(
         AiTextFailureKind kind,
         string message,
         string? requestedModel = null,
         TimeSpan? retryAfter = null,
-        string? partialText = null) =>
-        new(false, null, requestedModel, null, null, null, null, null, kind, message, retryAfter, partialText);
+        string? partialText = null,
+        AiRoutingPolicy? routing = null) =>
+        new(false, null, requestedModel, null, null, null, null, null, kind, message, retryAfter, partialText)
+        {
+            RoutingReceipt = AiGenerationReceipt.ForRequest(requestedModel, routing)
+        };
 }
