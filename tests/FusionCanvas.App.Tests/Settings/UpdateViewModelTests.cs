@@ -73,8 +73,7 @@ public sealed class UpdateViewModelTests
         var vm = new UpdateViewModel(service);
 
         await ExecuteAsync(vm.CheckCommand);
-        vm.UpdateCommand.Execute(null);
-        await ((AsyncRelayCommand)vm.UpdateCommand).ExecutionTask!.WaitAsync(TimeSpan.FromSeconds(3));
+        await ExecuteAsync(vm.UpdateCommand);
 
         Assert.Equal(UpdatePresentationStatus.Error, vm.Status);
         Assert.True(vm.IsDownloadRetryAvailable);
