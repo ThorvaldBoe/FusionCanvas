@@ -116,6 +116,7 @@ public sealed class UpdateViewModelTests
         vm.UpdateCommand.Execute(null);
         await service.DownloadStarted.Task.WaitAsync(TimeSpan.FromSeconds(3));
         Assert.Equal(UpdatePresentationStatus.Downloading, vm.Status);
+        Assert.True(vm.IsCancelVisible);
         Assert.True(vm.CancelCommand.CanExecute(null));
 
         vm.CancelCommand.Execute(null);
@@ -124,6 +125,7 @@ public sealed class UpdateViewModelTests
         Assert.Equal(UpdatePresentationStatus.UpdateAvailable, vm.Status);
         Assert.Null(vm.ErrorMessage);
         Assert.False(vm.IsDownloadRetryAvailable);
+        Assert.False(vm.IsCancelVisible);
         Assert.True(vm.UpdateCommand.CanExecute(null));
     }
 
@@ -189,7 +191,6 @@ public sealed class UpdateViewModelTests
             {
                 throw DownloadException;
             }
-
             return Package ?? throw new InvalidOperationException();
         }
 
