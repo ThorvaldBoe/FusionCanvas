@@ -41,4 +41,5 @@ public sealed record MainWindowApplicationServices(
     IMockupSourceMetadataAssistanceService? MockupSourceMetadataAssistance = null,
     IMockupSourceImageContentReader? MockupSourceImageContentReader = null,
     IMockupPlacementPreviewReader? MockupPlacementPreviewReader = null,
-    IGlobalColorRemovalService? GlobalColorRemoval = null);
+    IGlobalColorRemovalService? GlobalColorRemoval = null,
+    IMockupOutputResolutionSettingsService? MockupOutputResolutionSettings = null);

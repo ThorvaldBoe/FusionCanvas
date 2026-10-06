@@ -146,6 +146,7 @@ public static class AppWorkspaceFactory
             new PersistedSnowcloneCatalog(snowcloneLibrary),
             ideationAccess);
         var workspaceBatchRollback = new WorkspaceBatchRollbackService(repository);
+        var mockupOutputResolutionSettings = new MockupOutputResolutionSettingsService(repository);
         var mainWindowServices = new MainWindowApplicationServices(
             storeManagement,
             nicheManagement,
@@ -171,7 +172,8 @@ public static class AppWorkspaceFactory
             mockupSourceMetadataAssistance,
             mockupSourceImageContent,
             mockupPlacementPreviewReader,
-            globalColorRemoval);
+            globalColorRemoval,
+            mockupOutputResolutionSettings);
         return new AppWorkspaceRuntime(
             repository,
             new WorkspaceManagementService(

@@ -209,7 +209,7 @@ public sealed class LocalMockupTemplateReadinessTests
 
     private sealed class StubCompositor : IMockupRasterCompositor
     {
-        public Task<Stream> ComposeAsync(Stream template, Stream design, MockupImageSpaceMapping mapping, CancellationToken cancellationToken = default) =>
+        public Task<Stream> ComposeAsync(Stream template, Stream design, MockupImageSpaceMapping mapping, int maximumLongEdgePixels = MockupOutputResolutionPolicy.DefaultMaximumLongEdgePixels, CancellationToken cancellationToken = default) =>
             Task.FromResult<Stream>(new MemoryStream([1, 2, 3]));
     }
 

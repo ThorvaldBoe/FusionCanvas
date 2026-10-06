@@ -23,7 +23,7 @@
       <TextBlock Text="Upload source images first, then configure each selected image independently." TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
     </StackPanel>
 
-    <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="16">
+    <Grid Grid.Row="1" ColumnDefinitions="*,*,*" ColumnSpacing="16">
       <StackPanel Grid.Column="0" Spacing="4">
         <TextBlock Text="Template name" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
         <TextBox x:Name="TemplateNameTextBox" Text="{Binding TemplateName}" PlaceholderText="Mockup Template name" Classes="field" IsReadOnly="{Binding !CanEdit}" AutomationProperties.Name="Template name" />
@@ -31,6 +31,18 @@
       <StackPanel Grid.Column="1" Spacing="4">
         <TextBlock Text="Shared Design Area" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
         <ComboBox ItemsSource="{Binding AvailablePlaceholders}" SelectedItem="{Binding SelectedPlaceholder}" DisplayMemberBinding="{Binding Name}" PlaceholderText="Linked Design Area" IsEnabled="{Binding CanEdit}" AutomationProperties.Name="Shared Design Area" />
+      </StackPanel>
+      <StackPanel Grid.Column="2" Spacing="4">
+        <TextBlock Text="Maximum mockup long edge (px)" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <TextBox Text="{Binding MaximumMockupLongEdgeText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 PlaceholderText="2000" Classes="field" IsReadOnly="{Binding !CanEdit}"
+                 AutomationProperties.Name="Maximum mockup long edge in pixels"
+                 AutomationProperties.HelpText="{Binding MaximumMockupLongEdgeHelpText}" />
+        <TextBlock Text="{Binding MaximumMockupLongEdgeHelpText}" TextWrapping="Wrap"
+                   Foreground="{DynamicResource SecondaryTextBrush}" FontSize="12" />
+        <TextBlock Text="{Binding MaximumMockupLongEdgeValidationMessage}"
+                   IsVisible="{Binding HasMaximumMockupLongEdgeValidationMessage}"
+                   Foreground="{DynamicResource WarningTextBrush}" TextWrapping="Wrap" FontSize="12" />
       </StackPanel>
     </Grid>
 

@@ -1,6 +1,7 @@
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.Workspaces;
+using System.Text.Json;
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Domain.Items;
@@ -32,6 +33,27 @@ public sealed class MockupGenerationApplicabilityRegressionTests
         var result = await fixture.Service(compositor).ApplyAsync(new(fixture.Item.Id, fixture.Template.Id));
         Assert.True(result.Succeeded); Assert.Empty(result.Diagnostics); Assert.Single(result.Outputs); Assert.Equal("Black", result.Outputs[0].ColorValue);
         Assert.Equal(1, compositor.Calls); Assert.Equal(1, fixture.Files.SaveCount);
+    }
+
+    [Fact]
+    public async Task Apply_uses_store_resolution_and_records_rendered_dimensions()
+    {
+        var fixture = CreateFixture(false);
+        var configuredStore = fixture.Snapshot.Stores.Single() with { MetadataJson = "{\"mockupMaximumLongEdgePixels\":1200}" };
+        var repository = new MemoryRepository(fixture.Snapshot with { Stores = [configuredStore] });
+        var compositor = new CountingCompositor();
+        var service = new MockupGenerationService(repository, fixture.Files, new MockupTemplateSetupService(repository), compositor);
+
+        var result = await service.ApplyAsync(new(fixture.Item.Id, fixture.Template.Id));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(1200, compositor.LastMaximumLongEdgePixels);
+        var originalAssetIds = fixture.Snapshot.Assets.Select(asset => asset.Id).ToHashSet();
+        var generated = Assert.Single(repository.Snapshot.Assets.Where(asset => !originalAssetIds.Contains(asset.Id)));
+        using var metadata = JsonDocument.Parse(generated.MetadataJson);
+        Assert.Equal(1200, metadata.RootElement.GetProperty("renderedWidth").GetInt32());
+        Assert.Equal(1200, metadata.RootElement.GetProperty("renderedHeight").GetInt32());
+        Assert.Equal(1200, metadata.RootElement.GetProperty("maximumLongEdgePixels").GetInt32());
     }
 
     [Fact]
@@ -125,6 +147,6 @@ public sealed class MockupGenerationApplicabilityRegressionTests
             return Task.CompletedTask;
         }
     }
-    private sealed class CountingCompositor : IMockupRasterCompositor { public int Calls { get; private set; } public Task<Stream> ComposeAsync(Stream template, Stream design, MockupImageSpaceMapping mapping, CancellationToken cancellationToken = default) { Calls++; return Task.FromResult<Stream>(new MemoryStream([1])); } }
+    private sealed class CountingCompositor : IMockupRasterCompositor { public int Calls { get; private set; } public int LastMaximumLongEdgePixels { get; private set; } public Task<Stream> ComposeAsync(Stream template, Stream design, MockupImageSpaceMapping mapping, int maximumLongEdgePixels = MockupOutputResolutionPolicy.DefaultMaximumLongEdgePixels, CancellationToken cancellationToken = default) { Calls++; LastMaximumLongEdgePixels = maximumLongEdgePixels; return Task.FromResult<Stream>(new MemoryStream([1])); } }
     private sealed class MemoryFiles : IWorkspaceFileOutputStore { public string WorkspaceRoot => "unused"; public string ResolvePath(string workspaceRelativePath) => Path.Combine(WorkspaceRoot, workspaceRelativePath); public int SaveCount { get; private set; } public bool Exists(string workspaceRelativePath) => true; public bool TryDelete(string workspaceRelativePath) => true; public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default) => Task.FromResult<Stream>(new MemoryStream([1])); public Task<ManagedWorkspaceFile> SaveAsync(string fileName, AssetKind kind, Stream content, CancellationToken cancellationToken = default) { SaveCount++; return Task.FromResult(new ManagedWorkspaceFile(fileName, kind, $"assets/output-{SaveCount}.png", "unused", "unused")); } public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, AssetKind kind, CancellationToken cancellationToken = default) => throw new NotSupportedException(); public Task ExportCopyAsync(string workspaceRelativePath, string destinationPath, CancellationToken cancellationToken = default) => throw new NotSupportedException(); }
 }
