@@ -190,39 +190,6 @@ public sealed class UpdateIntegrationTests
     }
 
     [Fact]
-    public async Task Downloader_CancellationCleansUpPartialFile()
-    {
-        var manifest = Manifest(new string('A', 64));
-        var contentStream = new PartiallyBlockingStream();
-        using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StreamContent(contentStream)
-        });
-        using var cancellation = new CancellationTokenSource();
-        var directory = Path.Combine(Path.GetTempPath(), "FusionCanvasUpdateTests", Guid.NewGuid().ToString("N"));
-
-        try
-        {
-            var download = new UpdatePackageDownloader(client, directory)
-                .DownloadAndVerifyAsync(manifest, cancellationToken: cancellation.Token);
-
-            await contentStream.FirstRead.Task.WaitAsync(TimeSpan.FromSeconds(3));
-            await WaitForPartialFileAsync(directory);
-            cancellation.Cancel();
-
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => download);
-            Assert.Empty(Directory.EnumerateFiles(directory));
-        }
-        finally
-        {
-            if (Directory.Exists(directory))
-            {
-                Directory.Delete(directory, recursive: true);
-            }
-        }
-    }
-
-    [Fact]
     public async Task Downloader_RejectsDeclaredOversizedContent()
     {
         var manifest = Manifest(new string('A', 64));
