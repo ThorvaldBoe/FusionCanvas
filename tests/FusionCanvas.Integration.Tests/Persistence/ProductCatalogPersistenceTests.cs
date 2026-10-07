@@ -52,6 +52,44 @@ public class ProductCatalogPersistenceTests
     }
 
     [Fact]
+    public async Task SaveAndLoadAsync_RoundTripsExternalListingMapping()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var store = new Store(Guid.NewGuid(), "The Groan Zone", null, false, Now, Now, "{}");
+        var item = new Item(Guid.NewGuid(), store.Id, null, null, "Dad Joke Loading…", null, ItemStatus.Draft, WorkflowStage.Listing, false, Now, Now, "{}");
+        var mapping = new ExternalListingMapping(
+            store.Id,
+            item.Id,
+            "printify",
+            "shop-123",
+            "product-456",
+            "shopify-789",
+            "dad-joke-loading",
+            ExternalListingSyncState.Synchronized,
+            ExternalListingPublicationState.Published,
+            ExternalListingOperationState.Succeeded,
+            "{\"price\":\"30\"}",
+            null,
+            Now,
+            Now,
+            Now,
+            "{\"asset-1\":\"upload-1\"}",
+            "{\"title\":\"Accepted remote title\"}");
+        var snapshot = new WorkspaceSnapshot([WorkspaceSnapshot.DefaultWorkspace(Now)], [store], [], [], [item], [], [], [], [], [])
+        {
+            ExternalListingMappings = [mapping]
+        };
+
+        var repository = new SqliteWorkspaceRepository(tempDirectory.GetPath("mapping.db"));
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(mapping, Assert.Single(loaded.ExternalListingMappings));
+        Assert.Equal(mapping.UploadReferencesJson, loaded.ExternalListingMappings[0].UploadReferencesJson);
+        Assert.Equal(mapping.IntegrationValuesJson, loaded.ExternalListingMappings[0].IntegrationValuesJson);
+    }
+
+    [Fact]
     public async Task SaveAndLoadAsync_RoundTripsNormalizedOfferingAndMockupModel()
     {
         using var tempDirectory = new TemporaryDirectory();
@@ -143,7 +181,7 @@ public class ProductCatalogPersistenceTests
 
         Assert.Equal(template, Assert.Single(loaded.MockupTemplates));
         Assert.Equal(revision, Assert.Single(loaded.MockupTemplateRevisions));
-        Assert.Equal(20, SqliteWorkspaceRepository.CurrentSchemaVersion);
+        Assert.Equal(22, SqliteWorkspaceRepository.CurrentSchemaVersion);
     }
 
     [Fact]

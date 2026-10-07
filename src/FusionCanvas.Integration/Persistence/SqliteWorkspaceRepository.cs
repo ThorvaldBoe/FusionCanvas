@@ -33,7 +33,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
 
-        foreach (var table in new[] { "content_risk_reviews", "mockup_template_revision_source_image_values", "mockup_template_revision_source_images", "mockup_template_source_image_values", "mockup_template_source_images", "mockup_template_revision_colors", "mockup_template_revisions", "mockup_template_colors", "mockup_templates", "placeholder_variants", "offering_placeholders", "offering_variant_values", "offering_variants", "offering_option_values", "offering_options", "blueprint_offerings", "print_providers", "catalog_blueprints", "design_slot_assignments", "design_variant_row_colors", "design_variant_rows", "design_selected_colors", "item_listing_configuration", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
+        foreach (var table in new[] { "external_listing_mappings", "content_risk_reviews", "mockup_template_revision_source_image_values", "mockup_template_revision_source_images", "mockup_template_source_image_values", "mockup_template_source_images", "mockup_template_revision_colors", "mockup_template_revisions", "mockup_template_colors", "mockup_templates", "placeholder_variants", "offering_placeholders", "offering_variant_values", "offering_variants", "offering_option_values", "offering_options", "blueprint_offerings", "print_providers", "catalog_blueprints", "design_slot_assignments", "design_variant_row_colors", "design_variant_rows", "design_selected_colors", "item_listing_configuration", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
         {
             await ExecuteAsync(connection, transaction, $"DELETE FROM {QuoteIdentifier(table)};", cancellationToken);
         }
@@ -114,6 +114,11 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         foreach (var listing in snapshot.Items)
         {
             await InsertItemAsync(connection, transaction, listing, cancellationToken);
+        }
+
+        foreach (var mapping in snapshot.ExternalListingMappings)
+        {
+            await InsertExternalListingMappingAsync(connection, transaction, mapping, cancellationToken);
         }
 
         foreach (var asset in snapshot.Assets)
@@ -229,6 +234,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             ,MockupTemplateRevisionSourceImages = await LoadMockupTemplateRevisionSourceImagesAsync(connection, cancellationToken)
             ,MockupTemplateRevisionSourceImageOptionValues = await LoadMockupTemplateRevisionSourceImageOptionValuesAsync(connection, cancellationToken)
             ,ContentRiskReviews = await LoadContentRiskReviewsAsync(connection, cancellationToken)
+            ,ExternalListingMappings = await LoadExternalListingMappingsAsync(connection, cancellationToken)
         };
     }
 
@@ -586,6 +592,28 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 review_version INTEGER NOT NULL,
                 PRIMARY KEY (owner_id, owner_kind, content_kind, role)
             );
+
+            CREATE TABLE IF NOT EXISTS external_listing_mappings (
+                store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                provider_key TEXT NOT NULL,
+                shop_id TEXT NOT NULL,
+                product_id TEXT NULL,
+                external_publication_id TEXT NULL,
+                external_handle TEXT NULL,
+                synchronization_state INTEGER NOT NULL,
+                publication_state INTEGER NOT NULL,
+                operation_state INTEGER NOT NULL,
+                snapshot_json TEXT NULL,
+                operation_json TEXT NULL,
+                upload_references_json TEXT NULL,
+                integration_values_json TEXT NULL,
+                last_synchronized_at TEXT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (store_id, item_id),
+                UNIQUE (provider_key, shop_id, product_id)
+            );
             """;
 
         await ExecuteAsync(connection, null, sql, cancellationToken);
@@ -644,6 +672,8 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         await ApplyMigrationAsync(18, () => MigrateToVersion18Async(connection, cancellationToken));
         await ApplyMigrationAsync(19, () => MigrateToVersion19Async(connection, cancellationToken));
         await ApplyMigrationAsync(20, () => MigrateToVersion20Async(connection, cancellationToken));
+        await ApplyMigrationAsync(21, () => MigrateToVersion21Async(connection, cancellationToken));
+        await ApplyMigrationAsync(22, () => MigrateToVersion22Async(connection, cancellationToken));
 
         await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
     }
@@ -696,6 +726,38 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 PRIMARY KEY (owner_id, owner_kind, content_kind, role)
             );
             """, cancellationToken);
+
+    private static Task MigrateToVersion21Async(SqliteConnection connection, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, null, """
+            CREATE TABLE IF NOT EXISTS external_listing_mappings (
+                store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                provider_key TEXT NOT NULL,
+                shop_id TEXT NOT NULL,
+                product_id TEXT NULL,
+                external_publication_id TEXT NULL,
+                external_handle TEXT NULL,
+                synchronization_state INTEGER NOT NULL,
+                publication_state INTEGER NOT NULL,
+                operation_state INTEGER NOT NULL,
+                snapshot_json TEXT NULL,
+                operation_json TEXT NULL,
+                upload_references_json TEXT NULL,
+                last_synchronized_at TEXT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (store_id, item_id),
+                UNIQUE (provider_key, shop_id, product_id)
+            );
+            """, cancellationToken);
+
+    private static async Task MigrateToVersion22Async(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        if (!await ColumnExistsAsync(connection, "external_listing_mappings", "integration_values_json", cancellationToken).ConfigureAwait(false))
+        {
+            await ExecuteAsync(connection, null, "ALTER TABLE external_listing_mappings ADD COLUMN integration_values_json TEXT NULL;", cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     private static async Task MigrateToVersion13Async(SqliteConnection connection, CancellationToken cancellationToken)
     {
@@ -1606,6 +1668,39 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             VALUES ($id, $store_id, $name, $description, $kind, $workspace_relative_path, $original_source_path, $is_missing, $is_archived, $created_at, $updated_at, $metadata_json);
             """, cancellationToken, [.. CommonParameters(asset), ("$store_id", asset.StoreId.ToString()), ("$kind", (int)asset.Kind), ("$workspace_relative_path", asset.WorkspaceRelativePath), ("$original_source_path", asset.OriginalSourcePath), ("$is_missing", asset.IsMissing ? 1 : 0)]);
 
+    private static Task InsertExternalListingMappingAsync(
+        SqliteConnection connection,
+        System.Data.Common.DbTransaction transaction,
+        ExternalListingMapping mapping,
+        CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, transaction, """
+            INSERT INTO external_listing_mappings
+                (store_id, item_id, provider_key, shop_id, product_id, external_publication_id,
+                 external_handle, synchronization_state, publication_state, operation_state,
+                 snapshot_json, operation_json, upload_references_json, integration_values_json, last_synchronized_at, created_at, updated_at)
+            VALUES
+                ($store_id, $item_id, $provider_key, $shop_id, $product_id, $external_publication_id,
+                 $external_handle, $synchronization_state, $publication_state, $operation_state,
+                 $snapshot_json, $operation_json, $upload_references_json, $integration_values_json, $last_synchronized_at, $created_at, $updated_at);
+            """, cancellationToken,
+            ("$store_id", mapping.StoreId.ToString()),
+            ("$item_id", mapping.ItemId.ToString()),
+            ("$provider_key", mapping.ProviderKey),
+            ("$shop_id", mapping.ShopId),
+            ("$product_id", mapping.ProductId),
+            ("$external_publication_id", mapping.ExternalPublicationId),
+            ("$external_handle", mapping.ExternalHandle),
+            ("$synchronization_state", (int)mapping.SynchronizationState),
+            ("$publication_state", (int)mapping.PublicationState),
+            ("$operation_state", (int)mapping.OperationState),
+            ("$snapshot_json", mapping.SnapshotJson),
+            ("$operation_json", mapping.OperationJson),
+            ("$upload_references_json", mapping.UploadReferencesJson),
+            ("$integration_values_json", mapping.IntegrationValuesJson),
+            ("$last_synchronized_at", mapping.LastSynchronizedAt?.ToString("O")),
+            ("$created_at", mapping.CreatedAt.ToString("O")),
+            ("$updated_at", mapping.UpdatedAt.ToString("O")));
+
     private static Task InsertPromptAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, Prompt prompt, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, """
             INSERT INTO prompts (id, store_id, item_id, name, description, text, is_archived, created_at, updated_at, metadata_json)
@@ -2016,6 +2111,36 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         }
 
         return rejections;
+    }
+
+    private static async Task<IReadOnlyList<ExternalListingMapping>> LoadExternalListingMappingsAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        var mappings = new List<ExternalListingMapping>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM external_listing_mappings ORDER BY created_at, store_id, item_id;", cancellationToken))
+        {
+            mappings.Add(new ExternalListingMapping(
+                ReadGuid(reader, "store_id"),
+                ReadGuid(reader, "item_id"),
+                ReadString(reader, "provider_key"),
+                ReadString(reader, "shop_id"),
+                ReadNullableString(reader, "product_id"),
+                ReadNullableString(reader, "external_publication_id"),
+                ReadNullableString(reader, "external_handle"),
+                (ExternalListingSyncState)ReadInt(reader, "synchronization_state"),
+                (ExternalListingPublicationState)ReadInt(reader, "publication_state"),
+                (ExternalListingOperationState)ReadInt(reader, "operation_state"),
+                ReadNullableString(reader, "snapshot_json"),
+                ReadNullableString(reader, "operation_json"),
+                ReadNullableDate(reader, "last_synchronized_at"),
+                ReadDate(reader, "created_at"),
+                ReadDate(reader, "updated_at"),
+                ReadNullableString(reader, "upload_references_json"),
+                ReadNullableString(reader, "integration_values_json")));
+        }
+
+        return mappings;
     }
 
     private static async Task<IReadOnlyList<Asset>> LoadAssetsAsync(SqliteConnection connection, CancellationToken cancellationToken)
@@ -2435,6 +2560,26 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         }
 
         var itemIds = snapshot.Items.Select(item => item.Id).ToHashSet();
+        var mappingKeys = new HashSet<(Guid StoreId, Guid ItemId)>();
+        var remoteIdentityKeys = new HashSet<(string ProviderKey, string ShopId, string ProductId)>();
+        foreach (var mapping in snapshot.ExternalListingMappings)
+        {
+            if (!storeIds.Contains(mapping.StoreId) || !snapshot.Items.Any(item => item.Id == mapping.ItemId && item.StoreId == mapping.StoreId))
+            {
+                throw new InvalidOperationException("Every external listing mapping must reference an existing Item in its Store.");
+            }
+
+            if (!mappingKeys.Add((mapping.StoreId, mapping.ItemId)))
+            {
+                throw new InvalidOperationException("An Item may have only one external listing mapping per Store.");
+            }
+
+            if (mapping.ProductId is not null && !remoteIdentityKeys.Add((mapping.ProviderKey, mapping.ShopId, mapping.ProductId)))
+            {
+                throw new InvalidOperationException("An external product identity may be mapped only once.");
+            }
+        }
+
         foreach (var row in snapshot.DesignVariantRows)
         {
             if (!itemIds.Contains(row.ItemId))

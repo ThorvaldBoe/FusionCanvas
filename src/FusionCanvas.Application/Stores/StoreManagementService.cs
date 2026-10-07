@@ -133,6 +133,17 @@ public sealed class StoreManagementService : IStoreManagementService
         }
 
         var context = request.Context ?? _contextMapper.Read(existing);
+        var previousContext = _contextMapper.Read(existing);
+        if (previousContext.PrintifyShopId != context.PrintifyShopId)
+        {
+            var mappedCount = snapshot.ExternalListingMappings.Count(value => value.StoreId == existing.Id);
+            if (mappedCount > 0)
+            {
+                return StoreManagementResult.Failure(
+                    $"The selected Printify shop cannot be changed while {mappedCount} Item mapping{(mappedCount == 1 ? " is" : "s are")} active. Disconnect or migrate the mappings before selecting another shop.",
+                    BuildState(snapshot));
+            }
+        }
         var fulfillmentStrategy = request.FulfillmentStrategy ?? existing.FulfillmentStrategy;
         if (!Enum.IsDefined(fulfillmentStrategy) || !FulfillmentStrategyPolicy.IsAvailable(fulfillmentStrategy))
         {

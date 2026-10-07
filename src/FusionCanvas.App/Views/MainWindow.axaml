@@ -769,6 +769,100 @@
                     </StackPanel>
                   </Border>
 
+                  <Border IsVisible="{Binding ShowsPrintifyStageTool}"
+                          Padding="14"
+                          Background="{DynamicResource ElevatedSurfaceBrush}"
+                          BorderBrush="{DynamicResource ControlBorderBrush}"
+                          BorderThickness="1"
+                          CornerRadius="6">
+                    <StackPanel Spacing="8">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="Printify listing"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource StrongTextBrush}" />
+                        <Border Grid.Column="1"
+                                Padding="7,2"
+                                CornerRadius="8"
+                                Background="{DynamicResource SuccessBrush}"
+                                AutomationProperties.Name="Printify connection status">
+                          <TextBlock Text="{Binding PrintifyTool.ConnectionStatus}" FontSize="11" />
+                        </Border>
+                      </Grid>
+                      <TextBlock Text="{Binding PrintifyTool.Status}" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <TextBlock Text="{Binding PrintifyTool.ProductSummary}" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <TextBlock Text="Title" FontWeight="SemiBold" />
+                      <TextBox Text="{Binding PrintifyTool.Title, Mode=TwoWay}" AutomationProperties.Name="Printify title" />
+                      <TextBlock Text="Description" FontWeight="SemiBold" />
+                      <TextBox Text="{Binding PrintifyTool.Description, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="52" AutomationProperties.Name="Printify description" />
+                      <TextBlock Text="Shipping profile" FontWeight="SemiBold" />
+                      <TextBox Text="{Binding PrintifyTool.ShippingProfile, Mode=TwoWay}" AutomationProperties.Name="Printify shipping profile" />
+                      <TextBlock Text="Out-of-stock policy" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding PrintifyTool.OutOfStockPolicy}"
+                                 Foreground="{DynamicResource SecondaryTextBrush}"
+                                 AutomationProperties.Name="Printify out-of-stock policy" />
+                      <TextBlock Text="Fixed retail price" FontWeight="SemiBold" />
+                      <TextBox Text="{Binding PrintifyTool.PriceAmount, Mode=TwoWay}" AutomationProperties.Name="Printify fixed retail price" />
+                      <TextBlock Text="{Binding PrintifyTool.VariantSummary}" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <TextBlock Text="{Binding PrintifyTool.ArtworkSummary}" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <TextBlock Text="{Binding PrintifyTool.ErrorMessage}"
+                                 IsVisible="{Binding PrintifyTool.HasError}"
+                                 TextWrapping="Wrap"
+                                 Foreground="{DynamicResource DangerTextBrush}"
+                                 AutomationProperties.AutomationId="Printify.Error" />
+                      <TextBlock Text="{Binding PrintifyTool.FeedbackMessage}"
+                                 IsVisible="{Binding PrintifyTool.HasFeedback}"
+                                 TextWrapping="Wrap"
+                                 Foreground="{DynamicResource StrongTextBrush}" />
+                      <Border IsVisible="{Binding PrintifyTool.HasConflict}"
+                              Padding="8"
+                              Background="{DynamicResource WarningSurfaceBrush}"
+                              BorderBrush="{DynamicResource WarningTextBrush}"
+                              BorderThickness="1">
+                        <StackPanel Spacing="5">
+                          <TextBlock Text="Printify changed values outside Fusion Canvas. Choose which values to keep." TextWrapping="Wrap" FontWeight="SemiBold" />
+                          <TextBlock Text="{Binding PrintifyTool.ConflictSummary}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Button Content="Accept Printify changes" Command="{Binding PrintifyTool.AcceptRemoteCommand}" />
+                            <Button Content="Keep Fusion Canvas values" Command="{Binding PrintifyTool.KeepLocalCommand}" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Button Content="Create / update" Command="{Binding PrintifyTool.CreateOrUpdateCommand}" AutomationProperties.AutomationId="Printify.CreateOrUpdate" />
+                        <Button Content="Refresh" Command="{Binding PrintifyTool.RefreshCommand}" />
+                        <Button Content="Publish" Command="{Binding PrintifyTool.PublishCommand}" />
+                        <Button Content="Unpublish" Command="{Binding PrintifyTool.UnpublishCommand}" />
+                      </StackPanel>
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Button Content="Archive locally" Command="{Binding PrintifyTool.ArchiveCommand}" />
+                        <Button Content="Delete remote draft"
+                                Command="{Binding PrintifyTool.DeleteCommand}"
+                                Classes="danger"
+                                IsVisible="{Binding !PrintifyTool.IsDeleteConfirmationVisible}"
+                                AutomationProperties.AutomationId="Printify.Delete" />
+                        <Border IsVisible="{Binding PrintifyTool.IsDeleteConfirmationVisible}"
+                                Background="{DynamicResource DangerBackgroundBrush}"
+                                CornerRadius="4"
+                                Padding="8"
+                                AutomationProperties.Name="Printify delete confirmation">
+                          <StackPanel Spacing="6">
+                            <TextBlock Text="{Binding PrintifyTool.DeleteConfirmationText}" TextWrapping="Wrap" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <Button Content="Delete permanently"
+                                      Command="{Binding PrintifyTool.ConfirmDeleteCommand}"
+                                      Classes="danger"
+                                      AutomationProperties.AutomationId="Printify.ConfirmDelete" />
+                              <Button Content="Cancel"
+                                      Command="{Binding PrintifyTool.CancelDeleteCommand}"
+                                      AutomationProperties.AutomationId="Printify.CancelDelete" />
+                            </StackPanel>
+                          </StackPanel>
+                        </Border>
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+
                   <Border Padding="14"
                           Background="{DynamicResource ElevatedSurfaceBrush}"
                           BorderBrush="{DynamicResource ControlBorderBrush}"

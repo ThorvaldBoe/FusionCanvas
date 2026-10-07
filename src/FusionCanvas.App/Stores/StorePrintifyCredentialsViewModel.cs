@@ -52,7 +52,27 @@ public sealed class StorePrintifyCredentialsViewModel(IStorePrintifyConfiguratio
     public event EventHandler<int?>? ShopSelectionChanged;
     public bool HasKey => _kind == PrintifyConfigurationKind.Available;
     public bool IsMissing => _kind == PrintifyConfigurationKind.Missing;
-    public bool HasError => _kind is PrintifyConfigurationKind.Unavailable or PrintifyConfigurationKind.InvalidContext;
+    public bool HasError => _kind is PrintifyConfigurationKind.InvalidKey
+        or PrintifyConfigurationKind.PermissionDenied
+        or PrintifyConfigurationKind.RateLimited
+        or PrintifyConfigurationKind.NetworkFailure
+        or PrintifyConfigurationKind.UnexpectedResponse
+        or PrintifyConfigurationKind.Unavailable
+        or PrintifyConfigurationKind.InvalidContext;
+    public bool HasRepairGuidance => !string.IsNullOrWhiteSpace(RepairGuidance);
+    public string RepairGuidance => _kind switch
+    {
+        PrintifyConfigurationKind.Missing => "Add a Printify API key, then save and verify it before using Printify listing actions.",
+        PrintifyConfigurationKind.Available when !_persistedPrintify => "Save the selected Printify strategy before verifying the connection.",
+        PrintifyConfigurationKind.InvalidKey => "Replace the API key with a valid, non-expired Printify key.",
+        PrintifyConfigurationKind.PermissionDenied => "Use a Printify key with permission to read and mutate the selected shop.",
+        PrintifyConfigurationKind.RateLimited => "Wait for the Printify rate limit to clear, then retry verification.",
+        PrintifyConfigurationKind.NetworkFailure => "Check the connection and retry verification. Local catalog and mappings are preserved.",
+        PrintifyConfigurationKind.UnexpectedResponse => "Retry verification. If the problem persists, inspect the Printify shop and API status.",
+        PrintifyConfigurationKind.Unavailable => "Unlock or repair native credential storage, then retry. Existing local data is preserved.",
+        PrintifyConfigurationKind.InvalidContext => "Save and select an active Store before managing its Printify connection.",
+        _ => string.Empty
+    };
     public bool CanManage => !_isDisposed && IsVisible && _scope is not null && !IsBusy && (HasKey || IsMissing);
     public bool CanVerify => CanManage && HasKey && _persistedPrintify;
     public bool ShowSaveGuidance => HasKey && !_persistedPrintify;

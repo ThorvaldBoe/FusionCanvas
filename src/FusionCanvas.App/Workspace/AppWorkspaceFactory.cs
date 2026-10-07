@@ -30,6 +30,10 @@ using FusionCanvas.Application.WorkspaceTree;
 using FusionCanvas.Integration.AI;
 using FusionCanvas.Integration.SllGeneration;
 using FusionCanvas.Integration.Mockups;
+using FusionCanvas.Application.Listings;
+using FusionCanvas.Application.Stores.Printify;
+using FusionCanvas.Integration.Stores.Printify;
+using FusionCanvas.App.StageTools;
 
 namespace FusionCanvas.App.Workspace;
 
@@ -76,6 +80,12 @@ public static class AppWorkspaceFactory
             static path => new SqliteWorkspaceRepository(path, useConnectionPooling: false);
         var snowcloneRepository = new SqliteSnowcloneRepository(databasePath);
         var fileStore = new LocalWorkspaceFileStore(workspaceRootPath);
+        var printifyCredentials = new NativeStorePrintifyCredentialStore();
+        var printifyListingFactory = new PrintifyListingLifecycleServiceFactory(
+            repository,
+            printifyCredentials,
+            fileStore,
+            PrintifyListingClient.CreateHttpClient());
         var workspaceTransfer = new WorkspaceTransferService(
             repository,
             fileStore,
@@ -171,7 +181,10 @@ public static class AppWorkspaceFactory
             mockupSourceMetadataAssistance,
             mockupSourceImageContent,
             mockupPlacementPreviewReader,
-            globalColorRemoval);
+            globalColorRemoval,
+            printifyListingFactory,
+            new WorkspaceListingProjectionSource(fileStore, rasterImageMetadata),
+            new FusionCanvas.Integration.Stores.StoreContextMapper());
         return new AppWorkspaceRuntime(
             repository,
             new WorkspaceManagementService(

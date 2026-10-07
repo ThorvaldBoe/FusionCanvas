@@ -1,19 +1,23 @@
-using System.Net;
-using System.Net.Http.Headers;
 using System.Text.Json;
 using FusionCanvas.Application.Stores.Printify;
 using FusionCanvas.Application.Telemetry;
-using System.Diagnostics;
 
 namespace FusionCanvas.Integration.Stores.Printify;
 
-public sealed class PrintifyCatalogClient(HttpClient client, ITelemetryRecorder? telemetry = null) : IPrintifyCatalogClient
+public sealed class PrintifyCatalogClient : IPrintifyCatalogClient
 {
-    private readonly ITelemetryRecorder? _telemetry = telemetry;
+    private readonly HttpClient _client;
+    private readonly PrintifyHttpTransport _transport;
     private sealed record ProductPage(IReadOnlyList<PrintifyShopProductSummary> Products, IReadOnlyList<PrintifyCatalogBlueprint> Details, int LastPage);
     public static Uri CatalogBaseUri { get; } = new("https://api.printify.com/v1/catalog/");
     public static Uri ApiBaseUri { get; } = new("https://api.printify.com/v1/");
     private const int MaximumResponseBytes = 4 * 1024 * 1024;
+
+    public PrintifyCatalogClient(HttpClient client, ITelemetryRecorder? telemetry = null)
+    {
+        _client = client ?? throw new ArgumentNullException(nameof(client));
+        _transport = new PrintifyHttpTransport(client, telemetry: telemetry);
+    }
 
     public static HttpClient CreateHttpClient() => new(new HttpClientHandler { AllowAutoRedirect = false })
     {
@@ -375,133 +379,31 @@ public sealed class PrintifyCatalogClient(HttpClient client, ITelemetryRecorder?
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(30));
-        var stopwatch = Stopwatch.StartNew();
-        var capture = _telemetry?.IsCaptureEnabled == true;
-        string? requestDetails = null;
+        var uri = Uri.TryCreate(relativePath, UriKind.Absolute, out var absolute)
+            ? absolute
+            : new Uri(_client.BaseAddress ?? ApiBaseUri, relativePath);
+        var response = await _transport.SendAsync(HttpMethod.Get, uri, key, maximumResponseBytes: MaximumResponseBytes, cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (!response.Succeeded)
+        {
+            return (null, response.Outcome switch
+            {
+                PrintifyTransportOutcome.InvalidCredential => new(PrintifyCatalogResultKind.InvalidKey, "The Printify key is invalid or expired."),
+                PrintifyTransportOutcome.PermissionDenied => new(PrintifyCatalogResultKind.PermissionDenied, "The Printify key lacks catalog permission."),
+                PrintifyTransportOutcome.RateLimited => new(PrintifyCatalogResultKind.RateLimited, "Printify is rate limiting requests. Try again later."),
+                PrintifyTransportOutcome.NetworkFailure => new(PrintifyCatalogResultKind.NetworkFailure, "Printify is temporarily unavailable. Try again later."),
+                _ => Unexpected()
+            });
+        }
+
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, relativePath);
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key.Trim());
-            request.Headers.UserAgent.ParseAdd("FusionCanvas");
-            request.Headers.Accept.Add(new("application/json"));
-            if (capture) requestDetails = JsonSerializer.Serialize(new { method = request.Method.Method, uri = new Uri(client.BaseAddress!, relativePath).ToString() });
-            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
-            var failure = Classify(response.StatusCode);
-            if (failure is not null)
-            {
-                if (capture)
-                {
-                    string? failureBody = null;
-                    if (response.Content.Headers.ContentLength is not { } failedLength || failedLength <= MaximumResponseBytes)
-                    {
-                        try
-                        {
-                            var (bodyBytes, exceeded) = await ReadBodyBoundedAsync(response.Content, timeout.Token).ConfigureAwait(false);
-                            failureBody = System.Text.Encoding.UTF8.GetString(bodyBytes);
-                            if (exceeded)
-                                await RecordHttpAsync(requestDetails!, response.StatusCode, stopwatch.Elapsed, failureBody, failure.Kind.ToString(), cancellationToken, bodyBytes.Length, truncated: true).ConfigureAwait(false);
-                            else
-                                await RecordHttpAsync(requestDetails!, response.StatusCode, stopwatch.Elapsed, failureBody, failure.Kind.ToString(), cancellationToken, bodyBytes.Length).ConfigureAwait(false);
-                        }
-                        catch (Exception exception) when (exception is not OperationCanceledException)
-                        {
-                            await RecordHttpAsync(requestDetails!, response.StatusCode, stopwatch.Elapsed, null, failure.Kind.ToString(), cancellationToken).ConfigureAwait(false);
-                        }
-                    }
-                    else
-                    {
-                        await RecordHttpAsync(requestDetails!, response.StatusCode, stopwatch.Elapsed, null, failure.Kind.ToString(), cancellationToken, failedLength, truncated: true).ConfigureAwait(false);
-                    }
-                }
-                return (null, failure);
-            }
-            if (response.Content.Headers.ContentLength > MaximumResponseBytes)
-            {
-                if (capture)
-                    await RecordHttpAsync(requestDetails!, response.StatusCode, stopwatch.Elapsed, null, "ResponseTooLarge", cancellationToken, response.Content.Headers.ContentLength, truncated: true).ConfigureAwait(false);
-                return (null, Unexpected());
-            }
-
-            await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false);
-            using var buffer = new MemoryStream();
-            var chunk = new byte[8192];
-            int count;
-            while ((count = await stream.ReadAsync(chunk, timeout.Token).ConfigureAwait(false)) != 0)
-            {
-                if (buffer.Length + count > MaximumResponseBytes)
-                {
-                    if (capture)
-                        await RecordHttpAsync(requestDetails!, response.StatusCode, stopwatch.Elapsed, null, "ResponseTooLarge", cancellationToken, buffer.Length, truncated: true).ConfigureAwait(false);
-                    return (null, Unexpected());
-                }
-                buffer.Write(chunk, 0, count);
-            }
-            if (capture)
-                await RecordHttpAsync(requestDetails!, response.StatusCode, stopwatch.Elapsed, System.Text.Encoding.UTF8.GetString(buffer.ToArray()), "Succeeded", cancellationToken, buffer.Length).ConfigureAwait(false);
-            return (JsonDocument.Parse(buffer.ToArray()), null);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            if (capture) await RecordHttpAsync(requestDetails ?? JsonSerializer.Serialize(new { method = "GET", uri = relativePath }), null, stopwatch.Elapsed, null, "Cancelled", CancellationToken.None).ConfigureAwait(false);
-            throw;
-        }
-        catch (OperationCanceledException)
-        {
-            if (capture) await RecordHttpAsync(requestDetails ?? JsonSerializer.Serialize(new { method = "GET", uri = relativePath }), null, stopwatch.Elapsed, null, "Timeout", CancellationToken.None).ConfigureAwait(false);
-            return (null, new(PrintifyCatalogResultKind.NetworkFailure, "Printify catalog retrieval timed out. Try again."));
-        }
-        catch (HttpRequestException)
-        {
-            if (capture) await RecordHttpAsync(requestDetails ?? JsonSerializer.Serialize(new { method = "GET", uri = relativePath }), null, stopwatch.Elapsed, null, "NetworkFailure", CancellationToken.None).ConfigureAwait(false);
-            return (null, new(PrintifyCatalogResultKind.NetworkFailure, "Printify could not be reached. Try again."));
-        }
-        catch (IOException)
-        {
-            if (capture) await RecordHttpAsync(requestDetails ?? JsonSerializer.Serialize(new { method = "GET", uri = relativePath }), null, stopwatch.Elapsed, null, "ReadFailure", CancellationToken.None).ConfigureAwait(false);
-            return (null, new(PrintifyCatalogResultKind.NetworkFailure, "Printify response could not be read. Try again."));
+            return (JsonDocument.Parse(response.Body), null);
         }
         catch (JsonException)
         {
-            if (capture) await RecordHttpAsync(requestDetails ?? JsonSerializer.Serialize(new { method = "GET", uri = relativePath }), null, stopwatch.Elapsed, null, "InvalidJson", CancellationToken.None).ConfigureAwait(false);
             return (null, Unexpected());
         }
     }
-
-    private static async Task<(byte[] Bytes, bool Exceeded)> ReadBodyBoundedAsync(HttpContent content, CancellationToken cancellationToken)
-    {
-        await using var stream = await content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        using var buffer = new MemoryStream(Math.Min(MaximumResponseBytes, 81920));
-        var chunk = new byte[81920];
-        while (buffer.Length <= MaximumResponseBytes)
-        {
-            var remaining = (int)Math.Min(chunk.Length, MaximumResponseBytes + 1L - buffer.Length);
-            var count = await stream.ReadAsync(chunk.AsMemory(0, remaining), cancellationToken).ConfigureAwait(false);
-            if (count == 0) break;
-            buffer.Write(chunk, 0, count);
-        }
-        return (buffer.ToArray(), buffer.Length > MaximumResponseBytes);
-    }
-
-    private Task RecordHttpAsync(string requestDetails, HttpStatusCode? statusCode, TimeSpan elapsed, string? body, string outcome, CancellationToken cancellationToken, long? bodyBytes = null, bool truncated = false) =>
-        _telemetry!.RecordAsync(new TelemetryEventRequest(
-            "Integration.Printify", "HttpRequest", statusCode is >= HttpStatusCode.BadRequest ? "Warning" : "Information",
-            outcome, statusCode is { } status ? $"HTTP {(int)status}" : outcome,
-            RequestDetailsJson: requestDetails,
-            ResponseBody: body,
-            ResponseDetailsJson: JsonSerializer.Serialize(new { statusCode = statusCode is null ? (int?)null : (int)statusCode, elapsedMilliseconds = elapsed.TotalMilliseconds, contentBytes = bodyBytes, truncated })),
-            cancellationToken);
-
-    private static PrintifyCatalogResult? Classify(HttpStatusCode statusCode) => statusCode switch
-    {
-        HttpStatusCode.Unauthorized => new(PrintifyCatalogResultKind.InvalidKey, "The Printify key is invalid or expired."),
-        HttpStatusCode.Forbidden => new(PrintifyCatalogResultKind.PermissionDenied, "The Printify key lacks catalog permission."),
-        HttpStatusCode.TooManyRequests => new(PrintifyCatalogResultKind.RateLimited, "Printify is rate limiting requests. Try again later."),
-        _ when (int)statusCode >= 500 => new(PrintifyCatalogResultKind.NetworkFailure, "Printify is temporarily unavailable. Try again later."),
-        HttpStatusCode.OK => null,
-        _ => Unexpected()
-    };
 
     private static PrintifyCatalogResult Unexpected() => new(PrintifyCatalogResultKind.UnexpectedResponse, "Printify returned an unexpected catalog response.");
 

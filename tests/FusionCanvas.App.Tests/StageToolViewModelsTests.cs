@@ -1,14 +1,202 @@
+using Avalonia.Headless.XUnit;
 using FusionCanvas.App.StageTools;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Domain.Mockups;
+using FusionCanvas.Application.Items;
+using FusionCanvas.Application.Listings;
+using FusionCanvas.Application.Stores;
+using FusionCanvas.Application.Workspaces;
+using FusionCanvas.App.Stores;
+using FusionCanvas.App.Tests.TestSupport;
+using FusionCanvas.Domain.Products;
+using FusionCanvas.Domain.Stores;
+using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Items;
-using FusionCanvas.Application.Items;
 
 namespace FusionCanvas.App.Tests;
 
 public class StageToolViewModelsTests
 {
+    [Fact]
+    public async Task PrintifyTool_FailsClosedWhenItemStoreIsUnavailable()
+    {
+        var vm = new PrintifyListingStageToolViewModel(
+            serviceFactory: null,
+            projectionSource: null,
+            snapshot: () => WorkspaceSnapshot.Empty,
+            storeResolver: _ => null,
+            storeContextMapper: new UnavailableStoreContextMapper());
+
+        await vm.LoadAsync(Guid.NewGuid(), canEdit: true, TestContext.Current.CancellationToken);
+
+        Assert.True(vm.HasError);
+        Assert.Contains("Store is unavailable", vm.ErrorMessage);
+        Assert.Equal("Unavailable", vm.ConnectionStatus);
+        Assert.False(vm.CanCreateOrUpdate);
+        Assert.False(vm.CanPublish);
+    }
+
+    [AvaloniaFact]
+    public async Task PrintifyTool_RequiresConfirmationBeforeRemoteDeletionAndSupportsCancellation()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var storeId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var store = new Store(storeId, "The Groan Zone", null, false, now, now, "{}", null, FulfillmentStrategy.Printify);
+        var item = new Item(itemId, storeId, null, null, "Dad joke", null, ItemStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
+        var mapping = new ExternalListingMapping(
+            storeId,
+            itemId,
+            "printify",
+            "42",
+            "product-1",
+            null,
+            null,
+            ExternalListingSyncState.Synchronized,
+            ExternalListingPublicationState.NotApplicable,
+            ExternalListingOperationState.Succeeded,
+            "{}",
+            null,
+            now,
+            now,
+            now);
+        var snapshot = WorkspaceSnapshot.Empty with
+        {
+            Stores = [store],
+            Items = [item],
+            ExternalListingMappings = [mapping]
+        };
+        var repository = new MemoryRepository(snapshot);
+        var products = new Products
+        {
+            RemoteProduct = new ListingRemoteProduct("product-1", false, ListingPublicationState.Unpublished, ListingSnapshot.Empty)
+        };
+        var service = new ListingLifecycleService(repository, new Connection(), products, new Publication());
+        var vm = new PrintifyListingStageToolViewModel(
+            new Factory(service),
+            new ProjectionSource(),
+            () => repository.Snapshot,
+            id => id == storeId ? store : null,
+            new ContextMapper());
+
+        await vm.LoadAsync(itemId, canEdit: true, TestContext.Current.CancellationToken);
+        Assert.True(vm.CanDelete);
+
+        vm.DeleteCommand.Execute(null);
+        Assert.True(vm.IsDeleteConfirmationVisible);
+        Assert.Equal(0, products.DeleteCalls);
+        vm.CancelDeleteCommand.Execute(null);
+        Assert.False(vm.IsDeleteConfirmationVisible);
+
+        vm.DeleteCommand.Execute(null);
+        vm.ConfirmDeleteCommand.Execute(null);
+        await HeadlessUiWait.UntilAsync(() => !vm.IsBusy, "Printify deletion confirmation");
+
+        Assert.Equal(1, products.DeleteCalls);
+        Assert.False(vm.IsDeleteConfirmationVisible);
+    }
+
+    [AvaloniaFact]
+    public async Task PrintifyTool_HeadlessJourneyCreatesRefreshesReviewsConflictAndKeepsLocal()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var storeId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var store = new Store(storeId, "The Groan Zone", null, false, now, now, "{}", null, FulfillmentStrategy.Printify);
+        var item = new Item(itemId, storeId, null, null, "Dad joke", null, ItemStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
+        var snapshot = WorkspaceSnapshot.Empty with { Stores = [store], Items = [item] };
+        var repository = new MemoryRepository(snapshot);
+        var products = new Products();
+        var service = new ListingLifecycleService(repository, new Connection(), products, new Publication());
+        var vm = new PrintifyListingStageToolViewModel(
+            new Factory(service),
+            new ProjectionSource(),
+            () => repository.Snapshot,
+            id => id == storeId ? store : null,
+            new ContextMapper());
+
+        await vm.LoadAsync(itemId, canEdit: true, TestContext.Current.CancellationToken);
+        Assert.True(vm.CanCreateOrUpdate);
+        vm.CreateOrUpdateCommand.Execute(null);
+        await HeadlessUiWait.UntilAsync(() => !vm.IsBusy, "Printify create");
+        Assert.Equal(1, products.CreateCalls);
+        Assert.True(vm.CanRefresh);
+
+        products.RemoteProduct = new ListingRemoteProduct(
+            "product-1",
+            false,
+            ListingPublicationState.Unpublished,
+            new ListingSnapshot(new Dictionary<string, string?> { ["title"] = "Remote title" }));
+        vm.RefreshCommand.Execute(null);
+        await HeadlessUiWait.UntilAsync(() => !vm.IsBusy, "Printify refresh conflict");
+        Assert.True(vm.HasConflict);
+
+        vm.KeepLocalCommand.Execute(null);
+        await HeadlessUiWait.UntilAsync(() => !vm.IsBusy, "Printify keep-local update");
+        Assert.False(vm.HasConflict);
+        Assert.Equal(1, products.UpdateCalls);
+    }
+
+    [AvaloniaFact]
+    public async Task PrintifyTool_HeadlessShopifyJourneyPublishesUnpublishesAndReopensDeletionGate()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var storeId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var store = new Store(storeId, "The Groan Zone", null, false, now, now, "{}", null, FulfillmentStrategy.ShopifyPrintify);
+        var item = new Item(itemId, storeId, null, null, "Dad joke", null, ItemStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
+        var mapping = new ExternalListingMapping(
+            storeId,
+            itemId,
+            "printify",
+            "42",
+            "product-1",
+            null,
+            null,
+            ExternalListingSyncState.Synchronized,
+            ExternalListingPublicationState.Unpublished,
+            ExternalListingOperationState.Succeeded,
+            "{}",
+            null,
+            now,
+            now,
+            now);
+        var repository = new MemoryRepository(WorkspaceSnapshot.Empty with
+        {
+            Stores = [store],
+            Items = [item],
+            ExternalListingMappings = [mapping]
+        });
+        var products = new Products
+        {
+            RemoteProduct = new ListingRemoteProduct("product-1", false, ListingPublicationState.Unpublished, ListingSnapshot.Empty)
+        };
+        var publication = new Publication();
+        var service = new ListingLifecycleService(repository, new Connection(), products, publication);
+        var vm = new PrintifyListingStageToolViewModel(
+            new Factory(service),
+            new ProjectionSource(),
+            () => repository.Snapshot,
+            id => id == storeId ? store : null,
+            new ContextMapper());
+
+        await vm.LoadAsync(itemId, canEdit: true, TestContext.Current.CancellationToken);
+        Assert.True(vm.CanPublish);
+        products.RemoteProduct = new ListingRemoteProduct("product-1", false, ListingPublicationState.Published, ListingSnapshot.Empty);
+        vm.PublishCommand.Execute(null);
+        await HeadlessUiWait.UntilAsync(() => !vm.IsBusy, "Printify publish");
+        Assert.Equal(1, publication.PublishCalls);
+        Assert.True(vm.CanUnpublish);
+
+        products.RemoteProduct = new ListingRemoteProduct("product-1", false, ListingPublicationState.Unpublished, ListingSnapshot.Empty);
+        vm.UnpublishCommand.Execute(null);
+        await HeadlessUiWait.UntilAsync(() => !vm.IsBusy, "Printify unpublish");
+        Assert.Equal(1, publication.UnpublishCalls);
+        Assert.True(vm.CanPublish);
+        Assert.True(vm.CanDelete);
+    }
+
     [Fact]
     public void IdeaTool_LoadsIdeaAndAppliesReadOnlyReason()
     {
@@ -352,6 +540,114 @@ public class StageToolViewModelsTests
                 null,
                 [new MockupGenerationOutput(Guid.NewGuid(), $"mockup-{ApplyCalls}", $"mockup-{ApplyCalls}.png", "Black", request.TemplateId, 1, Guid.NewGuid())],
                 []));
+        }
+    }
+
+    private sealed class Factory(ListingLifecycleService service) : IListingLifecycleServiceFactory
+    {
+        public ListingLifecycleService Create(Store store) => service;
+    }
+
+    private sealed class ProjectionSource : IListingProjectionSource
+    {
+        public Task<ListingProjectionResult> BuildAsync(WorkspaceSnapshot snapshot, Guid itemId, ListingPricingInput pricing, string? shippingProfile, string? outOfStockPolicy, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ListingProjectionResult(new ListingProductProjection(
+                itemId,
+                snapshot.Items.Single(item => item.Id == itemId).StoreId,
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                "Dad joke – T-shirt",
+                "A joke shirt.",
+                shippingProfile,
+                outOfStockPolicy,
+                pricing,
+                [],
+                []), []));
+    }
+
+    private sealed class Connection : IListingConnectionPort
+    {
+        public Task<ListingReadiness> CheckAsync(ListingConnectionRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ListingReadiness(ListingConnectionState.Ready, true, request.RequirePublication, []));
+    }
+
+    private sealed class Products : IListingProductPort
+    {
+        public int CreateCalls { get; private set; }
+        public int UpdateCalls { get; private set; }
+        public int DeleteCalls { get; private set; }
+        public ListingRemoteProduct? RemoteProduct { get; set; }
+
+        public Task<ListingRemoteProduct?> GetAsync(string shopId, string productId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(RemoteProduct);
+
+        public Task<ListingMutationResult> CreateAsync(string shopId, ListingProductProjection projection, IReadOnlyDictionary<Guid, ListingImageReference> images, CancellationToken cancellationToken = default) =>
+            Task.FromResult(CreateResult());
+
+        public Task<ListingMutationResult> UpdateAsync(string shopId, string productId, ListingProductProjection projection, IReadOnlyDictionary<Guid, ListingImageReference> images, CancellationToken cancellationToken = default) =>
+            Task.FromResult(UpdateResult());
+
+        public Task<ListingMutationResult> DeleteAsync(string shopId, string productId, CancellationToken cancellationToken = default)
+        {
+            DeleteCalls++;
+            return Task.FromResult(new ListingMutationResult(productId, true));
+        }
+
+        private ListingMutationResult CreateResult()
+        {
+            CreateCalls++;
+            return new ListingMutationResult("product-1", true);
+        }
+
+        private ListingMutationResult UpdateResult()
+        {
+            UpdateCalls++;
+            return new ListingMutationResult("product-1", true);
+        }
+    }
+
+    private sealed class Publication : IListingPublicationPort
+    {
+        public int PublishCalls { get; private set; }
+        public int UnpublishCalls { get; private set; }
+
+        public Task<ListingMutationResult> PublishAsync(string shopId, string productId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(PublishResult(productId));
+
+        public Task<ListingMutationResult> UnpublishAsync(string shopId, string productId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(UnpublishResult(productId));
+
+        private ListingMutationResult PublishResult(string productId)
+        {
+            PublishCalls++;
+            return new ListingMutationResult(productId, true);
+        }
+
+        private ListingMutationResult UnpublishResult(string productId)
+        {
+            UnpublishCalls++;
+            return new ListingMutationResult(productId, true);
+        }
+    }
+
+    private sealed class ContextMapper : IStoreContextMapper
+    {
+        public StoreContext Read(Store store) => new(PrintifyShopId: 42, PrintifyShopTitle: "The Groan Zone");
+
+        public Store Apply(Store store, StoreContext context) => store;
+    }
+
+    private sealed class MemoryRepository(WorkspaceSnapshot snapshot) : IWorkspaceRepository
+    {
+        public WorkspaceSnapshot Snapshot { get; private set; } = snapshot;
+
+        public Task<WorkspaceSnapshot> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult(Snapshot);
+
+        public Task SaveAsync(WorkspaceSnapshot snapshot, CancellationToken cancellationToken = default)
+        {
+            Snapshot = snapshot;
+            return Task.CompletedTask;
         }
     }
 }

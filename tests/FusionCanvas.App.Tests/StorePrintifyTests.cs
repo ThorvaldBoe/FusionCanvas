@@ -119,6 +119,8 @@ public class StorePrintifyTests
         model.SetContext(Store(), FulfillmentStrategy.ShopifyPrintify, false, true);
         await model.PendingOperation;
         Assert.True(model.HasError);
+        Assert.True(model.HasRepairGuidance);
+        Assert.Contains("native credential storage", model.RepairGuidance, StringComparison.OrdinalIgnoreCase);
         Assert.False(model.IsMissing);
         Assert.False(model.CanManage);
         Assert.Null(model.CreateEditor());

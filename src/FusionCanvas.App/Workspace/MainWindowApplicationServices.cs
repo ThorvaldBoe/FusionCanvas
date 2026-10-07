@@ -13,6 +13,7 @@ using FusionCanvas.Application.Stores;
 using FusionCanvas.Application.SllGeneration;
 using FusionCanvas.Application.Tags;
 using FusionCanvas.Application.WorkspaceTree;
+using FusionCanvas.Application.Listings;
 
 namespace FusionCanvas.App.Workspace;
 
@@ -41,4 +42,7 @@ public sealed record MainWindowApplicationServices(
     IMockupSourceMetadataAssistanceService? MockupSourceMetadataAssistance = null,
     IMockupSourceImageContentReader? MockupSourceImageContentReader = null,
     IMockupPlacementPreviewReader? MockupPlacementPreviewReader = null,
-    IGlobalColorRemovalService? GlobalColorRemoval = null);
+    IGlobalColorRemovalService? GlobalColorRemoval = null,
+    IListingLifecycleServiceFactory? ListingLifecycle = null,
+    IListingProjectionSource? ListingProjectionSource = null,
+    IStoreContextMapper? StoreContextMapper = null);

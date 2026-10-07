@@ -11,7 +11,8 @@ public sealed class BuiltInStageToolContentResolver : IStageToolContentResolver
             ["idea-stage-tool"] = StageToolContentKind.Idea,
             ["concept-stage-tool"] = StageToolContentKind.Concept,
             ["design-stage-tool"] = StageToolContentKind.Design,
-            ["listing-stage-tool"] = StageToolContentKind.Listing
+            ["listing-stage-tool"] = StageToolContentKind.Listing,
+            ["printify-stage-tool"] = StageToolContentKind.Printify
         };
 
     public StageToolContentViewModel? Resolve(StageToolDescriptor descriptor, MainWindowViewModel owner)
