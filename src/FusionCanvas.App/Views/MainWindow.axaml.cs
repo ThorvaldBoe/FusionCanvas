@@ -865,11 +865,11 @@ public partial class MainWindow : Window
         vm.DesignTool.PreviewSupportingImage(slot.AssetId.Value, slot.ThumbnailPath);
     }
 
-    private async void OnRemoveColorFromSupportingImage(object? sender, RoutedEventArgs e)
+    private async void OnRemoveColorFromImage(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not MainWindowViewModel vm)
             return;
-        var slot = FindSupportingImageViewModel(sender);
+        var slot = FindSlotViewModel(sender);
         if (slot?.AssetId is not Guid assetId)
             return;
 
