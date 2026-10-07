@@ -1596,6 +1596,13 @@
                                                       FontSize="10" Classes="miniButton"
                                                       ToolTip.Tip="Download a copy of this final design artwork"
                                                       AutomationProperties.Name="Download final design artwork" />
+                                              <Button Content="Remove color" Click="OnRemoveColorFromImage"
+                                                      Tag="{Binding .}"
+                                                      IsEnabled="{Binding CanRemoveColor}"
+                                                      FontSize="10" Classes="miniButton"
+                                                      ToolTip.Tip="Remove a color globally from this final design artwork"
+                                                      ToolTip.ShowOnDisabled="True"
+                                                      AutomationProperties.Name="Remove a color globally" />
                                             </StackPanel>
                                             <Button Content="Remove" IsEnabled="{Binding !IsReadOnly}"
                                                     Tag="{Binding .}"
@@ -1687,7 +1694,7 @@
                                             Tag="{Binding .}"
                                             IsEnabled="{Binding CanExport}"
                                             FontSize="10" Classes="miniButton" />
-                                    <Button Content="Remove color" Click="OnRemoveColorFromSupportingImage"
+                                    <Button Content="Remove color" Click="OnRemoveColorFromImage"
                                             Tag="{Binding .}"
                                             IsEnabled="{Binding CanRemoveColor}"
                                             FontSize="10" Classes="miniButton"
