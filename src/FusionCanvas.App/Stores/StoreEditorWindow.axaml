@@ -176,6 +176,7 @@
                   <Button Content="Retry" Command="{Binding RetryCommand}" IsVisible="{Binding HasError}" />
                 </StackPanel>
                 <TextBlock Text="Save the selected Printify strategy before verifying." IsVisible="{Binding ShowSaveGuidance}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding RepairGuidance}" IsVisible="{Binding HasRepairGuidance}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
                 <TextBlock Text="{Binding Verification}" TextWrapping="Wrap" />
                 <ComboBox ItemsSource="{Binding Shops}" SelectedItem="{Binding SelectedShop, Mode=TwoWay}" DisplayMemberBinding="{Binding DisplayName}" IsVisible="{Binding HasKey}" PlaceholderText="Select Printify shop" AutomationProperties.AutomationId="StoreEditor.PrintifyShop" />
               </StackPanel>

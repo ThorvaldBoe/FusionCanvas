@@ -77,6 +77,8 @@ public sealed record WorkspaceSnapshot(
 
     public IReadOnlyList<ContentRiskReview> ContentRiskReviews { get; init; } = [];
 
+    public IReadOnlyList<ExternalListingMapping> ExternalListingMappings { get; init; } = [];
+
     public WorkspaceSnapshot(
         IReadOnlyList<Store> Stores,
         IReadOnlyList<Niche> Niches,

@@ -5,6 +5,7 @@ using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.Stores;
+using FusionCanvas.Domain.Products;
 
 namespace FusionCanvas.Application.Tests.Stores;
 
@@ -119,6 +120,47 @@ public class StoreManagementServiceTests
 
         Assert.True(result.Succeeded);
         Assert.Equal(FulfillmentStrategy.Printify, Assert.Single((await repository.LoadAsync(TestContext.Current.CancellationToken)).Stores).FulfillmentStrategy);
+    }
+
+    [Fact]
+    public async Task UpdateStoreAsync_PreservesPrintifyMappingsWhenStrategyIsTemporarilyDisabled()
+    {
+        var store = NewStore("North Star Studio") with { FulfillmentStrategy = FulfillmentStrategy.Printify };
+        var item = new Item(Guid.NewGuid(), store.Id, null, null, "Dad joke", null, ItemStatus.Draft, WorkflowStage.Listing, false, Now, Now, "{}");
+        var mapping = new ExternalListingMapping(
+            store.Id,
+            item.Id,
+            "printify",
+            "shop-1",
+            "product-1",
+            null,
+            null,
+            ExternalListingSyncState.Synchronized,
+            ExternalListingPublicationState.NotApplicable,
+            ExternalListingOperationState.Succeeded,
+            "{}",
+            null,
+            Now,
+            Now,
+            Now);
+        var repository = new InMemoryWorkspaceRepository(new WorkspaceSnapshot([store], [], [], [item], [], [], [], [], [])
+        {
+            ExternalListingMappings = [mapping]
+        });
+        var service = new StoreManagementService(repository, new TestStoreContextMapper());
+
+        var disable = await service.UpdateStoreAsync(
+            new StoreManagementUpdateRequest(store.Id, store.Name, FulfillmentStrategy: FulfillmentStrategy.Manual),
+            TestContext.Current.CancellationToken);
+        var restore = await service.UpdateStoreAsync(
+            new StoreManagementUpdateRequest(store.Id, store.Name, FulfillmentStrategy: FulfillmentStrategy.Printify),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(disable.Succeeded);
+        Assert.True(restore.Succeeded);
+        var saved = await repository.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(FulfillmentStrategy.Printify, Assert.Single(saved.Stores).FulfillmentStrategy);
+        Assert.Equal(mapping, Assert.Single(saved.ExternalListingMappings));
     }
 
     [Fact]

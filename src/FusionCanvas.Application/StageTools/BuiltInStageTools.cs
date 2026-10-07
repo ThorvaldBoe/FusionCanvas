@@ -36,10 +36,18 @@ public static class BuiltInStageTools
         new(
             "built-in-listing-tool",
             "Listing",
-            "Default Item-stage item tool.",
+            "Default Listing-stage mockup tool.",
             "listing-stage-tool",
             [WorkflowStage.Listing],
             RequiresSelectedItem: true,
-            IsDefault: true)
+            IsDefault: true),
+        new(
+            "built-in-printify-tool",
+            "Printify",
+            "Create and manage the Printify listing for the selected Item.",
+            "printify-stage-tool",
+            [WorkflowStage.Listing],
+            RequiresSelectedItem: true,
+            IsDefault: false)
     ];
 }

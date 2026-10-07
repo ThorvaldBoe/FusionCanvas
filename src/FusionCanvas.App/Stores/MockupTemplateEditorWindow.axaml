@@ -136,7 +136,7 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="stores:LocalMockupSourceDraftViewModel">
               <Border Classes="mockupTableRow" Classes.alternate="{Binding IsAlternateRow}" Classes.selected="{Binding IsSelected}" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
-                      Focusable="True" PointerPressed="OnSourceRowPointerPressed" KeyDown="OnSourceRowKeyDown"
+                      Focusable="True" KeyDown="OnSourceRowKeyDown"
                       AutomationProperties.Name="{Binding DisplayName, StringFormat='Select source image {0}'}"
                       AutomationProperties.HelpText="Press Enter or Space to select; hold Ctrl to toggle or Shift to select a range"
                       AutomationProperties.ItemStatus="{Binding IsSelected, StringFormat='Selected: {0}'}">

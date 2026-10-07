@@ -13,6 +13,7 @@ public sealed class StageToolContentResolverTests
     [InlineData("concept-stage-tool", StageToolContentKind.Concept)]
     [InlineData("design-stage-tool", StageToolContentKind.Design)]
     [InlineData("listing-stage-tool", StageToolContentKind.Listing)]
+    [InlineData("printify-stage-tool", StageToolContentKind.Printify)]
     public void Resolve_BuiltInDetailViewKeyReturnsOwnedContent(string detailViewKey, StageToolContentKind expectedKind)
     {
         var descriptor = new StageToolDescriptor(
