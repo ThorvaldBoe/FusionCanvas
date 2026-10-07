@@ -171,6 +171,30 @@ public class MainWindowConstructionTests
     }
 
     [AvaloniaFact]
+    public void ItemOverview_ExposesListingAndPrintifyStageTools()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Listing);
+        fixture.PumpLayout();
+
+        var selector = fixture.FindControl<Grid>(grid =>
+            AutomationProperties.GetAutomationId(grid) == "Item.StageToolSelector" && grid.IsVisible);
+        var printify = fixture.FindControl<Button>(button =>
+            button.Content?.ToString() == "Printify" && button.IsVisible);
+
+        Assert.True(fixture.ViewModel.DocumentWindow.HasMultipleStageTools);
+        Assert.Equal("Item stage tool selector", AutomationProperties.GetName(selector));
+        Assert.NotNull(printify);
+
+        printify.Command!.Execute(printify.CommandParameter);
+        fixture.PumpLayout();
+
+        Assert.True(fixture.ViewModel.ShowsPrintifyStageTool);
+        Assert.NotNull(fixture.FindControl<TextBlock>(text => text.Text == "Printify listing" && text.IsVisible));
+    }
+
+    [AvaloniaFact]
     public void DesignErrorRegionHasStableAccessibleIdentity()
     {
         using var fixture = new MainWindowFixture();

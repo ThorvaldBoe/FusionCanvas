@@ -664,6 +664,39 @@
                     BorderThickness="1">
                 <StackPanel Spacing="14">
                   <views:DocumentContextHeader />
+                  <Grid IsVisible="{Binding DocumentWindow.HasMultipleStageTools}"
+                        ColumnDefinitions="*,Auto"
+                        ColumnSpacing="12"
+                        AutomationProperties.Name="Item stage tool selector"
+                        AutomationProperties.AutomationId="Item.StageToolSelector">
+                    <StackPanel Spacing="2">
+                      <TextBlock Text="{Binding DocumentWindow.ActiveStageToolName}"
+                                 FontSize="14"
+                                 FontWeight="SemiBold"
+                                 Foreground="{DynamicResource StrongTextBrush}" />
+                      <TextBlock Text="{Binding DocumentWindow.ActiveStageToolDescription}"
+                                 FontSize="12"
+                                 Foreground="{DynamicResource SecondaryTextBrush}"
+                                 TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ItemsControl Grid.Column="1"
+                                  ItemsSource="{Binding DocumentWindow.AvailableStageTools}"
+                                  AutomationProperties.Name="Available item stage tools">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <StackPanel Orientation="Horizontal" Spacing="6" />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="doc:StageToolOptionViewModel">
+                          <Button Content="{Binding DisplayName}"
+                                  Command="{Binding $parent[ItemsControl].DataContext.DocumentWindow.SelectStageToolCommand}"
+                                  CommandParameter="{Binding}"
+                                  Classes="toolSelector" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </Grid>
                   <TextBlock IsVisible="{Binding ItemInspector.IsReadOnly}"
                              Text="{Binding ItemInspector.InactiveNotice}"
                              TextWrapping="Wrap"
