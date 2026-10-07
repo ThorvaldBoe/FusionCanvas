@@ -1637,6 +1637,13 @@
                                                        Classes="compactAction"
                                                       ToolTip.Tip="Download a copy of this final design artwork"
                                                       AutomationProperties.Name="Download final design artwork" />
+                                              <Button Content="Remove color" Click="OnRemoveColorFromImage"
+                                                      Tag="{Binding .}"
+                                                      IsEnabled="{Binding CanRemoveColor}"
+                                                       Classes="compactAction"
+                                                      ToolTip.Tip="Remove a color globally from this final design artwork"
+                                                      ToolTip.ShowOnDisabled="True"
+                                                      AutomationProperties.Name="Remove a color globally" />
                                             </StackPanel>
                                             <Button Content="Remove" IsEnabled="{Binding !IsReadOnly}"
                                                     Tag="{Binding .}"
@@ -1730,7 +1737,7 @@
                                             Tag="{Binding .}"
                                             IsEnabled="{Binding CanExport}"
                                              Classes="compactAction" />
-                                    <Button Content="Remove color" Click="OnRemoveColorFromSupportingImage"
+                                    <Button Content="Remove color" Click="OnRemoveColorFromImage"
                                             Tag="{Binding .}"
                                             IsEnabled="{Binding CanRemoveColor}"
                                              Classes="compactAction"

@@ -889,6 +889,9 @@ public class DesignStageToolHeadlessTests
             Assert.Contains(actionButtons, button => button.Content is "Replace artwork...");
             Assert.Contains(actionButtons, button => AutomationProperties.GetName(button) == slot.ArtworkPreviewAccessibleName);
             Assert.Contains(actionButtons, button => AutomationProperties.GetName(button) == "Download final design artwork");
+            var colorRemovalButton = Assert.Single(actionButtons.Where(button =>
+                AutomationProperties.GetName(button) == "Remove a color globally"));
+            Assert.True(colorRemovalButton.IsEffectivelyVisible);
             var reviewButton = Assert.Single(actionButtons.Where(button => button.Content is "View review details"));
             Assert.True(reviewButton.IsEffectivelyVisible);
             reviewButton.Command!.Execute(null);
