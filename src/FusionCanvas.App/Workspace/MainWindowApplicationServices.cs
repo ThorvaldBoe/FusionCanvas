@@ -43,6 +43,7 @@ public sealed record MainWindowApplicationServices(
     IMockupSourceImageContentReader? MockupSourceImageContentReader = null,
     IMockupPlacementPreviewReader? MockupPlacementPreviewReader = null,
     IGlobalColorRemovalService? GlobalColorRemoval = null,
+    IMockupOutputResolutionSettingsService? MockupOutputResolutionSettings = null,
     IListingLifecycleServiceFactory? ListingLifecycle = null,
     IListingProjectionSource? ListingProjectionSource = null,
     IStoreContextMapper? StoreContextMapper = null);

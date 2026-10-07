@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using FusionCanvas.App.Commands;
@@ -28,6 +29,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private readonly IRasterImageMetadataReader? _rasterImageMetadataReader;
     private readonly IMockupSourceMetadataAssistanceService? _mockupSourceMetadataAssistance;
     private readonly IMockupPlacementPreviewReader? _mockupPlacementPreviewReader;
+    private readonly IMockupOutputResolutionSettingsService? _mockupOutputResolutionSettings;
     private IReadOnlyList<MockupTemplateSourceImage> _templateSourceImages = [];
     private IReadOnlyList<MockupTemplateSourceImageOptionValue> _templateSourceConditions = [];
     private IAssetFilePicker _filePicker;
@@ -104,6 +106,8 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private string _mappingYText = string.Empty;
     private string _mappingWidthText = string.Empty;
     private string _mappingHeightText = string.Empty;
+    private string _maximumMockupLongEdgeText = MockupOutputResolutionPolicy.DefaultMaximumLongEdgePixels.ToString(CultureInfo.InvariantCulture);
+    private int _loadedMaximumMockupLongEdgePixels = MockupOutputResolutionPolicy.DefaultMaximumLongEdgePixels;
     private Guid? _pendingDesignAreaArchiveId;
     private string _pendingDesignAreaArchiveName = string.Empty;
     private bool _isDesignAreaArchiveConfirmationVisible;
@@ -124,7 +128,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private MockupTemplateCoverageRequirement? _selectedCoverageRequirement;
     private LocalMockupSourceDraftViewModel? _selectedCoverageExemplar;
 
-    public CatalogSetupViewModel(ICatalogSetupService catalog, IMockupTemplateSetupService mockups, IOfferingManagementService? offeringManagement = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, IAssetFilePicker? filePicker = null, IRasterImageMetadataReader? rasterImageMetadataReader = null, IMockupSourceMetadataAssistanceService? mockupSourceMetadataAssistance = null, IMockupPlacementPreviewReader? mockupPlacementPreviewReader = null)
+    public CatalogSetupViewModel(ICatalogSetupService catalog, IMockupTemplateSetupService mockups, IOfferingManagementService? offeringManagement = null, IProviderCatalogCandidateSource? providerCatalog = null, IMockupTemplateSourceImageService? sourceImages = null, IAssetFilePicker? filePicker = null, IRasterImageMetadataReader? rasterImageMetadataReader = null, IMockupSourceMetadataAssistanceService? mockupSourceMetadataAssistance = null, IMockupPlacementPreviewReader? mockupPlacementPreviewReader = null, IMockupOutputResolutionSettingsService? mockupOutputResolutionSettings = null)
     {
         _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         _mockups = mockups ?? throw new ArgumentNullException(nameof(mockups));
@@ -135,6 +139,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         _rasterImageMetadataReader = rasterImageMetadataReader;
         _mockupSourceMetadataAssistance = mockupSourceMetadataAssistance;
         _mockupPlacementPreviewReader = mockupPlacementPreviewReader;
+        _mockupOutputResolutionSettings = mockupOutputResolutionSettings;
         TemplateColorChoices.CollectionChanged += (_, _) => RefreshFilteredTemplateColorChoices();
 
         SaveOfferingCommand = new AsyncRelayCommand(SaveOfferingAsync, CanSaveOffering);
@@ -662,6 +667,22 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public string MappingYText { get => _mappingYText; set => SetMappingText(ref _mappingYText, value, ref _mappingY, nameof(MappingYText), nameof(MappingY)); }
     public string MappingWidthText { get => _mappingWidthText; set => SetMappingText(ref _mappingWidthText, value, ref _mappingWidth, nameof(MappingWidthText), nameof(MappingWidth), true); }
     public string MappingHeightText { get => _mappingHeightText; set => SetMappingText(ref _mappingHeightText, value, ref _mappingHeight, nameof(MappingHeightText), nameof(MappingHeight), false); }
+    public string MaximumMockupLongEdgeText
+    {
+        get => _maximumMockupLongEdgeText;
+        set
+        {
+            value ??= string.Empty;
+            if (!SetField(ref _maximumMockupLongEdgeText, value)) return;
+            OnPropertyChanged(nameof(MaximumMockupLongEdgeValidationMessage));
+            OnPropertyChanged(nameof(HasMaximumMockupLongEdgeValidationMessage));
+            OnPropertyChanged(nameof(MockupTemplateSaveValidationMessage));
+            OnPropertyChanged(nameof(HasMockupTemplateSaveValidationMessage));
+            NotifyMockupTemplateDraftChanged();
+            NotifyCommands();
+        }
+    }
+    public string MaximumMockupLongEdgeHelpText => "Store-wide. New mockups are scaled proportionally to this maximum long edge; smaller images are not enlarged. Existing mockups are unchanged.";
     public double MappingImageWidth => SelectedProviderMockup?.ImageWidth ?? SelectedLocalSource?.ImageWidth ?? 0;
     public double MappingImageHeight => SelectedProviderMockup?.ImageHeight ?? SelectedLocalSource?.ImageHeight ?? 0;
     public double PlacementAspectRatio => SelectedPlaceholder is { Width: > 0, Height: > 0 }
@@ -756,10 +777,16 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public IReadOnlyList<string> MockupTemplateReadinessMessages => CurrentMockupTemplateReadiness().Blockers.Select(MockupTemplateReadinessMessageTranslator.Translate).ToArray();
     public string MockupTemplateSaveValidationMessage => string.IsNullOrWhiteSpace(TemplateName)
         ? "Enter a template name to save."
+        : !TryParseMaximumMockupLongEdge(out _)
+            ? "Enter a positive whole number for the maximum mockup long edge."
         : SelectedProviderMockup is not null && !TryCreateMapping(out _)
             ? "Enter whole-number, positive placement values that stay within the image."
             : string.Empty;
     public bool HasMockupTemplateSaveValidationMessage => !string.IsNullOrWhiteSpace(MockupTemplateSaveValidationMessage);
+    public string MaximumMockupLongEdgeValidationMessage => TryParseMaximumMockupLongEdge(out _)
+        ? string.Empty
+        : "Enter a positive whole number.";
+    public bool HasMaximumMockupLongEdgeValidationMessage => !string.IsNullOrWhiteSpace(MaximumMockupLongEdgeValidationMessage);
 
     public bool IsMockupTemplateDiscardConfirmationVisible
     {
@@ -917,6 +944,11 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         {
             var catalog = await _catalog.LoadForStoreAsync(storeId, cancellationToken).ConfigureAwait(true);
             var mockups = await _mockups.LoadForStoreAsync(storeId, cancellationToken).ConfigureAwait(true);
+            var resolution = _mockupOutputResolutionSettings is null
+                ? new MockupOutputResolutionSettingsState(storeId, mockups.IsReadOnly, MockupOutputResolutionPolicy.Default)
+                : await _mockupOutputResolutionSettings.LoadAsync(storeId, cancellationToken).ConfigureAwait(true);
+            _loadedMaximumMockupLongEdgePixels = resolution.Policy.MaximumLongEdgePixels;
+            MaximumMockupLongEdgeText = _loadedMaximumMockupLongEdgePixels.ToString(CultureInfo.InvariantCulture);
             IsAvailable = true;
             IsReadOnly = catalog.IsReadOnly || mockups.IsReadOnly;
             _templateSourceImages = mockups.SourceImages ?? [];
@@ -1214,6 +1246,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
                 }
                 if (sourceState is not null) ApplyMockups(sourceState);
                 SelectedTemplate = template;
+                if (!await SaveMockupOutputResolutionAsync(SelectedOffering.StoreId).ConfigureAwait(true)) return;
                 EndTemplateDraft();
                 TemplateName = string.Empty;
                 LocalSourcePath = string.Empty;
@@ -1246,6 +1279,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
             var savedId = result.TemplateId ?? SelectedTemplate?.Id;
             ApplyMockups(result.State);
             SelectedTemplate = AvailableTemplates.FirstOrDefault(value => value.Id == savedId) ?? SelectedTemplate;
+            if (!await SaveMockupOutputResolutionAsync(SelectedOffering.StoreId).ConfigureAwait(true)) return;
             EndTemplateDraft();
             TemplateName = string.Empty;
             foreach (var color in TemplateColorChoices) color.IsSelected = false;
@@ -2528,6 +2562,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     private bool CanCreateTemplate()
     {
         if (!CanEdit || !IsAddingTemplate || SelectedOffering is null || string.IsNullOrWhiteSpace(TemplateName)) return false;
+        if (!TryParseMaximumMockupLongEdge(out _)) return false;
         if (_sourceImages is not null && HasPendingLocalSourceChanges && SelectedProviderMockup is null)
             return true;
         return SelectedProviderMockup is null || TryCreateMapping(out _);
@@ -2749,8 +2784,33 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(HasMeaningfulMockupTemplateDraft));
         OnPropertyChanged(nameof(MockupTemplateLifecycleLabel));
         OnPropertyChanged(nameof(MockupTemplateReadinessMessages));
+        OnPropertyChanged(nameof(MaximumMockupLongEdgeValidationMessage));
+        OnPropertyChanged(nameof(HasMaximumMockupLongEdgeValidationMessage));
         OnPropertyChanged(nameof(MockupTemplateSaveValidationMessage));
         OnPropertyChanged(nameof(HasMockupTemplateSaveValidationMessage));
+    }
+
+    private bool TryParseMaximumMockupLongEdge(out int value) =>
+        int.TryParse(MaximumMockupLongEdgeText, NumberStyles.None, CultureInfo.InvariantCulture, out value) && value > 0;
+
+    private async Task<bool> SaveMockupOutputResolutionAsync(Guid storeId)
+    {
+        if (_mockupOutputResolutionSettings is null)
+            return true;
+        if (!TryParseMaximumMockupLongEdge(out var value))
+            return false;
+        if (value == _loadedMaximumMockupLongEdgePixels)
+            return true;
+
+        var result = await _mockupOutputResolutionSettings.SaveAsync(storeId, value).ConfigureAwait(true);
+        if (!result.Succeeded)
+        {
+            ErrorMessage = result.Error ?? "Mockup output resolution could not be saved.";
+            return false;
+        }
+
+        _loadedMaximumMockupLongEdgePixels = value;
+        return true;
     }
 
     private MockupTemplateReadinessResult CurrentMockupTemplateReadiness()
@@ -2835,6 +2895,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         MappingYText,
         MappingWidthText,
         MappingHeightText,
+        MaximumMockupLongEdgeText,
         string.Join("|", TemplateColorChoices.Where(value => value.IsSelected).Select(value => value.Value.Id).OrderBy(value => value)),
         LocalSourcePath,
         string.Join("|", LocalSourceDrafts.Concat(_archivedLocalSourceDrafts).Select(CurrentLocalSourceDraftState).OrderBy(value => value)));
@@ -2971,6 +3032,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         string Y,
         string Width,
         string Height,
+        string MaximumMockupLongEdge,
         string SelectedColorIds,
         string LocalSourcePath,
         string LocalSourceDrafts);
