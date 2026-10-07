@@ -41,7 +41,7 @@ The rows below are the implementation checklist. Each row will be linked to a fo
 - `MainWindowConstructionTests` and `MainWindowLayoutTests`: 34 Avalonia-headless tests pass after adding the compact Printify surface and compiled bindings.
 - The supervised showcase-store unpublish/hide behavior check is intentionally not claimed here; it remains a supplemental manual verification item because it mutates an external Printify account.
 - `openspec validate printify-listing-lifecycle --strict` passed.
-- `dotnet test .\FusionCanvas.sln --no-restore -m:1` passed across the full solution: Domain 284, Application 663, Integration 348, App 964, and UI Description 29; 2,288 passed, 0 failed, 0 skipped. The run emitted the repository's existing NU1900 offline vulnerability-feed warnings only.
+- `dotnet test .\FusionCanvas.sln --no-restore -m:1` passed across the full solution after merging current `main`: Domain 290, Application 667, Integration 349, App 965, and UI Description 29; 2,300 passed, 0 failed, 0 skipped. The run emitted the repository's existing NU1900 offline vulnerability-feed warnings only.
 
 ## Application contracts and pure behavior
 
@@ -99,4 +99,5 @@ Passed: 25, Failed: 0
 | Store mapping migration and round-trip persistence | Isolated SQLite integration tests | Pass | Schema v22 migration and existing-data preservation covered. |
 | Unified transport, safe diagnostics, and secret redaction | Mocked integration tests and inspection | Pass | No live endpoint in deterministic tests; telemetry records request metadata only. |
 | Compact Listing-stage surface and accessible lifecycle controls | Avalonia headless construction, layout, view-model, and journey tests | Pass | Single-column UI, text states, conflict actions, focus-safe delete confirmation, and compiled bindings covered. |
+| Existing Store Editor headless regression after current-main merge | Isolated regression test plus full App and solution baselines | Pass | Row whitespace selection now resolves through the window-level pointer tunnel while preserving child-button actions. |
 | Live showcase-store unpublish/hide semantics | User-supervised external smoke check | Not run | Deliberately left as supplemental manual verification because it mutates the external showcase account. |
