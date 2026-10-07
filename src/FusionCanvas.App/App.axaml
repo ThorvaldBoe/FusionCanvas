@@ -4,6 +4,11 @@
              RequestedThemeVariant="Light">
   <Application.Styles>
     <FluentTheme />
+    <Style Selector="Button.compactAction">
+      <Setter Property="MinHeight" Value="{DynamicResource Token.Control.CompactHeight}" />
+      <Setter Property="Padding" Value="{DynamicResource Token.Layout.CompactPadding}" />
+      <Setter Property="FontSize" Value="{DynamicResource Token.Typography.Label}" />
+    </Style>
   </Application.Styles>
   <Application.Resources>
     <ResourceDictionary>

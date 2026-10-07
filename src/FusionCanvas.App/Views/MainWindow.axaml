@@ -1478,9 +1478,9 @@
 
                       <!-- Color Working Set -->
                       <StackPanel IsVisible="{Binding DesignTool.ShowsConfiguredState}" Spacing="6">
-                        <TextBlock Text="Color Working Set" FontSize="13" FontWeight="SemiBold"
+                         <TextBlock Text="Color Working Set" FontSize="{DynamicResource Token.Typography.SectionHeading}" FontWeight="SemiBold"
                                    Foreground="{DynamicResource StrongTextBrush}" />
-                        <TextBlock Text="Select the colors this design will use." TextWrapping="Wrap" FontSize="11"
+                         <TextBlock Text="Select the colors this design will use." TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Helper}"
                                    Foreground="{DynamicResource SecondaryTextBrush}" />
 
                         <ItemsControl ItemsSource="{Binding DesignTool.AvailableColors}">
@@ -1498,19 +1498,25 @@
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <TextBlock Text="Selected colors" FontSize="12" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource StrongTextBrush}" />
-                        <ItemsControl ItemsSource="{Binding DesignTool.SelectedColors}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="stageTools:DesignColorViewModel">
-                              <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
-                                <TextBlock Text="{Binding ColorValue}"
-                                           Foreground="{DynamicResource PrimaryTextBrush}" />
+                         <TextBlock Text="Selected colors" FontSize="{DynamicResource Token.Typography.Label}" FontWeight="SemiBold"
+                                    Foreground="{DynamicResource StrongTextBrush}" />
+                         <ItemsControl ItemsSource="{Binding DesignTool.SelectedColors}">
+                           <ItemsControl.ItemsPanel>
+                             <ItemsPanelTemplate>
+                               <StackPanel Spacing="{DynamicResource Token.Spacing.SelectedColorRowGap}" />
+                             </ItemsPanelTemplate>
+                           </ItemsControl.ItemsPanel>
+                           <ItemsControl.ItemTemplate>
+                             <DataTemplate x:DataType="stageTools:DesignColorViewModel">
+                               <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="6">
+                                 <TextBlock Text="{Binding ColorValue}"
+                                            Width="{DynamicResource Token.Control.SelectedColorLabelWidth}"
+                                            Foreground="{DynamicResource PrimaryTextBrush}" />
                                 <Button Grid.Column="1" Content="Make specific"
                                         IsEnabled="{Binding !IsReadOnly}"
                                         Click="OnMakeSpecificForColor"
-                                        Tag="{Binding ColorValue}" FontSize="11"
-                                        Classes="compactButton"
+                                         Tag="{Binding ColorValue}"
+                                         Classes="compactAction"
                                         AutomationProperties.Name="Make specific design for color" />
                               </Grid>
                             </DataTemplate>
@@ -1520,7 +1526,7 @@
 
                       <!-- Row x Area Slot Grid -->
                       <StackPanel IsVisible="{Binding DesignTool.ShowsConfiguredState}" Spacing="6">
-                        <TextBlock Text="Design Slot Grid" FontSize="13" FontWeight="SemiBold"
+                         <TextBlock Text="Design Slot Grid" FontSize="{DynamicResource Token.Typography.SectionHeading}" FontWeight="SemiBold"
                                    Foreground="{DynamicResource StrongTextBrush}" />
                         <ItemsControl ItemsSource="{Binding DesignTool.Rows}">
                           <ItemsControl.ItemTemplate>
@@ -1531,13 +1537,13 @@
                                       BorderThickness="1" CornerRadius="6">
                                 <StackPanel Spacing="6">
                                   <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
-                                    <TextBlock Text="{Binding ColorChips}" FontSize="12" FontWeight="SemiBold"
+                                     <TextBlock Text="{Binding ColorChips}" FontSize="{DynamicResource Token.Typography.Label}" FontWeight="SemiBold"
                                                Foreground="{DynamicResource PrimaryTextBrush}" />
                                     <Button Grid.Column="1" Content="Remove row"
                                             IsVisible="{Binding CanRemove}"
                                             Click="OnRemoveSpecificRow"
-                                            Tag="{Binding RowId}" FontSize="11"
-                                            Classes="compactButton" />
+                                             Tag="{Binding RowId}"
+                                             Classes="compactAction" />
                                   </Grid>
                                   <ItemsControl ItemsSource="{Binding Slots}">
                                     <ItemsControl.ItemsPanel>
@@ -1551,17 +1557,17 @@
                                                 Background="{DynamicResource SubtleSurfaceBrush}"
                                                 BorderBrush="{DynamicResource SubtleBorderBrush}"
                                                 BorderThickness="1" CornerRadius="4"
-                                                Width="120" MinHeight="100"
+                                                 Width="{DynamicResource Token.Control.DesignStageSlotCardWidth}" MinHeight="100"
                                                 DragDrop.AllowDrop="{Binding !IsReadOnly}"
                                                 DragDrop.DragOver="OnSlotDragOver"
                                                 DragDrop.Drop="OnSlotDrop"
                                                 AutomationProperties.Name="{Binding AreaName, StringFormat='Final design artwork slot: {0}'}">
                                           <StackPanel Spacing="4">
-                                            <TextBlock Text="Final design artwork" FontSize="10" FontWeight="SemiBold"
+                                             <TextBlock Text="Final design artwork" FontSize="{DynamicResource Token.Typography.Label}" FontWeight="SemiBold"
                                                        Foreground="{DynamicResource AccentBrush}" />
-                                            <TextBlock Text="{Binding AreaName}" FontSize="11" FontWeight="SemiBold"
+                                             <TextBlock Text="{Binding AreaName}" FontSize="{DynamicResource Token.Typography.Label}" FontWeight="SemiBold"
                                                        Foreground="{DynamicResource SecondaryTextBrush}" />
-                                            <TextBlock Text="{Binding PlaceholderDetails}" FontSize="9"
+                                             <TextBlock Text="{Binding PlaceholderDetails}" FontSize="{DynamicResource Token.Typography.Helper}"
                                                        TextWrapping="Wrap"
                                                        Foreground="{DynamicResource MutedTextBrush}" />
                                             <Border IsVisible="{Binding ShowsContentRiskWarning}"
@@ -1571,37 +1577,40 @@
                                                     BorderThickness="1">
                                               <StackPanel Spacing="3">
                                                 <TextBlock Text="Content risk review"
-                                                           FontSize="9"
+                                                            FontSize="{DynamicResource Token.Typography.Label}"
                                                            FontWeight="SemiBold"
                                                            Foreground="{DynamicResource WarningTextBrush}" />
                                                 <TextBlock Text="{Binding ContentRiskWarningText}"
                                                            TextWrapping="Wrap"
-                                                           FontSize="8"
+                                                            FontSize="{DynamicResource Token.Typography.Helper}"
                                                            Foreground="{DynamicResource SecondaryTextBrush}" />
                                                 <Button Content="View review details"
                                                         Command="{Binding ToggleContentRiskDetailsCommand}"
-                                                        FontSize="8"
-                                                        Classes="miniButton"
+                                                         Classes="compactAction"
                                                         AutomationProperties.Name="View content risk review details" />
                                                 <TextBlock Text="{Binding ContentRiskDetailsText}"
                                                            IsVisible="{Binding IsContentRiskDetailsExpanded}"
                                                            TextWrapping="Wrap"
-                                                           FontSize="8"
+                                                            FontSize="{DynamicResource Token.Typography.Helper}"
                                                            Foreground="{DynamicResource SecondaryTextBrush}" />
                                               </StackPanel>
                                             </Border>
-                                            <Border IsVisible="{Binding HasImage}" Width="80" Height="60"
+                                             <Border IsVisible="{Binding HasImage}"
+                                                     Width="{DynamicResource Token.Media.DesignStageThumbnailWidth}"
+                                                     Height="{DynamicResource Token.Media.DesignStageThumbnailHeight}"
                                                     Background="{DynamicResource PanelSurfaceBrush}" CornerRadius="4">
 <Image Source="{Binding Thumbnail}" Stretch="Uniform" />
                                             </Border>
-                                            <Border IsVisible="{Binding !HasImage}" Width="80" Height="60"
+                                             <Border IsVisible="{Binding !HasImage}"
+                                                     Width="{DynamicResource Token.Media.DesignStageThumbnailWidth}"
+                                                     Height="{DynamicResource Token.Media.DesignStageThumbnailHeight}"
                                                     Background="{DynamicResource SubtleSurfaceBrush}" CornerRadius="4"
                                                     BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="1">
                                               <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="2">
-                                                <TextBlock Text="Drop artwork here" FontSize="10"
+                                                 <TextBlock Text="Drop artwork here" FontSize="{DynamicResource Token.Typography.Label}"
                                                            Foreground="{DynamicResource MutedTextBrush}"
                                                            HorizontalAlignment="Center" />
-                                                <TextBlock Text="PNG only · drag and drop" FontSize="8"
+                                                 <TextBlock Text="PNG only · drag and drop" FontSize="{DynamicResource Token.Typography.Helper}"
                                                            Foreground="{DynamicResource MutedTextBrush}"
                                                            HorizontalAlignment="Center" />
                                               </StackPanel>
@@ -1610,8 +1619,7 @@
                                                     IsEnabled="{Binding !IsReadOnly}"
                                                     Click="OnBrowseSlotImage"
                                                     Tag="{Binding .}"
-                                                    FontSize="10"
-                                                    Classes="miniButton"
+                                                     Classes="compactAction"
                                                     ToolTip.Tip="Browse for a PNG final design artwork or replace the current artwork"
                                                     AutomationProperties.Name="{Binding ArtworkUploadAccessibleName}" />
                                             <StackPanel IsVisible="{Binding HasImage}"
@@ -1620,19 +1628,19 @@
                                               <Button Content="Enlarge" Click="OnViewSlotImage"
                                                       Tag="{Binding .}"
                                                       IsEnabled="{Binding CanPreview}"
-                                                      FontSize="10" Classes="miniButton"
+                                                       Classes="compactAction"
                                                       ToolTip.Tip="Open a larger preview of this final design artwork"
                                                       AutomationProperties.Name="{Binding ArtworkPreviewAccessibleName}" />
                                               <Button Content="Download" Click="OnExportSlotImage"
                                                       Tag="{Binding .}"
                                                       IsEnabled="{Binding CanExport}"
-                                                      FontSize="10" Classes="miniButton"
+                                                       Classes="compactAction"
                                                       ToolTip.Tip="Download a copy of this final design artwork"
                                                       AutomationProperties.Name="Download final design artwork" />
                                               <Button Content="Remove color" Click="OnRemoveColorFromImage"
                                                       Tag="{Binding .}"
                                                       IsEnabled="{Binding CanRemoveColor}"
-                                                      FontSize="10" Classes="miniButton"
+                                                       Classes="compactAction"
                                                       ToolTip.Tip="Remove a color globally from this final design artwork"
                                                       ToolTip.ShowOnDisabled="True"
                                                       AutomationProperties.Name="Remove a color globally" />
@@ -1641,10 +1649,10 @@
                                                     Tag="{Binding .}"
                                                     Click="OnRemoveSlotImage"
                                                     HorizontalAlignment="Stretch"
-                                                    FontSize="10" Classes="miniButton"
+                                                     Classes="compactAction"
                                                     ToolTip.Tip="Remove this final design artwork from the slot"
                                                     AutomationProperties.Name="Remove final design artwork" />
-                                            <TextBlock IsVisible="{Binding IsMissing}" Text="Missing" FontSize="10"
+                                             <TextBlock IsVisible="{Binding IsMissing}" Text="Missing" FontSize="{DynamicResource Token.Typography.Label}"
                                                        Foreground="{DynamicResource DangerTextBrush}" />
                                           </StackPanel>
                                         </Border>
@@ -1660,9 +1668,9 @@
 
                       <!-- Supporting Images -->
                       <StackPanel Spacing="6">
-                        <TextBlock Text="Supporting Images" FontSize="13" FontWeight="SemiBold"
+                         <TextBlock Text="Supporting Images" FontSize="{DynamicResource Token.Typography.SectionHeading}" FontWeight="SemiBold"
                                    Foreground="{DynamicResource StrongTextBrush}" />
-                        <TextBlock Text="Sketches, references, and existing artwork." TextWrapping="Wrap" FontSize="11"
+                         <TextBlock Text="Sketches, references, and existing artwork." TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Helper}"
                                    Foreground="{DynamicResource SecondaryTextBrush}" />
                         <Button Content="Import supporting image&#x2026;"
                                 IsEnabled="{Binding !DesignTool.IsReadOnly}"
@@ -1679,18 +1687,21 @@
                               <Border Padding="4" Margin="2"
                                       Background="{DynamicResource SubtleSurfaceBrush}"
                                       BorderBrush="{DynamicResource SubtleBorderBrush}"
-                                      BorderThickness="1" CornerRadius="4" Width="90">
+                                       BorderThickness="1" CornerRadius="4"
+                                       Width="{DynamicResource Token.Control.DesignStageSupportingCardWidth}">
                                 <StackPanel Spacing="2">
-                                  <Border Width="64" Height="48"
+                                  <Border Width="{DynamicResource Token.Media.DesignStageThumbnailWidth}"
+                                          Height="{DynamicResource Token.Media.DesignStageThumbnailHeight}"
                                           Background="{DynamicResource PanelSurfaceBrush}" CornerRadius="4">
                                     <Image Source="{Binding Thumbnail}" Stretch="Uniform" />
                                   </Border>
-                                  <TextBlock Text="{Binding AreaName}" FontSize="10"
-                                             Foreground="{DynamicResource PrimaryTextBrush}"
-                                             TextTrimming="CharacterEllipsis" MaxWidth="64" />
+                                   <TextBlock Text="{Binding AreaName}" FontSize="{DynamicResource Token.Typography.Label}"
+                                              Foreground="{DynamicResource PrimaryTextBrush}"
+                                              TextTrimming="CharacterEllipsis"
+                                              MaxWidth="{DynamicResource Token.Media.DesignStageThumbnailWidth}" />
                                   <TextBlock Text="{Binding ArtworkWarning}"
                                              IsVisible="{Binding ArtworkWarning, Converter={x:Static ObjectConverters.IsNotNull}}"
-                                             TextWrapping="Wrap" FontSize="9"
+                                              TextWrapping="Wrap" FontSize="{DynamicResource Token.Typography.Helper}"
                                              Foreground="{DynamicResource WarningTextBrush}" />
                                   <Border IsVisible="{Binding ShowsContentRiskWarning}"
                                           Padding="5"
@@ -1699,22 +1710,21 @@
                                           BorderThickness="1">
                                     <StackPanel Spacing="3">
                                       <TextBlock Text="Content risk review"
-                                                 FontSize="9"
+                                                  FontSize="{DynamicResource Token.Typography.Label}"
                                                  FontWeight="SemiBold"
                                                  Foreground="{DynamicResource WarningTextBrush}" />
                                       <TextBlock Text="{Binding ContentRiskWarningText}"
                                                  TextWrapping="Wrap"
-                                                 FontSize="8"
+                                                  FontSize="{DynamicResource Token.Typography.Helper}"
                                                  Foreground="{DynamicResource SecondaryTextBrush}" />
                                       <Button Content="View review details"
                                               Command="{Binding ToggleContentRiskDetailsCommand}"
-                                              FontSize="8"
-                                              Classes="miniButton"
+                                               Classes="compactAction"
                                               AutomationProperties.Name="View content risk review details" />
                                       <TextBlock Text="{Binding ContentRiskDetailsText}"
                                                  IsVisible="{Binding IsContentRiskDetailsExpanded}"
                                                  TextWrapping="Wrap"
-                                                 FontSize="8"
+                                                  FontSize="{DynamicResource Token.Typography.Helper}"
                                                  Foreground="{DynamicResource SecondaryTextBrush}" />
                                     </StackPanel>
                                   </Border>
@@ -1722,22 +1732,22 @@
                                     <Button Content="View" Click="OnViewSupportingImage"
                                             Tag="{Binding .}"
                                             IsEnabled="{Binding CanPreview}"
-                                            FontSize="10" Classes="miniButton" />
+                                             Classes="compactAction" />
                                     <Button Content="Download" Click="OnExportSupportingImage"
                                             Tag="{Binding .}"
                                             IsEnabled="{Binding CanExport}"
-                                            FontSize="10" Classes="miniButton" />
+                                             Classes="compactAction" />
                                     <Button Content="Remove color" Click="OnRemoveColorFromImage"
                                             Tag="{Binding .}"
                                             IsEnabled="{Binding CanRemoveColor}"
-                                            FontSize="10" Classes="miniButton"
+                                             Classes="compactAction"
                                             ToolTip.Tip="{Binding ColorRemovalAvailabilityMessage}"
                                             ToolTip.ShowOnDisabled="True"
                                             AutomationProperties.Name="Remove a color globally" />
                                     <Button Content="Remove" IsEnabled="{Binding !IsReadOnly}"
                                             Tag="{Binding .}"
                                             Click="OnRemoveSupportingImage"
-                                            FontSize="10" Classes="miniButton" />
+                                             Classes="compactAction" />
                                   </StackPanel>
                                 </StackPanel>
                               </Border>

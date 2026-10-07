@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -70,19 +71,22 @@ public class DesignStageToolHeadlessTests
     /// Creates a ViewModel with a Design-stage item that has a listing configuration,
     /// selected colors, a default row, and slot areas.
     /// </summary>
-    private static MainWindowViewModel CreateConfiguredDesignViewModel(bool withAssignedArtwork = false)
+    private static MainWindowViewModel CreateConfiguredDesignViewModel(
+        bool withAssignedArtwork = false,
+        string secondSelectedColor = "White")
     {
         var baseSnapshot = SampleWorkspace.Create();
         var designItem = baseSnapshot.Items.First(i => i.Id == SampleWorkspace.DesignNodeId);
         var offering = baseSnapshot.FulfillmentOfferings[0];
         var now = DateTimeOffset.UtcNow;
 
-        // Add a second variant with "White" so available colors include both
+        // Add a second variant so the selected-color layout can be exercised with
+        // both short and long labels.
         var existingVariant = baseSnapshot.ProductVariants.First(v => v.FulfillmentOfferingId == offering.Id);
         var whiteVariant = new ProductVariant(
             Guid.Parse("40000000-0000-0000-0000-000000000001"),
             offering.Id,
-            [new VariantOption("Color", "White")],
+            [new VariantOption("Color", secondSelectedColor)],
             now, now);
 
         var variants = new List<ProductVariant>(baseSnapshot.ProductVariants) { whiteVariant };
@@ -98,14 +102,14 @@ public class DesignStageToolHeadlessTests
         var selectedColors = new List<DesignSelectedColor>
         {
             new(designItem.Id, "Black"),
-            new(designItem.Id, "White")
+            new(designItem.Id, secondSelectedColor)
         };
         var rowId = Guid.Parse("30000000-0000-0000-0000-000000000001");
         var row = new DesignVariantRow(rowId, designItem.Id, isDefault: true, sortOrder: 0);
         var rowColors = new List<DesignVariantRowColor>
         {
             new(rowId, "Black"),
-            new(rowId, "White")
+            new(rowId, secondSelectedColor)
         };
 
         var snapshot = baseSnapshot with
@@ -732,6 +736,83 @@ public class DesignStageToolHeadlessTests
     }
 
     [AvaloniaFact]
+    public void ConfiguredState_DesignCardsUseSharedReadableSizingAndAlignedSelectedColorActions()
+    {
+        var vm = CreateConfiguredDesignViewModel(secondSelectedColor: "Heather Royal");
+        NavigateToDesign(vm);
+        var thumbnailPath = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "../../../../../src/FusionCanvas.App/Assets/FusionCanvasLogo_Square.png"));
+        vm.DesignTool.SupportingImages.Add(new DesignSlotViewModel(
+            new DesignSlotSummary(Guid.NewGuid(), "Reference", Guid.NewGuid(), thumbnailPath, false, true, true),
+            isReadOnly: false));
+        var window = ShowDesignWindow(vm);
+
+        try
+        {
+            var selectedColorButtons = window.GetVisualDescendants()
+                .OfType<Button>()
+                .Where(button => button.IsEffectivelyVisible
+                    && button.DataContext is DesignColorViewModel
+                    && button.Content is "Make specific"
+                    && button.GetVisualAncestors().OfType<ItemsControl>().Any(control =>
+                        ReferenceEquals(control.ItemsSource, vm.DesignTool.SelectedColors)))
+                .ToArray();
+            var firstSelectedColorButton = Assert.Single(selectedColorButtons.Where(button => Equals(button.Tag, "Black")));
+            var secondSelectedColorButton = Assert.Single(selectedColorButtons.Where(button => Equals(button.Tag, "Heather Royal")));
+            var firstActionPoint = firstSelectedColorButton.TranslatePoint(new Point(0, 0), window);
+            var secondActionPoint = secondSelectedColorButton.TranslatePoint(new Point(0, 0), window);
+            Assert.True(firstActionPoint.HasValue);
+            Assert.True(secondActionPoint.HasValue);
+            Assert.InRange(Math.Abs(firstActionPoint!.Value.X - secondActionPoint!.Value.X), 0, 0.1);
+            Assert.True(secondActionPoint.Value.Y >= firstActionPoint.Value.Y + firstSelectedColorButton.Bounds.Height + 5);
+            Assert.All(selectedColorButtons, button =>
+            {
+                Assert.True(button.FontSize >= 11);
+                Assert.True(button.Bounds.Height >= 28);
+            });
+
+            var finalThumbnailBorders = window.GetVisualDescendants()
+                .OfType<Border>()
+                .Where(border => border.IsEffectivelyVisible
+                    && border.DataContext is DesignSlotViewModel
+                    && border.Width == 128
+                    && border.Height == 96
+                    && border.GetVisualAncestors().OfType<ItemsControl>().Any(control =>
+                        control.ItemsSource == vm.DesignTool.Rows))
+                .ToArray();
+            Assert.Equal(vm.DesignTool.Rows.Sum(row => row.Slots.Count), finalThumbnailBorders.Length);
+
+            var supportingThumbnail = Assert.Single(window.GetVisualDescendants()
+                .OfType<Border>()
+                .Where(border => border.IsEffectivelyVisible
+                    && border.DataContext is DesignSlotViewModel
+                    && border.Width == 128
+                    && border.Height == 96
+                    && border.GetVisualAncestors().OfType<ItemsControl>().Any(control =>
+                        control.ItemsSource == vm.DesignTool.SupportingImages)));
+            Assert.Equal(128, supportingThumbnail.Width);
+            Assert.Equal(96, supportingThumbnail.Height);
+
+            var compactActionButtons = window.GetVisualDescendants()
+                .OfType<Button>()
+                .Where(button => button.IsEffectivelyVisible
+                    && button.Classes.Contains("compactAction"))
+                .ToArray();
+            Assert.NotEmpty(compactActionButtons);
+            Assert.All(compactActionButtons, button =>
+            {
+                Assert.True(button.FontSize >= 11);
+                Assert.True(button.Bounds.Height >= 28);
+            });
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
     public void ConfiguredState_SlotThumbnail_NullWhenNoFile()
     {
         var vm = CreateConfiguredDesignViewModel();
@@ -760,7 +841,7 @@ public class DesignStageToolHeadlessTests
             var slotBorders = window.GetVisualDescendants()
                 .OfType<Border>()
                 .Where(border => border.DataContext is DesignSlotViewModel
-                    && border.Width == 120
+                    && border.Width == 160
                     && DragDrop.GetAllowDrop(border))
                 .ToArray();
             var slotCount = vm.DesignTool.Rows.Sum(row => row.Slots.Count);
@@ -849,7 +930,7 @@ public class DesignStageToolHeadlessTests
         {
             var slotBorders = window.GetVisualDescendants()
                 .OfType<Border>()
-                .Where(border => border.DataContext is DesignSlotViewModel && border.Width == 120)
+                .Where(border => border.DataContext is DesignSlotViewModel && border.Width == 160)
                 .ToArray();
             var browseButtons = window.GetVisualDescendants()
                 .OfType<Button>()
