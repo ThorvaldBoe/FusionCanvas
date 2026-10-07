@@ -169,6 +169,7 @@
   <x:Double x:Key="Token.Spacing.ControlGap">8</x:Double>
   <x:Double x:Key="Token.Spacing.InlineGap">6</x:Double>
   <x:Double x:Key="Token.Spacing.CompactGap">4</x:Double>
+  <x:Double x:Key="Token.Spacing.SelectedColorRowGap">6</x:Double>
   <x:Double x:Key="Token.Spacing.CardPadding">14</x:Double>
   <x:Double x:Key="Token.Spacing.ToolPanelGap">14</x:Double>
   <Thickness x:Key="Token.Layout.CompactPadding">4</Thickness>
@@ -198,10 +199,16 @@
   <x:Double x:Key="Token.Control.ProgressHeight">4</x:Double>
   <x:Double x:Key="Token.Control.ActionMinWidth">90</x:Double>
   <x:Double x:Key="Token.Control.ColorInputWidth">120</x:Double>
+  <x:Double x:Key="Token.Control.SelectedColorLabelWidth">120</x:Double>
+  <x:Double x:Key="Token.Control.DesignStageSlotCardWidth">160</x:Double>
+  <x:Double x:Key="Token.Control.DesignStageSupportingCardWidth">152</x:Double>
   <x:Double x:Key="Token.Control.PolicyTextMinHeight">150</x:Double>
   <x:Double x:Key="Token.Control.PolicyTextMaxHeight">230</x:Double>
   <Thickness x:Key="Token.Control.ButtonPadding">12,6</Thickness>
   <x:Double x:Key="Token.Control.IconSize">18</x:Double>
+
+  <x:Double x:Key="Token.Media.DesignStageThumbnailWidth">128</x:Double>
+  <x:Double x:Key="Token.Media.DesignStageThumbnailHeight">96</x:Double>
 
   <x:Double x:Key="Token.Icon.Inline">16</x:Double>
   <x:Double x:Key="Token.Icon.Control">18</x:Double>
@@ -223,4 +230,5 @@
   <x:Double x:Key="Token.Window.ToolHeight">720</x:Double>
   <x:Double x:Key="Token.Window.ToolMinWidth">560</x:Double>
   <x:Double x:Key="Token.Window.ToolMinHeight">480</x:Double>
+
 </ResourceDictionary>
