@@ -26,7 +26,7 @@ public partial class MockupTemplateEditorWindow : Window
         KeyDown += OnKeyDown;
         LayoutUpdated += OnLayoutUpdated;
         AddHandler(Button.ClickEvent, OnButtonClick, RoutingStrategies.Bubble, handledEventsToo: true);
-        AddHandler(InputElement.PointerPressedEvent, OnSourceFilePointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(InputElement.PointerPressedEvent, OnSourcePointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
     }
 
     protected override void OnClosed(EventArgs e)
@@ -119,35 +119,21 @@ public partial class MockupTemplateEditorWindow : Window
         }
     }
 
-    private void OnSourceRowPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (sender is not Border row || !e.GetCurrentPoint(row).Properties.IsLeftButtonPressed || IsFromChildButton(row, e.Source))
-            return;
-
-        row.Focus();
-        SelectSourceRow(row, e.KeyModifiers);
-        e.Handled = true;
-    }
-
-    private void OnSourceFilePointerPressed(object? sender, PointerPressedEventArgs e)
+    private void OnSourcePointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
 
-        var point = e.GetPosition(this);
-        var file = this.GetVisualDescendants().OfType<Button>()
-            .Where(button => button.Classes.Contains("mockupTableFile"))
-            .FirstOrDefault(button => button.TranslatePoint(new Point(0, 0), this) is { } origin &&
-                new Rect(origin, button.Bounds.Size).Contains(point));
-        if (file is null) return;
-
-        var row = file.GetVisualAncestors().OfType<Border>()
+        var row = (e.Source as Visual)?.GetVisualAncestors().Prepend(e.Source as Visual)
+            .OfType<Border>()
             .FirstOrDefault(candidate => candidate.Classes.Contains("mockupTableRow"));
         if (row is null) return;
+        if (IsFromChildButton(row, e.Source)) return;
 
         row.Focus();
         SelectSourceRow(row, e.KeyModifiers);
-        _sourceFilePointerSelectionHandled = true;
-        Dispatcher.UIThread.Post(() => _sourceFilePointerSelectionHandled = false);
+        _sourceFilePointerSelectionHandled = e.Source is Button button && button.Classes.Contains("mockupTableFile");
+        if (_sourceFilePointerSelectionHandled)
+            Dispatcher.UIThread.Post(() => _sourceFilePointerSelectionHandled = false);
         e.Handled = true;
     }
 
