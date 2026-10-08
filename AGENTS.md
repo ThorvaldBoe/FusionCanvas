@@ -36,6 +36,8 @@ In this repository, an **audit** means a scoped, evidence-based Software Factory
 
 If both context files are absent, do not guess what the private terms mean; state that the private Software Factory context is unavailable and use the public repository guidance only.
 
+For Jev relevance routing, use the repository wrapper `tools/software-factory/jev_audit.py` and follow `tools/software-factory/README.md`. Link its invocation ID and relative JSONL log path from the axis audit record. A `SUCCEEDED` event is execution evidence; `FAILED`, incomplete `STARTED`, `BYPASSED`, and absent logs do not establish successful Jev usage. Record an explicit bypass with the wrapper when an existing factory exception or manual fallback applies, and retain the safe rationale in the audit note. Never infer historical Jev usage from installation, configuration, or connectivity checks.
+
 ## OpenSpec Workflow (mandatory for behavior changes)
 
 Every feature that adds or changes behavior goes through a rolling delivery-module workflow:
