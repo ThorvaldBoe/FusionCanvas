@@ -210,13 +210,24 @@ public sealed class GlobalColorRemovalService : IGlobalColorRemovalService
             }));
         var newLink = new AssetLink(newAssetId, WorkspaceEntityKind.Item, itemId);
         var contentRiskReview = CreateUnreviewedReview(newAssetId, raster.Png);
-        var updated = source.Snapshot! with
+        var sourceSnapshot = source.Snapshot!;
+        var itemRowIds = sourceSnapshot.DesignVariantRows
+            .Where(row => row.ItemId == itemId)
+            .Select(row => row.Id)
+            .ToHashSet();
+        var updatedAssignments = sourceSnapshot.DesignSlotAssignments
+            .Select(assignment => assignment.AssetId == source.Asset.Id && itemRowIds.Contains(assignment.RowId)
+                ? assignment with { AssetId = newAssetId }
+                : assignment)
+            .ToArray();
+        var updated = sourceSnapshot with
         {
-            Assets = [.. source.Snapshot.Assets, newAsset],
-            AssetLinks = [.. source.Snapshot.AssetLinks, newLink],
+            Assets = [.. sourceSnapshot.Assets, newAsset],
+            AssetLinks = [.. sourceSnapshot.AssetLinks, newLink],
+            DesignSlotAssignments = updatedAssignments,
             ContentRiskReviews = contentRiskReview is null
-                ? source.Snapshot.ContentRiskReviews
-                : [.. source.Snapshot.ContentRiskReviews, contentRiskReview]
+                ? sourceSnapshot.ContentRiskReviews
+                : [.. sourceSnapshot.ContentRiskReviews, contentRiskReview]
         };
 
         try
