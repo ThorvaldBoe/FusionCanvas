@@ -570,8 +570,47 @@
               Background="{DynamicResource ElevatedSurfaceBrush}"
               BorderBrush="{DynamicResource ControlBorderBrush}"
               BorderThickness="1">
-        <Grid>
-          <ScrollViewer IsVisible="{Binding DocumentWindow.HasActiveDocument}"
+        <Grid RowDefinitions="Auto,*">
+          <StackPanel Grid.Row="0"
+                      IsVisible="{Binding ItemInspector.HasState}">
+            <Grid IsVisible="{Binding DocumentWindow.HasMultipleStageTools}"
+                  ColumnDefinitions="*,Auto"
+                  ColumnSpacing="12"
+                  Margin="0,0,0,12"
+                  AutomationProperties.Name="Item stage tool selector"
+                  AutomationProperties.AutomationId="Item.StageToolSelector">
+              <StackPanel Spacing="2">
+                <TextBlock Text="{Binding DocumentWindow.ActiveStageToolName}"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource StrongTextBrush}" />
+                <TextBlock Text="{Binding DocumentWindow.ActiveStageToolDescription}"
+                           FontSize="12"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           TextWrapping="Wrap" />
+              </StackPanel>
+              <ItemsControl Grid.Column="1"
+                            ItemsSource="{Binding DocumentWindow.AvailableStageTools}"
+                            AutomationProperties.Name="Available item stage tools">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="6" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="doc:StageToolOptionViewModel">
+                    <Button Content="{Binding DisplayName}"
+                            Command="{Binding $parent[ItemsControl].DataContext.DocumentWindow.SelectStageToolCommand}"
+                            CommandParameter="{Binding}"
+                            Classes="toolSelector" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Grid>
+          </StackPanel>
+
+          <ScrollViewer Grid.Row="1"
+                        IsVisible="{Binding DocumentWindow.HasActiveDocument}"
                         VerticalScrollBarVisibility="Auto"
                         Padding="0,0,16,0">
             <StackPanel Spacing="12">
@@ -664,39 +703,6 @@
                     BorderThickness="1">
                 <StackPanel Spacing="14">
                   <views:DocumentContextHeader />
-                  <Grid IsVisible="{Binding DocumentWindow.HasMultipleStageTools}"
-                        ColumnDefinitions="*,Auto"
-                        ColumnSpacing="12"
-                        AutomationProperties.Name="Item stage tool selector"
-                        AutomationProperties.AutomationId="Item.StageToolSelector">
-                    <StackPanel Spacing="2">
-                      <TextBlock Text="{Binding DocumentWindow.ActiveStageToolName}"
-                                 FontSize="14"
-                                 FontWeight="SemiBold"
-                                 Foreground="{DynamicResource StrongTextBrush}" />
-                      <TextBlock Text="{Binding DocumentWindow.ActiveStageToolDescription}"
-                                 FontSize="12"
-                                 Foreground="{DynamicResource SecondaryTextBrush}"
-                                 TextWrapping="Wrap" />
-                    </StackPanel>
-                    <ItemsControl Grid.Column="1"
-                                  ItemsSource="{Binding DocumentWindow.AvailableStageTools}"
-                                  AutomationProperties.Name="Available item stage tools">
-                      <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                          <StackPanel Orientation="Horizontal" Spacing="6" />
-                        </ItemsPanelTemplate>
-                      </ItemsControl.ItemsPanel>
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="doc:StageToolOptionViewModel">
-                          <Button Content="{Binding DisplayName}"
-                                  Command="{Binding $parent[ItemsControl].DataContext.DocumentWindow.SelectStageToolCommand}"
-                                  CommandParameter="{Binding}"
-                                  Classes="toolSelector" />
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                  </Grid>
                   <TextBlock IsVisible="{Binding ItemInspector.IsReadOnly}"
                              Text="{Binding ItemInspector.InactiveNotice}"
                              TextWrapping="Wrap"
@@ -2308,7 +2314,8 @@
           </StackPanel>
           </ScrollViewer>
 
-          <StackPanel IsVisible="{Binding !DocumentWindow.HasActiveDocument}"
+          <StackPanel Grid.Row="1"
+                      IsVisible="{Binding !DocumentWindow.HasActiveDocument}"
                       HorizontalAlignment="Center"
                       VerticalAlignment="Center"
                       Spacing="8">
@@ -2323,7 +2330,8 @@
                        Foreground="{DynamicResource EmptyStateTextBrush}" />
           </StackPanel>
 
-          <Border IsVisible="{Binding ShowSelectionSummary}"
+          <Border Grid.Row="1"
+                  IsVisible="{Binding ShowSelectionSummary}"
                   Background="{DynamicResource ElevatedSurfaceBrush}"
                   Padding="4">
             <StackPanel Spacing="14">
