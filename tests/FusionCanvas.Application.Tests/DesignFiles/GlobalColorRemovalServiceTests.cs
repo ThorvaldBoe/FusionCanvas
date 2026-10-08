@@ -2,6 +2,7 @@ using FusionCanvas.Application.DesignFiles;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Assets;
 using FusionCanvas.Domain.Items;
+using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Workspace;
@@ -43,6 +44,41 @@ public sealed class GlobalColorRemovalServiceTests
         Assert.Contains(repository.Snapshot.AssetLinks, link => link.AssetId == fixture.DerivedAssetId && link.EntityId == fixture.Item.Id);
         Assert.Equal("assets/design - color removed.png", result.Asset.WorkspaceRelativePath);
         Assert.Equal(1, files.SaveCount);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_ReplacesTheSourceInTheItemDesignSlot()
+    {
+        var fixture = Fixture.Create();
+        var rowId = Guid.NewGuid();
+        var designAreaId = Guid.NewGuid();
+        var repository = new MemoryRepository(fixture.Snapshot with
+        {
+            DesignVariantRows = [new DesignVariantRow(rowId, fixture.Item.Id, true, 0)],
+            DesignSlotAssignments = [new DesignSlotAssignment(rowId, designAreaId, fixture.SourceAsset.Id)]
+        });
+        var files = new MemoryFiles();
+        var service = new GlobalColorRemovalService(
+            repository,
+            files,
+            files,
+            new StubProcessor
+            {
+                ApplyResult = new GlobalColorRemovalRasterResult([1, 2, 3], 2, 2, 2, 4)
+            },
+            clock: () => fixture.Now,
+            newId: () => fixture.DerivedAssetId);
+
+        var result = await service.ApplyAsync(
+            fixture.Item.Id,
+            fixture.SourceAsset.Id,
+            new GlobalColorRemovalParameters(new(0, 0, 0), 0.1),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        var assignment = Assert.Single(repository.Snapshot.DesignSlotAssignments);
+        Assert.Equal(fixture.DerivedAssetId, assignment.AssetId);
+        Assert.Contains(repository.Snapshot.Assets, asset => asset.Id == fixture.SourceAsset.Id);
     }
 
     [Fact]
