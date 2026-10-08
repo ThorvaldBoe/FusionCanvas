@@ -221,6 +221,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
             () => _workspaceSnapshot,
             ResolveStore,
             applicationServices.StoreContextMapper ?? new UnavailableStoreContextMapper());
+        ManualListingDetailsTool = new ManualListingDetailsStageToolViewModel(applicationServices.ManualListingDetails);
         Ideation = new IdeationViewModel(_ideationService, _ideationAccessStatus, snowcloneLibrary, rejectedPhrases);
         ConceptRefinement = new ConceptRefinementSessionViewModel(
             _conceptRefinementService,
@@ -393,6 +394,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
     public ListingStageToolViewModel ListingTool { get; }
 
     public PrintifyListingStageToolViewModel PrintifyTool { get; }
+    public ManualListingDetailsStageToolViewModel ManualListingDetailsTool { get; }
 
     public StageToolContentViewModel? ActiveStageToolContent { get; private set; }
 
@@ -532,6 +534,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
     public bool ShowsDesignStageTool => ActiveStageToolContent?.Kind == StageToolContentKind.Design;
     public bool ShowsListingStageTool => ActiveStageToolContent?.Kind == StageToolContentKind.Listing;
     public bool ShowsPrintifyStageTool => ActiveStageToolContent?.Kind == StageToolContentKind.Printify;
+    public bool ShowsManualListingDetailsStageTool => ActiveStageToolContent?.Kind == StageToolContentKind.ManualListingDetails;
 
     public string ActiveStageToolContentUnavailableMessage =>
         DocumentWindow.StageToolHostState?.SelectedTool is { } selected && ActiveStageToolContent is null
@@ -1337,6 +1340,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         OnPropertyChanged(nameof(ShowsDesignStageTool));
         OnPropertyChanged(nameof(ShowsListingStageTool));
         OnPropertyChanged(nameof(ShowsPrintifyStageTool));
+        OnPropertyChanged(nameof(ShowsManualListingDetailsStageTool));
         RaiseIdeationProperties();
 
         if (ActiveItem is not { } item)
@@ -1348,6 +1352,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         var canEdit = ItemWorkflowPolicy.CanEditStage(item, activeStage).IsAllowed;
         Run(cancellationToken => ListingTool.LoadAsync(item.Id, item.Status, canEdit, cancellationToken));
         Run(cancellationToken => PrintifyTool.LoadAsync(item.Id, canEdit, cancellationToken));
+        if (activeStage == WorkflowStage.Listing)
+            Run(cancellationToken => ManualListingDetailsTool.LoadAsync(item.Id, canEdit, cancellationToken));
         if (activeStage == WorkflowStage.Design)
         {
             Run(cancellationToken => DesignTool.LoadAsync(item.Id, canEdit, cancellationToken));
@@ -1477,6 +1483,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         OnPropertyChanged(nameof(ShowsDesignStageTool));
         OnPropertyChanged(nameof(ShowsListingStageTool));
         OnPropertyChanged(nameof(ShowsPrintifyStageTool));
+        OnPropertyChanged(nameof(ShowsManualListingDetailsStageTool));
         OnPropertyChanged(nameof(ActiveStageToolContentUnavailableMessage));
         OnPropertyChanged(nameof(HasActiveStageToolContentUnavailableMessage));
     }

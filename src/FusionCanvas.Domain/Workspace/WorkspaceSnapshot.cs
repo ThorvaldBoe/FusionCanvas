@@ -37,6 +37,12 @@ public sealed record WorkspaceSnapshot(
 
     public IReadOnlyList<ItemListingConfiguration> ItemListingConfigurations { get; init; } = [];
 
+    public IReadOnlyList<ItemListingDetails> ItemListingDetails { get; init; } = [];
+
+    public IReadOnlyList<ItemVariantListingTerms> ItemVariantListingTerms { get; init; } = [];
+
+    public IReadOnlyList<ItemListingSetupHistory> ItemListingSetupHistory { get; init; } = [];
+
     public IReadOnlyList<DesignSelectedColor> DesignSelectedColors { get; init; } = [];
 
     public IReadOnlyList<DesignVariantRow> DesignVariantRows { get; init; } = [];

@@ -19,6 +19,7 @@ using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Groups;
 using FusionCanvas.Domain.Mockups;
+using FusionCanvas.Domain.Stores;
 using FusionCanvas.Integration.Persistence;
 using FusionCanvas.App.Tests.TestSupport;
 
@@ -66,6 +67,25 @@ public class MainWindowConstructionTests
 
         Assert.NotNull(diagnostics);
         Assert.Equal("Mockup template readiness diagnostics", AutomationProperties.GetName(diagnostics));
+    }
+
+    [AvaloniaFact]
+    public void ListingDetailsToolShowsAccessibleFieldsForManualStoreAndEmptyOfferingGuidance()
+    {
+        using var fixture = new MainWindowFixture();
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Listing);
+        fixture.PumpLayout();
+
+        var title = fixture.FindControl<TextBox>(control => AutomationProperties.GetName(control) == "Listing title");
+        var description = fixture.FindControl<TextBox>(control => AutomationProperties.GetName(control) == "Listing description");
+        var currency = fixture.FindControl<TextBox>(control => AutomationProperties.GetName(control) == "Listing currency");
+
+        Assert.NotNull(title);
+        Assert.NotNull(description);
+        Assert.NotNull(currency);
+        Assert.Contains("Select an Offering in Design", fixture.ViewModel.ManualListingDetailsTool.OfferingSummary);
+        Assert.False(fixture.ViewModel.ManualListingDetailsTool.CanEditFulfillmentTerms);
     }
 
     [AvaloniaFact]
@@ -173,7 +193,10 @@ public class MainWindowConstructionTests
     [AvaloniaFact]
     public void ItemOverview_ExposesListingAndPrintifyStageTools()
     {
-        using var fixture = new MainWindowFixture();
+        var snapshot = SampleWorkspace.Create();
+        snapshot = snapshot with { Stores = snapshot.Stores.Select(store => store with { FulfillmentStrategy = FulfillmentStrategy.Printify }).ToArray() };
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+        using var fixture = new MainWindowFixture(snapshot: snapshot, repository: repository);
         fixture.ViewModel.OpenFromNavigation(fixture.ViewModel.NavigationContexts.Single(context => context.Context.Id == SampleWorkspace.ListingNodeId));
         fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Listing);
         fixture.PumpLayout();
@@ -186,6 +209,8 @@ public class MainWindowConstructionTests
         Assert.True(fixture.ViewModel.DocumentWindow.HasMultipleStageTools);
         Assert.Equal("Item stage tool selector", AutomationProperties.GetName(selector));
         Assert.NotNull(printify);
+        Assert.Null(fixture.FindControlOrDefault<Button>(control =>
+            control.Content?.ToString() == "Listing Details" && control.Classes.Contains("toolSelector")));
         AssertControlCanBeReachedThroughVisibleViewport(fixture, selector);
         AssertControlCanBeReachedThroughVisibleViewport(fixture, printify);
         Click(fixture, printify);
@@ -200,7 +225,10 @@ public class MainWindowConstructionTests
     [InlineData(1180, 760)]
     public void ListingStageSelector_RemainsReachableAfterReviewingScrolledDesign(double width, double height)
     {
-        using var fixture = new MainWindowFixture(width: width, height: height);
+        var snapshot = SampleWorkspace.Create();
+        snapshot = snapshot with { Stores = snapshot.Stores.Select(store => store with { FulfillmentStrategy = FulfillmentStrategy.Printify }).ToArray() };
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+        using var fixture = new MainWindowFixture(width: width, height: height, snapshot: snapshot, repository: repository);
         fixture.ViewModel.OpenFromNavigation(fixture.ViewModel.NavigationContexts.Single(context => context.Context.Id == SampleWorkspace.ListingNodeId));
         fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Design);
         fixture.PumpLayout();

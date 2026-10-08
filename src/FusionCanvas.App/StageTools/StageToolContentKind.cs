@@ -6,5 +6,6 @@ public enum StageToolContentKind
     Concept = 1,
     Design = 2,
     Listing = 3,
-    Printify = 4
+    Printify = 4,
+    ManualListingDetails = 5
 }

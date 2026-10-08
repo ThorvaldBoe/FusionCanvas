@@ -808,6 +808,55 @@
                     </StackPanel>
                   </Border>
 
+                  <Border IsVisible="{Binding ShowsManualListingDetailsStageTool}"
+                          Padding="14"
+                          Background="{DynamicResource ElevatedSurfaceBrush}"
+                          BorderBrush="{DynamicResource ControlBorderBrush}"
+                          BorderThickness="1"
+                          CornerRadius="6">
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="Listing Details" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource StrongTextBrush}" />
+                      <TextBlock Text="Record local listing copy, Variant pricing, and fulfillment terms. Tags remain on the Item." Foreground="{DynamicResource SecondaryTextBrush}" TextWrapping="Wrap" />
+                      <TextBlock Text="Title" FontWeight="SemiBold" />
+                      <TextBox Text="{Binding ManualListingDetailsTool.Title, Mode=TwoWay}" AutomationProperties.Name="Listing title" />
+                      <TextBlock Text="Description" FontWeight="SemiBold" />
+                      <TextBox Text="{Binding ManualListingDetailsTool.Description, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="72" AutomationProperties.Name="Listing description" />
+                      <TextBlock Text="Currency (ISO code)" FontWeight="SemiBold" />
+                      <TextBox Text="{Binding ManualListingDetailsTool.Currency, Mode=TwoWay}" MaxLength="3" AutomationProperties.Name="Listing currency" />
+                      <TextBlock Text="{Binding ManualListingDetailsTool.OfferingSummary}" Foreground="{DynamicResource SecondaryTextBrush}" TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding ManualListingDetailsTool.VariantPricingGuidance}" Foreground="{DynamicResource SecondaryTextBrush}" TextWrapping="Wrap" />
+                      <TextBlock Text="Variant pricing and fulfillment cost" FontWeight="SemiBold" />
+                      <ItemsControl ItemsSource="{Binding ManualListingDetailsTool.Variants}" IsEnabled="{Binding ManualListingDetailsTool.CanEditFulfillmentTerms}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <Grid ColumnDefinitions="*,120,140" ColumnSpacing="8" Margin="0,2">
+                              <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                              <TextBox Grid.Column="1" Text="{Binding SellingPrice, Mode=TwoWay}" PlaceholderText="Selling price" AutomationProperties.Name="Variant selling price" />
+                              <TextBox Grid.Column="2" Text="{Binding FulfillmentCost, Mode=TwoWay}" PlaceholderText="Fulfillment cost" AutomationProperties.Name="Variant fulfillment cost" />
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <TextBlock Text="Shipping option" FontWeight="SemiBold" />
+                      <TextBox Text="{Binding ManualListingDetailsTool.ShippingName, Mode=TwoWay}" PlaceholderText="Option name" IsEnabled="{Binding ManualListingDetailsTool.CanEditFulfillmentTerms}" />
+                      <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <TextBox Text="{Binding ManualListingDetailsTool.CustomerShippingCharge, Mode=TwoWay}" PlaceholderText="Customer shipping charge" IsEnabled="{Binding ManualListingDetailsTool.CanEditFulfillmentTerms}" />
+                        <TextBox Grid.Column="1" Text="{Binding ManualListingDetailsTool.SellerShippingCost, Mode=TwoWay}" PlaceholderText="Expected seller shipping cost" IsEnabled="{Binding ManualListingDetailsTool.CanEditFulfillmentTerms}" />
+                      </Grid>
+                      <TextBox Text="{Binding ManualListingDetailsTool.DeliveryEstimate, Mode=TwoWay}" PlaceholderText="Delivery estimate (manual, not validated)" IsEnabled="{Binding ManualListingDetailsTool.CanEditFulfillmentTerms}" />
+                      <TextBlock Text="{Binding ManualListingDetailsTool.GrossProfitSummary}" Foreground="{DynamicResource SecondaryTextBrush}" TextWrapping="Wrap" />
+                      <TextBlock Text="Gross profit = selling price + customer shipping − fulfillment cost − seller shipping cost." Foreground="{DynamicResource SecondaryTextBrush}" TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding ManualListingDetailsTool.Error}" IsVisible="{Binding ManualListingDetailsTool.HasError}" Foreground="{DynamicResource DangerTextBrush}" TextWrapping="Wrap" />
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="{Binding ManualListingDetailsTool.Status}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <Button Grid.Column="1" Content="Save details" Command="{Binding ManualListingDetailsTool.SaveCommand}" IsEnabled="{Binding ManualListingDetailsTool.CanSave}" />
+                      </Grid>
+                      <Expander Header="Previous fulfillment setups" IsExpanded="False">
+                        <TextBlock Text="{Binding ManualListingDetailsTool.HistorySummary}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      </Expander>
+                    </StackPanel>
+                  </Border>
+
                   <Border IsVisible="{Binding ShowsPrintifyStageTool}"
                           Padding="14"
                           Background="{DynamicResource ElevatedSurfaceBrush}"
@@ -2129,7 +2178,23 @@
                 <TextBlock Text="Confirm lifecycle change"
                            FontWeight="SemiBold" />
                 <TextBlock Text="{Binding StatusConfirmationMessage}"
-                           TextWrapping="Wrap" />
+                                   TextWrapping="Wrap" />
+                        <Border IsVisible="{Binding DesignTool.IsListingMigrationReviewVisible}"
+                                Padding="10"
+                                Background="{DynamicResource WarningSurfaceBrush}"
+                                BorderBrush="{DynamicResource WarningTextBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                AutomationProperties.Name="Offering migration review">
+                          <StackPanel Spacing="8">
+                            <TextBlock Text="Review fulfillment migration" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding DesignTool.ListingMigrationReviewSummary}" TextWrapping="Wrap" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <Button Content="Confirm migration" Command="{Binding DesignTool.ConfirmListingMigrationCommand}" AutomationProperties.AutomationId="Design.ConfirmListingMigration" />
+                              <Button Content="Cancel" Command="{Binding DesignTool.CancelListingMigrationCommand}" AutomationProperties.AutomationId="Design.CancelListingMigration" />
+                            </StackPanel>
+                          </StackPanel>
+                        </Border>
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <Button Content="Confirm"
                           Command="{Binding ConfirmStatusChangeCommand}"

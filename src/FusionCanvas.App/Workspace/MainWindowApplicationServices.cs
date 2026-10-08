@@ -46,4 +46,5 @@ public sealed record MainWindowApplicationServices(
     IMockupOutputResolutionSettingsService? MockupOutputResolutionSettings = null,
     IListingLifecycleServiceFactory? ListingLifecycle = null,
     IListingProjectionSource? ListingProjectionSource = null,
-    IStoreContextMapper? StoreContextMapper = null);
+    IStoreContextMapper? StoreContextMapper = null,
+    FusionCanvas.Application.Listings.ManualListingDetailsService? ManualListingDetails = null);

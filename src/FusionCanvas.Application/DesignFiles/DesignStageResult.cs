@@ -6,6 +6,7 @@ public sealed record DesignStageResult
     string? Error,
     DesignStageState? State)
 {
+    public FusionCanvas.Application.Listings.OfferingMigrationPreview? MigrationPreview { get; init; }
     public static DesignStageResult Success(DesignStageState state) =>
         new(true, null, state);
 

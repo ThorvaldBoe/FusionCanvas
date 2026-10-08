@@ -8,6 +8,7 @@ using FusionCanvas.Application.Catalog;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Catalog;
 using FusionCanvas.Application.AI;
+using FusionCanvas.Application.Listings;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.App;
 
@@ -64,6 +65,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     private FulfillmentOffering? _selectedRecoveryOffering;
     private FulfillmentOffering? _pendingRecoveryOffering;
     private bool _isRecoveryConfirmationVisible;
+    private OfferingMigrationPreview? _pendingListingMigration;
     private string _recoveryConfirmationMessage = string.Empty;
     private bool _canEditContext;
     private bool _isDisposed;
@@ -82,6 +84,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         _globalColorRemovalService = globalColorRemovalService;
         GenerateArtworkCommand = new RelayCommand(_ => _ = GenerateArtworkAsync(), () => CanGenerateArtwork);
         CancelArtworkCommand = new RelayCommand(_ => _artworkCts?.Cancel(), () => IsArtworkBusy);
+        ConfirmListingMigrationCommand = new RelayCommand(_ => _ = ConfirmListingMigrationAsync(), () => IsListingMigrationReviewVisible && !IsBusy);
+        CancelListingMigrationCommand = new RelayCommand(_ => _ = CancelListingMigrationAsync(), () => IsListingMigrationReviewVisible && !IsBusy);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -181,6 +185,12 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         }
     }
 
+    public bool IsListingMigrationReviewVisible => _pendingListingMigration is not null;
+    public string ListingMigrationReviewSummary => _pendingListingMigration is not { } migration ? string.Empty :
+        $"Move {migration.SourceOfferingName} → {migration.DestinationOfferingName}?\n" +
+        $"{migration.MatchedVariantCount} of {migration.VariantCount} destination Variants have exact matches; {migration.UnmatchedDestinationVariantCount} need new prices and costs. " +
+        "Prior shipping terms will be kept in history; the new setup starts with blank shipping terms.\n" + migration.ResetSummary;
+
     public string RecoveryConfirmationMessage
     {
         get => _recoveryConfirmationMessage;
@@ -203,6 +213,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         get => _selectedOffering;
         set
         {
+            if (_pendingListingMigration is not null && !_isApplyingState) return;
             if (_selectedOffering?.Id != value?.Id)
             {
                 _selectedOffering = value;
@@ -290,6 +301,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             _isBusy = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(CanChooseRecoveryOffering));
+            ConfirmListingMigrationCommand.NotifyCanExecuteChanged();
+            CancelListingMigrationCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -583,6 +596,8 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     public string ArtworkProgress => IsArtworkBusy ? "Generating artwork…" : string.Empty;
     public RelayCommand GenerateArtworkCommand { get; }
     public RelayCommand CancelArtworkCommand { get; }
+    public RelayCommand ConfirmListingMigrationCommand { get; }
+    public RelayCommand CancelListingMigrationCommand { get; }
 
     // --- Commands ---
     public async Task SelectConfigurationAsync(Guid offeringId, CancellationToken ct = default)
@@ -593,6 +608,14 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         {
             var result = await _designStageService.SelectConfigurationAsync(_itemId, offeringId, ct).ConfigureAwait(true);
             ErrorMessage = result.Error;
+            if (result.MigrationPreview is not null)
+            {
+                _pendingListingMigration = result.MigrationPreview;
+                OnPropertyChanged(nameof(IsListingMigrationReviewVisible));
+                OnPropertyChanged(nameof(ListingMigrationReviewSummary));
+                ConfirmListingMigrationCommand.NotifyCanExecuteChanged();
+                CancelListingMigrationCommand.NotifyCanExecuteChanged();
+            }
             if (result.Succeeded)
             {
                 await LoadAsync(_itemId, !IsReadOnly, ct).ConfigureAwait(true);
@@ -602,6 +625,35 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         {
             IsBusy = false;
         }
+    }
+
+    public async Task ConfirmListingMigrationAsync(CancellationToken cancellationToken = default)
+    {
+        if (_pendingListingMigration is not { } migration || IsBusy) return;
+        IsBusy = true;
+        try
+        {
+            var result = await _designStageService.ConfirmOfferingMigrationAsync(migration, cancellationToken).ConfigureAwait(true);
+            _pendingListingMigration = null;
+            OnPropertyChanged(nameof(IsListingMigrationReviewVisible));
+            OnPropertyChanged(nameof(ListingMigrationReviewSummary));
+            ConfirmListingMigrationCommand.NotifyCanExecuteChanged();
+            CancelListingMigrationCommand.NotifyCanExecuteChanged();
+            ErrorMessage = result.Error;
+            await LoadAsync(_itemId, _canEditContext, cancellationToken).ConfigureAwait(true);
+        }
+        finally { IsBusy = false; }
+    }
+
+    public async Task CancelListingMigrationAsync(CancellationToken cancellationToken = default)
+    {
+        if (_pendingListingMigration is null) return;
+        _pendingListingMigration = null;
+        OnPropertyChanged(nameof(IsListingMigrationReviewVisible));
+        OnPropertyChanged(nameof(ListingMigrationReviewSummary));
+        ConfirmListingMigrationCommand.NotifyCanExecuteChanged();
+        CancelListingMigrationCommand.NotifyCanExecuteChanged();
+        await LoadAsync(_itemId, _canEditContext, cancellationToken).ConfigureAwait(true);
     }
 
     public void RequestStaleConfigurationRecovery(FulfillmentOffering offering)

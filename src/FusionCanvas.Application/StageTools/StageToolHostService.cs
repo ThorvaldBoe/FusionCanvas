@@ -120,6 +120,14 @@ public sealed class StageToolHostService : IStageToolHostService
             tool.RequiresSelectedItem,
             request.NearbyWorkLimit));
 
+        if (tool.AllowedFulfillmentStrategies is { Count: > 0 } allowedStrategies
+            && resolution.Context is { } strategyContext
+            && !allowedStrategies.Contains(strategyContext.ActiveStore.FulfillmentStrategy))
+        {
+            return new StageToolAvailability(tool, StageToolAvailabilityKind.Unavailable,
+                "This tool is unavailable for the active Store fulfillment strategy.", resolution);
+        }
+
         if (resolution.IsAvailable)
         {
             return new StageToolAvailability(tool, StageToolAvailabilityKind.Available, null, resolution);

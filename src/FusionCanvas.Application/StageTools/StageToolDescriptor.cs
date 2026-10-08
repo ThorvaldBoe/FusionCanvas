@@ -1,4 +1,5 @@
 using FusionCanvas.Domain.Workflow;
+using FusionCanvas.Domain.Stores;
 
 namespace FusionCanvas.Application.StageTools;
 
@@ -12,7 +13,8 @@ public sealed record StageToolDescriptor(
     bool IsDefault,
     StageToolSourceKind SourceKind = StageToolSourceKind.BuiltIn,
     bool IsEnabled = true,
-    string? FailureMessage = null)
+    string? FailureMessage = null,
+    IReadOnlyCollection<FulfillmentStrategy>? AllowedFulfillmentStrategies = null)
 {
     public string Id { get; } = RequireText(Id, nameof(Id));
 
