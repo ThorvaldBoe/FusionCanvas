@@ -13,6 +13,9 @@ public interface IDesignStageService
     /// <summary>Selects a catalog offering as the item's listing configuration.</summary>
     Task<DesignStageResult> SelectConfigurationAsync(Guid itemId, Guid offeringId, CancellationToken cancellationToken = default);
 
+    Task<DesignStageResult> ConfirmOfferingMigrationAsync(FusionCanvas.Application.Listings.OfferingMigrationPreview preview, CancellationToken cancellationToken = default) =>
+        Task.FromResult(DesignStageResult.Failure("Offering migration is unavailable in this Design service."));
+
     /// <summary>Replaces a stale listing configuration after explicit user confirmation.</summary>
     Task<DesignStageResult> RecoverStaleConfigurationAsync(Guid itemId, Guid offeringId, CancellationToken cancellationToken = default);
 

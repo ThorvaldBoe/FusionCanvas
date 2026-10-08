@@ -186,7 +186,8 @@ public static class AppWorkspaceFactory
             mockupOutputResolutionSettings,
             printifyListingFactory,
             new WorkspaceListingProjectionSource(fileStore, rasterImageMetadata),
-            new FusionCanvas.Integration.Stores.StoreContextMapper());
+            new FusionCanvas.Integration.Stores.StoreContextMapper(),
+            new FusionCanvas.Application.Listings.ManualListingDetailsService(repository));
         return new AppWorkspaceRuntime(
             repository,
             new WorkspaceManagementService(

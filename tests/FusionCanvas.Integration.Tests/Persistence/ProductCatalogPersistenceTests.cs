@@ -181,7 +181,7 @@ public class ProductCatalogPersistenceTests
 
         Assert.Equal(template, Assert.Single(loaded.MockupTemplates));
         Assert.Equal(revision, Assert.Single(loaded.MockupTemplateRevisions));
-        Assert.Equal(22, SqliteWorkspaceRepository.CurrentSchemaVersion);
+        Assert.Equal(23, SqliteWorkspaceRepository.CurrentSchemaVersion);
     }
 
     [Fact]
@@ -511,6 +511,79 @@ public class ProductCatalogPersistenceTests
         Assert.Single(loaded.DesignSlotAssignments);
         Assert.Equal(itemId, loaded.ItemListingConfigurations[0].ItemId);
         Assert.Equal(offeringId, loaded.ItemListingConfigurations[0].OfferingId);
+    }
+
+    [Fact]
+    public async Task SaveAndLoadAsync_RoundTripsManualListingDetailsTermsAndHistory()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var repository = new SqliteWorkspaceRepository(tempDirectory.GetPath("listing-details.db"));
+        var snapshot = CreateCatalogSnapshot();
+        var item = snapshot.Items[0];
+        var offering = snapshot.FulfillmentOfferings[0];
+        var variant = snapshot.ProductVariants[0];
+        var details = new ItemListingDetails(item.Id, offering.Id, "Public title", "Public description", "USD", "Standard", 5m, 3m, "3-5 days");
+        var terms = new ItemVariantListingTerms(item.Id, variant.Id, 24.95m, 8.50m);
+        var history = new ItemListingSetupHistory(Guid.NewGuid(), item.Id, offering.Id, offering.Name, "Prior title", "Prior description",
+            "EUR", "Tracked", 7m, 4m, "5-8 days", "[]", Now);
+        snapshot = snapshot with
+        {
+            ItemListingConfigurations = [new ItemListingConfiguration(item.Id, offering.Id)],
+            ItemListingDetails = [details], ItemVariantListingTerms = [terms], ItemListingSetupHistory = [history]
+        };
+
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(details, Assert.Single(loaded.ItemListingDetails));
+        Assert.Equal(terms, Assert.Single(loaded.ItemVariantListingTerms));
+        Assert.Equal(history, Assert.Single(loaded.ItemListingSetupHistory));
+    }
+
+    [Fact]
+    public async Task LoadAsync_UpgradesVersion22WithoutInventingListingDetails()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var databasePath = tempDirectory.GetPath("listing-upgrade.db");
+        await new SqliteWorkspaceRepository(databasePath).SaveAsync(CreateCatalogSnapshot(), TestContext.Current.CancellationToken);
+        await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "DROP TABLE item_listing_setup_history; DROP TABLE item_variant_listing_terms; DROP TABLE item_listing_details; PRAGMA user_version = 22;";
+            await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+
+        var loaded = await new SqliteWorkspaceRepository(databasePath).LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Empty(loaded.ItemListingDetails);
+        Assert.Empty(loaded.ItemVariantListingTerms);
+        Assert.Empty(loaded.ItemListingSetupHistory);
+        Assert.Equal(23, await ReadUserVersionAsync(databasePath));
+    }
+
+    [Fact]
+    public async Task SaveAsync_InvalidVariantReferenceRollsBackListingDetailsReplacement()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var repository = new SqliteWorkspaceRepository(tempDirectory.GetPath("listing-rollback.db"));
+        var snapshot = CreateCatalogSnapshot();
+        var item = snapshot.Items[0];
+        var offering = snapshot.FulfillmentOfferings[0];
+        var prior = new ItemListingDetails(item.Id, offering.Id, "Saved title", "Saved description", "USD");
+        snapshot = snapshot with { ItemListingConfigurations = [new ItemListingConfiguration(item.Id, offering.Id)], ItemListingDetails = [prior] };
+        await repository.SaveAsync(snapshot, TestContext.Current.CancellationToken);
+        var invalid = snapshot with
+        {
+            ItemListingDetails = [new ItemListingDetails(item.Id, offering.Id, "Should roll back", "", "USD")],
+            ItemVariantListingTerms = [new ItemVariantListingTerms(item.Id, Guid.NewGuid(), 1m, 0m)]
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.SaveAsync(invalid, TestContext.Current.CancellationToken));
+
+        var loaded = await repository.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(prior, Assert.Single(loaded.ItemListingDetails));
+        Assert.Empty(loaded.ItemVariantListingTerms);
     }
 
     [Fact]

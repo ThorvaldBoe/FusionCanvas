@@ -1,4 +1,5 @@
 using FusionCanvas.Domain.Workflow;
+using FusionCanvas.Domain.Stores;
 
 namespace FusionCanvas.Application.StageTools;
 
@@ -48,6 +49,16 @@ public static class BuiltInStageTools
             "printify-stage-tool",
             [WorkflowStage.Listing],
             RequiresSelectedItem: true,
-            IsDefault: false)
+            IsDefault: false,
+            AllowedFulfillmentStrategies: [FulfillmentStrategy.Printify, FulfillmentStrategy.ShopifyPrintify]),
+        new(
+            "built-in-manual-listing-details-tool",
+            "Listing Details",
+            "Record local listing, price, and fulfillment details for the selected Item.",
+            "manual-listing-details-stage-tool",
+            [WorkflowStage.Listing],
+            RequiresSelectedItem: true,
+            IsDefault: false,
+            AllowedFulfillmentStrategies: [FulfillmentStrategy.Manual, FulfillmentStrategy.ShopifyManual])
     ];
 }

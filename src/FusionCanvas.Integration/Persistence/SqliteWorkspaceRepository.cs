@@ -33,7 +33,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         ValidateSnapshot(snapshot);
 
-        foreach (var table in new[] { "external_listing_mappings", "content_risk_reviews", "mockup_template_revision_source_image_values", "mockup_template_revision_source_images", "mockup_template_source_image_values", "mockup_template_source_images", "mockup_template_revision_colors", "mockup_template_revisions", "mockup_template_colors", "mockup_templates", "placeholder_variants", "offering_placeholders", "offering_variant_values", "offering_variants", "offering_option_values", "offering_options", "blueprint_offerings", "print_providers", "catalog_blueprints", "design_slot_assignments", "design_variant_row_colors", "design_variant_rows", "design_selected_colors", "item_listing_configuration", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
+        foreach (var table in new[] { "item_listing_setup_history", "item_variant_listing_terms", "item_listing_details", "external_listing_mappings", "content_risk_reviews", "mockup_template_revision_source_image_values", "mockup_template_revision_source_images", "mockup_template_source_image_values", "mockup_template_source_images", "mockup_template_revision_colors", "mockup_template_revisions", "mockup_template_colors", "mockup_templates", "placeholder_variants", "offering_placeholders", "offering_variant_values", "offering_variants", "offering_option_values", "offering_options", "blueprint_offerings", "print_providers", "catalog_blueprints", "design_slot_assignments", "design_variant_row_colors", "design_variant_rows", "design_selected_colors", "item_listing_configuration", "asset_links", "design_areas", "product_variants", "item_tags", "fulfillment_offerings", "prompts", "assets", "product_blueprints", "items", "ideation_rejections", "groups", "niches", "tags", "stores", "workspaces" })
         {
             await ExecuteAsync(connection, transaction, $"DELETE FROM {QuoteIdentifier(table)};", cancellationToken);
         }
@@ -160,6 +160,13 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await InsertItemListingConfigurationAsync(connection, transaction, config, cancellationToken);
         }
 
+        foreach (var details in snapshot.ItemListingDetails)
+            await InsertItemListingDetailsAsync(connection, transaction, details, cancellationToken);
+        foreach (var terms in snapshot.ItemVariantListingTerms)
+            await InsertItemVariantListingTermsAsync(connection, transaction, terms, cancellationToken);
+        foreach (var history in snapshot.ItemListingSetupHistory)
+            await InsertItemListingSetupHistoryAsync(connection, transaction, history, cancellationToken);
+
         foreach (var color in snapshot.DesignSelectedColors)
         {
             await InsertDesignSelectedColorAsync(connection, transaction, color, cancellationToken);
@@ -214,6 +221,9 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             ProductVariants = await LoadProductVariantsAsync(connection, cancellationToken),
             DesignAreas = await LoadDesignAreasAsync(connection, cancellationToken),
             ItemListingConfigurations = await LoadItemListingConfigurationsAsync(connection, cancellationToken),
+            ItemListingDetails = await LoadItemListingDetailsAsync(connection, cancellationToken),
+            ItemVariantListingTerms = await LoadItemVariantListingTermsAsync(connection, cancellationToken),
+            ItemListingSetupHistory = await LoadItemListingSetupHistoryAsync(connection, cancellationToken),
             DesignSelectedColors = await LoadDesignSelectedColorsAsync(connection, cancellationToken),
             DesignVariantRows = await LoadDesignVariantRowsAsync(connection, cancellationToken),
             DesignVariantRowColors = await LoadDesignVariantRowColorsAsync(connection, cancellationToken),
@@ -674,6 +684,7 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         await ApplyMigrationAsync(20, () => MigrateToVersion20Async(connection, cancellationToken));
         await ApplyMigrationAsync(21, () => MigrateToVersion21Async(connection, cancellationToken));
         await ApplyMigrationAsync(22, () => MigrateToVersion22Async(connection, cancellationToken));
+        await ApplyMigrationAsync(23, () => MigrateToVersion23Async(connection, cancellationToken));
 
         await SetPragmaUserVersionAsync(connection, currentSchemaVersion, cancellationToken);
     }
@@ -758,6 +769,44 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
             await ExecuteAsync(connection, null, "ALTER TABLE external_listing_mappings ADD COLUMN integration_values_json TEXT NULL;", cancellationToken).ConfigureAwait(false);
         }
     }
+
+    private static Task MigrateToVersion23Async(SqliteConnection connection, CancellationToken cancellationToken) =>
+        ExecuteAsync(connection, null, """
+            CREATE TABLE IF NOT EXISTS item_listing_details (
+                item_id TEXT PRIMARY KEY REFERENCES items(id) ON DELETE CASCADE,
+                offering_id TEXT NULL,
+                title TEXT NULL,
+                description TEXT NULL,
+                currency_code TEXT NULL,
+                shipping_option_name TEXT NULL,
+                customer_shipping_charge TEXT NULL,
+                expected_seller_shipping_cost TEXT NULL,
+                delivery_estimate TEXT NULL
+            );
+            CREATE TABLE IF NOT EXISTS item_variant_listing_terms (
+                item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                variant_id TEXT NOT NULL,
+                selling_price TEXT NULL,
+                expected_fulfillment_cost TEXT NULL,
+                PRIMARY KEY (item_id, variant_id)
+            );
+            CREATE TABLE IF NOT EXISTS item_listing_setup_history (
+                id TEXT PRIMARY KEY,
+                item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+                offering_id TEXT NULL,
+                offering_name TEXT NOT NULL,
+                title TEXT NULL,
+                description TEXT NULL,
+                currency_code TEXT NULL,
+                shipping_option_name TEXT NULL,
+                customer_shipping_charge TEXT NULL,
+                expected_seller_shipping_cost TEXT NULL,
+                delivery_estimate TEXT NULL,
+                variant_terms_json TEXT NOT NULL,
+                archived_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS ix_item_listing_history_item ON item_listing_setup_history(item_id, archived_at DESC);
+            """, cancellationToken);
 
     private static async Task MigrateToVersion13Async(SqliteConnection connection, CancellationToken cancellationToken)
     {
@@ -1839,6 +1888,20 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
     private static Task InsertItemListingConfigurationAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, ItemListingConfiguration config, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, "INSERT INTO item_listing_configuration (item_id, offering_id) VALUES ($item_id, $offering_id);", cancellationToken, ("$item_id", config.ItemId.ToString()), ("$offering_id", config.OfferingId.ToString()));
 
+    private static Task InsertItemListingDetailsAsync(SqliteConnection c, System.Data.Common.DbTransaction t, ItemListingDetails v, CancellationToken ct) =>
+        ExecuteAsync(c, t, "INSERT INTO item_listing_details (item_id, offering_id, title, description, currency_code, shipping_option_name, customer_shipping_charge, expected_seller_shipping_cost, delivery_estimate) VALUES ($item_id,$offering_id,$title,$description,$currency,$shipping_name,$customer_charge,$seller_cost,$delivery);", ct,
+            ("$item_id", v.ItemId.ToString()), ("$offering_id", v.OfferingId?.ToString()), ("$title", v.Title), ("$description", v.Description), ("$currency", v.CurrencyCode), ("$shipping_name", v.ShippingOptionName), ("$customer_charge", DecimalText(v.CustomerShippingCharge)), ("$seller_cost", DecimalText(v.ExpectedSellerShippingCost)), ("$delivery", v.DeliveryEstimate));
+
+    private static Task InsertItemVariantListingTermsAsync(SqliteConnection c, System.Data.Common.DbTransaction t, ItemVariantListingTerms v, CancellationToken ct) =>
+        ExecuteAsync(c, t, "INSERT INTO item_variant_listing_terms (item_id, variant_id, selling_price, expected_fulfillment_cost) VALUES ($item_id,$variant_id,$price,$cost);", ct,
+            ("$item_id", v.ItemId.ToString()), ("$variant_id", v.VariantId.ToString()), ("$price", DecimalText(v.SellingPrice)), ("$cost", DecimalText(v.ExpectedFulfillmentCost)));
+
+    private static Task InsertItemListingSetupHistoryAsync(SqliteConnection c, System.Data.Common.DbTransaction t, ItemListingSetupHistory v, CancellationToken ct) =>
+        ExecuteAsync(c, t, "INSERT INTO item_listing_setup_history (id,item_id,offering_id,offering_name,title,description,currency_code,shipping_option_name,customer_shipping_charge,expected_seller_shipping_cost,delivery_estimate,variant_terms_json,archived_at) VALUES ($id,$item_id,$offering_id,$offering_name,$title,$description,$currency,$shipping_name,$customer_charge,$seller_cost,$delivery,$terms,$archived_at);", ct,
+            ("$id", v.Id.ToString()), ("$item_id", v.ItemId.ToString()), ("$offering_id", v.OfferingId?.ToString()), ("$offering_name", v.OfferingName), ("$title", v.Title), ("$description", v.Description), ("$currency", v.CurrencyCode), ("$shipping_name", v.ShippingOptionName), ("$customer_charge", DecimalText(v.CustomerShippingCharge)), ("$seller_cost", DecimalText(v.ExpectedSellerShippingCost)), ("$delivery", v.DeliveryEstimate), ("$terms", v.VariantTermsJson), ("$archived_at", v.ArchivedAt.ToString("O")));
+
+    private static string? DecimalText(decimal? value) => value?.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
     private static Task InsertDesignSelectedColorAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, DesignSelectedColor color, CancellationToken cancellationToken) =>
         ExecuteAsync(connection, transaction, "INSERT INTO design_selected_colors (item_id, color_value) VALUES ($item_id, $color_value);", cancellationToken, ("$item_id", color.ItemId.ToString()), ("$color_value", color.ColorValue));
 
@@ -2354,6 +2417,30 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
         return configs;
     }
 
+    private static async Task<IReadOnlyList<ItemListingDetails>> LoadItemListingDetailsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var result = new List<ItemListingDetails>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM item_listing_details;", cancellationToken))
+            result.Add(new ItemListingDetails(ReadGuid(reader, "item_id"), ReadNullableGuid(reader, "offering_id"), ReadNullableString(reader, "title"), ReadNullableString(reader, "description"), ReadNullableString(reader, "currency_code"), ReadNullableString(reader, "shipping_option_name"), ReadNullableDecimal(reader, "customer_shipping_charge"), ReadNullableDecimal(reader, "expected_seller_shipping_cost"), ReadNullableString(reader, "delivery_estimate")));
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<ItemVariantListingTerms>> LoadItemVariantListingTermsAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var result = new List<ItemVariantListingTerms>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM item_variant_listing_terms;", cancellationToken))
+            result.Add(new ItemVariantListingTerms(ReadGuid(reader, "item_id"), ReadGuid(reader, "variant_id"), ReadNullableDecimal(reader, "selling_price"), ReadNullableDecimal(reader, "expected_fulfillment_cost")));
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<ItemListingSetupHistory>> LoadItemListingSetupHistoryAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    {
+        var result = new List<ItemListingSetupHistory>();
+        await foreach (var reader in ReadAsync(connection, "SELECT * FROM item_listing_setup_history ORDER BY archived_at DESC;", cancellationToken))
+            result.Add(new ItemListingSetupHistory(ReadGuid(reader, "id"), ReadGuid(reader, "item_id"), ReadNullableGuid(reader, "offering_id"), ReadString(reader, "offering_name"), ReadNullableString(reader, "title"), ReadNullableString(reader, "description"), ReadNullableString(reader, "currency_code"), ReadNullableString(reader, "shipping_option_name"), ReadNullableDecimal(reader, "customer_shipping_charge"), ReadNullableDecimal(reader, "expected_seller_shipping_cost"), ReadNullableString(reader, "delivery_estimate"), ReadString(reader, "variant_terms_json"), ReadDate(reader, "archived_at")));
+        return result;
+    }
+
     private static async Task<IReadOnlyList<DesignSelectedColor>> LoadDesignSelectedColorsAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
         var colors = new List<DesignSelectedColor>();
@@ -2550,6 +2637,28 @@ public sealed class SqliteWorkspaceRepository(string databasePath, bool useConne
                 throw new InvalidOperationException("Every item listing configuration must reference an existing fulfillment offering.");
             }
         }
+
+        foreach (var details in snapshot.ItemListingDetails)
+        {
+            var item = snapshot.Items.SingleOrDefault(value => value.Id == details.ItemId);
+            if (item is null) throw new InvalidOperationException("Every Listing Details record must reference an existing Item.");
+            if (details.OfferingId is Guid offeringId
+                && !snapshot.ItemListingConfigurations.Any(config => config.ItemId == item.Id && config.OfferingId == offeringId))
+                throw new InvalidOperationException("Active Listing Details must reference the Item's selected Offering.");
+        }
+
+        foreach (var terms in snapshot.ItemVariantListingTerms)
+        {
+            var details = snapshot.ItemListingDetails.SingleOrDefault(value => value.ItemId == terms.ItemId);
+            if (details is null || details.OfferingId is null)
+                throw new InvalidOperationException("Variant listing terms require active Listing Details with a selected Offering.");
+            var validVariant = snapshot.OfferingVariants.Any(value => value.Id == terms.VariantId && value.OfferingId == details.OfferingId && !value.IsArchived)
+                || snapshot.ProductVariants.Any(value => value.Id == terms.VariantId && value.FulfillmentOfferingId == details.OfferingId);
+            if (!validVariant) throw new InvalidOperationException("Variant listing terms must reference an active Variant in the Item's selected Offering.");
+        }
+
+        foreach (var history in snapshot.ItemListingSetupHistory)
+            if (!snapshot.Items.Any(value => value.Id == history.ItemId)) throw new InvalidOperationException("Every Listing Details history record must reference an existing Item.");
 
         foreach (var color in snapshot.DesignSelectedColors)
         {

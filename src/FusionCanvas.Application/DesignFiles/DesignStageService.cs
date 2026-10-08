@@ -12,6 +12,7 @@ using FusionCanvas.Application.Items;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.ContentRisk;
+using FusionCanvas.Application.Listings;
 
 namespace FusionCanvas.Application.DesignFiles;
 
@@ -76,9 +77,62 @@ public sealed class DesignStageService : IDesignStageService
             return DesignStageResult.Failure("The selected configuration is not valid for this item.", BuildState(snapshot, itemId));
         }
 
+        var existingConfiguration = snapshot.ItemListingConfigurations.SingleOrDefault(value => value.ItemId == itemId);
+        if (existingConfiguration is not null
+            && existingConfiguration.OfferingId != offeringId
+            && snapshot.ItemListingDetails.Any(value => value.ItemId == itemId))
+        {
+            try
+            {
+                var migration = new ManualListingDetailsService(_repository, _clock, _newId)
+                    .PreviewMigration(snapshot, itemId, offeringId);
+                return DesignStageResult.Failure("Review and confirm the fulfillment migration before changing this Offering.", BuildState(snapshot, itemId)) with
+                { MigrationPreview = migration };
+            }
+            catch (InvalidOperationException exception)
+            {
+                return DesignStageResult.Failure(exception.Message, BuildState(snapshot, itemId));
+            }
+        }
+
         var updated = ReplaceConfiguration(snapshot, item, offeringId);
+        if (existingConfiguration is null && snapshot.ItemListingDetails.SingleOrDefault(value => value.ItemId == itemId) is { } firstSetupDetails)
+        {
+            updated = updated with
+            {
+                ItemListingDetails = [.. updated.ItemListingDetails.Where(value => value.ItemId != itemId), firstSetupDetails with
+                {
+                    OfferingId = offeringId,
+                    ShippingOptionName = null,
+                    CustomerShippingCharge = null,
+                    ExpectedSellerShippingCost = null,
+                    DeliveryEstimate = null
+                }]
+            };
+        }
 
         return await SaveDesignMutationAsync(updated, itemId, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<DesignStageResult> ConfirmOfferingMigrationAsync(OfferingMigrationPreview preview, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var current = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+            var item = current.Items.SingleOrDefault(value => value.Id == preview.ItemId)
+                ?? throw new InvalidOperationException("Item was not found.");
+            var editDecision = ItemWorkflowPolicy.CanPerformOperation(item, ItemOperationKind.DesignStage);
+            if (!editDecision.IsAllowed) throw new InvalidOperationException(editDecision.Reason);
+            await new ManualListingDetailsService(_repository, _clock, _newId)
+                .ConfirmMigrationAsync(preview, cancellationToken).ConfigureAwait(false);
+            var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+            return DesignStageResult.Success(BuildState(snapshot, preview.ItemId));
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+            return DesignStageResult.Failure(exception.Message, BuildState(snapshot, preview.ItemId));
+        }
     }
 
     public async Task<DesignStageResult> RecoverStaleConfigurationAsync(Guid itemId, Guid offeringId, CancellationToken cancellationToken = default)
