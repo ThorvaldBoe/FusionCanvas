@@ -174,24 +174,140 @@ public class MainWindowConstructionTests
     public void ItemOverview_ExposesListingAndPrintifyStageTools()
     {
         using var fixture = new MainWindowFixture();
-        fixture.ViewModel.OpenFromNavigation(fixture.FirstItemContext());
+        fixture.ViewModel.OpenFromNavigation(fixture.ViewModel.NavigationContexts.Single(context => context.Context.Id == SampleWorkspace.ListingNodeId));
         fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Listing);
         fixture.PumpLayout();
 
         var selector = fixture.FindControl<Grid>(grid =>
             AutomationProperties.GetAutomationId(grid) == "Item.StageToolSelector" && grid.IsVisible);
-        var printify = fixture.FindControl<Button>(button =>
-            button.Content?.ToString() == "Printify" && button.IsVisible);
+        var printify = selector.GetVisualDescendants().OfType<Button>().Single(button =>
+            button.Content?.ToString() == "Printify");
 
         Assert.True(fixture.ViewModel.DocumentWindow.HasMultipleStageTools);
         Assert.Equal("Item stage tool selector", AutomationProperties.GetName(selector));
         Assert.NotNull(printify);
-
-        printify.Command!.Execute(printify.CommandParameter);
-        fixture.PumpLayout();
+        AssertControlCanBeReachedThroughVisibleViewport(fixture, selector);
+        AssertControlCanBeReachedThroughVisibleViewport(fixture, printify);
+        Click(fixture, printify);
 
         Assert.True(fixture.ViewModel.ShowsPrintifyStageTool);
-        Assert.NotNull(fixture.FindControl<TextBlock>(text => text.Text == "Printify listing" && text.IsVisible));
+        var printifyHeading = fixture.FindControl<TextBlock>(text => text.Text == "Printify listing");
+        Assert.True(IsEffectivelyVisible(printifyHeading));
+    }
+
+    [AvaloniaTheory]
+    [InlineData(900, 600)]
+    [InlineData(1180, 760)]
+    public void ListingStageSelector_RemainsReachableAfterReviewingScrolledDesign(double width, double height)
+    {
+        using var fixture = new MainWindowFixture(width: width, height: height);
+        fixture.ViewModel.OpenFromNavigation(fixture.ViewModel.NavigationContexts.Single(context => context.Context.Id == SampleWorkspace.ListingNodeId));
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Design);
+        fixture.PumpLayout();
+        var overview = fixture.Window.FindControl<Border>("ItemOverviewComposition")!;
+        var scroll = overview.GetVisualAncestors().OfType<ScrollViewer>().First();
+        scroll.Offset = new Vector(0, 600);
+        fixture.PumpLayout();
+
+        ActivateWorkflowStageWithKeyboard(fixture, WorkflowStage.Listing);
+
+        var selector = fixture.FindControl<Grid>(grid => AutomationProperties.GetAutomationId(grid) == "Item.StageToolSelector");
+        var printify = FindToolChoice(selector, "Printify");
+        AssertControlCanBeReachedThroughVisibleViewport(fixture, selector);
+        AssertControlCanBeReachedThroughVisibleViewport(fixture, printify);
+
+        Click(fixture, printify);
+        Assert.True(fixture.ViewModel.ShowsPrintifyStageTool);
+        var printifyHeading = fixture.FindControl<TextBlock>(text => text.Text == "Printify listing");
+        Assert.True(IsEffectivelyVisible(printifyHeading));
+
+        ActivateWorkflowStageWithKeyboard(fixture, WorkflowStage.Design);
+        ActivateWorkflowStageWithKeyboard(fixture, WorkflowStage.Listing);
+        selector = fixture.FindControl<Grid>(grid => AutomationProperties.GetAutomationId(grid) == "Item.StageToolSelector");
+        printify = FindToolChoice(selector, "Printify");
+        AssertControlCanBeReachedThroughVisibleViewport(fixture, printify);
+        Assert.Equal("Printify", fixture.ViewModel.DocumentWindow.SelectedStageTool!.DisplayName);
+        Assert.True(fixture.ViewModel.ShowsPrintifyStageTool);
+
+        Click(fixture, FindToolChoice(selector, "Listing"));
+        Assert.False(fixture.ViewModel.ShowsPrintifyStageTool);
+        Assert.Equal("Listing", fixture.ViewModel.DocumentWindow.SelectedStageTool!.DisplayName);
+    }
+
+    [AvaloniaFact]
+    public void PrintifyStageTool_IsUnavailableForDesignAndGroupTopicContexts()
+    {
+        using var fixture = new MainWindowFixture();
+        var listingItem = fixture.ViewModel.NavigationContexts.Single(context => context.Context.Id == SampleWorkspace.ListingNodeId);
+        fixture.ViewModel.OpenFromNavigation(listingItem);
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Design);
+        fixture.PumpLayout();
+
+        Assert.False(fixture.ViewModel.ShowsPrintifyStageTool);
+        AssertNoEffectivelyVisible(fixture.FindControlOrDefault<Button>(button => button.Content?.ToString() == "Printify"));
+
+        fixture.ViewModel.OpenFromNavigation(fixture.FirstGroupContext());
+        fixture.PumpLayout();
+
+        AssertNoEffectivelyVisible(fixture.FindControlOrDefault<Grid>(grid =>
+            AutomationProperties.GetAutomationId(grid) == "Item.StageToolSelector"));
+        AssertNoEffectivelyVisible(fixture.FindControlOrDefault<Button>(button => button.Content?.ToString() == "Printify"));
+        AssertNoEffectivelyVisible(fixture.FindControlOrDefault<TextBlock>(text => text.Text == "Printify listing"));
+    }
+
+    private static void ActivateWorkflowStageWithKeyboard(MainWindowFixture fixture, WorkflowStage stage)
+    {
+        var stageButton = fixture.FindControl<Button>(button =>
+            button.Content?.ToString() == stage.ToString()
+            && button.Command == fixture.ViewModel.SelectWorkflowStageCommand
+            && button.IsVisible);
+        stageButton.Focus();
+        fixture.Window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, string.Empty);
+        fixture.PumpLayout();
+        Assert.Equal(stage, fixture.ViewModel.WorkflowNavigator.ActiveViewStage);
+    }
+
+    private static Button FindToolChoice(Grid selector, string name) => selector.GetVisualDescendants()
+        .OfType<Button>()
+        .Single(button => button.Content?.ToString() == name && button.Classes.Contains("toolSelector"));
+
+    private static bool IsEffectivelyVisible(Control control) =>
+        control.IsVisible && control.GetVisualAncestors().OfType<Control>().All(ancestor => ancestor.IsVisible);
+
+    private static void AssertNoEffectivelyVisible(Control? control)
+    {
+        if (control is not null)
+        {
+            Assert.False(IsEffectivelyVisible(control), $"Expected {control} and its ancestors to be hidden.");
+        }
+    }
+
+    private static void AssertControlCanBeReachedThroughVisibleViewport(MainWindowFixture fixture, Control control)
+    {
+        Assert.True(IsEffectivelyVisible(control), $"Expected {control} and its ancestors to be visible.");
+        var origin = control.TranslatePoint(new Point(0, 0), fixture.Window);
+        Assert.NotNull(origin);
+        var controlBounds = new Rect(origin.Value, control.Bounds.Size);
+        Assert.True(fixture.Window.Bounds.Contains(controlBounds),
+            $"Control bounds {controlBounds} are outside window bounds {fixture.Window.Bounds}.");
+
+        foreach (var viewport in control.GetVisualAncestors().OfType<ScrollViewer>())
+        {
+            var viewportOrigin = viewport.TranslatePoint(new Point(0, 0), fixture.Window);
+            Assert.NotNull(viewportOrigin);
+            var viewportBounds = new Rect(viewportOrigin.Value, viewport.Bounds.Size);
+            Assert.True(viewportBounds.Contains(controlBounds),
+                $"Control bounds {controlBounds} are outside scroll viewport {viewportBounds}.");
+        }
+    }
+
+    private static void Click(MainWindowFixture fixture, Button button)
+    {
+        var point = button.TranslatePoint(new Point(button.Bounds.Width / 2, button.Bounds.Height / 2), fixture.Window);
+        Assert.NotNull(point);
+        fixture.Window.MouseDown(point.Value, MouseButton.Left);
+        fixture.Window.MouseUp(point.Value, MouseButton.Left);
+        fixture.PumpLayout();
     }
 
     [AvaloniaFact]
