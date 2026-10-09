@@ -1,6 +1,8 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:stores="using:FusionCanvas.App.Stores"
+        xmlns:virtualGrid="clr-namespace:AvaloniaVirtualDataGrid.Controls;assembly=AvaloniaVirtualDataGrid"
+        xmlns:virtualColumns="clr-namespace:AvaloniaVirtualDataGrid.Columns;assembly=AvaloniaVirtualDataGrid"
         x:Class="FusionCanvas.App.Stores.MockupTemplateEditorWindow"
         x:DataType="stores:CatalogSetupViewModel"
         Title="{Binding MockupTemplateEditorDialogTitle}"
@@ -8,13 +10,16 @@
         CanResize="True" WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ApplicationBackgroundBrush}">
   <Window.Styles>
-    <Style Selector="Border.mockupTableRow"><Setter Property="Background" Value="{DynamicResource PanelSurfaceBrush}" /></Style>
-    <Style Selector="Border.mockupTableRow.alternate"><Setter Property="Background" Value="{DynamicResource SubtleSurfaceBrush}" /></Style>
-    <Style Selector="Border.mockupTableRow.selected"><Setter Property="Background" Value="{DynamicResource SelectionBackgroundBrush}" /></Style>
+    <Style Selector="Border.mockupGridRow"><Setter Property="Background" Value="{DynamicResource PanelSurfaceBrush}" /></Style>
+    <Style Selector="Border.mockupGridRow.alternate"><Setter Property="Background" Value="{DynamicResource SubtleSurfaceBrush}" /></Style>
+    <Style Selector="Border.mockupGridRow.selected"><Setter Property="Background" Value="{DynamicResource SelectionBackgroundBrush}" /></Style>
     <Style Selector="Button.mockupTableFile">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="virtualGrid|VirtualDataGridHeaderPanel">
+      <Setter Property="IsVisible" Value="False" />
     </Style>
   </Window.Styles>
   <Grid Margin="16" RowDefinitions="Auto,Auto,*,Auto,Auto,Auto" RowSpacing="12">
@@ -121,47 +126,71 @@
       </Border>
       </StackPanel>
       <Border x:Name="MockupSourceTableBorder" Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
-      <Grid RowDefinitions="Auto,*">
-        <Border Grid.Row="0" Background="{DynamicResource TabBarBackgroundBrush}" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
-          <Grid ColumnDefinitions="2*,2*,Auto,Auto" ColumnSpacing="10">
-            <Button Content="{Binding FileSortLabel}" Command="{Binding SortLocalSourcesCommand}" CommandParameter="File" Classes="link" HorizontalAlignment="Left" FontWeight="Bold" AutomationProperties.Name="{Binding FileSortAccessibleName}" />
-            <Button Grid.Column="1" Content="{Binding ApplicabilitySortLabel}" Command="{Binding SortLocalSourcesCommand}" CommandParameter="Applicability" Classes="link" HorizontalAlignment="Left" FontWeight="Bold" AutomationProperties.Name="{Binding ApplicabilitySortAccessibleName}" />
-            <Button Grid.Column="2" MinWidth="80" Content="{Binding StatusSortLabel}" Command="{Binding SortLocalSourcesCommand}" CommandParameter="Status" Classes="link" HorizontalAlignment="Left" FontWeight="Bold" AutomationProperties.Name="{Binding StatusSortAccessibleName}" />
-            <TextBlock Grid.Column="3" MinWidth="80" Text="Action" FontWeight="Bold" />
-          </Grid>
-        </Border>
-      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-        <ItemsControl ItemsSource="{Binding LocalSourceDrafts}" AutomationProperties.Name="Mockup source image table">
-          <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="stores:LocalMockupSourceDraftViewModel">
-              <Border Classes="mockupTableRow" Classes.alternate="{Binding IsAlternateRow}" Classes.selected="{Binding IsSelected}" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
-                      Focusable="True" KeyDown="OnSourceRowKeyDown"
-                      AutomationProperties.Name="{Binding DisplayName, StringFormat='Select source image {0}'}"
-                      AutomationProperties.HelpText="Press Enter or Space to select; hold Ctrl to toggle or Shift to select a range"
-                      AutomationProperties.ItemStatus="{Binding IsSelected, StringFormat='Selected: {0}'}">
-                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="2*,2*,Auto,Auto" ColumnSpacing="10" RowSpacing="4">
-                  <Button Grid.Row="0" Grid.Column="0" Content="{Binding DisplayName}" Command="{Binding $parent[Window].DataContext.SelectLocalSourceCommand}" CommandParameter="{Binding}" HorizontalContentAlignment="Left" Classes="mockupTableFile" />
-                  <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ApplicabilitySummary}" VerticalAlignment="Center"
-                             Foreground="{DynamicResource SecondaryTextBrush}"
-                             TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
-                             Focusable="True" IsTabStop="True"
-                             ToolTip.Tip="{Binding ApplicabilitySummary}"
-                             AutomationProperties.Name="Applicability"
-                             AutomationProperties.HelpText="{Binding ApplicabilitySummary}" />
-                  <TextBlock Grid.Row="0" Grid.Column="2" MinWidth="80" Text="{Binding StatusLabel}" VerticalAlignment="Center" FontWeight="SemiBold"
-                             ToolTip.Tip="{Binding AssistanceStatus}"
-                             AutomationProperties.Name="Metadata assistance status"
-                             AutomationProperties.HelpText="{Binding AssistanceStatus}" />
-                  <Button Grid.Row="0" Grid.Column="3" MinWidth="80" Content="Archive" Command="{Binding $parent[Window].DataContext.RemoveLocalSourceCommand}" CommandParameter="{Binding}" Classes="secondary" />
-                  <TextBlock Grid.Row="1" Grid.ColumnSpan="4" Text="{Binding PreviewReadError}" IsVisible="{Binding HasPreviewReadError}" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource WarningTextBrush}" AutomationProperties.Name="Preview read warning" />
-                </Grid>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </ScrollViewer>
-      </Grid>
+        <Grid RowDefinitions="Auto,*">
+          <Border Grid.Row="0" Background="{DynamicResource TabBarBackgroundBrush}" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+            <Grid ColumnDefinitions="175,260,120,95">
+              <Button Content="{Binding FileSortLabel}" Command="{Binding SortLocalSourcesCommand}" CommandParameter="File" Classes="link" HorizontalAlignment="Left" FontWeight="Bold" AutomationProperties.Name="{Binding FileSortAccessibleName}" />
+              <Button Grid.Column="1" Content="{Binding ApplicabilitySortLabel}" Command="{Binding SortLocalSourcesCommand}" CommandParameter="Applicability" Classes="link" HorizontalAlignment="Left" FontWeight="Bold" AutomationProperties.Name="{Binding ApplicabilitySortAccessibleName}" />
+              <Button Grid.Column="2" Content="{Binding StatusSortLabel}" Command="{Binding SortLocalSourcesCommand}" CommandParameter="Status" Classes="link" HorizontalAlignment="Left" FontWeight="Bold" AutomationProperties.Name="{Binding StatusSortAccessibleName}" />
+              <TextBlock Grid.Column="3" Text="Action" FontWeight="Bold" VerticalAlignment="Center" />
+            </Grid>
+          </Border>
+          <virtualGrid:VirtualDataGrid x:Name="MockupSourceGrid" Grid.Row="1" Classes="mockupSourceGrid"
+                                       RowHeight="32" SelectionMode="None"
+                                       AutomationProperties.Name="Mockup source image table"
+                                       AutomationProperties.AutomationId="Catalog.MockupSourceGrid">
+            <virtualGrid:VirtualDataGrid.Columns>
+              <virtualColumns:VirtualDataGridTemplateColumn Header="File" Width="175" IsSortable="False" IsResizable="False">
+                <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                  <DataTemplate x:DataType="stores:LocalMockupSourceDraftViewModel">
+                    <Border Classes="mockupGridRow" Classes.alternate="{Binding IsAlternateRow}" Classes.selected="{Binding IsSelected}" Padding="8,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
+                            Focusable="True" IsTabStop="True" AutomationProperties.Name="{Binding DisplayName, StringFormat='Select source image {0}'}"
+                            AutomationProperties.HelpText="Press Enter or Space to select; hold Ctrl to toggle or Shift to select a range"
+                            AutomationProperties.ItemStatus="{Binding IsSelected, StringFormat='Selected: {0}'}">
+                      <Button Content="{Binding DisplayName}" HorizontalContentAlignment="Left" Classes="mockupTableFile" />
+                    </Border>
+                  </DataTemplate>
+                </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+              </virtualColumns:VirtualDataGridTemplateColumn>
+              <virtualColumns:VirtualDataGridTemplateColumn Header="Applicability" Width="260" IsSortable="False" IsResizable="False">
+                <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                  <DataTemplate x:DataType="stores:LocalMockupSourceDraftViewModel">
+                    <Border Classes="mockupGridRow" Classes.alternate="{Binding IsAlternateRow}" Classes.selected="{Binding IsSelected}" Padding="8,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                      <TextBlock Text="{Binding ApplicabilitySummary}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}"
+                                 TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ApplicabilitySummary}"
+                                 AutomationProperties.Name="Applicability" AutomationProperties.HelpText="{Binding ApplicabilitySummary}" />
+                    </Border>
+                  </DataTemplate>
+                </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+              </virtualColumns:VirtualDataGridTemplateColumn>
+              <virtualColumns:VirtualDataGridTemplateColumn Header="Status" Width="120" IsSortable="False" IsResizable="False">
+                <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                  <DataTemplate x:DataType="stores:LocalMockupSourceDraftViewModel">
+                    <Border Classes="mockupGridRow" Classes.alternate="{Binding IsAlternateRow}" Classes.selected="{Binding IsSelected}" Padding="8,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                      <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding StatusLabel}" FontWeight="SemiBold" ToolTip.Tip="{Binding AssistanceStatus}"
+                                   AutomationProperties.Name="Metadata assistance status" AutomationProperties.HelpText="{Binding AssistanceStatus}" />
+                        <TextBlock Text="⚠" IsVisible="{Binding HasPreviewReadError}" Foreground="{DynamicResource WarningTextBrush}"
+                                   ToolTip.Tip="{Binding PreviewReadError}" AutomationProperties.Name="Source image preview warning"
+                                   AutomationProperties.HelpText="{Binding PreviewReadError}" />
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+              </virtualColumns:VirtualDataGridTemplateColumn>
+              <virtualColumns:VirtualDataGridTemplateColumn Header="Action" Width="95" IsSortable="False" IsResizable="False">
+                <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                  <DataTemplate x:DataType="stores:LocalMockupSourceDraftViewModel">
+                    <Border Classes="mockupGridRow" Classes.alternate="{Binding IsAlternateRow}" Classes.selected="{Binding IsSelected}" Padding="4,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                      <Button MinWidth="80" Content="Archive" CommandParameter="{Binding}"
+                              Classes="secondary mockupSourceArchive" AutomationProperties.Name="Archive source image" />
+                    </Border>
+                  </DataTemplate>
+                </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+              </virtualColumns:VirtualDataGridTemplateColumn>
+            </virtualGrid:VirtualDataGrid.Columns>
+          </virtualGrid:VirtualDataGrid>
+        </Grid>
       </Border>
       <TextBlock Grid.Row="2" IsVisible="{Binding !HasLocalSource}" Text="No source images uploaded yet. Upload an image to begin." Foreground="{DynamicResource SecondaryTextBrush}" />
       <StackPanel Grid.Row="3" Spacing="4">
