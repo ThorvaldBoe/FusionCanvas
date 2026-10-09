@@ -1,7 +1,13 @@
+using System.Collections.Specialized;
+using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using AvaloniaVirtualDataGrid.Controls;
+using AvaloniaVirtualDataGrid.Core;
 using FusionCanvas.App.Assets;
 using FusionCanvas.App.Settings;
 using FusionCanvas.Application.Settings;
@@ -13,6 +19,8 @@ public partial class StoreEditorWindow : Window
 {
     private StoreManagementViewModel? _subscribedViewModel;
     private CatalogSetupViewModel? _subscribedCatalog;
+    private readonly InMemoryDataProvider<SellableVariantRowViewModel> _sellableVariantRows = new([]);
+    private Button? _pendingVariantArchiveButton;
     private bool _designAreaArchiveConfirmationOpen;
     private bool _optionValueManagementOpen;
     private bool _variantCreationDialogOpen;
@@ -38,8 +46,12 @@ public partial class StoreEditorWindow : Window
     public StoreEditorWindow()
     {
         InitializeComponent();
+        SellableVariantGrid.ItemsSource = _sellableVariantRows;
         Closing += OnClosing;
         DataContextChanged += OnDataContextChanged;
+        AddHandler(Button.ClickEvent, OnSellableVariantArchiveButtonClick, RoutingStrategies.Bubble, handledEventsToo: true);
+        AddHandler(InputElement.PointerPressedEvent, OnSellableVariantPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(InputElement.PointerReleasedEvent, OnSellableVariantPointerReleased, RoutingStrategies.Tunnel, handledEventsToo: true);
     }
 
     protected override void OnClosed(EventArgs e)
@@ -99,6 +111,8 @@ public partial class StoreEditorWindow : Window
         if (viewModel.CatalogSetup is { } catalog)
         {
             _subscribedCatalog = catalog;
+            catalog.SellableVariantRows.CollectionChanged += OnSellableVariantRowsChanged;
+            RefreshSellableVariantRows();
             catalog.AttachStoreEditor();
             if (TopLevel.GetTopLevel(this)?.StorageProvider is { } storageProvider)
                 catalog.FilePicker = new AvaloniaAssetFilePicker(storageProvider);
@@ -134,6 +148,7 @@ public partial class StoreEditorWindow : Window
     {
         if (_subscribedCatalog is null) return;
 
+        _subscribedCatalog.SellableVariantRows.CollectionChanged -= OnSellableVariantRowsChanged;
         _subscribedCatalog.DetachStoreEditor();
         _subscribedCatalog.OptionValueManagementRequested -= OnOptionValueManagementRequested;
         _subscribedCatalog.OptionChoiceFocusRequested -= OnOptionChoiceFocusRequested;
@@ -146,7 +161,80 @@ public partial class StoreEditorWindow : Window
         _subscribedCatalog.MockupTemplateEditorRequested -= OnMockupTemplateEditorRequested;
         _subscribedCatalog.DesignAreaEditorRequested -= OnDesignAreaEditorRequested;
         _subscribedCatalog = null;
+        _pendingVariantArchiveButton = null;
+        _sellableVariantRows.Reset([]);
     }
+
+    private void OnSellableVariantRowsChanged(object? sender, NotifyCollectionChangedEventArgs e) => RefreshSellableVariantRows();
+
+    private void RefreshSellableVariantRows() => _sellableVariantRows.Reset(_subscribedCatalog?.SellableVariantRows.ToArray() ?? []);
+
+    private void OnSellableVariantArchiveButtonClick(object? sender, RoutedEventArgs e)
+    {
+        if (e.Source is Button button
+            && button.Classes.Contains("sellableVariantArchive")
+            && button.CommandParameter is SellableVariantRowViewModel variant)
+        {
+            _subscribedCatalog?.ArchiveVariantCommand.Execute(variant);
+        }
+    }
+
+    private void OnSellableVariantPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+        var row = FindSellableVariantRow(e.Source);
+        if (row is null)
+        {
+            row = FindSellableVariantRowAtPoint(e.GetPosition(SellableVariantGrid));
+        }
+
+        if (row is null) return;
+        var button = FindSellableVariantButton(row, e.Source);
+        if (button is null)
+            button = FindSellableVariantButtonAtPoint(row, e.GetPosition(SellableVariantGrid));
+        if (button?.Classes.Contains("sellableVariantArchive") != true) return;
+
+        _pendingVariantArchiveButton = button;
+        e.Pointer.Capture(button);
+        e.Handled = true;
+    }
+
+    private void OnSellableVariantPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        var button = _pendingVariantArchiveButton;
+        _pendingVariantArchiveButton = null;
+        if (button is null) return;
+
+        e.Pointer.Capture(null);
+        var position = e.GetPosition(button);
+        if (position.X >= 0 && position.Y >= 0 && position.X <= button.Bounds.Width && position.Y <= button.Bounds.Height
+            && button.CommandParameter is SellableVariantRowViewModel variant)
+        {
+            _subscribedCatalog?.ArchiveVariantCommand.Execute(variant);
+        }
+
+        e.Handled = true;
+    }
+
+    private static VirtualDataRow? FindSellableVariantRow(object? source) => source is Visual visual
+        ? visual.GetVisualAncestors().Prepend(visual).OfType<VirtualDataRow>().FirstOrDefault()
+        : null;
+
+    private VirtualDataRow? FindSellableVariantRowAtPoint(Point position) => SellableVariantGrid.GetVisualDescendants()
+        .OfType<VirtualDataRow>()
+        .FirstOrDefault(row => row.DataContext is SellableVariantRowViewModel
+            && row.TranslatePoint(new Point(0, 0), SellableVariantGrid) is { } origin
+            && new Rect(origin, row.Bounds.Size).Contains(position));
+
+    private static Button? FindSellableVariantButton(VirtualDataRow row, object? source) => source is Visual visual
+        ? visual.GetVisualAncestors().Prepend(visual).TakeWhile(candidate => !ReferenceEquals(candidate, row)).OfType<Button>().FirstOrDefault()
+        : source as Button;
+
+    private Button? FindSellableVariantButtonAtPoint(VirtualDataRow row, Point gridPosition) => row.GetVisualDescendants()
+        .OfType<Button>()
+        .FirstOrDefault(button => SellableVariantGrid.TranslatePoint(gridPosition, button) is { } position
+            && new Rect(button.Bounds.Size).Contains(position));
 
     private void OnPrintifySelectionFocusRequested(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
     {
