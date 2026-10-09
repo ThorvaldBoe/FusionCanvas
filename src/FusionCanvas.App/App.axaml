@@ -4,6 +4,7 @@
              RequestedThemeVariant="Light">
   <Application.Styles>
     <FluentTheme />
+    <StyleInclude Source="avares://AvaloniaVirtualDataGrid/Themes/Generic.axaml" />
     <Style Selector="Button.compactAction">
       <Setter Property="MinHeight" Value="{DynamicResource Token.Control.CompactHeight}" />
       <Setter Property="Padding" Value="{DynamicResource Token.Layout.CompactPadding}" />

@@ -16,6 +16,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="AvaloniaVirtualDataGrid">
+      <HintPath>..\..\lib\AvaloniaVirtualDataGrid\net10.0\AvaloniaVirtualDataGrid.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
     <AvaloniaResource Include="Assets\FusionCanvasBanner.jpg" />
     <AvaloniaResource Include="Assets\FusionCanvas.ico" />
     <AvaloniaResource Include="Assets\FusionCanvasLogo_Square.png" />

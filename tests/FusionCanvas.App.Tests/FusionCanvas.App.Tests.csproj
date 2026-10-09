@@ -21,6 +21,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="AvaloniaVirtualDataGrid">
+      <HintPath>..\..\lib\AvaloniaVirtualDataGrid\net10.0\AvaloniaVirtualDataGrid.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\FusionCanvas.App\FusionCanvas.App.csproj" />
     <ProjectReference Include="..\..\src\FusionCanvas.Integration\FusionCanvas.Integration.csproj" />
   </ItemGroup>
