@@ -267,6 +267,7 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
     public ObservableCollection<MockupTemplateRevision> TemplateRevisions { get; } = [];
     public ObservableCollection<OptionKind> OptionKinds { get; } = [OptionKind.Color, OptionKind.Size, OptionKind.Other];
     public ObservableCollection<OfferingChoiceGroupViewModel> AvailableChoiceGroups { get; } = [];
+    public AvailableColorValuesGridViewModel AvailableColorsGrid { get; } = new();
     public ObservableCollection<SellableVariantRowViewModel> SellableVariantRows { get; } = [];
     public ObservableCollection<DesignAreaCardViewModel> DesignAreaCards { get; } = [];
     public ObservableCollection<MockupTemplateCardViewModel> MockupTemplateCards { get; } = [];
@@ -2344,7 +2345,10 @@ public sealed class CatalogSetupViewModel : INotifyPropertyChanged
         var groups = AvailableOptions.Select(option => new OfferingChoiceGroupViewModel(
             option,
             OptionValues.Where(value => value.OptionId == option.Id && !value.IsArchived).OrderBy(value => value.SortOrder).ToArray(),
-            ArchiveOptionCommand));
+            ArchiveOptionCommand)).ToArray();
+        AvailableColorsGrid.SetValues(
+            SelectedOffering?.Id,
+            groups.FirstOrDefault(group => group.Option.OptionKind == OptionKind.Color)?.Values ?? []);
         Replace(AvailableChoiceGroups, groups);
         Replace(SellableVariantRows, AvailableVariants.Select(value => SellableVariantRowViewModel.From(value, Options, OptionValues)));
 
