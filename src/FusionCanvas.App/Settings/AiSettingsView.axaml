@@ -96,7 +96,9 @@
       </StackPanel>
     </Border>
 
-    <ToggleSwitch Content="Advanced: configure application areas separately"
+    <ToggleSwitch x:Name="AdvancedModeToggle"
+                  AutomationProperties.AutomationId="Settings.AI.AdvancedMode"
+                  Content="Advanced: configure application areas separately"
                   IsChecked="{Binding AdvancedMode, Mode=TwoWay}" />
 
     <StackPanel IsVisible="{Binding AdvancedMode}" Spacing="14">

@@ -1,5 +1,12 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.Input.Raw;
+using Avalonia.Styling;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Settings;
 using FusionCanvas.Application.AI;
@@ -231,6 +238,91 @@ public class AiSettingsViewTests
         {
             window.Close();
         }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(720, 520, false)]
+    [InlineData(720, 520, true)]
+    [InlineData(860, 680, false)]
+    [InlineData(860, 680, true)]
+    [InlineData(856, 1303, false)]
+    [InlineData(856, 1303, true)]
+    public void AiSection_AdvancedToggleIsFullyReachableAtScrollEnd(int width, int height, bool dark)
+    {
+        var settings = new SettingsViewModel(
+            new InMemoryApplicationSettingsStore(), new FakeTheme(), ApplicationSettings.Default, null);
+        settings.OpenCommand.Execute(null);
+        settings.SelectedSection = SettingsSection.AI;
+        var model = new AiModelDescriptor("test/model", "Test model", null, null, ["text"], ["text"],
+            [AiParameterRegistry.MaxCompletionTokens, AiParameterRegistry.Temperature, AiParameterRegistry.TopP],
+            8192, 2048, null, null, true, new AiReasoningCapabilities(false, false, ["low"], "low", false));
+        foreach (var profile in new[] { settings.Ai.Artwork, settings.Ai.General })
+        {
+            profile.Models = [model];
+            profile.ModelId = model.Id;
+        }
+        var window = new SettingsWindow
+        {
+            DataContext = settings,
+            RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light
+        };
+        try
+        {
+            window.Show();
+            window.Width = width;
+            window.Height = height;
+            PumpLayout(window);
+            var view = window.GetVisualDescendants().OfType<AiSettingsView>().Single();
+            var toggle = view.FindControl<ToggleSwitch>("AdvancedModeToggle")!;
+            var scroll = toggle.GetVisualAncestors().OfType<ScrollViewer>().First();
+            Assert.True(scroll.Extent.Height > scroll.Viewport.Height);
+            scroll.ScrollToEnd();
+            PumpLayout(window);
+            AssertFullyInViewport(toggle);
+
+            Assert.True(toggle.Focus());
+            window.KeyPress(Key.Space, RawInputModifiers.None, PhysicalKey.Space, " ");
+            window.KeyRelease(Key.Space, RawInputModifiers.None, PhysicalKey.Space, " ");
+            PumpLayout(window);
+            Assert.True(settings.Ai.AdvancedMode);
+            var lastProfileToggle = view.GetVisualDescendants().OfType<ToggleSwitch>()
+                .Last(control => Equals(control.Content, "Use General settings"));
+            scroll.ScrollToEnd();
+            PumpLayout(window);
+            AssertFullyInViewport(lastProfileToggle);
+
+            toggle.BringIntoView();
+            PumpLayout(window);
+            AssertFullyInViewport(toggle);
+            window.KeyPress(Key.Space, RawInputModifiers.None, PhysicalKey.Space, " ");
+            window.KeyRelease(Key.Space, RawInputModifiers.None, PhysicalKey.Space, " ");
+            PumpLayout(window);
+            Assert.False(settings.Ai.AdvancedMode);
+            scroll.ScrollToEnd();
+            PumpLayout(window);
+            AssertFullyInViewport(toggle);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    private static void PumpLayout(Window window)
+    {
+        window.UpdateLayout();
+        Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+    }
+
+    private static void AssertFullyInViewport(Control control)
+    {
+        var presenter = control.GetVisualAncestors().OfType<ScrollContentPresenter>().First();
+        var position = control.TranslatePoint(default, presenter)!.Value;
+        Assert.True(control.Bounds.Height > 0);
+        Assert.True(position.X >= 0 && position.X + control.Bounds.Width <= presenter.Bounds.Width);
+        Assert.True(position.Y >= 0 && position.Y + control.Bounds.Height <= presenter.Bounds.Height,
+            $"Control Y={position.Y}, height={control.Bounds.Height}; viewport={presenter.Bounds.Height}");
     }
 
     private static AiModelDescriptor Descriptor(string id, bool zdr) =>
