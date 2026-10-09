@@ -1764,6 +1764,96 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public async Task BulkAdd_GridShowsPreviewAndOnlyCreatesAfterExplicitConfirmation()
+    {
+        var provider = new BulkPreviewProviderCatalog();
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true,
+            includeOfferingOptions: true, providerCatalog: provider);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        try
+        {
+            viewModel.SelectProductsTabCommand.Execute(null);
+            viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+            viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+            viewModel.OpenVariantManagementCommand.Execute(null);
+            window.UpdateLayout();
+            var bulkAdd = window.FindControl<Button>("BulkAddVariantButton")!;
+            bulkAdd.Focus();
+            window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, string.Empty);
+            await HeadlessUiWait.UntilAsync(() => window.OwnedWindows.OfType<BulkAddVariantsWindow>().Any(), "bulk add dialog opens");
+            var dialog = Assert.Single(window.OwnedWindows.OfType<BulkAddVariantsWindow>());
+            var catalog = viewModel.CatalogSetup!;
+            var color = Assert.Single(catalog.AvailableColors);
+            provider.Combinations.UnionWith(catalog.BulkSizeChoices.Select(size => new ProviderCatalogCombination(color.Id, size.Value.Id)));
+            dialog.FindControl<ComboBox>("BulkColorComboBox")!.SelectedItem = color;
+            dialog.UpdateLayout();
+            foreach (var size in dialog.GetVisualDescendants().OfType<CheckBox>())
+            {
+                size.Focus();
+                dialog.KeyPress(Key.Space, RawInputModifiers.None, PhysicalKey.Space, string.Empty);
+                dialog.KeyRelease(Key.Space, RawInputModifiers.None, PhysicalKey.Space, string.Empty);
+            }
+            Assert.Equal(2, catalog.BulkSizeChoices.Count(choice => choice.IsSelected));
+            var grid = dialog.FindControl<AvaloniaVirtualDataGrid.Controls.VirtualDataGrid>("BulkPreviewGrid")!;
+            Assert.False(grid.IsVisible);
+            var preview = FindButton(dialog, "Preview valid Variants")!;
+            Assert.True(preview.IsEnabled);
+            preview.Focus();
+            dialog.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, string.Empty);
+            var previewTask = Assert.IsType<AsyncRelayCommand>(preview.Command).ExecutionTask;
+            Assert.NotNull(previewTask);
+            await previewTask;
+            Assert.Equal(2, catalog.BulkPreviewCandidates.Count);
+            await HeadlessUiWait.UntilAsync(() =>
+            {
+                dialog.UpdateLayout();
+                return grid.GetVisualDescendants().OfType<AvaloniaVirtualDataGrid.Controls.VirtualDataRow>().Count() == 2;
+            }, "provider preview renders both sizes");
+
+            var rows = grid.GetVisualDescendants().OfType<AvaloniaVirtualDataGrid.Controls.VirtualDataRow>().ToArray();
+            var duplicate = Assert.Single(rows, row => Assert.IsType<TextBlock>(row.Cells[0].Content).Text == "S");
+            Assert.Equal("A sellable Variant already exists.", Assert.IsType<TextBlock>(duplicate.Cells[1].Content).Text);
+            var eligible = Assert.Single(rows, row => Assert.IsType<TextBlock>(row.Cells[0].Content).Text == "M");
+            Assert.True(string.IsNullOrEmpty(Assert.IsType<TextBlock>(eligible.Cells[1].Content).Text));
+            Assert.Single(catalog.SellableVariantRows);
+
+            // Changing a size invalidates the snapshot; the next Preview must replace it.
+            var medium = dialog.GetVisualDescendants().OfType<CheckBox>().Single(check => (check.Content as string) == "M");
+            medium.Focus();
+            dialog.KeyPress(Key.Space, RawInputModifiers.None, PhysicalKey.Space, string.Empty);
+            dialog.KeyRelease(Key.Space, RawInputModifiers.None, PhysicalKey.Space, string.Empty);
+            Assert.False(grid.IsVisible);
+            Assert.Empty(catalog.BulkPreviewCandidates);
+            dialog.KeyPress(Key.Space, RawInputModifiers.None, PhysicalKey.Space, string.Empty);
+            dialog.KeyRelease(Key.Space, RawInputModifiers.None, PhysicalKey.Space, string.Empty);
+            preview.Focus();
+            dialog.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, string.Empty);
+            await HeadlessUiWait.UntilAsync(() => !catalog.IsBusy && catalog.BulkPreviewCandidates.Count == 2, "refreshed preview completes");
+            dialog.UpdateLayout();
+            var confirm = FindButton(dialog, "Create previewed Variants")!;
+            Assert.True(confirm.IsEnabled);
+            confirm.Focus();
+            dialog.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, string.Empty);
+            await HeadlessUiWait.UntilAsync(() => !dialog.IsVisible && catalog.SellableVariantRows.Count == 2, "explicit Create adds only the eligible Variant and closes the dialog");
+            Assert.False(catalog.IsAddingBulkVariants);
+            Assert.Empty(catalog.BulkPreviewCandidates);
+        }
+        finally
+        {
+            foreach (var dialog in window.OwnedWindows.OfType<Window>().ToArray()) dialog.Close();
+            window.Close();
+        }
+    }
+
+    private sealed class BulkPreviewProviderCatalog : IProviderCatalogCandidateSource
+    {
+        public HashSet<ProviderCatalogCombination> Combinations { get; } = [];
+
+        public Task<ProviderCatalogCandidateDescriptor> LoadAsync(OfferingContext context, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ProviderCatalogCandidateDescriptor(context, true, null, Combinations));
+    }
+
+    [AvaloniaFact]
     public void BulkAdd_OpensFocusedDialogScopedToOffering()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);

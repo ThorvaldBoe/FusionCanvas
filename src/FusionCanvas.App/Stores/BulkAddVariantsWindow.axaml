@@ -2,6 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:stores="clr-namespace:FusionCanvas.App.Stores"
         xmlns:catalogApplication="clr-namespace:FusionCanvas.Application.Catalog;assembly=FusionCanvas.Application"
+        xmlns:virtualGrid="clr-namespace:AvaloniaVirtualDataGrid.Controls;assembly=AvaloniaVirtualDataGrid"
+        xmlns:virtualColumns="clr-namespace:AvaloniaVirtualDataGrid.Columns;assembly=AvaloniaVirtualDataGrid"
         x:Class="FusionCanvas.App.Stores.BulkAddVariantsWindow"
         x:DataType="stores:CatalogSetupViewModel"
         Title="Bulk add"
@@ -37,16 +39,35 @@
       <TextBlock Text="{Binding BulkResultMessage}"
                  IsVisible="{Binding HasBulkResultMessage}"
                  TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
-      <ItemsControl ItemsSource="{Binding BulkPreviewCandidates}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="catalogApplication:BulkVariantCandidate">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <TextBlock Text="{Binding SizeName}" />
-              <TextBlock Text="{Binding ExclusionReason}" Foreground="{DynamicResource SecondaryTextBrush}" />
-            </StackPanel>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
+      <virtualGrid:VirtualDataGrid x:Name="BulkPreviewGrid"
+                                   Classes="bulkPreview"
+                                   IsVisible="{Binding HasBulkPreview}"
+                                   Height="180"
+                                   RowHeight="32"
+                                   SelectionMode="None"
+                                   Focusable="False"
+                                   AutomationProperties.AutomationId="Catalog.BulkVariantPreview"
+                                   AutomationProperties.Name="Bulk variant preview">
+        <virtualGrid:VirtualDataGrid.Columns>
+          <virtualColumns:VirtualDataGridTemplateColumn Header="Size" Width="116" IsSortable="False" IsResizable="False">
+            <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="catalogApplication:BulkVariantCandidate">
+                <TextBlock Text="{Binding SizeName}" ToolTip.Tip="{Binding SizeName}"
+                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="8,0" />
+              </DataTemplate>
+            </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+          </virtualColumns:VirtualDataGridTemplateColumn>
+          <virtualColumns:VirtualDataGridTemplateColumn Header="Exclusion reason" Width="284" IsSortable="False" IsResizable="False">
+            <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="catalogApplication:BulkVariantCandidate">
+                <TextBlock Text="{Binding ExclusionReason}" ToolTip.Tip="{Binding ExclusionReason}"
+                           Foreground="{DynamicResource SecondaryTextBrush}"
+                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="8,0" />
+              </DataTemplate>
+            </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+          </virtualColumns:VirtualDataGridTemplateColumn>
+        </virtualGrid:VirtualDataGrid.Columns>
+      </virtualGrid:VirtualDataGrid>
       <Button Content="Create previewed Variants"
               IsVisible="{Binding HasBulkPreview}"
               Command="{Binding ConfirmBulkVariantsCommand}"
@@ -54,6 +75,12 @@
     </StackPanel>
   </Grid>
   <Window.Styles>
+    <Style Selector="virtualGrid|VirtualDataGrid.bulkPreview /template/ ScrollViewer#PART_ScrollViewer">
+      <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+    </Style>
+    <Style Selector="virtualGrid|VirtualDataGridHeaderPanel">
+      <Setter Property="IsHitTestVisible" Value="False" />
+    </Style>
     <Style Selector="Button.primary">
       <Setter Property="Padding" Value="10,8" />
       <Setter Property="Background" Value="{DynamicResource CommandBackgroundBrush}" />
