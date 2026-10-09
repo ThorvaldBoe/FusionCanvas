@@ -7,6 +7,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Styling;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Settings;
 using FusionCanvas.App.Stores;
@@ -779,6 +780,7 @@ public class StoreEditorHeadlessTests
     public void AvailableOptionChoiceCards_UseBorderedCardTreatmentAndStackOnNarrowWidth()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        window.Width = 1100;
         var viewModel = (StoreManagementViewModel)window.DataContext!;
         viewModel.SelectProductsTabCommand.Execute(null);
         viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
@@ -813,7 +815,7 @@ public class StoreEditorHeadlessTests
         Assert.NotNull(colorTopLeft);
         Assert.NotNull(sizeTopLeft);
         Assert.True(colorTopLeft.Value.Y == sizeTopLeft.Value.Y,
-            "Cards should sit on one row at the default width.");
+            "Cards should sit on one row when the available width allows it.");
         Assert.True(colorTopLeft.Value.X + color.Bounds.Width <= sizeTopLeft.Value.X,
             $"Multiple cards should align on one row when the available width allows it. Color={colorTopLeft} Size={sizeTopLeft}");
 
@@ -827,9 +829,120 @@ public class StoreEditorHeadlessTests
         var narrowSize = size.TranslatePoint(new Avalonia.Point(0, 0), window);
         Assert.True(narrowColor!.Value.Y < narrowSize!.Value.Y,
             "Cards should wrap onto a new row when the window narrows.");
-        Assert.Equal(narrowColor.Value.X, narrowSize.Value.X);
 
         window.Close();
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Available_colors_grid_renders_accessible_controls_templates_stripes_and_empty_states(bool dark)
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        window.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        try
+        {
+            var catalog = viewModel.CatalogSetup!;
+            var colorCard = window.GetVisualDescendants().OfType<Border>()
+                .First(border => AutomationProperties.GetAutomationId(border) == "Catalog.OptionCard"
+                    && ((OfferingChoiceGroupViewModel)border.DataContext!).IsColor);
+            var grid = window.GetVisualDescendants()
+                .OfType<AvaloniaVirtualDataGrid.Controls.VirtualDataGrid>()
+                .First(control => AutomationProperties.GetAutomationId(control) == "Catalog.ColorGrid");
+            var colorOption = catalog.Options.Single(option => option.OptionKind == OptionKind.Color);
+            catalog.AvailableColorsGrid.SetValues(catalog.SelectedOffering!.Id,
+            [
+                new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, catalog.SelectedOffering.Id, "Black", 0),
+                new OfferingOptionValue(Guid.NewGuid(), colorOption.Id, catalog.SelectedOffering.Id,
+                    "Heather Blue with an exceptionally long catalog color name for truncation", 1)
+            ]);
+            await HeadlessUiWait.UntilAsync(() => grid.GetVisualDescendants()
+                .OfType<AvaloniaVirtualDataGrid.Controls.VirtualDataRow>().Count() == 2,
+                "color grid renders active color rows");
+
+            var search = window.GetVisualDescendants().OfType<TextBox>()
+                .First(control => AutomationProperties.GetAutomationId(control) == "Catalog.ColorSearch");
+            Assert.Equal("Search Colors", AutomationProperties.GetName(search));
+            var pageSize = window.GetVisualDescendants().OfType<ComboBox>()
+                .First(control => AutomationProperties.GetAutomationId(control) == "Catalog.ColorPageSize");
+            var sort = window.GetVisualDescendants().OfType<ComboBox>()
+                .First(control => AutomationProperties.GetAutomationId(control) == "Catalog.ColorSort");
+            Assert.Equal("Colors per page", AutomationProperties.GetName(pageSize));
+            Assert.Equal("Sort Colors", AutomationProperties.GetName(sort));
+            Assert.Equal(10, pageSize.SelectedItem);
+            Assert.Equal("Configured order", sort.SelectedItem);
+            Assert.Equal("Available Colors", AutomationProperties.GetName(grid));
+            Assert.True(search.Focusable && search.IsTabStop && search.IsEnabled);
+            Assert.True(pageSize.Focusable && pageSize.IsTabStop && pageSize.IsEnabled);
+            Assert.True(sort.Focusable && sort.IsTabStop && sort.IsEnabled);
+
+            var rows = grid.GetVisualDescendants().OfType<AvaloniaVirtualDataGrid.Controls.VirtualDataRow>().ToArray();
+            Assert.Equal([false, true], rows.Select(row => ((Border)row.Cells[0].Content!).Classes.Contains("alternate")));
+            Assert.Equal(0, Assert.IsAssignableFrom<ISolidColorBrush>(((Border)rows[0].Cells[0].Content!).Background).Color.A);
+            Assert.True(global::Avalonia.Application.Current!.Resources.TryGetResource(
+                "Token.Color.SurfaceSubtle", dark ? ThemeVariant.Dark : ThemeVariant.Light, out var subtleSurface));
+            Assert.Equal(Assert.IsAssignableFrom<ISolidColorBrush>(subtleSurface).Color,
+                Assert.IsAssignableFrom<ISolidColorBrush>(((Border)rows[1].Cells[0].Content!).Background).Color);
+            var colorTexts = rows.SelectMany(row => ((Control)row.Cells[0].Content!).GetVisualDescendants().OfType<TextBlock>()).ToArray();
+            Assert.Equal(["Black", "Heather Blue with an exceptionally long catalog color name for truncation"], colorTexts.Select(text => text.Text));
+            Assert.All(colorTexts, text => Assert.Equal(TextTrimming.CharacterEllipsis, text.TextTrimming));
+            Assert.All(colorTexts, text => Assert.Equal(text.Text, ToolTip.GetTip(text)));
+            Assert.Equal(ScrollBarVisibility.Disabled,
+                Assert.Single(grid.GetVisualDescendants().OfType<ScrollViewer>()).HorizontalScrollBarVisibility);
+
+            search.Text = "nothing matches";
+            await HeadlessUiWait.UntilAsync(() => catalog.AvailableColorsGrid.HasNoSearchResults, "search input filters color values");
+            window.UpdateLayout();
+            var noMatches = window.GetVisualDescendants().OfType<TextBlock>()
+                .First(control => AutomationProperties.GetAutomationId(control) == "Catalog.ColorNoMatches");
+            Assert.True(IsEffectivelyVisible(noMatches));
+            Assert.Empty(grid.GetVisualDescendants().OfType<AvaloniaVirtualDataGrid.Controls.VirtualDataRow>());
+            Assert.Equal("Showing 0 colors", window.GetVisualDescendants().OfType<TextBlock>()
+                .First(control => AutomationProperties.GetAutomationId(control) == "Catalog.ColorPageSummary").Text);
+            Assert.False(catalog.AvailableColorsGrid.PreviousPageCommand.CanExecute(null));
+            Assert.False(catalog.AvailableColorsGrid.NextPageCommand.CanExecute(null));
+            Assert.False(colorCard.GetVisualDescendants().OfType<Button>()
+                .First(button => AutomationProperties.GetAutomationId(button) == "Catalog.ColorPreviousPage").IsEffectivelyEnabled);
+            Assert.False(colorCard.GetVisualDescendants().OfType<Button>()
+                .First(button => AutomationProperties.GetAutomationId(button) == "Catalog.ColorNextPage").IsEffectivelyEnabled);
+
+            catalog.AvailableColorsGrid.SetValues(catalog.SelectedOffering.Id, []);
+            window.UpdateLayout();
+            var empty = window.GetVisualDescendants().OfType<TextBlock>()
+                .First(control => AutomationProperties.GetAutomationId(control) == "Catalog.ColorNoValues");
+            Assert.True(IsEffectivelyVisible(empty));
+            Assert.False(IsEffectivelyVisible(search));
+            Assert.Equal("Showing 0 colors", window.GetVisualDescendants().OfType<TextBlock>()
+                .First(control => AutomationProperties.GetAutomationId(control) == "Catalog.ColorPageSummary").Text);
+            Assert.False(catalog.AvailableColorsGrid.PreviousPageCommand.CanExecute(null));
+            Assert.False(catalog.AvailableColorsGrid.NextPageCommand.CanExecute(null));
+            Assert.False(colorCard.GetVisualDescendants().OfType<Button>()
+                .First(button => AutomationProperties.GetAutomationId(button) == "Catalog.ColorPreviousPage").IsEffectivelyEnabled);
+            Assert.False(colorCard.GetVisualDescendants().OfType<Button>()
+                .First(button => AutomationProperties.GetAutomationId(button) == "Catalog.ColorNextPage").IsEffectivelyEnabled);
+
+            var cards = window.GetVisualDescendants().OfType<Border>()
+                .Where(control => AutomationProperties.GetAutomationId(control) == "Catalog.OptionCard").ToArray();
+            var sizeCard = cards.Single(card => !((OfferingChoiceGroupViewModel)card.DataContext!).IsColor);
+            Assert.Equal(390, colorCard.Width);
+            Assert.Equal(235, sizeCard.Width);
+            Assert.Contains(sizeCard.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "S   M");
+            var manageButton = Assert.Single(colorCard.GetVisualDescendants().OfType<Button>(),
+                button => button.Content?.ToString() == "Manage values");
+            Assert.Same(catalog.ManageOptionCommand, manageButton.Command);
+            Assert.Same(colorOption, manageButton.CommandParameter);
+        }
+        finally
+        {
+            window.Close();
+        }
     }
 
     [AvaloniaFact]

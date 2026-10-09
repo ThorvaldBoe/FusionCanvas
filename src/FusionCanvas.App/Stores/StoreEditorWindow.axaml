@@ -7,6 +7,8 @@
         xmlns:appProducts="clr-namespace:FusionCanvas.Application.Products;assembly=FusionCanvas.Application"
         xmlns:catalog="clr-namespace:FusionCanvas.Domain.Catalog;assembly=FusionCanvas.Domain"
         xmlns:mockups="clr-namespace:FusionCanvas.Domain.Mockups;assembly=FusionCanvas.Domain"
+        xmlns:virtualGrid="clr-namespace:AvaloniaVirtualDataGrid.Controls;assembly=AvaloniaVirtualDataGrid"
+        xmlns:virtualColumns="clr-namespace:AvaloniaVirtualDataGrid.Columns;assembly=AvaloniaVirtualDataGrid"
         x:Class="FusionCanvas.App.Stores.StoreEditorWindow"
         x:DataType="stores:StoreManagementViewModel"
         Title="Store Editor"
@@ -1041,7 +1043,7 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="stores:OfferingChoiceGroupViewModel">
-                        <Border Classes="choiceCard" Padding="10" Width="235" Margin="0,0,10,10"
+                        <Border Classes="choiceCard" Padding="10" Width="{Binding CardWidth}" Margin="0,0,10,10"
                                 AutomationProperties.AutomationId="Catalog.OptionCard">
                           <StackPanel Spacing="6">
                             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
@@ -1064,7 +1066,76 @@
                                 </Button.Flyout>
                               </Button>
                             </Grid>
-                            <TextBlock Text="{Binding ValuesSummary}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+                            <TextBlock IsVisible="{Binding !IsColor}" Text="{Binding ValuesSummary}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+                            <StackPanel IsVisible="{Binding IsColor}" Spacing="6">
+                              <TextBlock IsVisible="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.HasNoColors}"
+                                         Text="No Colors configured." Foreground="{DynamicResource SecondaryTextBrush}"
+                                         AutomationProperties.AutomationId="Catalog.ColorNoValues" />
+                              <StackPanel IsVisible="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.HasColors}" Spacing="6">
+                                <TextBox Classes="field"
+                                         PlaceholderText="Search colors"
+                                         AutomationProperties.Name="Search Colors"
+                                         AutomationProperties.AutomationId="Catalog.ColorSearch"
+                                         Text="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                  <StackPanel Grid.Column="0" Spacing="3">
+                                    <TextBlock Text="Sort by" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
+                                    <ComboBox ItemsSource="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.SortOptions}"
+                                              SelectedItem="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.SortOption, Mode=TwoWay}"
+                                              AutomationProperties.Name="Sort Colors"
+                                              AutomationProperties.AutomationId="Catalog.ColorSort" />
+                                  </StackPanel>
+                                  <StackPanel Grid.Column="1" Spacing="3">
+                                    <TextBlock Text="Rows per page" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
+                                    <ComboBox ItemsSource="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.PageSizes}"
+                                              SelectedItem="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.PageSize, Mode=TwoWay}"
+                                              AutomationProperties.Name="Colors per page"
+                                              AutomationProperties.AutomationId="Catalog.ColorPageSize" />
+                                  </StackPanel>
+                                </Grid>
+                                <Grid Height="280">
+                                  <virtualGrid:VirtualDataGrid x:Name="AvailableColorsGrid" Classes="colorValuesGrid"
+                                                               ItemsSource="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.Rows}"
+                                                               Height="280" RowHeight="32" SelectionMode="None" Focusable="False"
+                                                               AutomationProperties.Name="Available Colors"
+                                                               AutomationProperties.AutomationId="Catalog.ColorGrid">
+                                    <virtualGrid:VirtualDataGrid.Columns>
+                                      <virtualColumns:VirtualDataGridTemplateColumn Header="Color" Width="348" IsSortable="False" IsResizable="False">
+                                        <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                                          <DataTemplate x:DataType="stores:AvailableColorGridRowViewModel">
+                                            <Border Classes="colorChoiceGridRow" Classes.alternate="{Binding IsAlternate}" Padding="8,0">
+                                              <TextBlock Text="{Binding ColorName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                                         ToolTip.Tip="{Binding ColorName}" />
+                                            </Border>
+                                          </DataTemplate>
+                                        </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                                      </virtualColumns:VirtualDataGridTemplateColumn>
+                                    </virtualGrid:VirtualDataGrid.Columns>
+                                  </virtualGrid:VirtualDataGrid>
+                                  <TextBlock IsVisible="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.HasNoSearchResults}"
+                                             Text="No Colors match your search."
+                                             HorizontalAlignment="Center" VerticalAlignment="Center"
+                                             Foreground="{DynamicResource SecondaryTextBrush}"
+                                             AutomationProperties.AutomationId="Catalog.ColorNoMatches" />
+                                </Grid>
+                              </StackPanel>
+                              <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.PageSummary}"
+                                           VerticalAlignment="Center"
+                                           AutomationProperties.AutomationId="Catalog.ColorPageSummary" />
+                                <Button Grid.Column="1" Content="Previous"
+                                        Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.PreviousPageCommand}"
+                                        Classes="secondary" Padding="8,4"
+                                        AutomationProperties.Name="Previous Colors page"
+                                        AutomationProperties.AutomationId="Catalog.ColorPreviousPage" />
+                                <Button Grid.Column="2" Content="Next"
+                                        Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.NextPageCommand}"
+                                        Classes="secondary" Padding="8,4"
+                                        AutomationProperties.Name="Next Colors page"
+                                        AutomationProperties.AutomationId="Catalog.ColorNextPage" />
+                              </Grid>
+                            </StackPanel>
                             <StackPanel Orientation="Horizontal" Spacing="8">
                               <Button Content="Manage values"
                                       Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ManageOptionCommand}"
@@ -1414,6 +1485,18 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
       <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+    </Style>
+    <Style Selector="Border.colorChoiceGridRow">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.colorChoiceGridRow.alternate">
+      <Setter Property="Background" Value="{DynamicResource Token.Color.SurfaceSubtle}" />
+    </Style>
+    <Style Selector="virtualGrid|VirtualDataGrid.colorValuesGrid /template/ ScrollViewer#PART_ScrollViewer">
+      <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+    </Style>
+    <Style Selector="virtualGrid|VirtualDataGridHeaderPanel">
+      <Setter Property="IsHitTestVisible" Value="False" />
     </Style>
     <Style Selector="Button.tabButton">
       <Setter Property="MinWidth" Value="116" />
