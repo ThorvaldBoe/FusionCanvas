@@ -1175,19 +1175,72 @@
                                TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailableOptions}" Text="Add Options and Values before creating Variants." Foreground="{DynamicResource SecondaryTextBrush}" />
                     <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailableVariants}" Text="No concrete Variants configured." Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <ItemsControl ItemsSource="{Binding CatalogSetup.SellableVariantRows}">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="stores:SellableVariantRowViewModel">
-                          <Border Classes="listItem" Padding="8">
-                            <Grid ColumnDefinitions="2*,3*,Auto" ColumnSpacing="12">
-                              <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" />
-                              <TextBlock Grid.Column="1" Text="{Binding SemanticSummary}" Foreground="{DynamicResource SecondaryTextBrush}" />
-                              <Button Grid.Column="2" Content="Archive" Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ArchiveVariantCommand}" CommandParameter="{Binding}" Classes="danger" />
-                            </Grid>
-                          </Border>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <virtualGrid:VirtualDataGrid x:Name="SellableVariantGrid" Height="224" Classes="sellableVariantGrid"
+                                                 RowHeight="32" SelectionMode="None"
+                                                 AutomationProperties.Name="Sellable Variants"
+                                                 AutomationProperties.AutomationId="Catalog.SellableVariantGrid">
+                      <virtualGrid:VirtualDataGrid.Columns>
+                        <virtualColumns:VirtualDataGridTemplateColumn Header="Name" Width="140" IsSortable="False" IsResizable="False">
+                          <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="stores:SellableVariantRowViewModel">
+                              <Border Classes="listItem" Padding="8,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center"
+                                           TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                           ToolTip.Tip="{Binding Name}" AutomationProperties.Name="Variant name"
+                                           AutomationProperties.HelpText="{Binding Name}" />
+                              </Border>
+                            </DataTemplate>
+                          </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn>
+                        <virtualColumns:VirtualDataGridTemplateColumn Header="Color" Width="82" IsSortable="False" IsResizable="False">
+                          <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="stores:SellableVariantRowViewModel">
+                              <Border Classes="listItem" Padding="8,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                                <TextBlock Text="{Binding Color}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}"
+                                           TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                           ToolTip.Tip="{Binding Color}" AutomationProperties.Name="Color"
+                                           AutomationProperties.HelpText="{Binding Color}" />
+                              </Border>
+                            </DataTemplate>
+                          </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn>
+                        <virtualColumns:VirtualDataGridTemplateColumn Header="Size" Width="66" IsSortable="False" IsResizable="False">
+                          <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="stores:SellableVariantRowViewModel">
+                              <Border Classes="listItem" Padding="8,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                                <TextBlock Text="{Binding Size}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}"
+                                           TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                           ToolTip.Tip="{Binding Size}" AutomationProperties.Name="Size"
+                                           AutomationProperties.HelpText="{Binding Size}" />
+                              </Border>
+                            </DataTemplate>
+                          </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn>
+                        <virtualColumns:VirtualDataGridTemplateColumn Header="Other" Width="110" IsSortable="False" IsResizable="False">
+                          <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="stores:SellableVariantRowViewModel">
+                              <Border Classes="listItem" Padding="8,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                                <TextBlock Text="{Binding Other}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}"
+                                           TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                           ToolTip.Tip="{Binding Other}" AutomationProperties.Name="Other option values"
+                                           AutomationProperties.HelpText="{Binding Other}" />
+                              </Border>
+                            </DataTemplate>
+                          </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn>
+                        <virtualColumns:VirtualDataGridTemplateColumn Header="Action" Width="84" IsSortable="False" IsResizable="False">
+                          <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="stores:SellableVariantRowViewModel">
+                              <Border Classes="listItem" Padding="4,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                                <Button MinWidth="72" Content="Archive" CommandParameter="{Binding}"
+                                        Classes="secondary sellableVariantArchive"
+                                        AutomationProperties.Name="{Binding Name, StringFormat='Archive Variant {0}'}" />
+                              </Border>
+                            </DataTemplate>
+                          </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn>
+                      </virtualGrid:VirtualDataGrid.Columns>
+                    </virtualGrid:VirtualDataGrid>
                 </StackPanel>
               </Border>
 

@@ -5,6 +5,7 @@ using Avalonia.Automation;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Styling;
@@ -59,18 +60,22 @@ public class StoreEditorHeadlessTests
 
         Assert.Equal(1, SubscriptionCount(first, nameof(StoreManagementViewModel.StoreNameFocusRequested)));
         Assert.Equal(1, SubscriptionCount(firstCatalog, nameof(CatalogSetupViewModel.OptionValueManagementRequested)));
+        Assert.Equal(1, SubscriptionCount(firstCatalog.SellableVariantRows, "CollectionChanged"));
 
         window.DataContext = second;
 
         Assert.Equal(0, SubscriptionCount(first, nameof(StoreManagementViewModel.StoreNameFocusRequested)));
         Assert.Equal(0, SubscriptionCount(firstCatalog, nameof(CatalogSetupViewModel.OptionValueManagementRequested)));
+        Assert.Equal(0, SubscriptionCount(firstCatalog.SellableVariantRows, "CollectionChanged"));
         Assert.Equal(1, SubscriptionCount(second, nameof(StoreManagementViewModel.StoreNameFocusRequested)));
         Assert.Equal(1, SubscriptionCount(secondCatalog, nameof(CatalogSetupViewModel.OptionValueManagementRequested)));
+        Assert.Equal(1, SubscriptionCount(secondCatalog.SellableVariantRows, "CollectionChanged"));
 
         window.Close();
 
         Assert.Equal(0, SubscriptionCount(second, nameof(StoreManagementViewModel.StoreNameFocusRequested)));
         Assert.Equal(0, SubscriptionCount(secondCatalog, nameof(CatalogSetupViewModel.OptionValueManagementRequested)));
+        Assert.Equal(0, SubscriptionCount(secondCatalog.SellableVariantRows, "CollectionChanged"));
     }
 
     [AvaloniaFact]
@@ -333,7 +338,7 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
-    public async Task VariantManagement_ArchiveButtonInvokesVariantArchiveCommand()
+    public async Task VariantManagement_GridArchiveActionPreservesBlockedDependencyFeedbackByPointerAndKeyboard()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
         var viewModel = (StoreManagementViewModel)window.DataContext!;
@@ -342,18 +347,137 @@ public class StoreEditorHeadlessTests
         viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
         viewModel.OpenVariantManagementCommand.Execute(null);
         window.UpdateLayout();
+        var grid = window.FindControl<VirtualDataGrid>("SellableVariantGrid")!;
+        grid.GetVisualAncestors().OfType<ScrollViewer>().FirstOrDefault()?.ScrollToEnd();
+        window.UpdateLayout();
 
         var archive = window.GetVisualDescendants()
             .OfType<Button>()
-            .Single(button => IsEffectivelyVisible(button) && string.Equals(button.Content as string, "Archive", StringComparison.Ordinal));
+            .Single(button => IsEffectivelyVisible(button) && button.Classes.Contains("sellableVariantArchive"));
 
-        Assert.IsType<SellableVariantRowViewModel>(archive.CommandParameter);
-        Assert.Same(viewModel.CatalogSetup!.ArchiveVariantCommand, archive.Command);
-        archive.Command!.Execute(archive.CommandParameter);
+        Assert.Same(Assert.Single(viewModel.CatalogSetup!.SellableVariantRows), archive.CommandParameter);
+        Assert.Null(archive.Command);
+        Assert.True(archive.Bounds.Width > 0 && archive.Bounds.Height > 0);
+        var pointerPosition = archive.TranslatePoint(new Point(archive.Bounds.Width / 2, archive.Bounds.Height / 2), window);
+        Assert.NotNull(pointerPosition);
+        HeadlessWindowExtensions.MouseDown(window, pointerPosition!.Value, MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseUp(window, pointerPosition.Value, MouseButton.Left, RawInputModifiers.None);
         await WaitForAsync(() => !viewModel.CatalogSetup.IsBusy);
 
         Assert.Contains("Placeholder", viewModel.CatalogSetup.ErrorMessage, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Front", viewModel.CatalogSetup.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+
+        archive.Focus();
+        Assert.True(archive.IsFocused);
+        HeadlessWindowExtensions.KeyPress(window, Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, string.Empty);
+        await WaitForAsync(() => !viewModel.CatalogSetup.IsBusy);
+        Assert.Contains("Placeholder", viewModel.CatalogSetup.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task VariantManagement_GridAlignsSemanticValuesAndVirtualizesTheActiveRows()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        var catalog = viewModel.CatalogSetup!;
+        var first = Assert.Single(catalog.SellableVariantRows);
+        catalog.SellableVariantRows[0] = first with
+        {
+            Name = "Black variant with an exceptionally long provider-facing name",
+            Color = "Blackened blue with an exceptionally long catalog color value",
+            Size = "Extra extra large",
+            Other = "Tall with an additional long custom option value"
+        };
+        var rowsToAdd = Enumerable.Range(1, 40)
+            .Select(index => new SellableVariantRowViewModel(Guid.NewGuid(), $"Variant {index:D2}", "Blue", "M", null, false))
+            .ToArray();
+        foreach (var row in rowsToAdd)
+        {
+            catalog.SellableVariantRows.Add(row);
+        }
+
+        window.UpdateLayout();
+        var grid = window.FindControl<VirtualDataGrid>("SellableVariantGrid")!;
+        grid.GetVisualAncestors().OfType<ScrollViewer>().FirstOrDefault()?.ScrollToEnd();
+        window.UpdateLayout();
+        var provider = Assert.IsType<InMemoryDataProvider<SellableVariantRowViewModel>>(grid.ItemsSource);
+        Assert.Equal(41, provider.Count);
+        await HeadlessUiWait.UntilAsync(
+            () => grid.GetVisualDescendants().OfType<VirtualDataRow>().Any(),
+            "Sellable Variant grid realizes its active rows");
+        window.UpdateLayout();
+
+        var realizedRows = grid.GetVisualDescendants().OfType<VirtualDataRow>().ToArray();
+        Assert.InRange(realizedRows.Length, 1, provider.Count - 1);
+        Assert.All(realizedRows, row => Assert.Equal(32, row.Bounds.Height));
+        Assert.Equal(5, realizedRows[0].Cells.Count);
+        var visibleHeadings = grid.GetVisualDescendants().OfType<TextBlock>().Select(text => text.Text).ToHashSet(StringComparer.Ordinal);
+        Assert.All(new[] { "Name", "Color", "Size", "Other", "Action" }, heading => Assert.Contains(heading, visibleHeadings));
+        var firstGridRow = realizedRows.Single(row => ReferenceEquals(row.DataContext, catalog.SellableVariantRows[0]));
+        var name = firstGridRow.Cells[0].GetVisualDescendants().OfType<TextBlock>().Single();
+        var color = firstGridRow.Cells[1].GetVisualDescendants().OfType<TextBlock>().Single();
+        var size = firstGridRow.Cells[2].GetVisualDescendants().OfType<TextBlock>().Single();
+        var other = firstGridRow.Cells[3].GetVisualDescendants().OfType<TextBlock>().Single();
+        Assert.Equal("Black variant with an exceptionally long provider-facing name", name.Text);
+        Assert.Equal("Blackened blue with an exceptionally long catalog color value", color.Text);
+        Assert.Equal("Extra extra large", size.Text);
+        Assert.Equal("Tall with an additional long custom option value", other.Text);
+        Assert.All([name, color, size, other], text => Assert.Equal(TextTrimming.CharacterEllipsis, text.TextTrimming));
+        Assert.All([name, color, size, other], text => Assert.Equal(text.Text, ToolTip.GetTip(text)));
+        Assert.All([name, color, size, other], text => Assert.Equal(text.Text, AutomationProperties.GetHelpText(text)));
+        Assert.Equal(catalog.SellableVariantRows.Select(row => row.Name), provider.Select(row => row.Name));
+        Assert.All(provider, row => Assert.False(row.IsArchived));
+
+        var scrollViewer = Assert.Single(grid.GetVisualDescendants().OfType<ScrollViewer>());
+        scrollViewer.ScrollToEnd();
+        window.UpdateLayout();
+        await HeadlessUiWait.UntilAsync(
+            () => grid.GetVisualDescendants().OfType<VirtualDataRow>().Any(row => ReferenceEquals(row.DataContext, rowsToAdd[^1])),
+            "scrolling reaches the last active Variant row");
+
+        catalog.SellableVariantRows.RemoveAt(0);
+        Assert.Equal(40, provider.Count);
+        var replacementWindow = CreateEditorWindow(showWindow: false);
+        var replacementViewModel = replacementWindow.DataContext;
+        replacementWindow.DataContext = null;
+        window.DataContext = replacementViewModel;
+        Assert.Empty(provider);
+        replacementWindow.Close();
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task VariantManagement_GridRefreshesAfterSuccessfulArchive()
+    {
+        var window = CreateEditorWindow(
+            includeNormalizedCatalog: true,
+            useFixedProviderOffering: true,
+            includeOfferingOptions: true,
+            includeOfferingDependents: false);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        var grid = window.FindControl<VirtualDataGrid>("SellableVariantGrid")!;
+        grid.GetVisualAncestors().OfType<ScrollViewer>().FirstOrDefault()?.ScrollToEnd();
+        window.UpdateLayout();
+        var catalog = viewModel.CatalogSetup!;
+        var provider = Assert.IsType<InMemoryDataProvider<SellableVariantRowViewModel>>(grid.ItemsSource);
+        var archive = grid.GetVisualDescendants().OfType<Button>().Single(button => button.Classes.Contains("sellableVariantArchive"));
+        catalog.ArchiveVariantCommand.Execute(archive.CommandParameter);
+        await HeadlessUiWait.UntilAsync(() => !catalog.IsBusy && catalog.AvailableVariantCount == 0, "successful Variant archive refreshes the active count");
+        window.UpdateLayout();
+
+        Assert.Empty(catalog.SellableVariantRows);
+        Assert.Empty(provider);
+        Assert.Empty(grid.GetVisualDescendants().OfType<VirtualDataRow>());
+        Assert.False(catalog.HasError, catalog.ErrorMessage);
         window.Close();
     }
 
@@ -3723,10 +3847,11 @@ public class StoreEditorHeadlessTests
         INichePopulationService? nichePopulationService = null,
         IAssetFilePicker? filePicker = null,
         IRasterImageMetadataReader? rasterImageMetadataReader = null,
-        IMockupSourceMetadataAssistanceService? mockupSourceMetadataAssistance = null)
+        IMockupSourceMetadataAssistanceService? mockupSourceMetadataAssistance = null,
+        bool includeOfferingDependents = true)
     {
         var store = customStore ?? new Store(Guid.NewGuid(), "North Star", null, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog, useFixedProviderOffering, includeOfferingOptions, primaryArtworkDesignArea, customNiche));
+        var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog, useFixedProviderOffering, includeOfferingOptions, primaryArtworkDesignArea, customNiche, includeOfferingDependents));
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(repository),
@@ -3948,7 +4073,8 @@ public class StoreEditorHeadlessTests
         bool useFixedProviderOffering,
         bool includeOfferingOptions,
         bool primaryArtworkDesignArea = false,
-        Niche? customNiche = null)
+        Niche? customNiche = null,
+        bool includeOfferingDependents = true)
     {
         var product = new StoreProduct(Guid.NewGuid(), store.Id, "Gildan 64000", null, null, Now, Now, "{}");
         var offering = new FulfillmentOffering(Guid.NewGuid(), product.Id, "Printful", null, FulfillmentKind.FixedProvider, "Printful", null, Now, Now, "{}");
@@ -4004,10 +4130,10 @@ public class StoreEditorHeadlessTests
             OfferingOptions = includeOfferingOptions ? [colorOption, sizeOption] : [],
             OfferingOptionValues = includeOfferingOptions ? [black, small, medium] : [],
             OfferingVariants = includeOfferingOptions ? [variant] : [],
-            OfferingPlaceholders = includeOfferingOptions ? [area] : [],
-            MockupTemplates = includeOfferingOptions ? [template] : [],
-            MockupTemplateColorVariants = includeOfferingOptions ? [templateColor] : [],
-            MockupTemplateRevisions = includeOfferingOptions ? [revision] : []
+            OfferingPlaceholders = includeOfferingOptions && includeOfferingDependents ? [area] : [],
+            MockupTemplates = includeOfferingOptions && includeOfferingDependents ? [template] : [],
+            MockupTemplateColorVariants = includeOfferingOptions && includeOfferingDependents ? [templateColor] : [],
+            MockupTemplateRevisions = includeOfferingOptions && includeOfferingDependents ? [revision] : []
         };
     }
 
