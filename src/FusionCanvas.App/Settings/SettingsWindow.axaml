@@ -39,8 +39,8 @@
       </StackPanel>
     </Border>
 
-    <ScrollViewer Grid.Column="1" Padding="24">
-      <Grid>
+    <ScrollViewer Grid.Column="1">
+      <Grid Margin="{DynamicResource Token.Layout.PageInset}">
         <StackPanel IsVisible="{Binding IsGeneralSection}" Spacing="18">
           <TextBlock Text="General"
                      FontSize="20"
