@@ -5,6 +5,7 @@ using System.Windows.Input;
 using FusionCanvas.App.DocumentWindow;
 using FusionCanvas.Application.Listings;
 using FusionCanvas.Application.Stores;
+using FusionCanvas.Application.Stores.Printify;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Workspace;
 
@@ -17,6 +18,7 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     private readonly Func<WorkspaceSnapshot> _snapshot;
     private readonly Func<Guid, Store?> _storeResolver;
     private readonly IStoreContextMapper _storeContextMapper;
+    private readonly PrintifyListingImportService? _variantSetupImport;
     private ListingLifecycleService? _service;
     private ListingConnectionRequest? _request;
     private ListingProductProjection? _projection;
@@ -39,13 +41,15 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         IListingProjectionSource? projectionSource,
         Func<WorkspaceSnapshot> snapshot,
         Func<Guid, Store?> storeResolver,
-        IStoreContextMapper storeContextMapper)
+        IStoreContextMapper storeContextMapper,
+        PrintifyListingImportService? variantSetupImport = null)
     {
         _serviceFactory = serviceFactory;
         _projectionSource = projectionSource;
         _snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
         _storeResolver = storeResolver ?? throw new ArgumentNullException(nameof(storeResolver));
         _storeContextMapper = storeContextMapper ?? throw new ArgumentNullException(nameof(storeContextMapper));
+        _variantSetupImport = variantSetupImport;
         CreateOrUpdateCommand = new RelayCommand(_ => _ = CreateOrUpdateAsync(), () => CanCreateOrUpdate);
         RefreshCommand = new RelayCommand(_ => _ = RefreshAsync(), () => CanRefresh);
         PublishCommand = new RelayCommand(_ => _ = PublishAsync(), () => CanPublish);
@@ -56,6 +60,7 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         CancelDeleteCommand = new RelayCommand(_ => HideDeleteConfirmation(), () => IsDeleteConfirmationVisible);
         AcceptRemoteCommand = new RelayCommand(_ => _ = ReconcileAsync(ListingConflictResolution.AcceptRemote), () => CanReconcile);
         KeepLocalCommand = new RelayCommand(_ => _ = ReconcileAsync(ListingConflictResolution.KeepLocal), () => CanReconcile);
+        DownloadVariantSetupCommand = new RelayCommand(_ => _ = DownloadVariantSetupAsync(), () => CanDownloadVariantSetup);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -70,6 +75,7 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     public ICommand CancelDeleteCommand { get; }
     public ICommand AcceptRemoteCommand { get; }
     public ICommand KeepLocalCommand { get; }
+    public ICommand DownloadVariantSetupCommand { get; }
     public string Status { get => _status; private set => SetField(ref _status, value); }
     public string ConnectionStatus { get => _connectionStatus; private set => SetField(ref _connectionStatus, value); }
     public string Title { get => _title; private set { if (SetField(ref _title, value)) NotifyActions(); } }
@@ -101,6 +107,7 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     public bool CanDelete => !IsBusy && !IsDeleteConfirmationVisible && _mapping?.Identity is not null && _service is not null;
     public bool CanConfirmDelete => !IsBusy && IsDeleteConfirmationVisible && _mapping?.Identity is not null && _service is not null;
     public bool CanReconcile => !IsBusy && HasConflict && _service is not null && _projection is not null && _request is not null;
+    public bool CanDownloadVariantSetup => !IsBusy && _variantSetupImport is not null && _mapping?.Identity is not null;
 
     public async Task LoadAsync(Guid itemId, bool canEdit, CancellationToken cancellationToken = default)
     {
@@ -115,7 +122,15 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         FeedbackMessage = null;
         Status = canEdit ? "Checking Printify…" : "Read-only";
         ConnectionStatus = "Checking…";
-        var store = _storeResolver(_snapshot().Items.SingleOrDefault(value => value.Id == itemId)?.StoreId ?? Guid.Empty);
+        var initialSnapshot = _snapshot();
+        var selectedItem = initialSnapshot.Items.SingleOrDefault(value => value.Id == itemId);
+        var store = _storeResolver(selectedItem?.StoreId ?? Guid.Empty);
+        var savedMapping = initialSnapshot.ExternalListingMappings.SingleOrDefault(value => value.ItemId == itemId && value.StoreId == selectedItem?.StoreId);
+        if (savedMapping is not null)
+        {
+            _mapping = ToApplicationMapping(savedMapping);
+            NotifyActions();
+        }
         if (store is null || store.IsArchived)
         {
             SetBlocked("The selected Store is unavailable.");
@@ -188,6 +203,20 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     private Task DeleteAsync() => RunAsync(async cancellationToken => ApplyResult(await _service!.DeleteRemoteAsync(_request!, _itemId, cancellationToken).ConfigureAwait(true)));
     private Task ReconcileAsync(ListingConflictResolution resolution) => RunAsync(async cancellationToken => ApplyResult(await _service!.ReconcileAsync(_request!, _projection!, resolution, cancellationToken).ConfigureAwait(true)));
 
+    private Task DownloadVariantSetupAsync() => RunAsync(async cancellationToken =>
+    {
+        var storeId = _snapshot().Items.SingleOrDefault(value => value.Id == _itemId)?.StoreId ?? Guid.Empty;
+        var store = _storeResolver(storeId);
+        if (store is null) throw new InvalidOperationException("The selected Store is unavailable.");
+        var result = await _variantSetupImport!.DownloadVariantSetupAsync(new StoreCredentialScope(store.WorkspaceId, store.Id), _itemId, cancellationToken).ConfigureAwait(true);
+        if (!result.Succeeded) ErrorMessage = result.Message;
+        else FeedbackMessage = result.Message;
+        OnPropertyChanged(nameof(CanDownloadVariantSetup));
+        VariantSetupCompleted?.Invoke(this, EventArgs.Empty);
+    });
+
+    public event EventHandler? VariantSetupCompleted;
+
     private async Task RunAsync(Func<CancellationToken, Task> operation)
     {
         if (IsBusy) return;
@@ -250,6 +279,7 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanDelete));
         OnPropertyChanged(nameof(CanConfirmDelete));
         OnPropertyChanged(nameof(CanReconcile));
+        OnPropertyChanged(nameof(CanDownloadVariantSetup));
         foreach (var command in new[] { CreateOrUpdateCommand, RefreshCommand, PublishCommand, UnpublishCommand, ArchiveCommand, DeleteCommand, ConfirmDeleteCommand, CancelDeleteCommand, AcceptRemoteCommand, KeepLocalCommand })
             (command as RelayCommand)?.NotifyCanExecuteChanged();
     }

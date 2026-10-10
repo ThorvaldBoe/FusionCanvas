@@ -220,7 +220,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
             applicationServices.ListingProjectionSource,
             () => _workspaceSnapshot,
             ResolveStore,
-            applicationServices.StoreContextMapper ?? new UnavailableStoreContextMapper());
+            applicationServices.StoreContextMapper ?? new UnavailableStoreContextMapper(),
+            applicationServices.PrintifyListingImport);
+        PrintifyTool.VariantSetupCompleted += async (_, _) => await RefreshWorkspaceAfterImportAsync();
+        PrintifyListingImportService = applicationServices.PrintifyListingImport;
         ManualListingDetailsTool = new ManualListingDetailsStageToolViewModel(applicationServices.ManualListingDetails);
         Ideation = new IdeationViewModel(_ideationService, _ideationAccessStatus, snowcloneLibrary, rejectedPhrases);
         ConceptRefinement = new ConceptRefinementSessionViewModel(
@@ -394,6 +397,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
     public ListingStageToolViewModel ListingTool { get; }
 
     public PrintifyListingStageToolViewModel PrintifyTool { get; }
+    public FusionCanvas.Application.Stores.Printify.PrintifyListingImportService? PrintifyListingImportService { get; }
+
+    public FusionCanvas.Application.Stores.Printify.StoreCredentialScope? CreatePrintifyImportScope() =>
+        StoreManagement.SelectedStore is { } store && WorkspaceManagement.SelectedWorkspace is { } workspace
+            ? new FusionCanvas.Application.Stores.Printify.StoreCredentialScope(workspace.Id, store.Id)
+            : null;
     public ManualListingDetailsStageToolViewModel ManualListingDetailsTool { get; }
 
     public StageToolContentViewModel? ActiveStageToolContent { get; private set; }

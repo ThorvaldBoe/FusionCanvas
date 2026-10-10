@@ -351,7 +351,8 @@
           <TreeView x:Name="WorkspaceTreeControl"
                     ItemsSource="{Binding WorkspaceTree.Roots}"
                     Background="Transparent"
-                    BorderThickness="0">
+                    BorderThickness="0"
+                    AutomationProperties.AutomationId="WorkspaceTree">
             <TreeView.ItemTemplate>
               <TreeDataTemplate x:DataType="nav:WorkspaceTreeNodeViewModel" ItemsSource="{Binding Children}">
                 <Border Classes="treeRow"
@@ -383,6 +384,7 @@
                       <MenuItem Header="New group" IsVisible="{Binding IsTopicAndSingleSelection}" Click="OnContextNewGroup" />
                       <MenuItem Header="New Item" IsVisible="{Binding IsSingleSelectionContext}" Click="OnContextNewItem" />
                       <MenuItem Header="Import…" IsVisible="{Binding IsTopicAndSingleSelection}" Click="OnContextImport" />
+                      <MenuItem Header="Import from Printify…" IsVisible="{Binding IsNicheAndSingleSelection}" Click="OnContextPrintifyImport" AutomationProperties.AutomationId="Printify.ImportFromNiche" />
                       <Separator />
               <MenuItem Header="Rename" IsVisible="{Binding HasContextActionsAndSingleSelection}" Click="OnContextRename" />
               <MenuItem Header="Copy" IsVisible="{Binding HasContextActionsAndSingleSelection}" Click="OnContextCopy" />
@@ -944,6 +946,10 @@
                         </StackPanel>
                       </Border>
                       <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Button Content="Download variant setup"
+                                Command="{Binding PrintifyTool.DownloadVariantSetupCommand}"
+                                IsVisible="{Binding PrintifyTool.CanDownloadVariantSetup}"
+                                AutomationProperties.AutomationId="Printify.DownloadVariantSetup" />
                         <Button Content="Create / update" Command="{Binding PrintifyTool.CreateOrUpdateCommand}" AutomationProperties.AutomationId="Printify.CreateOrUpdate" />
                         <Button Content="Refresh" Command="{Binding PrintifyTool.RefreshCommand}" />
                         <Button Content="Publish" Command="{Binding PrintifyTool.PublishCommand}" />
