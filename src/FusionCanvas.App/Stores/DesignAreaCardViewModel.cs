@@ -16,6 +16,10 @@ public sealed record DesignAreaCardViewModel(
 
     public string MaximumSizeSummary => $"{MaximumWidthPixels:N0} × {MaximumHeightPixels:N0} px";
 
+    public string CompatibilityAccessibilitySummary => IsPrimaryForArtworkGeneration
+        ? $"{CompatibilitySummary}. Primary for artwork generation."
+        : CompatibilitySummary;
+
     public static DesignAreaCardViewModel From(DesignAreaSetupSummary summary)
     {
         ArgumentNullException.ThrowIfNull(summary);

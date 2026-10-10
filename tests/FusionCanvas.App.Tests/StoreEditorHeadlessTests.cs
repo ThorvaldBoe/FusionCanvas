@@ -2293,7 +2293,96 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
-    public void DesignAreaCard_ShowsEditArchiveHorizontal()
+    public async Task DesignAreaGrid_AlignsSummariesAndKeepsRowActionsTogether()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenDesignAreaManagementCommand.Execute(null);
+        var catalog = viewModel.CatalogSetup!;
+        var original = Assert.Single(catalog.DesignAreaCards);
+        var card = original with
+        {
+            Name = "Front printable area with a deliberately long name",
+            Placement = "Front center printable placement",
+            CompatibilitySummary = "23 compatible active Variants",
+            IsPrimaryForArtworkGeneration = true
+        };
+        catalog.DesignAreaCards[0] = card;
+        catalog.DesignAreaCards.Add(original with { Id = Guid.NewGuid(), Name = "Back", Placement = "Back" });
+        window.UpdateLayout();
+
+        var grid = window.FindControl<VirtualDataGrid>("DesignAreaGrid")!;
+        var provider = Assert.IsType<InMemoryDataProvider<DesignAreaCardViewModel>>(grid.ItemsSource);
+        Assert.Equal(2, provider.Count);
+        await HeadlessUiWait.UntilAsync(
+            () => grid.GetVisualDescendants().OfType<AvaloniaVirtualDataGrid.Controls.VirtualDataRow>().Count() == 2,
+            "Design Area grid realizes both active rows");
+        window.UpdateLayout();
+
+        var rows = grid.GetVisualDescendants().OfType<AvaloniaVirtualDataGrid.Controls.VirtualDataRow>()
+            .OrderBy(row => row.Index).ToArray();
+        Assert.Equal(2, rows.Length);
+        Assert.All(rows, row =>
+        {
+            Assert.Equal(5, row.Cells.Count);
+            Assert.Equal(32, row.Bounds.Height);
+        });
+
+        var headings = grid.GetVisualDescendants().OfType<TextBlock>().Select(text => text.Text).ToHashSet(StringComparer.Ordinal);
+        Assert.All(new[] { "Name", "Placement", "Maximum size", "Compatibility", "Actions" }, heading => Assert.Contains(heading, headings));
+        Assert.All(Enumerable.Range(0, 5), column =>
+        {
+            Assert.Equal(rows[0].Cells[column].Bounds.X, rows[1].Cells[column].Bounds.X);
+            Assert.Equal(rows[0].Cells[column].Bounds.Width, rows[1].Cells[column].Bounds.Width);
+        });
+
+        var firstRow = rows.Single(row => ReferenceEquals(row.DataContext, card));
+        var name = Assert.Single(firstRow.Cells[0].GetVisualDescendants().OfType<TextBlock>());
+        var placement = Assert.Single(firstRow.Cells[1].GetVisualDescendants().OfType<TextBlock>());
+        var maximum = Assert.Single(firstRow.Cells[2].GetVisualDescendants().OfType<TextBlock>());
+        var compatibility = firstRow.Cells[3].GetVisualDescendants().OfType<TextBlock>()
+            .Single(text => text.Text == card.CompatibilitySummary);
+        var primary = firstRow.Cells[3].GetVisualDescendants().OfType<TextBlock>()
+            .Single(text => text.Text == "Primary");
+
+        Assert.Equal(card.Name, name.Text);
+        Assert.Equal(card.Name, ToolTip.GetTip(name));
+        Assert.Equal(card.Name, AutomationProperties.GetName(name));
+        Assert.Equal(card.Placement, placement.Text);
+        Assert.Equal(card.Placement, ToolTip.GetTip(placement));
+        Assert.Contains("px", maximum.Text, StringComparison.Ordinal);
+        Assert.Equal(card.CompatibilitySummary, compatibility.Text);
+        Assert.Equal(card.CompatibilityAccessibilitySummary, ToolTip.GetTip(compatibility));
+        Assert.Equal(card.CompatibilityAccessibilitySummary, AutomationProperties.GetName(compatibility));
+        Assert.True(IsEffectivelyVisible(primary));
+        Assert.Equal("Primary for artwork generation", ToolTip.GetTip(primary));
+        Assert.Equal("Primary for artwork generation", AutomationProperties.GetName(primary));
+
+        var editButton = Assert.Single(firstRow.Cells[4].GetVisualDescendants().OfType<Button>(),
+            button => button.Classes.Contains("designAreaEdit"));
+        var archiveButton = Assert.Single(firstRow.Cells[4].GetVisualDescendants().OfType<Button>(),
+            button => button.Classes.Contains("designAreaArchive"));
+
+        Assert.Same(card, editButton.CommandParameter);
+        Assert.Same(card, archiveButton.CommandParameter);
+        Assert.Equal("Edit Design Area " + card.Name, AutomationProperties.GetName(editButton));
+        Assert.Equal("Archive Design Area " + card.Name, AutomationProperties.GetName(archiveButton));
+        Assert.Equal(editButton.Bounds.Y, archiveButton.Bounds.Y, 0.5);
+        Assert.True(archiveButton.Bounds.X > editButton.Bounds.X,
+            "Archive button should be to the right of Edit button.");
+        Assert.True(editButton.TabIndex <= archiveButton.TabIndex,
+            "Edit should appear before Archive in tab order.");
+        Assert.NotNull(editButton.Command);
+        Assert.NotNull(archiveButton.Command);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task DesignAreaGrid_RowButtonsSupportPointerAndKeyboardWithExistingFocusBehavior()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
         var viewModel = (StoreManagementViewModel)window.DataContext!;
@@ -2302,30 +2391,129 @@ public class StoreEditorHeadlessTests
         viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
         viewModel.OpenDesignAreaManagementCommand.Execute(null);
         window.UpdateLayout();
+
+        var card = Assert.Single(viewModel.CatalogSetup!.DesignAreaCards);
+        var editButton = window.FindControl<VirtualDataGrid>("DesignAreaGrid")!
+            .GetVisualDescendants().OfType<Button>()
+            .Single(button => button.Classes.Contains("designAreaEdit")
+                && button.CommandParameter is DesignAreaCardViewModel row
+                && row.Id == card.Id);
+        var editPosition = editButton.TranslatePoint(new Point(editButton.Bounds.Width / 2, editButton.Bounds.Height / 2), window);
+        Assert.NotNull(editPosition);
+        HeadlessWindowExtensions.MouseDown(window, editPosition!.Value, MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseUp(window, editPosition.Value, MouseButton.Left, RawInputModifiers.None);
+        await HeadlessUiWait.UntilAsync(
+            () => window.OwnedWindows.OfType<DesignAreaEditorWindow>().Any(),
+            "pointer Edit opens the Design Area dialog");
         window.UpdateLayout();
 
-        var editButton = Assert.IsType<Button>(FindButton(window, "Edit")!);
-        var archiveButton = Assert.IsType<Button>(FindButton(window, "Archive")!);
+        var editor = Assert.Single(window.OwnedWindows.OfType<DesignAreaEditorWindow>());
+        Assert.Equal(card.Id, viewModel.CatalogSetup.SelectedPlaceholderId);
+        editor.Close();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
 
-        // Assert they share the same card (same listItem Border ancestor)
-        var editCard = editButton.GetVisualAncestors().OfType<Border>()
-            .Single(b => b.Classes.Contains("listItem"));
-        var archiveCard = archiveButton.GetVisualAncestors().OfType<Border>()
-            .Single(b => b.Classes.Contains("listItem"));
-        Assert.Same(editCard, archiveCard);
+        editButton = window.FindControl<VirtualDataGrid>("DesignAreaGrid")!
+            .GetVisualDescendants().OfType<Button>()
+            .Single(button => button.Classes.Contains("designAreaEdit")
+                && button.CommandParameter is DesignAreaCardViewModel row
+                && row.Id == card.Id);
+        Assert.True(editButton.IsFocused);
 
-        // Assert horizontal ordering: same Y, Archive to the right of Edit
-        Assert.Equal(editButton.Bounds.Y, archiveButton.Bounds.Y, 0.5);
-        Assert.True(archiveButton.Bounds.X > editButton.Bounds.X,
-            "Archive button should be to the right of Edit button.");
+        var archiveButton = window.FindControl<VirtualDataGrid>("DesignAreaGrid")!
+            .GetVisualDescendants().OfType<Button>()
+            .Single(button => button.Classes.Contains("designAreaArchive")
+                && button.CommandParameter is DesignAreaCardViewModel row
+                && row.Id == card.Id);
+        var archivePosition = archiveButton.TranslatePoint(new Point(archiveButton.Bounds.Width / 2, archiveButton.Bounds.Height / 2), window);
+        Assert.NotNull(archivePosition);
+        HeadlessWindowExtensions.MouseDown(window, archivePosition!.Value, MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseUp(window, archivePosition.Value, MouseButton.Left, RawInputModifiers.None);
+        await HeadlessUiWait.UntilAsync(
+            () => window.OwnedWindows.OfType<DesignAreaArchiveConfirmationWindow>().Any(),
+            "pointer Archive opens the existing confirmation");
+        window.UpdateLayout();
 
-        // Assert focus/tab order follows visual order (Edit then Archive)
-        Assert.True(editButton.TabIndex <= archiveButton.TabIndex,
-            "Edit should appear before Archive in tab order.");
+        var confirmation = Assert.Single(window.OwnedWindows.OfType<DesignAreaArchiveConfirmationWindow>());
+        Assert.Equal(card.Id, viewModel.CatalogSetup.PendingDesignAreaArchiveId);
+        confirmation.Close(false);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        Assert.True(archiveButton.IsFocused);
+        Assert.Single(viewModel.CatalogSetup.DesignAreaCards);
 
-        // Assert command bindings are non-null and unchanged
-        Assert.NotNull(editButton.Command);
-        Assert.NotNull(archiveButton.Command);
+        archiveButton.Focus();
+        HeadlessWindowExtensions.KeyPress(window, Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, string.Empty);
+        await HeadlessUiWait.UntilAsync(
+            () => window.OwnedWindows.OfType<DesignAreaArchiveConfirmationWindow>().Any(),
+            "keyboard Archive opens the existing confirmation");
+        Assert.Equal(card.Id, viewModel.CatalogSetup.PendingDesignAreaArchiveId);
+        Assert.Single(window.OwnedWindows.OfType<DesignAreaArchiveConfirmationWindow>()).Close(false);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void DesignAreaGrid_UsesNormalWidthAndScrollsAtMinimumWidthWithoutHidingAdd()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenDesignAreaManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        var grid = window.FindControl<VirtualDataGrid>("DesignAreaGrid")!;
+        var scrollViewer = Assert.Single(grid.GetVisualDescendants().OfType<ScrollViewer>());
+        var normalRow = Assert.Single(grid.GetVisualDescendants().OfType<AvaloniaVirtualDataGrid.Controls.VirtualDataRow>());
+        var normalActionColumnEnd = normalRow.Cells[4].TranslatePoint(
+            new Point(normalRow.Cells[4].Bounds.Width, 0), scrollViewer);
+        Assert.NotNull(normalActionColumnEnd);
+        Assert.True(normalActionColumnEnd!.Value.X <= scrollViewer.Viewport.Width,
+            $"All declared columns should fit at the normal width; action end={normalActionColumnEnd.Value.X}, viewport={scrollViewer.Viewport.Width}, extent={scrollViewer.Extent.Width}.");
+
+        window.Width = 720;
+        window.UpdateLayout();
+        Assert.Equal(ScrollBarVisibility.Auto, scrollViewer.HorizontalScrollBarVisibility);
+        Assert.True(scrollViewer.Extent.Width > scrollViewer.Viewport.Width,
+            $"The minimum-width grid should scroll horizontally; extent={scrollViewer.Extent.Width}, viewport={scrollViewer.Viewport.Width}.");
+
+        scrollViewer.ScrollToEnd();
+        window.UpdateLayout();
+        var archiveButton = Assert.Single(grid.GetVisualDescendants().OfType<Button>(),
+            button => button.Classes.Contains("designAreaArchive"));
+        Assert.True(IsEffectivelyVisible(archiveButton));
+        Assert.True(FindButton(window, "Add Design Area")!.IsVisible);
+        Assert.True(AssertEffectivelyVisible(window, "Catalog.DesignAreaList").Bounds.Width > 0);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void DesignAreaGrid_EmptyOfferingKeepsAddActionVisible()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true,
+            includeOfferingOptions: true, includeOfferingDependents: false, includeDesignArea: false);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenDesignAreaManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        var catalog = viewModel.CatalogSetup!;
+        Assert.Empty(catalog.DesignAreaCards);
+
+        var emptyMessage = window.GetVisualDescendants().OfType<TextBlock>()
+            .Single(text => text.Text == "No Design Areas configured.");
+        Assert.True(IsEffectivelyVisible(emptyMessage));
+        var grid = window.FindControl<VirtualDataGrid>("DesignAreaGrid")!;
+        Assert.Empty(Assert.IsType<InMemoryDataProvider<DesignAreaCardViewModel>>(grid.ItemsSource));
+        Assert.True(IsEffectivelyVisible(FindButton(window, "Add Design Area")!));
 
         window.Close();
     }
@@ -4080,10 +4268,11 @@ public class StoreEditorHeadlessTests
         IAssetFilePicker? filePicker = null,
         IRasterImageMetadataReader? rasterImageMetadataReader = null,
         IMockupSourceMetadataAssistanceService? mockupSourceMetadataAssistance = null,
-        bool includeOfferingDependents = true)
+        bool includeOfferingDependents = true,
+        bool includeDesignArea = true)
     {
         var store = customStore ?? new Store(Guid.NewGuid(), "North Star", null, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog, useFixedProviderOffering, includeOfferingOptions, primaryArtworkDesignArea, customNiche, includeOfferingDependents));
+        var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog, useFixedProviderOffering, includeOfferingOptions, primaryArtworkDesignArea, customNiche, includeOfferingDependents, includeDesignArea));
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(repository),
@@ -4314,7 +4503,8 @@ public class StoreEditorHeadlessTests
         bool includeOfferingOptions,
         bool primaryArtworkDesignArea = false,
         Niche? customNiche = null,
-        bool includeOfferingDependents = true)
+        bool includeOfferingDependents = true,
+        bool includeDesignArea = true)
     {
         var product = new StoreProduct(Guid.NewGuid(), store.Id, "Gildan 64000", null, null, Now, Now, "{}");
         var offering = new FulfillmentOffering(Guid.NewGuid(), product.Id, "Printful", null, FulfillmentKind.FixedProvider, "Printful", null, Now, Now, "{}");
@@ -4370,10 +4560,10 @@ public class StoreEditorHeadlessTests
             OfferingOptions = includeOfferingOptions ? [colorOption, sizeOption] : [],
             OfferingOptionValues = includeOfferingOptions ? [black, small, medium] : [],
             OfferingVariants = includeOfferingOptions ? [variant] : [],
-            OfferingPlaceholders = includeOfferingOptions && includeOfferingDependents ? [area] : [],
-            MockupTemplates = includeOfferingOptions && includeOfferingDependents ? [template] : [],
-            MockupTemplateColorVariants = includeOfferingOptions && includeOfferingDependents ? [templateColor] : [],
-            MockupTemplateRevisions = includeOfferingOptions && includeOfferingDependents ? [revision] : []
+            OfferingPlaceholders = includeOfferingOptions && includeOfferingDependents && includeDesignArea ? [area] : [],
+            MockupTemplates = includeOfferingOptions && includeOfferingDependents && includeDesignArea ? [template] : [],
+            MockupTemplateColorVariants = includeOfferingOptions && includeOfferingDependents && includeDesignArea ? [templateColor] : [],
+            MockupTemplateRevisions = includeOfferingOptions && includeOfferingDependents && includeDesignArea ? [revision] : []
         };
     }
 

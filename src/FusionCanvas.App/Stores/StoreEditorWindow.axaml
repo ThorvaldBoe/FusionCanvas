@@ -1255,27 +1255,88 @@
                       <Button x:Name="AddDesignAreaButton" Grid.Column="1" Content="Add Design Area" Command="{Binding CatalogSetup.StartAddPlaceholderCommand}" Classes="primary" />
                     </Grid>
                     <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailablePlaceholders}" Text="No Design Areas configured." Foreground="{DynamicResource SecondaryTextBrush}" />
-                    <ItemsControl ItemsSource="{Binding CatalogSetup.DesignAreaCards}">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="stores:DesignAreaCardViewModel">
-                          <Border Classes="listItem" Padding="8">
-                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                              <StackPanel Grid.Column="0" Spacing="3">
-                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding Placement}" Foreground="{DynamicResource SecondaryTextBrush}" />
-                                <TextBlock Text="{Binding MaximumSizeSummary}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                                <TextBlock Text="{Binding CompatibilitySummary}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                                <TextBlock Text="Primary for artwork generation" IsVisible="{Binding IsPrimaryForArtworkGeneration}" FontSize="12" Foreground="{DynamicResource AccentBrush}" />
-                              </StackPanel>
-                              <StackPanel Grid.Column="1" Spacing="8" Orientation="Horizontal">
-                                <Button Content="Edit" Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.EditPlaceholderCommand}" CommandParameter="{Binding}" Classes="secondary" />
-                                <Button Content="Archive" Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ArchivePlaceholderCommand}" CommandParameter="{Binding}" Classes="danger" />
-                              </StackPanel>
-                            </Grid>
-                          </Border>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <virtualGrid:VirtualDataGrid x:Name="DesignAreaGrid" Height="260" Classes="designAreaGrid"
+                                                 DataContext="{Binding CatalogSetup}"
+                                                 RowHeight="32" SelectionMode="None"
+                                                 AutomationProperties.Name="Design Areas"
+                                                 AutomationProperties.AutomationId="Catalog.DesignAreaGrid">
+                      <virtualGrid:VirtualDataGrid.Columns>
+                        <virtualColumns:VirtualDataGridTemplateColumn Header="Name" Width="104" IsSortable="False" IsResizable="False">
+                          <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="stores:DesignAreaCardViewModel">
+                              <Border Classes="designAreaGridCell" Padding="6,4" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center"
+                                           TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                           ToolTip.Tip="{Binding Name}" AutomationProperties.Name="{Binding Name}"
+                                           AutomationProperties.HelpText="{Binding Name}" />
+                              </Border>
+                            </DataTemplate>
+                          </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn>
+                        <virtualColumns:VirtualDataGridTemplateColumn Header="Placement" Width="62" IsSortable="False" IsResizable="False">
+                          <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="stores:DesignAreaCardViewModel">
+                              <Border Classes="designAreaGridCell" Padding="6,4" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                                <TextBlock Text="{Binding Placement}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}"
+                                           TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                           ToolTip.Tip="{Binding Placement}" AutomationProperties.Name="{Binding Placement}"
+                                           AutomationProperties.HelpText="{Binding Placement}" />
+                              </Border>
+                            </DataTemplate>
+                          </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn>
+                        <virtualColumns:VirtualDataGridTemplateColumn Header="Maximum size" Width="100" IsSortable="False" IsResizable="False">
+                          <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="stores:DesignAreaCardViewModel">
+                              <Border Classes="designAreaGridCell" Padding="6,4" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                                <TextBlock Text="{Binding MaximumSizeSummary}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}"
+                                           TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                           ToolTip.Tip="{Binding MaximumSizeSummary}" AutomationProperties.Name="{Binding MaximumSizeSummary, StringFormat='Maximum size: {0}'}"
+                                           AutomationProperties.HelpText="{Binding MaximumSizeSummary}" />
+                              </Border>
+                            </DataTemplate>
+                          </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn>
+                        <virtualColumns:VirtualDataGridTemplateColumn Header="Compatibility" Width="106" IsSortable="False" IsResizable="False">
+                          <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="stores:DesignAreaCardViewModel">
+                              <Border Classes="designAreaGridCell" Padding="6,3" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                                <StackPanel VerticalAlignment="Center" Spacing="1">
+                                  <TextBlock Text="{Binding CompatibilitySummary}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}"
+                                             TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                             ToolTip.Tip="{Binding CompatibilityAccessibilitySummary}"
+                                             AutomationProperties.Name="{Binding CompatibilityAccessibilitySummary}"
+                                             AutomationProperties.HelpText="{Binding CompatibilityAccessibilitySummary}" />
+                                  <TextBlock Text="Primary" IsVisible="{Binding IsPrimaryForArtworkGeneration}"
+                                             FontSize="10" Foreground="{DynamicResource AccentBrush}"
+                                             TextWrapping="NoWrap"
+                                             ToolTip.Tip="Primary for artwork generation"
+                                             AutomationProperties.Name="Primary for artwork generation" />
+                                </StackPanel>
+                              </Border>
+                            </DataTemplate>
+                          </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn>
+                        <virtualColumns:VirtualDataGridTemplateColumn Header="Actions" Width="112" IsSortable="False" IsResizable="False">
+                          <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="stores:DesignAreaCardViewModel">
+                              <Border Classes="designAreaGridCell" Padding="4,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                  <Button Width="42" MinHeight="28" Padding="2,2" FontSize="11" Content="Edit"
+                                          Command="{Binding $parent[virtualGrid:VirtualDataGrid].DataContext.EditPlaceholderCommand}"
+                                          CommandParameter="{Binding}" Classes="secondary designAreaEdit"
+                                          AutomationProperties.Name="{Binding Name, StringFormat='Edit Design Area {0}'}" />
+                                  <Button Width="58" MinHeight="28" Padding="2,2" FontSize="11" Content="Archive"
+                                          Command="{Binding $parent[virtualGrid:VirtualDataGrid].DataContext.ArchivePlaceholderCommand}"
+                                          CommandParameter="{Binding}" Classes="danger designAreaArchive"
+                                          AutomationProperties.Name="{Binding Name, StringFormat='Archive Design Area {0}'}" />
+                                </StackPanel>
+                              </Border>
+                            </DataTemplate>
+                          </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn>
+                      </virtualGrid:VirtualDataGrid.Columns>
+                    </virtualGrid:VirtualDataGrid>
                   </StackPanel>
               </Border>
 
@@ -1619,6 +1680,9 @@
     </Style>
     <Style Selector="virtualGrid|VirtualDataGrid.colorValuesGrid /template/ ScrollViewer#PART_ScrollViewer">
       <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+    </Style>
+    <Style Selector="virtualGrid|VirtualDataGrid.designAreaGrid /template/ ScrollViewer#PART_ScrollViewer">
+      <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
     </Style>
     <Style Selector="virtualGrid|VirtualDataGridHeaderPanel">
       <Setter Property="IsHitTestVisible" Value="False" />
