@@ -61,21 +61,29 @@ public class StoreEditorHeadlessTests
         Assert.Equal(1, SubscriptionCount(first, nameof(StoreManagementViewModel.StoreNameFocusRequested)));
         Assert.Equal(1, SubscriptionCount(firstCatalog, nameof(CatalogSetupViewModel.OptionValueManagementRequested)));
         Assert.Equal(1, SubscriptionCount(firstCatalog.SellableVariantRows, "CollectionChanged"));
+        Assert.Equal(2, SubscriptionCount(firstCatalog.MockupTemplateCards, "CollectionChanged"));
+        Assert.Equal(3, SubscriptionCount(firstCatalog, nameof(CatalogSetupViewModel.PropertyChanged)));
 
         window.DataContext = second;
 
         Assert.Equal(0, SubscriptionCount(first, nameof(StoreManagementViewModel.StoreNameFocusRequested)));
         Assert.Equal(0, SubscriptionCount(firstCatalog, nameof(CatalogSetupViewModel.OptionValueManagementRequested)));
         Assert.Equal(0, SubscriptionCount(firstCatalog.SellableVariantRows, "CollectionChanged"));
+        Assert.Equal(1, SubscriptionCount(firstCatalog.MockupTemplateCards, "CollectionChanged"));
+        Assert.Equal(1, SubscriptionCount(firstCatalog, nameof(CatalogSetupViewModel.PropertyChanged)));
         Assert.Equal(1, SubscriptionCount(second, nameof(StoreManagementViewModel.StoreNameFocusRequested)));
         Assert.Equal(1, SubscriptionCount(secondCatalog, nameof(CatalogSetupViewModel.OptionValueManagementRequested)));
         Assert.Equal(1, SubscriptionCount(secondCatalog.SellableVariantRows, "CollectionChanged"));
+        Assert.Equal(2, SubscriptionCount(secondCatalog.MockupTemplateCards, "CollectionChanged"));
+        Assert.Equal(3, SubscriptionCount(secondCatalog, nameof(CatalogSetupViewModel.PropertyChanged)));
 
         window.Close();
 
         Assert.Equal(0, SubscriptionCount(second, nameof(StoreManagementViewModel.StoreNameFocusRequested)));
         Assert.Equal(0, SubscriptionCount(secondCatalog, nameof(CatalogSetupViewModel.OptionValueManagementRequested)));
         Assert.Equal(0, SubscriptionCount(secondCatalog.SellableVariantRows, "CollectionChanged"));
+        Assert.Equal(1, SubscriptionCount(secondCatalog.MockupTemplateCards, "CollectionChanged"));
+        Assert.Equal(1, SubscriptionCount(secondCatalog, nameof(CatalogSetupViewModel.PropertyChanged)));
     }
 
     [AvaloniaFact]
@@ -2561,6 +2569,223 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
+    public void MockupTemplateTable_PreservesBlockedGuidanceWhenOfferingHasNoDesignAreas()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: false);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        AssertEffectivelyVisible(window, "Catalog.MockupTemplateList");
+        Assert.Empty(Assert.IsType<InMemoryDataProvider<MockupTemplateCardViewModel>>(
+            window.FindControl<VirtualDataGrid>("MockupTemplateGrid")!.ItemsSource));
+        var visibleText = string.Join(" ", window.GetVisualDescendants().OfType<TextBlock>()
+            .Where(IsEffectivelyVisible).Select(text => text.Text));
+        Assert.Contains("Create a Design Area", visibleText);
+        Assert.True(IsEffectivelyVisible(FindButton(window, "Manage Design Areas")!));
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task MockupTemplateTable_SearchesRefreshesAndRetainsFullSummaryText()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        var grid = window.FindControl<VirtualDataGrid>("MockupTemplateGrid")!;
+        var search = window.FindControl<TextBox>("MockupTemplateSearchBox")!;
+        var catalog = viewModel.CatalogSetup!;
+        var provider = Assert.IsType<InMemoryDataProvider<MockupTemplateCardViewModel>>(grid.ItemsSource);
+        var firstCard = Assert.Single(catalog.MockupTemplateCards);
+        var longCard = new MockupTemplateCardViewModel(
+            Guid.NewGuid(),
+            "Winter collection front mockup",
+            "Front panel with extended placement guidance",
+            "Colors: Matte Black / Heather Gray / Natural White",
+            "12 compatible Variants",
+            14,
+            "Ready for use");
+        catalog.MockupTemplateCards.Add(longCard);
+
+        await HeadlessUiWait.UntilAsync(() => provider.Count == 2, "both active template rows render");
+        window.UpdateLayout();
+        var rows = grid.GetVisualDescendants().OfType<VirtualDataRow>().OrderBy(row => row.Index).ToArray();
+        Assert.Equal(2, rows.Length);
+        Assert.Equal(firstCard.Id, Assert.IsType<MockupTemplateCardViewModel>(rows[0].DataContext).Id);
+        Assert.Equal(longCard.Id, Assert.IsType<MockupTemplateCardViewModel>(rows[1].DataContext).Id);
+        Assert.Equal(5, rows[0].Cells.Count);
+        Assert.Equal(5, rows[1].Cells.Count);
+        Assert.All(Enumerable.Range(0, 5), column =>
+        {
+            Assert.Equal(rows[0].Cells[column].Bounds.X, rows[1].Cells[column].Bounds.X, 0.5);
+            Assert.Equal(rows[0].Cells[column].Bounds.Width, rows[1].Cells[column].Bounds.Width, 0.5);
+        });
+
+        var longValues = new[]
+        {
+            longCard.Name,
+            longCard.TargetDesignArea,
+            longCard.ColorSummary,
+            longCard.VariantSummary,
+            longCard.RevisionSummary
+        };
+        var longTexts = rows[1].Cells.Select(cell => Assert.Single(cell.GetVisualDescendants().OfType<TextBlock>())).ToArray();
+        for (var column = 0; column < longValues.Length; column++)
+        {
+            Assert.Equal(longValues[column], AutomationProperties.GetName(longTexts[column]));
+            Assert.Equal(longValues[column], ToolTip.GetTip(longTexts[column]));
+        }
+        var longText = longTexts[2];
+        ClickControl(window, longText);
+        await HeadlessUiWait.UntilAsync(() => catalog.SelectedMockupTemplateCard?.Id == longCard.Id, "pointer selection activates the clicked template row");
+        Assert.True(grid.Focus());
+        Assert.True(grid.IsFocused);
+        var up = new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Up };
+        grid.RaiseEvent(up);
+        Assert.True(up.Handled);
+        await HeadlessUiWait.UntilAsync(() => catalog.SelectedMockupTemplateCard?.Id == firstCard.Id, "keyboard navigation selects the previous template row");
+        grid.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Down });
+        await HeadlessUiWait.UntilAsync(() => catalog.SelectedMockupTemplateCard?.Id == longCard.Id, "keyboard navigation selects the next template row");
+        window.UpdateLayout();
+        var details = AssertEffectivelyVisible(window, "Catalog.SelectedMockupTemplateDetails");
+        var detailText = string.Join(" ", details.GetVisualDescendants().OfType<TextBlock>().Select(text => text.Text));
+        Assert.Contains(longCard.Name, detailText);
+        Assert.Contains(longCard.TargetDesignArea, detailText);
+        Assert.Contains(longCard.ColorSummary, detailText);
+        Assert.Contains(longCard.VariantSummary, detailText);
+        Assert.Contains(longCard.RevisionSummary, detailText);
+
+        search.Text = "extended placement";
+        await HeadlessUiWait.UntilAsync(() => provider.Count == 1, "search filters to the matching Design Area");
+        Assert.Equal(longCard.Id, Assert.IsType<MockupTemplateCardViewModel>(provider.Single()).Id);
+        search.Text = "no matching template";
+        await HeadlessUiWait.UntilAsync(() => provider.Count == 0, "search removes nonmatching rows");
+        Assert.False(grid.IsVisible);
+        Assert.False(catalog.HasSelectedMockupTemplateCard);
+        Assert.True(IsEffectivelyVisible(window.GetVisualDescendants().OfType<TextBlock>()
+            .Single(text => AutomationProperties.GetAutomationId(text) == "Catalog.MockupTemplateNoSearchResults")));
+        Assert.Equal("no matching template", catalog.MockupTemplateSearchText);
+
+        search.Text = "   ";
+        await HeadlessUiWait.UntilAsync(() => provider.Count == 2, "clearing search restores all active rows");
+        Assert.True(grid.IsVisible);
+        viewModel.BackToOfferingOverviewCommand.Execute(null);
+        Assert.Equal(string.Empty, catalog.MockupTemplateSearchText);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task MockupTemplateTable_RowActionsAndArchiveConfirmationSupportPointerAndKeyboard()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenMockupTemplateManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        var catalog = viewModel.CatalogSetup!;
+        var card = Assert.Single(catalog.MockupTemplateCards);
+        var grid = window.FindControl<VirtualDataGrid>("MockupTemplateGrid")!;
+        await HeadlessUiWait.UntilAsync(() => grid.GetVisualDescendants().OfType<VirtualDataRow>().Any(), "the template row renders");
+        var rowText = Assert.Single(grid.GetVisualDescendants().OfType<VirtualDataRow>()
+            .SelectMany(row => row.Cells)
+            .SelectMany(cell => cell.GetVisualDescendants().OfType<TextBlock>())
+            , text => text.Text == card.Name);
+        ClickControl(window, rowText);
+        await HeadlessUiWait.UntilAsync(() => catalog.SelectedMockupTemplateCard?.Id == card.Id, "pointer selection activates the template row");
+        window.UpdateLayout();
+        Assert.Same(card, catalog.SelectedMockupTemplateCard);
+        var edit = window.GetVisualDescendants().OfType<Button>()
+            .Single(button => AutomationProperties.GetName(button) == $"Edit {card.Name}");
+        var duplicate = window.GetVisualDescendants().OfType<Button>()
+            .Single(button => AutomationProperties.GetName(button) == $"Duplicate {card.Name}");
+        var archive = window.GetVisualDescendants().OfType<Button>()
+            .Single(button => AutomationProperties.GetName(button) == $"Archive {card.Name}");
+        Assert.True(edit.IsEnabled);
+        Assert.True(duplicate.IsEnabled);
+        Assert.True(archive.IsEnabled);
+        Assert.True(edit.IsTabStop);
+        Assert.True(duplicate.IsTabStop);
+        Assert.True(archive.IsTabStop);
+        Assert.Same(catalog.EditTemplateCommand, edit.Command);
+        Assert.Same(card, edit.CommandParameter);
+        Assert.Same(catalog.DuplicateTemplateCommand, duplicate.Command);
+        Assert.Same(catalog.ArchiveTemplateCommand, archive.Command);
+
+        edit.BringIntoView();
+        window.UpdateLayout();
+        ClickControl(window, edit);
+        await HeadlessUiWait.UntilAsync(() => window.OwnedWindows.OfType<MockupTemplateEditorWindow>().Any(), "Edit opens the focused template editor");
+        Assert.Equal(card.Id, catalog.SelectedTemplateId);
+        var editor = Assert.Single(window.OwnedWindows.OfType<MockupTemplateEditorWindow>());
+        editor.Close();
+        await HeadlessUiWait.UntilAsync(() => !editor.IsVisible, "template editor closes");
+
+        var duplicateButton = window.GetVisualDescendants().OfType<Button>()
+            .Single(button => AutomationProperties.GetName(button) == $"Duplicate {card.Name}");
+        ClickControl(window, duplicateButton);
+        await HeadlessUiWait.UntilAsync(() => window.OwnedWindows.OfType<MockupTemplateEditorWindow>().Any(), "Duplicate opens the focused template editor");
+        await HeadlessUiWait.UntilAsync(() => catalog.Templates.Count == 2, "Duplicate creates a separate template identity");
+        Assert.NotEqual(card.Id, catalog.SelectedTemplateId);
+        var duplicateEditor = window.OwnedWindows.OfType<MockupTemplateEditorWindow>().Single(dialog => dialog.IsVisible);
+        duplicateEditor.Close();
+        await HeadlessUiWait.UntilAsync(() => !duplicateEditor.IsVisible, "duplicate editor closes");
+
+        var originalTemplateText = grid.GetVisualDescendants().OfType<VirtualDataRow>()
+            .SelectMany(row => row.Cells)
+            .SelectMany(cell => cell.GetVisualDescendants().OfType<TextBlock>())
+            .Single(text => text.Text == card.Name);
+        ClickControl(window, originalTemplateText);
+        await HeadlessUiWait.UntilAsync(() => catalog.SelectedMockupTemplateCard?.Id == card.Id, "pointer selection reactivates the original template row");
+        window.UpdateLayout();
+
+        archive = window.GetVisualDescendants().OfType<Button>()
+            .Single(button => AutomationProperties.GetName(button) == $"Archive {card.Name}");
+        archive.BringIntoView();
+        window.UpdateLayout();
+        ClickControl(window, archive);
+        await HeadlessUiWait.UntilAsync(() => window.OwnedWindows.OfType<MockupTemplateArchiveConfirmationWindow>().Any(), "Archive opens confirmation");
+        var confirmation = Assert.Single(window.OwnedWindows.OfType<MockupTemplateArchiveConfirmationWindow>());
+        Assert.Contains(card.Name, string.Join(" ", confirmation.GetVisualDescendants().OfType<TextBlock>().Select(text => text.Text)));
+        Assert.True(confirmation.FindControl<Button>("CancelButton")!.IsFocused);
+        HeadlessWindowExtensions.KeyPress(confirmation, Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, string.Empty);
+        await HeadlessUiWait.UntilAsync(() => !confirmation.IsVisible, "Escape cancels archive confirmation");
+        Assert.False(catalog.Templates.Single(value => value.Id == card.Id).IsArchived);
+        Assert.True(window.GetVisualDescendants().OfType<Button>().Single(button =>
+            button.CommandParameter is MockupTemplateCardViewModel row && row.Id == card.Id
+            && (AutomationProperties.GetName(button)?.StartsWith("Archive ", StringComparison.Ordinal) ?? false)).IsFocused);
+
+        archive = window.GetVisualDescendants().OfType<Button>()
+            .Single(button => AutomationProperties.GetName(button) == $"Archive {card.Name}");
+        archive.BringIntoView();
+        window.UpdateLayout();
+        ClickControl(window, archive);
+        await HeadlessUiWait.UntilAsync(() => window.OwnedWindows.OfType<MockupTemplateArchiveConfirmationWindow>().Any(), "Archive can be confirmed after cancellation");
+        confirmation = Assert.Single(window.OwnedWindows.OfType<MockupTemplateArchiveConfirmationWindow>());
+        var confirm = confirmation.GetVisualDescendants().OfType<Button>()
+            .Single(button => AutomationProperties.GetName(button) == "Confirm Mockup Template archive");
+        ClickControl(confirmation, confirm);
+        await HeadlessUiWait.UntilAsync(() => catalog.Templates.Single(value => value.Id == card.Id).IsArchived, "confirmation soft-archives the requested template");
+        Assert.Equal(2, catalog.Templates.Count);
+        Assert.Single(catalog.MockupTemplateCards);
+        Assert.True(window.FindControl<TextBox>("MockupTemplateSearchBox")!.IsFocused);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void MockupTemplateManagement_UsesListOnlySurfaceAndGuardedAddDialog()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
@@ -2770,7 +2995,7 @@ public class StoreEditorHeadlessTests
     }
 
     [AvaloniaFact]
-    public void MockupTemplateManagement_EditDialogPopulatesAndReturnsFocusOnCancel()
+    public async Task MockupTemplateManagement_EditDialogPopulatesAndReturnsFocusOnCancel()
     {
         var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
         var viewModel = (StoreManagementViewModel)window.DataContext!;
@@ -2781,8 +3006,15 @@ public class StoreEditorHeadlessTests
         window.UpdateLayout();
 
         var card = Assert.Single(viewModel.CatalogSetup!.MockupTemplateCards);
+        var row = Assert.Single(window.FindControl<VirtualDataGrid>("MockupTemplateGrid")!
+            .GetVisualDescendants().OfType<VirtualDataRow>());
+        var rowText = row.Cells.SelectMany(cell => cell.GetVisualDescendants().OfType<TextBlock>())
+            .First(text => text.Text == card.Name);
+        ClickControl(window, rowText);
+        await HeadlessUiWait.UntilAsync(() => viewModel.CatalogSetup.SelectedMockupTemplateCard?.Id == card.Id,
+            "pointer selection activates the template row");
         var edit = window.GetVisualDescendants().OfType<Button>()
-            .Single(button => button.DataContext is MockupTemplateCardViewModel value
+            .Single(button => button.CommandParameter is MockupTemplateCardViewModel value
                 && value.Id == card.Id
                 && ReferenceEquals(button.Command, viewModel.CatalogSetup.EditTemplateCommand));
         edit.Command!.Execute(edit.CommandParameter);
@@ -3949,6 +4181,14 @@ public class StoreEditorHeadlessTests
                 (string.Equals(b.Content as string, content, System.StringComparison.Ordinal) ||
                  b.GetVisualDescendants().OfType<TextBlock>().Any(text =>
                      string.Equals(text.Text, content, System.StringComparison.Ordinal))));
+
+    private static void ClickControl(Window window, Control control)
+    {
+        var position = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window);
+        Assert.NotNull(position);
+        HeadlessWindowExtensions.MouseDown(window, position!.Value, MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseUp(window, position.Value, MouseButton.Left, RawInputModifiers.None);
+    }
 
     private static bool IsEffectivelyVisible(Control control)
     {

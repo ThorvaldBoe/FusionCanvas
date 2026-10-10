@@ -1,4 +1,5 @@
 using System.Collections.Specialized;
+using System.ComponentModel;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -20,12 +21,15 @@ public partial class StoreEditorWindow : Window
     private StoreManagementViewModel? _subscribedViewModel;
     private CatalogSetupViewModel? _subscribedCatalog;
     private readonly InMemoryDataProvider<SellableVariantRowViewModel> _sellableVariantRows = new([]);
+    private readonly InMemoryDataProvider<MockupTemplateCardViewModel> _mockupTemplateRows = new([]);
     private Button? _pendingVariantArchiveButton;
     private bool _designAreaArchiveConfirmationOpen;
     private bool _optionValueManagementOpen;
     private bool _variantCreationDialogOpen;
     private bool _mockupTemplateEditorOpen;
     private MockupTemplateEditorWindow? _mockupTemplateEditorWindow;
+    private bool _mockupTemplateArchiveConfirmationOpen;
+    private MockupTemplateArchiveConfirmationWindow? _mockupTemplateArchiveConfirmationWindow;
     private bool _designAreaEditorOpen;
     private StorePrintifyCredentialsViewModel? _printify;
     private PrintifyApiKeyWindow? _printifyDialog;
@@ -47,6 +51,11 @@ public partial class StoreEditorWindow : Window
     {
         InitializeComponent();
         SellableVariantGrid.ItemsSource = _sellableVariantRows;
+        MockupTemplateGrid.ItemsSource = _mockupTemplateRows;
+        MockupTemplateGrid.AddHandler(InputElement.PointerPressedEvent, OnMockupTemplateGridPointerPressed,
+            RoutingStrategies.Tunnel, handledEventsToo: true);
+        MockupTemplateGrid.AddHandler(InputElement.KeyDownEvent, OnMockupTemplateGridKeyDown,
+            RoutingStrategies.Bubble, handledEventsToo: true);
         Closing += OnClosing;
         DataContextChanged += OnDataContextChanged;
         AddHandler(Button.ClickEvent, OnSellableVariantArchiveButtonClick, RoutingStrategies.Bubble, handledEventsToo: true);
@@ -68,7 +77,12 @@ public partial class StoreEditorWindow : Window
         {
             dialog.Close();
         }
+        if (_mockupTemplateArchiveConfirmationWindow is { IsVisible: true } archiveDialog)
+        {
+            archiveDialog.Close(false);
+        }
 
+        DataContext = null;
         base.OnClosed(e);
     }
 
@@ -112,7 +126,10 @@ public partial class StoreEditorWindow : Window
         {
             _subscribedCatalog = catalog;
             catalog.SellableVariantRows.CollectionChanged += OnSellableVariantRowsChanged;
+            catalog.MockupTemplateCards.CollectionChanged += OnMockupTemplateCardsChanged;
+            catalog.PropertyChanged += OnCatalogSetupPropertyChanged;
             RefreshSellableVariantRows();
+            RefreshMockupTemplateRows();
             catalog.AttachStoreEditor();
             if (TopLevel.GetTopLevel(this)?.StorageProvider is { } storageProvider)
                 catalog.FilePicker = new AvaloniaAssetFilePicker(storageProvider);
@@ -124,6 +141,7 @@ public partial class StoreEditorWindow : Window
             catalog.BulkVariantActionFocusRequested += OnBulkVariantActionFocusRequested;
             catalog.DesignAreaArchiveConfirmationRequested += OnDesignAreaArchiveConfirmationRequested;
             catalog.DesignAreaArchiveFocusRequested += OnDesignAreaArchiveFocusRequested;
+            catalog.MockupTemplateArchiveConfirmationRequested += OnMockupTemplateArchiveConfirmationRequested;
             catalog.MockupTemplateEditorRequested += OnMockupTemplateEditorRequested;
             catalog.DesignAreaEditorRequested += OnDesignAreaEditorRequested;
         }
@@ -149,6 +167,8 @@ public partial class StoreEditorWindow : Window
         if (_subscribedCatalog is null) return;
 
         _subscribedCatalog.SellableVariantRows.CollectionChanged -= OnSellableVariantRowsChanged;
+        _subscribedCatalog.MockupTemplateCards.CollectionChanged -= OnMockupTemplateCardsChanged;
+        _subscribedCatalog.PropertyChanged -= OnCatalogSetupPropertyChanged;
         _subscribedCatalog.DetachStoreEditor();
         _subscribedCatalog.OptionValueManagementRequested -= OnOptionValueManagementRequested;
         _subscribedCatalog.OptionChoiceFocusRequested -= OnOptionChoiceFocusRequested;
@@ -158,16 +178,82 @@ public partial class StoreEditorWindow : Window
         _subscribedCatalog.BulkVariantActionFocusRequested -= OnBulkVariantActionFocusRequested;
         _subscribedCatalog.DesignAreaArchiveConfirmationRequested -= OnDesignAreaArchiveConfirmationRequested;
         _subscribedCatalog.DesignAreaArchiveFocusRequested -= OnDesignAreaArchiveFocusRequested;
+        _subscribedCatalog.MockupTemplateArchiveConfirmationRequested -= OnMockupTemplateArchiveConfirmationRequested;
         _subscribedCatalog.MockupTemplateEditorRequested -= OnMockupTemplateEditorRequested;
         _subscribedCatalog.DesignAreaEditorRequested -= OnDesignAreaEditorRequested;
         _subscribedCatalog = null;
         _pendingVariantArchiveButton = null;
         _sellableVariantRows.Reset([]);
+        _mockupTemplateRows.Reset([]);
     }
 
     private void OnSellableVariantRowsChanged(object? sender, NotifyCollectionChangedEventArgs e) => RefreshSellableVariantRows();
 
     private void RefreshSellableVariantRows() => _sellableVariantRows.Reset(_subscribedCatalog?.SellableVariantRows.ToArray() ?? []);
+
+    private void OnMockupTemplateCardsChanged(object? sender, NotifyCollectionChangedEventArgs e) => RefreshMockupTemplateRows();
+
+    private void OnMockupTemplateGridKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key is not (Key.Up or Key.Down) || _subscribedCatalog is not { } catalog) return;
+
+        var rows = catalog.FilteredMockupTemplateCards;
+        if (rows.Count == 0) return;
+
+        var selectedIndex = -1;
+        for (var index = 0; index < rows.Count; index++)
+        {
+            if (rows[index].Id == catalog.SelectedMockupTemplateCard?.Id)
+            {
+                selectedIndex = index;
+                break;
+            }
+        }
+
+        var nextIndex = selectedIndex < 0
+            ? (e.Key == Key.Down ? 0 : rows.Count - 1)
+            : Math.Clamp(selectedIndex + (e.Key == Key.Down ? 1 : -1), 0, rows.Count - 1);
+        var selectedRow = rows[nextIndex];
+        MockupTemplateGrid.SelectedItem = selectedRow;
+        catalog.SelectedMockupTemplateCard = selectedRow;
+        e.Handled = true;
+    }
+
+    private void OnMockupTemplateGridPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(MockupTemplateGrid).Properties.IsLeftButtonPressed
+            || _subscribedCatalog is not { } catalog
+            || e.Source is not Visual source) return;
+
+        var row = source.GetVisualAncestors().Prepend(source).OfType<VirtualDataRow>().FirstOrDefault();
+        if (row?.DataContext is not MockupTemplateCardViewModel card
+            || !catalog.FilteredMockupTemplateCards.Any(item => item.Id == card.Id)) return;
+
+        MockupTemplateGrid.SelectedItem = card;
+        catalog.SelectedMockupTemplateCard = card;
+    }
+
+    private void OnCatalogSetupPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(CatalogSetupViewModel.SelectedMockupTemplateCard)
+            && _subscribedCatalog is { } catalog)
+        {
+            MockupTemplateGrid.SelectedItem = catalog.SelectedMockupTemplateCard;
+        }
+
+        if (e.PropertyName is nameof(CatalogSetupViewModel.MockupTemplateSearchText)
+            or nameof(CatalogSetupViewModel.FilteredMockupTemplateCards))
+        {
+            RefreshMockupTemplateRows();
+        }
+    }
+
+    private void RefreshMockupTemplateRows()
+    {
+        var catalog = _subscribedCatalog;
+        _mockupTemplateRows.Reset(catalog?.FilteredMockupTemplateCards ?? []);
+        MockupTemplateGrid.SelectedItem = catalog?.SelectedMockupTemplateCard;
+    }
 
     private void OnSellableVariantArchiveButtonClick(object? sender, RoutedEventArgs e)
     {
@@ -429,6 +515,59 @@ public partial class StoreEditorWindow : Window
         }
     }
 
+    private async void OnMockupTemplateArchiveConfirmationRequested(object? sender, EventArgs e)
+    {
+        if (_mockupTemplateArchiveConfirmationOpen || _subscribedCatalog is not { } catalog) return;
+        var templateId = catalog.PendingMockupTemplateArchiveId;
+        if (templateId is null || VisualRoot is null || !IsVisible)
+        {
+            catalog.CancelMockupTemplateArchiveCommand.Execute(null);
+            return;
+        }
+
+        _mockupTemplateArchiveConfirmationOpen = true;
+        var dialog = new MockupTemplateArchiveConfirmationWindow { DataContext = catalog };
+        _mockupTemplateArchiveConfirmationWindow = dialog;
+        var confirmed = false;
+        try
+        {
+            confirmed = await dialog.ShowDialog<bool>(this);
+            if (confirmed)
+            {
+                catalog.ConfirmMockupTemplateArchiveCommand.Execute(null);
+            }
+            else
+            {
+                catalog.CancelMockupTemplateArchiveCommand.Execute(null);
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_mockupTemplateArchiveConfirmationWindow, dialog))
+            {
+                _mockupTemplateArchiveConfirmationWindow = null;
+            }
+            _mockupTemplateArchiveConfirmationOpen = false;
+            RestoreMockupTemplateArchiveFocus(templateId.Value, confirmed);
+        }
+    }
+
+    private void RestoreMockupTemplateArchiveFocus(Guid templateId, bool archived)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!archived)
+            {
+                var archiveButton = this.GetVisualDescendants().OfType<Button>()
+                    .FirstOrDefault(button => button.CommandParameter is MockupTemplateCardViewModel card && card.Id == templateId
+                        && AutomationProperties.GetName(button)?.StartsWith("Archive ", StringComparison.Ordinal) == true);
+                if (archiveButton is not null && archiveButton.Focus()) return;
+            }
+
+            MockupTemplateSearchBox.Focus();
+        }, DispatcherPriority.Input);
+    }
+
     private void OnDesignAreaArchiveFocusRequested(object? sender, EventArgs e)
     {
         if (_subscribedCatalog is not { } catalog) return;
@@ -485,7 +624,8 @@ public partial class StoreEditorWindow : Window
             {
                 var editButton = editedTemplateId is Guid id
                     ? this.GetVisualDescendants().OfType<Button>().FirstOrDefault(button =>
-                        button.DataContext is MockupTemplateCardViewModel card && card.Id == id)
+                        button.CommandParameter is MockupTemplateCardViewModel card && card.Id == id
+                        && ReferenceEquals(button.Command, catalog.EditTemplateCommand))
                     : null;
                 (editButton ?? AddMockupTemplateButton).Focus();
             });

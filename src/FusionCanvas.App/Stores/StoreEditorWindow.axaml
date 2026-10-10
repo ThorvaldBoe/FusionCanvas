@@ -1291,34 +1291,106 @@
                   <TextBlock Text="{Binding CatalogSetup.ProviderCatalogMessage}"
                              IsVisible="{Binding CatalogSetup.HasProviderCatalogMessage}"
                              TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
-                  <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailableTemplates}" Text="No Mockup Templates configured." Foreground="{DynamicResource SecondaryTextBrush}" />
-                  <ItemsControl ItemsSource="{Binding CatalogSetup.MockupTemplateCards}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="stores:MockupTemplateCardViewModel">
-                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" HorizontalAlignment="Stretch">
-                          <Button Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.EditTemplateCommand}"
-                                  CommandParameter="{Binding}" Classes="listItem" HorizontalContentAlignment="Left"
-                                  HorizontalAlignment="Stretch"
-                                  AutomationProperties.Name="{Binding Name, StringFormat='Edit {0}'}">
-                            <StackPanel Spacing="3">
-                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                              <TextBlock Text="{Binding TargetDesignArea, StringFormat='Design Area: {0}'}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                              <TextBlock Text="{Binding ColorSummary, StringFormat='Colors: {0}'}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                              <TextBlock Text="{Binding VariantSummary}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                              <TextBlock Text="{Binding RevisionSummary}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                              </StackPanel>
-                          </Button>
-                          <Button Grid.Column="1" Content="Duplicate"
-                                  Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.DuplicateTemplateCommand}"
-                                  CommandParameter="{Binding}" Classes="secondary"
-                                  AutomationProperties.Name="{Binding Name, StringFormat='Duplicate {0}'}" />
-                          <Button Grid.Column="2" Content="Archive"
-                                  Command="{Binding $parent[ItemsControl].DataContext.CatalogSetup.ArchiveTemplateCommand}"
-                                  CommandParameter="{Binding}" Classes="secondary" />
-                        </Grid>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
+                  <TextBox x:Name="MockupTemplateSearchBox"
+                           Text="{Binding CatalogSetup.MockupTemplateSearchText, Mode=TwoWay}"
+                           PlaceholderText="Search templates"
+                           AutomationProperties.Name="Search Mockup Templates"
+                           AutomationProperties.AutomationId="Catalog.MockupTemplateSearch" />
+                  <TextBlock IsVisible="{Binding !CatalogSetup.HasAvailableTemplates}"
+                             Text="No Mockup Templates configured."
+                             Foreground="{DynamicResource SecondaryTextBrush}" />
+                  <TextBlock IsVisible="{Binding CatalogSetup.HasNoMockupTemplateSearchResults}"
+                             Text="No active Mockup Templates match this search. Clear or change the query."
+                             TextWrapping="Wrap"
+                             Foreground="{DynamicResource SecondaryTextBrush}"
+                             AutomationProperties.AutomationId="Catalog.MockupTemplateNoSearchResults" />
+                  <virtualGrid:VirtualDataGrid x:Name="MockupTemplateGrid"
+                                               Height="240"
+                                               RowHeight="40"
+                                               SelectionMode="Single"
+                                               Focusable="True"
+                                               IsTabStop="True"
+                                               IsVisible="{Binding CatalogSetup.HasFilteredMockupTemplateCards}"
+                                               AutomationProperties.Name="Active Mockup Templates"
+                                               AutomationProperties.AutomationId="Catalog.MockupTemplateTable">
+                    <virtualGrid:VirtualDataGrid.Columns>
+                      <virtualColumns:VirtualDataGridTemplateColumn Header="Template" Width="116" IsSortable="False" IsResizable="False">
+                        <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                          <DataTemplate x:DataType="stores:MockupTemplateCardViewModel">
+                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                       ToolTip.Tip="{Binding Name}" AutomationProperties.Name="{Binding Name}" />
+                          </DataTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                      </virtualColumns:VirtualDataGridTemplateColumn>
+                      <virtualColumns:VirtualDataGridTemplateColumn Header="Design Area" Width="100" IsSortable="False" IsResizable="False">
+                        <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                          <DataTemplate x:DataType="stores:MockupTemplateCardViewModel">
+                            <TextBlock Text="{Binding TargetDesignArea}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                       ToolTip.Tip="{Binding TargetDesignArea}" AutomationProperties.Name="{Binding TargetDesignArea}" />
+                          </DataTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                      </virtualColumns:VirtualDataGridTemplateColumn>
+                      <virtualColumns:VirtualDataGridTemplateColumn Header="Colors" Width="110" IsSortable="False" IsResizable="False">
+                        <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                          <DataTemplate x:DataType="stores:MockupTemplateCardViewModel">
+                            <TextBlock Text="{Binding ColorSummary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                       ToolTip.Tip="{Binding ColorSummary}" AutomationProperties.Name="{Binding ColorSummary}" />
+                          </DataTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                      </virtualColumns:VirtualDataGridTemplateColumn>
+                      <virtualColumns:VirtualDataGridTemplateColumn Header="Variants" Width="92" IsSortable="False" IsResizable="False">
+                        <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                          <DataTemplate x:DataType="stores:MockupTemplateCardViewModel">
+                            <TextBlock Text="{Binding VariantSummary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                       ToolTip.Tip="{Binding VariantSummary}" AutomationProperties.Name="{Binding VariantSummary}" />
+                          </DataTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                      </virtualColumns:VirtualDataGridTemplateColumn>
+                      <virtualColumns:VirtualDataGridTemplateColumn Header="Revision" Width="110" IsSortable="False" IsResizable="False">
+                        <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                          <DataTemplate x:DataType="stores:MockupTemplateCardViewModel">
+                            <TextBlock Text="{Binding RevisionSummary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                       ToolTip.Tip="{Binding RevisionSummary}" AutomationProperties.Name="{Binding RevisionSummary}" />
+                          </DataTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                      </virtualColumns:VirtualDataGridTemplateColumn>
+                    </virtualGrid:VirtualDataGrid.Columns>
+                  </virtualGrid:VirtualDataGrid>
+                  <Border Classes="panel" Padding="8"
+                          IsVisible="{Binding CatalogSetup.HasSelectedMockupTemplateCard}"
+                          AutomationProperties.AutomationId="Catalog.SelectedMockupTemplateDetails">
+                    <StackPanel Spacing="6">
+                      <TextBlock Text="{Binding CatalogSetup.SelectedMockupTemplateCard.Name}"
+                                 FontWeight="SemiBold"
+                                 AutomationProperties.Name="{Binding CatalogSetup.SelectedMockupTemplateCard.Name}" />
+                      <TextBlock Text="{Binding CatalogSetup.SelectedMockupTemplateCard.TargetDesignArea, StringFormat='Design Area: {0}'}"
+                                 TextWrapping="Wrap"
+                                 AutomationProperties.Name="{Binding CatalogSetup.SelectedMockupTemplateCard.TargetDesignArea}" />
+                      <TextBlock Text="{Binding CatalogSetup.SelectedMockupTemplateCard.ColorSummary, StringFormat='Colors: {0}'}"
+                                 TextWrapping="Wrap"
+                                 AutomationProperties.Name="{Binding CatalogSetup.SelectedMockupTemplateCard.ColorSummary}" />
+                      <TextBlock Text="{Binding CatalogSetup.SelectedMockupTemplateCard.VariantSummary}"
+                                 TextWrapping="Wrap"
+                                 AutomationProperties.Name="{Binding CatalogSetup.SelectedMockupTemplateCard.VariantSummary}" />
+                      <TextBlock Text="{Binding CatalogSetup.SelectedMockupTemplateCard.RevisionSummary}"
+                                 TextWrapping="Wrap"
+                                 AutomationProperties.Name="{Binding CatalogSetup.SelectedMockupTemplateCard.RevisionSummary}" />
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Edit"
+                                Command="{Binding CatalogSetup.EditTemplateCommand}"
+                                CommandParameter="{Binding CatalogSetup.SelectedMockupTemplateCard}"
+                                AutomationProperties.Name="{Binding CatalogSetup.SelectedMockupTemplateCard.Name, StringFormat='Edit {0}'}" />
+                        <Button Content="Duplicate"
+                                Command="{Binding CatalogSetup.DuplicateTemplateCommand}"
+                                CommandParameter="{Binding CatalogSetup.SelectedMockupTemplateCard}"
+                                AutomationProperties.Name="{Binding CatalogSetup.SelectedMockupTemplateCard.Name, StringFormat='Duplicate {0}'}" />
+                        <Button Content="Archive"
+                                Command="{Binding CatalogSetup.ArchiveTemplateCommand}"
+                                CommandParameter="{Binding CatalogSetup.SelectedMockupTemplateCard}"
+                                AutomationProperties.Name="{Binding CatalogSetup.SelectedMockupTemplateCard.Name, StringFormat='Archive {0}'}" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
                   <Border IsVisible="{Binding !CatalogSetup.HasAvailablePlaceholders}"
                           Background="{DynamicResource WarningBackgroundBrush}"
                           BorderBrush="{DynamicResource WarningBorderBrush}" BorderThickness="1" Padding="10">
