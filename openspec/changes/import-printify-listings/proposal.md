@@ -2,6 +2,10 @@
 
 Creators who already sell through Printify need a practical way to bring those existing listings into FusionCanvas when they first set up a workspace or reconnect a Store. A focused import lets them continue managing those Items locally while new designs can originate in FusionCanvas and move through its Printify listing workflow.
 
+## Origin
+
+- Primary issue: [#139](https://github.com/ThorvaldBoe/FusionCanvas/issues/139)
+
 ## What Changes
 
 - Add a `Import from Printify…` action to a Niche's navigation context menu.
