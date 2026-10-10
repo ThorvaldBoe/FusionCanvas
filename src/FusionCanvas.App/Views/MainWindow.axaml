@@ -11,6 +11,8 @@
         xmlns:appWorkflowNav="clr-namespace:FusionCanvas.Application.WorkflowNavigation;assembly=FusionCanvas.Application"
         xmlns:appItems="clr-namespace:FusionCanvas.Application.Items;assembly=FusionCanvas.Application"
         xmlns:appGroups="clr-namespace:FusionCanvas.Application.Groups;assembly=FusionCanvas.Application"
+        xmlns:virtualGrid="clr-namespace:AvaloniaVirtualDataGrid.Controls;assembly=AvaloniaVirtualDataGrid"
+        xmlns:virtualColumns="clr-namespace:AvaloniaVirtualDataGrid.Columns;assembly=AvaloniaVirtualDataGrid"
         x:Class="FusionCanvas.App.Views.MainWindow"
         x:DataType="views:MainWindowViewModel"
         KeyDown="OnWindowKeyDown"
@@ -826,17 +828,42 @@
                       <TextBlock Text="{Binding ManualListingDetailsTool.OfferingSummary}" Foreground="{DynamicResource SecondaryTextBrush}" TextWrapping="Wrap" />
                       <TextBlock Text="{Binding ManualListingDetailsTool.VariantPricingGuidance}" Foreground="{DynamicResource SecondaryTextBrush}" TextWrapping="Wrap" />
                       <TextBlock Text="Variant pricing and fulfillment cost" FontWeight="SemiBold" />
-                      <ItemsControl ItemsSource="{Binding ManualListingDetailsTool.Variants}" IsEnabled="{Binding ManualListingDetailsTool.CanEditFulfillmentTerms}">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate>
-                            <Grid ColumnDefinitions="*,120,140" ColumnSpacing="8" Margin="0,2">
-                              <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                              <TextBox Grid.Column="1" Text="{Binding SellingPrice, Mode=TwoWay}" PlaceholderText="Selling price" AutomationProperties.Name="Variant selling price" />
-                              <TextBox Grid.Column="2" Text="{Binding FulfillmentCost, Mode=TwoWay}" PlaceholderText="Fulfillment cost" AutomationProperties.Name="Variant fulfillment cost" />
-                            </Grid>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
+                      <virtualGrid:VirtualDataGrid x:Name="ManualListingVariantsGrid"
+                                                   Height="224"
+                                                   RowHeight="36"
+                                                   SelectionMode="None"
+                                                   IsEnabled="{Binding ManualListingDetailsTool.CanEditFulfillmentTerms}"
+                                                   AutomationProperties.Name="Variant pricing and fulfillment costs">
+                        <virtualGrid:VirtualDataGrid.Columns>
+                          <virtualColumns:VirtualDataGridTemplateColumn Header="Variant" Width="160" IsSortable="False" IsResizable="False">
+                            <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                              <DataTemplate x:DataType="stageTools:VariantListingTermsViewModel">
+                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                              </DataTemplate>
+                            </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                          </virtualColumns:VirtualDataGridTemplateColumn>
+                          <virtualColumns:VirtualDataGridTemplateColumn Header="Selling price" Width="130" IsSortable="False" IsResizable="False">
+                            <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                              <DataTemplate x:DataType="stageTools:VariantListingTermsViewModel">
+                                <TextBox Text="{Binding SellingPrice, Mode=TwoWay}"
+                                         PlaceholderText="Selling price"
+                                         Height="28"
+                                         AutomationProperties.Name="Variant selling price" />
+                              </DataTemplate>
+                            </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                          </virtualColumns:VirtualDataGridTemplateColumn>
+                          <virtualColumns:VirtualDataGridTemplateColumn Header="Fulfillment cost" Width="140" IsSortable="False" IsResizable="False">
+                            <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                              <DataTemplate x:DataType="stageTools:VariantListingTermsViewModel">
+                                <TextBox Text="{Binding FulfillmentCost, Mode=TwoWay}"
+                                         PlaceholderText="Fulfillment cost"
+                                         Height="28"
+                                         AutomationProperties.Name="Variant fulfillment cost" />
+                              </DataTemplate>
+                            </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                          </virtualColumns:VirtualDataGridTemplateColumn>
+                        </virtualGrid:VirtualDataGrid.Columns>
+                      </virtualGrid:VirtualDataGrid>
                       <TextBlock Text="Shipping option" FontWeight="SemiBold" />
                       <TextBox Text="{Binding ManualListingDetailsTool.ShippingName, Mode=TwoWay}" PlaceholderText="Option name" IsEnabled="{Binding ManualListingDetailsTool.CanEditFulfillmentTerms}" />
                       <Grid ColumnDefinitions="*,*" ColumnSpacing="8">

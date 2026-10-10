@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
@@ -8,6 +9,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using AvaloniaVirtualDataGrid.Core;
 using FusionCanvas.App.Assets;
 using FusionCanvas.App.Groups;
 using FusionCanvas.App.Ideation;
@@ -43,10 +45,13 @@ public partial class MainWindow : Window
     private FusionCanvas.Application.Items.Import.IItemCsvCodec? _itemCsvImportCodec;
     private DesignStageToolViewModel? _subscribedDesignTool;
     private ListingStageToolViewModel? _subscribedListingTool;
+    private ManualListingDetailsStageToolViewModel? _subscribedManualListingTool;
+    private readonly InMemoryDataProvider<VariantListingTermsViewModel> _manualListingVariantRows = new([]);
 
     public MainWindow()
     {
         InitializeComponent();
+        ManualListingVariantsGrid.ItemsSource = _manualListingVariantRows;
         _windowCoordinator = new MainWindowWindowCoordinator(this, WorkspaceTreeControl);
         WorkspaceTreeControl.AddHandler(PointerPressedEvent, OnWorkspaceTreePointerPressed, RoutingStrategies.Tunnel);
         WorkspaceTreeControl.AddHandler(KeyDownEvent, OnWorkspaceTreeKeyDown, RoutingStrategies.Tunnel);
@@ -58,6 +63,7 @@ public partial class MainWindow : Window
     {
         ArgumentNullException.ThrowIfNull(services);
         InitializeComponent();
+        ManualListingVariantsGrid.ItemsSource = _manualListingVariantRows;
         _windowCoordinator = new MainWindowWindowCoordinator(this, WorkspaceTreeControl);
         WorkspaceTreeControl.AddHandler(PointerPressedEvent, OnWorkspaceTreePointerPressed, RoutingStrategies.Tunnel);
         WorkspaceTreeControl.AddHandler(KeyDownEvent, OnWorkspaceTreeKeyDown, RoutingStrategies.Tunnel);
@@ -159,6 +165,8 @@ public partial class MainWindow : Window
             _subscribedListingTool.PropertyChanged -= OnListingToolPropertyChanged;
         }
 
+        SubscribeManualListingTool(null);
+
         _subscribedDesignTool = (DataContext as MainWindowViewModel)?.DesignTool;
         if (_subscribedDesignTool is not null)
         {
@@ -170,7 +178,31 @@ public partial class MainWindow : Window
         {
             _subscribedListingTool.PropertyChanged += OnListingToolPropertyChanged;
         }
+
+        SubscribeManualListingTool((DataContext as MainWindowViewModel)?.ManualListingDetailsTool);
     }
+
+    private void SubscribeManualListingTool(ManualListingDetailsStageToolViewModel? tool)
+    {
+        if (_subscribedManualListingTool is not null)
+        {
+            _subscribedManualListingTool.Variants.CollectionChanged -= OnManualListingVariantsChanged;
+        }
+
+        _subscribedManualListingTool = tool;
+        if (_subscribedManualListingTool is not null)
+        {
+            _subscribedManualListingTool.Variants.CollectionChanged += OnManualListingVariantsChanged;
+        }
+
+        RefreshManualListingVariantRows();
+    }
+
+    private void OnManualListingVariantsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        => RefreshManualListingVariantRows();
+
+    private void RefreshManualListingVariantRows()
+        => _manualListingVariantRows.Reset(_subscribedManualListingTool?.Variants.ToArray() ?? []);
 
     private void OnDesignToolPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
@@ -253,6 +285,7 @@ public partial class MainWindow : Window
     {
         _dispatcherCallbacksDisabled = true;
         Dispatcher.UIThread.ShutdownStarted -= OnDispatcherShutdownStarted;
+        SubscribeManualListingTool(null);
         if (DataContext is MainWindowViewModel viewModel)
         {
             viewModel.Dispose();

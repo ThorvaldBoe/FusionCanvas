@@ -1,12 +1,17 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
+using Avalonia.Data;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.VisualTree;
 using AvaloniaVirtualDataGrid.Columns;
 using AvaloniaVirtualDataGrid.Controls;
 using AvaloniaVirtualDataGrid.Core;
 using AvaloniaVirtualDataGrid.Services;
 using FusionCanvas.App.Tests.TestSupport;
+using FusionCanvas.App.StageTools;
 using FusionCanvas.Application.Catalog;
 
 namespace FusionCanvas.App.Tests;
@@ -71,6 +76,104 @@ public sealed class VirtualDataGridIntegrationTests
             var refreshedRow = Assert.Single(grid.GetVisualDescendants().OfType<VirtualDataRow>());
             Assert.Equal("M", Assert.IsType<TextBlock>(refreshedRow.Cells[0].Content).Text);
             Assert.Equal("Provider unavailable", Assert.IsType<TextBlock>(refreshedRow.Cells[1].Content).Text);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task Template_editors_support_keyboard_navigation_and_two_way_text_input()
+    {
+        var row = new VariantListingTermsViewModel(Guid.NewGuid(), "Black / Medium", 24.95m, 8.50m);
+        var secondRow = new VariantListingTermsViewModel(Guid.NewGuid(), "White / Large", 28m, 9m);
+        var provider = new InMemoryDataProvider<VariantListingTermsViewModel>([row, secondRow]);
+        var grid = new VirtualDataGrid
+        {
+            ItemsSource = provider,
+            RowHeight = 32,
+            SelectionMode = DataGridSelectionMode.None
+        };
+        grid.Columns.Add(new VirtualDataGridTextColumn("Variant", item => ((VariantListingTermsViewModel)item!).Name)
+        {
+            Width = 180,
+            IsSortable = false
+        });
+        grid.Columns.Add(new VirtualDataGridTemplateColumn
+        {
+            Header = "Selling price",
+            Width = 140,
+            IsSortable = false,
+            CellTemplate = new FuncDataTemplate<VariantListingTermsViewModel>((item, _) =>
+            {
+                var editor = new TextBox { Name = "SellingPriceEditor", Focusable = true, IsTabStop = true };
+                editor.Bind(TextBox.TextProperty, new Binding(nameof(VariantListingTermsViewModel.SellingPrice)) { Mode = BindingMode.TwoWay });
+                return editor;
+            })
+        });
+        grid.Columns.Add(new VirtualDataGridTemplateColumn
+        {
+            Header = "Fulfillment cost",
+            Width = 140,
+            IsSortable = false,
+            CellTemplate = new FuncDataTemplate<VariantListingTermsViewModel>((item, _) =>
+            {
+                var editor = new TextBox { Name = "FulfillmentCostEditor", Focusable = true, IsTabStop = true };
+                editor.Bind(TextBox.TextProperty, new Binding(nameof(VariantListingTermsViewModel.FulfillmentCost)) { Mode = BindingMode.TwoWay });
+                return editor;
+            })
+        });
+        var window = new Window { Width = 420, Height = 200, Content = grid };
+
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+            await HeadlessUiWait.UntilAsync(
+                () => grid.GetVisualDescendants().OfType<VirtualDataRow>().Any(),
+                "editable grid realizes its Variant row");
+            var realizedRows = grid.GetVisualDescendants().OfType<VirtualDataRow>().OrderBy(value => value.Index).ToArray();
+            Assert.Equal(2, realizedRows.Length);
+            var firstCells = realizedRows[0].Cells;
+            var secondCells = realizedRows[1].Cells;
+            Assert.Equal(3, firstCells.Count);
+            Assert.Equal(3, secondCells.Count);
+            Assert.All(Enumerable.Range(0, 3), column =>
+                Assert.Equal(firstCells[column].Bounds.Width, secondCells[column].Bounds.Width));
+            Assert.All(Enumerable.Range(0, 3), column =>
+                Assert.Equal(firstCells[column].Bounds.X, secondCells[column].Bounds.X));
+            var cell = firstCells[1];
+
+            var priceEditor = Assert.Single(cell.GetVisualDescendants().OfType<TextBox>());
+            Assert.Equal("24.95", priceEditor.Text);
+            var editorCenter = priceEditor.TranslatePoint(new Point(priceEditor.Bounds.Width / 2, priceEditor.Bounds.Height / 2), window);
+            Assert.NotNull(editorCenter);
+            HeadlessWindowExtensions.MouseDown(window, editorCenter!.Value, MouseButton.Left, RawInputModifiers.None);
+            HeadlessWindowExtensions.MouseUp(window, editorCenter.Value, MouseButton.Left, RawInputModifiers.None);
+            Assert.True(priceEditor.Focusable);
+            Assert.True(priceEditor.IsTabStop);
+            Assert.True(priceEditor.IsFocused);
+            priceEditor.Text = "27.95";
+            Assert.Equal("27.95", row.SellingPrice);
+            Assert.Equal("Black / Medium", row.Name);
+
+            var costEditor = Assert.Single(firstCells[2].GetVisualDescendants().OfType<TextBox>());
+            HeadlessWindowExtensions.KeyPress(window, Key.Tab, RawInputModifiers.None, PhysicalKey.Tab, string.Empty);
+            Assert.True(costEditor.IsFocused);
+            costEditor.Text = "9.25";
+            Assert.Equal("9.25", row.FulfillmentCost);
+
+            var nextPriceEditor = Assert.Single(secondCells[1].GetVisualDescendants().OfType<TextBox>());
+            HeadlessWindowExtensions.KeyPress(window, Key.Tab, RawInputModifiers.None, PhysicalKey.Tab, string.Empty);
+            Assert.True(nextPriceEditor.IsFocused);
+            nextPriceEditor.Text = "31.50";
+            Assert.Equal("31.50", secondRow.SellingPrice);
+            Assert.Equal("27.95", row.SellingPrice);
+
+            var secondCostEditor = Assert.Single(secondCells[2].GetVisualDescendants().OfType<TextBox>());
+            HeadlessWindowExtensions.KeyPress(window, Key.Tab, RawInputModifiers.None, PhysicalKey.Tab, string.Empty);
+            Assert.True(secondCostEditor.IsFocused);
         }
         finally
         {
