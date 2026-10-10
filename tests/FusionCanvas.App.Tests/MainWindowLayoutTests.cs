@@ -22,6 +22,8 @@ using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Integration.Persistence;
 using FusionCanvas.App.Tests.TestSupport;
+using AvaloniaVirtualDataGrid.Controls;
+using AvaloniaVirtualDataGrid.Core;
 
 namespace FusionCanvas.App.Tests;
 
@@ -80,12 +82,21 @@ public class MainWindowConstructionTests
         var title = fixture.FindControl<TextBox>(control => AutomationProperties.GetName(control) == "Listing title");
         var description = fixture.FindControl<TextBox>(control => AutomationProperties.GetName(control) == "Listing description");
         var currency = fixture.FindControl<TextBox>(control => AutomationProperties.GetName(control) == "Listing currency");
+        var variantGrid = fixture.FindControl<VirtualDataGrid>(control => control.Name == "ManualListingVariantsGrid");
 
         Assert.NotNull(title);
         Assert.NotNull(description);
         Assert.NotNull(currency);
+        Assert.NotNull(variantGrid);
         Assert.Contains("Select an Offering in Design", fixture.ViewModel.ManualListingDetailsTool.OfferingSummary);
         Assert.False(fixture.ViewModel.ManualListingDetailsTool.CanEditFulfillmentTerms);
+        Assert.False(variantGrid.IsEnabled);
+        var provider = Assert.IsType<InMemoryDataProvider<VariantListingTermsViewModel>>(variantGrid.ItemsSource);
+        Assert.Empty(provider);
+
+        var row = new VariantListingTermsViewModel(Guid.NewGuid(), "Black / Medium", 24.95m, 8.50m);
+        fixture.ViewModel.ManualListingDetailsTool.Variants.Add(row);
+        Assert.Same(row, Assert.Single(provider));
     }
 
     [AvaloniaFact]
