@@ -71,11 +71,13 @@ public class StoreEditorHeadlessTests
         Assert.Equal(0, SubscriptionCount(firstCatalog.SellableVariantRows, "CollectionChanged"));
         Assert.Equal(1, SubscriptionCount(firstCatalog.MockupTemplateCards, "CollectionChanged"));
         Assert.Equal(1, SubscriptionCount(firstCatalog, nameof(CatalogSetupViewModel.PropertyChanged)));
+        Assert.Equal(0, SubscriptionCount(first.BlueprintOfferingCards, "CollectionChanged"));
         Assert.Equal(1, SubscriptionCount(second, nameof(StoreManagementViewModel.StoreNameFocusRequested)));
         Assert.Equal(1, SubscriptionCount(secondCatalog, nameof(CatalogSetupViewModel.OptionValueManagementRequested)));
         Assert.Equal(1, SubscriptionCount(secondCatalog.SellableVariantRows, "CollectionChanged"));
         Assert.Equal(2, SubscriptionCount(secondCatalog.MockupTemplateCards, "CollectionChanged"));
         Assert.Equal(3, SubscriptionCount(secondCatalog, nameof(CatalogSetupViewModel.PropertyChanged)));
+        Assert.Equal(1, SubscriptionCount(second.BlueprintOfferingCards, "CollectionChanged"));
 
         window.Close();
 
@@ -84,6 +86,7 @@ public class StoreEditorHeadlessTests
         Assert.Equal(0, SubscriptionCount(secondCatalog.SellableVariantRows, "CollectionChanged"));
         Assert.Equal(1, SubscriptionCount(secondCatalog.MockupTemplateCards, "CollectionChanged"));
         Assert.Equal(1, SubscriptionCount(secondCatalog, nameof(CatalogSetupViewModel.PropertyChanged)));
+        Assert.Equal(0, SubscriptionCount(second.BlueprintOfferingCards, "CollectionChanged"));
     }
 
     [AvaloniaFact]
@@ -1091,7 +1094,8 @@ public class StoreEditorHeadlessTests
         var card = Assert.Single(viewModel.BlueprintOfferingCards);
         var offeringButton = window.GetVisualDescendants()
             .OfType<Button>()
-            .Single(button => ReferenceEquals(button.DataContext, card));
+            .Single(button => AutomationProperties.GetAutomationId(button) == "Catalog.OpenOffering"
+                && ReferenceEquals(button.DataContext, card));
 
         Assert.NotNull(offeringButton.Command);
         Assert.Same(card, offeringButton.CommandParameter);
@@ -1117,7 +1121,8 @@ public class StoreEditorHeadlessTests
         var card = Assert.Single(viewModel.BlueprintOfferingCards);
         var offeringButton = window.GetVisualDescendants()
             .OfType<Button>()
-            .Single(button => ReferenceEquals(button.DataContext, card));
+            .Single(button => AutomationProperties.GetAutomationId(button) == "Catalog.OpenOffering"
+                && ReferenceEquals(button.DataContext, card));
 
         Assert.NotNull(offeringButton.Command);
         Assert.Same(card, offeringButton.CommandParameter);
@@ -1130,6 +1135,129 @@ public class StoreEditorHeadlessTests
         Assert.False(viewModel.CatalogSetup.IsOfferingContextUnavailable);
         AssertEffectivelyVisible(window, "Catalog.OfferingStatus");
 
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task BlueprintOfferingGridKeepsAlignedSummariesFullGuidanceAndOneClickOpen()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeArchivedOffering: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        var blueprint = Assert.Single(viewModel.Products);
+        viewModel.OpenProductDetailCommand.Execute(blueprint);
+        window.UpdateLayout();
+
+        var card = Assert.Single(viewModel.BlueprintOfferingCards);
+        var grid = window.FindControl<VirtualDataGrid>("BlueprintOfferingGrid");
+        Assert.NotNull(grid);
+        Assert.Equal(6, grid!.Columns.Count);
+        Assert.All(grid.Columns, column =>
+        {
+            Assert.False(column.IsSortable);
+            Assert.False(column.IsResizable);
+        });
+        var archivedToggle = window.GetVisualDescendants().OfType<CheckBox>()
+            .Single(checkBox => checkBox.Content as string == "Show archived Blueprint Offerings");
+        Assert.False(archivedToggle.IsChecked);
+        viewModel.ShowArchivedOfferings = true;
+        await WaitForAsync(() => viewModel.BlueprintOfferingCards.Count == 2);
+        window.UpdateLayout();
+        Assert.Contains(viewModel.BlueprintOfferingCards, offering => offering.Status == "Archived");
+        var activeAndArchivedRows = grid.GetVisualDescendants().OfType<VirtualDataRow>().OrderBy(row => row.Index).ToArray();
+        Assert.Equal(2, activeAndArchivedRows.Length);
+        Assert.All(Enumerable.Range(0, 6), column =>
+        {
+            Assert.Equal(activeAndArchivedRows[0].Cells[column].Bounds.X, activeAndArchivedRows[1].Cells[column].Bounds.X);
+            Assert.Equal(activeAndArchivedRows[0].Cells[column].Bounds.Width, activeAndArchivedRows[1].Cells[column].Bounds.Width);
+        });
+        var archivedRow = Assert.Single(activeAndArchivedRows, row => ((BlueprintOfferingCardViewModel)row.DataContext!).Status == "Archived");
+        Assert.Equal("Archived", Assert.Single(archivedRow.Cells[3].GetVisualDescendants().OfType<TextBlock>()).Text);
+        viewModel.ShowArchivedOfferings = false;
+        await WaitForAsync(() => viewModel.BlueprintOfferingCards.Count == 1);
+        window.UpdateLayout();
+        Assert.Single(grid.GetVisualDescendants().OfType<VirtualDataRow>());
+
+        card = Assert.Single(viewModel.BlueprintOfferingCards);
+        var detailedCard = card with
+        {
+            ReadinessSummary = "Mockup Templates need attention before they can be used",
+            ReadinessGuidance = ["Add an active Design Area.", "Assign a compatible Color."]
+        };
+        viewModel.BlueprintOfferingCards[0] = detailedCard;
+        window.UpdateLayout();
+        await HeadlessUiWait.UntilAsync(
+            () => grid.GetVisualDescendants().OfType<VirtualDataRow>().Any(row => ReferenceEquals(row.DataContext, detailedCard)),
+            "Offering grid realizes the current Blueprint row");
+        window.UpdateLayout();
+
+        var row = Assert.Single(grid.GetVisualDescendants().OfType<VirtualDataRow>());
+        Assert.Equal(6, row.Cells.Count);
+        Assert.Equal(32, row.Bounds.Height);
+        var name = Assert.Single(row.Cells[1].GetVisualDescendants().OfType<TextBlock>());
+        var setup = Assert.Single(row.Cells[4].GetVisualDescendants().OfType<TextBlock>());
+        var readiness = Assert.Single(row.Cells[5].GetVisualDescendants().OfType<TextBlock>());
+        Assert.Equal(detailedCard.Name, name.Text);
+        Assert.Equal(detailedCard.SetupSummary, setup.Text);
+        Assert.Equal(detailedCard.ReadinessSummary, readiness.Text);
+        Assert.Equal(detailedCard.SetupSummary, ToolTip.GetTip(setup));
+        Assert.Equal(detailedCard.ReadinessDetails, ToolTip.GetTip(readiness));
+        Assert.Equal(detailedCard.ReadinessDetails, AutomationProperties.GetHelpText(readiness));
+        Assert.True(row.Cells[0].Bounds.Right <= row.Cells[1].Bounds.X);
+
+        var open = Assert.Single(row.Cells[0].GetVisualDescendants().OfType<Button>());
+        Assert.Equal("Open", open.Content);
+        Assert.Equal("Catalog.OpenOffering", AutomationProperties.GetAutomationId(open));
+        Assert.Same(detailedCard, open.CommandParameter);
+        Assert.NotNull(open.Command);
+        var openPoint = open.TranslatePoint(new Point(open.Bounds.Width / 2, open.Bounds.Height / 2), window);
+        Assert.NotNull(openPoint);
+        HeadlessWindowExtensions.MouseDown(window, openPoint!.Value, MouseButton.Left, RawInputModifiers.None);
+        HeadlessWindowExtensions.MouseUp(window, openPoint.Value, MouseButton.Left, RawInputModifiers.None);
+        window.UpdateLayout();
+
+        Assert.True(viewModel.IsOfferingDetail);
+        Assert.Equal(detailedCard.Id, viewModel.SelectedOffering?.Id);
+        Assert.Equal(blueprint.Id, viewModel.SelectedProduct?.Id);
+        AssertEffectivelyVisible(window, "Catalog.OfferingStatus");
+
+        viewModel.BackToProductCommand.Execute(null);
+        window.UpdateLayout();
+        var keyboardOpen = Assert.Single(window.GetVisualDescendants().OfType<Button>(),
+            button => AutomationProperties.GetAutomationId(button) == "Catalog.OpenOffering");
+        keyboardOpen.Focus();
+        Assert.True(keyboardOpen.IsFocused);
+        HeadlessWindowExtensions.KeyPress(window, Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, string.Empty);
+        window.UpdateLayout();
+        Assert.True(viewModel.IsOfferingDetail);
+        Assert.Equal(detailedCard.Id, viewModel.SelectedOffering?.Id);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void BlueprintOfferingGridEmptyStateKeepsTheScopedAddRoute()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, includeBlueprintOffering: false);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        var blueprint = Assert.Single(viewModel.Products);
+        viewModel.OpenProductDetailCommand.Execute(blueprint);
+        window.UpdateLayout();
+
+        var grid = window.FindControl<VirtualDataGrid>("BlueprintOfferingGrid");
+        Assert.NotNull(grid);
+        Assert.False(IsEffectivelyVisible(grid!));
+        Assert.Empty(grid!.GetVisualDescendants().OfType<VirtualDataRow>());
+        Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(),
+            text => IsEffectivelyVisible(text) && text.Text?.StartsWith("No Blueprint Offerings yet.", StringComparison.Ordinal) == true);
+        var add = FindButton(window, "Add Blueprint Offering");
+        Assert.NotNull(add);
+        Assert.True(add!.IsEnabled);
+
+        add.Command!.Execute(add.CommandParameter);
+
+        Assert.True(viewModel.IsCreatingNewOffering);
+        Assert.Equal(blueprint.Id, viewModel.SelectedProduct?.Id);
         window.Close();
     }
 
@@ -4269,10 +4397,12 @@ public class StoreEditorHeadlessTests
         IRasterImageMetadataReader? rasterImageMetadataReader = null,
         IMockupSourceMetadataAssistanceService? mockupSourceMetadataAssistance = null,
         bool includeOfferingDependents = true,
-        bool includeDesignArea = true)
+        bool includeDesignArea = true,
+        bool includeArchivedOffering = false,
+        bool includeBlueprintOffering = true)
     {
         var store = customStore ?? new Store(Guid.NewGuid(), "North Star", null, false, Now, Now, "{}");
-        var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog, useFixedProviderOffering, includeOfferingOptions, primaryArtworkDesignArea, customNiche, includeOfferingDependents, includeDesignArea));
+        var repository = new InMemoryWorkspaceRepository(Snapshot(store, includeNormalizedCatalog, useFixedProviderOffering, includeOfferingOptions, primaryArtworkDesignArea, customNiche, includeOfferingDependents, includeDesignArea, includeArchivedOffering, includeBlueprintOffering));
         var viewModel = new StoreManagementViewModel(
             new StoreManagementService(repository, new FusionCanvas.Integration.Stores.StoreContextMapper()),
             new NicheManagementService(repository),
@@ -4504,7 +4634,9 @@ public class StoreEditorHeadlessTests
         bool primaryArtworkDesignArea = false,
         Niche? customNiche = null,
         bool includeOfferingDependents = true,
-        bool includeDesignArea = true)
+        bool includeDesignArea = true,
+        bool includeArchivedOffering = false,
+        bool includeBlueprintOffering = true)
     {
         var product = new StoreProduct(Guid.NewGuid(), store.Id, "Gildan 64000", null, null, Now, Now, "{}");
         var offering = new FulfillmentOffering(Guid.NewGuid(), product.Id, "Printful", null, FulfillmentKind.FixedProvider, "Printful", null, Now, Now, "{}");
@@ -4522,7 +4654,7 @@ public class StoreEditorHeadlessTests
             [])
         {
             StoreProducts = [product],
-            FulfillmentOfferings = [offering]
+            FulfillmentOfferings = includeBlueprintOffering ? [offering] : []
         };
 
         if (!includeNormalizedCatalog)
@@ -4555,7 +4687,9 @@ public class StoreEditorHeadlessTests
         return snapshot with
         {
             Blueprints = [blueprint],
-            BlueprintOfferings = [normalizedOffering],
+            BlueprintOfferings = includeArchivedOffering
+                ? [normalizedOffering, normalizedOffering with { Id = Guid.NewGuid(), Name = "Archived Offering", IsArchived = true }]
+                : includeBlueprintOffering ? [normalizedOffering] : [],
             PrintProviders = useFixedProviderOffering ? [provider] : [],
             OfferingOptions = includeOfferingOptions ? [colorOption, sizeOption] : [],
             OfferingOptionValues = includeOfferingOptions ? [black, small, medium] : [],

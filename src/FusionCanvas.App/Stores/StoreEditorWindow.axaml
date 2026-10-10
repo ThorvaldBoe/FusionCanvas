@@ -692,35 +692,69 @@
                              Text="No Blueprint Offerings yet. Add an Offering to connect this Blueprint to a fulfillment setup."
                              TextWrapping="Wrap"
                              Foreground="{DynamicResource SecondaryTextBrush}" />
-                  <ItemsControl ItemsSource="{Binding BlueprintOfferingCards}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="stores:BlueprintOfferingCardViewModel">
-                        <Button Command="{Binding $parent[ItemsControl].DataContext.SelectOfferingCommand}"
-                                CommandParameter="{Binding}"
-                                AutomationProperties.AutomationId="Catalog.OpenOffering"
-                                Classes="listItem"
-                                HorizontalContentAlignment="Left">
-                          <StackPanel Spacing="3">
-                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                              <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" />
-                              <TextBlock Grid.Column="1" Text="{Binding Status}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                            </Grid>
-                            <TextBlock Text="{Binding FulfillmentContext}"
-                                       FontSize="12"
-                                       Foreground="{DynamicResource SecondaryTextBrush}" />
-                            <TextBlock Text="{Binding SetupSummary}"
-                                       FontSize="12"
-                                       Foreground="{DynamicResource SecondaryTextBrush}" />
-                            <TextBlock Text="{Binding ReadinessSummary}"
-                                       FontSize="12"
-                                       TextWrapping="Wrap"
-                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                  <virtualGrid:VirtualDataGrid x:Name="BlueprintOfferingGrid"
+                                               Height="220"
+                                               RowHeight="32"
+                                               SelectionMode="None"
+                                               IsVisible="{Binding HasBlueprintOfferingCards}"
+                                               AutomationProperties.AutomationId="Catalog.BlueprintOfferingGrid">
+                    <virtualGrid:VirtualDataGrid.Columns>
+                      <virtualColumns:VirtualDataGridTemplateColumn Header="Action" Width="72" IsSortable="False" IsResizable="False">
+                        <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                          <DataTemplate x:DataType="stores:BlueprintOfferingCardViewModel">
+                            <Button Content="Open"
+                                    Command="{Binding $parent[virtualGrid:VirtualDataGrid].DataContext.SelectOfferingCommand}"
+                                    CommandParameter="{Binding}"
+                                    AutomationProperties.AutomationId="Catalog.OpenOffering"
+                                    AutomationProperties.Name="Open Offering"
+                                    Classes="secondary fixedAction" />
+                          </DataTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                      </virtualColumns:VirtualDataGridTemplateColumn>
+                      <virtualColumns:VirtualDataGridTemplateColumn Header="Offering" Width="120" IsSortable="False" IsResizable="False">
+                        <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                          <DataTemplate x:DataType="stores:BlueprintOfferingCardViewModel">
+                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"
+                                       ToolTip.Tip="{Binding Name}" AutomationProperties.HelpText="{Binding Name}" />
+                          </DataTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                      </virtualColumns:VirtualDataGridTemplateColumn>
+                      <virtualColumns:VirtualDataGridTemplateColumn Header="Fulfillment" Width="116" IsSortable="False" IsResizable="False">
+                        <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                          <DataTemplate x:DataType="stores:BlueprintOfferingCardViewModel">
+                            <TextBlock Text="{Binding FulfillmentContext}" TextTrimming="CharacterEllipsis"
+                                       ToolTip.Tip="{Binding FulfillmentContext}" AutomationProperties.HelpText="{Binding FulfillmentContext}" />
+                          </DataTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                      </virtualColumns:VirtualDataGridTemplateColumn>
+                      <virtualColumns:VirtualDataGridTemplateColumn Header="Status" Width="126" IsSortable="False" IsResizable="False">
+                        <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                          <DataTemplate x:DataType="stores:BlueprintOfferingCardViewModel">
+                            <TextBlock Text="{Binding Status}" TextTrimming="CharacterEllipsis"
+                                       ToolTip.Tip="{Binding Status}" AutomationProperties.HelpText="{Binding Status}" />
+                          </DataTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                      </virtualColumns:VirtualDataGridTemplateColumn>
+                      <virtualColumns:VirtualDataGridTemplateColumn Header="Setup" Width="142" IsSortable="False" IsResizable="False">
+                        <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                          <DataTemplate x:DataType="stores:BlueprintOfferingCardViewModel">
+                            <TextBlock Text="{Binding SetupSummary}" TextTrimming="CharacterEllipsis"
+                                       ToolTip.Tip="{Binding SetupSummary}" AutomationProperties.HelpText="{Binding SetupSummary}" />
+                          </DataTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                      </virtualColumns:VirtualDataGridTemplateColumn>
+                      <virtualColumns:VirtualDataGridTemplateColumn Header="Readiness" Width="154" IsSortable="False" IsResizable="False">
+                        <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                          <DataTemplate x:DataType="stores:BlueprintOfferingCardViewModel">
+                            <TextBlock Text="{Binding ReadinessSummary}" TextTrimming="CharacterEllipsis"
+                                       ToolTip.Tip="{Binding ReadinessDetails}"
+                                       AutomationProperties.HelpText="{Binding ReadinessDetails}"
                                        AutomationProperties.Name="Offering readiness summary" />
-                          </StackPanel>
-                        </Button>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
+                          </DataTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                      </virtualColumns:VirtualDataGridTemplateColumn>
+                    </virtualGrid:VirtualDataGrid.Columns>
+                  </virtualGrid:VirtualDataGrid>
                 </StackPanel>
               </Border>
             </StackPanel>

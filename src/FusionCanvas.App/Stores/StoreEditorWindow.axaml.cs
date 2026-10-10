@@ -23,6 +23,7 @@ public partial class StoreEditorWindow : Window
     private readonly InMemoryDataProvider<SellableVariantRowViewModel> _sellableVariantRows = new([]);
     private readonly InMemoryDataProvider<MockupTemplateCardViewModel> _mockupTemplateRows = new([]);
     private readonly InMemoryDataProvider<DesignAreaCardViewModel> _designAreaRows = new([]);
+    private readonly InMemoryDataProvider<BlueprintOfferingCardViewModel> _blueprintOfferingRows = new([]);
     private Button? _pendingVariantArchiveButton;
     private Button? _pendingDesignAreaButton;
     private bool _designAreaArchiveConfirmationOpen;
@@ -55,6 +56,7 @@ public partial class StoreEditorWindow : Window
         SellableVariantGrid.ItemsSource = _sellableVariantRows;
         MockupTemplateGrid.ItemsSource = _mockupTemplateRows;
         DesignAreaGrid.ItemsSource = _designAreaRows;
+        BlueprintOfferingGrid.ItemsSource = _blueprintOfferingRows;
         MockupTemplateGrid.AddHandler(InputElement.PointerPressedEvent, OnMockupTemplateGridPointerPressed,
             RoutingStrategies.Tunnel, handledEventsToo: true);
         MockupTemplateGrid.AddHandler(InputElement.KeyDownEvent, OnMockupTemplateGridKeyDown,
@@ -66,6 +68,7 @@ public partial class StoreEditorWindow : Window
         AddHandler(InputElement.PointerReleasedEvent, OnSellableVariantPointerReleased, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(InputElement.PointerPressedEvent, OnDesignAreaPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(InputElement.PointerReleasedEvent, OnDesignAreaPointerReleased, RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(InputElement.PointerPressedEvent, OnBlueprintOfferingOpenPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
     }
 
     protected override void OnClosed(EventArgs e)
@@ -122,6 +125,8 @@ public partial class StoreEditorWindow : Window
         viewModel.StoreNameFocusRequested += OnStoreNameFocusRequested;
         viewModel.ProductNameFocusRequested += OnProductNameFocusRequested;
         viewModel.OfferingNameFocusRequested += OnOfferingNameFocusRequested;
+        viewModel.BlueprintOfferingCards.CollectionChanged += OnBlueprintOfferingCardsChanged;
+        RefreshBlueprintOfferingRows();
         if (viewModel.PrintifyCatalogImportSession is { } printifyImport)
         {
             printifyImport.SelectionFocusRequested += OnPrintifySelectionFocusRequested;
@@ -166,7 +171,9 @@ public partial class StoreEditorWindow : Window
         _subscribedViewModel.StoreNameFocusRequested -= OnStoreNameFocusRequested;
         _subscribedViewModel.ProductNameFocusRequested -= OnProductNameFocusRequested;
         _subscribedViewModel.OfferingNameFocusRequested -= OnOfferingNameFocusRequested;
+        _subscribedViewModel.BlueprintOfferingCards.CollectionChanged -= OnBlueprintOfferingCardsChanged;
         _subscribedViewModel = null;
+        _blueprintOfferingRows.Reset([]);
     }
 
     private void DetachCatalogSubscriptions()
@@ -204,6 +211,10 @@ public partial class StoreEditorWindow : Window
     private void OnMockupTemplateCardsChanged(object? sender, NotifyCollectionChangedEventArgs e) => RefreshMockupTemplateRows();
 
     private void OnDesignAreaCardsChanged(object? sender, NotifyCollectionChangedEventArgs e) => RefreshDesignAreaRows();
+
+    private void OnBlueprintOfferingCardsChanged(object? sender, NotifyCollectionChangedEventArgs e) => RefreshBlueprintOfferingRows();
+
+    private void RefreshBlueprintOfferingRows() => _blueprintOfferingRows.Reset(_subscribedViewModel?.BlueprintOfferingCards.ToArray() ?? []);
 
     private void RefreshDesignAreaRows() => _designAreaRows.Reset(_subscribedCatalog?.DesignAreaCards.ToArray() ?? []);
 
@@ -350,6 +361,25 @@ public partial class StoreEditorWindow : Window
 
         _pendingDesignAreaButton = button;
         e.Pointer.Capture(button);
+        e.Handled = true;
+    }
+
+    private void OnBlueprintOfferingOpenPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+        var openButton = e.Source is Visual source
+            ? source.GetVisualAncestors().Prepend(source).OfType<Button>()
+                .FirstOrDefault(button => AutomationProperties.GetAutomationId(button) == "Catalog.OpenOffering")
+            : null;
+        openButton ??= BlueprintOfferingGrid.GetVisualDescendants().OfType<Button>()
+            .Where(button => AutomationProperties.GetAutomationId(button) == "Catalog.OpenOffering")
+            .FirstOrDefault(button => button.TranslatePoint(new Point(0, 0), BlueprintOfferingGrid) is { } origin
+                && new Rect(origin, button.Bounds.Size).Contains(e.GetPosition(BlueprintOfferingGrid)));
+        if (openButton?.Command is not { } command) return;
+
+        openButton.Focus();
+        command.Execute(openButton.CommandParameter);
         e.Handled = true;
     }
 
