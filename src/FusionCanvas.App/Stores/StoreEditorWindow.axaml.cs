@@ -22,7 +22,9 @@ public partial class StoreEditorWindow : Window
     private CatalogSetupViewModel? _subscribedCatalog;
     private readonly InMemoryDataProvider<SellableVariantRowViewModel> _sellableVariantRows = new([]);
     private readonly InMemoryDataProvider<MockupTemplateCardViewModel> _mockupTemplateRows = new([]);
+    private readonly InMemoryDataProvider<DesignAreaCardViewModel> _designAreaRows = new([]);
     private Button? _pendingVariantArchiveButton;
+    private Button? _pendingDesignAreaButton;
     private bool _designAreaArchiveConfirmationOpen;
     private bool _optionValueManagementOpen;
     private bool _variantCreationDialogOpen;
@@ -52,6 +54,7 @@ public partial class StoreEditorWindow : Window
         InitializeComponent();
         SellableVariantGrid.ItemsSource = _sellableVariantRows;
         MockupTemplateGrid.ItemsSource = _mockupTemplateRows;
+        DesignAreaGrid.ItemsSource = _designAreaRows;
         MockupTemplateGrid.AddHandler(InputElement.PointerPressedEvent, OnMockupTemplateGridPointerPressed,
             RoutingStrategies.Tunnel, handledEventsToo: true);
         MockupTemplateGrid.AddHandler(InputElement.KeyDownEvent, OnMockupTemplateGridKeyDown,
@@ -61,6 +64,8 @@ public partial class StoreEditorWindow : Window
         AddHandler(Button.ClickEvent, OnSellableVariantArchiveButtonClick, RoutingStrategies.Bubble, handledEventsToo: true);
         AddHandler(InputElement.PointerPressedEvent, OnSellableVariantPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(InputElement.PointerReleasedEvent, OnSellableVariantPointerReleased, RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(InputElement.PointerPressedEvent, OnDesignAreaPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(InputElement.PointerReleasedEvent, OnDesignAreaPointerReleased, RoutingStrategies.Tunnel, handledEventsToo: true);
     }
 
     protected override void OnClosed(EventArgs e)
@@ -127,9 +132,11 @@ public partial class StoreEditorWindow : Window
             _subscribedCatalog = catalog;
             catalog.SellableVariantRows.CollectionChanged += OnSellableVariantRowsChanged;
             catalog.MockupTemplateCards.CollectionChanged += OnMockupTemplateCardsChanged;
+            catalog.DesignAreaCards.CollectionChanged += OnDesignAreaCardsChanged;
             catalog.PropertyChanged += OnCatalogSetupPropertyChanged;
             RefreshSellableVariantRows();
             RefreshMockupTemplateRows();
+            RefreshDesignAreaRows();
             catalog.AttachStoreEditor();
             if (TopLevel.GetTopLevel(this)?.StorageProvider is { } storageProvider)
                 catalog.FilePicker = new AvaloniaAssetFilePicker(storageProvider);
@@ -168,6 +175,7 @@ public partial class StoreEditorWindow : Window
 
         _subscribedCatalog.SellableVariantRows.CollectionChanged -= OnSellableVariantRowsChanged;
         _subscribedCatalog.MockupTemplateCards.CollectionChanged -= OnMockupTemplateCardsChanged;
+        _subscribedCatalog.DesignAreaCards.CollectionChanged -= OnDesignAreaCardsChanged;
         _subscribedCatalog.PropertyChanged -= OnCatalogSetupPropertyChanged;
         _subscribedCatalog.DetachStoreEditor();
         _subscribedCatalog.OptionValueManagementRequested -= OnOptionValueManagementRequested;
@@ -183,8 +191,10 @@ public partial class StoreEditorWindow : Window
         _subscribedCatalog.DesignAreaEditorRequested -= OnDesignAreaEditorRequested;
         _subscribedCatalog = null;
         _pendingVariantArchiveButton = null;
+        _pendingDesignAreaButton = null;
         _sellableVariantRows.Reset([]);
         _mockupTemplateRows.Reset([]);
+        _designAreaRows.Reset([]);
     }
 
     private void OnSellableVariantRowsChanged(object? sender, NotifyCollectionChangedEventArgs e) => RefreshSellableVariantRows();
@@ -192,6 +202,10 @@ public partial class StoreEditorWindow : Window
     private void RefreshSellableVariantRows() => _sellableVariantRows.Reset(_subscribedCatalog?.SellableVariantRows.ToArray() ?? []);
 
     private void OnMockupTemplateCardsChanged(object? sender, NotifyCollectionChangedEventArgs e) => RefreshMockupTemplateRows();
+
+    private void OnDesignAreaCardsChanged(object? sender, NotifyCollectionChangedEventArgs e) => RefreshDesignAreaRows();
+
+    private void RefreshDesignAreaRows() => _designAreaRows.Reset(_subscribedCatalog?.DesignAreaCards.ToArray() ?? []);
 
     private void OnMockupTemplateGridKeyDown(object? sender, KeyEventArgs e)
     {
@@ -321,6 +335,67 @@ public partial class StoreEditorWindow : Window
         .OfType<Button>()
         .FirstOrDefault(button => SellableVariantGrid.TranslatePoint(gridPosition, button) is { } position
             && new Rect(button.Bounds.Size).Contains(position));
+
+    private void OnDesignAreaPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+        var row = FindDesignAreaRow(e.Source)
+            ?? FindDesignAreaRowAtPoint(e.GetPosition(DesignAreaGrid));
+        if (row is null) return;
+
+        var button = FindDesignAreaButton(row, e.Source)
+            ?? FindDesignAreaButtonAtPoint(row, e.GetPosition(DesignAreaGrid));
+        if (!IsDesignAreaActionButton(button)) return;
+
+        _pendingDesignAreaButton = button;
+        e.Pointer.Capture(button);
+        e.Handled = true;
+    }
+
+    private void OnDesignAreaPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        var button = _pendingDesignAreaButton;
+        _pendingDesignAreaButton = null;
+        if (button is null) return;
+
+        e.Pointer.Capture(null);
+        var position = e.GetPosition(button);
+        if (position.X >= 0 && position.Y >= 0
+            && position.X <= button.Bounds.Width && position.Y <= button.Bounds.Height
+            && button.CommandParameter is DesignAreaCardViewModel card
+            && button.Command?.CanExecute(card) == true)
+        {
+            button.Command.Execute(card);
+        }
+
+        e.Handled = true;
+    }
+
+    private static VirtualDataRow? FindDesignAreaRow(object? source) => source is Visual visual
+        ? visual.GetVisualAncestors().Prepend(visual).OfType<VirtualDataRow>()
+            .FirstOrDefault(row => row.DataContext is DesignAreaCardViewModel)
+        : null;
+
+    private VirtualDataRow? FindDesignAreaRowAtPoint(Point position) => DesignAreaGrid.GetVisualDescendants()
+        .OfType<VirtualDataRow>()
+        .FirstOrDefault(row => row.DataContext is DesignAreaCardViewModel
+            && row.TranslatePoint(new Point(0, 0), DesignAreaGrid) is { } origin
+            && new Rect(origin, row.Bounds.Size).Contains(position));
+
+    private static Button? FindDesignAreaButton(VirtualDataRow row, object? source) => source is Visual visual
+        ? visual.GetVisualAncestors().Prepend(visual).TakeWhile(candidate => !ReferenceEquals(candidate, row))
+            .OfType<Button>().FirstOrDefault(IsDesignAreaActionButton)
+        : source is Button button && IsDesignAreaActionButton(button) ? button : null;
+
+    private Button? FindDesignAreaButtonAtPoint(VirtualDataRow row, Point gridPosition) => row.GetVisualDescendants()
+        .OfType<Button>()
+        .FirstOrDefault(button => IsDesignAreaActionButton(button)
+            && DesignAreaGrid.TranslatePoint(gridPosition, button) is { } position
+            && new Rect(button.Bounds.Size).Contains(position));
+
+    private static bool IsDesignAreaActionButton(Button? button) => button is not null
+        && (button.Classes.Contains("designAreaEdit") || button.Classes.Contains("designAreaArchive"));
 
     private void OnPrintifySelectionFocusRequested(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
     {
