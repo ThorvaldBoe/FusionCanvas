@@ -19,6 +19,9 @@ public sealed record BlueprintOfferingCardViewModel(
     public int ReadyMockupTemplateCount { get; init; }
     public string ReadinessSummary { get; init; } = "Catalog readiness is unavailable.";
     public IReadOnlyList<string> ReadinessGuidance { get; init; } = [];
+    public string ReadinessDetails => ReadinessGuidance.Count == 0
+        ? ReadinessSummary
+        : $"{ReadinessSummary}{Environment.NewLine}{string.Join(Environment.NewLine, ReadinessGuidance)}";
 
     public static BlueprintOfferingCardViewModel From(BlueprintOfferingSetupSummary summary)
     {
