@@ -37,6 +37,28 @@ public class StageToolViewModelsTests
         Assert.False(vm.CanPublish);
     }
 
+    [Fact]
+    public async Task PrintifyTool_OffersVariantSetupForLinkedItemBeforeLifecycleProjectionIsReady()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var storeId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var store = new Store(storeId, "Store", null, false, now, now, "{}", null, FulfillmentStrategy.Printify);
+        var item = new Item(itemId, storeId, null, null, "Imported listing", "Description", ItemStatus.Published, WorkflowStage.Listing, false, now, now, "{}");
+        var mapping = new ExternalListingMapping(storeId, itemId, "printify", "42", "product-1", null, null,
+            ExternalListingSyncState.Synchronized, ExternalListingPublicationState.Published, ExternalListingOperationState.Succeeded, null, null, now, now, now);
+        var snapshot = WorkspaceSnapshot.Empty with { Stores = [store], Items = [item], ExternalListingMappings = [mapping] };
+        var variantSetupService = new FusionCanvas.Application.Stores.Printify.PrintifyListingImportService(null!, null!, null!, null!, null!);
+        var vm = new PrintifyListingStageToolViewModel(null, null, () => snapshot, id => id == storeId ? store : null,
+            new ContextMapper(), variantSetupService);
+
+        await vm.LoadAsync(itemId, canEdit: true, TestContext.Current.CancellationToken);
+
+        Assert.True(vm.HasError);
+        Assert.True(vm.CanDownloadVariantSetup);
+        Assert.True(vm.DownloadVariantSetupCommand.CanExecute(null));
+    }
+
     [AvaloniaFact]
     public async Task PrintifyTool_RequiresConfirmationBeforeRemoteDeletionAndSupportsCancellation()
     {

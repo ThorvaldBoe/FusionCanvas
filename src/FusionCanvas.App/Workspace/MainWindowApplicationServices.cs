@@ -47,4 +47,5 @@ public sealed record MainWindowApplicationServices(
     IListingLifecycleServiceFactory? ListingLifecycle = null,
     IListingProjectionSource? ListingProjectionSource = null,
     IStoreContextMapper? StoreContextMapper = null,
-    FusionCanvas.Application.Listings.ManualListingDetailsService? ManualListingDetails = null);
+    FusionCanvas.Application.Listings.ManualListingDetailsService? ManualListingDetails = null,
+    FusionCanvas.Application.Stores.Printify.PrintifyListingImportService? PrintifyListingImport = null);
