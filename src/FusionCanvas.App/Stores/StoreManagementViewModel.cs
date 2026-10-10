@@ -682,8 +682,14 @@ public sealed class StoreManagementViewModel : INotifyPropertyChanged, IAsyncDis
         get => _catalogEditorLevel;
         private set
         {
+            var leavingMockupTemplateManagement = _catalogEditorLevel == CatalogEditorLevel.MockupTemplateManagement
+                && value != CatalogEditorLevel.MockupTemplateManagement;
             if (SetField(ref _catalogEditorLevel, value))
             {
+                if (leavingMockupTemplateManagement && CatalogSetup is not null)
+                {
+                    CatalogSetup.MockupTemplateSearchText = string.Empty;
+                }
                 OnPropertyChanged(nameof(IsCatalogOverview));
                 OnPropertyChanged(nameof(IsProductDetail));
                 OnPropertyChanged(nameof(IsOfferingDetail));

@@ -15,6 +15,77 @@ namespace FusionCanvas.App.Tests;
 public sealed class CatalogSetupViewModelTests
 {
     [Fact]
+    public async Task MockupTemplateSearchFiltersEveryDisplayedFieldCaseInsensitivelyAndPreservesOrder()
+    {
+        var (viewModel, _, offering) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: true);
+        viewModel.MockupTemplateCards.Clear();
+        var zeta = new MockupTemplateCardViewModel(Guid.NewGuid(), "Zeta", "Back Panel", "Colors: Cyan", "5 compatible Variants", 4, "Ready for use");
+        var alpha = new MockupTemplateCardViewModel(Guid.NewGuid(), "Alpha", "Front Panel", "Colors: Matte Black / Gray", "2 compatible Variants", 2, "Draft");
+        var beta = new MockupTemplateCardViewModel(Guid.NewGuid(), "Beta", "Sleeve", "Colors: Navy", "1 compatible Variant", 7, "Draft");
+        viewModel.MockupTemplateCards.Add(zeta);
+        viewModel.MockupTemplateCards.Add(alpha);
+        viewModel.MockupTemplateCards.Add(beta);
+
+        viewModel.MockupTemplateSearchText = "bAcK pAnEl";
+        Assert.Same(zeta, Assert.Single(viewModel.FilteredMockupTemplateCards));
+        viewModel.MockupTemplateSearchText = "mAtTe bLaCk";
+        Assert.Same(alpha, Assert.Single(viewModel.FilteredMockupTemplateCards));
+        viewModel.MockupTemplateSearchText = "5 COMPATIBLE";
+        Assert.Same(zeta, Assert.Single(viewModel.FilteredMockupTemplateCards));
+        viewModel.MockupTemplateSearchText = "READY FOR USE";
+        Assert.Same(zeta, Assert.Single(viewModel.FilteredMockupTemplateCards));
+        viewModel.MockupTemplateSearchText = "compatible variant";
+        Assert.Equal([zeta, alpha, beta], viewModel.FilteredMockupTemplateCards);
+
+        viewModel.MockupTemplateSearchText = "no match";
+        Assert.Empty(viewModel.FilteredMockupTemplateCards);
+        Assert.True(viewModel.HasNoMockupTemplateSearchResults);
+        viewModel.MockupTemplateSearchText = "  ";
+        Assert.Equal([zeta, alpha, beta], viewModel.FilteredMockupTemplateCards);
+        Assert.False(viewModel.HasNoMockupTemplateSearchResults);
+
+        viewModel.MockupTemplateSearchText = "zeta";
+        viewModel.SelectOffering(viewModel.Offerings.First(value => value.Id != offering.Id).Id);
+        Assert.Equal(string.Empty, viewModel.MockupTemplateSearchText);
+        Assert.Empty(viewModel.FilteredMockupTemplateCards);
+    }
+
+    [Fact]
+    public async Task MockupTemplateArchiveRequiresConfirmationAndCancelPreservesTemplateAndRevision()
+    {
+        var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: true, completeLocalSource: true);
+        var card = Assert.Single(viewModel.MockupTemplateCards);
+        var revision = Assert.Single(viewModel.TemplateRevisions);
+        var requests = 0;
+        viewModel.MockupTemplateArchiveConfirmationRequested += (_, _) => requests++;
+
+        viewModel.ArchiveTemplateCommand.Execute(card);
+
+        Assert.Equal(1, requests);
+        Assert.True(viewModel.IsMockupTemplateArchiveConfirmationVisible);
+        Assert.Equal(card.Id, viewModel.PendingMockupTemplateArchiveId);
+        Assert.Contains(card.Name, viewModel.MockupTemplateArchiveConfirmationMessage);
+        Assert.Contains("saved revisions will be retained", viewModel.MockupTemplateArchiveConfirmationMessage);
+        Assert.False(Assert.Single(viewModel.Templates).IsArchived);
+        Assert.Same(revision, Assert.Single(viewModel.TemplateRevisions));
+
+        viewModel.CancelMockupTemplateArchiveCommand.Execute(null);
+
+        Assert.False(viewModel.IsMockupTemplateArchiveConfirmationVisible);
+        Assert.False(Assert.Single(viewModel.Templates).IsArchived);
+        Assert.Same(revision, Assert.Single(viewModel.TemplateRevisions));
+
+        viewModel.ArchiveTemplateCommand.Execute(card);
+        var confirm = Assert.IsType<AsyncRelayCommand>(viewModel.ConfirmMockupTemplateArchiveCommand);
+        confirm.Execute(null);
+        await confirm.ExecutionTask!.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(Assert.Single(viewModel.Templates).IsArchived);
+        Assert.Same(revision, Assert.Single(viewModel.TemplateRevisions));
+        Assert.Empty(viewModel.MockupTemplateCards);
+    }
+
+    [Fact]
     public async Task TemplateColorSearchFiltersCaseInsensitivelyAndRestoresOriginalOrder()
     {
         var (viewModel, _, _) = await CreateCatalogWithDesignAreaAsync(referencedByTemplate: false);
