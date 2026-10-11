@@ -1,0 +1,16 @@
+{
+  "extract_definition_version": "1.2",
+  "standard": "Values, Vision & Taste",
+  "standard_version": "1.1",
+  "generated_at": "2026-10-10T14:47:50.8530763+00:00",
+  "repository": "FusionCanvas",
+  "source_revision": "013feb0",
+  "working_tree": "CLEAN",
+  "extract_id": "VVT-EXTRACT-printify-listing-import",
+  "extract_revision": 1,
+  "criteria_count": "Indexed at standard headings; no numeric weighting",
+  "entries": [
+    {"entry_id":"VVT-DEC-printify-listing-bootstrap@1","decision_id":"VVT-DEC-printify-listing-bootstrap","decision_state":"PROPOSED","scope":"Explicit Niche-level Printify bootstrap import; optional later reconstruction of catalog and Design state","decision_owner":"UNKNOWN","intended_user":"Creator with an established Printify shop setting up or restoring FusionCanvas","intended_outcome":"Bring existing listing identity/data/artwork into the local workflow while enabling future designs to originate in FusionCanvas and transition to Printify","authoritative_intent":["openspec/changes/import-printify-listings/proposal.md","openspec/changes/import-printify-listings/design.md"],"implementation_evidence":["src/FusionCanvas.App/Stores/PrintifyListingImportWindow.axaml","src/FusionCanvas.Application/Stores/Printify/PrintifyListingImportService.cs"],"tradeoffs":["local bootstrap over background synchronization","finished uploaded image assumed for v1 setup reconstruction","Printify-only placement transforms do not transfer"],"uncertainties":["no observed post-release outcome","pending change is not an accepted spec"]}
+  ],
+  "coverage_summary": "One product-level decision candidate; standard and source definition are Draft; no verdict encoded in extract."
+}

@@ -1,0 +1,15 @@
+{
+  "extract_definition_version": "1.2",
+  "standard": "Functionality & Logic",
+  "standard_version": "1.2",
+  "generated_at": "2026-10-10T14:47:50.8530763+00:00",
+  "repository": "FusionCanvas",
+  "source_revision": "013feb0",
+  "working_tree": "CLEAN",
+  "extract_id": "FL-EXTRACT-printify-listing-import",
+  "extract_revision": 1,
+  "entries": [
+    {"entry_id":"FL-CAP-printify-listing-import@1","capability":"Import Printify shop listings into FusionCanvas Items","state":"PROPOSED","accepted_spec":"No accepted printify-listing-import capability found; assess against pending OpenSpec change","requirements":"openspec/changes/import-printify-listings/specs/printify-listing-import/spec.md","implementation":["src/FusionCanvas.Application/Stores/Printify/PrintifyListingImportService.cs","src/FusionCanvas.Integration/Stores/Printify/PrintifyListingImportClient.cs","src/FusionCanvas.App/Stores/Printify/PrintifyListingImportViewModel.cs"],"dependencies":["Store Printify credential/shop","workspace repository","managed file store","existing catalog import service","external listing mapping"],"verification":["tests/FusionCanvas.Application.Tests/Stores/PrintifyListingImportServiceTests.cs","tests/FusionCanvas.Integration.Tests/Stores/Printify/PrintifyListingImportClientTests.cs","tests/FusionCanvas.App.Tests/PrintifyListingImportViewModelTests.cs","openspec/changes/import-printify-listings/verification.md"],"known_gaps":["focused retrieval retry test","focused repository-save failure assertion"]}
+  ],
+  "coverage_summary": "One cohesive capability; accepted behavior remains unchanged until pending OpenSpec change is synchronized/archived."
+}

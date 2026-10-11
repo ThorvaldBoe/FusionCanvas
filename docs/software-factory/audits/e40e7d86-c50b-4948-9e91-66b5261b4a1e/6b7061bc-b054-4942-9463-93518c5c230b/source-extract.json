@@ -1,0 +1,19 @@
+{
+  "extract_definition_version": "2.0",
+  "standard": "Architecture & Code Structure",
+  "standard_version": "2.0.0",
+  "generated_at": "2026-10-10T14:47:50.8530763+00:00",
+  "repository": "FusionCanvas",
+  "source_revision": "013feb0",
+  "working_tree": "CLEAN",
+  "working_tree_changes_included": "NO",
+  "extract_id": "ARCH-EXTRACT-printify-listing-import",
+  "extract_revision": 1,
+  "entries": [
+    {"entry_id":"ARCH-CAP-printify-listing-import@1","unit":"PrintifyListingImportService","project":"FusionCanvas.Application","locators":["src/FusionCanvas.Application/Stores/Printify/PrintifyListingImportService.cs"],"responsibilities":["preview","duplicate check","per-product import transaction","optional variant setup orchestration"],"direct_dependencies":["IStoreContextReader","IStorePrintifyCredentialStore","IPrintifyListingImportClient","IWorkspaceRepository","IWorkspaceFileOutputStore","IPrintifyCatalogClient"],"relationships":["Integration PrintifyListingImportClient","App PrintifyListingImportViewModel"],"evidence":["tests/FusionCanvas.Application.Tests/Stores/PrintifyListingImportServiceTests.cs"]},
+    {"entry_id":"ARCH-TYPE-printify-import-contracts@1","unit":"Printify import DTOs and client port","project":"FusionCanvas.Application","locators":["src/FusionCanvas.Application/Stores/Printify/IPrintifyListingImportClient.cs","src/FusionCanvas.Application/Stores/Printify/PrintifyArtworkDownload.cs","src/FusionCanvas.Application/Stores/Printify/PrintifyListing*.cs"],"responsibilities":["application-facing provider contract and immutable listing data shapes"],"relationships":["PrintifyListingImportService","Integration PrintifyListingImportClient"],"evidence":["tests/FusionCanvas.Application.Tests/Stores/PrintifyListingImportServiceTests.cs"]},
+    {"entry_id":"ARCH-TYPE-printify-import-adapter@1","unit":"PrintifyListingImportClient","project":"FusionCanvas.Integration","locators":["src/FusionCanvas.Integration/Stores/Printify/PrintifyListingImportClient.cs"],"responsibilities":["HTTP pagination and parsing","Printify product detail retrieval","validated artwork download"],"direct_dependencies":["PrintifyHttpTransport","HttpClient"],"relationships":["IPrintifyListingImportClient"],"evidence":["tests/FusionCanvas.Integration.Tests/Stores/Printify/PrintifyListingImportClientTests.cs"]},
+    {"entry_id":"ARCH-SURFACE-printify-import-ui@1","unit":"Import dialog, view models, context-menu launch and composition","project":"FusionCanvas.App","locators":["src/FusionCanvas.App/Stores/PrintifyListingImportViewModel.cs","src/FusionCanvas.App/Stores/PrintifyListingImportWindow.axaml","src/FusionCanvas.App/Views/MainWindow.axaml.cs","src/FusionCanvas.App/Navigation/WorkspaceTreeNodeViewModel.cs","src/FusionCanvas.App/Workspace/AppWorkspaceFactory.cs"],"responsibilities":["user interaction and service composition"],"relationships":["Application service","headless and Appium tests"],"evidence":["tests/FusionCanvas.App.Tests/PrintifyListingImportWindowTests.cs","tests/FusionCanvas.UITests/PrintifyListingImportUiSmokeTests.cs"]}
+  ],
+  "coverage_summary": "Feature-boundary map; detailed per-type inventory is summarized into capability/contract/adapter/UI units for this targeted review. Build outputs and unrelated solution modules excluded."
+}

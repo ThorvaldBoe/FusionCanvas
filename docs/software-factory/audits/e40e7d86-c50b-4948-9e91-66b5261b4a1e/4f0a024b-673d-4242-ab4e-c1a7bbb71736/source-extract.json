@@ -1,0 +1,25 @@
+{
+  "extract_definition_version": "1.2",
+  "standard": "Security & Privacy",
+  "standard_version": "1.0",
+  "generated_at": "2026-10-10T14:47:50.8530763+00:00",
+  "repository": "FusionCanvas",
+  "source_revision": "013feb0",
+  "working_tree": "CLEAN",
+  "extract_id": "SEC-EXTRACT-printify-listing-import",
+  "extract_revision": 1,
+  "actors": ["local user","FusionCanvas desktop process","Printify API","Printify image hosts"],
+  "assets": ["Printify bearer credential (existing credential store)","listing metadata and product IDs","original artwork bytes","local Item/mapping/asset records"],
+  "boundaries": ["credential store to fixed Printify API","API response to JSON parser","allowlisted image host to bounded downloader","downloaded bytes to managed workspace assets"],
+  "surfaces": [
+    {"surface_id":"SEC-SURF-printify-listing-import","status":"PARTIAL","source_locations":["src/FusionCanvas.Application/Stores/Printify/PrintifyListingImportService.cs","src/FusionCanvas.Integration/Stores/Printify/PrintifyListingImportClient.cs","src/FusionCanvas.Integration/Stores/Printify/PrintifyHttpTransport.cs"],"controls":["GET-only listing/product reads","fixed API origin","bearer credential from existing store","response byte limit","product identity check","one-to-one mapping guard"],"limits":["full credential lifecycle not traced"]},
+    {"surface_id":"SEC-SURF-printify-artwork-download","status":"PARTIAL","source_locations":["src/FusionCanvas.Integration/Stores/Printify/PrintifyListingImportClient.cs","src/FusionCanvas.Integration/Files/LocalWorkspaceFileStore.cs"],"controls":["HTTPS host allowlist","auto redirects disabled","30-second timeout","20 MiB cap","content-type and signature checks","managed path normalization","signed query/fragment stripped from provenance"],"limits":["full workspace deletion/backup lifecycle not traced"]}
+  ],
+  "privacy_flows": [
+    {"privacy_flow_id":"PRIV-FLOW-printify-listing-metadata","status":"PARTIAL","purpose":"user-requested listing bootstrap","lifecycle":"Printify API -> local parsed product snapshot -> Item mapping/workspace; deletion lifecycle UNKNOWN"},
+    {"privacy_flow_id":"PRIV-FLOW-printify-original-artwork","status":"PARTIAL","purpose":"local reuse/offline access to imported artwork","lifecycle":"Printify image host -> bounded downloader -> managed file -> Item-linked Asset; deletion/recovery lifecycle UNKNOWN"},
+    {"privacy_flow_id":"PRIV-FLOW-printify-credential-use","status":"PARTIAL","purpose":"authenticate read requests to Printify","lifecycle":"existing credential store -> bearer request header -> Printify API; full credential lifecycle outside changed scope"}
+  ],
+  "automated_sweep": {"status":"INCOMPLETE","evidence":"dotnet restore reported NU1902/NU1903 ImageSharp 3.1.12 advisories; package inventory command exited during restore without a report; dedicated secret/static scanner not run"},
+  "coverage_summary": "Pass A and scoped Pass B reviewed; Pass C incomplete. Working source-extract definition; not a certification."
+}

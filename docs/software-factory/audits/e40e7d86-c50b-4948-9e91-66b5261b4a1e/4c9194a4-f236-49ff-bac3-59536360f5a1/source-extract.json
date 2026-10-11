@@ -1,0 +1,16 @@
+{
+  "extract_definition_version": "1.2",
+  "standard": "UX",
+  "standard_version": "1.1",
+  "generated_at": "2026-10-10T14:47:50.8530763+00:00",
+  "repository": "FusionCanvas",
+  "source_revision": "013feb0",
+  "working_tree": "CLEAN",
+  "extract_id": "UX-EXTRACT-printify-listing-import",
+  "extract_revision": 1,
+  "entries": [
+    {"entry_id":"UX-WF-printify-listing-bootstrap@1","unit":"Niche-scoped Printify listing import","outcome":"Review, choose, connect/import, and recover listing bootstrap failures","entry_point":"Niche navigation context menu","steps":["load shop products","hide/reveal already linked","select products","optional duplicate check","choose new Item or eligible existing Item","import and review outcomes"],"states":["loading","empty","linked","selected","duplicate candidates","error","partial success","cancelled"],"locators":["src/FusionCanvas.App/Views/MainWindow.axaml","src/FusionCanvas.App/Stores/PrintifyListingImportWindow.axaml","src/FusionCanvas.App/Stores/PrintifyListingImportViewModel.cs"],"evidence":["tests/FusionCanvas.App.Tests/PrintifyListingImportWindowTests.cs","tests/FusionCanvas.App.Tests/PrintifyListingImportViewModelTests.cs"]},
+    {"entry_id":"UX-WF-printify-variant-setup@1","unit":"Optional listing variant setup","outcome":"Download catalog/Design setup when the user is ready to edit the listing","entry_point":"Listing-stage action","locators":["src/FusionCanvas.App/StageTools/PrintifyListingStageToolViewModel.cs","src/FusionCanvas.Application/Stores/Printify/PrintifyListingImportService.cs"],"evidence":["tests/FusionCanvas.App.Tests/StageToolViewModelsTests.cs","tests/FusionCanvas.Application.Tests/Stores/PrintifyListingImportServiceTests.cs"]}
+  ],
+  "coverage_summary": "Two user workflows; native Appium journey listed as not run in change verification."
+}

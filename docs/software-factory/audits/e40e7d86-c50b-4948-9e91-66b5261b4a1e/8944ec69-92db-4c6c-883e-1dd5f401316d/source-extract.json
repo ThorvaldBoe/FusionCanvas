@@ -1,0 +1,17 @@
+{
+  "extract_definition_version": "1.4",
+  "standard": "FusionCanvas UI",
+  "standard_version": "1.4",
+  "generated_at": "2026-10-10T14:47:50.8530763+00:00",
+  "repository": "FusionCanvas",
+  "source_revision": "013feb0",
+  "working_tree": "CLEAN",
+  "extract_id": "UI-EXTRACT-printify-listing-import",
+  "extract_revision": 1,
+  "entries": [
+    {"entry_id":"UI-SURFACE-printify-import-dialog@1","unit":"Printify listing import dialog","kind":"Window/dialog","locators":["src/FusionCanvas.App/Stores/PrintifyListingImportWindow.axaml","src/FusionCanvas.App/Stores/PrintifyListingImportWindow.axaml.cs"],"patterns":["title and explanatory text","product selection rows","duplicate-candidate chooser","loading/error/progress messages","cancel/close/import actions"],"shared_dependencies":["application brushes","secondary button style","automation IDs"],"evidence":["tests/FusionCanvas.App.Tests/PrintifyListingImportWindowTests.cs"]},
+    {"entry_id":"UI-SURFACE-niche-import-command@1","unit":"Niche context-menu command","kind":"Navigation context menu","locators":["src/FusionCanvas.App/Views/MainWindow.axaml","src/FusionCanvas.App/Views/MainWindow.axaml.cs"],"evidence":["tests/FusionCanvas.App.Tests/StageToolViewModelsTests.cs","tests/FusionCanvas.UITests/PrintifyListingImportUiSmokeTests.cs"]},
+    {"entry_id":"UI-SURFACE-listing-variant-setup@1","unit":"Optional Listing-stage setup action","kind":"Stage tool action","locators":["src/FusionCanvas.App/StageTools/PrintifyListingStageToolViewModel.cs"],"evidence":["tests/FusionCanvas.App.Tests/StageToolViewModelsTests.cs"]}
+  ],
+  "coverage_summary": "Three changed UI surfaces; native desktop journey not run. Standard and definition are Draft."
+}
