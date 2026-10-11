@@ -24,6 +24,8 @@ public partial class StoreEditorWindow : Window
     private readonly InMemoryDataProvider<MockupTemplateCardViewModel> _mockupTemplateRows = new([]);
     private readonly InMemoryDataProvider<DesignAreaCardViewModel> _designAreaRows = new([]);
     private readonly InMemoryDataProvider<BlueprintOfferingCardViewModel> _blueprintOfferingRows = new([]);
+    private readonly InMemoryDataProvider<PrintifyCatalogImportItemViewModel> _printifyBlueprintRows = new([]);
+    private PrintifyCatalogImportViewModel? _subscribedPrintifyImport;
     private Button? _pendingVariantArchiveButton;
     private Button? _pendingDesignAreaButton;
     private bool _designAreaArchiveConfirmationOpen;
@@ -57,6 +59,7 @@ public partial class StoreEditorWindow : Window
         MockupTemplateGrid.ItemsSource = _mockupTemplateRows;
         DesignAreaGrid.ItemsSource = _designAreaRows;
         BlueprintOfferingGrid.ItemsSource = _blueprintOfferingRows;
+        PrintifyBlueprintGrid.ItemsSource = _printifyBlueprintRows;
         MockupTemplateGrid.AddHandler(InputElement.PointerPressedEvent, OnMockupTemplateGridPointerPressed,
             RoutingStrategies.Tunnel, handledEventsToo: true);
         MockupTemplateGrid.AddHandler(InputElement.KeyDownEvent, OnMockupTemplateGridKeyDown,
@@ -122,16 +125,13 @@ public partial class StoreEditorWindow : Window
         }
 
         _subscribedViewModel = viewModel;
+        viewModel.PropertyChanged += OnStoreManagementPropertyChanged;
         viewModel.StoreNameFocusRequested += OnStoreNameFocusRequested;
         viewModel.ProductNameFocusRequested += OnProductNameFocusRequested;
         viewModel.OfferingNameFocusRequested += OnOfferingNameFocusRequested;
         viewModel.BlueprintOfferingCards.CollectionChanged += OnBlueprintOfferingCardsChanged;
         RefreshBlueprintOfferingRows();
-        if (viewModel.PrintifyCatalogImportSession is { } printifyImport)
-        {
-            printifyImport.SelectionFocusRequested += OnPrintifySelectionFocusRequested;
-            printifyImport.ImportFocusRequested += OnPrintifyImportFocusRequested;
-        }
+        AttachPrintifyImportSession(viewModel.PrintifyCatalogImportSession);
         if (viewModel.CatalogSetup is { } catalog)
         {
             _subscribedCatalog = catalog;
@@ -163,11 +163,8 @@ public partial class StoreEditorWindow : Window
     {
         if (_subscribedViewModel is null) return;
 
-        if (_subscribedViewModel.PrintifyCatalogImportSession is { } printifyImport)
-        {
-            printifyImport.SelectionFocusRequested -= OnPrintifySelectionFocusRequested;
-            printifyImport.ImportFocusRequested -= OnPrintifyImportFocusRequested;
-        }
+        _subscribedViewModel.PropertyChanged -= OnStoreManagementPropertyChanged;
+        AttachPrintifyImportSession(null);
         _subscribedViewModel.StoreNameFocusRequested -= OnStoreNameFocusRequested;
         _subscribedViewModel.ProductNameFocusRequested -= OnProductNameFocusRequested;
         _subscribedViewModel.OfferingNameFocusRequested -= OnOfferingNameFocusRequested;
@@ -175,6 +172,44 @@ public partial class StoreEditorWindow : Window
         _subscribedViewModel = null;
         _blueprintOfferingRows.Reset([]);
     }
+
+    private void OnStoreManagementPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(StoreManagementViewModel.PrintifyCatalogImportSession)
+            && sender is StoreManagementViewModel viewModel)
+        {
+            AttachPrintifyImportSession(viewModel.PrintifyCatalogImportSession);
+        }
+    }
+
+    private void AttachPrintifyImportSession(PrintifyCatalogImportViewModel? session)
+    {
+        if (_subscribedPrintifyImport is { } previous)
+        {
+            previous.PropertyChanged -= OnPrintifyImportPropertyChanged;
+            previous.SelectionFocusRequested -= OnPrintifySelectionFocusRequested;
+            previous.ImportFocusRequested -= OnPrintifyImportFocusRequested;
+        }
+
+        _subscribedPrintifyImport = session;
+        if (session is not null)
+        {
+            session.PropertyChanged += OnPrintifyImportPropertyChanged;
+            session.SelectionFocusRequested += OnPrintifySelectionFocusRequested;
+            session.ImportFocusRequested += OnPrintifyImportFocusRequested;
+        }
+
+        RefreshPrintifyBlueprintRows();
+    }
+
+    private void OnPrintifyImportPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(PrintifyCatalogImportViewModel.HasBlueprints))
+            RefreshPrintifyBlueprintRows();
+    }
+
+    private void RefreshPrintifyBlueprintRows() =>
+        _printifyBlueprintRows.Reset(_subscribedPrintifyImport?.Blueprints.ToArray() ?? []);
 
     private void DetachCatalogSubscriptions()
     {
@@ -429,9 +464,9 @@ public partial class StoreEditorWindow : Window
 
     private void OnPrintifySelectionFocusRequested(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>
     {
-        if (PrintifyBlueprintList is { } list)
+        if (PrintifyBlueprintGrid is { } grid)
         {
-            (list.GetVisualDescendants().OfType<CheckBox>().FirstOrDefault() as Control ?? list).Focus();
+            (grid.GetVisualDescendants().OfType<CheckBox>().FirstOrDefault() as Control ?? grid).Focus();
         }
         else
         {

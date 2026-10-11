@@ -13,6 +13,7 @@ public sealed class PrintifyCatalogImportItemViewModel(PrintifyShopProductSummar
         : product.BlueprintName!;
     public string ProductTitle => product.Title;
     public string Subtitle => $"Product {product.ProductId} · Provider {product.ProviderId}";
+    public string SelectionAccessibleName => $"{BlueprintName} — {ProductTitle} — {Subtitle}";
     public bool IsSelected { get => _isSelected; set { if (_isSelected == value) return; _isSelected = value; PropertyChanged?.Invoke(this, new(nameof(IsSelected))); } }
     public event PropertyChangedEventHandler? PropertyChanged;
 }
