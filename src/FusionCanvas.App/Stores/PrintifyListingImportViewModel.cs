@@ -36,7 +36,19 @@ public sealed class PrintifyListingImportViewModel : INotifyPropertyChanged
     public ICommand ImportCommand { get; }
     public ICommand ToggleLinkedCommand { get; }
     public ICommand CancelCommand { get; }
-    public bool ShowLinked { get => _showLinked; set { _showLinked = value; Changed(); Changed(nameof(VisibleProducts)); } }
+    public bool ShowLinked
+    {
+        get => _showLinked;
+        set
+        {
+            if (_showLinked == value) return;
+            _showLinked = value;
+            Changed();
+            Changed(nameof(LinkedProductsToggleLabel));
+            Changed(nameof(VisibleProducts));
+        }
+    }
+    public string LinkedProductsToggleLabel => ShowLinked ? "Hide linked products" : "Show linked products";
     public bool IsBusy
     {
         get => _isBusy;
