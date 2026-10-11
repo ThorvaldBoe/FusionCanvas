@@ -16,7 +16,7 @@
       <TextBlock Text="Import files to attach them to this context and preserve their managed workspace copy." TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" />
     </StackPanel>
 
-    <ScrollViewer Grid.Row="1" Margin="0,0,0,14">
+    <ScrollViewer Grid.Row="1" Margin="0,0,0,14" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
       <StackPanel Spacing="10">
         <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource DangerTextBrush}" />
 
@@ -32,7 +32,15 @@
           </StackPanel>
         </Border>
 
-        <ItemsControl ItemsSource="{Binding Assets}">
+        <ItemsControl x:Name="AssetsList"
+                      ItemsSource="{Binding Assets}"
+                      AutomationProperties.AutomationId="Assets.List"
+                      AutomationProperties.Name="Assets">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <VirtualizingStackPanel />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="assets:AssetRowViewModel">
               <Border Padding="12" Background="{DynamicResource ElevatedSurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,0,0,8">
@@ -49,10 +57,10 @@
                     <Image Source="{Binding Thumbnail}" Width="64" Height="64" Stretch="UniformToFill" />
                   </Button>
                   <StackPanel Grid.Column="1" Spacing="2">
-                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding ManagedFileName}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="Missing managed file" IsVisible="{Binding IsMissing}" FontSize="11" Foreground="{DynamicResource DangerTextBrush}" />
-                    <TextBlock Text="{Binding ContextLabel}" IsVisible="{Binding ContextLabel, Converter={x:Static ObjectConverters.IsNotNull}}" FontSize="11" Foreground="{DynamicResource AccentBrush}" />
+                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding Name}" />
+                    <TextBlock Text="{Binding ManagedFileName}" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ManagedFileName}" AutomationProperties.Name="{Binding ManagedFileName}" AutomationProperties.HelpText="{Binding ManagedFileName}" />
+                    <TextBlock Text="Missing managed file" IsVisible="{Binding IsMissing}" FontSize="11" Foreground="{DynamicResource DangerTextBrush}" AutomationProperties.Name="Missing managed file" />
+                    <TextBlock Text="{Binding ContextLabel}" IsVisible="{Binding ContextLabel, Converter={x:Static ObjectConverters.IsNotNull}}" FontSize="11" Foreground="{DynamicResource AccentBrush}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ContextLabel}" AutomationProperties.Name="{Binding ContextLabel}" AutomationProperties.HelpText="{Binding ContextLabel}" />
                   </StackPanel>
                   <ComboBox Grid.Column="2"
                             ItemsSource="{Binding Parent.AvailablePurposes}"
