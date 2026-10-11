@@ -1077,7 +1077,163 @@ public class StoreEditorHeadlessTests
         window.Close();
     }
 
-    [AvaloniaTheory]
+        [AvaloniaFact]
+    public async Task NonColorOptionValues_UseBoundedVirtualGridsWithSavedOrderAndAccessibleText()
+    {
+        var window = CreateEditorWindow(includeNormalizedCatalog: true, useFixedProviderOffering: true, includeOfferingOptions: true);
+        var viewModel = (StoreManagementViewModel)window.DataContext!;
+        viewModel.SelectProductsTabCommand.Execute(null);
+        viewModel.OpenProductDetailCommand.Execute(Assert.Single(viewModel.Products));
+        viewModel.OpenOfferingDetailCommand.Execute(Assert.Single(viewModel.SelectedProduct!.Offerings));
+        viewModel.OpenVariantManagementCommand.Execute(null);
+        window.UpdateLayout();
+
+        try
+        {
+            var catalog = viewModel.CatalogSetup!;
+            var offeringId = catalog.SelectedOffering!.Id;
+            var sizeOption = catalog.Options.Single(option => option.OptionKind == OptionKind.Size);
+            var sizeValues = Enumerable.Range(0, 81)
+                .Reverse()
+                .Select(index => new OfferingOptionValue(
+                    Guid.NewGuid(),
+                    sizeOption.Id,
+                    offeringId,
+                    index == 0 ? "Extra extra large with a very long provider supplied Size name" : $"Size {index:D3}",
+                    index,
+                    isArchived: index == 80))
+                .ToArray();
+            var sizeGroup = new OfferingChoiceGroupViewModel(sizeOption, sizeValues, catalog.ArchiveOptionCommand);
+            var sizeGroupIndex = catalog.AvailableChoiceGroups
+                .Select((group, index) => (group, index))
+                .Single(item => item.group.Option.Id == sizeOption.Id).index;
+            catalog.AvailableChoiceGroups[sizeGroupIndex] = sizeGroup;
+
+            var customOption = new OfferingOption(Guid.NewGuid(), offeringId, OptionKind.Other, "Material", 2);
+            var customValues = Enumerable.Range(0, 90)
+                .Reverse()
+                .Select(index => new OfferingOptionValue(
+                    Guid.NewGuid(),
+                    customOption.Id,
+                    offeringId,
+                    index == 0 ? "Organic cotton blend with exceptionally long identifying details" : $"Material {index:D3}",
+                    index))
+                .ToArray();
+            var customGroup = new OfferingChoiceGroupViewModel(customOption, customValues, catalog.ArchiveOptionCommand);
+            catalog.AvailableChoiceGroups.Add(customGroup);
+            var emptyOption = new OfferingOption(Guid.NewGuid(), offeringId, OptionKind.Other, "Finish", 3);
+            var emptyGroup = new OfferingChoiceGroupViewModel(emptyOption, [], catalog.ArchiveOptionCommand);
+            catalog.AvailableChoiceGroups.Add(emptyGroup);
+
+            window.UpdateLayout();
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+
+            Assert.Equal(80, sizeGroup.Values.Count);
+            Assert.Equal(80, sizeGroup.ValueRows.Count);
+            Assert.Equal(sizeValues.Where(value => !value.IsArchived)
+                .OrderBy(value => value.SortOrder).ThenBy(value => value.Id).Select(value => value.Value),
+                sizeGroup.ValueRows.Select(row => row.Value));
+
+            var sizeCard = window.GetVisualDescendants().OfType<Border>()
+                .Single(card => AutomationProperties.GetAutomationId(card) == "Catalog.OptionCard"
+                    && ((OfferingChoiceGroupViewModel)card.DataContext!).Option.Id == sizeOption.Id);
+            var sizeGrid = Assert.Single(sizeCard.GetVisualDescendants().OfType<VirtualDataGrid>(),
+                grid => AutomationProperties.GetAutomationId(grid) == sizeGroup.ValueGridAutomationId);
+            await HeadlessUiWait.UntilAsync(() => sizeGrid.GetVisualDescendants().OfType<VirtualDataRow>().Any(),
+                "Size summary rows render");
+            Assert.Equal(235, sizeCard.Width);
+            Assert.Equal(120, sizeGrid.Bounds.Height);
+            Assert.Equal("None", sizeGrid.SelectionMode.ToString());
+            Assert.Equal($"Available Size values for {sizeOption.Name}", AutomationProperties.GetName(sizeGrid));
+            Assert.All(sizeGrid.Columns, column =>
+            {
+                Assert.False(column.IsSortable);
+                Assert.False(column.IsResizable);
+            });
+            var initialSizeRows = sizeGrid.GetVisualDescendants().OfType<VirtualDataRow>().OrderBy(row => row.Index).ToArray();
+            Assert.InRange(initialSizeRows.Length, 1, sizeGroup.ValueRows.Count - 1);
+            Assert.Equal(32, initialSizeRows[0].Bounds.Height);
+            Assert.True(sizeGrid.Bounds.Width < sizeCard.Width);
+            var firstSizeText = Assert.Single(((Control)initialSizeRows[0].Cells[0].Content!).GetVisualDescendants().OfType<TextBlock>());
+            var firstSizeValue = sizeGroup.ValueRows[0].Value;
+            Assert.Equal(firstSizeValue, ToolTip.GetTip(firstSizeText));
+            Assert.Equal(firstSizeValue, AutomationProperties.GetName(firstSizeText));
+            Assert.Contains(firstSizeValue, AutomationProperties.GetHelpText(firstSizeText)!);
+            Assert.Equal(TextTrimming.CharacterEllipsis, firstSizeText.TextTrimming);
+
+            var sizeScrollViewer = Assert.Single(sizeGrid.GetVisualDescendants().OfType<ScrollViewer>());
+            sizeScrollViewer.ScrollToEnd();
+            window.UpdateLayout();
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            var lastSizeRow = sizeGrid.GetVisualDescendants().OfType<VirtualDataRow>()
+                .Single(row => row.Index == sizeGroup.ValueRows.Count - 1);
+            var lastSizeText = Assert.Single(((Control)lastSizeRow.Cells[0].Content!).GetVisualDescendants().OfType<TextBlock>());
+            Assert.Equal(sizeGroup.ValueRows[sizeGroup.ValueRows.Count - 1].Value, lastSizeText.Text);
+
+            var customCard = window.GetVisualDescendants().OfType<Border>()
+                .Single(card => AutomationProperties.GetAutomationId(card) == "Catalog.OptionCard"
+                    && ((OfferingChoiceGroupViewModel)card.DataContext!).Option.Id == customOption.Id);
+            var customGrid = Assert.Single(customCard.GetVisualDescendants().OfType<VirtualDataGrid>(),
+                grid => AutomationProperties.GetAutomationId(grid) == customGroup.ValueGridAutomationId);
+            Assert.Equal("Available Other values for Material", AutomationProperties.GetName(customGrid));
+            Assert.Equal(90, customGroup.ValueRows.Count);
+            var initialCustomRows = customGrid.GetVisualDescendants().OfType<VirtualDataRow>()
+                .OrderBy(row => row.Index).ToArray();
+            Assert.InRange(initialCustomRows.Length, 1, customGroup.ValueRows.Count - 1);
+            var firstCustomText = Assert.Single(((Control)initialCustomRows[0].Cells[0].Content!)
+                .GetVisualDescendants().OfType<TextBlock>());
+            var firstCustomValue = customGroup.ValueRows[0].Value;
+            Assert.Equal(firstCustomValue, ToolTip.GetTip(firstCustomText));
+            Assert.Equal(firstCustomValue, AutomationProperties.GetName(firstCustomText));
+            Assert.Contains(firstCustomValue, AutomationProperties.GetHelpText(firstCustomText)!);
+            Assert.Equal(TextTrimming.CharacterEllipsis, firstCustomText.TextTrimming);
+            var customScrollViewer = Assert.Single(customGrid.GetVisualDescendants().OfType<ScrollViewer>());
+            customScrollViewer.ScrollToEnd();
+            window.UpdateLayout();
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            var lastCustomRow = customGrid.GetVisualDescendants().OfType<VirtualDataRow>()
+                .Single(row => row.Index == customGroup.ValueRows.Count - 1);
+            var lastCustomText = Assert.Single(((Control)lastCustomRow.Cells[0].Content!).GetVisualDescendants().OfType<TextBlock>());
+            Assert.Equal(customGroup.ValueRows[customGroup.ValueRows.Count - 1].Value, lastCustomText.Text);
+            Assert.InRange(customGrid.GetVisualDescendants().OfType<VirtualDataRow>().Count(), 1, customGroup.ValueRows.Count - 1);
+
+            var emptyCard = window.GetVisualDescendants().OfType<Border>()
+                .Single(card => AutomationProperties.GetAutomationId(card) == "Catalog.OptionCard"
+                    && ((OfferingChoiceGroupViewModel)card.DataContext!).Option.Id == emptyOption.Id);
+            Assert.Contains(emptyCard.GetVisualDescendants().OfType<TextBlock>(),
+                text => AutomationProperties.GetAutomationId(text) == emptyGroup.EmptyValueSummaryAutomationId
+                    && IsEffectivelyVisible(text));
+            Assert.DoesNotContain(emptyCard.GetVisualDescendants().OfType<VirtualDataGrid>(), grid => IsEffectivelyVisible(grid));
+
+            foreach (var (card, option, group) in new[]
+                     {
+                         (sizeCard, sizeOption, sizeGroup),
+                         (customCard, customOption, customGroup)
+                     })
+            {
+                var manage = Assert.Single(card.GetVisualDescendants().OfType<Button>(),
+                    button => button.Content?.ToString() == "Manage values");
+                Assert.Same(catalog.ManageOptionCommand, manage.Command);
+                Assert.Same(option, manage.CommandParameter);
+                var overflow = card.GetVisualDescendants().OfType<Button>()
+                    .Single(button => AutomationProperties.GetAutomationId(button) == group.OverflowAutomationId);
+                Assert.Equal(group.AccessibleOverflowName, AutomationProperties.GetName(overflow));
+            }
+
+            var colorCard = window.GetVisualDescendants().OfType<Border>()
+                .Single(card => AutomationProperties.GetAutomationId(card) == "Catalog.OptionCard"
+                    && ((OfferingChoiceGroupViewModel)card.DataContext!).IsColor);
+            Assert.Equal(0, ((OfferingChoiceGroupViewModel)colorCard.DataContext!).ValueRows.Count);
+            Assert.Single(colorCard.GetVisualDescendants().OfType<VirtualDataGrid>(),
+                grid => AutomationProperties.GetAutomationId(grid) == "Catalog.ColorGrid");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+[AvaloniaTheory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Available_colors_grid_renders_accessible_controls_templates_stripes_and_empty_states(bool dark)
@@ -1177,7 +1333,13 @@ public class StoreEditorHeadlessTests
             var sizeCard = cards.Single(card => !((OfferingChoiceGroupViewModel)card.DataContext!).IsColor);
             Assert.Equal(390, colorCard.Width);
             Assert.Equal(235, sizeCard.Width);
-            Assert.Contains(sizeCard.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "S   M");
+            var sizeGroup = (OfferingChoiceGroupViewModel)sizeCard.DataContext!;
+            var sizeGrid = Assert.Single(sizeCard.GetVisualDescendants().OfType<VirtualDataGrid>(),
+                grid => AutomationProperties.GetAutomationId(grid) == sizeGroup.ValueGridAutomationId);
+            Assert.Equal(["S", "M"], sizeGrid.GetVisualDescendants().OfType<VirtualDataRow>()
+                .OrderBy(row => row.Index)
+                .SelectMany(row => ((Control)row.Cells[0].Content!).GetVisualDescendants().OfType<TextBlock>())
+                .Select(text => text.Text));
             var manageButton = Assert.Single(colorCard.GetVisualDescendants().OfType<Button>(),
                 button => button.Content?.ToString() == "Manage values");
             Assert.Same(catalog.ManageOptionCommand, manageButton.Command);
