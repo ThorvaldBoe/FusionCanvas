@@ -540,21 +540,67 @@
                              Foreground="{DynamicResource SecondaryTextBrush}" />
                   <ProgressBar IsVisible="{Binding IsBusy}" IsIndeterminate="True" Height="4" />
                   <TextBlock IsVisible="{Binding !HasBlueprints}" Text="No products are available in the selected Printify shop." Foreground="{DynamicResource SecondaryTextBrush}" />
-                  <ItemsControl x:Name="PrintifyBlueprintList" ItemsSource="{Binding Blueprints}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="stores:PrintifyCatalogImportItemViewModel">
-                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                  AutomationProperties.AutomationId="Catalog.PrintifyBlueprintChoice"
-                                  AutomationProperties.Name="{Binding BlueprintName}">
-                          <StackPanel Spacing="2">
-                            <TextBlock Text="{Binding BlueprintName}" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding ProductTitle}" Foreground="{DynamicResource SecondaryTextBrush}" />
-                            <TextBlock Text="{Binding Subtitle}" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" />
-                          </StackPanel>
-                        </CheckBox>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
+                  <virtualGrid:VirtualDataGrid x:Name="PrintifyBlueprintGrid"
+                                               Classes="printifyBlueprintGrid"
+                                               Height="360"
+                                               RowHeight="72"
+                                               SelectionMode="None"
+                                               AutomationProperties.AutomationId="Catalog.PrintifyBlueprintGrid"
+                                               AutomationProperties.Name="Printify shop products to import">
+                    <virtualGrid:VirtualDataGrid.Columns>
+                      <virtualColumns:VirtualDataGridTemplateColumn Header="Select" Width="48" IsSortable="False" IsResizable="False">
+                        <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                          <DataTemplate x:DataType="stores:PrintifyCatalogImportItemViewModel">
+                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                      AutomationProperties.AutomationId="Catalog.PrintifyBlueprintChoice"
+                                      AutomationProperties.Name="{Binding SelectionAccessibleName}"
+                                      ToolTip.Tip="{Binding SelectionAccessibleName}"
+                                      VerticalAlignment="Center" />
+                          </DataTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                      </virtualColumns:VirtualDataGridTemplateColumn>
+                      <virtualColumns:VirtualDataGridTemplateColumn Header="Blueprint" Width="170" IsSortable="False" IsResizable="False">
+                        <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                          <DataTemplate x:DataType="stores:PrintifyCatalogImportItemViewModel">
+                            <TextBlock Text="{Binding BlueprintName}"
+                                       ToolTip.Tip="{Binding BlueprintName}"
+                                       AutomationProperties.HelpText="{Binding BlueprintName}"
+                                       TextTrimming="CharacterEllipsis"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       Margin="8,0" />
+                          </DataTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                      </virtualColumns:VirtualDataGridTemplateColumn>
+                      <virtualColumns:VirtualDataGridTemplateColumn Header="Shop product" Width="280" IsSortable="False" IsResizable="False">
+                        <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                          <DataTemplate x:DataType="stores:PrintifyCatalogImportItemViewModel">
+                            <TextBlock Text="{Binding ProductTitle}"
+                                       ToolTip.Tip="{Binding ProductTitle}"
+                                       AutomationProperties.HelpText="{Binding ProductTitle}"
+                                       TextTrimming="CharacterEllipsis"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="8,0" />
+                          </DataTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                      </virtualColumns:VirtualDataGridTemplateColumn>
+                      <virtualColumns:VirtualDataGridTemplateColumn Header="Product / provider identity" Width="210" IsSortable="False" IsResizable="False">
+                        <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                          <DataTemplate x:DataType="stores:PrintifyCatalogImportItemViewModel">
+                            <TextBlock Text="{Binding Subtitle}"
+                                       ToolTip.Tip="{Binding Subtitle}"
+                                       AutomationProperties.HelpText="{Binding Subtitle}"
+                                       TextTrimming="CharacterEllipsis"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="8,0" />
+                          </DataTemplate>
+                        </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                      </virtualColumns:VirtualDataGridTemplateColumn>
+                    </virtualGrid:VirtualDataGrid.Columns>
+                  </virtualGrid:VirtualDataGrid>
                   <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Foreground="{DynamicResource DangerTextBrush}" TextWrapping="Wrap" />
                   <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Content="Load selected" Command="{Binding ConfirmCommand}" Classes="primary fixedAction" Width="112" />
@@ -1720,6 +1766,9 @@
     </Style>
     <Style Selector="virtualGrid|VirtualDataGridHeaderPanel">
       <Setter Property="IsHitTestVisible" Value="False" />
+    </Style>
+    <Style Selector="virtualGrid|VirtualDataGrid.printifyBlueprintGrid /template/ ScrollViewer#PART_ScrollViewer">
+      <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
     </Style>
     <Style Selector="Button.tabButton">
       <Setter Property="MinWidth" Value="116" />
