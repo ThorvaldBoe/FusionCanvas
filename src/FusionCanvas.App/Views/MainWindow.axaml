@@ -908,6 +908,42 @@
                       </Grid>
                       <TextBlock Text="{Binding PrintifyTool.Status}" Foreground="{DynamicResource SecondaryTextBrush}" />
                       <TextBlock Text="{Binding PrintifyTool.ProductSummary}" Foreground="{DynamicResource SecondaryTextBrush}" />
+                      <TextBlock Text="Linked Printify product ID" FontWeight="SemiBold" />
+                      <TextBox Text="{Binding PrintifyTool.CurrentProductIdDisplay}"
+                               IsReadOnly="True"
+                               AutomationProperties.Name="Linked Printify product ID"
+                               AutomationProperties.AutomationId="Printify.CurrentProductId" />
+                      <TextBlock Text="Link an existing product" FontWeight="SemiBold" />
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                        <TextBox Text="{Binding PrintifyTool.CandidateProductId, Mode=TwoWay}"
+                                 PlaceholderText="Printify product ID"
+                                 IsEnabled="{Binding PrintifyTool.CanEditCandidateProductId}"
+                                 AutomationProperties.Name="Existing Printify product ID"
+                                 AutomationProperties.AutomationId="Printify.CandidateProductId" />
+                        <Button Grid.Column="1"
+                                Content="Verify"
+                                Command="{Binding PrintifyTool.VerifyProductLinkCommand}"
+                                IsEnabled="{Binding PrintifyTool.CanVerifyProductLink}"
+                                AutomationProperties.AutomationId="Printify.VerifyProductLink" />
+                      </Grid>
+                      <Border IsVisible="{Binding PrintifyTool.IsLinkConfirmationVisible}"
+                              Padding="8"
+                              Background="{DynamicResource WarningSurfaceBrush}"
+                              BorderBrush="{DynamicResource WarningTextBrush}"
+                              BorderThickness="1"
+                              AutomationProperties.Name="Printify product link confirmation">
+                        <StackPanel Spacing="6">
+                          <TextBlock Text="{Binding PrintifyTool.LinkConfirmationText}" TextWrapping="Wrap" />
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="Confirm link"
+                                    Command="{Binding PrintifyTool.ConfirmProductLinkCommand}"
+                                    AutomationProperties.AutomationId="Printify.ConfirmProductLink" />
+                            <Button Content="Cancel"
+                                    Command="{Binding PrintifyTool.CancelProductLinkCommand}"
+                                    AutomationProperties.AutomationId="Printify.CancelProductLink" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
                       <TextBlock Text="Title" FontWeight="SemiBold" />
                       <TextBox Text="{Binding PrintifyTool.Title, Mode=TwoWay}" AutomationProperties.Name="Printify title" />
                       <TextBlock Text="Description" FontWeight="SemiBold" />

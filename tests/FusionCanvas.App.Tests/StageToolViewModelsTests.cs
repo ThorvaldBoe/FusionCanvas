@@ -161,6 +161,80 @@ public class StageToolViewModelsTests
     }
 
     [AvaloniaFact]
+    public async Task PrintifyTool_VerifiesExistingProductBeforeConfirmingAndCanCancel()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var storeId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var store = new Store(storeId, "The Groan Zone", null, false, now, now, "{}", null, FulfillmentStrategy.Printify);
+        var item = new Item(itemId, storeId, null, null, "Dad joke", null, ItemStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
+        var repository = new MemoryRepository(WorkspaceSnapshot.Empty with { Stores = [store], Items = [item] });
+        var products = new Products
+        {
+            RemoteProduct = new ListingRemoteProduct("product-9", false, ListingPublicationState.Unpublished,
+                new ListingSnapshot(new Dictionary<string, string?> { ["title"] = "Existing Printify title" }),
+                ShopId: "42", HasVerifiedIdentity: true)
+        };
+        var service = new ListingLifecycleService(repository, new Connection(), products, new Publication());
+        var vm = new PrintifyListingStageToolViewModel(
+            new Factory(service),
+            new ProjectionSource(),
+            () => repository.Snapshot,
+            id => id == storeId ? store : null,
+            new ContextMapper());
+
+        await vm.LoadAsync(itemId, canEdit: true, TestContext.Current.CancellationToken);
+        Assert.Equal("Not linked", vm.CurrentProductIdDisplay);
+        Assert.True(vm.CanEditCandidateProductId);
+        vm.CandidateProductId = "product-9";
+        Assert.True(vm.CanVerifyProductLink);
+        vm.VerifyProductLinkCommand.Execute(null);
+        await HeadlessUiWait.UntilAsync(() => !vm.IsBusy, "Printify existing product verification");
+
+        Assert.True(vm.IsLinkConfirmationVisible);
+        Assert.Contains("product-9", vm.LinkConfirmationText);
+        Assert.Contains("Existing Printify title", vm.LinkConfirmationText);
+        Assert.Contains("The Groan Zone", vm.LinkConfirmationText);
+        Assert.Empty(repository.Snapshot.ExternalListingMappings);
+
+        vm.CancelProductLinkCommand.Execute(null);
+        Assert.False(vm.IsLinkConfirmationVisible);
+        Assert.Empty(repository.Snapshot.ExternalListingMappings);
+
+        vm.CandidateProductId = "product-9";
+        vm.VerifyProductLinkCommand.Execute(null);
+        await HeadlessUiWait.UntilAsync(() => !vm.IsBusy, "Printify re-verification before link");
+        vm.ConfirmProductLinkCommand.Execute(null);
+        await HeadlessUiWait.UntilAsync(() => !vm.IsBusy, "Printify existing product link");
+
+        Assert.Equal("product-9", vm.CurrentProductId);
+        Assert.Equal("product-9", repository.Snapshot.ExternalListingMappings.Single().ProductId);
+    }
+
+    [Fact]
+    public async Task PrintifyTool_ShowsLinkedProductIdButDisablesChangesWhenReadOnly()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var storeId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var store = new Store(storeId, "The Groan Zone", null, false, now, now, "{}", null, FulfillmentStrategy.Printify);
+        var item = new Item(itemId, storeId, null, null, "Dad joke", null, ItemStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
+        var mapping = new ExternalListingMapping(storeId, itemId, "printify", "42", "product-1", null, null,
+            ExternalListingSyncState.Synchronized, ExternalListingPublicationState.Unpublished, ExternalListingOperationState.Succeeded, "{}", null, now, now, now);
+        var repository = new MemoryRepository(WorkspaceSnapshot.Empty with { Stores = [store], Items = [item], ExternalListingMappings = [mapping] });
+        var service = new ListingLifecycleService(repository, new Connection(), new Products(), new Publication());
+        var vm = new PrintifyListingStageToolViewModel(new Factory(service), new ProjectionSource(), () => repository.Snapshot,
+            id => id == storeId ? store : null, new ContextMapper());
+
+        await vm.LoadAsync(itemId, canEdit: false, TestContext.Current.CancellationToken);
+
+        Assert.Equal("product-1", vm.CurrentProductId);
+        Assert.False(vm.CanEditCandidateProductId);
+        Assert.False(vm.CanVerifyProductLink);
+        Assert.False(vm.CanConfirmProductLink);
+    }
+
+    [AvaloniaFact]
     public async Task PrintifyTool_HeadlessShopifyJourneyPublishesUnpublishesAndReopensDeletionGate()
     {
         var now = DateTimeOffset.UtcNow;

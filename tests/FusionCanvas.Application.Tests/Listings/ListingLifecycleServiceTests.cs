@@ -1,7 +1,10 @@
 using FusionCanvas.Application.Listings;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Products;
+using FusionCanvas.Domain.Items;
+using FusionCanvas.Domain.Stores;
 using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Workflow;
 
 namespace FusionCanvas.Application.Tests.Listings;
 
@@ -311,6 +314,93 @@ public sealed class ListingLifecycleServiceTests
         Assert.Equal(0, products.DeleteCalls);
     }
 
+    [Fact]
+    public async Task Verify_and_confirm_link_persist_only_verified_product()
+    {
+        var storeId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(storeId, "Store", null, false, now, now, "{}", fulfillmentStrategy: FulfillmentStrategy.Printify);
+        var item = new Item(itemId, storeId, null, null, "Item", null, ItemStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
+        var repository = new MemoryRepository
+        {
+            Snapshot = WorkspaceSnapshot.Empty with { Stores = [store], Items = [item] }
+        };
+        var products = new FakeProducts
+        {
+            RemoteProduct = new ListingRemoteProduct("product-9", false, ListingPublicationState.Unpublished, Snapshot("External title"), ShopId: "shop-1", HasVerifiedIdentity: true)
+        };
+        var service = new ListingLifecycleService(repository, new FakeConnection(), products, new FakePublication(), () => now);
+        var request = new ListingConnectionRequest(storeId, "shop-1", false);
+
+        var verified = await service.VerifyProductLinkAsync(request, itemId, " product-9 ", TestContext.Current.CancellationToken);
+
+        Assert.True(verified.Succeeded);
+        Assert.Equal("product-9", verified.Candidate!.ProductId);
+        Assert.Equal("External title", verified.Candidate.Title);
+        Assert.Empty(repository.Snapshot.ExternalListingMappings);
+
+        var result = await service.LinkExistingProductAsync(request, itemId, verified.Candidate, TestContext.Current.CancellationToken);
+
+        Assert.Equal(ListingLifecycleResultKind.Succeeded, result.Kind);
+        var mapping = Assert.Single(repository.Snapshot.ExternalListingMappings);
+        Assert.Equal("product-9", mapping.ProductId);
+        Assert.Equal("shop-1", mapping.ShopId);
+        Assert.Contains("External title", mapping.SnapshotJson);
+        Assert.Equal(ExternalListingSyncState.Synchronized, mapping.SynchronizationState);
+        Assert.Equal(ExternalListingOperationState.Succeeded, mapping.OperationState);
+        Assert.Equal(3, products.GetCalls);
+    }
+
+    [Fact]
+    public async Task Product_identity_mismatch_duplicate_and_uncertain_mapping_are_rejected_without_writes()
+    {
+        var storeId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var otherItemId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(storeId, "Store", null, false, now, now, "{}", fulfillmentStrategy: FulfillmentStrategy.Printify);
+        var item = new Item(itemId, storeId, null, null, "Item", null, ItemStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
+        var otherItem = item with { Id = otherItemId, Name = "Other Item" };
+        var request = new ListingConnectionRequest(storeId, "shop-1", false);
+        var repository = new MemoryRepository
+        {
+            Snapshot = WorkspaceSnapshot.Empty with { Stores = [store], Items = [item, otherItem] }
+        };
+        var products = new FakeProducts
+        {
+            RemoteProduct = new ListingRemoteProduct("product-9", false, ListingPublicationState.Unpublished, Snapshot("External title"), ShopId: "shop-2", HasVerifiedIdentity: true)
+        };
+        var service = new ListingLifecycleService(repository, new FakeConnection(), products, new FakePublication());
+
+        var mismatch = await service.VerifyProductLinkAsync(request, itemId, "product-9", TestContext.Current.CancellationToken);
+        Assert.False(mismatch.Succeeded);
+        Assert.Empty(repository.Snapshot.ExternalListingMappings);
+
+        products = new FakeProducts
+        {
+            RemoteProduct = new ListingRemoteProduct("product-9", false, ListingPublicationState.Unpublished, Snapshot("External title"), ShopId: "shop-1", HasVerifiedIdentity: true)
+        };
+        repository.Snapshot = repository.Snapshot with { ExternalListingMappings = [Mapping(storeId, otherItemId, "{}")] };
+        service = new ListingLifecycleService(repository, new FakeConnection(), products, new FakePublication());
+        var duplicate = await service.VerifyProductLinkAsync(request, itemId, "product-1", TestContext.Current.CancellationToken);
+        Assert.False(duplicate.Succeeded);
+        Assert.Single(repository.Snapshot.ExternalListingMappings);
+
+        repository.Snapshot = repository.Snapshot with
+        {
+            ExternalListingMappings =
+            [
+                Mapping(storeId, itemId, "{}") with { SynchronizationState = ExternalListingSyncState.Uncertain, OperationState = ExternalListingOperationState.NeedsReconciliation },
+                Mapping(storeId, otherItemId, "{}")
+            ]
+        };
+        service = new ListingLifecycleService(repository, new FakeConnection(), products, new FakePublication());
+        var uncertain = await service.VerifyProductLinkAsync(request, itemId, "product-9", TestContext.Current.CancellationToken);
+        Assert.False(uncertain.Succeeded);
+        Assert.Equal("product-1", repository.Snapshot.ExternalListingMappings.Single(value => value.ItemId == itemId).ProductId);
+    }
+
     private static ExternalListingMapping Mapping(Guid storeId, Guid itemId, string snapshotJson) =>
         new(
             storeId,
@@ -360,14 +450,18 @@ public sealed class ListingLifecycleServiceTests
         public int CreateCalls { get; private set; }
         public int DeleteCalls { get; private set; }
         public int UpdateCalls { get; private set; }
+        public int GetCalls { get; private set; }
         public ListingMutationResult CreateResult { get; init; } = new("product", true);
         public ListingMutationResult UpdateResult { get; init; } = new("product", true);
         public ListingRemoteProduct? RemoteProduct { get; init; }
         public Exception? DeleteException { get; init; }
         public ListingProductProjection? LastProjection { get; private set; }
 
-        public Task<ListingRemoteProduct?> GetAsync(string shopId, string productId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(RemoteProduct);
+        public Task<ListingRemoteProduct?> GetAsync(string shopId, string productId, CancellationToken cancellationToken = default)
+        {
+            GetCalls++;
+            return Task.FromResult(RemoteProduct);
+        }
 
         public Task<ListingMutationResult> CreateAsync(string shopId, ListingProductProjection projection, IReadOnlyDictionary<Guid, ListingImageReference> images, CancellationToken cancellationToken = default)
         {

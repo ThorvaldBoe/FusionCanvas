@@ -11,8 +11,8 @@ public sealed class PrintifyListingClientTests
     public async Task Connection_and_create_use_shared_authenticated_transport_and_product_payload()
     {
         var storeId = Guid.NewGuid();
-        var handler = new RecordingHandler(request => request.RequestUri!.AbsolutePath.EndsWith("/shops/42.json", StringComparison.Ordinal)
-            ? Json(HttpStatusCode.OK, "{\"id\":42}")
+        var handler = new RecordingHandler(request => request.RequestUri!.AbsolutePath.EndsWith("/shops.json", StringComparison.Ordinal)
+            ? Json(HttpStatusCode.OK, "[{\"id\":42,\"title\":\"Main Shop\"}]")
             : Json(HttpStatusCode.Created, "{\"id\":\"product-1\",\"visible\":false,\"is_locked\":false}"));
         using var http = new HttpClient(handler);
         var client = new PrintifyListingClient(storeId, http, _ => Task.FromResult<string?>("secret-sentinel"));
@@ -21,6 +21,7 @@ public sealed class PrintifyListingClientTests
         var mutation = await client.CreateAsync("42", Projection(), new Dictionary<Guid, ListingImageReference>(), TestContext.Current.CancellationToken);
 
         Assert.True(readiness.ProductOperationsAvailable);
+        Assert.EndsWith("/v1/shops.json", handler.Requests[0].RequestUri!.AbsolutePath);
         Assert.True(mutation.IsDefinitive);
         Assert.Equal("product-1", mutation.ProductId);
         Assert.All(handler.Requests, request => Assert.Equal("secret-sentinel", request.Headers.Authorization!.Parameter));
@@ -44,7 +45,7 @@ public sealed class PrintifyListingClientTests
     [Fact]
     public async Task Product_read_maps_visibility_external_identity_and_shipping_template()
     {
-        using var http = new HttpClient(new RecordingHandler(_ => Json(HttpStatusCode.OK, "{\"id\":\"product-1\",\"visible\":true,\"is_locked\":false,\"external\":[{\"id\":\"shopify-1\",\"handle\":\"dad-joke-loading\",\"shipping_template_id\":\"shipping-template-1\"}]}")));
+        using var http = new HttpClient(new RecordingHandler(_ => Json(HttpStatusCode.OK, "{\"id\":\"product-1\",\"shop_id\":42,\"visible\":true,\"is_locked\":false,\"external\":[{\"id\":\"shopify-1\",\"handle\":\"dad-joke-loading\",\"shipping_template_id\":\"shipping-template-1\"}]}")));
         var client = new PrintifyListingClient(Guid.NewGuid(), http, _ => Task.FromResult<string?>("key"));
 
         var product = await client.GetAsync("42", "product-1", TestContext.Current.CancellationToken);
@@ -54,6 +55,53 @@ public sealed class PrintifyListingClientTests
         Assert.Equal("shopify-1", product.ExternalSalesChannelId);
         Assert.Equal("dad-joke-loading", product.ExternalHandle);
         Assert.Equal("shipping-template-1", product.Snapshot.Fields["shippingProfile"]);
+        Assert.Equal("42", product.ShopId);
+        Assert.True(product.HasVerifiedIdentity);
+    }
+
+    [Fact]
+    public async Task Connection_is_unavailable_when_selected_shop_is_missing()
+    {
+        var storeId = Guid.NewGuid();
+        using var http = new HttpClient(new RecordingHandler(_ => Json(HttpStatusCode.OK, "[{\"id\":84,\"title\":\"Other Shop\"}]")));
+        var client = new PrintifyListingClient(storeId, http, _ => Task.FromResult<string?>("key"));
+
+        var readiness = await client.CheckAsync(new ListingConnectionRequest(storeId, "42", false), TestContext.Current.CancellationToken);
+
+        Assert.False(readiness.ProductOperationsAvailable);
+        Assert.Contains("not available", readiness.Issues.Single().Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("[{\"title\":\"No ID\"}]")]
+    [InlineData("<html>")]
+    public async Task Connection_is_unavailable_when_shop_list_is_invalid(string body)
+    {
+        var storeId = Guid.NewGuid();
+        using var http = new HttpClient(new RecordingHandler(_ => Json(HttpStatusCode.OK, body)));
+        var client = new PrintifyListingClient(storeId, http, _ => Task.FromResult<string?>("key"));
+
+        var readiness = await client.CheckAsync(new ListingConnectionRequest(storeId, "42", false), TestContext.Current.CancellationToken);
+
+        Assert.False(readiness.ProductOperationsAvailable);
+        Assert.Contains("invalid shop", readiness.Issues.Single().Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("{\"id\":\"other-product\",\"shop_id\":42}", false)]
+    [InlineData("{\"id\":\"product-1\",\"shop_id\":84}", false)]
+    [InlineData("{\"shop_id\":42}", false)]
+    [InlineData("{\"id\":\"product-1\",\"shop_id\":42}", true)]
+    public async Task Product_read_retains_identity_validation_data(string body, bool expectedMatch)
+    {
+        using var http = new HttpClient(new RecordingHandler(_ => Json(HttpStatusCode.OK, body)));
+        var client = new PrintifyListingClient(Guid.NewGuid(), http, _ => Task.FromResult<string?>("key"));
+
+        var product = await client.GetAsync("42", "product-1", TestContext.Current.CancellationToken);
+
+        Assert.NotNull(product);
+        Assert.Equal(expectedMatch, product!.HasVerifiedIdentity && product.ShopId == "42");
     }
 
     [Theory]

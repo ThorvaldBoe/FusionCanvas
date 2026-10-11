@@ -45,6 +45,138 @@ public sealed class ListingLifecycleService
         CancellationToken cancellationToken = default) =>
         _connection.CheckAsync(request, cancellationToken);
 
+    public async Task<ListingProductLinkVerification> VerifyProductLinkAsync(
+        ListingConnectionRequest request,
+        Guid itemId,
+        string productId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (itemId == Guid.Empty || string.IsNullOrWhiteSpace(request.ShopId) || string.IsNullOrWhiteSpace(productId))
+            return new(false, Message: "Enter a Printify product ID and select a Store shop.");
+
+        var readiness = await _connection.CheckAsync(request, cancellationToken).ConfigureAwait(false);
+        if (!readiness.ProductOperationsAvailable)
+            return new(false, Message: readiness.Issues.FirstOrDefault()?.Message ?? "Printify is unavailable.");
+
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var store = snapshot.Stores.SingleOrDefault(value => value.Id == request.StoreId && !value.IsArchived);
+        var item = snapshot.Items.SingleOrDefault(value => value.Id == itemId);
+        if (store is null || item?.StoreId != request.StoreId)
+            return new(false, Message: "The selected Item is not part of the active Store.");
+
+        var existing = snapshot.ExternalListingMappings.SingleOrDefault(value => value.StoreId == request.StoreId && value.ItemId == itemId);
+        if (existing is not null && !string.Equals(existing.ShopId, request.ShopId, StringComparison.Ordinal))
+            return new(false, Message: "This Item is mapped to a different Printify shop. Resolve the Store shop mapping before changing its product.");
+        if (existing is not null && IsUncertain(existing))
+            return new(false, Message: "Refresh or reconcile the current Printify product before replacing its mapping.");
+
+        var normalizedProductId = productId.Trim();
+        if (snapshot.ExternalListingMappings.Any(value =>
+                value.StoreId == request.StoreId
+                && value.ItemId != itemId
+                && value.ProviderKey == ProviderKey
+                && value.ShopId == request.ShopId
+                && value.ProductId == normalizedProductId))
+        {
+            return new(false, Message: "This Printify product is already linked to another Item in this Store.");
+        }
+
+        ListingRemoteProduct? remote;
+        try
+        {
+            remote = await _products.GetAsync(request.ShopId, normalizedProductId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return new(false, Message: $"Printify could not verify this product. {exception.Message}");
+        }
+
+        if (remote is null)
+            return new(false, Message: "Printify could not find this product in the selected shop.");
+        if (!remote.HasVerifiedIdentity
+            || !string.Equals(remote.ProductId, normalizedProductId, StringComparison.Ordinal)
+            || !string.Equals(remote.ShopId, request.ShopId, StringComparison.Ordinal))
+        {
+            return new(false, Message: "Printify returned a different or incomplete product identity for the selected shop.");
+        }
+
+        return new(true, new(normalizedProductId, request.ShopId, remote.Snapshot.Fields.GetValueOrDefault("title")));
+    }
+
+    public async Task<ListingLifecycleResult> LinkExistingProductAsync(
+        ListingConnectionRequest request,
+        Guid itemId,
+        ListingProductLinkCandidate candidate,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(candidate);
+        if (!string.Equals(candidate.ShopId, request.ShopId, StringComparison.Ordinal))
+            return new(ListingLifecycleResultKind.Failed, Message: "The verified product belongs to a different selected shop.");
+
+        var verification = await VerifyProductLinkAsync(request, itemId, candidate.ProductId, cancellationToken).ConfigureAwait(false);
+        if (!verification.Succeeded || verification.Candidate is null)
+            return new(ListingLifecycleResultKind.Unavailable, Message: verification.Message ?? "Printify could not verify this product.");
+
+        ListingRemoteProduct? remote;
+        try
+        {
+            remote = await _products.GetAsync(request.ShopId, candidate.ProductId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return new(ListingLifecycleResultKind.Unavailable, Message: $"Printify could not re-verify this product. {exception.Message} The current mapping was preserved.");
+        }
+        if (remote is null
+            || !remote.HasVerifiedIdentity
+            || !string.Equals(remote.ProductId, candidate.ProductId, StringComparison.Ordinal)
+            || !string.Equals(remote.ShopId, request.ShopId, StringComparison.Ordinal))
+        {
+            return new(ListingLifecycleResultKind.Unavailable, Message: "Printify could not re-verify this product in the selected shop. The current mapping was preserved.");
+        }
+
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var existing = snapshot.ExternalListingMappings.SingleOrDefault(value => value.StoreId == request.StoreId && value.ItemId == itemId);
+        if (existing is not null && IsUncertain(existing))
+            return new(ListingLifecycleResultKind.Uncertain, ToApplicationMapping(existing), Message: "Refresh or reconcile the current Printify product before replacing its mapping.");
+        if (snapshot.ExternalListingMappings.Any(value =>
+                value.StoreId == request.StoreId
+                && value.ItemId != itemId
+                && value.ProviderKey == ProviderKey
+                && value.ShopId == request.ShopId
+                && value.ProductId == candidate.ProductId))
+        {
+            return new(ListingLifecycleResultKind.Failed, existing is null ? null : ToApplicationMapping(existing), Message: "This Printify product is already linked to another Item in this Store.");
+        }
+
+        var now = _clock();
+        var linked = new ExternalListingMapping(
+            request.StoreId,
+            itemId,
+            ProviderKey,
+            request.ShopId,
+            candidate.ProductId,
+            remote.ExternalSalesChannelId,
+            remote.ExternalHandle,
+            ExternalListingSyncState.Synchronized,
+            (ExternalListingPublicationState)remote.PublicationState,
+            ExternalListingOperationState.Succeeded,
+            SerializeSnapshot(remote.Snapshot),
+            null,
+            now,
+            existing?.CreatedAt ?? now,
+            now,
+            existing is not null && existing.ProductId == candidate.ProductId ? existing.UploadReferencesJson : null,
+            SerializeIntegrationValues(IntegrationValuesFromSnapshot(remote.Snapshot)));
+        await _repository.SaveAsync(ReplaceMapping(snapshot, linked), cancellationToken).ConfigureAwait(false);
+        return new(ListingLifecycleResultKind.Succeeded, ToApplicationMapping(linked), Message: $"Printify product {candidate.ProductId} is now linked to this Item.");
+    }
+
+    private static bool IsUncertain(ExternalListingMapping mapping) =>
+        mapping.SynchronizationState is ExternalListingSyncState.Pending or ExternalListingSyncState.Uncertain
+        || mapping.OperationState is ExternalListingOperationState.IntentRecorded or ExternalListingOperationState.NeedsReconciliation;
+
     public async Task<ListingLifecycleResult> RefreshAsync(
         ListingConnectionRequest request,
         Guid itemId,

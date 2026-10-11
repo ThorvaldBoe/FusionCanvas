@@ -49,18 +49,32 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
         if (!PrintifyToken.IsValid(secret))
             return Unavailable("Printify is not connected. Verify the Store's API key before using this tool.");
 
-        var response = await SendAsync(HttpMethod.Get, $"shops/{Uri.EscapeDataString(request.ShopId)}.json", secret!, cancellationToken: cancellationToken).ConfigureAwait(false);
+        var response = await SendAsync(HttpMethod.Get, "shops.json", secret!, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!response.Succeeded)
             return Unavailable(MessageFor(response.Outcome));
 
         try
         {
             using var document = JsonDocument.Parse(response.Body);
-            var shopId = document.RootElement.TryGetProperty("id", out var id) && id.TryGetInt32(out var numericId)
-                ? numericId.ToString(CultureInfo.InvariantCulture)
-                : request.ShopId;
-            if (!string.Equals(shopId, request.ShopId, StringComparison.Ordinal))
-                return Unavailable("Printify returned a different shop identity than the selected Store shop.");
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+                return Unavailable("Printify returned an invalid shop list.");
+
+            var selectedShopFound = false;
+            foreach (var shop in document.RootElement.EnumerateArray())
+            {
+                if (shop.ValueKind != JsonValueKind.Object
+                    || !shop.TryGetProperty("id", out var id)
+                    || !id.TryGetInt32(out var numericId))
+                {
+                    return Unavailable("Printify returned an invalid shop list.");
+                }
+
+                if (string.Equals(numericId.ToString(CultureInfo.InvariantCulture), request.ShopId, StringComparison.Ordinal))
+                    selectedShopFound = true;
+            }
+
+            if (!selectedShopFound)
+                return Unavailable("The selected Printify shop is not available for this account. Refresh Store settings and select an available shop.");
 
             return new(
                 ListingConnectionState.Ready,
@@ -257,7 +271,16 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
     {
         using var document = JsonDocument.Parse(body);
         var root = document.RootElement;
-        var id = ReadString(root, "id") ?? productId;
+        var returnedId = ReadString(root, "id");
+        var id = returnedId ?? productId;
+        var shopId = root.TryGetProperty("shop_id", out var shopValue)
+            ? shopValue.ValueKind switch
+            {
+                JsonValueKind.Number when shopValue.TryGetInt32(out var numericShopId) => numericShopId.ToString(CultureInfo.InvariantCulture),
+                JsonValueKind.String => shopValue.GetString(),
+                _ => null
+            }
+            : null;
         var publication = root.TryGetProperty("visible", out var visible)
             ? visible.ValueKind == JsonValueKind.True
                 ? ListingPublicationState.Published
@@ -273,7 +296,8 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
             ["variants"] = ReadVariantPrices(root)
         });
         return new(id, root.TryGetProperty("is_locked", out var lockedProperty) && lockedProperty.ValueKind == JsonValueKind.True, publication, snapshot,
-            ReadExternalValue(root, "id") ?? ReadString(root, "external_id"), ReadExternalValue(root, "handle") ?? ReadString(root, "handle"));
+            ReadExternalValue(root, "id") ?? ReadString(root, "external_id"), ReadExternalValue(root, "handle") ?? ReadString(root, "handle"),
+            shopId, !string.IsNullOrWhiteSpace(returnedId) && string.Equals(returnedId, productId, StringComparison.Ordinal));
     }
 
     private static string? TryReadProductId(byte[] body)

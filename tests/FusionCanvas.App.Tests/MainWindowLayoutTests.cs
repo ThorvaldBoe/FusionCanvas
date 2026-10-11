@@ -231,6 +231,35 @@ public class MainWindowConstructionTests
         Assert.True(IsEffectivelyVisible(printifyHeading));
     }
 
+    [AvaloniaFact]
+    public void PrintifyProductLinkControls_AreVisibleAndCurrentProductIdIsCopyable()
+    {
+        var snapshot = SampleWorkspace.Create();
+        snapshot = snapshot with { Stores = snapshot.Stores.Select(store => store with { FulfillmentStrategy = FulfillmentStrategy.Printify }).ToArray() };
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+        using var fixture = new MainWindowFixture(snapshot: snapshot, repository: repository);
+        fixture.ViewModel.OpenFromNavigation(fixture.ViewModel.NavigationContexts.Single(context => context.Context.Id == SampleWorkspace.ListingNodeId));
+        fixture.ViewModel.SelectWorkflowStage(WorkflowStage.Listing);
+        fixture.PumpLayout();
+
+        var selector = fixture.FindControl<Grid>(grid => AutomationProperties.GetAutomationId(grid) == "Item.StageToolSelector");
+        var printify = selector.GetVisualDescendants().OfType<Button>().Single(button => button.Content?.ToString() == "Printify");
+        Click(fixture, printify);
+        fixture.PumpLayout();
+
+        var linkedId = fixture.FindControl<TextBox>(control => AutomationProperties.GetAutomationId(control) == "Printify.CurrentProductId");
+        var candidateId = fixture.FindControl<TextBox>(control => AutomationProperties.GetAutomationId(control) == "Printify.CandidateProductId");
+        var verify = fixture.FindControl<Button>(control => AutomationProperties.GetAutomationId(control) == "Printify.VerifyProductLink");
+
+        Assert.True(IsEffectivelyVisible(linkedId));
+        Assert.True(linkedId.IsReadOnly);
+        Assert.Equal("Not linked", linkedId.Text);
+        Assert.Equal("Linked Printify product ID", AutomationProperties.GetName(linkedId));
+        Assert.True(IsEffectivelyVisible(candidateId));
+        Assert.Equal("Existing Printify product ID", AutomationProperties.GetName(candidateId));
+        Assert.True(IsEffectivelyVisible(verify));
+    }
+
     [AvaloniaTheory]
     [InlineData(900, 600)]
     [InlineData(1180, 760)]
