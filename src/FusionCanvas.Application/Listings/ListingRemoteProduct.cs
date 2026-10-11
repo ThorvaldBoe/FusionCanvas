@@ -6,4 +6,6 @@ public sealed record ListingRemoteProduct(
     ListingPublicationState PublicationState,
     ListingSnapshot Snapshot,
     string? ExternalSalesChannelId = null,
-    string? ExternalHandle = null);
+    string? ExternalHandle = null,
+    string? ShopId = null,
+    bool HasVerifiedIdentity = false);

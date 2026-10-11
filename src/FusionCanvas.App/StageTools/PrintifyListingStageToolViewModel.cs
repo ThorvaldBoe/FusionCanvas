@@ -26,6 +26,7 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     private Guid _itemId;
     private bool _canEdit;
     private bool _isBusy;
+    private bool _isLinkConfirmationVisible;
     private string _status = "Not loaded";
     private string _connectionStatus = "Not checked";
     private string _title = string.Empty;
@@ -35,6 +36,9 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     private string? _error;
     private string? _feedback;
     private ListingMapping? _mapping;
+    private ListingProductLinkCandidate? _linkCandidate;
+    private string _candidateProductId = string.Empty;
+    private string? _shopTitle;
 
     public PrintifyListingStageToolViewModel(
         IListingLifecycleServiceFactory? serviceFactory,
@@ -58,6 +62,9 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         DeleteCommand = new RelayCommand(_ => ShowDeleteConfirmation(), () => CanDelete);
         ConfirmDeleteCommand = new RelayCommand(_ => _ = DeleteAsync(), () => CanConfirmDelete);
         CancelDeleteCommand = new RelayCommand(_ => HideDeleteConfirmation(), () => IsDeleteConfirmationVisible);
+        VerifyProductLinkCommand = new RelayCommand(_ => _ = VerifyProductLinkAsync(), () => CanVerifyProductLink);
+        ConfirmProductLinkCommand = new RelayCommand(_ => _ = ConfirmProductLinkAsync(), () => CanConfirmProductLink);
+        CancelProductLinkCommand = new RelayCommand(_ => CancelProductLink(), () => IsLinkConfirmationVisible);
         AcceptRemoteCommand = new RelayCommand(_ => _ = ReconcileAsync(ListingConflictResolution.AcceptRemote), () => CanReconcile);
         KeepLocalCommand = new RelayCommand(_ => _ = ReconcileAsync(ListingConflictResolution.KeepLocal), () => CanReconcile);
         DownloadVariantSetupCommand = new RelayCommand(_ => _ = DownloadVariantSetupAsync(), () => CanDownloadVariantSetup);
@@ -73,6 +80,9 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     public ICommand DeleteCommand { get; }
     public ICommand ConfirmDeleteCommand { get; }
     public ICommand CancelDeleteCommand { get; }
+    public ICommand VerifyProductLinkCommand { get; }
+    public ICommand ConfirmProductLinkCommand { get; }
+    public ICommand CancelProductLinkCommand { get; }
     public ICommand AcceptRemoteCommand { get; }
     public ICommand KeepLocalCommand { get; }
     public ICommand DownloadVariantSetupCommand { get; }
@@ -90,6 +100,13 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     public bool HasFeedback => !string.IsNullOrWhiteSpace(FeedbackMessage);
     public bool HasConflict => _conflict is not null;
     public bool IsDeleteConfirmationVisible { get; private set; }
+    public bool IsLinkConfirmationVisible { get => _isLinkConfirmationVisible; private set { if (SetField(ref _isLinkConfirmationVisible, value)) OnPropertyChanged(nameof(IsLinkConfirmationVisible)); } }
+    public string CurrentProductId => _mapping?.Identity?.ProductId ?? string.Empty;
+    public string CurrentProductIdDisplay => string.IsNullOrWhiteSpace(CurrentProductId) ? "Not linked" : CurrentProductId;
+    public string CandidateProductId { get => _candidateProductId; set { if (SetField(ref _candidateProductId, value)) NotifyActions(); } }
+    public string LinkConfirmationText => _linkCandidate is null
+        ? string.Empty
+        : $"Link {Title} to Printify product {_linkCandidate.ProductId}{(string.IsNullOrWhiteSpace(_linkCandidate.Title) ? string.Empty : $" — {_linkCandidate.Title}")}{(string.IsNullOrWhiteSpace(_shopTitle) ? string.Empty : $" in {_shopTitle}")}? The remote product will not be changed.";
     public string DeleteConfirmationText => _mapping?.Identity is { } identity
         ? $"Delete the remote Printify draft {identity.ProductId}? This cannot be undone. Local mapping history will be retained."
         : "Delete the remote Printify draft? This cannot be undone.";
@@ -106,6 +123,9 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     public bool CanArchive => !IsBusy && _mapping is not null && _service is not null;
     public bool CanDelete => !IsBusy && !IsDeleteConfirmationVisible && _mapping?.Identity is not null && _service is not null;
     public bool CanConfirmDelete => !IsBusy && IsDeleteConfirmationVisible && _mapping?.Identity is not null && _service is not null;
+    public bool CanEditCandidateProductId => !IsBusy && _canEdit && _service is not null && _request is not null;
+    public bool CanVerifyProductLink => !IsBusy && _canEdit && _service is not null && _request is not null && !string.IsNullOrWhiteSpace(CandidateProductId);
+    public bool CanConfirmProductLink => !IsBusy && _canEdit && IsLinkConfirmationVisible && _linkCandidate is not null && _service is not null && _request is not null;
     public bool CanReconcile => !IsBusy && HasConflict && _service is not null && _projection is not null && _request is not null;
     public bool CanDownloadVariantSetup => !IsBusy && _variantSetupImport is not null && _mapping?.Identity is not null;
 
@@ -116,6 +136,11 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         _projection = null;
         _conflict = null;
         _mapping = null;
+        _linkCandidate = null;
+        CandidateProductId = string.Empty;
+        IsLinkConfirmationVisible = false;
+        OnPropertyChanged(nameof(CurrentProductId));
+        OnPropertyChanged(nameof(CurrentProductIdDisplay));
         IsDeleteConfirmationVisible = false;
         OnPropertyChanged(nameof(IsDeleteConfirmationVisible));
         ErrorMessage = null;
@@ -142,6 +167,7 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
             return;
         }
         var context = _storeContextMapper.Read(store);
+        _shopTitle = context.PrintifyShopTitle;
         if (context.PrintifyShopId is not int shopId)
         {
             SetBlocked("Select and save a Printify shop in Store settings first.");
@@ -175,6 +201,8 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         var mapping = _snapshot().ExternalListingMappings.SingleOrDefault(value => value.StoreId == store.Id && value.ItemId == itemId);
         if (mapping is not null)
             _mapping = ToApplicationMapping(mapping);
+        OnPropertyChanged(nameof(CurrentProductId));
+        OnPropertyChanged(nameof(CurrentProductIdDisplay));
         Status = _mapping?.SynchronizationState.ToString() ?? "Ready to create";
         NotifyActions();
     }
@@ -202,6 +230,47 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     private Task ArchiveAsync() => RunAsync(async cancellationToken => ApplyResult(await _service!.ArchiveLocallyAsync(_request!.StoreId, _itemId, cancellationToken).ConfigureAwait(true)));
     private Task DeleteAsync() => RunAsync(async cancellationToken => ApplyResult(await _service!.DeleteRemoteAsync(_request!, _itemId, cancellationToken).ConfigureAwait(true)));
     private Task ReconcileAsync(ListingConflictResolution resolution) => RunAsync(async cancellationToken => ApplyResult(await _service!.ReconcileAsync(_request!, _projection!, resolution, cancellationToken).ConfigureAwait(true)));
+
+    private Task VerifyProductLinkAsync() => RunAsync(async cancellationToken =>
+    {
+        IsLinkConfirmationVisible = false;
+        _linkCandidate = null;
+        OnPropertyChanged(nameof(LinkConfirmationText));
+        var result = await _service!.VerifyProductLinkAsync(_request!, _itemId, CandidateProductId, cancellationToken).ConfigureAwait(true);
+        if (!result.Succeeded || result.Candidate is null)
+        {
+            ErrorMessage = result.Message ?? "Printify could not verify this product.";
+            return;
+        }
+
+        _linkCandidate = result.Candidate;
+        IsLinkConfirmationVisible = true;
+        OnPropertyChanged(nameof(LinkConfirmationText));
+        NotifyActions();
+    });
+
+    private Task ConfirmProductLinkAsync() => RunAsync(async cancellationToken =>
+    {
+        if (_linkCandidate is null) return;
+        ApplyResult(await _service!.LinkExistingProductAsync(_request!, _itemId, _linkCandidate, cancellationToken).ConfigureAwait(true));
+        CandidateProductId = string.Empty;
+        _linkCandidate = null;
+        IsLinkConfirmationVisible = false;
+        OnPropertyChanged(nameof(CurrentProductId));
+        OnPropertyChanged(nameof(CurrentProductIdDisplay));
+        OnPropertyChanged(nameof(LinkConfirmationText));
+        NotifyActions();
+    });
+
+    private void CancelProductLink()
+    {
+        CandidateProductId = string.Empty;
+        _linkCandidate = null;
+        IsLinkConfirmationVisible = false;
+        ErrorMessage = null;
+        OnPropertyChanged(nameof(LinkConfirmationText));
+        NotifyActions();
+    }
 
     private Task DownloadVariantSetupAsync() => RunAsync(async cancellationToken =>
     {
@@ -239,6 +308,8 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(HasConflict));
         OnPropertyChanged(nameof(ConflictSummary));
         OnPropertyChanged(nameof(DeleteConfirmationText));
+        OnPropertyChanged(nameof(CurrentProductId));
+        OnPropertyChanged(nameof(CurrentProductIdDisplay));
         NotifyActions();
     }
 
@@ -278,9 +349,12 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanArchive));
         OnPropertyChanged(nameof(CanDelete));
         OnPropertyChanged(nameof(CanConfirmDelete));
+        OnPropertyChanged(nameof(CanEditCandidateProductId));
+        OnPropertyChanged(nameof(CanVerifyProductLink));
+        OnPropertyChanged(nameof(CanConfirmProductLink));
         OnPropertyChanged(nameof(CanReconcile));
         OnPropertyChanged(nameof(CanDownloadVariantSetup));
-        foreach (var command in new[] { CreateOrUpdateCommand, RefreshCommand, PublishCommand, UnpublishCommand, ArchiveCommand, DeleteCommand, ConfirmDeleteCommand, CancelDeleteCommand, AcceptRemoteCommand, KeepLocalCommand })
+        foreach (var command in new[] { CreateOrUpdateCommand, RefreshCommand, PublishCommand, UnpublishCommand, ArchiveCommand, DeleteCommand, ConfirmDeleteCommand, CancelDeleteCommand, VerifyProductLinkCommand, ConfirmProductLinkCommand, CancelProductLinkCommand, AcceptRemoteCommand, KeepLocalCommand })
             (command as RelayCommand)?.NotifyCanExecuteChanged();
     }
 
