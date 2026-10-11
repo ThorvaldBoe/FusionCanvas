@@ -1146,7 +1146,32 @@
                                 </Button.Flyout>
                               </Button>
                             </Grid>
-                            <TextBlock IsVisible="{Binding !IsColor}" Text="{Binding ValuesSummary}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+                            <TextBlock IsVisible="{Binding ShowEmptyValueSummary}" Text="{Binding ValuesSummary}" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       AutomationProperties.AutomationId="{Binding EmptyValueSummaryAutomationId}" />
+                            <virtualGrid:VirtualDataGrid IsVisible="{Binding ShowValueGrid}"
+                                                         Classes="optionValueSummaryGrid"
+                                                         ItemsSource="{Binding ValueRows}"
+                                                         Height="{Binding ValueGridHeight}" RowHeight="{Binding ValueGridRowHeight}"
+                                                         SelectionMode="None" Focusable="False"
+                                                         AutomationProperties.Name="{Binding ValueGridAccessibleName}"
+                                                         AutomationProperties.AutomationId="{Binding ValueGridAutomationId}">
+                              <virtualGrid:VirtualDataGrid.Columns>
+                                <virtualColumns:VirtualDataGridTemplateColumn Header="Configured values" Width="195"
+                                                                             IsSortable="False" IsResizable="False">
+                                  <virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate x:DataType="stores:AvailableOptionValueGridRowViewModel">
+                                      <Border Classes="optionValueGridRow" Classes.alternate="{Binding IsAlternate}" Padding="8,0">
+                                        <TextBlock Text="{Binding Value}" TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center" ToolTip.Tip="{Binding Value}"
+                                                   AutomationProperties.Name="{Binding AccessibleName}"
+                                                   AutomationProperties.HelpText="{Binding AccessibleHelpText}" />
+                                      </Border>
+                                    </DataTemplate>
+                                  </virtualColumns:VirtualDataGridTemplateColumn.CellTemplate>
+                                </virtualColumns:VirtualDataGridTemplateColumn>
+                              </virtualGrid:VirtualDataGrid.Columns>
+                            </virtualGrid:VirtualDataGrid>
                             <StackPanel IsVisible="{Binding IsColor}" Spacing="6">
                               <TextBlock IsVisible="{Binding $parent[ItemsControl].DataContext.CatalogSetup.AvailableColorsGrid.HasNoColors}"
                                          Text="No Colors configured." Foreground="{DynamicResource SecondaryTextBrush}"
@@ -1756,6 +1781,12 @@
       <Setter Property="Background" Value="Transparent" />
     </Style>
     <Style Selector="Border.colorChoiceGridRow.alternate">
+      <Setter Property="Background" Value="{DynamicResource Token.Color.SurfaceSubtle}" />
+    </Style>
+    <Style Selector="Border.optionValueGridRow">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.optionValueGridRow.alternate">
       <Setter Property="Background" Value="{DynamicResource Token.Color.SurfaceSubtle}" />
     </Style>
     <Style Selector="virtualGrid|VirtualDataGrid.colorValuesGrid /template/ ScrollViewer#PART_ScrollViewer">
