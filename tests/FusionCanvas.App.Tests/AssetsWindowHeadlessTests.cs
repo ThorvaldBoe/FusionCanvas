@@ -1,3 +1,5 @@
+using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media.Imaging;
@@ -19,6 +21,74 @@ namespace FusionCanvas.App.Tests;
 public sealed class AssetsWindowHeadlessTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 13, 12, 0, 0, TimeSpan.Zero);
+
+    [AvaloniaFact]
+    public async Task AssetsWindow_RealizesOnlyVisibleRowsAndScrollsToLaterAsset()
+    {
+        const int assetCount = 120;
+        const string longAssetName = "A very long asset name that remains available to assistive technology after visual trimming.png";
+        using var viewModel = new AssetsViewModel(new StubAssetManagementService());
+        var rows = Enumerable.Range(0, assetCount)
+            .Select(index => new AssetSummary(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                index == assetCount - 1 ? longAssetName : $"Asset {index:D3}",
+                AssetKind.ReferenceImage,
+                $"assets/asset-{index:D3}.png",
+                null,
+                $"asset-{index:D3}.png",
+                IsMissing: true,
+                ContextLabel: $"Context {index:D3}",
+                Now,
+                Now))
+            .Select(summary => new AssetRowViewModel(summary, viewModel.AvailablePurposes, viewModel));
+        foreach (var row in rows)
+        {
+            viewModel.Assets.Add(row);
+        }
+
+        var window = new AssetsWindow
+        {
+            DataContext = viewModel,
+            Width = 780,
+            Height = 440
+        };
+        window.Show();
+        window.UpdateLayout();
+
+        try
+        {
+            var scrollViewer = Assert.Single(window.GetVisualDescendants().OfType<ScrollViewer>());
+            var initiallyRealizedRows = window.GetVisualDescendants().OfType<ComboBox>().Count();
+            Assert.InRange(initiallyRealizedRows, 1, assetCount - 1);
+            Assert.True(scrollViewer.Extent.Height > scrollViewer.Viewport.Height);
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Asset 000");
+
+            scrollViewer.Offset = new Vector(0, scrollViewer.Extent.Height);
+            await HeadlessUiWait.UntilAsync(
+                () => window.GetVisualDescendants().OfType<TextBlock>().Any(text => text.Text == longAssetName),
+                "the final asset row is realized after scrolling");
+            window.UpdateLayout();
+
+            var finalName = Assert.Single(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == longAssetName);
+            Assert.Equal(longAssetName, ToolTip.GetTip(finalName));
+            Assert.Equal(longAssetName, AutomationProperties.GetName(finalName));
+            Assert.Equal(longAssetName, AutomationProperties.GetHelpText(finalName));
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Asset 000");
+            Assert.InRange(window.GetVisualDescendants().OfType<ComboBox>().Count(), 1, assetCount - 1);
+
+            var finalRow = Assert.Single(viewModel.Assets, row => row.Name == longAssetName);
+            var finalPurpose = Assert.Single(window.GetVisualDescendants().OfType<ComboBox>(), combo => ReferenceEquals(combo.DataContext, finalRow));
+            Assert.Same(viewModel.AvailablePurposes, finalPurpose.ItemsSource);
+            var finalRemove = Assert.Single(window.GetVisualDescendants().OfType<Button>(), button =>
+                ReferenceEquals(button.DataContext, finalRow) && Equals(button.Content, "Remove…"));
+            Assert.True(finalRemove.IsEnabled);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
 
     [AvaloniaFact]
     public async Task StoreAssetJourney_ImportsRelabelsPreviewsCancelsRemovalAndRehydrates()
@@ -140,6 +210,20 @@ public sealed class AssetsWindowHeadlessTests
 
     private static AssetManagementService Compose(IWorkspaceRepository repository, string workspaceRoot) =>
         new(repository, new LocalWorkspaceFileStore(workspaceRoot));
+
+    private sealed class StubAssetManagementService : IAssetManagementService
+    {
+        public Guid? ActiveWorkspaceId => null;
+        public void SetActiveWorkspace(Guid? workspaceId) { }
+        public Task<AssetManagementState> LoadAsync(AssetContextReference context, CancellationToken cancellationToken = default) =>
+            Task.FromResult(AssetManagementState.Empty);
+        public Task<AssetManagementResult> ImportAssetAsync(AssetManagementImportRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+        public Task<AssetManagementResult> RelabelAssetAsync(AssetManagementRelabelRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+        public Task<AssetManagementResult> RemoveAssetAsync(AssetManagementRemoveRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
 
     private static void SeedManagedFile(string workspaceRoot, string relativePath, string sourcePath)
     {
