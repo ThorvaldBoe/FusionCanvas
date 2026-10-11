@@ -14,7 +14,7 @@
     </StackPanel>
     <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
       <Button Content="Refresh" Command="{Binding LoadCommand}" Classes="secondary" />
-      <Button Content="Show/hide linked products" Command="{Binding ToggleLinkedCommand}" Classes="secondary" />
+      <Button Content="{Binding LinkedProductsToggleLabel}" AutomationProperties.Name="{Binding LinkedProductsToggleLabel}" Command="{Binding ToggleLinkedCommand}" Classes="secondary" />
       <Button Content="Check selected for duplicates" Command="{Binding CheckDuplicatesCommand}" IsEnabled="{Binding CanImport}" Classes="secondary" />
       <TextBlock Text="{Binding Message}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" />
     </StackPanel>
