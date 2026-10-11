@@ -1,6 +1,11 @@
 using System.Net.Sockets;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Integration.Persistence;
+using FusionCanvas.Domain.Stores;
+using FusionCanvas.Domain.Niches;
+using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Application.Stores;
+using FusionCanvas.Integration.Stores;
 using OpenQA.Selenium.Appium;
 using OpenQA.Selenium.Appium.Windows;
 
@@ -21,7 +26,7 @@ internal sealed class UiApplicationSession : IDisposable
 
     public DisposableUiTestRoot TestRoot => _testRoot;
 
-    public static UiApplicationSession Start()
+    public static UiApplicationSession Start(bool usePrintifyImportFixture = false)
     {
         var configuration = UiTestConfiguration.Load();
         configuration.ValidateForDesktopRun();
@@ -30,11 +35,11 @@ internal sealed class UiApplicationSession : IDisposable
         var testRoot = new DisposableUiTestRoot();
         try
         {
-            SeedWorkspace(testRoot);
+            SeedWorkspace(testRoot, usePrintifyImportFixture);
 
             var options = new AppiumOptions();
             options.App = configuration.ApplicationPath;
-            options.AddAdditionalAppiumOption("appArguments", testRoot.CreateApplicationArguments());
+            options.AddAdditionalAppiumOption("appArguments", testRoot.CreateApplicationArguments(usePrintifyImportFixture));
             options.AddAdditionalAppiumOption("appWorkingDir", Path.GetDirectoryName(configuration.ApplicationPath)!);
             options.AddAdditionalAppiumOption("createSessionTimeout", 15_000);
             options.PlatformName = "Windows";
@@ -62,7 +67,7 @@ internal sealed class UiApplicationSession : IDisposable
         }
     }
 
-    private static void SeedWorkspace(DisposableUiTestRoot testRoot)
+    private static void SeedWorkspace(DisposableUiTestRoot testRoot, bool usePrintifyImportFixture)
     {
         var repository = new SqliteWorkspaceRepository(testRoot.DatabasePath, useConnectionPooling: false);
         var workspaces = new WorkspaceManagementService(repository, new FusionCanvas.Integration.Workspaces.WorkspaceContextMapper());
@@ -73,6 +78,18 @@ internal sealed class UiApplicationSession : IDisposable
         if (!result.Succeeded)
         {
             throw new InvalidOperationException($"Could not seed the disposable UI-test workspace: {result.Error}");
+        }
+
+        if (usePrintifyImportFixture)
+        {
+            var snapshot = repository.LoadAsync().GetAwaiter().GetResult();
+            var workspaceId = snapshot.Workspaces.Single().Id;
+            var now = DateTimeOffset.UtcNow;
+            var storeId = Guid.NewGuid();
+            var store = new Store(storeId, workspaceId, "UI Test Store", null, false, now, now, "{}", fulfillmentStrategy: FulfillmentStrategy.Printify);
+            store = new StoreContextMapper().Apply(store, new StoreContext(PrintifyShopId: 42, PrintifyShopTitle: "Mock shop"));
+            var niche = new Niche(Guid.NewGuid(), storeId, "UI Test Niche", null, false, now, now, "{}");
+            repository.SaveAsync(snapshot with { Stores = [store], Niches = [niche] }).GetAwaiter().GetResult();
         }
     }
 

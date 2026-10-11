@@ -145,6 +145,7 @@ public sealed class WorkspaceTreeNodeViewModel : INotifyPropertyChanged
     public bool IsItemAndSingleSelection => IsItem && IsSingleSelectionContext;
     public bool HasContextActionsAndSingleSelection => HasContextActions && IsSingleSelectionContext;
     public bool IsTopicAndSingleSelection => IsTopic && IsSingleSelectionContext;
+    public bool IsNicheAndSingleSelection => EntityKind == WorkspaceEntityKind.Niche && IsSingleSelectionContext;
 
     public int SelectionCount
     {

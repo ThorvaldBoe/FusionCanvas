@@ -24,8 +24,9 @@ internal sealed class DisposableUiTestRoot : IDisposable
 
     public string RootPath => _rootPath;
 
-    public string CreateApplicationArguments() => string.Join(' ',
+    public string CreateApplicationArguments(bool usePrintifyImportFixture = false) => string.Join(' ',
         "--fusioncanvas-ui-test",
+        usePrintifyImportFixture ? "--fusioncanvas-ui-test-printify-import" : string.Empty,
         "--fusioncanvas-workspace-db", Quote(DatabasePath),
         "--fusioncanvas-workspace-root", Quote(WorkspaceRootPath),
         "--fusioncanvas-settings-path", Quote(SettingsPath));

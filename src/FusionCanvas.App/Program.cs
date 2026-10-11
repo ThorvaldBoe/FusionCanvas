@@ -8,7 +8,9 @@ public static class Program
     private const string WorkspaceRootArgument = "--fusioncanvas-workspace-root";
     private const string SettingsPathArgument = "--fusioncanvas-settings-path";
     private const string UiTestModeArgument = "--fusioncanvas-ui-test";
+    private const string UiTestPrintifyImportArgument = "--fusioncanvas-ui-test-printify-import";
     internal const string UiTestModeEnvironmentVariable = "FUSIONCANVAS_UI_TEST_MODE";
+    internal const string UiTestPrintifyImportEnvironmentVariable = "FUSIONCANVAS_UI_TEST_PRINTIFY_IMPORT";
 
     [STAThread]
     public static void Main(string[] args)
@@ -36,6 +38,12 @@ public static class Program
             if (argument == UiTestModeArgument)
             {
                 Environment.SetEnvironmentVariable(UiTestModeEnvironmentVariable, "1");
+                continue;
+            }
+
+            if (argument == UiTestPrintifyImportArgument)
+            {
+                Environment.SetEnvironmentVariable(UiTestPrintifyImportEnvironmentVariable, "1");
                 continue;
             }
 

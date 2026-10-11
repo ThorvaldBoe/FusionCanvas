@@ -86,6 +86,15 @@ public static class AppWorkspaceFactory
             printifyCredentials,
             fileStore,
             PrintifyListingClient.CreateHttpClient());
+        var useUiTestPrintify = Environment.GetEnvironmentVariable(Program.UiTestModeEnvironmentVariable) == "1"
+            && Environment.GetEnvironmentVariable(Program.UiTestPrintifyImportEnvironmentVariable) == "1";
+        IPrintifyListingImportClient printifyImportClient = useUiTestPrintify
+            ? new UiTestPrintifyListingImportClient()
+            : new PrintifyListingImportClient(PrintifyListingImportClient.CreateApiHttpClient(), PrintifyListingImportClient.CreateImageHttpClient(), telemetry);
+        IPrintifyCatalogClient printifyCatalogClient = useUiTestPrintify
+            ? new UiTestPrintifyCatalogClient()
+            : new PrintifyCatalogClient(PrintifyCatalogClient.CreateHttpClient(), telemetry);
+        IStorePrintifyCredentialStore printifyImportCredentials = useUiTestPrintify ? new UiTestPrintifyCredentialStore() : printifyCredentials;
         var workspaceTransfer = new WorkspaceTransferService(
             repository,
             fileStore,
@@ -187,7 +196,8 @@ public static class AppWorkspaceFactory
             printifyListingFactory,
             new WorkspaceListingProjectionSource(fileStore, rasterImageMetadata),
             new FusionCanvas.Integration.Stores.StoreContextMapper(),
-            new FusionCanvas.Application.Listings.ManualListingDetailsService(repository));
+            new FusionCanvas.Application.Listings.ManualListingDetailsService(repository),
+            new PrintifyListingImportService(storeManagement, printifyImportCredentials, printifyImportClient, repository, fileStore, printifyCatalogClient));
         return new AppWorkspaceRuntime(
             repository,
             new WorkspaceManagementService(

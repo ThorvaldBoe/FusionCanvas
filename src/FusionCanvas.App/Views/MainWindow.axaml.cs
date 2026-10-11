@@ -1268,6 +1268,23 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnContextPrintifyImport(object? sender, RoutedEventArgs e)
+    {
+        if (!TrySelectContextTopic(sender, out var viewModel, out var node)
+            || node.EntityKind != WorkspaceEntityKind.Niche
+            || viewModel.PrintifyListingImportService is not { } service
+            || viewModel.CreatePrintifyImportScope() is not { } scope)
+        {
+            return;
+        }
+
+        var import = new PrintifyListingImportViewModel(service, scope, node.EntityId);
+        var window = new PrintifyListingImportWindow { DataContext = import };
+        window.OpenStoreSetupRequested += (_, _) => viewModel.StoreManagement.OpenStoreEditorCommand.Execute(null);
+        await window.ShowDialog(this);
+        await viewModel.RefreshWorkspaceAfterImportAsync();
+    }
+
     private bool TrySelectContextGroup(
         object? sender,
         out MainWindowViewModel viewModel,

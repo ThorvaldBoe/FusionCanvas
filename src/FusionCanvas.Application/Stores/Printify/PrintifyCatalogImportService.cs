@@ -57,14 +57,7 @@ public sealed class PrintifyCatalogImportService(
                 || currentStore.Context.PrintifyShopId != store.Context.PrintifyShopId)
                 return InvalidContext;
             var snapshot = await repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-            var updated = ImportSelected(snapshot, scope.StoreId, result.SelectedProducts, _clock, _newId);
-            // The Products editor still reads the legacy projection while the
-            // catalog editor reads the normalized records written above. Keep
-            // both views aligned so imported variants and design areas are
-            // visible from either route.
-            var synchronized = CatalogCompatibilitySynchronizer
-                .SynchronizeStore(updated, scope.StoreId, _clock, _newId)
-                .Snapshot;
+            var synchronized = ApplySelectedCatalog(snapshot, scope.StoreId, result.SelectedProducts, _clock, _newId);
             await repository.SaveAsync(synchronized, cancellationToken).ConfigureAwait(false);
             return result with { Message = "Selected Printify catalog imported." };
         }
@@ -84,7 +77,7 @@ public sealed class PrintifyCatalogImportService(
         }
     }
 
-    private static WorkspaceSnapshot ImportSelected(
+    public static WorkspaceSnapshot ApplySelectedCatalog(
         WorkspaceSnapshot snapshot,
         Guid storeId,
         IReadOnlyList<PrintifyCatalogBlueprint> catalog,
