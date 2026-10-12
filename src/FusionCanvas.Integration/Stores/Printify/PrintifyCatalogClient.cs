@@ -110,7 +110,7 @@ public sealed class PrintifyCatalogClient : IPrintifyCatalogClient
                 var placeholders = requestedPlaceholders.Count == 0
                     ? []
                     : requestedPlaceholders.Select(requested => MatchPlaceholder(catalogVariant.Placeholders, requested)).ToArray();
-                resolvedVariants.Add(catalogVariant with { OptionValueIds = productVariant.OptionValueIds, Title = productVariant.Title, IsEnabled = productVariant.IsEnabled, IsAvailable = productVariant.IsAvailable, Placeholders = placeholders });
+                resolvedVariants.Add(catalogVariant with { OptionValueIds = productVariant.OptionValueIds, Title = productVariant.Title, IsEnabled = productVariant.IsEnabled, IsAvailable = productVariant.IsAvailable, Placeholders = placeholders, ProductionCost = productVariant.ProductionCost });
             }
             if (resolvedVariants.Count != productVariants.Count)
                 return Unexpected();
@@ -313,7 +313,7 @@ public sealed class PrintifyCatalogClient : IPrintifyCatalogClient
                     placeholders.Add(new(RequiredString(placeholder, "position"), OptionalString(placeholder, "decoration_method") ?? "unknown", 1, 1));
                 }
             }
-            return new PrintifyCatalogVariant(id, RequiredString(variant, "title"), OptionalBool(variant, "is_enabled", true), OptionalBool(variant, "is_available", true), ParseOptionIds(variant), placeholders);
+            return new PrintifyCatalogVariant(id, RequiredString(variant, "title"), OptionalBool(variant, "is_enabled", true), OptionalBool(variant, "is_available", true), ParseOptionIds(variant), placeholders, OptionalProductionCost(variant));
         }).ToList();
     }
 
@@ -440,7 +440,14 @@ public sealed class PrintifyCatalogClient : IPrintifyCatalogClient
         return variants.EnumerateArray().Select(item => new PrintifyCatalogVariant(
             RequiredInt(item, "id"), RequiredString(item, "title"),
             OptionalBool(item, "is_enabled", true), OptionalBool(item, "is_available", true),
-            ParseOptionIds(item), ParsePlaceholders(item))).ToList();
+            ParseOptionIds(item), ParsePlaceholders(item), OptionalProductionCost(item))).ToList();
+    }
+
+    private static decimal? OptionalProductionCost(JsonElement variant)
+    {
+        if (!variant.TryGetProperty("cost", out var cost)) return null;
+        if (!cost.TryGetInt32(out var cents) || cents < 0) throw new JsonException();
+        return cents / 100m;
     }
 
     private static List<int> ParseOptionIds(JsonElement item)

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Application.Workspaces;
@@ -173,7 +174,8 @@ public sealed class PrintifyCatalogImportService(
                     var optionValueIds = importedVariant.OptionValueIds.Where(optionValuesBySourceId.ContainsKey).Select(id => optionValuesBySourceId[id]).ToArray();
                     var variant = variants.SingleOrDefault(value => value.OfferingId == offering.Id && MetadataHasId(value.MetadataJson, importedVariant.Id));
                     var variantId = variant?.Id ?? newId();
-                    var replacement = new OfferingVariant(variantId, offering.Id, importedVariant.Title, optionValueIds, !importedVariant.IsEnabled || !importedVariant.IsAvailable, variant?.CreatedAt ?? now, now, Metadata("variant", importedVariant.Id));
+                    var metadataJson = UpdateVariantMetadata(variant?.MetadataJson, importedVariant.Id, importedVariant.ProductionCost);
+                    var replacement = new OfferingVariant(variantId, offering.Id, importedVariant.Title, optionValueIds, !importedVariant.IsEnabled || !importedVariant.IsAvailable, variant?.CreatedAt ?? now, now, metadataJson);
                     if (variant is null) variants.Add(replacement); else Replace(variants, value => value.Id == variant.Id, replacement);
                     localVariantIds[importedVariant.Id] = variantId;
                 }
@@ -402,6 +404,29 @@ public sealed class PrintifyCatalogImportService(
 
     private static string Metadata(string kind, params int[] ids) => JsonSerializer.Serialize(new { source = "printify", kind, ids });
     private static string Metadata(string kind, int blueprintId, string productId) => JsonSerializer.Serialize(new { source = "printify", kind, blueprintId, productId });
+
+    private static string UpdateVariantMetadata(string? existingMetadata, int variantId, decimal? productionCost)
+    {
+        JsonObject metadata;
+        try
+        {
+            metadata = string.IsNullOrWhiteSpace(existingMetadata)
+                ? new JsonObject()
+                : JsonNode.Parse(existingMetadata) as JsonObject ?? new JsonObject();
+        }
+        catch (JsonException)
+        {
+            metadata = new JsonObject();
+        }
+
+        metadata["source"] = "printify";
+        metadata["kind"] = "variant";
+        metadata["ids"] = new JsonArray(JsonValue.Create(variantId));
+        if (productionCost is decimal cost)
+            metadata["productionCost"] = JsonValue.Create(cost);
+
+        return metadata.ToJsonString();
+    }
     private static bool MetadataKindIs(string json, string kind)
     {
         using var document = ParseMetadata(json);

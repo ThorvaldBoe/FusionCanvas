@@ -6,4 +6,5 @@ public sealed record PrintifyCatalogVariant(
     bool IsEnabled,
     bool IsAvailable,
     IReadOnlyList<int> OptionValueIds,
-    IReadOnlyList<PrintifyCatalogPlaceholder> Placeholders);
+    IReadOnlyList<PrintifyCatalogPlaceholder> Placeholders,
+    decimal? ProductionCost = null);
