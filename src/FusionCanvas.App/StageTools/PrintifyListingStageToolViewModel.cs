@@ -192,7 +192,7 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         var projectionResult = await _projectionSource.BuildAsync(_snapshot(), itemId, new ListingPricingInput(ListingPricingPolicy.FixedRetailPrice, ParsePrice()), ShippingProfile, null, cancellationToken).ConfigureAwait(true);
         if (!projectionResult.IsValid)
         {
-            SetBlocked(string.Join(" ", projectionResult.Issues.Select(value => value.Message)));
+            SetBlocked(string.Join(" ", projectionResult.Issues.Select(value => value.Message)), connectionUnavailable: false);
             return;
         }
         _projection = projectionResult.Projection;
@@ -330,11 +330,12 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         NotifyActions();
     }
 
-    private void SetBlocked(string message)
+    private void SetBlocked(string message, bool connectionUnavailable = true)
     {
         Status = "Unavailable";
         ErrorMessage = message;
-        ConnectionStatus = "Unavailable";
+        if (connectionUnavailable)
+            ConnectionStatus = "Unavailable";
         NotifyActions();
     }
 
