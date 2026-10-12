@@ -630,11 +630,16 @@ public sealed class OpenRouterClient :
             throw;
         }
 
-        stopwatch.Stop();
-        if (!capture) return response;
+        if (!capture)
+        {
+            stopwatch.Stop();
+            return response;
+        }
 
         string? responseBody = null;
         var responseDetails = BuildResponseDetails(response, stopwatch.Elapsed);
+        long? responseBodyBytes = null;
+        var responseBodyTruncated = false;
         var contentType = response.Content.Headers.ContentType?.MediaType;
         if (IsTextContent(contentType))
         {
@@ -645,15 +650,34 @@ public sealed class OpenRouterClient :
             var originalHeaders = originalContent.Headers
                 .SelectMany(header => header.Value.Select(value => (header.Key, Value: value)))
                 .ToArray();
-            var bytes = await originalContent.ReadAsByteArrayAsync(requestCancellationToken).ConfigureAwait(false);
+            byte[] bytes;
+            try
+            {
+                bytes = await originalContent.ReadAsByteArrayAsync(requestCancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException exception)
+            {
+                stopwatch.Stop();
+                var (severity, outcome) = ClassifyCancellation(callerCancellationToken, timeoutCancellationToken);
+                await _telemetry!.RecordAsync(new TelemetryEventRequest(
+                    "Integration.OpenRouter", "HttpResponse", severity, outcome, exception.GetType().Name,
+                    RequestBody: requestBody,
+                    RequestDetailsJson: requestDetails,
+                    ResponseDetailsJson: BuildResponseDetails(response, stopwatch.Elapsed),
+                    MetadataJson: JsonSerializer.Serialize(new { elapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds, timeoutSeconds = timeout.TotalSeconds })),
+                    CancellationToken.None).ConfigureAwait(false);
+                response.Dispose();
+                throw;
+            }
             if (bytes.Length <= maximumBodyBytes)
             {
                 responseBody = Encoding.UTF8.GetString(bytes);
             }
             else
             {
-                responseDetails = BuildResponseDetails(response, stopwatch.Elapsed, bytes.Length, truncated: true);
+                responseBodyTruncated = true;
             }
+            responseBodyBytes = bytes.Length;
 
             var replacement = new ByteArrayContent(bytes);
             foreach (var header in originalHeaders) replacement.Headers.TryAddWithoutValidation(header.Key, header.Value);
@@ -661,6 +685,8 @@ public sealed class OpenRouterClient :
             response.Content = replacement;
         }
 
+        stopwatch.Stop();
+        responseDetails = BuildResponseDetails(response, stopwatch.Elapsed, responseBodyBytes, responseBodyTruncated);
         await _telemetry!.RecordAsync(new TelemetryEventRequest(
             "Integration.OpenRouter", "HttpResponse", response.IsSuccessStatusCode ? "Information" : "Warning",
             response.IsSuccessStatusCode ? "Succeeded" : "HttpFailure",
