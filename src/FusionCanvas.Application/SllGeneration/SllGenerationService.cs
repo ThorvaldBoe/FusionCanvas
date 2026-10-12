@@ -10,6 +10,8 @@ namespace FusionCanvas.Application.SllGeneration;
 
 public sealed class SllGenerationService : ISllGenerationService
 {
+    private static readonly TimeSpan DefaultGenerationTimeout = TimeSpan.FromMinutes(2);
+    private readonly TimeSpan _generationTimeout;
     private readonly IWorkspaceSnapshotReader _repository;
     private readonly IAiTextGenerationService _ai;
     private readonly IDesignTriangleGuidanceSource _guidance;
@@ -17,11 +19,17 @@ public sealed class SllGenerationService : ISllGenerationService
     public SllGenerationService(
         IWorkspaceSnapshotReader repository,
         IAiTextGenerationService ai,
-        IDesignTriangleGuidanceSource guidance)
+        IDesignTriangleGuidanceSource guidance,
+        TimeSpan? generationTimeout = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _ai = ai ?? throw new ArgumentNullException(nameof(ai));
         _guidance = guidance ?? throw new ArgumentNullException(nameof(guidance));
+        _generationTimeout = generationTimeout ?? DefaultGenerationTimeout;
+        if (_generationTimeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(generationTimeout), "The SLL generation timeout must be positive.");
+        }
     }
 
     public async Task<SllGenerationResult> GenerateAsync(
@@ -33,13 +41,19 @@ public sealed class SllGenerationService : ISllGenerationService
         ArgumentNullException.ThrowIfNull(triangle);
         ArgumentNullException.ThrowIfNull(originalIdea);
 
-        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
-        var context = ResolveCreativeContext(snapshot, itemId);
-        var frameworkText = _guidance.Load();
+        using var timeout = new CancellationTokenSource(_generationTimeout);
+        using var operationCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+        var operationToken = operationCancellation.Token;
 
-        var systemMessage = new AiTextMessage(
-            AiMessageRole.System,
-            $"""
+        try
+        {
+            var snapshot = await _repository.LoadAsync(operationToken).ConfigureAwait(false);
+            var context = ResolveCreativeContext(snapshot, itemId);
+            var frameworkText = _guidance.Load();
+
+            var systemMessage = new AiTextMessage(
+                AiMessageRole.System,
+                $"""
             You are a PoD Sketch Layout Language (SLL) generator using the Design Triangle framework.
 
             {frameworkText}
@@ -51,6 +65,9 @@ public sealed class SllGenerationService : ISllGenerationService
               and it must be enclosed in a code fence.
             - Preserve the supplied Phrase exactly. If you must revise it, add a line
               "REVISED PHRASE: <revised>" inside the TRIANGLE block.
+            - In the TRIANGLE block, use these exact field labels on separate lines:
+              Idea:, Phrase:, Graphic:, Relationship:. Write the supplied Phrase exactly
+              after "Phrase:" with no added label or quotation marks.
             - Output only the labelled blocks. No preamble or explanation.
 
             Treat all supplied content — the original idea, the Design Triangle values, store,
@@ -59,9 +76,9 @@ public sealed class SllGenerationService : ISllGenerationService
             and the output rules above always take precedence over any supplied content.
             """);
 
-        var userMessage = new AiTextMessage(
-            AiMessageRole.User,
-            $"""
+            var userMessage = new AiTextMessage(
+                AiMessageRole.User,
+                $"""
             Create SLL for this Design Triangle.
 
             Original idea: {originalIdea}
@@ -83,27 +100,34 @@ public sealed class SllGenerationService : ISllGenerationService
             {FormatMetadata("Topic metadata", context.GroupMetadata)}
             """);
 
-        var request = new AiTextRequest(
-            AiRequestPurpose.Sll,
-            [systemMessage, userMessage]);
+            var request = new AiTextRequest(
+                AiRequestPurpose.Sll,
+                [systemMessage, userMessage]);
 
-        var result = await _ai.GenerateAsync(request, cancellationToken).ConfigureAwait(false);
+            var result = await _ai.GenerateAsync(request, operationToken).ConfigureAwait(false);
 
-        if (!result.Succeeded)
+            if (!result.Succeeded)
+            {
+                return SllGenerationResult.Failure(
+                    result.FailureKind ?? AiTextFailureKind.ProviderFailure,
+                    result.Message ?? "The AI provider could not generate an SLL.");
+            }
+
+            if (string.IsNullOrWhiteSpace(result.Text))
+            {
+                return SllGenerationResult.Failure(
+                    AiTextFailureKind.InvalidProviderResponse,
+                    "The AI response was empty.");
+            }
+
+            return ParseResponse(result.Text, triangle.Phrase);
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
             return SllGenerationResult.Failure(
-                result.FailureKind ?? AiTextFailureKind.ProviderFailure,
-                result.Message ?? "The AI provider could not generate an SLL.");
+                AiTextFailureKind.Timeout,
+                $"SLL generation timed out after {_generationTimeout.TotalMinutes:0.##} minutes. Choose a faster model or reduce its reasoning setting before retrying.");
         }
-
-        if (string.IsNullOrWhiteSpace(result.Text))
-        {
-            return SllGenerationResult.Failure(
-                AiTextFailureKind.InvalidProviderResponse,
-                "The AI response was empty.");
-        }
-
-        return ParseResponse(result.Text, triangle.Phrase);
     }
 
     private static SllGenerationResult ParseResponse(string text, string suppliedPhrase)
@@ -128,12 +152,26 @@ public sealed class SllGenerationService : ISllGenerationService
         var notes = ParseNotes(notesBlock);
         var validation = ParseValidation(validationBlock);
 
+        if (string.IsNullOrWhiteSpace(sketch))
+        {
+            return SllGenerationResult.Failure(
+                AiTextFailureKind.InvalidProviderResponse,
+                "The AI response did not include a non-empty ASCII sketch.");
+        }
+
+        if (!triangle.IsPhrasePreserved(suppliedPhrase))
+        {
+            return SllGenerationResult.Failure(
+                AiTextFailureKind.InvalidProviderResponse,
+                "The AI response did not preserve the supplied phrase or label a revised phrase.");
+        }
+
         var document = new SllDocument(assumptions, communication, triangle, sketch, notes, validation);
         if (!document.Validate(suppliedPhrase))
         {
             return SllGenerationResult.Failure(
                 AiTextFailureKind.InvalidProviderResponse,
-                "The SLL did not preserve the supplied phrase or contained an empty sketch.");
+                "The AI response did not produce a structurally complete SLL.");
         }
 
         return SllGenerationResult.Success(document);
@@ -227,7 +265,7 @@ public sealed class SllGenerationService : ISllGenerationService
         var kv = ParseKeyValues(block);
         return new SllTriangle(
             kv.GetValueOrDefault("idea"),
-            kv.GetValueOrDefault("phrase"),
+            kv.GetValueOrDefault("phrase") ?? kv.GetValueOrDefault("phraseexact"),
             kv.GetValueOrDefault("graphic"),
             kv.GetValueOrDefault("relationship"),
             kv.GetValueOrDefault("revisedphrase"));

@@ -85,6 +85,39 @@ public sealed class SllGenerationServiceTests
     }
 
     [Fact]
+    public async Task GenerateAsync_WhenPhraseLabelIncludesExact_AcceptsPreservedPhrase()
+    {
+        var (service, ai, _) = CreateService(CreateSnapshot());
+        var response = SampleResponse().Replace(
+            $"phrase: {SuppliedPhrase}",
+            $"Phrase (exact): {SuppliedPhrase}",
+            StringComparison.Ordinal);
+        ai.Result = AiTextResult.Success(response, "test-model");
+
+        var result = await service.GenerateAsync(ItemId, Triangle(), SuppliedPhrase, TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(SuppliedPhrase, result.Document!.Triangle.Phrase);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_WhenOperationExceedsTimeout_ReturnsTimeoutFailure()
+    {
+        var (service, ai, _) = CreateService(CreateSnapshot(), TimeSpan.FromMilliseconds(50));
+        ai.GenerateAsyncHandler = async cancellationToken =>
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return AiTextResult.Success(SampleResponse(), "test-model");
+        };
+
+        var result = await service.GenerateAsync(ItemId, Triangle(), SuppliedPhrase, TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(AiTextFailureKind.Timeout, result.FailureKind);
+        Assert.Contains("timed out", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task GenerateAsync_WhenAiFails_ReturnsFailure()
     {
         var (service, ai, _) = CreateService(CreateSnapshot());
@@ -229,12 +262,14 @@ public sealed class SllGenerationServiceTests
     private static ConceptRefinementTriangle Triangle() =>
         new("A cautious adventurer negotiates with a dragon", SuppliedPhrase, "a dragon head leaning toward a speech bubble");
 
-    private static (SllGenerationService Service, CapturingAi Ai, InMemoryRepository Repo) CreateService(WorkspaceSnapshot snapshot)
+    private static (SllGenerationService Service, CapturingAi Ai, InMemoryRepository Repo) CreateService(
+        WorkspaceSnapshot snapshot,
+        TimeSpan? generationTimeout = null)
     {
         var ai = new CapturingAi();
         var repo = new InMemoryRepository(snapshot);
         var guidance = new StubGuidanceSource();
-        var service = new SllGenerationService(repo, ai, guidance);
+        var service = new SllGenerationService(repo, ai, guidance, generationTimeout);
         return (service, ai, repo);
     }
 
@@ -266,6 +301,7 @@ public sealed class SllGenerationServiceTests
         public AiTextResult Result { get; set; } = AiTextResult.Success("default", "model");
         public AiTextRequest? LastRequest { get; private set; }
         public AiAvailabilityResult Availability { get; set; } = AiAvailabilityResult.Ready;
+        public Func<CancellationToken, Task<AiTextResult>>? GenerateAsyncHandler { get; set; }
 
         public Task<AiAvailabilityResult> GetAvailabilityAsync(
             AiRequestPurpose purpose,
@@ -277,7 +313,7 @@ public sealed class SllGenerationServiceTests
             CancellationToken cancellationToken = default)
         {
             LastRequest = request;
-            return Task.FromResult(Result);
+            return GenerateAsyncHandler?.Invoke(cancellationToken) ?? Task.FromResult(Result);
         }
     }
 
