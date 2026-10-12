@@ -161,7 +161,7 @@ public sealed class PrintifyListingImportClient : IPrintifyListingImportClient
     }
 
     private static bool IsAllowedArtworkUri(Uri uri) => uri.Scheme == Uri.UriSchemeHttps && uri.UserInfo.Length == 0
-        && (uri.Host.Equals("images.printify.com", StringComparison.OrdinalIgnoreCase)
+        && (uri.Host.EndsWith(".printify.com", StringComparison.OrdinalIgnoreCase)
             || uri.Host.Equals("printify-upload.s3.amazonaws.com", StringComparison.OrdinalIgnoreCase));
 
     private static JsonElement RequiredArray(JsonElement item, string name) => item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Array ? value : throw new JsonException();
