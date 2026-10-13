@@ -64,6 +64,47 @@ public sealed class PrintifyListingImportClientTests
     }
 
     [Fact]
+    public async Task Product_detail_accepts_printify_s3_artwork_host()
+    {
+        const string body = """
+        {"id":"p1","title":"Listing","blueprint_id":68,"print_provider_id":9,
+         "options":[],"variants":[{"id":11,"title":"Black / M","is_enabled":true,"is_available":true}],
+         "print_areas":[{"variant_ids":[11],"placeholders":[{"position":"front","images":[{"id":"img-1","src":"https://pfy-prod-image-storage.s3.us-east-2.amazonaws.com/artwork/abc?signature=hidden","variant_ids":[11]}]}]}]}
+        """;
+        using var api = new HttpClient(new Handler((_, _) => Task.FromResult(Json(body))));
+        using var images = new HttpClient(new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound))));
+        var client = new PrintifyListingImportClient(api, images);
+
+        var product = await client.GetProductAsync("synthetic-key", 42, "p1", TestContext.Current.CancellationToken);
+
+        Assert.NotNull(product);
+        Assert.Equal("pfy-prod-image-storage.s3.us-east-2.amazonaws.com", new Uri(Assert.Single(Assert.Single(product.PrintAreas).Images).SourceUrl).Host);
+    }
+
+    [Fact]
+    public async Task Product_detail_marks_artwork_without_source_as_unsupported_and_keeps_valid_layers()
+    {
+        const string body = """
+        {"id":"p1","title":"Listing","blueprint_id":68,"print_provider_id":9,
+         "options":[],"variants":[{"id":11,"title":"Black / M","is_enabled":true,"is_available":true}],
+         "print_areas":[{"variant_ids":[11],"placeholders":[{"position":"front","images":[
+           {"id":"img-valid","src":"https://images.printify.com/art.png","variant_ids":[11]},
+           {"id":"img-empty","src":"","variant_ids":[11]}
+         ]}]}]}
+        """;
+        using var api = new HttpClient(new Handler((_, _) => Task.FromResult(Json(body))));
+        using var images = new HttpClient(new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound))));
+        var client = new PrintifyListingImportClient(api, images);
+
+        var product = await client.GetProductAsync("synthetic-key", 42, "p1", TestContext.Current.CancellationToken);
+
+        Assert.NotNull(product);
+        var area = Assert.Single(product.PrintAreas);
+        Assert.True(area.HasUnsupportedLayers);
+        Assert.Equal("img-valid", Assert.Single(area.Images).ImageId);
+    }
+
+    [Fact]
     public async Task Artwork_download_is_unauthed_bounded_and_requires_safe_https_and_valid_image_bytes()
     {
         var png = new byte[] { 137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0 };

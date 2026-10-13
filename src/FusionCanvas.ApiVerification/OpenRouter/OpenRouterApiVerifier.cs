@@ -184,12 +184,13 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
             ?? throw new InvalidOperationException($"OpenRouter did not list the selected text model `{SafeDiagnostic.Redact(modelId)}`.");
         var endpointCatalog = await service.GetEndpointsAsync(configuration.OpenRouterApiKey!, model.Id, false, cancellationToken).ConfigureAwait(false);
         var maximumTokens = Math.Min(MaximumCompletionTokens, model.MaxCompletionTokens ?? MaximumCompletionTokens);
-        var profileTemplate = BuildTestProfile(model, maximumTokens);
         var endpoint = endpointCatalog.Endpoints
             .Where(candidate => candidate.PromptPrice is not null && candidate.CompletionPrice is not null)
-            .Where(candidate => candidate.SupportedParameters.Contains(AiParameterRegistry.MaxCompletionTokens, StringComparer.Ordinal))
+            .Where(candidate => candidate.SupportedParameters.Contains(AiParameterRegistry.MaxCompletionTokens, StringComparer.Ordinal)
+                || candidate.SupportedParameters.Contains("max_tokens", StringComparer.Ordinal))
             .OrderBy(candidate => candidate.PromptPrice + candidate.CompletionPrice)
             .FirstOrDefault() ?? throw new InvalidOperationException("No exact model endpoint advertises bounded completion tokens and current prompt/completion prices; generation is blocked.");
+        var profileTemplate = BuildTestProfile(model, endpoint.SupportedParameters, maximumTokens);
         var profile = profileTemplate with { Routing = AiRoutingPolicy.ForEndpoint(endpoint.EndpointId, endpoint.ProviderId) };
         var prompt = "Reply with exactly the word OK.";
         var promptBytes = Encoding.UTF8.GetByteCount(prompt);
@@ -209,6 +210,11 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
         }
         Console.WriteLine($"Text model: {model.Id}");
         Console.WriteLine($"Endpoint: {endpoint.ProviderName} / {endpoint.EndpointId}");
+        var endpointParameters = endpoint.SupportedParameters.ToHashSet(StringComparer.Ordinal);
+        var endpointGaps = model.SupportedParameters.Where(parameter => !endpointParameters.Contains(parameter)).OrderBy(parameter => parameter, StringComparer.Ordinal).ToArray();
+        if (endpointGaps.Length > 0)
+            Console.WriteLine($"Model parameters omitted for this endpoint: {string.Join(", ", endpointGaps)}");
+        Console.WriteLine($"Endpoint-supported parameters: {string.Join(", ", endpoint.SupportedParameters.OrderBy(parameter => parameter, StringComparer.Ordinal))}");
         Console.WriteLine($"Effective request parameters: {ProfileSummary(profile)}");
         Console.WriteLine($"Cumulative conservative maximum: {estimate:0.000000} USD / ceiling {ceiling:0.000000} USD");
         if (!await SessionConfirmation.RequirePhraseAsync("This sends one short generation request to OpenRouter.", $"GENERATE {model.Id}", cancellationToken).ConfigureAwait(false))
@@ -341,7 +347,7 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
             requestedModels,
             textCatalog.Models.Select(model => model.Id),
             imageCatalog.Models.Select(model => model.Id));
-        var candidates = selection.Candidates;
+        IReadOnlyList<OpenRouterQualificationCandidate> candidates = selection.Candidates;
         if (selection.InvalidAllCombination || selection.UnknownModelIds.Count > 0 || candidates.Count == 0)
         {
             var reason = selection.InvalidAllCombination
@@ -355,19 +361,22 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
 
         Console.WriteLine($"Qualification candidates: {candidates.Count} operation/model pairs.");
         var plannedBounds = new Dictionary<(string Id, string Kind), decimal>();
+        var boundedCandidates = new List<OpenRouterQualificationCandidate>();
         decimal plannedMaximum = 0;
         foreach (var candidate in candidates)
         {
-            var bound = await EstimateCandidateMaximumAsync(service, candidate.Id, candidate.Kind, cancellationToken).ConfigureAwait(false);
+            var bound = await EstimateCandidateMaximumAsync(service, candidate, textCatalog.Models, imageCatalog.Models, cancellationToken).ConfigureAwait(false);
             if (bound is null)
             {
-                operations.Add(new($"openrouter-{candidate.Kind}-generation", "blocked", "No conservative cost bound is available; no qualification calls were sent.", ModelId: candidate.Id));
-                return (plannedMaximum, null);
+                operations.Add(new($"openrouter-{candidate.Kind}-generation", "budget-deferred", "No conservative cost bound is available; this model was skipped before any generation request.", ModelId: candidate.Id));
+                continue;
             }
             plannedMaximum += bound.Value;
             plannedBounds[(candidate.Id, candidate.Kind)] = bound.Value;
+            boundedCandidates.Add(candidate);
             Console.WriteLine($"  {candidate.Kind}: {candidate.Id} (max {bound.Value:0.000000} USD)");
         }
+        candidates = boundedCandidates.ToArray();
         Console.WriteLine($"Aggregate conservative maximum: {plannedMaximum:0.000000} USD / session ceiling {ceiling:0.000000} USD");
         if (plannedMaximum > ceiling)
         {
@@ -453,31 +462,35 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
         return (estimatedTotal, hasActual ? actualTotal : null);
     }
 
-    private async Task<decimal?> EstimateCandidateMaximumAsync(OpenRouterClient service, string modelId, string kind, CancellationToken cancellationToken)
+    private async Task<decimal?> EstimateCandidateMaximumAsync(
+        OpenRouterClient service,
+        OpenRouterQualificationCandidate candidate,
+        IReadOnlyCollection<AiModelDescriptor> textModels,
+        IReadOnlyCollection<AiModelDescriptor> imageModels,
+        CancellationToken cancellationToken)
     {
-        if (kind == "text")
+        if (candidate.Kind == "text")
         {
-            var models = await service.GetModelsAsync(configuration.OpenRouterApiKey!, false, cancellationToken).ConfigureAwait(false);
-            var model = models.Models.SingleOrDefault(candidate => candidate.Id.Equals(modelId, StringComparison.OrdinalIgnoreCase));
+            var model = textModels.SingleOrDefault(model => model.Id.Equals(candidate.Id, StringComparison.OrdinalIgnoreCase));
             if (model is null) return null;
             var endpoints = await service.GetEndpointsAsync(configuration.OpenRouterApiKey!, model.Id, false, cancellationToken).ConfigureAwait(false);
             var maxTokens = Math.Min(MaximumCompletionTokens, model.MaxCompletionTokens ?? MaximumCompletionTokens);
             var endpoint = endpoints.Endpoints
                 .Where(candidate => candidate.PromptPrice is not null && candidate.CompletionPrice is not null)
-                .Where(candidate => candidate.SupportedParameters.Contains(AiParameterRegistry.MaxCompletionTokens, StringComparer.Ordinal))
+                .Where(candidate => candidate.SupportedParameters.Contains(AiParameterRegistry.MaxCompletionTokens, StringComparer.Ordinal)
+                    || candidate.SupportedParameters.Contains("max_tokens", StringComparer.Ordinal))
                 .OrderBy(candidate => candidate.PromptPrice + candidate.CompletionPrice)
                 .FirstOrDefault();
             if (endpoint is not null)
             {
-                var profile = BuildTestProfile(model, maxTokens) with { Routing = AiRoutingPolicy.ForEndpoint(endpoint.EndpointId, endpoint.ProviderId) };
+                var profile = BuildTestProfile(model, endpoint.SupportedParameters, maxTokens) with { Routing = AiRoutingPolicy.ForEndpoint(endpoint.EndpointId, endpoint.ProviderId) };
                 Console.WriteLine($"    endpoint: {endpoint.ProviderName} / {endpoint.EndpointId}");
                 Console.WriteLine($"    effective parameters: {ProfileSummary(profile)}");
             }
             return endpoint is null ? null : OpenRouterCostBound.EstimateTextMaximum(endpoint, Encoding.UTF8.GetByteCount("Reply with exactly the word OK."), maxTokens);
         }
 
-        var imageModels = await service.GetImageModelsAsync(configuration.OpenRouterApiKey!, false, cancellationToken).ConfigureAwait(false);
-        var imageModel = imageModels.Models.SingleOrDefault(candidate => candidate.Id.Equals(modelId, StringComparison.OrdinalIgnoreCase));
+        var imageModel = imageModels.SingleOrDefault(model => model.Id.Equals(candidate.Id, StringComparison.OrdinalIgnoreCase));
         if (imageModel is null) return null;
         var imageEndpoints = await service.GetImageEndpointsAsync(configuration.OpenRouterApiKey!, imageModel.Id, false, cancellationToken).ConfigureAwait(false);
         var imageEndpoint = imageEndpoints
@@ -497,8 +510,16 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
     }
 
     internal static AiProfileSettings BuildTestProfile(AiModelDescriptor model, int maximumTokens)
+        => BuildTestProfile(model, model.SupportedParameters, maximumTokens);
+
+    internal static AiProfileSettings BuildTestProfile(
+        AiModelDescriptor model,
+        IReadOnlyCollection<string> endpointSupportedParameters,
+        int maximumTokens)
     {
-        var supported = model.SupportedParameters.ToHashSet(StringComparer.Ordinal);
+        var supported = model.SupportedParameters
+            .Intersect(endpointSupportedParameters, StringComparer.Ordinal)
+            .ToHashSet(StringComparer.Ordinal);
         var reasoning = AiReasoningSettings.ProviderDefault;
         if (supported.Contains(AiParameterRegistry.Reasoning) && model.Reasoning is { } capabilities)
         {
@@ -512,7 +533,7 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
         var profile = AiProfileSettings.Empty with
         {
             ModelId = model.Id,
-            MaxCompletionTokens = supported.Contains(AiParameterRegistry.MaxCompletionTokens) ? maximumTokens : null,
+            MaxCompletionTokens = supported.Contains(AiParameterRegistry.MaxCompletionTokens) || supported.Contains("max_tokens") ? maximumTokens : null,
             Temperature = supported.Contains(AiParameterRegistry.Temperature) ? 0.2 : null,
             TopP = supported.Contains(AiParameterRegistry.TopP) ? 0.9 : null,
             TopK = supported.Contains(AiParameterRegistry.TopK) ? 20 : null,

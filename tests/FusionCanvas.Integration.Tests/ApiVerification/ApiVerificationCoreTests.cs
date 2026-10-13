@@ -26,6 +26,12 @@ public sealed class ApiVerificationCoreTests
         Assert.Contains("printify-product-delete", ids);
         Assert.Contains("printify-product-publish", ids);
         Assert.Contains("printify-product-unpublish", ids);
+        AssertScenarioPlans("printify-smoke", "printify-shops", "printify-blueprints", "printify-blueprint", "printify-providers", "printify-variants",
+            "printify-shop-products-catalog", "printify-shop-products-import", "printify-selected-products", "printify-shop-product");
+        AssertScenarioPlans("printify-product-detail", "printify-shops", "printify-shop-products-catalog", "printify-shop-products-import",
+            "printify-selected-products", "printify-shop-product");
+        AssertScenarioPlans("printify-artwork-import", "printify-shops", "printify-shop-products-catalog", "printify-shop-products-import",
+            "printify-selected-products", "printify-shop-product", "printify-artwork-download");
         Assert.DoesNotContain(ApiOperationInventory.Operations, operation => operation.Path.Contains("order", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(ApiOperationInventory.Operations, operation => operation.CostClassification == ApiOperationCostClass.Unknown);
         Assert.All(ApiOperationInventory.Operations.Where(operation => operation.Provider == "Printify"), operation =>
@@ -41,6 +47,16 @@ public sealed class ApiVerificationCoreTests
             Assert.All(operation.AdditionalScenarios ?? [], scenario => Assert.Contains(scenario, ApiVerificationScenarios.Printify));
         });
         Assert.Contains("printify-product-detail", ApiVerificationScenarios.Printify);
+    }
+
+    private static void AssertScenarioPlans(string scenario, params string[] expectedOperationIds)
+    {
+        var planned = ApiOperationInventory.Operations
+            .Where(operation => operation.Scenario.Equals(scenario, StringComparison.OrdinalIgnoreCase)
+                || operation.AdditionalScenarios?.Contains(scenario, StringComparer.OrdinalIgnoreCase) == true)
+            .Select(operation => operation.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.Subset(planned, expectedOperationIds.ToHashSet(StringComparer.Ordinal));
     }
 
     [Fact]
@@ -167,6 +183,36 @@ public sealed class ApiVerificationCoreTests
         Assert.Equal("low", reasoning.Reasoning.Effort);
         Assert.Empty(AiParameterRegistry.Validate(sampling, samplingModel));
         Assert.Empty(AiParameterRegistry.Validate(reasoning, reasoningModel));
+    }
+
+    [Fact]
+    public void QualificationProfileUsesIntersectionOfModelAndSelectedEndpointParameters()
+    {
+        var model = new AiModelDescriptor("provider/model", "Model", null, null, ["text"], ["text"],
+            [AiParameterRegistry.MaxCompletionTokens, AiParameterRegistry.Temperature, AiParameterRegistry.Seed],
+            1000, 128, null, null, false, null);
+
+        var profile = OpenRouterApiVerifier.BuildTestProfile(
+            model,
+            [AiParameterRegistry.MaxCompletionTokens, AiParameterRegistry.Temperature],
+            24);
+
+        Assert.Equal(24, profile.MaxCompletionTokens);
+        Assert.Equal(0.2, profile.Temperature);
+        Assert.Null(profile.Seed);
+        Assert.Empty(AiParameterRegistry.Validate(profile, model));
+    }
+
+    [Fact]
+    public void QualificationProfileRecognizesLegacyMaxTokensAliasForBoundedRequests()
+    {
+        var model = new AiModelDescriptor("provider/model", "Model", null, null, ["text"], ["text"],
+            ["max_tokens", AiParameterRegistry.Temperature], 1000, 128, null, null, false, null);
+
+        var profile = OpenRouterApiVerifier.BuildTestProfile(model, ["max_tokens", AiParameterRegistry.Temperature], 24);
+
+        Assert.Equal(24, profile.MaxCompletionTokens);
+        Assert.Empty(AiParameterRegistry.Validate(profile, model));
     }
 
     [Fact]

@@ -93,7 +93,12 @@ public sealed class PrintifyListingImportClient : IPrintifyListingImportClient
                 if (layers.GetArrayLength() != 1 || placeholder.TryGetProperty("text", out _) || placeholder.TryGetProperty("layers", out _)) unsupported = true;
                 foreach (var image in layers.EnumerateArray())
                 {
-                    var source = RequiredString(image, "src");
+                    var source = OptionalString(image, "src");
+                    if (string.IsNullOrWhiteSpace(source))
+                    {
+                        unsupported = true;
+                        continue;
+                    }
                     var uri = ValidateArtworkUri(source);
                     var imageId = OptionalString(image, "id") ?? uri.AbsolutePath.Split('/').LastOrDefault() ?? "artwork";
                     var imageVariants = image.TryGetProperty("variant_ids", out var variantValues) && variantValues.ValueKind == JsonValueKind.Array
@@ -155,14 +160,36 @@ public sealed class PrintifyListingImportClient : IPrintifyListingImportClient
 
     private static Uri ValidateArtworkUri(string value)
     {
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || !IsAllowedArtworkUri(uri))
-            throw new InvalidOperationException("Printify returned an unsafe artwork URL.");
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
+        {
+            var host = ExtractSafeHost(value);
+            throw new InvalidOperationException(host is null
+                ? "Printify returned an invalid artwork URL without an absolute host."
+                : $"Printify returned an invalid artwork URL from host '{host}'.");
+        }
+        if (!IsAllowedArtworkUri(uri))
+            throw new InvalidOperationException($"Printify returned an unsafe artwork URL from host '{uri.IdnHost}'.");
         return uri;
+    }
+
+    private static string? ExtractSafeHost(string value)
+    {
+        var schemeEnd = value.IndexOf("://", StringComparison.Ordinal);
+        if (schemeEnd < 0) return null;
+        var hostStart = schemeEnd + 3;
+        var hostEnd = value.IndexOfAny(['/','?','#'], hostStart);
+        if (hostEnd < 0) hostEnd = value.Length;
+        var host = value[hostStart..hostEnd];
+        var userInfoEnd = host.LastIndexOf('@');
+        if (userInfoEnd >= 0) host = host[(userInfoEnd + 1)..];
+        var safeHost = new string(host.Where(character => char.IsAsciiLetterOrDigit(character) || character is '.' or '-').Take(253).ToArray());
+        return string.IsNullOrWhiteSpace(safeHost) ? null : safeHost;
     }
 
     private static bool IsAllowedArtworkUri(Uri uri) => uri.Scheme == Uri.UriSchemeHttps && uri.UserInfo.Length == 0
         && (uri.Host.EndsWith(".printify.com", StringComparison.OrdinalIgnoreCase)
-            || uri.Host.Equals("printify-upload.s3.amazonaws.com", StringComparison.OrdinalIgnoreCase));
+            || uri.Host.Equals("printify-upload.s3.amazonaws.com", StringComparison.OrdinalIgnoreCase)
+            || uri.Host.Equals("pfy-prod-image-storage.s3.us-east-2.amazonaws.com", StringComparison.OrdinalIgnoreCase));
 
     private static JsonElement RequiredArray(JsonElement item, string name) => item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Array ? value : throw new JsonException();
     private static string RequiredString(JsonElement item, string name) => OptionalString(item, name) ?? throw new JsonException();
