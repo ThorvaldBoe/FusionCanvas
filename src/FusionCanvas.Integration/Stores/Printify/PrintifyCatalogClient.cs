@@ -11,7 +11,7 @@ public sealed class PrintifyCatalogClient : IPrintifyCatalogClient
     private sealed record ProductPage(IReadOnlyList<PrintifyShopProductSummary> Products, IReadOnlyList<PrintifyCatalogBlueprint> Details, int LastPage);
     public static Uri CatalogBaseUri { get; } = new("https://api.printify.com/v1/catalog/");
     public static Uri ApiBaseUri { get; } = new("https://api.printify.com/v1/");
-    private const int MaximumResponseBytes = 4 * 1024 * 1024;
+    private const int MaximumResponseBytes = 8 * 1024 * 1024;
 
     public PrintifyCatalogClient(HttpClient client, ITelemetryRecorder? telemetry = null)
     {

@@ -270,6 +270,21 @@ public sealed class PrintifyCatalogClientTests
         Assert.Equal(5850, placeholder.Height);
     }
 
+    [Fact]
+    public async Task LoadsBlueprintCatalogWhenResponseExceedsFourMegabytes()
+    {
+        var description = new string('x', 4 * 1024 * 1024 + 1);
+        var body = "[{\"id\":68,\"title\":\"Tee\",\"description\":\"" + description + "\"}]";
+        using var client = new HttpClient(new Handler((_, _) => Task.FromResult(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) })))
+        { BaseAddress = PrintifyCatalogClient.CatalogBaseUri };
+
+        var result = await new PrintifyCatalogClient(client).LoadBlueprintsAsync("synthetic-key", TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(description.Length, Assert.Single(result.Blueprints!).Description!.Length);
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.Unauthorized, PrintifyCatalogResultKind.InvalidKey)]
     [InlineData(HttpStatusCode.Forbidden, PrintifyCatalogResultKind.PermissionDenied)]
@@ -298,7 +313,7 @@ public sealed class PrintifyCatalogClientTests
             (await new PrintifyCatalogClient(invalid).LoadBlueprintsAsync("key", TestContext.Current.CancellationToken)).Kind);
 
         using var oversized = new HttpClient(new Handler((_, _) => Task.FromResult(
-            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(new string('x', 4 * 1024 * 1024 + 1)) })))
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(new string('x', 8 * 1024 * 1024 + 1)) })))
         { BaseAddress = PrintifyCatalogClient.CatalogBaseUri };
         Assert.Equal(PrintifyCatalogResultKind.UnexpectedResponse,
             (await new PrintifyCatalogClient(oversized).LoadBlueprintsAsync("key", TestContext.Current.CancellationToken)).Kind);
