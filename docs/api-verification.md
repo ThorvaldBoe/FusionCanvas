@@ -10,10 +10,9 @@ Use dedicated test credentials. Do not place their values in source files, comma
 $env:FUSIONCANVAS_OPENROUTER_TEST_API_KEY = '<dedicated test key>'
 $env:FUSIONCANVAS_OPENROUTER_SESSION_MAX_COST_USD = '0.25'
 $env:FUSIONCANVAS_PRINTIFY_DEVTEST_API_KEY = '<FusionCanvas DevTest key>'
-$env:FUSIONCANVAS_PRINTIFY_DEVTEST_SHOP_ID = '<numeric shop id>'
 ```
 
-The Printify runner validates that the configured key returns the configured numeric shop ID and the exact `FusionCanvas DevTest` shop name before it runs shop operations. The shop name is fixed in the runner and cannot be overridden. Product lifecycle scenarios stop when that identity check fails.
+After you confirm a Printify session, the runner calls `GET /v1/shops.json` using the configured key and selects the shop whose title exactly matches `FusionCanvas DevTest`. It blocks if there is no exact match, more than one exact match, or the returned ID is invalid. You do not need to find or configure the numeric shop ID. The resolved ID is used for the run and recorded with the session-owned product journal. Product lifecycle operations remain blocked until the shop identity resolves uniquely.
 
 ## Inspect before running
 
