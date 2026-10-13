@@ -130,8 +130,8 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
     public Task<ListingMutationResult> CreateAsync(string shopId, ListingProductProjection projection, IReadOnlyDictionary<Guid, ListingImageReference> images, CancellationToken cancellationToken = default) =>
         MutateProductAsync(HttpMethod.Post, $"shops/{Uri.EscapeDataString(shopId)}/products.json", null, projection, images, cancellationToken);
 
-    public Task<ListingMutationResult> UpdateAsync(string shopId, string productId, ListingProductProjection projection, IReadOnlyDictionary<Guid, ListingImageReference> images, CancellationToken cancellationToken = default) =>
-        MutateProductAsync(HttpMethod.Put, $"shops/{Uri.EscapeDataString(shopId)}/products/{Uri.EscapeDataString(productId)}.json", productId, projection, images, cancellationToken);
+    public Task<ListingMutationResult> UpdateAsync(string shopId, string productId, ListingProductProjection projection, IReadOnlyDictionary<Guid, ListingImageReference> images, IReadOnlySet<string>? changedFields = null, CancellationToken cancellationToken = default) =>
+        MutateProductAsync(HttpMethod.Put, $"shops/{Uri.EscapeDataString(shopId)}/products/{Uri.EscapeDataString(productId)}.json", productId, projection, images, cancellationToken, changedFields);
 
     public async Task<ListingMutationResult> DeleteAsync(string shopId, string productId, CancellationToken cancellationToken = default)
     {
@@ -152,10 +152,11 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
         string? knownProductId,
         ListingProductProjection projection,
         IReadOnlyDictionary<Guid, ListingImageReference> images,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlySet<string>? changedFields = null)
     {
         var secret = await RequireCredentialAsync(cancellationToken).ConfigureAwait(false);
-        var payload = BuildProductPayload(projection, images);
+        var payload = BuildProductPayload(projection, images, changedFields);
         var response = await SendJsonAsync(method, path, secret, payload, cancellationToken).ConfigureAwait(false);
         return MutationResult(response, knownProductId ?? TryReadProductId(response.Body), ListingPublicationState.Unpublished);
     }
@@ -193,7 +194,7 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
         return secret!;
     }
 
-    private static string BuildProductPayload(ListingProductProjection projection, IReadOnlyDictionary<Guid, ListingImageReference> images)
+    private static string BuildProductPayload(ListingProductProjection projection, IReadOnlyDictionary<Guid, ListingImageReference> images, IReadOnlySet<string>? changedFields = null)
     {
         if (projection.ExternalBlueprintId is null || projection.ExternalProviderId is null)
             throw new InvalidOperationException("The selected Blueprint and Print Provider have no Printify identities.");
@@ -238,16 +239,19 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
             ? null
             : new { shipping_template_id = projection.ShippingProfile };
 
-        return JsonSerializer.Serialize(new
+        var payload = new Dictionary<string, object?>(StringComparer.Ordinal);
+        bool Include(string field) => changedFields is null || changedFields.Count == 0 || changedFields.Contains(field);
+        if (changedFields is null || changedFields.Count == 0)
         {
-            title = projection.Title,
-            description = projection.Description ?? string.Empty,
-            blueprint_id = projection.ExternalBlueprintId.Value,
-            print_provider_id = projection.ExternalProviderId.Value,
-            variants,
-            print_areas = areas,
-            external = shippingTemplate
-        }, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
+            payload["blueprint_id"] = projection.ExternalBlueprintId.Value;
+            payload["print_provider_id"] = projection.ExternalProviderId.Value;
+        }
+        if (Include("title")) payload["title"] = projection.Title;
+        if (Include("description")) payload["description"] = projection.Description ?? string.Empty;
+        if (Include("variants")) payload["variants"] = variants;
+        if (Include("variants")) payload["print_areas"] = areas;
+        if (Include("shippingProfile") && shippingTemplate is not null) payload["external"] = shippingTemplate;
+        return JsonSerializer.Serialize(payload, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
     }
 
     private static ListingMutationResult MutationResult(PrintifyTransportResponse response, string? productId, ListingPublicationState publicationState)
@@ -281,13 +285,7 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
                 _ => null
             }
             : null;
-        var publication = root.TryGetProperty("visible", out var visible)
-            ? visible.ValueKind == JsonValueKind.True
-                ? ListingPublicationState.Published
-                : visible.ValueKind == JsonValueKind.False
-                    ? ListingPublicationState.Unpublished
-                    : fallbackPublication
-            : fallbackPublication;
+        var publication = ReadPublicationState(root, fallbackPublication);
         var snapshot = new ListingSnapshot(new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             ["title"] = ReadString(root, "title"),
@@ -299,6 +297,34 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
             ReadExternalValue(root, "id") ?? ReadString(root, "external_id"), ReadExternalValue(root, "handle") ?? ReadString(root, "handle"),
             shopId, !string.IsNullOrWhiteSpace(returnedId) && string.Equals(returnedId, productId, StringComparison.Ordinal));
     }
+
+    private static ListingPublicationState ReadPublicationState(JsonElement root, ListingPublicationState fallbackPublication)
+    {
+        // Printify defaults `visible` to true; external channel identity is the publish-success marker.
+        if (!root.TryGetProperty("external", out var external))
+            return fallbackPublication;
+
+        if (external.ValueKind == JsonValueKind.Array)
+        {
+            if (external.EnumerateArray().Any(HasExternalIdentity))
+                return ListingPublicationState.Published;
+            return external.GetArrayLength() == 0 ? fallbackPublication : ListingPublicationState.Unverified;
+        }
+
+        if (external.ValueKind == JsonValueKind.Object)
+        {
+            if (HasExternalIdentity(external))
+                return ListingPublicationState.Published;
+            return external.EnumerateObject().Any() ? ListingPublicationState.Unverified : fallbackPublication;
+        }
+
+        return ListingPublicationState.Unverified;
+    }
+
+    private static bool HasExternalIdentity(JsonElement external) =>
+        external.ValueKind == JsonValueKind.Object
+        && (!string.IsNullOrWhiteSpace(ReadString(external, "id"))
+            || !string.IsNullOrWhiteSpace(ReadString(external, "handle")));
 
     private static string? TryReadProductId(byte[] body)
     {
@@ -356,6 +382,8 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
         {
             var id = ReadScalar(variant, "id");
             var price = ReadScalar(variant, "price");
+            if (!variant.TryGetProperty("is_enabled", out var enabled) || enabled.ValueKind != JsonValueKind.True)
+                continue;
             if (id is null || price is null)
                 continue;
 

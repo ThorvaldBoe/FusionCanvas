@@ -289,7 +289,7 @@ internal sealed class PrintifyApiVerifier(VerificationConfiguration configuratio
             ?? throw new InvalidOperationException("No catalog provider has an enabled, available variant with an artwork placeholder; product writes are blocked.");
         var variant = provider.Variants.First(value => value.IsEnabled && value.IsAvailable && value.Placeholders.Count > 0);
         var placeholder = variant.Placeholders[0];
-        Console.WriteLine("Write plan: upload one generated PNG; create an unpublished product; read it back; update its title; optionally publish and unpublish; then delete and verify absence.");
+        Console.WriteLine("Write plan: upload one generated PNG; create an unpublished product; read it back; update its title; optionally publish and unpublish; then delete and verify absence. If the update is paused by a drift conflict, report changed field names and explicitly keep the generated test values for this session-owned product before retrying.");
         Console.WriteLine($"Target: {configuration.PrintifyDevTestShopName} (shop {shopId}), blueprint {blueprint.Summary.Id}, provider {provider.Id}, variant {variant.Id} ({variant.Title}), print position {placeholder.Position}.");
         var assetId = Guid.NewGuid();
         var fingerprint = Convert.ToHexString(SHA256.HashData(TestPng));
@@ -360,7 +360,20 @@ internal sealed class PrintifyApiVerifier(VerificationConfiguration configuratio
         if (await ConfirmAsync($"Update session-owned product {productId} title.", "UPDATE PRINTIFY PRODUCT", cancellationToken).ConfigureAwait(false))
         {
             await SaveJournalAsync(runId, shopId, "product-update", productId, "owned", cancellationToken).ConfigureAwait(false);
-            var updated = await lifecycle.CreateOrUpdateAsync(new(storeId, shop, RequirePublication: true), updatedProjection, cancellationToken).ConfigureAwait(false);
+            var updateRequest = new ListingConnectionRequest(storeId, shop, RequirePublication: true);
+            var updated = await lifecycle.CreateOrUpdateAsync(updateRequest, updatedProjection, cancellationToken).ConfigureAwait(false);
+            if (updated.Kind == ListingLifecycleResultKind.Conflict)
+            {
+                if (updated.Conflict is null)
+                    throw new InvalidOperationException("The application paused the test product update without returning field-level conflict details.");
+
+                var diagnostic = PrintifyConflictDiagnostic.Format(updated.Conflict);
+                operations.Add(new("printify-product-update-conflict", "observed",
+                    "The application drift guard paused the update before sending it. The conflict was explicitly resolved using the generated test values for this session-owned product.",
+                    diagnostic, ResourceId: productId));
+                Console.WriteLine($"Update conflict fields: {diagnostic}");
+                updated = await lifecycle.ReconcileAsync(updateRequest, updatedProjection, ListingConflictResolution.KeepLocal, cancellationToken).ConfigureAwait(false);
+            }
             if (updated.Kind != ListingLifecycleResultKind.Succeeded) throw new InvalidOperationException(updated.Message ?? "The application listing update did not complete definitively.");
             readback = await listing.GetAsync(shop, productId, cancellationToken).ConfigureAwait(false);
             if (readback?.Snapshot.Fields.GetValueOrDefault("title") == updatedProjection.Title)
@@ -468,6 +481,8 @@ internal sealed class PrintifyApiVerifier(VerificationConfiguration configuratio
             ? $"- If product deletion is declined or uncertain, inspect the DevTest shop and run `recover --provider printify --run-id {runId}` for this session-owned resource."
             : "- No session-created product is expected; no resource recovery action is planned.");
         lines.Add("Excluded: orders and chargeable operations.");
+        if (scenario == "printify-product-lifecycle")
+            lines.Add("If the application drift guard pauses the test product update, the verifier records changed field names and explicitly keeps the generated local values only for this session-owned product.");
         return string.Join(Environment.NewLine, lines);
     }
 

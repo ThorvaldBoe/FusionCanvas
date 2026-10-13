@@ -460,10 +460,10 @@ public class OpenRouterClientTests : IDisposable
     public async Task GetEndpointsAsync_ParsesProviderVariantCapabilitiesAndPrivacy()
     {
         var handler = new RecordingHandler(Json(HttpStatusCode.OK, """
-            {"endpoints":[
-              {"provider_id":"deepinfra","provider_name":"DeepInfra","name":"deepinfra/turbo","model_name":"Turbo","context_length":8192,"max_completion_tokens":2048,"supported_parameters":["temperature"],"is_zdr":true,"pricing":{"prompt":"0.1","completion":"0.2"},"latency_last_30m":123.4,"throughput_last_30m":45.6},
+            {"data":{"id":"vendor/model","endpoints":[
+              {"provider_id":"deepinfra","provider_tag":"deepinfra","provider_name":"DeepInfra","name":"DeepInfra: Turbo","model_name":"Turbo","context_length":8192,"max_completion_tokens":2048,"supported_parameters":["temperature"],"is_zdr":true,"pricing":{"prompt":"0.1","completion":"0.2"},"latency_last_30m":123.4,"throughput_last_30m":45.6},
               {"provider_id":"other","provider_name":"Other","name":"other/default","is_zdr":false}
-            ]}
+            ]}}
             """));
 
         var catalog = await CreateClient(handler).GetEndpointsAsync(
@@ -471,7 +471,7 @@ public class OpenRouterClientTests : IDisposable
 
         var endpoint = Assert.Single(catalog.Endpoints);
         Assert.Equal("deepinfra", endpoint.ProviderId);
-        Assert.Equal("deepinfra/turbo", endpoint.EndpointId);
+        Assert.Equal("deepinfra", endpoint.EndpointId);
         Assert.Equal(8192, endpoint.ContextLength);
         Assert.Equal(2048, endpoint.MaxCompletionTokens);
         Assert.Equal(123.4, endpoint.LatencyMilliseconds);
@@ -504,6 +504,7 @@ public class OpenRouterClientTests : IDisposable
         var provider = body.RootElement.GetProperty("provider");
         Assert.True(provider.GetProperty("require_parameters").GetBoolean());
         Assert.True(provider.GetProperty("zdr").GetBoolean());
+        Assert.False(body.RootElement.TryGetProperty("reasoning", out _));
         Assert.Equal(expectNoFallback, provider.TryGetProperty("allow_fallbacks", out var fallback) && !fallback.GetBoolean());
         Assert.Equal(expectOrder, provider.TryGetProperty("order", out var order) && order[0].GetString() == endpointId);
         Assert.Equal(mode == AiRoutingMode.SpecificProvider, provider.TryGetProperty("only", out var only) && only[0].GetString() == providerId);

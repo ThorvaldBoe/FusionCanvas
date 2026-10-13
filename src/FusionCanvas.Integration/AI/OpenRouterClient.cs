@@ -174,10 +174,15 @@ public sealed class OpenRouterClient :
             using var response = await SendGetAsync(path, apiKey, cancellationToken).ConfigureAwait(false);
             EnsureCatalogSuccess(response);
             using var json = await ReadJsonAsync(response, cancellationToken).ConfigureAwait(false);
-            var data = json.RootElement.TryGetProperty("endpoints", out var endpoints)
+            var root = json.RootElement;
+            var data = root.TryGetProperty("endpoints", out var endpoints)
                 && endpoints.ValueKind == JsonValueKind.Array
                 ? endpoints
-                : RequiredArray(json.RootElement, "data");
+                : root.TryGetProperty("data", out var responseData)
+                    ? responseData.ValueKind == JsonValueKind.Array
+                        ? responseData
+                        : RequiredArray(responseData, "endpoints")
+                    : throw new JsonException("Missing endpoint array.");
             var parsed = data.EnumerateArray()
                 .Select(item => ParseModelEndpoint(item, modelId))
                 .OfType<AiModelEndpointDescriptor>()
@@ -802,13 +807,16 @@ public sealed class OpenRouterClient :
                 profile.StopSequences.Select(value => JsonValue.Create(value)).ToArray());
         }
 
-        root["reasoning"] = profile.Reasoning.Mode switch
+        if (profile.Reasoning.Mode != AiReasoningMode.ProviderDefault)
         {
-            AiReasoningMode.Disabled => new JsonObject { ["enabled"] = false },
-            AiReasoningMode.Effort => new JsonObject { ["effort"] = profile.Reasoning.Effort },
-            AiReasoningMode.TokenBudget => new JsonObject { ["max_tokens"] = profile.Reasoning.TokenBudget },
-            _ => null
-        };
+            root["reasoning"] = profile.Reasoning.Mode switch
+            {
+                AiReasoningMode.Disabled => new JsonObject { ["enabled"] = false },
+                AiReasoningMode.Effort => new JsonObject { ["effort"] = profile.Reasoning.Effort },
+                AiReasoningMode.TokenBudget => new JsonObject { ["max_tokens"] = profile.Reasoning.TokenBudget },
+                _ => null
+            };
+        }
 
         return root.ToJsonString();
     }
@@ -907,10 +915,14 @@ public sealed class OpenRouterClient :
                          ReadString(item, "provider_tag") ??
                          ReadString(item, "provider_name");
         var providerName = ReadString(item, "provider_name") ?? providerId;
-        var endpointId = ReadString(item, "name") ??
+        // `name` is a display label (for example "OpenAI: GPT-4"), while
+        // `tag`/`provider_tag` is the value accepted by OpenRouter's
+        // provider.order routing field.
+        var endpointId = ReadString(item, "provider_tag") ??
+                         ReadString(item, "tag") ??
                          ReadString(item, "endpoint_id") ??
                          ReadString(item, "id") ??
-                         ReadString(item, "provider_tag") ??
+                         ReadString(item, "name") ??
                          providerId;
         if (string.IsNullOrWhiteSpace(providerId) || string.IsNullOrWhiteSpace(providerName) || string.IsNullOrWhiteSpace(endpointId))
         {

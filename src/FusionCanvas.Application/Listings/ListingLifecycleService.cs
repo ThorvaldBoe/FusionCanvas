@@ -334,6 +334,7 @@ public sealed class ListingLifecycleService
             return new(ListingLifecycleResultKind.Uncertain, ToApplicationMapping(existing), Message: "Reconcile the previous Printify operation before retrying.");
         }
 
+        IReadOnlySet<string>? changedFields = null;
         if (existing?.ProductId is not null)
         {
             ListingRemoteProduct? remote;
@@ -364,6 +365,12 @@ public sealed class ListingLifecycleService
                 }, cancellationToken).ConfigureAwait(false);
                 return new(ListingLifecycleResultKind.Missing, ToApplicationMapping(missing), Message: "The mapped Printify product could not be found.");
             }
+
+            changedFields = localSnapshot.Fields
+                .Where(field => !remote.Snapshot.Fields.TryGetValue(field.Key, out var remoteValue)
+                    || !string.Equals(field.Value, remoteValue, StringComparison.Ordinal))
+                .Select(field => field.Key)
+                .ToHashSet(StringComparer.Ordinal);
 
             if (!forceLocal && !string.IsNullOrWhiteSpace(existing.SnapshotJson))
             {
@@ -415,7 +422,7 @@ public sealed class ListingLifecycleService
         {
             mutation = existing?.ProductId is null
                 ? await _products.CreateAsync(connectionRequest.ShopId, effectiveProjection, images, cancellationToken).ConfigureAwait(false)
-                : await _products.UpdateAsync(connectionRequest.ShopId, existing.ProductId, effectiveProjection, images, cancellationToken).ConfigureAwait(false);
+                : await _products.UpdateAsync(connectionRequest.ShopId, existing.ProductId, effectiveProjection, images, changedFields, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -441,6 +448,19 @@ public sealed class ListingLifecycleService
             };
             await _repository.SaveAsync(ReplaceMapping(intentSnapshot, uncertain), cancellationToken).ConfigureAwait(false);
             return new(ListingLifecycleResultKind.Uncertain, ToApplicationMapping(uncertain), Message: mutation.ErrorMessage ?? "The Printify response was ambiguous. Refresh before retrying.");
+        }
+
+        if (mutation.ErrorCode is not null)
+        {
+            var failed = intent with
+            {
+                SynchronizationState = ExternalListingSyncState.Failed,
+                OperationState = ExternalListingOperationState.Failed,
+                OperationJson = JsonSerializer.Serialize(new { mutation.ErrorCode, mutation.ErrorMessage }),
+                UpdatedAt = _clock()
+            };
+            await _repository.SaveAsync(ReplaceMapping(intentSnapshot, failed), cancellationToken).ConfigureAwait(false);
+            return new(ListingLifecycleResultKind.Failed, ToApplicationMapping(failed), Message: mutation.ErrorMessage ?? "Printify rejected the listing mutation.");
         }
 
         if (string.IsNullOrWhiteSpace(mutation.ProductId))

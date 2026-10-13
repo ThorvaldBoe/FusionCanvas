@@ -42,6 +42,26 @@ public sealed class ListingLifecycleServiceTests
     }
 
     [Fact]
+    public async Task Definitive_mutation_error_is_not_recorded_as_success()
+    {
+        var repository = new MemoryRepository();
+        var products = new FakeProducts
+        {
+            CreateResult = new ListingMutationResult("product-1", true, ErrorCode: "UnexpectedResponse", ErrorMessage: "Printify rejected the payload.")
+        };
+        var service = new ListingLifecycleService(repository, new FakeConnection(), products, new FakePublication());
+
+        var result = await service.CreateOrUpdateAsync(
+            new ListingConnectionRequest(Guid.NewGuid(), "shop-1", false),
+            Projection(Guid.NewGuid(), Guid.NewGuid()),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(ListingLifecycleResultKind.Failed, result.Kind);
+        Assert.Equal(ListingSynchronizationState.Failed, result.Mapping!.SynchronizationState);
+        Assert.Equal("Printify rejected the payload.", result.Message);
+    }
+
+    [Fact]
     public async Task Ambiguous_create_is_persisted_and_blocks_blind_retry()
     {
         var storeId = Guid.NewGuid();
@@ -245,6 +265,8 @@ public sealed class ListingLifecycleServiceTests
 
         Assert.Equal(ListingLifecycleResultKind.Succeeded, result.Kind);
         Assert.Equal("Dad Joke Loading… – T-shirt", products.LastProjection!.Title);
+        Assert.Contains("title", products.LastChangedFields!);
+        Assert.Contains("variants", products.LastChangedFields!);
         Assert.Null(repository.Snapshot.ExternalListingMappings.Single().IntegrationValuesJson);
         Assert.Equal(1, products.UpdateCalls);
     }
@@ -456,6 +478,7 @@ public sealed class ListingLifecycleServiceTests
         public ListingRemoteProduct? RemoteProduct { get; init; }
         public Exception? DeleteException { get; init; }
         public ListingProductProjection? LastProjection { get; private set; }
+        public IReadOnlySet<string>? LastChangedFields { get; private set; }
 
         public Task<ListingRemoteProduct?> GetAsync(string shopId, string productId, CancellationToken cancellationToken = default)
         {
@@ -469,10 +492,11 @@ public sealed class ListingLifecycleServiceTests
             return Task.FromResult(CreateResult);
         }
 
-        public Task<ListingMutationResult> UpdateAsync(string shopId, string productId, ListingProductProjection projection, IReadOnlyDictionary<Guid, ListingImageReference> images, CancellationToken cancellationToken = default)
+        public Task<ListingMutationResult> UpdateAsync(string shopId, string productId, ListingProductProjection projection, IReadOnlyDictionary<Guid, ListingImageReference> images, IReadOnlySet<string>? changedFields = null, CancellationToken cancellationToken = default)
         {
             UpdateCalls++;
             LastProjection = projection;
+            LastChangedFields = changedFields;
             return Task.FromResult(UpdateResult);
         }
 

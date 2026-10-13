@@ -32,6 +32,23 @@ public sealed class PrintifyListingClientTests
     }
 
     [Fact]
+    public async Task Product_update_sends_only_fields_changed_from_remote()
+    {
+        var handler = new RecordingHandler(_ => Json(HttpStatusCode.OK, "{\"id\":\"product-1\"}"));
+        using var http = new HttpClient(handler);
+        var client = new PrintifyListingClient(Guid.NewGuid(), http, _ => Task.FromResult<string?>("key"));
+
+        var result = await client.UpdateAsync("42", "product-1", Projection(), new Dictionary<Guid, ListingImageReference>(),
+            new HashSet<string>(["title"], StringComparer.Ordinal), TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsDefinitive);
+        Assert.Equal(HttpMethod.Put, handler.Requests.Single().Method);
+        using var payload = System.Text.Json.JsonDocument.Parse(handler.Bodies.Single());
+        Assert.Equal(["title"], payload.RootElement.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(Projection().Title, payload.RootElement.GetProperty("title").GetString());
+    }
+
+    [Fact]
     public async Task Network_failure_is_marked_ambiguous_for_mutation()
     {
         var client = new PrintifyListingClient(Guid.NewGuid(), new HttpClient(new ThrowingHandler()), _ => Task.FromResult<string?>("key"));
@@ -43,7 +60,7 @@ public sealed class PrintifyListingClientTests
     }
 
     [Fact]
-    public async Task Product_read_maps_visibility_external_identity_and_shipping_template()
+    public async Task Product_read_maps_external_publication_identity_and_shipping_template()
     {
         using var http = new HttpClient(new RecordingHandler(_ => Json(HttpStatusCode.OK, "{\"id\":\"product-1\",\"shop_id\":42,\"visible\":true,\"is_locked\":false,\"external\":[{\"id\":\"shopify-1\",\"handle\":\"dad-joke-loading\",\"shipping_template_id\":\"shipping-template-1\"}]}")));
         var client = new PrintifyListingClient(Guid.NewGuid(), http, _ => Task.FromResult<string?>("key"));
@@ -57,6 +74,35 @@ public sealed class PrintifyListingClientTests
         Assert.Equal("shipping-template-1", product.Snapshot.Fields["shippingProfile"]);
         Assert.Equal("42", product.ShopId);
         Assert.True(product.HasVerifiedIdentity);
+    }
+
+    [Theory]
+    [InlineData("{\"visible\":true}", ListingPublicationState.Unpublished)]
+    [InlineData("{\"visible\":true,\"external\":[]}", ListingPublicationState.Unpublished)]
+    [InlineData("{\"visible\":false,\"external\":[{\"id\":\"channel-product-1\"}]}", ListingPublicationState.Published)]
+    [InlineData("{\"visible\":true,\"external\":\"unexpected\"}", ListingPublicationState.Unverified)]
+    public async Task Product_read_does_not_treat_visibility_as_channel_publication(string productJson, ListingPublicationState expected)
+    {
+        using var http = new HttpClient(new RecordingHandler(_ => Json(HttpStatusCode.OK, productJson)));
+        var client = new PrintifyListingClient(Guid.NewGuid(), http, _ => Task.FromResult<string?>("key"));
+
+        var product = await client.GetAsync("42", "product-1", TestContext.Current.CancellationToken);
+
+        Assert.NotNull(product);
+        Assert.Equal(expected, product!.PublicationState);
+    }
+
+    [Fact]
+    public async Task Product_read_ignores_disabled_variant_prices_for_drift_snapshot()
+    {
+        using var http = new HttpClient(new RecordingHandler(_ => Json(HttpStatusCode.OK,
+            "{\"id\":\"product-1\",\"variants\":[{\"id\":33719,\"price\":1000,\"is_enabled\":true},{\"id\":33720,\"price\":1200,\"is_enabled\":false}]}")));
+        var client = new PrintifyListingClient(Guid.NewGuid(), http, _ => Task.FromResult<string?>("key"));
+
+        var product = await client.GetAsync("42", "product-1", TestContext.Current.CancellationToken);
+
+        Assert.NotNull(product);
+        Assert.Equal("33719:10", product!.Snapshot.Fields["variants"]);
     }
 
     [Fact]
