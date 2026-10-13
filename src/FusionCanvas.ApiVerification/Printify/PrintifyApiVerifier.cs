@@ -26,9 +26,9 @@ internal sealed class PrintifyApiVerifier(VerificationConfiguration configuratio
         var cleanup = new List<string>();
         var scenario = "printify-recovery";
         var status = "blocked";
-        if (!Guid.TryParseExact(sourceRunId, "N", out _) || string.IsNullOrWhiteSpace(configuration.PrintifyApiKey) || configuration.PrintifyDevTestShopId is not { } shopId)
+        if (!Guid.TryParseExact(sourceRunId, "N", out _) || string.IsNullOrWhiteSpace(configuration.PrintifyApiKey))
         {
-            operations.Add(new(scenario, "blocked", "A valid --run-id and configured DevTest credential/shop ID are required."));
+            operations.Add(new(scenario, "blocked", "A valid --run-id and dedicated DevTest credential are required."));
             await WriteReportAsync(runId, scenario, startedAt, status, operations, findings, cleanup, cancellationToken).ConfigureAwait(false);
             return 3;
         }
@@ -56,6 +56,13 @@ internal sealed class PrintifyApiVerifier(VerificationConfiguration configuratio
             await using var reportStream = File.OpenRead(sourcePath);
             source = await System.Text.Json.JsonSerializer.DeserializeAsync<VerificationSessionReport>(reportStream, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
+        if (journal is null)
+        {
+            operations.Add(new(scenario, "blocked", "Recovery requires a session journal with the original shop identity."));
+            await WriteReportAsync(runId, scenario, startedAt, "blocked", operations, findings, cleanup, cancellationToken).ConfigureAwait(false);
+            return 3;
+        }
+        var shopId = journal.ShopId;
         var recoveryTarget = PrintifyRecoveryEligibility.Resolve(sourceRunId!, shopId, journal, source);
         var productId = recoveryTarget?.ProductId;
         if (recoveryTarget is null || recoveryTarget.AlreadyDeleted)
@@ -69,10 +76,12 @@ internal sealed class PrintifyApiVerifier(VerificationConfiguration configuratio
         {
             using var credentialClient = _runtime.CredentialClient();
             var credentials = await new PrintifyCredentialVerifier(credentialClient).VerifyAsync(configuration.PrintifyApiKey!, cancellationToken).ConfigureAwait(false);
-            var selectedShop = credentials.Shops?.SingleOrDefault(shop => shop.Id == shopId);
-            if (credentials.Kind != PrintifyConfigurationKind.Verified || selectedShop is null
-                || !selectedShop.Title.Equals(configuration.PrintifyDevTestShopName, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("The configured shop did not match the verified FusionCanvas DevTest identity; recovery is blocked.");
+            var matchingShops = credentials.Shops?
+                .Where(shop => string.Equals(shop.Title, configuration.PrintifyDevTestShopName, StringComparison.Ordinal))
+                .ToArray() ?? [];
+            if (credentials.Kind != PrintifyConfigurationKind.Verified || matchingShops.Length != 1
+                || matchingShops[0].Id != shopId || matchingShops[0].Id <= 0)
+                throw new InvalidOperationException("The exact FusionCanvas DevTest shop title did not resolve uniquely to the original session shop ID; recovery is blocked.");
 
             if (!await ConfirmAsync($"Delete only session-owned Printify product {productId} from {configuration.PrintifyDevTestShopName} (shop {shopId}).", "RECOVER PRINTIFY PRODUCT", cancellationToken).ConfigureAwait(false))
             {
@@ -139,18 +148,18 @@ internal sealed class PrintifyApiVerifier(VerificationConfiguration configuratio
             await WriteReportAsync(runId, scenario, startedAt, "blocked", operations, findings, cleanup, cancellationToken).ConfigureAwait(false);
             return 3;
         }
-        if (string.IsNullOrWhiteSpace(configuration.PrintifyApiKey) || configuration.PrintifyDevTestShopId is not { } shopId)
+        if (string.IsNullOrWhiteSpace(configuration.PrintifyApiKey))
         {
-            Console.Error.WriteLine("Set FUSIONCANVAS_PRINTIFY_DEVTEST_API_KEY and FUSIONCANVAS_PRINTIFY_DEVTEST_SHOP_ID. No request was sent.");
-            operations.Add(new(scenario, "blocked", "Dedicated Printify DevTest credential or shop ID is not configured."));
+            Console.Error.WriteLine("Set FUSIONCANVAS_PRINTIFY_DEVTEST_API_KEY. No request was sent.");
+            operations.Add(new(scenario, "blocked", "Dedicated Printify DevTest credential is not configured."));
             await WriteReportAsync(runId, scenario, startedAt, "blocked", operations, findings, cleanup, cancellationToken).ConfigureAwait(false);
             return 3;
         }
 
-        var runPlan = BuildRunPlan(scenario, runId, shopId, plannedOperations);
+        var runPlan = BuildRunPlan(scenario, runId, plannedOperations);
         Console.WriteLine(runPlan);
         if (!await ConfirmAsync(
-                runPlan + "\nThe next network step verifies the configured shop identity. No writes occur until their separate confirmations.",
+                runPlan + "\nAfter confirmation, the first request lists shops and resolves the exact target title. No writes occur until their separate confirmations.",
                 $"RUN PRINTIFY {scenario.ToUpperInvariant()}", cancellationToken).ConfigureAwait(false))
         {
             operations.Add(new("session-confirmation", "cancelled", "No provider request was sent."));
@@ -163,13 +172,21 @@ internal sealed class PrintifyApiVerifier(VerificationConfiguration configuratio
             using var credentialClient = _runtime.CredentialClient();
             var verifier = new PrintifyCredentialVerifier(credentialClient);
             var credentials = await verifier.VerifyAsync(configuration.PrintifyApiKey!, cancellationToken).ConfigureAwait(false);
-            var selectedShop = credentials.Shops?.SingleOrDefault(shop => shop.Id == shopId);
-            if (credentials.Kind != PrintifyConfigurationKind.Verified || selectedShop is null
-                || !selectedShop.Title.Equals(configuration.PrintifyDevTestShopName, StringComparison.OrdinalIgnoreCase))
+            var matchingShops = credentials.Shops?
+                .Where(shop => string.Equals(shop.Title, configuration.PrintifyDevTestShopName, StringComparison.Ordinal))
+                .ToArray() ?? [];
+            if (credentials.Kind != PrintifyConfigurationKind.Verified || matchingShops.Length != 1 || matchingShops[0].Id <= 0)
             {
-                throw new InvalidOperationException("The configured Printify shop ID/name did not match a shop returned by the dedicated API key. Writes are blocked.");
+                var reason = matchingShops.Length == 0
+                    ? $"No shop titled exactly `{configuration.PrintifyDevTestShopName}` was returned."
+                    : matchingShops.Length > 1
+                        ? $"More than one shop is titled exactly `{configuration.PrintifyDevTestShopName}`."
+                        : "The resolved shop has an invalid numeric ID.";
+                throw new InvalidOperationException($"{reason} Printify operations are blocked.");
             }
-            operations.Add(new("printify-shops", "passed", $"Verified configured DevTest shop `{selectedShop.Title}` (ID {shopId})."));
+            var selectedShop = matchingShops[0];
+            var shopId = selectedShop.Id;
+            operations.Add(new("printify-shops", "passed", $"Resolved exact DevTest shop `{selectedShop.Title}` to ID {shopId}."));
 
             using var catalogHttp = _runtime.CatalogClient();
             var catalog = new PrintifyCatalogClient(catalogHttp);
@@ -431,12 +448,12 @@ internal sealed class PrintifyApiVerifier(VerificationConfiguration configuratio
     private Task<bool> ConfirmAsync(string instruction, string phrase, CancellationToken cancellationToken) =>
         _runtime.Confirm(instruction, phrase, cancellationToken);
 
-    private string BuildRunPlan(string scenario, string runId, int shopId, IReadOnlyList<ApiOperationDefinition> operations)
+    private string BuildRunPlan(string scenario, string runId, IReadOnlyList<ApiOperationDefinition> operations)
     {
         var lines = new List<string>
         {
             $"Printify preflight — scenario: {scenario}",
-            $"Configured target: {configuration.PrintifyDevTestShopName} (shop ID {shopId}); the first request must verify this exact shop against the dedicated key.",
+            $"Target: {configuration.PrintifyDevTestShopName}; the first confirmed request resolves its numeric shop ID by exact title from the dedicated key's shop list.",
             "Planned provider operations:"
         };
         lines.AddRange(operations.Select(operation => $"- {operation.Id}: {operation.Method} {operation.Path} [{operation.Effect}; {operation.CostClassification}]"));
