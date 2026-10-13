@@ -52,23 +52,6 @@ function Read-PositiveDecimal {
     }
 }
 
-function Read-PositiveShopId {
-    while ($true) {
-        $text = Read-Host -Prompt 'FusionCanvas DevTest numeric Printify shop ID'
-        [int] $value = 0
-        $valid = [int]::TryParse(
-            $text,
-            [Globalization.NumberStyles]::None,
-            [Globalization.CultureInfo]::InvariantCulture,
-            [ref] $value)
-        if ($valid -and $value -gt 0) {
-            return $value
-        }
-
-        Write-Host 'Enter a positive numeric shop ID.' -ForegroundColor Yellow
-    }
-}
-
 $openRouterSecure = $null
 $printifySecure = $null
 $openRouterKey = $null
@@ -76,7 +59,6 @@ $printifyKey = $null
 
 try {
     $openRouterBudget = $null
-    $printifyShopId = $null
 
     if ($Provider -in @('OpenRouter', 'Both')) {
         $openRouterSecure = Read-ApiVerificationKey 'Paste the dedicated OpenRouter test API key (input is hidden)'
@@ -85,7 +67,6 @@ try {
 
     if ($Provider -in @('Printify', 'Both')) {
         $printifySecure = Read-ApiVerificationKey 'Paste the Printify FusionCanvas DevTest API key (input is hidden)'
-        $printifyShopId = Read-PositiveShopId
     }
 
     # Persist selected settings for this Windows user and also populate this process for immediate use.
@@ -109,15 +90,9 @@ try {
         $printifyKey = ConvertFrom-SecureStringValue $printifySecure
         [Environment]::SetEnvironmentVariable('FUSIONCANVAS_PRINTIFY_DEVTEST_API_KEY', $printifyKey, [EnvironmentVariableTarget]::User)
         [Environment]::SetEnvironmentVariable('FUSIONCANVAS_PRINTIFY_DEVTEST_API_KEY', $printifyKey, [EnvironmentVariableTarget]::Process)
-        $printifyShopIdText = $printifyShopId.ToString([Globalization.CultureInfo]::InvariantCulture)
-        [Environment]::SetEnvironmentVariable(
-            'FUSIONCANVAS_PRINTIFY_DEVTEST_SHOP_ID',
-            $printifyShopIdText,
-            [EnvironmentVariableTarget]::User)
-        [Environment]::SetEnvironmentVariable(
-            'FUSIONCANVAS_PRINTIFY_DEVTEST_SHOP_ID',
-            $printifyShopIdText,
-            [EnvironmentVariableTarget]::Process)
+        # Older setup versions asked for a manual shop ID; the runner now resolves it by exact shop title.
+        [Environment]::SetEnvironmentVariable('FUSIONCANVAS_PRINTIFY_DEVTEST_SHOP_ID', $null, [EnvironmentVariableTarget]::User)
+        [Environment]::SetEnvironmentVariable('FUSIONCANVAS_PRINTIFY_DEVTEST_SHOP_ID', $null, [EnvironmentVariableTarget]::Process)
     }
 
     Write-Host "Saved the selected $Provider API verification settings to your Windows User environment. Key values were not displayed." -ForegroundColor Green

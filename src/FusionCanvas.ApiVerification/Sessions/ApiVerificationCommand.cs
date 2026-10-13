@@ -104,7 +104,7 @@ internal static class ApiVerificationCommand
         else
         {
             Console.WriteLine($"Credential: FUSIONCANVAS_PRINTIFY_DEVTEST_API_KEY {(string.IsNullOrWhiteSpace(configuration.PrintifyApiKey) ? "[missing]" : "[configured]")}");
-            Console.WriteLine($"Target: {configuration.PrintifyDevTestShopName} / shop ID {configuration.PrintifyDevTestShopId?.ToString() ?? "[missing]"}");
+            Console.WriteLine($"Target: {configuration.PrintifyDevTestShopName} (shop ID resolved from the API by exact title during the confirmed run)");
         }
 
         foreach (var operation in operations)

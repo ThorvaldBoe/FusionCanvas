@@ -3,6 +3,7 @@ using FusionCanvas.ApiVerification.OpenRouter;
 using FusionCanvas.ApiVerification.Printify;
 using FusionCanvas.ApiVerification.Sessions;
 using FusionCanvas.Application.AI;
+using FusionCanvas.Application.Stores.Printify;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -153,6 +154,33 @@ public sealed class ApiVerificationCoreTests
     }
 
     [Fact]
+    public void PrintifyDevTestShopResolutionUsesExactTitleAndReturnsNumericId()
+    {
+        var shops = new[]
+        {
+            new PrintifyShopOption(1, "Other Shop"),
+            new PrintifyShopOption(987654, VerificationConfiguration.RequiredPrintifyDevTestShopName)
+        };
+
+        var selected = PrintifyApiVerifier.ResolveDevTestShop(shops, VerificationConfiguration.RequiredPrintifyDevTestShopName);
+
+        Assert.Equal(987654, selected.Id);
+    }
+
+    [Fact]
+    public void PrintifyDevTestShopResolutionRejectsMissingDuplicateAndNonExactTitles()
+    {
+        var title = VerificationConfiguration.RequiredPrintifyDevTestShopName;
+
+        Assert.Throws<InvalidOperationException>(() => PrintifyApiVerifier.ResolveDevTestShop(
+            [new PrintifyShopOption(1, "fusioncanvas devtest")], title));
+        Assert.Throws<InvalidOperationException>(() => PrintifyApiVerifier.ResolveDevTestShop(
+            [new PrintifyShopOption(1, title), new PrintifyShopOption(2, title)], title));
+        Assert.Throws<InvalidOperationException>(() => PrintifyApiVerifier.ResolveDevTestShop(
+            [new PrintifyShopOption(0, title)], title));
+    }
+
+    [Fact]
     public void PrintifyRecoveryRequiresSessionJournalAndExactDevTestOwnership()
     {
         var runId = Guid.NewGuid().ToString("N");
@@ -254,7 +282,7 @@ public sealed class ApiVerificationCoreTests
     public async Task ProviderVerifiersBlockBeforeNetworkWhenDedicatedCredentialsAreMissing()
     {
         var directory = Path.Combine(Path.GetTempPath(), "FusionCanvas.ApiVerification.Tests", Guid.NewGuid().ToString("N"));
-        var configuration = new VerificationConfiguration(null, null, null, VerificationConfiguration.RequiredPrintifyDevTestShopName, null, directory);
+        var configuration = new VerificationConfiguration(null, null, VerificationConfiguration.RequiredPrintifyDevTestShopName, null, directory);
         try
         {
             var openRouter = await new OpenRouterApiVerifier(configuration).RunAsync("openrouter-smoke", [], null, false, CancellationToken.None);
@@ -276,7 +304,7 @@ public sealed class ApiVerificationCoreTests
     public async Task PrintifyCancellationBeforeSessionConfirmationMakesNoProviderCalls()
     {
         var directory = Path.Combine(Path.GetTempPath(), "FusionCanvas.ApiVerification.Tests", Guid.NewGuid().ToString("N"));
-        var configuration = new VerificationConfiguration(null, "devtest-key", 123, VerificationConfiguration.RequiredPrintifyDevTestShopName, null, directory);
+        var configuration = new VerificationConfiguration(null, "devtest-key", VerificationConfiguration.RequiredPrintifyDevTestShopName, null, directory);
         string? displayedPlan = null;
         var runtime = new PrintifyApiVerifierRuntime(
             () => throw new InvalidOperationException("Network client should not be created after cancellation."),
@@ -313,7 +341,7 @@ public sealed class ApiVerificationCoreTests
     public async Task PrintifyShopMismatchStopsBeforeCatalogAndAnyWriteOperation()
     {
         var directory = Path.Combine(Path.GetTempPath(), "FusionCanvas.ApiVerification.Tests", Guid.NewGuid().ToString("N"));
-        var configuration = new VerificationConfiguration(null, "devtest-key", 123, VerificationConfiguration.RequiredPrintifyDevTestShopName, null, directory);
+        var configuration = new VerificationConfiguration(null, "devtest-key", VerificationConfiguration.RequiredPrintifyDevTestShopName, null, directory);
         var handler = new JsonResponseHandler("""[{"id":123,"title":"Another Shop"}]""");
         var runtime = new PrintifyApiVerifierRuntime(
             () => new HttpClient(handler, disposeHandler: false),
@@ -332,7 +360,7 @@ public sealed class ApiVerificationCoreTests
             Assert.Equal("/v1/shops.json", handler.Requests[0].AbsolutePath);
             Assert.All(handler.Methods, method => Assert.Equal(HttpMethod.Get, method));
             var reportPath = Assert.Single(Directory.EnumerateFiles(directory, "*.json"));
-            Assert.Contains("configured Printify shop ID/name", await File.ReadAllTextAsync(reportPath), StringComparison.Ordinal);
+            Assert.Contains("No shop titled exactly", await File.ReadAllTextAsync(reportPath), StringComparison.Ordinal);
         }
         finally
         {
