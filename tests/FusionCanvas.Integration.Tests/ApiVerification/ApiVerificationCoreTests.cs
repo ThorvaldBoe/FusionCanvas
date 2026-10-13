@@ -341,7 +341,7 @@ public sealed class ApiVerificationCoreTests
     public async Task PrintifyShopMismatchStopsBeforeCatalogAndAnyWriteOperation()
     {
         var directory = Path.Combine(Path.GetTempPath(), "FusionCanvas.ApiVerification.Tests", Guid.NewGuid().ToString("N"));
-        var configuration = new VerificationConfiguration(null, "devtest-key", 123, VerificationConfiguration.RequiredPrintifyDevTestShopName, null, directory);
+        var configuration = new VerificationConfiguration(null, "devtest-key", VerificationConfiguration.RequiredPrintifyDevTestShopName, null, directory);
         var handler = new JsonResponseHandler("""[{"id":123,"title":"Another Shop"}]""");
         var runtime = new PrintifyApiVerifierRuntime(
             () => new HttpClient(handler, disposeHandler: false),
