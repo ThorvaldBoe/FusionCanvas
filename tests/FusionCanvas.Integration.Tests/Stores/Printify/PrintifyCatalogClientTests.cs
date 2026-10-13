@@ -274,7 +274,7 @@ public sealed class PrintifyCatalogClientTests
     public async Task LoadsBlueprintCatalogWhenResponseExceedsFourMegabytes()
     {
         var description = new string('x', 4 * 1024 * 1024 + 1);
-        var body = "[{\\"id\\":68,\\"title\\":\\"Tee\\",\\"description\\":\\"" + description + "\\"}]";
+        var body = "[{\"id\":68,\"title\":\"Tee\",\"description\":\"" + description + "\"}]";
         using var client = new HttpClient(new Handler((_, _) => Task.FromResult(
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) })))
         { BaseAddress = PrintifyCatalogClient.CatalogBaseUri };
