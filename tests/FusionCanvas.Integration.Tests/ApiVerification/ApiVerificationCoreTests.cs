@@ -3,6 +3,7 @@ using FusionCanvas.ApiVerification.OpenRouter;
 using FusionCanvas.ApiVerification.Printify;
 using FusionCanvas.ApiVerification.Sessions;
 using FusionCanvas.Application.AI;
+using FusionCanvas.Application.Listings;
 using FusionCanvas.Application.Stores.Printify;
 using System.Net;
 using System.Text;
@@ -40,6 +41,21 @@ public sealed class ApiVerificationCoreTests
             Assert.All(operation.AdditionalScenarios ?? [], scenario => Assert.Contains(scenario, ApiVerificationScenarios.Printify));
         });
         Assert.Contains("printify-product-detail", ApiVerificationScenarios.Printify);
+    }
+
+    [Fact]
+    public void PrintifyConflictDiagnosticNamesChangedFieldsWithoutExposingValues()
+    {
+        var conflict = new ListingLifecycleConflict(new ListingDriftComparison(
+        [
+            new("variants", "private-last", "private-remote", "private-local", true, false),
+            new("title", "private-title", "private-title", "private-title updated", false, true)
+        ]));
+
+        var diagnostic = PrintifyConflictDiagnostic.Format(conflict);
+
+        Assert.Equal("title (remote changed: no; local changed: yes), variants (remote changed: yes; local changed: no)", diagnostic);
+        Assert.DoesNotContain("private-", diagnostic, StringComparison.Ordinal);
     }
 
     [Fact]
