@@ -76,12 +76,11 @@ internal sealed class PrintifyApiVerifier(VerificationConfiguration configuratio
         {
             using var credentialClient = _runtime.CredentialClient();
             var credentials = await new PrintifyCredentialVerifier(credentialClient).VerifyAsync(configuration.PrintifyApiKey!, cancellationToken).ConfigureAwait(false);
-            var matchingShops = credentials.Shops?
-                .Where(shop => string.Equals(shop.Title, configuration.PrintifyDevTestShopName, StringComparison.Ordinal))
-                .ToArray() ?? [];
-            if (credentials.Kind != PrintifyConfigurationKind.Verified || matchingShops.Length != 1
-                || matchingShops[0].Id != shopId || matchingShops[0].Id <= 0)
-                throw new InvalidOperationException("The exact FusionCanvas DevTest shop title did not resolve uniquely to the original session shop ID; recovery is blocked.");
+            var selectedShop = credentials.Kind == PrintifyConfigurationKind.Verified
+                ? ResolveDevTestShop(credentials.Shops, configuration.PrintifyDevTestShopName)
+                : throw new InvalidOperationException("Printify did not verify the dedicated credential; recovery is blocked.");
+            if (selectedShop.Id != shopId)
+                throw new InvalidOperationException("The exact FusionCanvas DevTest shop title no longer resolves to the original session shop ID; recovery is blocked.");
 
             if (!await ConfirmAsync($"Delete only session-owned Printify product {productId} from {configuration.PrintifyDevTestShopName} (shop {shopId}).", "RECOVER PRINTIFY PRODUCT", cancellationToken).ConfigureAwait(false))
             {
@@ -172,19 +171,9 @@ internal sealed class PrintifyApiVerifier(VerificationConfiguration configuratio
             using var credentialClient = _runtime.CredentialClient();
             var verifier = new PrintifyCredentialVerifier(credentialClient);
             var credentials = await verifier.VerifyAsync(configuration.PrintifyApiKey!, cancellationToken).ConfigureAwait(false);
-            var matchingShops = credentials.Shops?
-                .Where(shop => string.Equals(shop.Title, configuration.PrintifyDevTestShopName, StringComparison.Ordinal))
-                .ToArray() ?? [];
-            if (credentials.Kind != PrintifyConfigurationKind.Verified || matchingShops.Length != 1 || matchingShops[0].Id <= 0)
-            {
-                var reason = matchingShops.Length == 0
-                    ? $"No shop titled exactly `{configuration.PrintifyDevTestShopName}` was returned."
-                    : matchingShops.Length > 1
-                        ? $"More than one shop is titled exactly `{configuration.PrintifyDevTestShopName}`."
-                        : "The resolved shop has an invalid numeric ID.";
-                throw new InvalidOperationException($"{reason} Printify operations are blocked.");
-            }
-            var selectedShop = matchingShops[0];
+            if (credentials.Kind != PrintifyConfigurationKind.Verified)
+                throw new InvalidOperationException("Printify did not verify the dedicated credential. Printify operations are blocked.");
+            var selectedShop = ResolveDevTestShop(credentials.Shops, configuration.PrintifyDevTestShopName);
             var shopId = selectedShop.Id;
             operations.Add(new("printify-shops", "passed", $"Resolved exact DevTest shop `{selectedShop.Title}` to ID {shopId}."));
 
@@ -447,6 +436,18 @@ internal sealed class PrintifyApiVerifier(VerificationConfiguration configuratio
 
     private Task<bool> ConfirmAsync(string instruction, string phrase, CancellationToken cancellationToken) =>
         _runtime.Confirm(instruction, phrase, cancellationToken);
+
+    internal static PrintifyShopOption ResolveDevTestShop(IReadOnlyList<PrintifyShopOption>? shops, string exactTitle)
+    {
+        var matches = shops?.Where(shop => string.Equals(shop.Title, exactTitle, StringComparison.Ordinal)).ToArray() ?? [];
+        if (matches.Length == 0)
+            throw new InvalidOperationException($"No shop titled exactly `{exactTitle}` was returned.");
+        if (matches.Length > 1)
+            throw new InvalidOperationException($"More than one shop is titled exactly `{exactTitle}`.");
+        if (matches[0].Id <= 0)
+            throw new InvalidOperationException($"The shop titled exactly `{exactTitle}` has an invalid numeric ID.");
+        return matches[0];
+    }
 
     private string BuildRunPlan(string scenario, string runId, IReadOnlyList<ApiOperationDefinition> operations)
     {
