@@ -165,15 +165,15 @@ public sealed class ApiVerificationCoreTests
     {
         var samplingModel = new AiModelDescriptor("provider/sampling", "Sampling", null, null, ["text"], ["text"],
             [AiParameterRegistry.MaxCompletionTokens, AiParameterRegistry.Temperature, AiParameterRegistry.TopP],
-            1000, 128, null, null, false, null);
+            1000, 1024, null, null, false, null);
         var reasoningModel = new AiModelDescriptor("provider/reasoning", "Reasoning", null, null, ["text"], ["text"],
             [AiParameterRegistry.Seed, AiParameterRegistry.Reasoning],
             1000, 32, null, null, false, new(false, false, ["low"], "low", false));
 
-        var sampling = OpenRouterApiVerifier.BuildTestProfile(samplingModel, 24);
+        var sampling = OpenRouterApiVerifier.BuildTestProfile(samplingModel, 512);
         var reasoning = OpenRouterApiVerifier.BuildTestProfile(reasoningModel, 24);
 
-        Assert.Equal(24, sampling.MaxCompletionTokens);
+        Assert.Equal(512, sampling.MaxCompletionTokens);
         Assert.Equal(0.2, sampling.Temperature);
         Assert.Equal(0.9, sampling.TopP);
         Assert.Null(sampling.Seed);
@@ -190,14 +190,14 @@ public sealed class ApiVerificationCoreTests
     {
         var model = new AiModelDescriptor("provider/model", "Model", null, null, ["text"], ["text"],
             [AiParameterRegistry.MaxCompletionTokens, AiParameterRegistry.Temperature, AiParameterRegistry.Seed],
-            1000, 128, null, null, false, null);
+            1000, 1024, null, null, false, null);
 
         var profile = OpenRouterApiVerifier.BuildTestProfile(
             model,
             [AiParameterRegistry.MaxCompletionTokens, AiParameterRegistry.Temperature],
-            24);
+            512);
 
-        Assert.Equal(24, profile.MaxCompletionTokens);
+        Assert.Equal(512, profile.MaxCompletionTokens);
         Assert.Equal(0.2, profile.Temperature);
         Assert.Null(profile.Seed);
         Assert.Empty(AiParameterRegistry.Validate(profile, model));
@@ -207,11 +207,11 @@ public sealed class ApiVerificationCoreTests
     public void QualificationProfileRecognizesLegacyMaxTokensAliasForBoundedRequests()
     {
         var model = new AiModelDescriptor("provider/model", "Model", null, null, ["text"], ["text"],
-            ["max_tokens", AiParameterRegistry.Temperature], 1000, 128, null, null, false, null);
+            ["max_tokens", AiParameterRegistry.Temperature], 1000, 1024, null, null, false, null);
 
-        var profile = OpenRouterApiVerifier.BuildTestProfile(model, ["max_tokens", AiParameterRegistry.Temperature], 24);
+        var profile = OpenRouterApiVerifier.BuildTestProfile(model, ["max_tokens", AiParameterRegistry.Temperature], 512);
 
-        Assert.Equal(24, profile.MaxCompletionTokens);
+        Assert.Equal(512, profile.MaxCompletionTokens);
         Assert.Empty(AiParameterRegistry.Validate(profile, model));
     }
 
@@ -338,6 +338,39 @@ public sealed class ApiVerificationCoreTests
         Assert.Equal(baseline, OpenRouterQualificationEvidenceStore.CreateFingerprint(new { Model = "provider/model", Temperature = 0.2, Adapter = "1" }));
         Assert.NotEqual(baseline, OpenRouterQualificationEvidenceStore.CreateFingerprint(new { Model = "provider/model", Temperature = 0.3, Adapter = "1" }));
         Assert.NotEqual(baseline, OpenRouterQualificationEvidenceStore.CreateFingerprint(new { Model = "provider/model", Temperature = 0.2, Adapter = "2" }));
+    }
+
+    [Theory]
+    [InlineData("budget-deferred", "partial")]
+    [InlineData("budget-blocked", "partial")]
+    [InlineData("rate-limited", "partial")]
+    [InlineData("passed", "passed")]
+    [InlineData("reused", "passed")]
+    public void OpenRouterQualificationStatusDoesNotReportDeferredCoverageAsPassed(string operationStatus, string expected)
+    {
+        var operations = new[] { new VerificationOperationResult("openrouter-text-generation", operationStatus, ModelId: "provider/model") };
+
+        Assert.Equal(expected, OpenRouterApiVerifier.ResolveSessionStatus("openrouter-qualification", "passed", operations));
+    }
+
+    [Fact]
+    public void OpenRouterQualificationFailureTakesPrecedenceOverDeferredCoverage()
+    {
+        var operations = new[]
+        {
+            new VerificationOperationResult("openrouter-text-generation", "budget-deferred", ModelId: "provider/model-a"),
+            new VerificationOperationResult("openrouter-image-generation", "failed", ModelId: "provider/model-b")
+        };
+
+        Assert.Equal("failed", OpenRouterApiVerifier.ResolveSessionStatus("openrouter-qualification", "passed", operations));
+    }
+
+    [Fact]
+    public void OpenRouterRateLimitedRunIsPartialRatherThanPassedOrModelFailure()
+    {
+        var operations = new[] { new VerificationOperationResult("openrouter-chat-completion", "rate-limited", ModelId: "provider/model") };
+
+        Assert.Equal("partial", OpenRouterApiVerifier.ResolveSessionStatus("openrouter-text-generation", "passed", operations));
     }
 
     [Fact]
