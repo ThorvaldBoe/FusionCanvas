@@ -37,6 +37,8 @@ public class OpenRouterClientTests : IDisposable
                 {"data":[
                   {"id":"zdr/model","name":"ZDR","description":"ok","architecture":{"input_modalities":["text"],"output_modalities":["text"]},"supported_parameters":["temperature","future"],"context_length":1000,"top_provider":{"max_completion_tokens":200},"pricing":{"prompt":"0.1","completion":"0.2"}},
                   {"id":"plain/model","name":"Plain","architecture":{"input_modalities":["text"],"output_modalities":["text"]},"supported_parameters":[],"context_length":1000,"top_provider":{},"pricing":{}},
+                  {"id":"audio/model","name":"Audio","architecture":{"input_modalities":["text","image"],"output_modalities":["text","audio"]},"supported_parameters":["temperature"]},
+                  {"id":"batch/model:batch","name":"Batch only","architecture":{"input_modalities":["text"],"output_modalities":["text"]},"supported_parameters":["temperature"]},
                   {"id":"image/model","name":"Image","architecture":{"input_modalities":["text"],"output_modalities":["image"]},"supported_parameters":[]}
                 ]}
                 """),
@@ -54,6 +56,8 @@ public class OpenRouterClientTests : IDisposable
         Assert.Equal(2, handler.Requests.Count);
         Assert.Equal("/api/v1/models", handler.Requests[0].Uri.AbsolutePath);
         Assert.DoesNotContain("zdr", handler.Requests[0].Uri.Query);
+        Assert.DoesNotContain(catalog.Models, model => model.Id == "audio/model");
+        Assert.DoesNotContain(catalog.Models, model => model.Id == "batch/model:batch");
         Assert.Equal("Bearer", handler.Requests[0].Scheme);
         Assert.Equal("secret", handler.Requests[0].Parameter);
         Assert.Equal("/api/v1/endpoints/zdr", handler.Requests[1].Uri.AbsolutePath);
@@ -303,6 +307,50 @@ public class OpenRouterClientTests : IDisposable
     }
 
     [Fact]
+    public async Task ImageGenerateAsync_IncludesHttpStatusAndRetryAfterWithoutProviderBody()
+    {
+        var response = Json((HttpStatusCode)429, """{"error":{"message":"private provider detail"}}""");
+        response.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromSeconds(9));
+        var handler = new RecordingHandler(response);
+        var client = CreateClient(handler);
+
+        var (result, failure) = await client.GenerateAsync(new AiImageGenerationRequest(
+            "selected/model", "safe prompt", new AiImageSize(512, 512), false,
+            "secret", false, "provider-tag"), TestContext.Current.CancellationToken);
+
+        Assert.Null(result);
+        Assert.NotNull(failure);
+        Assert.Equal(AiImageGenerationFailureKind.RateLimited, failure.Kind);
+        Assert.Contains("HTTP 429", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("Retry after 9 seconds", failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("private provider detail", failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret", failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("safe prompt", failure.Message, StringComparison.Ordinal);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task ImageGenerateAsync_ReportsOnlySafeProviderErrorFields()
+    {
+        var handler = new RecordingHandler(Json(HttpStatusCode.BadRequest,
+            """{"error":{"message":"No provider for model bytedance-seed/seedream-4.5 supports parameter(s): resolution, aspect_ratio","code":"no_provider_supports_parameter","param":"resolution"}}"""));
+        var client = CreateClient(handler);
+
+        var (result, failure) = await client.GenerateAsync(new AiImageGenerationRequest(
+            "selected/model", "private prompt", new AiImageSize(512, 512), false,
+            "secret", false, "provider-tag"), TestContext.Current.CancellationToken);
+
+        Assert.Null(result);
+        Assert.NotNull(failure);
+        Assert.Contains("HTTP 400", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("code=no_provider_supports_parameter", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("param=resolution", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("No provider for model bytedance-seed/seedream-4.5 supports parameter(s): resolution, aspect_ratio", failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("private prompt", failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret", failure.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task GetModelsAsync_FailsClosedWhenZdrListUnavailableWhileRequired()
     {
         var handler = new RecordingHandler(
@@ -448,6 +496,7 @@ public class OpenRouterClientTests : IDisposable
         Assert.Equal("actual/model", result.ActualModel);
         Assert.Equal(5, result.Usage!.TotalTokens);
         using var body = JsonDocument.Parse(handler.Requests[0].Body!);
+        Assert.Equal("text", Assert.Single(body.RootElement.GetProperty("modalities").EnumerateArray()).GetString());
         Assert.True(body.RootElement.GetProperty("provider").GetProperty("require_parameters").GetBoolean());
         Assert.True(body.RootElement.GetProperty("provider").GetProperty("zdr").GetBoolean());
         Assert.Equal("high", body.RootElement.GetProperty("reasoning").GetProperty("effort").GetString());
@@ -612,6 +661,56 @@ public class OpenRouterClientTests : IDisposable
         Assert.Single(handler.Requests);
         Assert.DoesNotContain("secret", result.Message);
         Assert.DoesNotContain("prompt", result.Message);
+    }
+
+    [Theory]
+    [InlineData("{}", "choices array")]
+    [InlineData("{\"choices\":[]}", "empty choices array")]
+    [InlineData("{\"choices\":[{\"message\":{\"content\":null}}]}", "content of type Null")]
+    [InlineData("{\"choices\":[{\"message\":{\"content\":null,\"reasoning\":\"private chain of thought\",\"refusal\":null},\"finish_reason\":\"length\"}]}", "reasoning field present: True")]
+    [InlineData("{\"choices\":[{\"message\":{\"content\":null,\"audio\":{\"data\":\"private audio payload\"}},\"finish_reason\":\"stop\"}]}", "audio field present: True")]
+    [InlineData("{\"choices\":[{\"message\":{\"content\":\"\"},\"finish_reason\":\"length\"}]}", "Finish reason: length")]
+    public async Task GenerateAsync_ReportsSafeChatResponseContractDetails(string responseBody, string expectedDetail)
+    {
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK, responseBody));
+
+        var result = await CreateClient(handler).GenerateAsync(
+            new AiProviderTextRequest(
+                "secret",
+                "model",
+                [new AiTextMessage(AiMessageRole.User, "prompt")],
+                AiProfileSettings.Empty with { ModelId = "model" },
+                false),
+            TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(AiTextFailureKind.InvalidProviderResponse, result.FailureKind);
+        Assert.Contains(expectedDetail, result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("prompt", result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_IncludesHttpStatusAndRetryAfterForRateLimits()
+    {
+        var response = Json((HttpStatusCode)429, """{"error":{"message":"private provider detail"}}""");
+        response.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromSeconds(7));
+        var handler = new RecordingHandler(response);
+
+        var result = await CreateClient(handler).GenerateAsync(
+            new AiProviderTextRequest(
+                "secret",
+                "model",
+                [new AiTextMessage(AiMessageRole.User, "prompt")],
+                AiProfileSettings.Empty with { ModelId = "model" },
+                false),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(AiTextFailureKind.RateLimited, result.FailureKind);
+        Assert.Equal(TimeSpan.FromSeconds(7), result.RetryAfter);
+        Assert.Contains("HTTP 429", result.Message, StringComparison.Ordinal);
+        Assert.Contains("Retry after 7 seconds", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("private provider detail", result.Message, StringComparison.Ordinal);
     }
 
     [Fact]

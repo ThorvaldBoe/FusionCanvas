@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Telemetry;
 using System.Diagnostics;
@@ -383,11 +384,35 @@ public sealed class OpenRouterClient :
                 request.ModelId,
                 routing: request.Routing ?? request.Profile.Routing);
         }
-        catch (Exception exception) when (exception is IOException or JsonException or InvalidDataException)
+        catch (ChatCompletionContractException exception)
         {
             return AiTextResult.Failure(
                 AiTextFailureKind.InvalidProviderResponse,
-                "OpenRouter returned an invalid response.",
+                exception.Message,
+                request.ModelId,
+                routing: request.Routing ?? request.Profile.Routing);
+        }
+        catch (JsonException)
+        {
+            return AiTextResult.Failure(
+                AiTextFailureKind.InvalidProviderResponse,
+                "OpenRouter returned malformed JSON in a successful chat response.",
+                request.ModelId,
+                routing: request.Routing ?? request.Profile.Routing);
+        }
+        catch (InvalidDataException)
+        {
+            return AiTextResult.Failure(
+                AiTextFailureKind.InvalidProviderResponse,
+                "OpenRouter successful response exceeded the supported response size.",
+                request.ModelId,
+                routing: request.Routing ?? request.Profile.Routing);
+        }
+        catch (IOException)
+        {
+            return AiTextResult.Failure(
+                AiTextFailureKind.InvalidProviderResponse,
+                "OpenRouter could not fully read the successful chat response.",
                 request.ModelId,
                 routing: request.Routing ?? request.Profile.Routing);
         }
@@ -478,7 +503,16 @@ public sealed class OpenRouterClient :
                 cancellationToken,
                 timeout.Token).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
-                return (null, new(MapImageFailure(response.StatusCode), "OpenRouter could not complete the image request."));
+            {
+                var retryAfter = ReadRetryAfter(response);
+                var retryDiagnostic = retryAfter is { } delay
+                    ? $" Retry after {Math.Ceiling(delay.TotalSeconds):0} seconds."
+                    : string.Empty;
+                var providerDiagnostic = await ReadSafeImageErrorFieldsAsync(response, requestCancellation.Token).ConfigureAwait(false);
+                return (null, new(
+                    MapImageFailure(response.StatusCode),
+                    $"OpenRouter could not complete the image request. HTTP {(int)response.StatusCode}.{retryDiagnostic}{providerDiagnostic}"));
+            }
 
             using var json = await ReadJsonAsync(response, requestCancellation.Token, MaximumImageResponseBytes).ConfigureAwait(false);
             var data = RequiredArray(json.RootElement, "data");
@@ -540,6 +574,33 @@ public sealed class OpenRouterClient :
         HttpStatusCode.NotFound => AiImageGenerationFailureKind.Unavailable,
         _ => AiImageGenerationFailureKind.Unknown
     };
+
+    private async Task<string> ReadSafeImageErrorFieldsAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var json = await ReadJsonAsync(response, cancellationToken, MaximumImageResponseBytes).ConfigureAwait(false);
+            var error = ReadObject(json.RootElement, "error");
+            var code = ReadString(error, "code");
+            var parameter = ReadString(error, "param");
+            var message = ReadString(error, "message");
+            var fields = new List<string>(2);
+            if (IsSafeDiagnosticToken(code)) fields.Add($"code={code}");
+            if (IsSafeDiagnosticToken(parameter)) fields.Add($"param={parameter}");
+            if (message is { Length: <= 240 } && Regex.IsMatch(
+                    message,
+                    "^No provider for model [A-Za-z0-9._-]+/[A-Za-z0-9._:-]+ supports parameter\\(s\\): [A-Za-z0-9_, -]+$",
+                    RegexOptions.CultureInvariant))
+            {
+                fields.Add(message);
+            }
+            return fields.Count > 0 ? $" Provider details: {string.Join(", ", fields)}." : string.Empty;
+        }
+        catch (Exception exception) when (exception is JsonException or IOException or InvalidDataException)
+        {
+            return string.Empty;
+        }
+    }
 
     private async Task<HttpResponseMessage> SendGetAsync(
         string path,
@@ -760,6 +821,7 @@ public sealed class OpenRouterClient :
         {
             ["model"] = request.ModelId,
             ["stream"] = false,
+            ["modalities"] = new JsonArray(JsonValue.Create("text")),
             ["messages"] = new JsonArray(request.Messages.Select(message =>
                 new JsonObject
                 {
@@ -868,8 +930,13 @@ public sealed class OpenRouterClient :
         var inputs = ReadStrings(architecture, "input_modalities");
         var outputs = ReadStrings(architecture, "output_modalities");
         if (!inputs.Contains("text", StringComparer.OrdinalIgnoreCase) ||
-            !outputs.Contains("text", StringComparer.OrdinalIgnoreCase))
+            !outputs.Contains("text", StringComparer.OrdinalIgnoreCase) ||
+            outputs.Contains("audio", StringComparer.OrdinalIgnoreCase) ||
+            id.EndsWith(":batch", StringComparison.OrdinalIgnoreCase))
         {
+            // FusionCanvas's synchronous chat adapter consumes text responses only. Audio-output
+            // models can return responses it cannot consume, and :batch variants require the
+            // separate asynchronous batch API rather than this chat-completions call.
             return null;
         }
 
@@ -896,7 +963,8 @@ public sealed class OpenRouterClient :
     {
         var id = ReadString(item, "id");
         var name = ReadString(item, "name");
-        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name)) return null;
+        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name)
+            || id.EndsWith(":batch", StringComparison.OrdinalIgnoreCase)) return null;
         var architecture = ReadObject(item, "architecture");
         var outputs = ReadStrings(architecture, "output_modalities");
         if (!outputs.Contains("image", StringComparer.OrdinalIgnoreCase)) return null;
@@ -1088,19 +1156,41 @@ public sealed class OpenRouterClient :
 
     private static AiTextResult ParseSuccess(JsonElement root, AiProviderTextRequest request)
     {
-        var choices = RequiredArray(root, "choices");
+        if (!root.TryGetProperty("choices", out var choices) || choices.ValueKind != JsonValueKind.Array)
+        {
+            throw new ChatCompletionContractException("OpenRouter's successful chat response did not contain a choices array.");
+        }
         if (choices.GetArrayLength() == 0)
         {
-            throw new JsonException("No completion choice was returned.");
+            throw new ChatCompletionContractException("OpenRouter's successful chat response contained an empty choices array.");
         }
 
         var choice = choices[0];
-        var message = RequiredObject(choice, "message");
-        var text = ReadString(message, "content");
+        if (!choice.TryGetProperty("message", out var message) || message.ValueKind != JsonValueKind.Object)
+        {
+            throw new ChatCompletionContractException("OpenRouter's first completion choice did not contain a message object.");
+        }
+
+        if (!message.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.String)
+        {
+            var diagnosticFinishReason = ReadString(choice, "finish_reason");
+            var safeFinishReason = IsSafeDiagnosticToken(diagnosticFinishReason) ? diagnosticFinishReason : "not reported";
+            var reasoningPresent = message.TryGetProperty("reasoning", out var reasoning)
+                && reasoning.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined);
+            var refusalPresent = message.TryGetProperty("refusal", out var refusal)
+                && refusal.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined);
+            var audioPresent = message.TryGetProperty("audio", out var audio)
+                && audio.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined);
+            throw new ChatCompletionContractException(
+                $"OpenRouter's first completion choice had content of type {content.ValueKind}; FusionCanvas expected text. Finish reason: {safeFinishReason}; reasoning field present: {reasoningPresent}; refusal field present: {refusalPresent}; audio field present: {audioPresent}.");
+        }
+
+        var text = content.GetString();
         var finishReason = ReadString(choice, "finish_reason");
         if (string.IsNullOrWhiteSpace(text))
         {
-            throw new JsonException("The completion did not contain text.");
+            var reason = IsSafeDiagnosticToken(finishReason) ? $" Finish reason: {finishReason}." : string.Empty;
+            throw new ChatCompletionContractException($"OpenRouter's first completion choice did not contain non-empty assistant text.{reason}");
         }
 
         if (string.Equals(finishReason, "error", StringComparison.OrdinalIgnoreCase))
@@ -1166,13 +1256,22 @@ public sealed class OpenRouterClient :
         {
             kind = AiTextFailureKind.RouteNotFulfilled;
         }
+        var retryAfter = ReadRetryAfter(response);
+        var retryDiagnostic = retryAfter is { } delay
+            ? $" Retry after {Math.Ceiling(delay.TotalSeconds):0} seconds."
+            : string.Empty;
         return AiTextResult.Failure(
             kind,
-            SafeFailureMessage(kind),
+            $"{SafeFailureMessage(kind)} HTTP {(int)response.StatusCode}.{retryDiagnostic}",
             requestedModel,
-            ReadRetryAfter(response),
+            retryAfter,
             routing: routing);
     }
+
+    private static bool IsSafeDiagnosticToken(string? value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && value.Length <= 64
+        && value.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or '.');
 
     private static string SafeFailureMessage(AiTextFailureKind kind) => kind switch
     {
@@ -1185,6 +1284,10 @@ public sealed class OpenRouterClient :
         AiTextFailureKind.RouteNotFulfilled => "The selected provider or endpoint could not fulfill the request; retrying with another route is your choice.",
         _ => "OpenRouter could not complete the request."
     };
+
+    private sealed class ChatCompletionContractException(string message) : Exception(message)
+    {
+    }
 
     private static async Task<JsonDocument> ReadJsonAsync(
         HttpResponseMessage response,
