@@ -138,7 +138,8 @@ public class OpenRouterClientTests : IDisposable
                     "size":{"type":"string"},
                     "background":{"type":"enum","values":["transparent","opaque"]},
                     "output_format":{"type":"enum","values":["png"]}
-                  }
+                  },
+                  "pricing":[{"billable":"output_image","cost_usd":0.05,"unit":"image"}]
                 }
               ]
             }
@@ -153,6 +154,7 @@ public class OpenRouterClientTests : IDisposable
         Assert.True(endpoint.SupportsImageOutput);
         Assert.True(endpoint.SupportsTransparency);
         Assert.Contains(new AiImageSize(1024, 1024), endpoint.SupportedSizes);
+        Assert.Equal([new AiImagePrice("output_image", 0.05m, "image")], endpoint.Pricing);
         Assert.Equal("/api/v1/images/models/image/model/endpoints", handler.Requests[0].Uri.AbsolutePath);
     }
 

@@ -9,4 +9,5 @@ public sealed record AiImageEndpointCapabilities(
     IReadOnlyList<AiImageSize> SupportedSizes,
     bool SupportsTransparency,
     string? ProviderName = null,
-    AiImageEndpointParameterCapabilities? Parameters = null);
+    AiImageEndpointParameterCapabilities? Parameters = null,
+    IReadOnlyList<AiImagePrice>? Pricing = null);

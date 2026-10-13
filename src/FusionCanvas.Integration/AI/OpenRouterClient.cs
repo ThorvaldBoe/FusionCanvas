@@ -988,7 +988,30 @@ public sealed class OpenRouterClient :
                 supportsExplicitSize,
                 supportsOutputFormat,
                 backgrounds,
-                supported.Contains("n", StringComparer.OrdinalIgnoreCase)));
+                supported.Contains("n", StringComparer.OrdinalIgnoreCase)),
+            ParseImagePricing(item));
+    }
+
+    private static IReadOnlyList<AiImagePrice> ParseImagePricing(JsonElement item)
+    {
+        if (!item.TryGetProperty("pricing", out var pricing) || pricing.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var entries = new List<AiImagePrice>();
+        foreach (var entry in pricing.EnumerateArray().Take(32))
+        {
+            var billable = ReadString(entry, "billable");
+            var unit = ReadString(entry, "unit");
+            var cost = ReadDecimal(entry, "cost_usd");
+            if (!string.IsNullOrWhiteSpace(billable) && !string.IsNullOrWhiteSpace(unit) && cost is >= 0)
+            {
+                entries.Add(new AiImagePrice(Bound(billable, 64)!, cost.Value, Bound(unit, 64)!));
+            }
+        }
+
+        return entries;
     }
 
     private static IReadOnlyList<AiImageSize> ReadImageSizes(JsonElement item)
