@@ -240,6 +240,21 @@ public class AiSettingsViewTests
         }
     }
 
+    [Fact]
+    public void ProfileEditor_SnapshotUsesCompletionTokenAliasAdvertisedBySelectedEndpoint()
+    {
+        var viewModel = new AiProfileEditorViewModel(AiProfileSettings.Empty);
+        viewModel.SetEndpoints([
+            new AiModelEndpointDescriptor("model", "openai", "OpenAI", "openai/flex", "Flex", 8192, 2048,
+                ["max_tokens"], true, 0.1m, 0.2m, 100, 50)
+        ]);
+
+        viewModel.RoutingMode = AiRoutingMode.ExactEndpoint;
+        viewModel.EndpointId = "openai/flex";
+
+        Assert.Equal("max_tokens", viewModel.Snapshot.Routing!.CompletionTokenParameter);
+    }
+
     [AvaloniaTheory]
     [InlineData(720, 520, false)]
     [InlineData(720, 520, true)]

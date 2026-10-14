@@ -236,6 +236,34 @@ public sealed class ApiVerificationCoreTests
     }
 
     [Fact]
+    public void QualificationSummaryShowsTheCompletionTokenFieldActuallySentToTheEndpoint()
+    {
+        var profile = AiProfileSettings.Empty with
+        {
+            MaxCompletionTokens = 512,
+            Routing = AiRoutingPolicy.ForEndpoint("openai/flex", "openai", "max_tokens")
+        };
+
+        var summary = OpenRouterApiVerifier.ProfileSummary(profile);
+
+        Assert.Contains("max_tokens=512", summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("max_completion_tokens=", summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void QualificationSubsetExpandsAllOnlyWithinTheRequestedModality()
+    {
+        var known = new[] { ("text-a", "text"), ("text-b", "text"), ("image-a", "image") };
+
+        var valid = OpenRouterApiVerifier.TryResolveQualificationSubset("text:all", known, out var selected);
+
+        Assert.True(valid);
+        Assert.Equal(new[] { ("text-a", "text"), ("text-b", "text") }, selected.OrderBy(value => value.Id));
+        Assert.False(OpenRouterApiVerifier.TryResolveQualificationSubset("audio:all", known, out _));
+        Assert.False(OpenRouterApiVerifier.TryResolveQualificationSubset("text:missing", known, out _));
+    }
+
+    [Fact]
     public void PrintifyDevTestShopResolutionUsesExactTitleAndReturnsNumericId()
     {
         var shops = new[]

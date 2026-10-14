@@ -84,6 +84,12 @@ public static class AiImageEndpointPolicy
         endpoint.Parameters?.AspectRatios.Count > 0 ||
         endpoint.Parameters?.Resolutions.Count > 0;
 
+    // Live OpenRouter verification returns HTTP 400 for an explicit "resolution"
+    // on Seedream 4.5, including the advertised "1K" value. Its default is 1K,
+    // so let the provider choose that default tier for this model.
+    private static bool RequiresDefaultResolution(string modelId) =>
+        string.Equals(modelId, "bytedance-seed/seedream-4.5", StringComparison.OrdinalIgnoreCase);
+
     private static EndpointSelectionCandidate CreateCandidate(
         AiImageEndpointCapabilities endpoint,
         AiImageSize target,
@@ -93,7 +99,9 @@ public static class AiImageEndpointPolicy
         var parameters = endpoint.Parameters;
         var selectedSize = endpoint.SupportedSizes.Count > 0 ? SelectSize(endpoint.SupportedSizes, target) : (AiImageSize?)null;
         var aspectRatio = selectedSize is null ? SelectAspectRatio(parameters?.AspectRatios ?? [], target) : null;
-        var resolution = selectedSize is null ? SelectResolution(parameters?.Resolutions ?? [], target) : null;
+        var resolution = selectedSize is null && !RequiresDefaultResolution(endpoint.ModelId)
+            ? SelectResolution(parameters?.Resolutions ?? [], target)
+            : null;
         var providerSize = selectedSize ?? EstimateProviderSize(target, aspectRatio, resolution);
         var outputFormat = PreferredRasterFormat(endpoint.RasterFormats, transparentBackground);
         var background = parameters?.Backgrounds.FirstOrDefault(value =>

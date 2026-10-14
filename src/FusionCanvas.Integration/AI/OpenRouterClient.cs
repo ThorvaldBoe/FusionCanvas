@@ -571,8 +571,10 @@ public sealed class OpenRouterClient :
             if (!string.IsNullOrWhiteSpace(request.Options.Background)) root["background"] = request.Options.Background;
             if (request.Options.Count is { } count) root["n"] = count;
         }
-        var provider = new JsonObject { ["require_parameters"] = true, ["allow_fallbacks"] = false };
-        if (request.RequireZeroDataRetention) provider["zdr"] = true;
+        // The Image API has a narrower routing schema than chat completions.
+        // Keep this object to fields documented for image requests; endpoint
+        // capabilities and the pinned provider enforce parameter and privacy rules.
+        var provider = new JsonObject { ["allow_fallbacks"] = false };
         if (!string.IsNullOrWhiteSpace(request.ProviderTag)) provider["only"] = new JsonArray(JsonValue.Create(request.ProviderTag));
         root["provider"] = provider;
         return root.ToJsonString();
@@ -867,7 +869,14 @@ public sealed class OpenRouterClient :
                 break;
         }
 
-        Add(root, "max_completion_tokens", profile.MaxCompletionTokens);
+        var completionTokenParameter = request.Routing?.CompletionTokenParameter
+            ?? profile.Routing?.CompletionTokenParameter
+            ?? "max_completion_tokens";
+        if (completionTokenParameter is not ("max_completion_tokens" or "max_tokens"))
+        {
+            completionTokenParameter = "max_completion_tokens";
+        }
+        Add(root, completionTokenParameter, profile.MaxCompletionTokens);
         Add(root, "temperature", profile.Temperature);
         Add(root, "top_p", profile.TopP);
         Add(root, "top_k", profile.TopK);
