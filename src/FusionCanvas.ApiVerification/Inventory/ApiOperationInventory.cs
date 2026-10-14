@@ -27,6 +27,8 @@ internal static class ApiOperationInventory
         new("printify-product-update", "Printify", "PUT", "/v1/shops/{shop}/products/{product}.json", "PrintifyListingClient.UpdateAsync", "printify-product-lifecycle", "write", CostClassification: ApiOperationCostClass.NoDirectCharge),
         new("printify-product-delete", "Printify", "DELETE", "/v1/shops/{shop}/products/{product}.json", "PrintifyListingClient.DeleteAsync", "printify-product-lifecycle", "write", CostClassification: ApiOperationCostClass.NoDirectCharge),
         new("printify-product-publish", "Printify", "POST", "/v1/shops/{shop}/products/{product}/publish.json", "PrintifyListingClient.PublishAsync", "printify-product-lifecycle", "external-visibility", CostClassification: ApiOperationCostClass.MayExposeSales),
-        new("printify-product-unpublish", "Printify", "POST", "/v1/shops/{shop}/products/{product}/unpublish.json", "PrintifyListingClient.UnpublishAsync", "printify-product-lifecycle", "write", CostClassification: ApiOperationCostClass.NoDirectCharge)
+        new("printify-product-unpublish", "Printify", "POST", "/v1/shops/{shop}/products/{product}/unpublish.json", "PrintifyListingClient.UnpublishAsync", "printify-product-lifecycle", "write", CostClassification: ApiOperationCostClass.NoDirectCharge),
+        new("printify-publishing-succeeded", "Printify", "POST", "/v1/shops/{shop}/products/{product}/publishing_succeeded.json", "PrintifyListingClient.PublishingSucceededAsync (verification channel callback)", "printify-product-lifecycle", "write", CostClassification: ApiOperationCostClass.NoDirectCharge),
+        new("printify-publishing-failed", "Printify", "POST", "/v1/shops/{shop}/products/{product}/publishing_failed.json", "PrintifyListingClient.PublishingFailedAsync (verification cleanup)", "printify-product-lifecycle", "write", CostClassification: ApiOperationCostClass.NoDirectCharge)
     ];
 }
