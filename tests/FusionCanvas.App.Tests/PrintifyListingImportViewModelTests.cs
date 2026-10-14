@@ -37,6 +37,20 @@ public sealed class PrintifyListingImportViewModelTests
     }
 
     [Fact]
+    public async Task Duplicate_check_without_selection_explains_required_action_without_product_request()
+    {
+        var fixture = new Fixture(["available-product"]);
+        var viewModel = new PrintifyListingImportViewModel(fixture.Service, fixture.Scope, fixture.NicheId);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+
+        await viewModel.CheckDuplicatesAsync();
+
+        Assert.Equal("Select one or more unlinked products first.", viewModel.Message);
+        Assert.Equal(0, fixture.Client.ProductDetailCalls);
+        Assert.Equal("Select one or more unlinked products first.", viewModel.DuplicateCheckGuidance);
+    }
+
+    [Fact]
     public async Task Dialog_reports_mixed_import_outcomes_and_keeps_failed_product_retryable()
     {
         var fixture = new Fixture(["available-product", "missing-product"]);
@@ -123,6 +137,7 @@ public sealed class PrintifyListingImportViewModelTests
     private sealed class Client(string[] productIds) : IPrintifyListingImportClient
     {
         public int ShopProductCalls { get; private set; }
+        public int ProductDetailCalls { get; private set; }
         public TaskCompletionSource<IReadOnlyList<PrintifyListingProductSummary>>? ProductGate { get; set; }
         public async Task<IReadOnlyList<PrintifyListingProductSummary>> GetShopProductsAsync(string apiKey, int shopId, CancellationToken cancellationToken = default)
         {
@@ -130,8 +145,11 @@ public sealed class PrintifyListingImportViewModelTests
             if (ProductGate is not null) return await ProductGate.Task.WaitAsync(cancellationToken);
             return productIds.Select(id => new PrintifyListingProductSummary(id, id, "Description", true, 68, 9)).ToArray();
         }
-        public Task<PrintifyListingProductDetail?> GetProductAsync(string apiKey, int shopId, string productId, CancellationToken cancellationToken = default) =>
-            Task.FromResult<PrintifyListingProductDetail?>(productId == "missing-product" ? null : new(productId, productId, "Description", true, 68, 9, null, [], [], []));
+        public Task<PrintifyListingProductDetail?> GetProductAsync(string apiKey, int shopId, string productId, CancellationToken cancellationToken = default)
+        {
+            ProductDetailCalls++;
+            return Task.FromResult<PrintifyListingProductDetail?>(productId == "missing-product" ? null : new(productId, productId, "Description", true, 68, 9, null, [], [], []));
+        }
         public Task<PrintifyArtworkDownload> DownloadArtworkAsync(string sourceUrl, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 

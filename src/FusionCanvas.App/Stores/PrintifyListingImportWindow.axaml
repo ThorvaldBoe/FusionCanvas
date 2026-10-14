@@ -16,6 +16,7 @@
       <Button Content="Refresh" Command="{Binding LoadCommand}" Classes="secondary" />
       <Button Content="{Binding LinkedProductsToggleLabel}" AutomationProperties.Name="{Binding LinkedProductsToggleLabel}" Command="{Binding ToggleLinkedCommand}" Classes="secondary" />
       <Button Content="Check selected for duplicates" Command="{Binding CheckDuplicatesCommand}" IsEnabled="{Binding CanImport}" Classes="secondary" />
+      <TextBlock Text="{Binding DuplicateCheckGuidance}" IsVisible="{Binding HasDuplicateCheckGuidance}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" />
       <TextBlock Text="{Binding Message}" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" />
     </StackPanel>
     <Border Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
