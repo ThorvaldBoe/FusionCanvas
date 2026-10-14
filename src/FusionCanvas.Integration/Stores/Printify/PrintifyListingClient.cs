@@ -62,6 +62,7 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
                 return Unavailable("Printify returned an invalid shop list.");
 
             var selectedShopFound = false;
+            string? selectedSalesChannel = null;
             foreach (var shop in document.RootElement.EnumerateArray())
             {
                 if (shop.ValueKind != JsonValueKind.Object
@@ -72,17 +73,33 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
                 }
 
                 if (string.Equals(numericId.ToString(CultureInfo.InvariantCulture), request.ShopId, StringComparison.Ordinal))
+                {
                     selectedShopFound = true;
+                    selectedSalesChannel = ReadString(shop, "sales_channel");
+                }
             }
 
             if (!selectedShopFound)
                 return Unavailable("The selected Printify shop is not available for this account. Refresh Store settings and select an available shop.");
 
+            var publicationAvailable = request.RequirePublication
+                && !string.IsNullOrWhiteSpace(selectedSalesChannel)
+                && !string.Equals(selectedSalesChannel, "disconnected", StringComparison.OrdinalIgnoreCase)
+                && (!request.RequireShopifyChannel || string.Equals(selectedSalesChannel, "Shopify", StringComparison.OrdinalIgnoreCase));
+            var issues = request.RequirePublication && !publicationAvailable
+                ? new[]
+                {
+                    new ListingReadinessIssue(
+                        "printify-sales-channel-unavailable",
+                        PublicationUnavailableMessage(selectedSalesChannel, request.RequireShopifyChannel))
+                }
+                : [];
+
             return new(
                 ListingConnectionState.Ready,
                 ProductOperationsAvailable: true,
-                PublicationOperationsAvailable: request.RequirePublication,
-                []);
+                PublicationOperationsAvailable: publicationAvailable,
+                issues);
         }
         catch (JsonException)
         {
@@ -276,6 +293,24 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
         if (!PrintifyToken.IsValid(secret))
             throw new InvalidOperationException("Printify is not connected.");
         return secret!;
+    }
+
+    private static string PublicationUnavailableMessage(string? salesChannel, bool requireShopifyChannel)
+    {
+        if (string.IsNullOrWhiteSpace(salesChannel)
+            || string.Equals(salesChannel, "disconnected", StringComparison.OrdinalIgnoreCase))
+        {
+            if (requireShopifyChannel)
+                return "Connect this Printify shop to Shopify before publishing.";
+            return "Connect this Printify shop to a supported sales channel before publishing.";
+        }
+
+        if (requireShopifyChannel)
+        {
+            return $"This Printify shop is connected to {salesChannel}, not Shopify. Connect the Store's Shopify channel in Printify before publishing.";
+        }
+
+        return "The selected Printify sales channel is unavailable for publication.";
     }
 
     private static string BuildProductPayload(ListingProductProjection projection, IReadOnlyDictionary<Guid, ListingImageReference> images, IReadOnlySet<string>? changedFields = null)

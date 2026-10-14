@@ -15,7 +15,7 @@ The external boundary is Printify only. Shopify publication is requested through
 - Project the current Item, fixed-provider Offering, Design-selected colors, variant rows, and design-area assignments into a complete Printify product.
 - Use tolerant top-aligned, full-width artwork placement without requiring exact image dimensions or aspect ratios.
 - Detect remote drift before mutation and provide explicit accept-remote or keep-local resolution.
-- Derive Shopify publication availability only from `Shopify + Printify`.
+- Derive publication availability from the selected Printify shop's connected sales channel and the Store strategy. Standalone `Printify` may publish to any connected supported channel; `Shopify + Printify` requires a Shopify channel.
 - Keep the Printify integration unified at the transport and application-service level while retaining focused contracts for catalog, uploads, and products.
 - Validate the user-facing flow with prototype screens, official Printify UI/reference screenshots, targeted architecture and UX audits, deterministic tests, and a limited supervised live smoke test when necessary.
 
@@ -75,9 +75,9 @@ The service will never blindly retry an ambiguous create, update, publish, unpub
 
 For an uncertain create without a returned product ID, reconciliation lists every product in the selected Printify shop and compares exact title, Blueprint, and Provider against the persisted create intent. Matching products are offered for explicit identity verification and linking. If no match is found, the UI requires explicit user confirmation and the application repeats the list check immediately before retrying; it does not infer certainty from a single shop read. The Listing tool reports the blocked state and displays progress while remote operations run.
 
-### 7. Derive publication from fulfillment strategy
+### 7. Derive publication from the connected Printify sales channel
 
-Product operations are available for `Printify` and `Shopify + Printify` when readiness passes. Publish and unpublish actions are available only for `Shopify + Printify` and are sent only to Printify. Publication state is separate from Item lifecycle status and includes pending/unverified states.
+Product operations are available for `Printify` and `Shopify + Printify` when readiness passes. Publish and unpublish actions are available for either strategy only when the selected Printify shop reports a connected sales channel. For `Shopify + Printify`, the connected channel must be Shopify; standalone `Printify` may use any supported connected channel. The integration checks the `sales_channel` returned by `GET /v1/shops.json`, rejects `disconnected`, and reports why publication is unavailable. Publication requests and follow-up callbacks are sent only to Printify. Publication state is separate from Item lifecycle status and includes pending/unverified states.
 
 The product must be verified as unpublished and unlocked before remote deletion is offered. Local archive never sends a remote delete. A failed connection disables remote actions but does not discard mappings or local work.
 
@@ -162,7 +162,7 @@ Rollback is additive: disable the Printify tool and remote commands while preser
 
 - Map every scenario in the delta specs to focused domain/application/integration/persistence tests or deterministic Avalonia headless view tests. Include partial and empty artwork assignments, both pricing policies with absent costs, and imported cost fallback from catalog data.
 - Add one critical headless user journey covering ready connection → preview → create/save → refresh → conflict decision → update, using isolated persistence and mocked Printify services.
-- Add a second headless journey for `Shopify + Printify` publication state and unpublish/delete gating if the final UI crosses enough rendered and persistence seams to justify it.
+- Add headless coverage for publication readiness across both Printify strategies, including disconnected-channel guidance and Shopify-channel enforcement for `Shopify + Printify`.
 - Perform the planned prototype, screenshot-reference, architecture, UX, and API-safety audits before implementation approval.
 - Run `openspec validate` and `dotnet test .\FusionCanvas.sln` before considering the module verified.
 

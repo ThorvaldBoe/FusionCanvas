@@ -592,7 +592,7 @@ public sealed class ListingLifecycleService
     {
         if (!connectionRequest.RequirePublication)
         {
-            return new(ListingLifecycleResultKind.NotAllowed, Message: "Publishing is available only for Shopify + Printify.");
+            return new(ListingLifecycleResultKind.NotAllowed, Message: "Publishing requires a Printify-enabled Store and a connected sales channel.");
         }
 
         return await MutatePublicationAsync(connectionRequest, itemId, publish: true, cancellationToken).ConfigureAwait(false);
@@ -605,7 +605,7 @@ public sealed class ListingLifecycleService
     {
         if (!connectionRequest.RequirePublication)
         {
-            return new(ListingLifecycleResultKind.NotAllowed, Message: "Unpublishing is available only for Shopify + Printify.");
+            return new(ListingLifecycleResultKind.NotAllowed, Message: "Unpublishing requires a Printify-enabled Store and a connected sales channel.");
         }
 
         return await MutatePublicationAsync(connectionRequest, itemId, publish: false, cancellationToken).ConfigureAwait(false);

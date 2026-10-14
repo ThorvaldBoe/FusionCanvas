@@ -286,7 +286,7 @@ public class StageToolViewModelsTests
     }
 
     [Fact]
-    public async Task PrintifyTool_ExplainsWhyUnpublishedProductCannotBePublishedForStandalonePrintify()
+    public async Task PrintifyTool_AllowsPublishForStandalonePrintifyWhenChannelIsConnected()
     {
         var now = DateTimeOffset.UtcNow;
         var storeId = Guid.NewGuid();
@@ -296,7 +296,31 @@ public class StageToolViewModelsTests
         var mapping = new ExternalListingMapping(storeId, itemId, "printify", "42", "product-1", null, null,
             ExternalListingSyncState.Synchronized, ExternalListingPublicationState.Unpublished, ExternalListingOperationState.Succeeded, "{}", null, now, now, now);
         var repository = new MemoryRepository(WorkspaceSnapshot.Empty with { Stores = [store], Items = [item], ExternalListingMappings = [mapping] });
-        var service = new ListingLifecycleService(repository, new Connection(), new Products(), new Publication());
+        var connection = new Connection();
+        var service = new ListingLifecycleService(repository, connection, new Products(), new Publication());
+        var vm = new PrintifyListingStageToolViewModel(new Factory(service), new ProjectionSource(), () => repository.Snapshot,
+            id => id == storeId ? store : null, new ContextMapper());
+
+        await vm.LoadAsync(itemId, canEdit: true, TestContext.Current.CancellationToken);
+
+        Assert.True(vm.CanPublish);
+        Assert.False(vm.HasPublicationAvailabilityMessage);
+        Assert.False(connection.LastRequest!.RequireShopifyChannel);
+    }
+
+    [Fact]
+    public async Task PrintifyTool_ExplainsWhyPublishIsUnavailableWhenShopHasNoChannel()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var storeId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var store = new Store(storeId, "The Groan Zone", null, false, now, now, "{}", null, FulfillmentStrategy.Printify);
+        var item = new Item(itemId, storeId, null, null, "Dad joke", null, ItemStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
+        var mapping = new ExternalListingMapping(storeId, itemId, "printify", "42", "product-1", null, null,
+            ExternalListingSyncState.Synchronized, ExternalListingPublicationState.Unpublished, ExternalListingOperationState.Succeeded, "{}", null, now, now, now);
+        var repository = new MemoryRepository(WorkspaceSnapshot.Empty with { Stores = [store], Items = [item], ExternalListingMappings = [mapping] });
+        var connection = new Connection { PublicationAvailable = false, PublicationMessage = "Connect this Printify shop to a supported sales channel before publishing." };
+        var service = new ListingLifecycleService(repository, connection, new Products(), new Publication());
         var vm = new PrintifyListingStageToolViewModel(new Factory(service), new ProjectionSource(), () => repository.Snapshot,
             id => id == storeId ? store : null, new ContextMapper());
 
@@ -304,7 +328,7 @@ public class StageToolViewModelsTests
 
         Assert.False(vm.CanPublish);
         Assert.True(vm.HasPublicationAvailabilityMessage);
-        Assert.Contains("Shopify + Printify", vm.PublicationAvailabilityMessage);
+        Assert.Contains("connect", vm.PublicationAvailabilityMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     [AvaloniaFact]
@@ -342,7 +366,8 @@ public class StageToolViewModelsTests
             RemoteProduct = new ListingRemoteProduct("product-1", false, ListingPublicationState.Unpublished, ListingSnapshot.Empty)
         };
         var publication = new Publication();
-        var service = new ListingLifecycleService(repository, new Connection(), products, publication);
+        var connection = new Connection();
+        var service = new ListingLifecycleService(repository, connection, products, publication);
         var vm = new PrintifyListingStageToolViewModel(
             new Factory(service),
             new ProjectionSource(),
@@ -351,6 +376,7 @@ public class StageToolViewModelsTests
             new ContextMapper());
 
         await vm.LoadAsync(itemId, canEdit: true, TestContext.Current.CancellationToken);
+        Assert.True(connection.LastRequest!.RequireShopifyChannel);
         Assert.True(vm.CanPublish);
         products.RemoteProduct = new ListingRemoteProduct("product-1", false, ListingPublicationState.Published, ListingSnapshot.Empty);
         vm.PublishCommand.Execute(null);
@@ -737,8 +763,22 @@ public class StageToolViewModelsTests
 
     private sealed class Connection : IListingConnectionPort
     {
+        public bool PublicationAvailable { get; init; } = true;
+        public string? PublicationMessage { get; init; }
+        public ListingConnectionRequest? LastRequest { get; private set; }
+
         public Task<ListingReadiness> CheckAsync(ListingConnectionRequest request, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new ListingReadiness(ListingConnectionState.Ready, true, request.RequirePublication, []));
+            Task.FromResult(SetReadiness(request));
+
+        private ListingReadiness SetReadiness(ListingConnectionRequest request)
+        {
+            LastRequest = request;
+            return new ListingReadiness(
+                ListingConnectionState.Ready,
+                true,
+                request.RequirePublication && PublicationAvailable,
+                PublicationMessage is null ? [] : [new ListingReadinessIssue("printify-sales-channel-unavailable", PublicationMessage)]);
+        }
     }
 
     private sealed class Products : IListingProductPort

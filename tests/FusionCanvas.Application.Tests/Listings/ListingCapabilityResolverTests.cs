@@ -8,7 +8,7 @@ public sealed class ListingCapabilityResolverTests
     [Theory]
     [InlineData(FulfillmentStrategy.Manual, false, false)]
     [InlineData(FulfillmentStrategy.ShopifyManual, false, false)]
-    [InlineData(FulfillmentStrategy.Printify, true, false)]
+    [InlineData(FulfillmentStrategy.Printify, true, true)]
     [InlineData(FulfillmentStrategy.ShopifyPrintify, true, true)]
     public void Strategy_controls_product_and_publication_capabilities(
         FulfillmentStrategy strategy,
@@ -35,11 +35,23 @@ public sealed class ListingCapabilityResolverTests
     }
 
     [Fact]
-    public void Standalone_printify_never_exposes_publication()
+    public void Standalone_printify_can_publish_when_the_shop_has_a_connected_channel()
     {
         var capabilities = ListingCapabilityResolver.Resolve(
             FulfillmentStrategy.Printify,
             new ListingReadiness(ListingConnectionState.Ready, true, true, []));
+
+        Assert.True(capabilities.ProductOperationsAvailable);
+        Assert.True(capabilities.PublicationOperationsAvailable);
+    }
+
+    [Fact]
+    public void Disconnected_printify_shop_disables_publication_but_keeps_product_operations()
+    {
+        var capabilities = ListingCapabilityResolver.Resolve(
+            FulfillmentStrategy.Printify,
+            new ListingReadiness(ListingConnectionState.Ready, true, false,
+                [new ListingReadinessIssue("printify-sales-channel-unavailable", "Connect a channel.")]));
 
         Assert.True(capabilities.ProductOperationsAvailable);
         Assert.False(capabilities.PublicationOperationsAvailable);
