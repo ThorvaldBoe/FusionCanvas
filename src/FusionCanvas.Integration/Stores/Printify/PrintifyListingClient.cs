@@ -146,6 +146,31 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
     public Task<ListingMutationResult> UnpublishAsync(string shopId, string productId, CancellationToken cancellationToken = default) =>
         MutatePublicationAsync(shopId, productId, publish: false, cancellationToken);
 
+    public async Task<ListingMutationResult> PublishingFailedAsync(string shopId, string productId, string reason, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("A failure reason is required.", nameof(reason));
+
+        var secret = await RequireCredentialAsync(cancellationToken).ConfigureAwait(false);
+        var path = $"shops/{Uri.EscapeDataString(shopId)}/products/{Uri.EscapeDataString(productId)}/publishing_failed.json";
+        var response = await SendJsonAsync(HttpMethod.Post, path, secret, JsonSerializer.Serialize(new { reason }), cancellationToken).ConfigureAwait(false);
+        return MutationResult(response, productId, ListingPublicationState.Unpublished);
+    }
+
+    public async Task<ListingMutationResult> PublishingSucceededAsync(string shopId, string productId, string externalId, string externalHandle, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(externalId))
+            throw new ArgumentException("An external channel identity is required.", nameof(externalId));
+        if (string.IsNullOrWhiteSpace(externalHandle))
+            throw new ArgumentException("An external channel handle is required.", nameof(externalHandle));
+
+        var secret = await RequireCredentialAsync(cancellationToken).ConfigureAwait(false);
+        var path = $"shops/{Uri.EscapeDataString(shopId)}/products/{Uri.EscapeDataString(productId)}/publishing_succeeded.json";
+        var payload = JsonSerializer.Serialize(new { external = new { id = externalId, handle = externalHandle } });
+        var response = await SendJsonAsync(HttpMethod.Post, path, secret, payload, cancellationToken).ConfigureAwait(false);
+        return MutationResult(response, productId, ListingPublicationState.Published);
+    }
+
     private async Task<ListingMutationResult> MutateProductAsync(
         HttpMethod method,
         string path,
@@ -167,7 +192,18 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
         var path = publish
             ? $"shops/{Uri.EscapeDataString(shopId)}/products/{Uri.EscapeDataString(productId)}/publish.json"
             : $"shops/{Uri.EscapeDataString(shopId)}/products/{Uri.EscapeDataString(productId)}/unpublish.json";
-        var response = await SendAsync(HttpMethod.Post, path, secret, cancellationToken: cancellationToken).ConfigureAwait(false);
+        var response = publish
+            ? await SendJsonAsync(HttpMethod.Post, path, secret, JsonSerializer.Serialize(new
+            {
+                title = true,
+                description = true,
+                images = true,
+                variants = true,
+                tags = true,
+                keyFeatures = true,
+                shipping_template = true
+            }), cancellationToken).ConfigureAwait(false)
+            : await SendAsync(HttpMethod.Post, path, secret, cancellationToken: cancellationToken).ConfigureAwait(false);
         return MutationResult(response, productId, publish ? ListingPublicationState.Published : ListingPublicationState.Unpublished);
     }
 
@@ -259,7 +295,7 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
         if (!response.Succeeded)
         {
             var definitive = response.Outcome is not (PrintifyTransportOutcome.NetworkFailure);
-            return new(productId, definitive, ErrorCode: response.Outcome.ToString(), ErrorMessage: MessageFor(response.Outcome));
+            return new(productId, definitive, ErrorCode: response.Outcome.ToString(), ErrorMessage: MessageFor(response.Outcome, response.StatusCode));
         }
 
         ListingRemoteProduct? product = null;
@@ -398,7 +434,7 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
 
     private static ListingReadiness Unavailable(string message) => new(ListingConnectionState.Unavailable, false, false, [new("printify-unavailable", message)]);
 
-    private static string MessageFor(PrintifyTransportOutcome outcome) => outcome switch
+    private static string MessageFor(PrintifyTransportOutcome outcome, HttpStatusCode? statusCode = null) => outcome switch
     {
         PrintifyTransportOutcome.InvalidCredential => "Printify rejected the saved API key.",
         PrintifyTransportOutcome.PermissionDenied => "The Printify API key lacks permission for this operation.",
@@ -406,6 +442,7 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
         PrintifyTransportOutcome.RateLimited => "Printify is rate limiting requests. Try again later.",
         PrintifyTransportOutcome.Locked => "Printify has locked the product. Refresh before trying again.",
         PrintifyTransportOutcome.NetworkFailure => "Printify is unavailable. Try again when the connection is restored.",
+        PrintifyTransportOutcome.UnexpectedResponse when statusCode is { } status => $"Printify returned an unexpected response (HTTP {(int)status}).",
         _ => "Printify returned an unexpected response."
     };
 }

@@ -97,6 +97,16 @@ internal sealed class PrintifyApiVerifier(VerificationConfiguration configuratio
                 var existing = await listing.GetAsync(shopId.ToString(System.Globalization.CultureInfo.InvariantCulture), productId!, cancellationToken).ConfigureAwait(false);
                 if (existing?.PublicationState == ListingPublicationState.Published)
                     throw new InvalidOperationException("The session-owned product is still published. Unpublish it through the normal workflow before retrying recovery deletion.");
+                if (existing?.IsLocked == true)
+                {
+                    var unlocked = await listing.PublishingFailedAsync(shopId.ToString(System.Globalization.CultureInfo.InvariantCulture), productId!,
+                        "FusionCanvas API verification cleanup: no connected channel handler completed the publish event.", cancellationToken).ConfigureAwait(false);
+                    if (!unlocked.IsDefinitive || unlocked.ErrorCode is not null)
+                        throw new InvalidOperationException(unlocked.ErrorMessage ?? "Printify did not unlock the pending test publication.");
+                    existing = await listing.GetAsync(shopId.ToString(System.Globalization.CultureInfo.InvariantCulture), productId!, cancellationToken).ConfigureAwait(false);
+                    if (existing?.IsLocked == true)
+                        throw new InvalidOperationException("Printify accepted publishing_failed but still reports the test product as locked.");
+                }
                 if (existing is not null)
                 {
                     var deleted = await listing.DeleteAsync(shopId.ToString(System.Globalization.CultureInfo.InvariantCulture), productId!, cancellationToken).ConfigureAwait(false);
@@ -389,16 +399,57 @@ internal sealed class PrintifyApiVerifier(VerificationConfiguration configuratio
         if (await ConfirmAsync($"Publish session-owned product {productId}. This may expose a sellable listing on connected channels; a resulting external order can incur production/shipping charges. Check the DevTest store and all connected channels before proceeding. This runner will not create orders.", "PUBLISH PRINTIFY PRODUCT AFTER CHANNEL CHECK", cancellationToken).ConfigureAwait(false))
         {
             await SaveJournalAsync(runId, shopId, "product-publish", productId, "owned", cancellationToken).ConfigureAwait(false);
-            var published = await lifecycle.PublishAsync(new(storeId, shop, RequirePublication: true), projection.ItemId, cancellationToken).ConfigureAwait(false);
+            var publicationRequest = new ListingConnectionRequest(storeId, shop, RequirePublication: true);
+            var published = await lifecycle.PublishAsync(publicationRequest, projection.ItemId, cancellationToken).ConfigureAwait(false);
+            var publishAcceptedWithoutStateChange = published.Kind == ListingLifecycleResultKind.Uncertain
+                && string.Equals(published.Message, "Printify returned a publication state different from the requested state. Refresh before retrying.", StringComparison.Ordinal);
             if (published.Kind == ListingLifecycleResultKind.Succeeded)
                 operations.Add(new("printify-product-publish", "passed", "Published and read-back verified the session-owned product.", ResourceId: productId));
+            else if (publishAcceptedWithoutStateChange)
+                operations.Add(new("printify-product-publish", "passed", "Printify accepted the publish notification, but product read-back did not confirm channel publication. Printify documents this endpoint as a channel event notification, so this result confirms the API request only.", ResourceId: productId));
             else
             {
                 var actual = SafeDiagnostic.Redact(published.Message ?? "The application lifecycle did not verify the published state.");
                 operations.Add(new("printify-product-publish", "failed", actual, ResourceId: productId));
                 findings.Add(new(Guid.NewGuid().ToString("N"), "printify-product-publish", "open", "publication-state-mismatch", "Published", actual, "src/FusionCanvas.Application/Listings/ListingLifecycleService.cs", DateTimeOffset.UtcNow));
             }
-            if (await ConfirmAsync($"Unpublish session-owned product {productId}.", "UNPUBLISH PRINTIFY PRODUCT", cancellationToken).ConfigureAwait(false))
+            var canUnpublish = true;
+            if (publishAcceptedWithoutStateChange)
+            {
+                if (await ConfirmAsync($"Simulate a connected channel reporting success for session-owned test product {productId} using a fake example.com handle, so we can verify Printify's published state and unpublish endpoint. No storefront listing or order is created by this callback.", "CONFIRM PRINTIFY PUBLISH TEST", cancellationToken).ConfigureAwait(false))
+                {
+                    var successCallback = await listing.PublishingSucceededAsync(shop, productId, $"api-verification-{runId}", $"https://example.com/fusioncanvas-api-verification/{runId}", cancellationToken).ConfigureAwait(false);
+                    if (successCallback.IsDefinitive && successCallback.ErrorCode is null)
+                        operations.Add(new("printify-publishing-succeeded", "passed", "Printify accepted the documented publishing_succeeded callback with a test-only example.com external identity.", ResourceId: productId));
+                    else
+                    {
+                        var diagnostic = SafeDiagnostic.Redact(successCallback.ErrorMessage ?? "Printify rejected the publishing_succeeded callback.");
+                        operations.Add(new("printify-publishing-succeeded", "failed", diagnostic, ResourceId: productId));
+                        findings.Add(new(Guid.NewGuid().ToString("N"), "printify-publishing-succeeded", "open", "publish-success-callback", "The pending test product becomes published and unlocked.", diagnostic, "src/FusionCanvas.Integration/Stores/Printify/PrintifyListingClient.cs", DateTimeOffset.UtcNow));
+                        canUnpublish = false;
+                    }
+                    if (canUnpublish)
+                    {
+                        var refreshed = await lifecycle.RefreshAsync(publicationRequest, projection.ItemId, cancellationToken).ConfigureAwait(false);
+                        if (refreshed.Kind != ListingLifecycleResultKind.Succeeded || refreshed.Mapping?.PublicationState != ListingPublicationState.Published)
+                        {
+                            var diagnostic = SafeDiagnostic.Redact(refreshed.Message ?? "The publishing_succeeded callback did not produce a published product read-back.");
+                            operations.Add(new("printify-publishing-succeeded", "failed", diagnostic, ResourceId: productId));
+                            findings.Add(new(Guid.NewGuid().ToString("N"), "printify-publishing-succeeded", "open", "publish-success-readback", "Published", refreshed.Mapping?.PublicationState.ToString() ?? diagnostic, "src/FusionCanvas.Integration/Stores/Printify/PrintifyListingClient.cs", DateTimeOffset.UtcNow));
+                            operations.Add(new("printify-product-unpublish", "not-run", "The product did not enter the published state, so unpublish was not attempted.", ResourceId: productId));
+                            canUnpublish = false;
+                        }
+                    }
+                }
+                else
+                {
+                    operations.Add(new("printify-publishing-succeeded", "cancelled", "The publishing_succeeded callback was declined.", ResourceId: productId));
+                    operations.Add(new("printify-product-unpublish", "not-run", "The product remains in a pending publish state until the channel callback is completed.", ResourceId: productId));
+                    canUnpublish = false;
+                }
+            }
+
+            if (canUnpublish && await ConfirmAsync($"Unpublish session-owned product {productId}.", "UNPUBLISH PRINTIFY PRODUCT", cancellationToken).ConfigureAwait(false))
             {
                 await SaveJournalAsync(runId, shopId, "product-unpublish", productId, "owned", cancellationToken).ConfigureAwait(false);
                 var unpublished = await lifecycle.UnpublishAsync(new(storeId, shop, RequirePublication: true), projection.ItemId, cancellationToken).ConfigureAwait(false);
@@ -411,7 +462,7 @@ internal sealed class PrintifyApiVerifier(VerificationConfiguration configuratio
                     findings.Add(new(Guid.NewGuid().ToString("N"), "printify-product-unpublish", "open", "publication-state-mismatch", "Unpublished", actual, "src/FusionCanvas.Application/Listings/ListingLifecycleService.cs", DateTimeOffset.UtcNow));
                 }
             }
-            else operations.Add(new("printify-product-unpublish", "cancelled", "Write declined.", ResourceId: productId));
+            else if (canUnpublish) operations.Add(new("printify-product-unpublish", "cancelled", "Write declined.", ResourceId: productId));
         }
         else
         {

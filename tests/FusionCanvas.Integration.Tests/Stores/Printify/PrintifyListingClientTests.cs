@@ -49,6 +49,58 @@ public sealed class PrintifyListingClientTests
     }
 
     [Fact]
+    public async Task Publish_sends_documented_field_selection_and_unpublish_posts_without_a_body()
+    {
+        var handler = new RecordingHandler(_ => Json(HttpStatusCode.OK, string.Empty));
+        using var http = new HttpClient(handler);
+        var client = new PrintifyListingClient(Guid.NewGuid(), http, _ => Task.FromResult<string?>("key"));
+
+        var published = await client.PublishAsync("42", "product-1", TestContext.Current.CancellationToken);
+        var unpublished = await client.UnpublishAsync("42", "product-1", TestContext.Current.CancellationToken);
+
+        Assert.True(published.IsDefinitive);
+        Assert.True(unpublished.IsDefinitive);
+        Assert.Equal(HttpMethod.Post, handler.Requests[0].Method);
+        Assert.EndsWith("/products/product-1/publish.json", handler.Requests[0].RequestUri!.AbsolutePath);
+        using var publishPayload = System.Text.Json.JsonDocument.Parse(handler.Bodies[0]);
+        Assert.All(new[] { "title", "description", "images", "variants", "tags", "keyFeatures", "shipping_template" },
+            field => Assert.True(publishPayload.RootElement.GetProperty(field).GetBoolean()));
+        Assert.EndsWith("/products/product-1/unpublish.json", handler.Requests[1].RequestUri!.AbsolutePath);
+        Assert.Equal(string.Empty, handler.Bodies[1]);
+    }
+
+    [Fact]
+    public async Task Publishing_failed_sends_a_reason_to_the_documented_unlock_endpoint()
+    {
+        var handler = new RecordingHandler(_ => Json(HttpStatusCode.OK, string.Empty));
+        using var http = new HttpClient(handler);
+        var client = new PrintifyListingClient(Guid.NewGuid(), http, _ => Task.FromResult<string?>("key"));
+
+        var result = await client.PublishingFailedAsync("42", "product-1", "No connected channel handler.", TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsDefinitive);
+        Assert.EndsWith("/products/product-1/publishing_failed.json", handler.Requests.Single().RequestUri!.AbsolutePath);
+        using var payload = System.Text.Json.JsonDocument.Parse(handler.Bodies.Single());
+        Assert.Equal("No connected channel handler.", payload.RootElement.GetProperty("reason").GetString());
+    }
+
+    [Fact]
+    public async Task Publishing_succeeded_sends_external_channel_identity()
+    {
+        var handler = new RecordingHandler(_ => Json(HttpStatusCode.OK, string.Empty));
+        using var http = new HttpClient(handler);
+        var client = new PrintifyListingClient(Guid.NewGuid(), http, _ => Task.FromResult<string?>("key"));
+
+        var result = await client.PublishingSucceededAsync("42", "product-1", "channel-product-1", "https://example.com/products/product-1", TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsDefinitive);
+        Assert.EndsWith("/products/product-1/publishing_succeeded.json", handler.Requests.Single().RequestUri!.AbsolutePath);
+        using var payload = System.Text.Json.JsonDocument.Parse(handler.Bodies.Single());
+        Assert.Equal("channel-product-1", payload.RootElement.GetProperty("external").GetProperty("id").GetString());
+        Assert.Equal("https://example.com/products/product-1", payload.RootElement.GetProperty("external").GetProperty("handle").GetString());
+    }
+
+    [Fact]
     public async Task Network_failure_is_marked_ambiguous_for_mutation()
     {
         var client = new PrintifyListingClient(Guid.NewGuid(), new HttpClient(new ThrowingHandler()), _ => Task.FromResult<string?>("key"));
