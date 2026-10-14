@@ -5,6 +5,7 @@ using FusionCanvas.ApiVerification.Sessions;
 using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Listings;
 using FusionCanvas.Application.Stores.Printify;
+using FusionCanvas.Integration.AI;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -386,6 +387,20 @@ public sealed class ApiVerificationCoreTests
         Assert.Equal(baseline, OpenRouterQualificationEvidenceStore.CreateFingerprint(new { Model = "provider/model", Temperature = 0.2, Adapter = "1" }));
         Assert.NotEqual(baseline, OpenRouterQualificationEvidenceStore.CreateFingerprint(new { Model = "provider/model", Temperature = 0.3, Adapter = "1" }));
         Assert.NotEqual(baseline, OpenRouterQualificationEvidenceStore.CreateFingerprint(new { Model = "provider/model", Temperature = 0.2, Adapter = "2" }));
+    }
+
+    [Fact]
+    public void QualificationAdapterRevisionUsesCommitAwareInformationalVersion()
+    {
+        var assembly = typeof(OpenRouterClient).Assembly;
+        var revision = OpenRouterQualificationEvidenceStore.GetAdapterRevision(assembly);
+        var informationalVersion = assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+            .Single()
+            .InformationalVersion;
+
+        Assert.Equal(informationalVersion, revision);
+        Assert.NotEqual(assembly.GetName().Version?.ToString(), revision);
     }
 
     [Theory]

@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.Json;
 using FusionCanvas.ApiVerification.Sessions;
@@ -19,6 +20,13 @@ internal sealed class OpenRouterQualificationEvidenceStore(string dataDirectory)
 
     public static string CreateFingerprint<T>(T value) =>
         Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(value)));
+
+    public static string GetAdapterRevision(Assembly assembly)
+    {
+        ArgumentNullException.ThrowIfNull(assembly);
+        return assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            ?? assembly.ManifestModule.ModuleVersionId.ToString("N");
+    }
 
     public async Task SaveAsync(OpenRouterQualificationEvidence evidence, CancellationToken cancellationToken = default)
     {
