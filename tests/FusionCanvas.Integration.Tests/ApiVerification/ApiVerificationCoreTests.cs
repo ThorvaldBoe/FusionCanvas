@@ -225,6 +225,82 @@ public sealed class ApiVerificationCoreTests
     }
 
     [Fact]
+    public void QualificationBuildsDifferentParameterProfilesAndTokenCapsPerEndpoint()
+    {
+        var model = new AiModelDescriptor("provider/model", "Model", null, null, ["text"], ["text"],
+            [AiParameterRegistry.MaxCompletionTokens, "max_tokens", AiParameterRegistry.Temperature, AiParameterRegistry.TopP, AiParameterRegistry.Seed, AiParameterRegistry.Stop],
+            1000, 1024, null, null, false, null);
+        var endpointA = new AiModelEndpointDescriptor("provider/model", "provider-a", "Provider A", "provider-a/fp8", null,
+            1000, 256, ["max_tokens", AiParameterRegistry.Temperature, AiParameterRegistry.Stop], false, 0.1m, 0.2m, null, null);
+        var endpointB = new AiModelEndpointDescriptor("provider/model", "provider-b", "Provider B", "provider-b/fp16", null,
+            1000, 96, [AiParameterRegistry.MaxCompletionTokens, AiParameterRegistry.TopP, AiParameterRegistry.Seed], false, 0.1m, 0.2m, null, null);
+
+        var profileA = OpenRouterApiVerifier.BuildTestProfile(model, endpointA.SupportedParameters,
+            OpenRouterApiVerifier.SelectMaximumCompletionTokens(model, endpointA)) with
+        {
+            Routing = AiRoutingPolicy.ForEndpoint(endpointA.EndpointId, endpointA.ProviderId, "max_tokens")
+        };
+        var profileB = OpenRouterApiVerifier.BuildTestProfile(model, endpointB.SupportedParameters,
+            OpenRouterApiVerifier.SelectMaximumCompletionTokens(model, endpointB)) with
+        {
+            Routing = AiRoutingPolicy.ForEndpoint(endpointB.EndpointId, endpointB.ProviderId, AiParameterRegistry.MaxCompletionTokens)
+        };
+
+        Assert.Equal(256, profileA.MaxCompletionTokens);
+        Assert.Equal(0.2, profileA.Temperature);
+        Assert.Equal(["<END>"], profileA.StopSequences);
+        Assert.Null(profileA.TopP);
+        Assert.Equal(96, profileB.MaxCompletionTokens);
+        Assert.Null(profileB.Temperature);
+        Assert.Empty(profileB.StopSequences);
+        Assert.Equal(0.9, profileB.TopP);
+        Assert.Equal(7, profileB.Seed);
+        Assert.Empty(AiParameterRegistry.Validate(profileA, model));
+        Assert.Empty(AiParameterRegistry.Validate(profileB, model));
+    }
+
+    [Fact]
+    public void QualificationBlocksCatalogsWithoutPositiveTokenBounds()
+    {
+        var model = new AiModelDescriptor("provider/model", "Model", null, null, ["text"], ["text"],
+            [AiParameterRegistry.MaxCompletionTokens], 1000, 0, null, null, false, null);
+        var endpoint = new AiModelEndpointDescriptor("provider/model", "provider", "Provider", "provider/fp8", null,
+            1000, 0, [AiParameterRegistry.MaxCompletionTokens], false, 0.1m, 0.2m, null, null);
+
+        Assert.False(OpenRouterApiVerifier.TrySelectMaximumCompletionTokens(model, endpoint, out var maximum));
+        Assert.Equal(0, maximum);
+    }
+
+    [Fact]
+    public void QualificationEvidenceIgnoresVolatileEndpointMetricsAndParameterOrdering()
+    {
+        var model = new AiModelDescriptor("provider/model", "Model", null, null, ["text"], ["text"],
+            [AiParameterRegistry.MaxCompletionTokens, AiParameterRegistry.Temperature], 1000, 1024, null, null, false, null);
+        var endpoint = new AiModelEndpointDescriptor("provider/model", "provider", "Provider", "provider/fp8", null,
+            1000, 512, [AiParameterRegistry.MaxCompletionTokens, AiParameterRegistry.Temperature], false, 0.1m, 0.2m, 30, 100);
+        var refreshedEndpoint = endpoint with
+        {
+            SupportedParameters = [AiParameterRegistry.Temperature, AiParameterRegistry.MaxCompletionTokens],
+            LatencyMilliseconds = 250,
+            ThroughputTokensPerSecond = 50,
+            IsStale = true
+        };
+        var profile = OpenRouterApiVerifier.BuildTestProfile(model, endpoint.SupportedParameters, 512) with
+        {
+            Routing = AiRoutingPolicy.ForEndpoint(endpoint.EndpointId, endpoint.ProviderId, AiParameterRegistry.MaxCompletionTokens)
+        };
+
+        var first = OpenRouterApiVerifier.CreateTextQualificationFingerprint(model, endpoint, profile);
+        var refreshed = OpenRouterApiVerifier.CreateTextQualificationFingerprint(model, refreshedEndpoint, profile);
+
+        Assert.Equal(first, refreshed);
+        Assert.NotEqual(first, OpenRouterApiVerifier.CreateTextQualificationFingerprint(
+            model, refreshedEndpoint with { PromptPrice = 0.15m }, profile));
+        Assert.NotEqual(first, OpenRouterApiVerifier.CreateTextQualificationFingerprint(
+            model, refreshedEndpoint with { MaxCompletionTokens = 256 }, profile));
+    }
+
+    [Fact]
     public void QualificationProfileRecognizesLegacyMaxTokensAliasForBoundedRequests()
     {
         var model = new AiModelDescriptor("provider/model", "Model", null, null, ["text"], ["text"],

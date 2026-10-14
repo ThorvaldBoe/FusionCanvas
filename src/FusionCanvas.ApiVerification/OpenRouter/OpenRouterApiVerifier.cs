@@ -7,6 +7,12 @@ using FusionCanvas.Integration.AI;
 
 namespace FusionCanvas.ApiVerification.OpenRouter;
 
+internal sealed record OpenRouterQualificationRoute(
+    OpenRouterQualificationCandidate Candidate,
+    string EndpointId,
+    decimal MaximumCost,
+    bool EvidenceReused);
+
 internal sealed class OpenRouterApiVerifier(VerificationConfiguration configuration)
 {
     private const int MaximumCompletionTokens = 512;
@@ -215,19 +221,22 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
         ICollection<VerificationFinding> findings,
         CancellationToken cancellationToken,
         bool allowEvidenceReuse = false,
-        bool force = false)
+        bool force = false,
+        string? selectedEndpointId = null)
     {
         var models = await service.GetModelsAsync(configuration.OpenRouterApiKey!, false, cancellationToken).ConfigureAwait(false);
         var model = models.Models.SingleOrDefault(candidate => candidate.Id.Equals(modelId, StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException($"OpenRouter did not list the selected text model `{SafeDiagnostic.Redact(modelId)}`.");
         var endpointCatalog = await service.GetEndpointsAsync(configuration.OpenRouterApiKey!, model.Id, false, cancellationToken).ConfigureAwait(false);
-        var maximumTokens = Math.Min(MaximumCompletionTokens, model.MaxCompletionTokens ?? MaximumCompletionTokens);
         var endpoint = endpointCatalog.Endpoints
             .Where(candidate => candidate.PromptPrice is not null && candidate.CompletionPrice is not null)
             .Where(candidate => candidate.SupportedParameters.Contains(AiParameterRegistry.MaxCompletionTokens, StringComparer.Ordinal)
                 || candidate.SupportedParameters.Contains("max_tokens", StringComparer.Ordinal))
+            .Where(candidate => SelectCompletionTokenParameter(model.SupportedParameters, candidate.SupportedParameters) is not null)
+            .Where(candidate => selectedEndpointId is null || candidate.EndpointId.Equals(selectedEndpointId, StringComparison.OrdinalIgnoreCase))
             .OrderBy(candidate => candidate.PromptPrice + candidate.CompletionPrice)
             .FirstOrDefault() ?? throw new InvalidOperationException("No exact model endpoint advertises bounded completion tokens and current prompt/completion prices; generation is blocked.");
+        var maximumTokens = SelectMaximumCompletionTokens(model, endpoint);
         var profileTemplate = BuildTestProfile(model, endpoint.SupportedParameters, maximumTokens);
         var completionTokenParameter = SelectCompletionTokenParameter(model.SupportedParameters, endpoint.SupportedParameters);
         var profile = profileTemplate with { Routing = AiRoutingPolicy.ForEndpoint(endpoint.EndpointId, endpoint.ProviderId, completionTokenParameter) };
@@ -235,16 +244,15 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
         var promptBytes = Encoding.UTF8.GetByteCount(prompt);
         var estimate = OpenRouterCostBound.EstimateTextMaximum(endpoint, promptBytes, maximumTokens)
             ?? throw new InvalidOperationException("A conservative text generation cost bound could not be calculated.");
-        if (estimate > ceiling)
-        {
-            operations.Add(new("openrouter-chat-completion", "blocked", $"Estimated maximum {FormatUsd(estimate)} USD exceeds the session ceiling {FormatUsd(ceiling)} USD. provider={endpoint.ProviderId}; request={ProfileSummary(profile)}", ModelId: model.Id, ResourceId: endpoint.EndpointId));
-            return (estimate, null);
-        }
-
-        var fingerprint = OpenRouterQualificationEvidenceStore.CreateFingerprint(new { model.Id, model.SupportedParameters, endpoint.EndpointId, endpoint.ProviderId, profile, OutputModalities = new[] { "text" }, AdapterRevision = OpenRouterQualificationEvidenceStore.GetAdapterRevision(typeof(OpenRouterClient).Assembly) });
+        var fingerprint = CreateTextQualificationFingerprint(model, endpoint, profile);
         if (allowEvidenceReuse && !force && await TryLoadQualificationEvidenceAsync(model.Id, "text", fingerprint, cancellationToken).ConfigureAwait(false) is { Status: "passed" } evidence)
         {
             operations.Add(new("openrouter-chat-completion", "reused", $"Matching passing evidence from {evidence.VerifiedAt:u}; no generation request sent. provider={endpoint.ProviderId}; request={ProfileSummary(profile)}", ModelId: model.Id, ProfileFingerprint: fingerprint, ResourceId: endpoint.EndpointId));
+            return (0, null);
+        }
+        if (estimate > ceiling)
+        {
+            operations.Add(new("openrouter-chat-completion", "blocked", $"Estimated maximum {FormatUsd(estimate)} USD exceeds the session ceiling {FormatUsd(ceiling)} USD. provider={endpoint.ProviderId}; request={ProfileSummary(profile)}", ModelId: model.Id, ResourceId: endpoint.EndpointId));
             return (estimate, null);
         }
         Console.WriteLine($"Text model: {model.Id}");
@@ -307,7 +315,8 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
         ICollection<VerificationFinding> findings,
         CancellationToken cancellationToken,
         bool allowEvidenceReuse = false,
-        bool force = false)
+        bool force = false,
+        string? selectedEndpointId = null)
     {
         var models = await service.GetImageModelsAsync(configuration.OpenRouterApiKey!, false, cancellationToken).ConfigureAwait(false);
         var model = models.Models.SingleOrDefault(candidate => candidate.Id.Equals(modelId, StringComparison.OrdinalIgnoreCase))
@@ -316,6 +325,7 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
         var endpoint = endpoints
             .Where(candidate => candidate.Pricing is { Count: > 0 })
             .Where(candidate => candidate.SupportsImageOutput)
+            .Where(candidate => selectedEndpointId is null || candidate.EndpointId.Equals(selectedEndpointId, StringComparison.OrdinalIgnoreCase))
             .Select(candidate => new
             {
                 Endpoint = candidate,
@@ -335,17 +345,16 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
             .Where(candidate => candidate.MaximumCost is not null)
             .OrderBy(candidate => candidate.MaximumCost)
             .FirstOrDefault() ?? throw new InvalidOperationException("No image endpoint has supported output dimensions and recognized per-image pricing; generation is blocked.");
-        if (endpoint.MaximumCost > ceiling)
-        {
-            operations.Add(new("openrouter-image-generation", "blocked", $"Estimated maximum {FormatUsd(endpoint.MaximumCost.Value)} USD exceeds the session ceiling {FormatUsd(ceiling)} USD; provider={endpoint.Endpoint.ProviderName}; options={FormatImageOptions(endpoint.Selection.Options)}.", ModelId: model.Id, ResourceId: endpoint.Endpoint.EndpointId));
-            return (endpoint.MaximumCost.Value, null);
-        }
-
         var maximumCost = endpoint.MaximumCost ?? throw new InvalidOperationException("An image cost bound is unavailable.");
-        var fingerprint = OpenRouterQualificationEvidenceStore.CreateFingerprint(new { model.Id, model.SupportedParameters, endpoint.Endpoint.EndpointId, endpoint.Endpoint.Pricing, endpoint.Selection, AdapterRevision = OpenRouterQualificationEvidenceStore.GetAdapterRevision(typeof(OpenRouterClient).Assembly) });
+        var fingerprint = OpenRouterQualificationEvidenceStore.CreateFingerprint(new { model.Id, model.SupportedParameters, endpoint.Endpoint, endpoint.Selection, AdapterRevision = OpenRouterQualificationEvidenceStore.GetAdapterRevision(typeof(OpenRouterClient).Assembly) });
         if (allowEvidenceReuse && !force && await TryLoadQualificationEvidenceAsync(model.Id, "image", fingerprint, cancellationToken).ConfigureAwait(false) is { Status: "passed" } evidence)
         {
             operations.Add(new("openrouter-image-generation", "reused", $"Matching passing evidence from {evidence.VerifiedAt:u}; no generation request sent. provider={endpoint.Endpoint.ProviderName}; options={FormatImageOptions(endpoint.Selection.Options)}.", ModelId: model.Id, ProfileFingerprint: fingerprint, ResourceId: endpoint.Endpoint.EndpointId));
+            return (0, null);
+        }
+        if (maximumCost > ceiling)
+        {
+            operations.Add(new("openrouter-image-generation", "blocked", $"Estimated maximum {FormatUsd(maximumCost)} USD exceeds the session ceiling {FormatUsd(ceiling)} USD; provider={endpoint.Endpoint.ProviderName}; options={FormatImageOptions(endpoint.Selection.Options)}.", ModelId: model.Id, ResourceId: endpoint.Endpoint.EndpointId));
             return (maximumCost, null);
         }
         Console.WriteLine($"Image model: {model.Id}");
@@ -416,7 +425,7 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
             requestedModels,
             textCatalog.Models.Select(model => model.Id),
             imageCatalog.Models.Select(model => model.Id));
-        IReadOnlyList<OpenRouterQualificationCandidate> candidates = selection.Candidates;
+        var candidates = selection.Candidates;
         if (selection.InvalidAllCombination || selection.UnknownModelIds.Count > 0 || candidates.Count == 0)
         {
             var reason = selection.InvalidAllCombination
@@ -428,16 +437,16 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
             return (0, null);
         }
 
-        Console.WriteLine($"Qualification candidates: {candidates.Count} operation/model pairs.");
-        var plannedBounds = new Dictionary<(string Id, string Kind), decimal>();
-        var boundedCandidates = new List<OpenRouterQualificationCandidate>();
+        Console.WriteLine($"Qualification candidates: {candidates.Count} model/modality pairs; every priced endpoint with a bounded profile is considered separately.");
+        var plannedRoutes = new List<OpenRouterQualificationRoute>();
         decimal plannedMaximum = 0;
         foreach (var candidate in candidates)
         {
-            decimal? bound;
+            IReadOnlyList<OpenRouterQualificationRoute> routes;
             try
             {
-                bound = await EstimateCandidateMaximumAsync(service, candidate, textCatalog.Models, imageCatalog.Models, cancellationToken).ConfigureAwait(false);
+                routes = await EstimateCandidateRoutesAsync(
+                    service, candidate, textCatalog.Models, imageCatalog.Models, operations, findings, force, cancellationToken).ConfigureAwait(false);
             }
             catch (AiModelCatalogFetchException exception)
             {
@@ -458,39 +467,50 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
                     DateTimeOffset.UtcNow));
                 continue;
             }
-            if (bound is null)
+
+            foreach (var route in routes)
             {
-                operations.Add(new($"openrouter-{candidate.Kind}-generation", "budget-deferred", "No conservative cost bound is available; this model was skipped before any generation request.", ModelId: candidate.Id));
-                continue;
+                plannedRoutes.Add(route);
+                if (!route.EvidenceReused)
+                    plannedMaximum += route.MaximumCost;
+                Console.WriteLine($"  {candidate.Kind}: {candidate.Id} / {route.EndpointId} (max {(route.EvidenceReused ? "0.000000" : FormatUsd(route.MaximumCost))} USD{(route.EvidenceReused ? ", passing evidence" : string.Empty)})");
             }
-            plannedMaximum += bound.Value;
-            plannedBounds[(candidate.Id, candidate.Kind)] = bound.Value;
-            boundedCandidates.Add(candidate);
-            Console.WriteLine($"  {candidate.Kind}: {candidate.Id} (max {FormatUsd(bound.Value)} USD)");
         }
-        candidates = boundedCandidates.ToArray();
-        Console.WriteLine($"Aggregate conservative maximum: {FormatUsd(plannedMaximum)} USD / session ceiling {FormatUsd(ceiling)} USD");
+
+        if (plannedRoutes.Count == 0)
+        {
+            operations.Add(new("openrouter-qualification", "budget-deferred", "No endpoint/profile pair had a conservative cost bound; no generation request was sent."));
+            return (0, null);
+        }
+
+        Console.WriteLine($"Aggregate conservative maximum for new calls: {FormatUsd(plannedMaximum)} USD / session ceiling {FormatUsd(ceiling)} USD");
+        IReadOnlySet<(string Id, string Kind)>? selectedKeys = null;
         if (plannedMaximum > ceiling)
         {
-            Console.WriteLine("Select a subset by entering comma-separated `text:model/id` and/or `image:model/id` entries from the preflight above. Use `text:all` or `image:all` to select every bounded candidate in that modality. Press Enter to defer all.");
+            Console.WriteLine("Select models by entering comma-separated `text:model/id` and/or `image:model/id` entries from the preflight above. A selected model includes each bounded endpoint/profile pair. Use `text:all` or `image:all` for every model in that modality. Press Enter to defer all.");
             var selected = await Console.In.ReadLineAsync(cancellationToken).ConfigureAwait(false);
-            if (!TryResolveQualificationSubset(selected ?? string.Empty, plannedBounds.Keys, out var canonicalSelectedKeys))
+            if (!TryResolveQualificationSubset(selected ?? string.Empty, plannedRoutes.Select(route => (route.Candidate.Id, route.Candidate.Kind)), out var canonicalSelectedKeys))
             {
                 operations.Add(new("openrouter-qualification", "budget-deferred", "No valid subset was selected; no generation requests were sent."));
                 return (plannedMaximum, null);
             }
-            candidates = candidates.Where(candidate => canonicalSelectedKeys.Contains((candidate.Id, candidate.Kind))).ToArray();
-            plannedMaximum = candidates.Sum(candidate => plannedBounds[(candidate.Id, candidate.Kind)]);
+            selectedKeys = canonicalSelectedKeys;
+            var selectedRoutes = plannedRoutes.Where(route => selectedKeys.Contains((route.Candidate.Id, route.Candidate.Kind))).ToArray();
+            plannedMaximum = selectedRoutes.Where(route => !route.EvidenceReused).Sum(route => route.MaximumCost);
             if (plannedMaximum > ceiling)
             {
                 operations.Add(new("openrouter-qualification", "budget-blocked", $"Selected subset maximum {FormatUsd(plannedMaximum)} USD still exceeds the {FormatUsd(ceiling)} USD ceiling; no generation requests were sent."));
                 return (plannedMaximum, null);
             }
-            foreach (var pair in plannedBounds.Keys.Where(key => !canonicalSelectedKeys.Contains(key)))
-                operations.Add(new($"openrouter-{pair.Kind}-generation", "budget-deferred", "Not selected from the preflight matrix.", ModelId: pair.Id));
+            foreach (var route in plannedRoutes.Where(route => !selectedKeys.Contains((route.Candidate.Id, route.Candidate.Kind))))
+                operations.Add(new($"openrouter-{route.Candidate.Kind}-generation", "budget-deferred", "Not selected from the preflight matrix.", ModelId: route.Candidate.Id, ResourceId: route.EndpointId));
         }
-        Console.WriteLine($"Existing evidence is {(force ? "ignored" : "reused when fingerprints match")}; each billable request still needs its own confirmation.");
-        if (!await SessionConfirmation.RequirePhraseAsync("Catalog discovery has completed. Qualification may send bounded generation calls for the listed models.", "QUALIFY OPENROUTER", cancellationToken).ConfigureAwait(false))
+
+        var selectedPlan = selectedKeys is null
+            ? plannedRoutes
+            : plannedRoutes.Where(route => selectedKeys.Contains((route.Candidate.Id, route.Candidate.Kind))).ToList();
+        Console.WriteLine($"Existing evidence is {(force ? "ignored" : "reused when fingerprints match")}; each new endpoint generation still needs its own confirmation.");
+        if (!await SessionConfirmation.RequirePhraseAsync("Catalog discovery has completed. Qualification may send bounded generation calls for the listed model and endpoint profiles.", "QUALIFY OPENROUTER", cancellationToken).ConfigureAwait(false))
         {
             operations.Add(new("openrouter-qualification", "cancelled", "Qualification calls were declined."));
             return (0, null);
@@ -499,19 +519,23 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
         decimal estimatedTotal = 0;
         decimal actualTotal = 0;
         var hasActual = false;
-        foreach (var candidate in candidates)
+        foreach (var route in selectedPlan)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var before = operations.Count;
             decimal estimate;
             decimal? actual;
-            if (candidate.Kind == "text")
+            if (route.Candidate.Kind == "text")
             {
-                (estimate, actual) = await RunTextGenerationAsync(service, candidate.Id, ceiling - estimatedTotal, operations, findings, cancellationToken, allowEvidenceReuse: true, force: force).ConfigureAwait(false);
+                (estimate, actual) = await RunTextGenerationAsync(
+                    service, route.Candidate.Id, ceiling - estimatedTotal, operations, findings, cancellationToken,
+                    allowEvidenceReuse: true, force: force, selectedEndpointId: route.EndpointId).ConfigureAwait(false);
             }
             else
             {
-                (estimate, actual) = await RunImageGenerationAsync(service, candidate.Id, ceiling - estimatedTotal, operations, findings, cancellationToken, allowEvidenceReuse: true, force: force).ConfigureAwait(false);
+                (estimate, actual) = await RunImageGenerationAsync(
+                    service, route.Candidate.Id, ceiling - estimatedTotal, operations, findings, cancellationToken,
+                    allowEvidenceReuse: true, force: force, selectedEndpointId: route.EndpointId).ConfigureAwait(false);
             }
 
             estimatedTotal += estimate;
@@ -536,77 +560,249 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
 
             if (operations.Count == before)
             {
-                operations.Add(new($"openrouter-qualification-{candidate.Kind}", "not-run", candidate.Id));
+                operations.Add(new($"openrouter-qualification-{route.Candidate.Kind}", "not-run", route.Candidate.Id, ModelId: route.Candidate.Id, ResourceId: route.EndpointId));
             }
         }
 
         return (estimatedTotal, hasActual ? actualTotal : null);
     }
 
-    private async Task<decimal?> EstimateCandidateMaximumAsync(
+    private async Task<IReadOnlyList<OpenRouterQualificationRoute>> EstimateCandidateRoutesAsync(
         OpenRouterClient service,
         OpenRouterQualificationCandidate candidate,
         IReadOnlyCollection<AiModelDescriptor> textModels,
         IReadOnlyCollection<AiModelDescriptor> imageModels,
+        ICollection<VerificationOperationResult> operations,
+        ICollection<VerificationFinding> findings,
+        bool force,
         CancellationToken cancellationToken)
     {
+        var routes = new List<OpenRouterQualificationRoute>();
         if (candidate.Kind == "text")
         {
             var model = textModels.SingleOrDefault(model => model.Id.Equals(candidate.Id, StringComparison.OrdinalIgnoreCase));
-            if (model is null) return null;
+            if (model is null) return routes;
             var endpoints = await service.GetEndpointsAsync(configuration.OpenRouterApiKey!, model.Id, false, cancellationToken).ConfigureAwait(false);
-            var maxTokens = Math.Min(MaximumCompletionTokens, model.MaxCompletionTokens ?? MaximumCompletionTokens);
-            var endpoint = endpoints.Endpoints
-                .Where(candidate => candidate.PromptPrice is not null && candidate.CompletionPrice is not null)
-                .Where(candidate => candidate.SupportedParameters.Contains(AiParameterRegistry.MaxCompletionTokens, StringComparer.Ordinal)
-                    || candidate.SupportedParameters.Contains("max_tokens", StringComparer.Ordinal))
-                .OrderBy(candidate => candidate.PromptPrice + candidate.CompletionPrice)
-                .FirstOrDefault();
-            if (endpoint is not null)
+            var eligible = endpoints.Endpoints
+                .Where(endpoint => endpoint.PromptPrice is not null && endpoint.CompletionPrice is not null)
+                .Where(endpoint => SelectCompletionTokenParameter(model.SupportedParameters, endpoint.SupportedParameters) is not null)
+                .OrderBy(endpoint => endpoint.PromptPrice + endpoint.CompletionPrice)
+                .ToArray();
+            if (eligible.Length == 0)
             {
-                var completionTokenParameter = SelectCompletionTokenParameter(model.SupportedParameters, endpoint.SupportedParameters);
-                var profile = BuildTestProfile(model, endpoint.SupportedParameters, maxTokens) with { Routing = AiRoutingPolicy.ForEndpoint(endpoint.EndpointId, endpoint.ProviderId, completionTokenParameter) };
-                Console.WriteLine($"    endpoint: {endpoint.ProviderName} / {endpoint.EndpointId}");
-                Console.WriteLine($"    effective parameters: {ProfileSummary(profile)}");
+                operations.Add(new($"openrouter-{candidate.Kind}-generation", "budget-deferred", "No endpoint exposes both a conservative prompt/completion price and a jointly supported completion-token limit; no request was sent.", ModelId: model.Id));
+                return routes;
             }
-            return endpoint is null ? null : OpenRouterCostBound.EstimateTextMaximum(endpoint, Encoding.UTF8.GetByteCount("Reply with exactly the word OK."), maxTokens);
+
+            foreach (var endpoint in eligible)
+            {
+                if (!TrySelectMaximumCompletionTokens(model, endpoint, out var maxTokens))
+                {
+                    RecordQualificationPlanningFailure(
+                        candidate,
+                        endpoint.EndpointId,
+                        "The model or endpoint catalog did not provide a positive completion-token limit; no generation request was sent.",
+                        operations,
+                        findings);
+                    continue;
+                }
+
+                var completionTokenParameter = SelectCompletionTokenParameter(model.SupportedParameters, endpoint.SupportedParameters)!;
+                AiProfileSettings profile;
+                try
+                {
+                    profile = BuildTestProfile(model, endpoint.SupportedParameters, maxTokens) with
+                    {
+                        Routing = AiRoutingPolicy.ForEndpoint(endpoint.EndpointId, endpoint.ProviderId, completionTokenParameter)
+                    };
+                }
+                catch (InvalidOperationException exception)
+                {
+                    RecordQualificationPlanningFailure(
+                        candidate,
+                        endpoint.EndpointId,
+                        SafeDiagnostic.Redact(exception.Message),
+                        operations,
+                        findings);
+                    continue;
+                }
+
+                var maximumCost = OpenRouterCostBound.EstimateTextMaximum(
+                    endpoint, Encoding.UTF8.GetByteCount("Reply with exactly the word OK."), maxTokens);
+                if (maximumCost is null)
+                {
+                    operations.Add(new($"openrouter-{candidate.Kind}-generation", "budget-deferred", "A conservative request cost could not be calculated for this endpoint; no request was sent.", ModelId: model.Id, ResourceId: endpoint.EndpointId));
+                    continue;
+                }
+
+                var fingerprint = CreateTextQualificationFingerprint(model, endpoint, profile);
+                var evidence = !force
+                    ? await TryLoadQualificationEvidenceAsync(model.Id, "text", fingerprint, cancellationToken).ConfigureAwait(false)
+                    : null;
+                var reused = evidence?.Status == "passed";
+                Console.WriteLine($"    endpoint: {endpoint.ProviderName} / {endpoint.EndpointId}; maximum completion tokens: {maxTokens}");
+                Console.WriteLine($"    effective parameters: {ProfileSummary(profile)}");
+                routes.Add(new(candidate, endpoint.EndpointId, maximumCost.Value, reused));
+            }
+
+            return routes;
         }
 
         var imageModel = imageModels.SingleOrDefault(model => model.Id.Equals(candidate.Id, StringComparison.OrdinalIgnoreCase));
-        if (imageModel is null) return null;
+        if (imageModel is null) return routes;
         var imageEndpoints = await service.GetImageEndpointsAsync(configuration.OpenRouterApiKey!, imageModel.Id, false, cancellationToken).ConfigureAwait(false);
-        var imageEndpoint = imageEndpoints
-            .Where(candidate => candidate.Pricing is { Count: > 0 } && candidate.SupportsImageOutput)
-            .Select(candidate => new
+        var eligibleImageEndpoints = imageEndpoints
+            .Where(endpoint => endpoint.Pricing is { Count: > 0 } && endpoint.SupportsImageOutput)
+            .Select(endpoint => new
             {
-                Endpoint = candidate,
-                Selection = AiImageEndpointPolicy.SelectEndpoint([candidate], imageModel.Id, false, false, new AiImageSize(1024, 1024))
+                Endpoint = endpoint,
+                Selection = AiImageEndpointPolicy.SelectEndpoint([endpoint], imageModel.Id, false, false, new AiImageSize(1024, 1024))
             })
-            .Where(candidate => candidate.Selection is not null)
-            .Select(candidate => new
+            .Where(selection => selection.Selection is not null)
+            .Select(selection => new
             {
-                candidate.Endpoint,
-                Selection = candidate.Selection!,
-                Cost = OpenRouterCostBound.EstimateImageMaximum(
-                    candidate.Endpoint,
-                    candidate.Selection!.ProviderSize,
+                selection.Endpoint,
+                Selection = selection.Selection!,
+                MaximumCost = OpenRouterCostBound.EstimateImageMaximum(
+                    selection.Endpoint,
+                    selection.Selection!.ProviderSize,
                     1,
                     Encoding.UTF8.GetByteCount(ImageQualificationPrompt))
             })
-            .Where(candidate => candidate.Cost is not null)
-            .OrderBy(candidate => candidate.Cost)
-            .FirstOrDefault();
-        if (imageEndpoint is not null)
+            .ToArray();
+        if (eligibleImageEndpoints.Length == 0)
         {
-            Console.WriteLine($"    endpoint: {imageEndpoint.Endpoint.ProviderName} / {imageEndpoint.Endpoint.EndpointId}");
-            Console.WriteLine($"    image output: {imageEndpoint.Selection.ProviderSize.Width} x {imageEndpoint.Selection.ProviderSize.Height}, 1 image");
-            Console.WriteLine($"    effective image parameters: {FormatImageOptions(imageEndpoint.Selection.Options)}");
+            operations.Add(new($"openrouter-{candidate.Kind}-generation", "budget-deferred", "No image endpoint has supported output dimensions and recognized per-image pricing; no request was sent.", ModelId: imageModel.Id));
+            return routes;
         }
-        return imageEndpoint?.Cost;
+
+        foreach (var endpoint in eligibleImageEndpoints)
+        {
+            if (endpoint.MaximumCost is not { } maximumCost)
+            {
+                operations.Add(new($"openrouter-{candidate.Kind}-generation", "budget-deferred", "A conservative image cost could not be calculated for this endpoint; no request was sent.", ModelId: imageModel.Id, ResourceId: endpoint.Endpoint.EndpointId));
+                continue;
+            }
+
+            var fingerprint = CreateImageQualificationFingerprint(imageModel, endpoint.Endpoint, endpoint.Selection);
+            var evidence = !force
+                ? await TryLoadQualificationEvidenceAsync(imageModel.Id, "image", fingerprint, cancellationToken).ConfigureAwait(false)
+                : null;
+            var reused = evidence?.Status == "passed";
+            Console.WriteLine($"    endpoint: {endpoint.Endpoint.ProviderName} / {endpoint.Endpoint.EndpointId}");
+            Console.WriteLine($"    image output: {endpoint.Selection.ProviderSize.Width} x {endpoint.Selection.ProviderSize.Height}, 1 image");
+            Console.WriteLine($"    effective image parameters: {FormatImageOptions(endpoint.Selection.Options)}");
+            routes.Add(new(candidate, endpoint.Endpoint.EndpointId, maximumCost, reused));
+        }
+
+        return routes;
+    }
+
+    private static void RecordQualificationPlanningFailure(
+        OpenRouterQualificationCandidate candidate,
+        string endpointId,
+        string diagnostic,
+        ICollection<VerificationOperationResult> operations,
+        ICollection<VerificationFinding> findings)
+    {
+        const string operationId = "openrouter-chat-completion";
+        operations.Add(new(
+            operationId,
+            "blocked",
+            "The advertised model/endpoint profile cannot be sent safely.",
+            diagnostic,
+            candidate.Id,
+            ResourceId: endpointId));
+        findings.Add(new(
+            Guid.NewGuid().ToString("N"),
+            operationId,
+            "open",
+            "request-or-response",
+            "The selected model and endpoint expose a valid, conservatively bounded FusionCanvas request profile.",
+            diagnostic,
+            "src/FusionCanvas.ApiVerification/OpenRouter/OpenRouterApiVerifier.cs",
+            DateTimeOffset.UtcNow));
     }
 
     internal static AiProfileSettings BuildTestProfile(AiModelDescriptor model, int maximumTokens)
         => BuildTestProfile(model, model.SupportedParameters, maximumTokens);
+
+    internal static int SelectMaximumCompletionTokens(AiModelDescriptor model, AiModelEndpointDescriptor endpoint)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(endpoint);
+        var maximum = Math.Min(MaximumCompletionTokens, model.MaxCompletionTokens ?? MaximumCompletionTokens);
+        return Math.Min(maximum, endpoint.MaxCompletionTokens ?? maximum);
+    }
+
+    internal static string CreateTextQualificationFingerprint(
+        AiModelDescriptor model,
+        AiModelEndpointDescriptor endpoint,
+        AiProfileSettings profile) => OpenRouterQualificationEvidenceStore.CreateFingerprint(new
+        {
+            model.Id,
+            ModelParameters = model.SupportedParameters.OrderBy(parameter => parameter, StringComparer.Ordinal).ToArray(),
+            model.ContextLength,
+            model.MaxCompletionTokens,
+            Endpoint = new
+            {
+                endpoint.ModelId,
+                endpoint.ProviderId,
+                endpoint.EndpointId,
+                endpoint.ContextLength,
+                endpoint.MaxCompletionTokens,
+                SupportedParameters = endpoint.SupportedParameters.OrderBy(parameter => parameter, StringComparer.Ordinal).ToArray(),
+                endpoint.ZeroDataRetentionCompatible,
+                endpoint.PromptPrice,
+                endpoint.CompletionPrice
+            },
+            profile,
+            OutputModalities = new[] { "text" },
+            AdapterRevision = OpenRouterQualificationEvidenceStore.GetAdapterRevision(typeof(OpenRouterClient).Assembly)
+        });
+
+    internal static string CreateImageQualificationFingerprint(
+        AiModelDescriptor model,
+        AiImageEndpointCapabilities endpoint,
+        AiImageEndpointPolicy.EndpointSelection selection) => OpenRouterQualificationEvidenceStore.CreateFingerprint(new
+        {
+            model.Id,
+            ModelParameters = model.SupportedParameters.OrderBy(parameter => parameter, StringComparer.Ordinal).ToArray(),
+            Endpoint = new
+            {
+                endpoint.EndpointId,
+                endpoint.ModelId,
+                endpoint.ZeroDataRetentionCompatible,
+                endpoint.SupportsImageOutput,
+                RasterFormats = endpoint.RasterFormats.OrderBy(format => format, StringComparer.Ordinal).ToArray(),
+                SupportedSizes = endpoint.SupportedSizes.OrderBy(size => size.Width).ThenBy(size => size.Height).ToArray(),
+                endpoint.SupportsTransparency,
+                Parameters = endpoint.Parameters is null ? null : new
+                {
+                    AspectRatios = endpoint.Parameters.AspectRatios.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
+                    Resolutions = endpoint.Parameters.Resolutions.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
+                    endpoint.Parameters.SupportsExplicitSize,
+                    endpoint.Parameters.SupportsOutputFormat,
+                    Backgrounds = endpoint.Parameters.Backgrounds.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
+                    endpoint.Parameters.SupportsImageCount
+                },
+                Pricing = endpoint.Pricing?.OrderBy(price => price.Billable, StringComparer.Ordinal)
+                    .ThenBy(price => price.Unit, StringComparer.Ordinal)
+                    .ThenBy(price => price.CostUsd).ToArray()
+            },
+            selection.ProviderSize,
+            selection.Options,
+            AdapterRevision = OpenRouterQualificationEvidenceStore.GetAdapterRevision(typeof(OpenRouterClient).Assembly)
+        });
+
+    internal static bool TrySelectMaximumCompletionTokens(
+        AiModelDescriptor model,
+        AiModelEndpointDescriptor endpoint,
+        out int maximum)
+    {
+        maximum = SelectMaximumCompletionTokens(model, endpoint);
+        return maximum > 0;
+    }
 
     internal static AiProfileSettings BuildTestProfile(
         AiModelDescriptor model,
