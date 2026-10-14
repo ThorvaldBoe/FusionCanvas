@@ -21,6 +21,16 @@ public sealed class OpenRouterClient :
     IAiImageGenerationProvider
 {
     private const int MaximumVisionRequestBytes = 25_000_000;
+    // These Recraft models require style-reference images. FusionCanvas' image
+    // generation contract currently sends a prompt and generation options only.
+    // Keep incompatible models out of the prompt-only image catalog so the UI
+    // cannot offer requests that the production adapter cannot express.
+    private static readonly HashSet<string> ImageModelsRequiringReferenceImages = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "recraft/recraft-v4-styles",
+        "recraft/recraft-v4-styles-pro"
+    };
+
     public static readonly Uri DefaultBaseAddress = new("https://openrouter.ai/");
     private static readonly TimeSpan MetadataTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan GenerationTimeout = TimeSpan.FromMinutes(5);
@@ -968,7 +978,8 @@ public sealed class OpenRouterClient :
         var id = ReadString(item, "id");
         var name = ReadString(item, "name");
         if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name)
-            || id.EndsWith(":batch", StringComparison.OrdinalIgnoreCase)) return null;
+            || id.EndsWith(":batch", StringComparison.OrdinalIgnoreCase)
+            || ImageModelsRequiringReferenceImages.Contains(id)) return null;
         var architecture = ReadObject(item, "architecture");
         var outputs = ReadStrings(architecture, "output_modalities");
         if (!outputs.Contains("image", StringComparer.OrdinalIgnoreCase)) return null;
