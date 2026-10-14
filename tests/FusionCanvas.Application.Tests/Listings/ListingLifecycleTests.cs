@@ -117,6 +117,41 @@ public sealed class ListingLifecycleTests
         Assert.Single(projection.Artwork);
         Assert.Equal(2d, projection.Artwork[0].Placement.Scale);
         Assert.Equal(0d, projection.Artwork[0].Placement.Angle);
+        Assert.Equal(68, projection.ExternalBlueprintId);
+        Assert.Equal(39, projection.ExternalProviderId);
+    }
+
+    [Fact]
+    public void Projection_reads_blueprint_identity_from_imported_product_metadata()
+    {
+        var request = CreateRequest();
+        request = request with
+        {
+            Blueprint = request.Blueprint with { MetadataJson = "{\"source\":\"printify\",\"kind\":\"product\",\"blueprintId\":68,\"productId\":\"remote-product\"}" },
+            Offering = request.Offering with { ExternalOfferingId = "remote-product:39" }
+        };
+
+        var result = ListingProjectionBuilder.Build(request);
+
+        Assert.True(result.IsValid, string.Join("; ", result.Issues.Select(value => value.Message)));
+        Assert.Equal(68, result.Projection!.ExternalBlueprintId);
+        Assert.Equal(39, result.Projection.ExternalProviderId);
+    }
+
+    [Fact]
+    public void Projection_rejects_unresolved_printify_blueprint_identity_before_mutation()
+    {
+        var request = CreateRequest();
+        request = request with
+        {
+            Blueprint = request.Blueprint with { MetadataJson = "{}" },
+            Offering = request.Offering with { ExternalOfferingId = "remote-product:39" }
+        };
+
+        var result = ListingProjectionBuilder.Build(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Issues, value => value.Code == "printify-blueprint-identity-missing");
     }
 
     [Fact]
@@ -192,9 +227,9 @@ public sealed class ListingLifecycleTests
 
         return new ListingProjectionRequest(
             new Item(itemId, storeId, null, null, "Dad Joke Loading…", "A joke shirt.", ItemStatus.Draft, WorkflowStage.Listing, false, now, now, "{}"),
-            new Blueprint(blueprintId, storeId, "T-shirt", null, false, now, now),
+            new Blueprint(blueprintId, storeId, "T-shirt", null, false, now, now, "{\"source\":\"printify\",\"kind\":\"blueprint\",\"ids\":[68]}"),
             new BlueprintOffering(offeringId, blueprintId, storeId, "SwiftPod T-shirt", null, BlueprintOfferingKind.FixedPrintProvider, providerId, null, null, null, false, now, now),
-            new PrintProvider(providerId, storeId, "SwiftPod", "provider-1", false, now, now),
+            new PrintProvider(providerId, storeId, "SwiftPod", "39", false, now, now),
             [
                 new OfferingVariant(variantId, offeringId, "Black / M", [optionValueId], false, now, now, "{\"productionCost\":20}")
             ],
