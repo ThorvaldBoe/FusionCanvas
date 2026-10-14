@@ -527,6 +527,12 @@ public sealed class OpenRouterClient :
             }
 
             using var json = await ReadJsonAsync(response, requestCancellation.Token, MaximumImageResponseBytes).ConfigureAwait(false);
+            if (ReadObject(json.RootElement, "error") is { ValueKind: JsonValueKind.Object } error)
+            {
+                return (null, new(
+                    AiImageGenerationFailureKind.InvalidResponse,
+                    $"OpenRouter returned a provider error envelope with a successful HTTP status. {SummarizeProviderError(error)}"));
+            }
             var data = RequiredArray(json.RootElement, "data");
             if (data.GetArrayLength() != 1)
                 return (null, new(AiImageGenerationFailureKind.InvalidResponse, "OpenRouter did not return exactly one image."));
@@ -595,22 +601,8 @@ public sealed class OpenRouterClient :
         {
             using var json = await ReadJsonAsync(response, cancellationToken, MaximumImageResponseBytes).ConfigureAwait(false);
             var error = ReadObject(json.RootElement, "error");
-            var code = ReadString(error, "code");
-            var parameter = ReadString(error, "param");
-            var message = ReadString(error, "message");
-            var fields = new List<string>(3);
-            if (IsSafeDiagnosticToken(code)) fields.Add($"code={code}");
-            if (IsSafeDiagnosticToken(parameter)) fields.Add($"param={parameter}");
-            var type = ReadString(error, "type");
-            if (IsSafeDiagnosticToken(type)) fields.Add($"type={type}");
-            if (message is { Length: <= 240 } && Regex.IsMatch(
-                    message,
-                    "^No provider for model [A-Za-z0-9._-]+/[A-Za-z0-9._:-]+ supports parameter\\(s\\): [A-Za-z0-9_, -]+$",
-                    RegexOptions.CultureInvariant))
-            {
-                fields.Add(message);
-            }
-            return fields.Count > 0 ? $" Provider details: {string.Join(", ", fields)}." : string.Empty;
+            var summary = error.ValueKind == JsonValueKind.Object ? SummarizeProviderError(error) : string.Empty;
+            return string.IsNullOrEmpty(summary) ? string.Empty : $" {summary}";
         }
         catch (Exception exception) when (exception is JsonException or IOException or InvalidDataException)
         {
@@ -1258,15 +1250,143 @@ public sealed class OpenRouterClient :
     private static string SummarizeProviderError(JsonElement error)
     {
         var fields = new List<string>(3);
-        var code = ReadString(error, "code");
+        var code = ReadSafeDiagnosticScalar(error, "code");
         var parameter = ReadString(error, "param");
         var type = ReadString(error, "type");
         if (IsSafeDiagnosticToken(code)) fields.Add($"code={code}");
         if (IsSafeDiagnosticToken(parameter)) fields.Add($"param={parameter}");
         if (IsSafeDiagnosticToken(type)) fields.Add($"type={type}");
-        return fields.Count > 0
-            ? $"Provider details: {string.Join(", ", fields)}."
-            : "Provider details were omitted.";
+        var shape = error.ValueKind == JsonValueKind.Object
+            ? error.EnumerateObject()
+                .Take(12)
+                .Where(property => IsSafeDiagnosticToken(property.Name) && property.Name.Length <= 48)
+                .Select(property => $"{property.Name}={property.Value.ValueKind}")
+                .ToArray()
+            : [];
+        var metadata = ReadObject(error, "metadata");
+        var metadataErrorType = ReadString(metadata, "error_type");
+        if (IsSafeDiagnosticToken(metadataErrorType)) fields.Add($"metadata.error_type={metadataErrorType}");
+        var rawErrorFields = ReadSafeRawErrorFields(metadata);
+        if (rawErrorFields is not null) fields.Add(rawErrorFields);
+        var metadataShape = metadata.ValueKind == JsonValueKind.Object
+            ? metadata.EnumerateObject()
+                .Take(12)
+                .Where(property => IsSafeDiagnosticToken(property.Name) && property.Name.Length <= 48)
+                .Select(property => $"{property.Name}={property.Value.ValueKind}")
+                .ToArray()
+            : [];
+        var summary = fields.Count > 0
+            ? $"Provider error values: {string.Join(", ", fields)}."
+            : "Provider error values were omitted.";
+        var message = ReadSafeUnsupportedParameters(error, metadata);
+        if (message is not null)
+        {
+            summary += $" {message}";
+        }
+
+        if (shape.Length == 0)
+        {
+            return $"{summary} Error object is empty or has no safe field names.";
+        }
+
+        var metadataSummary = metadataShape.Length > 0
+            ? $" Metadata field types: {string.Join(", ", metadataShape)}."
+            : string.Empty;
+        return $"{summary} Error field types: {string.Join(", ", shape)}.{metadataSummary}";
+    }
+
+    private static string? ReadSafeUnsupportedParameters(JsonElement error, JsonElement metadata)
+    {
+        var rawError = ReadNestedRawError(metadata);
+        foreach (var candidate in new[]
+                 {
+                     ReadString(error, "message"),
+                     ReadString(metadata, "raw"),
+                     ReadString(metadata, "message"),
+                     rawError is { } nested ? ReadString(nested, "message") : null
+                 })
+        {
+            if (candidate is not { Length: <= 240 })
+            {
+                continue;
+            }
+
+            var match = Regex.Match(
+                candidate,
+                "^No provider for model [A-Za-z0-9._-]+/[A-Za-z0-9._:-]+ supports parameter\\(s\\): (?<parameters>[A-Za-z0-9_, -]+)$",
+                RegexOptions.CultureInvariant);
+            if (match.Success)
+            {
+                return $"Provider reports unsupported parameters: {match.Groups["parameters"].Value.Trim()}.";
+            }
+
+            var namedParameter = Regex.Match(
+                candidate,
+                "(?i)(?:unknown|unsupported|invalid|not supported)[^\\r\\n]{0,48}(?:parameter|field|argument)\\s*[:=]?\\s*['\\\"]?(?<parameter>[a-z][a-z0-9_]*)",
+                RegexOptions.CultureInvariant);
+            if (namedParameter.Success && IsKnownApiParameter(namedParameter.Groups["parameter"].Value))
+            {
+                return $"Provider identifies an invalid or unsupported parameter: {namedParameter.Groups["parameter"].Value.ToLowerInvariant()}.";
+            }
+        }
+
+        return null;
+    }
+
+    private static JsonElement? ReadNestedRawError(JsonElement metadata)
+    {
+        var raw = ReadString(metadata, "raw");
+        if (raw is not { Length: <= 4096 }) return null;
+        try
+        {
+            using var document = JsonDocument.Parse(raw);
+            var root = document.RootElement;
+            var error = ReadObject(root, "error");
+            return error.ValueKind == JsonValueKind.Object ? error.Clone() : root.ValueKind == JsonValueKind.Object ? root.Clone() : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string? ReadSafeRawErrorFields(JsonElement metadata)
+    {
+        var nested = ReadNestedRawError(metadata);
+        if (nested is not { } error) return null;
+        var fields = new List<string>(3);
+        var code = ReadSafeDiagnosticScalar(error, "code");
+        var parameter = ReadString(error, "param");
+        var type = ReadString(error, "type");
+        if (IsSafeDiagnosticToken(code)) fields.Add($"code={code}");
+        if (IsKnownApiParameter(parameter)) fields.Add($"param={parameter}");
+        if (IsSafeDiagnosticToken(type)) fields.Add($"type={type}");
+        return fields.Count > 0 ? $"Nested provider error fields: {string.Join(", ", fields)}." : null;
+    }
+
+    private static bool IsKnownApiParameter(string? value) => value is
+        "max_tokens" or "max_completion_tokens" or "temperature" or "top_p" or "top_k" or "min_p" or "top_a" or
+        "frequency_penalty" or "presence_penalty" or "repetition_penalty" or "seed" or "stop" or "tools" or
+        "tool_choice" or "response_format" or "structured_outputs" or "include_reasoning" or "reasoning" or
+        "reasoning_effort" or "logprobs" or "top_logprobs" or "modalities" or "image_config" or "size" or
+        "aspect_ratio" or "resolution";
+
+    private static string? ReadSafeDiagnosticScalar(JsonElement parent, string name)
+    {
+        if (parent.ValueKind != JsonValueKind.Object || !parent.TryGetProperty(name, out var element))
+        {
+            return null;
+        }
+
+        if (element.ValueKind == JsonValueKind.String)
+        {
+            var value = element.GetString();
+            return IsSafeDiagnosticToken(value) ? value : null;
+        }
+
+        return element.ValueKind == JsonValueKind.Number && element.TryGetInt64(out var numericCode)
+            ? numericCode.ToString(CultureInfo.InvariantCulture)
+            : null;
     }
 
     private async Task<AiTextResult> ParseFailureAsync(
@@ -1323,7 +1443,7 @@ public sealed class OpenRouterClient :
             : "Response root object is empty or has no safe field names.";
         var error = ReadObject(root, "error");
         var errorFields = new List<string>(3);
-        var code = ReadString(error, "code");
+        var code = ReadSafeDiagnosticScalar(error, "code");
         var parameter = ReadString(error, "param");
         var type = ReadString(error, "type");
         if (IsSafeDiagnosticToken(code)) errorFields.Add($"code={code}");

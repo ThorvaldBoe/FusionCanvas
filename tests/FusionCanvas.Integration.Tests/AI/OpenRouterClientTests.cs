@@ -370,7 +370,7 @@ public class OpenRouterClientTests : IDisposable
         Assert.Contains("HTTP 400", failure.Message, StringComparison.Ordinal);
         Assert.Contains("code=no_provider_supports_parameter", failure.Message, StringComparison.Ordinal);
         Assert.Contains("param=resolution", failure.Message, StringComparison.Ordinal);
-        Assert.Contains("No provider for model bytedance-seed/seedream-4.5 supports parameter(s): resolution, aspect_ratio", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("Provider reports unsupported parameters: resolution, aspect_ratio.", failure.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("private prompt", failure.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("secret", failure.Message, StringComparison.Ordinal);
     }
@@ -806,6 +806,103 @@ public class OpenRouterClientTests : IDisposable
         Assert.Contains("type=invalid_response", result.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("private prompt echoed", result.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("secret", result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_SummarizesNumericProviderErrorCodeAndFieldTypesWithoutValues()
+    {
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK,
+            """{"error":{"code":503,"message":"private provider details","metadata":{"provider":"private","error_type":"provider_error"}},"model":"vendor/model"}"""));
+
+        var result = await CreateClient(handler).GenerateAsync(
+            new AiProviderTextRequest(
+                "secret",
+                "vendor/model",
+                [new AiTextMessage(AiMessageRole.User, "private prompt")],
+                AiProfileSettings.Empty with { ModelId = "vendor/model" },
+                false),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(AiTextFailureKind.InvalidProviderResponse, result.FailureKind);
+        Assert.Contains("code=503", result.Message, StringComparison.Ordinal);
+        Assert.Contains("metadata.error_type=provider_error", result.Message, StringComparison.Ordinal);
+        Assert.Contains("Error field types: code=Number, message=String, metadata=Object", result.Message, StringComparison.Ordinal);
+        Assert.Contains("Metadata field types: provider=String, error_type=String", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("private provider details", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("private prompt", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("private", result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_ReportsAllowListedUnsupportedParametersFromProviderMetadata()
+    {
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK,
+            """{"error":{"code":400,"message":"Provider request failed","metadata":{"raw":"No provider for model vendor/model supports parameter(s): stop, seed","provider_name":"private provider"}}}"""));
+
+        var result = await CreateClient(handler).GenerateAsync(
+            new AiProviderTextRequest(
+                "secret",
+                "vendor/model",
+                [new AiTextMessage(AiMessageRole.User, "private prompt")],
+                AiProfileSettings.Empty with { ModelId = "vendor/model" },
+                false),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(AiTextFailureKind.InvalidProviderResponse, result.FailureKind);
+        Assert.Contains("code=400", result.Message, StringComparison.Ordinal);
+        Assert.Contains("Provider reports unsupported parameters: stop, seed", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Provider request failed", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("vendor/model", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("private provider", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("private prompt", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret", result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_ExtractsOnlyAllowListedFieldsFromNestedRawProviderError()
+    {
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK,
+            """{"error":{"code":400,"message":"Request failed","metadata":{"error_type":"invalid_request","raw":"{\"error\":{\"message\":\"Unsupported parameter seed for private prompt\",\"param\":\"seed\",\"type\":\"invalid_request\"}}"}}}"""));
+
+        var result = await CreateClient(handler).GenerateAsync(
+            new AiProviderTextRequest(
+                "secret",
+                "vendor/model",
+                [new AiTextMessage(AiMessageRole.User, "private prompt")],
+                AiProfileSettings.Empty with { ModelId = "vendor/model" },
+                false),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(AiTextFailureKind.InvalidProviderResponse, result.FailureKind);
+        Assert.Contains("Nested provider error fields: param=seed, type=invalid_request", result.Message, StringComparison.Ordinal);
+        Assert.Contains("Provider identifies an invalid or unsupported parameter: seed.", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("private prompt", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret", result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ImageGenerateAsync_SummarizesUnexpectedSuccessEnvelopeWithoutEchoingValues()
+    {
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK,
+            """{"error":{"code":503,"message":"private provider details","metadata":{"provider":"private","error_type":"provider_error"}}}"""));
+
+        var (result, failure) = await CreateClient(handler).GenerateAsync(new AiImageGenerationRequest(
+            "selected/model", "private prompt", new AiImageSize(512, 512), false,
+            "secret", false, "provider-tag"), TestContext.Current.CancellationToken);
+
+        Assert.Null(result);
+        Assert.NotNull(failure);
+        Assert.Equal(AiImageGenerationFailureKind.InvalidResponse, failure.Kind);
+        Assert.Contains("provider error envelope", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("code=503", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("metadata.error_type=provider_error", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("Error field types: code=Number, message=String, metadata=Object", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("Metadata field types: provider=String, error_type=String", failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("private provider details", failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("private prompt", failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret", failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("private", failure.Message, StringComparison.Ordinal);
     }
 
     [Fact]
