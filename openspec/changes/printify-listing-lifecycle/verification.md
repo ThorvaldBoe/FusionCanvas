@@ -18,9 +18,9 @@ The rows below are the implementation checklist. Each row will be linked to a fo
 | Spec area | Verification method | Status |
 | --- | --- | --- |
 | Connection readiness and strategy gating | Application tests with deterministic readiness/strategy fakes; headless state tests | Pass — readiness, publication gate, fail-closed unavailable state, strategy switching, and Store repair guidance are covered |
-| Item/Design/catalog projection | Pure application projection tests | Pass for initial projection slice |
+| Item/Design/catalog projection, including sparse artwork and optional production cost | Pure Application tests plus a mocked Printify catalog import test | Pass — `ListingLifecycleTests` and `PrintifyCatalogClientTests` pass with the updated cases |
 | Artwork placement | Pure calculation tests for matching, square, and aspect-ratio-mismatch inputs | Pass |
-| Pricing policies | Pure calculation tests for fixed retail, fixed profit, cost differences, and invalid input | Pass |
+| Pricing policies and absent costs | Pure Application projection and calculator tests for fixed retail, fixed profit, cost differences, missing cost, and invalid input | Pass — fixed retail projects without cost; fixed profit fails readiness when a selected variant lacks cost |
 | Create/update and ambiguous results | Application tests with mocked lifecycle port and persisted operation intent | Pass — definitive create, ambiguous retry blocking, update, remote-read uncertainty, and image/mutation failure paths are covered |
 | Remote drift and explicit resolution | Pure comparison tests plus application reconciliation tests | Pass — remote conflict, accept-remote integration-value persistence, and keep-local update paths are covered |
 | Publication/unpublication | Application tests with Printify-only publication port; supervised showcase verification for final external visibility | Pass for deterministic application behavior — strategy gate, intent, read-back verification, mismatch/uncertain states, and Printify-only adapter are covered; live visibility remains supplemental |
@@ -42,6 +42,16 @@ The rows below are the implementation checklist. Each row will be linked to a fo
 - The supervised showcase-store unpublish/hide behavior check is intentionally not claimed here; it remains a supplemental manual verification item because it mutates an external Printify account.
 - `openspec validate printify-listing-lifecycle --strict` passed.
 - `dotnet test .\FusionCanvas.sln --no-restore -m:1` passed across the full solution after merging current `main`: Domain 290, Application 667, Integration 349, App 965, and UI Description 29; 2,300 passed, 0 failed, 0 skipped. The run emitted the repository's existing NU1900 offline vulnerability-feed warnings only.
+
+## Feedback-driven regression verification (2026-10-14)
+
+| Criterion | Method | Result | Evidence / limitation |
+| --- | --- | --- | --- |
+| One assigned artwork area is sufficient; unassigned areas are omitted; zero assigned areas block | `ListingLifecycleTests` | Pass | 12 focused lifecycle tests passed. |
+| Missing production cost is allowed for fixed retail and blocks only fixed-profit pricing | `ListingLifecycleTests` | Pass | Projection retains `null` cost for fixed-retail pricing and reports a readiness issue for fixed-profit pricing. |
+| Catalog cost is retained when selected shop-product detail omits `cost` | `PrintifyCatalogClientTests` | Pass | 19 focused Printify catalog integration tests passed. |
+| Solution baseline | `dotnet test .\FusionCanvas.sln --no-restore -m:1 -v:q`, with `TEMP` and `TMP` directed to `.codex-test-temp` inside the worktree | Pass | Domain 294, Application 692, Integration 417, App 1,020, UI Description 29; 2,452 passed, 0 failed, 0 skipped. Existing NU1900 offline vulnerability-feed warnings and test-platform compatibility warnings remain. |
+| Strict OpenSpec validation and whitespace check | `openspec validate printify-listing-lifecycle --strict`; `git diff --check` | Pass | Change validates and the diff has no whitespace errors. |
 
 ## Application contracts and pure behavior
 
@@ -89,7 +99,9 @@ Passed: 25, Failed: 0
 | Capability / scenario | Method | Result | Evidence / limitation |
 | --- | --- | --- | --- |
 | Connection readiness and Printify-enabled strategy gating | Application tests, integration fakes, and headless view tests | Pass | Focused lifecycle, strategy, Store repair-guidance, and fail-closed UI tests; full solution baseline also passes. |
-| Projection from Item, fixed provider Offering, Design-selected colors, variants, and artwork assignments | Pure Application tests | Pass | `ListingProjectionBuilder` and related projection tests. |
+| Projection from Item, fixed provider Offering, Design-selected colors, variants, and sparse artwork assignments | Pure Application tests | Pass | `ListingLifecycleTests`: one assigned front area succeeds while another remains empty; no assigned artwork still fails readiness. |
+| Fixed retail pricing with missing cost and fixed-profit pricing with missing cost | Pure Application tests | Pass | `ListingLifecycleTests`: fixed retail succeeds with nullable cost; fixed-profit returns a missing-cost readiness issue. |
+| Catalog cost survives selected shop-product import when shop-product detail omits cost | Mocked Printify Integration test | Pass | `PrintifyCatalogClientTests.SelectedProductPreservesCatalogCostWhenShopProductOmitsItAndDoesNotFetchUnselectedDetail` verifies catalog cost fallback. |
 | Tolerant full-width, top-aligned artwork placement | Pure Application tests | Pass | Matching, square, and aspect-ratio-mismatch cases covered. |
 | Fixed retail and fixed profit pricing | Pure Application tests | Pass | Cost differences and invalid input covered. |
 | Create, update, refresh, intent persistence, and ambiguous mutation recovery | Application tests with deterministic ports | Pass | Definitive identity, retry blocking, read uncertainty, and mutation failure paths covered. |

@@ -5,7 +5,7 @@ public sealed record ListingVariantProjection(
     string Name,
     string? Color,
     IReadOnlyList<KeyValuePair<string, string>> Options,
-    decimal ProductionCost,
+    decimal? ProductionCost,
     ListingPrice Price)
 {
     public int? ExternalVariantId { get; init; }

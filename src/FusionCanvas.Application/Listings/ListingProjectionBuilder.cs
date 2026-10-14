@@ -33,8 +33,8 @@ public static class ListingProjectionBuilder
 
         var optionValuesById = request.OptionValues.ToDictionary(value => value.Id);
         var optionsById = request.Options.ToDictionary(value => value.Id);
-        var prices = new Dictionary<Guid, decimal>();
-        var variantProjections = new List<(OfferingVariant Variant, string? Color, IReadOnlyList<KeyValuePair<string, string>> Options, decimal Cost)>();
+        var prices = new Dictionary<Guid, decimal?>();
+        var variantProjections = new List<(OfferingVariant Variant, string? Color, IReadOnlyList<KeyValuePair<string, string>> Options, decimal? Cost)>();
 
         foreach (var variant in request.Variants.Where(value => !value.IsArchived))
         {
@@ -63,7 +63,11 @@ public static class ListingProjectionBuilder
                 continue;
             }
 
-            var cost = ReadProductionCost(variant.MetadataJson, issues, variant.Name);
+            var cost = ReadProductionCost(variant.MetadataJson);
+            if (request.Pricing.Policy == ListingPricingPolicy.FixedProfitAmount && cost is null)
+            {
+                issues.Add(new("production-cost-missing", $"Production cost is required for fixed-profit pricing of variant '{variant.Name}'."));
+            }
             prices[variant.Id] = cost;
             variantProjections.Add((variant, color, optionPairs, cost));
         }
@@ -135,13 +139,14 @@ public static class ListingProjectionBuilder
             .ToDictionary(value => value.Key, value => value.First());
 
         var result = new List<ListingArtworkProjection>();
+        var hasAssignment = false;
         foreach (var area in request.DesignAreas)
         {
             if (!assignmentsByArea.TryGetValue(area.Id, out var assignment) || !assignment.AssetId.HasValue)
             {
-                issues.Add(new("artwork-assignment-missing", $"Design area '{area.Name}' has no artwork assignment."));
                 continue;
             }
+            hasAssignment = true;
 
             if (!assetsById.TryGetValue(assignment.AssetId.Value, out var asset) || asset.IsMissing)
             {
@@ -170,10 +175,15 @@ public static class ListingProjectionBuilder
             });
         }
 
+        if (result.Count == 0 && !hasAssignment)
+        {
+            issues.Add(new("artwork-assignment-missing", "Assign artwork to at least one design area before creating a Printify product."));
+        }
+
         return result;
     }
 
-    private static decimal ReadProductionCost(string metadataJson, ICollection<ListingReadinessIssue> issues, string variantName)
+    private static decimal? ReadProductionCost(string metadataJson)
     {
         try
         {
@@ -190,8 +200,7 @@ public static class ListingProjectionBuilder
             // The readiness diagnostic below is intentionally the same for malformed and missing metadata.
         }
 
-        issues.Add(new("production-cost-missing", $"Production cost is unavailable for variant '{variantName}'."));
-        return 0m;
+        return null;
     }
 
     private static int? ReadExternalId(string metadataJson)

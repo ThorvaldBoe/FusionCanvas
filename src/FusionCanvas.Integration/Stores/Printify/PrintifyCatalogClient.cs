@@ -110,7 +110,7 @@ public sealed class PrintifyCatalogClient : IPrintifyCatalogClient
                 var placeholders = requestedPlaceholders.Count == 0
                     ? []
                     : requestedPlaceholders.Select(requested => MatchPlaceholder(catalogVariant.Placeholders, requested)).ToArray();
-                resolvedVariants.Add(catalogVariant with { OptionValueIds = productVariant.OptionValueIds, Title = productVariant.Title, IsEnabled = productVariant.IsEnabled, IsAvailable = productVariant.IsAvailable, Placeholders = placeholders, ProductionCost = productVariant.ProductionCost });
+                resolvedVariants.Add(catalogVariant with { OptionValueIds = productVariant.OptionValueIds, Title = productVariant.Title, IsEnabled = productVariant.IsEnabled, IsAvailable = productVariant.IsAvailable, Placeholders = placeholders, ProductionCost = productVariant.ProductionCost ?? catalogVariant.ProductionCost });
             }
             if (resolvedVariants.Count != productVariants.Count)
                 return Unexpected();
