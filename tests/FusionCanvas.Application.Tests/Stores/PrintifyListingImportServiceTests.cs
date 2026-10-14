@@ -87,6 +87,21 @@ public sealed class PrintifyListingImportServiceTests
     }
 
     [Fact]
+    public async Task Duplicate_check_finds_design_title_inside_long_printify_seo_title()
+    {
+        var fixture = new Fixture();
+        var existing = new Item(Guid.NewGuid(), fixture.Store.Id, fixture.Niche.Id, null, "Dad Joke Loading", "A local design", ItemStatus.Draft, WorkflowStage.Design, false, fixture.Now, fixture.Now, "{}");
+        fixture.Repository.Snapshot = fixture.Repository.Snapshot with { Items = [existing] };
+
+        var matches = await fixture.Service.CheckDuplicatesAsync(fixture.Scope, ["seo-product"], TestContext.Current.CancellationToken);
+
+        var candidate = Assert.Single(matches["seo-product"]);
+        Assert.Equal(existing.Id, candidate.ItemId);
+        Assert.True(candidate.CanConnect);
+        Assert.True(candidate.TitleSimilarity < 0.90);
+    }
+
+    [Fact]
     public async Task Duplicate_check_leaves_unrelated_items_as_new_import_candidates()
     {
         var fixture = new Fixture();
@@ -320,6 +335,7 @@ public sealed class PrintifyListingImportServiceTests
         private static readonly PrintifyListingProductDetail[] Products =
         [
             Product("visible-product", "Moonlit Fox", true),
+            Product("seo-product", "Dad Joke Loading T-Shirt | Funny Dad Tee, Humor Typography Shirt", true),
             Product("hidden-product", "Hidden shirt", false),
             Product("unsupported-product", "Layered artwork", true) with
             {

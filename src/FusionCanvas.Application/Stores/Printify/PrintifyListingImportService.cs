@@ -27,6 +27,7 @@ public sealed class PrintifyListingImportService(
 {
     private const string ProviderKey = "printify";
     private const int MaximumDuplicateTextLength = 2048;
+    private const int MinimumContainedTitleLength = 12;
     private readonly Func<DateTimeOffset> _clock = clock ?? (() => DateTimeOffset.UtcNow);
     private readonly Func<Guid> _newId = newId ?? Guid.NewGuid;
 
@@ -170,7 +171,9 @@ public sealed class PrintifyListingImportService(
                 var title = Similarity(product.Title, item.Name);
                 var description = Similarity(product.Description, item.Description);
                 return new PrintifyListingImportCandidate(item.Id, item.Name, item.Description, Location(snapshot, item), !mapped.Contains(item.Id), title, description);
-            }).Where(candidate => candidate.TitleSimilarity >= 0.90 || candidate.DescriptionSimilarity >= 0.90)
+            }).Where(candidate => candidate.TitleSimilarity >= 0.90
+                || candidate.DescriptionSimilarity >= 0.90
+                || IsContainedTitleMatch(product.Title, candidate.Name))
                 .OrderByDescending(candidate => Math.Max(candidate.TitleSimilarity, candidate.DescriptionSimilarity)).ToArray();
             result.Add(id, matches);
         }
@@ -342,6 +345,13 @@ public sealed class PrintifyListingImportService(
             previous = current;
         }
         return 1d - (double)previous[b.Length] / Math.Max(a.Length, b.Length);
+    }
+    private static bool IsContainedTitleMatch(string? productTitle, string? itemTitle)
+    {
+        var product = Normalize(productTitle);
+        var item = Normalize(itemTitle);
+        return Math.Min(product.Length, item.Length) >= MinimumContainedTitleLength
+            && (product.Contains(item, StringComparison.Ordinal) || item.Contains(product, StringComparison.Ordinal));
     }
     private async Task CleanupAsync(IEnumerable<ManagedWorkspaceFile> staged)
     {

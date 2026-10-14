@@ -63,6 +63,8 @@ public sealed class PrintifyListingImportViewModel : INotifyPropertyChanged
         }
     }
     public bool CanImport => !IsBusy && SelectedRows.Length > 0;
+    public string DuplicateCheckGuidance => SelectedRows.Length == 0 ? "Select one or more unlinked products first." : string.Empty;
+    public bool HasDuplicateCheckGuidance => !string.IsNullOrEmpty(DuplicateCheckGuidance);
     public string? Message { get => _message; private set { _message = value; Changed(); } }
     public string? Error { get => _error; private set { _error = value; Changed(); Changed(nameof(HasError)); } }
     public bool HasError => !string.IsNullOrWhiteSpace(Error);
@@ -89,13 +91,24 @@ public sealed class PrintifyListingImportViewModel : INotifyPropertyChanged
 
     public async Task CheckDuplicatesAsync()
     {
+        var selectedRows = SelectedRows;
+        if (selectedRows.Length == 0)
+        {
+            Error = null;
+            Message = DuplicateCheckGuidance;
+            return;
+        }
+
         using var source = new CancellationTokenSource(); _operationCancellation = source;
         IsBusy = true; Error = null;
         try
         {
-            var matches = await _service.CheckDuplicatesAsync(_scope, SelectedRows.Select(row => row.ProductId).ToArray(), source.Token);
-            foreach (var row in SelectedRows) row.Candidates = matches.GetValueOrDefault(row.ProductId) ?? [];
-            Message = "Duplicate check complete. Choose an existing Item from a product row or import it as new.";
+            var matches = await _service.CheckDuplicatesAsync(_scope, selectedRows.Select(row => row.ProductId).ToArray(), source.Token);
+            foreach (var row in selectedRows) row.Candidates = matches.GetValueOrDefault(row.ProductId) ?? [];
+            var matchedCount = selectedRows.Count(row => row.HasCandidates);
+            Message = matchedCount == 0
+                ? "Duplicate check complete. No possible matches found; unmatched products can be imported as new."
+                : "Duplicate check complete. Review possible matches and choose an existing Item or import as new.";
         }
         catch (OperationCanceledException) { Message = "Duplicate check cancelled."; }
         catch (Exception exception) { Error = exception.Message; }
@@ -136,6 +149,8 @@ public sealed class PrintifyListingImportViewModel : INotifyPropertyChanged
         if (e.PropertyName == nameof(PrintifyListingImportRowViewModel.IsSelected))
         {
             Changed(nameof(CanImport));
+            Changed(nameof(DuplicateCheckGuidance));
+            Changed(nameof(HasDuplicateCheckGuidance));
             ((AsyncRelayCommand)CheckDuplicatesCommand).NotifyCanExecuteChanged();
             ((AsyncRelayCommand)ImportCommand).NotifyCanExecuteChanged();
         }
