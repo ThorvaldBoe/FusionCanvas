@@ -156,6 +156,19 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
         return currentStatus;
     }
 
+    internal static string ClassifyTextFailure(AiTextFailureKind? failureKind) => failureKind switch
+    {
+        AiTextFailureKind.RouteNotFulfilled or AiTextFailureKind.NoEligibleProvider or AiTextFailureKind.ModelUnavailable => "provider-route",
+        AiTextFailureKind.Blocked => "provider-permission",
+        AiTextFailureKind.RateLimited => "provider-capacity",
+        AiTextFailureKind.Authentication => "credential",
+        AiTextFailureKind.InsufficientCredit => "account-billing",
+        AiTextFailureKind.InvalidProviderResponse => "response-contract",
+        AiTextFailureKind.InvalidConfiguration or AiTextFailureKind.InvalidRequest => "effective-parameters",
+        AiTextFailureKind.Timeout or AiTextFailureKind.NetworkFailure => "transport",
+        _ => "generation-contract"
+    };
+
     private async Task RunCredentialCheckAsync(OpenRouterClient service, ICollection<VerificationOperationResult> operations, CancellationToken cancellationToken)
     {
         var result = await service.ValidateAsync(configuration.OpenRouterApiKey!, cancellationToken).ConfigureAwait(false);
@@ -280,13 +293,7 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
             operations.Add(new("openrouter-chat-completion", failureStatus, Diagnostic: diagnostic, ModelId: model.Id, ProfileFingerprint: fingerprint, ResourceId: endpoint.EndpointId, Summary: $"provider={endpoint.ProviderId}; request={ProfileSummary(profile)}"));
             if (failureStatus == "failed")
             {
-                var category = result.FailureKind switch
-                {
-                    AiTextFailureKind.RouteNotFulfilled or AiTextFailureKind.NoEligibleProvider or AiTextFailureKind.ModelUnavailable => "provider-route",
-                    AiTextFailureKind.InvalidProviderResponse => "response-contract",
-                    AiTextFailureKind.InvalidConfiguration => "effective-parameters",
-                    _ => "generation-contract"
-                };
+                var category = ClassifyTextFailure(result.FailureKind);
                 findings.Add(new(Guid.NewGuid().ToString("N"), "openrouter-chat-completion", "open", category, "The selected model and pinned endpoint accept the effective FusionCanvas request profile.", diagnostic, "src/FusionCanvas.Integration/AI/OpenRouterClient.cs", DateTimeOffset.UtcNow));
             }
             return (estimate, result.Usage?.Cost);
