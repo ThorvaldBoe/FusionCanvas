@@ -41,6 +41,8 @@ dotnet run --project .\src\FusionCanvas.ApiVerification -- qualify --provider op
 
 Qualification profiles use model catalog capabilities and `AiParameterRegistry`, pin to a priced endpoint, use a short text prompt and a single image, and request confirmation per generation. Matching successful fingerprints are reused unless `--force` is passed. Evidence is keyed by model, effective profile, endpoint, advertised capabilities, and adapter version. Reports and qualification evidence are stored under `%LOCALAPPDATA%\FusionCanvas\ApiVerification`.
 
+The prompt-only image catalog omits Recraft V4 Styles and V4 Styles Pro because those models require style-reference images, which the current image-generation request contract cannot send. Other Recraft models remain available when their endpoint accepts the prompt-only request.
+
 ## Printify
 
 ```powershell

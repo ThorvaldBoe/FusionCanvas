@@ -97,6 +97,27 @@ public class OpenRouterClientTests : IDisposable
     }
 
     [Fact]
+    public async Task GetImageModelsAsync_ExcludesModelsThatRequireUnsupportedStyleReferenceImages()
+    {
+        var handler = new RecordingHandler(
+            Json(HttpStatusCode.OK, """
+                {"data":[
+                  {"id":"recraft/recraft-v4-styles","name":"Recraft V4 Styles","architecture":{"output_modalities":["image"]}},
+                  {"id":"recraft/recraft-v4-styles-pro","name":"Recraft V4 Styles Pro","architecture":{"output_modalities":["image"]}},
+                  {"id":"recraft/recraft-v4.1","name":"Recraft V4.1","architecture":{"output_modalities":["image"]}}
+                ]}
+                """),
+            Json(HttpStatusCode.OK, """{"data":[]}"""));
+
+        var catalog = await CreateClient(handler).GetImageModelsAsync(
+            "secret",
+            false,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal("recraft/recraft-v4.1", Assert.Single(catalog.Models).Id);
+    }
+
+    [Fact]
     public async Task GetImageModelsAsync_MapsTimeoutToNetworkOrServiceFailure()
     {
         var client = CreateClient(new ExceptionHandler(new TaskCanceledException("simulated timeout")));
