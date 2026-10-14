@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using FusionCanvas.Application.Listings;
+using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Integration.Stores.Printify;
 
 namespace FusionCanvas.Integration.Tests.Stores.Printify;
@@ -29,6 +30,43 @@ public sealed class PrintifyListingClientTests
         Assert.Contains(handler.Bodies, body => body.Contains("\"print_provider_id\":23", StringComparison.Ordinal));
         Assert.Contains(handler.Bodies, body => body.Contains("\"id\":33719", StringComparison.Ordinal));
         Assert.Contains(handler.Bodies, body => body.Contains("\"shipping_template_id\":\"shipping-template-1\"", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Shop_product_reconciliation_reads_all_pages_and_parses_matching_identity_fields()
+    {
+        var handler = new RecordingHandler(request => request.RequestUri!.Query.Contains("page=1", StringComparison.Ordinal)
+            ? Json(HttpStatusCode.OK, "{\"current_page\":1,\"last_page\":2,\"data\":[{\"id\":\"product-1\",\"title\":\"Dad Joke Shirt\",\"blueprint_id\":68,\"print_provider_id\":23}]}")
+            : Json(HttpStatusCode.OK, "{\"current_page\":2,\"last_page\":2,\"data\":[{\"id\":\"product-2\",\"title\":\"Other Shirt\",\"blueprint_id\":69,\"print_provider_id\":24}]}"));
+        using var http = new HttpClient(handler);
+        var client = new PrintifyListingClient(Guid.NewGuid(), http, _ => Task.FromResult<string?>("key"));
+
+        var products = await client.ListShopProductsAsync("42", TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, products.Count);
+        Assert.Equal(new ListingRemoteProductSummary("product-1", "Dad Joke Shirt", 68, 23), products[0]);
+        Assert.Equal(new ListingRemoteProductSummary("product-2", "Other Shirt", 69, 24), products[1]);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Contains("/shops/42/products.json?limit=50&page=1", handler.Requests[0].RequestUri!.PathAndQuery);
+        Assert.Contains("/shops/42/products.json?limit=50&page=2", handler.Requests[1].RequestUri!.PathAndQuery);
+    }
+
+    [Fact]
+    public async Task Printify_listing_requests_are_recorded_in_enabled_debug_telemetry()
+    {
+        var handler = new RecordingHandler(_ => Json(HttpStatusCode.OK, "{\"current_page\":1,\"last_page\":1,\"data\":[{\"id\":\"product-1\",\"title\":\"Dad Joke Shirt\",\"blueprint_id\":68,\"print_provider_id\":23}]}"));
+        var telemetry = new RecordingTelemetryRecorder();
+        using var http = new HttpClient(handler);
+        var client = new PrintifyListingClient(Guid.NewGuid(), http, _ => Task.FromResult<string?>("secret-sentinel"), telemetry: telemetry);
+
+        await client.ListShopProductsAsync("42", TestContext.Current.CancellationToken);
+
+        var request = Assert.Single(telemetry.Requests);
+        Assert.Equal("Integration.Printify", request.Area);
+        Assert.Equal("HttpRequest", request.Name);
+        using var requestDetails = System.Text.Json.JsonDocument.Parse(request.RequestDetailsJson!);
+        Assert.EndsWith("/shops/42/products.json?limit=50&page=1", requestDetails.RootElement.GetProperty("uri").GetString());
+        Assert.DoesNotContain("secret-sentinel", request.RequestDetailsJson);
     }
 
     [Fact]
@@ -277,4 +315,17 @@ public sealed class PrintifyListingClientTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             throw new HttpRequestException("synthetic outage");
     }
+
+    private sealed class RecordingTelemetryRecorder : ITelemetryRecorder
+    {
+        public bool IsCaptureEnabled => true;
+        public List<TelemetryEventRequest> Requests { get; } = [];
+
+        public Task RecordAsync(TelemetryEventRequest request, CancellationToken cancellationToken = default)
+        {
+            Requests.Add(request);
+            return Task.CompletedTask;
+        }
+    }
 }
+

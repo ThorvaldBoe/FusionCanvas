@@ -1,6 +1,7 @@
 using FusionCanvas.Application.Listings;
 using FusionCanvas.Application.Stores;
 using FusionCanvas.Application.Stores.Printify;
+using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Domain.Stores;
 
@@ -10,7 +11,8 @@ public sealed class PrintifyListingLifecycleServiceFactory(
     IWorkspaceRepository repository,
     IStorePrintifyCredentialStore credentials,
     IWorkspaceFileReader fileReader,
-    HttpClient client) : IListingLifecycleServiceFactory
+    HttpClient client,
+    ITelemetryRecorder? telemetry = null) : IListingLifecycleServiceFactory
 {
     public ListingLifecycleService Create(Store store)
     {
@@ -26,7 +28,9 @@ public sealed class PrintifyListingLifecycleServiceFactory(
                     cancellationToken).ConfigureAwait(false);
                 return read.Secret;
             },
-            fileReader);
+            fileReader,
+            telemetry);
         return new ListingLifecycleService(repository, listingClient, listingClient, listingClient, images: listingClient);
     }
 }
+

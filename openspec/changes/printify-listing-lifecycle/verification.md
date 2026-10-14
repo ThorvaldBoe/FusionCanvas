@@ -27,6 +27,7 @@ The rows below are the implementation checklist. Each row will be linked to a fo
 | Archive/delete guards | Application tests covering published, locked, uncertain, unpublished, and confirmed deletion | Pass — local archive, published/locked/uncertain guards, verified deletion, and exception-to-uncertain behavior are covered |
 | Store mapping persistence/migration | Isolated SQLite repository tests | Pass |
 | Unified Printify transport and secret redaction | Integration tests with mocked HTTP handlers and diagnostic assertions | Pass — shared transport, client, credential, representative failure fixtures, bounded responses, safe messages, and telemetry request metadata are covered; the composition root supplies the recorder to both credential and catalog paths |
+| Ambiguous create recovery, debug visibility, and progress | Application service tests, mocked Printify Integration tests, and Avalonia headless view-model journey | Pass — shop listing is paginated and telemetry-enabled; exact product matches are offered for linking, confirmed retries require a second no-match check, unresolved outcomes are visible, and busy state is exercised |
 | Listing-stage UI | Deterministic Avalonia headless view tests for state visibility and action enablement | Pass — Printify registration, fail-closed loading, readiness guidance, command state, delete confirmation/cancellation, and existing MainWindow compiled-binding/layout lanes pass |
 | Fulfillment-strategy capability resolution | Pure Application tests covering Manual, Shopify Manual, Printify, Shopify + Printify, and unavailable readiness | Pass |
 
@@ -111,5 +112,7 @@ Passed: 25, Failed: 0
 | Store mapping migration and round-trip persistence | Isolated SQLite integration tests | Pass | Schema v22 migration and existing-data preservation covered. |
 | Unified transport, safe diagnostics, and secret redaction | Mocked integration tests and inspection | Pass | No live endpoint in deterministic tests; telemetry records request metadata only. |
 | Compact Listing-stage surface and accessible lifecycle controls | Avalonia headless construction, layout, view-model, and journey tests | Pass | Single-column UI, text states, conflict actions, focus-safe delete confirmation, and compiled bindings covered. |
+| Uncertain create with no saved product ID | Application, Integration, and headless UI tests; full solution baseline | Pass | A previously ambiguous create cannot silently block the button: shop reconciliation identifies a matching product for explicit linking or requires explicit retry confirmation after a fresh no-match check; the Printify tool shows progress while actions run. |
 | Existing Store Editor headless regression after current-main merge | Isolated regression test plus full App and solution baselines | Pass | Row whitespace selection now resolves through the window-level pointer tunnel while preserving child-button actions. |
 | Live showcase-store unpublish/hide semantics | User-supervised external smoke check | Not run | Deliberately left as supplemental manual verification because it mutates the external showcase account. |
+

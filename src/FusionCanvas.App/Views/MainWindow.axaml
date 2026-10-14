@@ -906,6 +906,10 @@
                           <TextBlock Text="{Binding PrintifyTool.ConnectionStatus}" FontSize="11" />
                         </Border>
                       </Grid>
+                      <ProgressBar IsVisible="{Binding PrintifyTool.IsBusy}"
+                                   IsIndeterminate="True"
+                                   Height="3"
+                                   AutomationProperties.Name="Printify operation in progress" />
                       <TextBlock Text="{Binding PrintifyTool.Status}" Foreground="{DynamicResource SecondaryTextBrush}" />
                       <TextBlock Text="{Binding PrintifyTool.ProductSummary}" Foreground="{DynamicResource SecondaryTextBrush}" />
                       <TextBlock Text="Linked Printify product ID" FontWeight="SemiBold" />
@@ -981,12 +985,37 @@
                           </StackPanel>
                         </StackPanel>
                       </Border>
+                      <Border IsVisible="{Binding PrintifyTool.IsUncertainCreateRetryConfirmationVisible}"
+                              Padding="8"
+                              Background="{DynamicResource WarningSurfaceBrush}"
+                              BorderBrush="{DynamicResource WarningTextBrush}"
+                              BorderThickness="1"
+                              AutomationProperties.Name="Confirm retry after uncertain Printify create">
+                        <StackPanel Spacing="6">
+                          <TextBlock Text="{Binding PrintifyTool.UncertainCreateRetryConfirmationText}" TextWrapping="Wrap" />
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Button Content="Retry create"
+                                    Command="{Binding PrintifyTool.ConfirmUncertainCreateRetryCommand}"
+                                    AutomationProperties.AutomationId="Printify.ConfirmUncertainCreateRetry" />
+                            <Button Content="Cancel"
+                                    Command="{Binding PrintifyTool.CancelUncertainCreateRetryCommand}"
+                                    AutomationProperties.AutomationId="Printify.CancelUncertainCreateRetry" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
                       <StackPanel Orientation="Horizontal" Spacing="6">
                         <Button Content="Download variant setup"
                                 Command="{Binding PrintifyTool.DownloadVariantSetupCommand}"
                                 IsVisible="{Binding PrintifyTool.CanDownloadVariantSetup}"
                                 AutomationProperties.AutomationId="Printify.DownloadVariantSetup" />
-                        <Button Content="Create / update" Command="{Binding PrintifyTool.CreateOrUpdateCommand}" AutomationProperties.AutomationId="Printify.CreateOrUpdate" />
+                        <Button Content="Create / update"
+                                Command="{Binding PrintifyTool.CreateOrUpdateCommand}"
+                                IsEnabled="{Binding PrintifyTool.CanCreateOrUpdate}"
+                                AutomationProperties.AutomationId="Printify.CreateOrUpdate" />
+                        <Button Content="Check Printify before retry"
+                                Command="{Binding PrintifyTool.ReconcileUncertainCreateCommand}"
+                                IsVisible="{Binding PrintifyTool.HasUnresolvedCreate}"
+                                AutomationProperties.AutomationId="Printify.ReconcileUncertainCreate" />
                         <Button Content="Refresh" Command="{Binding PrintifyTool.RefreshCommand}" />
                         <Button Content="Publish" Command="{Binding PrintifyTool.PublishCommand}" />
                         <Button Content="Unpublish" Command="{Binding PrintifyTool.UnpublishCommand}" />

@@ -85,6 +85,96 @@ public sealed class ListingLifecycleServiceTests
     }
 
     [Fact]
+    public async Task Uncertain_create_lists_shop_and_requires_two_no_match_checks_before_retry()
+    {
+        var storeId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var projection = Projection(storeId, itemId) with { ExternalBlueprintId = 68, ExternalProviderId = 23 };
+        var repository = new MemoryRepository
+        {
+            Snapshot = WorkspaceSnapshot.Empty with
+            {
+                ExternalListingMappings = [UncertainCreateMapping(storeId, itemId, projection.Title, 68, 23)]
+            }
+        };
+        var products = new FakeProducts();
+        var service = new ListingLifecycleService(repository, new FakeConnection(), products, new FakePublication());
+        var request = new ListingConnectionRequest(storeId, "shop-1", false);
+
+        var reconciliation = await service.ReconcileUncertainCreateAsync(request, itemId, projection, TestContext.Current.CancellationToken);
+        Assert.Equal(ListingLifecycleResultKind.NoRemoteMatch, reconciliation.Kind);
+        Assert.Equal(0, products.CreateCalls);
+
+        var retry = await service.RetryUncertainCreateAsync(request, itemId, projection, TestContext.Current.CancellationToken);
+
+        Assert.Equal(ListingLifecycleResultKind.Succeeded, retry.Kind);
+        Assert.Equal(2, products.ListShopProductsCalls);
+        Assert.Equal(1, products.CreateCalls);
+        Assert.Equal("product", retry.Mapping!.Identity!.ProductId);
+    }
+
+    [Fact]
+    public async Task Uncertain_create_with_shop_match_does_not_create_and_returns_candidate_identity()
+    {
+        var storeId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var projection = Projection(storeId, itemId) with { ExternalBlueprintId = 68, ExternalProviderId = 23 };
+        var repository = new MemoryRepository
+        {
+            Snapshot = WorkspaceSnapshot.Empty with
+            {
+                ExternalListingMappings = [UncertainCreateMapping(storeId, itemId, projection.Title, 68, 23)]
+            }
+        };
+        var products = new FakeProducts
+        {
+            ShopProducts = [new ListingRemoteProductSummary("product-existing", projection.Title, 68, 23)]
+        };
+        var service = new ListingLifecycleService(repository, new FakeConnection(), products, new FakePublication());
+
+        var result = await service.ReconcileUncertainCreateAsync(new ListingConnectionRequest(storeId, "shop-1", false), itemId, projection, TestContext.Current.CancellationToken);
+
+        Assert.Equal(ListingLifecycleResultKind.Uncertain, result.Kind);
+        Assert.Contains("product-existing", result.Message);
+        Assert.Equal(0, products.CreateCalls);
+    }
+
+    [Fact]
+    public async Task Verified_shop_product_can_be_explicitly_linked_to_uncertain_create()
+    {
+        var storeId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store(storeId, "Printify Store", null, false, now, now, "{}", null, FulfillmentStrategy.Printify);
+        var item = new Item(itemId, storeId, null, null, "Dad Joke Loading", null, ItemStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
+        var repository = new MemoryRepository
+        {
+            Snapshot = WorkspaceSnapshot.Empty with
+            {
+                Stores = [store],
+                Items = [item],
+                ExternalListingMappings = [UncertainCreateMapping(storeId, itemId, "Dad Joke Loading", 68, 23)]
+            }
+        };
+        var products = new FakeProducts
+        {
+            RemoteProduct = new ListingRemoteProduct("product-existing", false, ListingPublicationState.Unpublished,
+                ListingSnapshot.Empty, ShopId: "shop-1", HasVerifiedIdentity: true)
+        };
+        var service = new ListingLifecycleService(repository, new FakeConnection(), products, new FakePublication());
+
+        var result = await service.LinkExistingProductAsync(
+            new ListingConnectionRequest(storeId, "shop-1", false),
+            itemId,
+            new ListingProductLinkCandidate("product-existing", "shop-1", "Dad Joke Loading"),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(ListingLifecycleResultKind.Succeeded, result.Kind);
+        Assert.Equal("product-existing", result.Mapping!.Identity!.ProductId);
+        Assert.Equal(0, products.CreateCalls);
+    }
+
+    [Fact]
     public async Task Unavailable_connection_does_not_mutate_repository_or_remote()
     {
         var repository = new MemoryRepository();
@@ -441,6 +531,29 @@ public sealed class ListingLifecycleServiceTests
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow);
 
+    private static ExternalListingMapping UncertainCreateMapping(Guid storeId, Guid itemId, string title, int blueprintId, int providerId) =>
+        new(
+            storeId,
+            itemId,
+            "printify",
+            "shop-1",
+            null,
+            null,
+            null,
+            ExternalListingSyncState.Uncertain,
+            ExternalListingPublicationState.NotApplicable,
+            ExternalListingOperationState.NeedsReconciliation,
+            System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string?>
+            {
+                ["createTitle"] = title,
+                ["createBlueprintId"] = blueprintId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["createProviderId"] = providerId.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            }),
+            "{\"kind\":\"Create\"}",
+            null,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow);
+
     private static ListingSnapshot Snapshot(string title) =>
         new(new Dictionary<string, string?> { ["title"] = title });
 
@@ -479,6 +592,14 @@ public sealed class ListingLifecycleServiceTests
         public Exception? DeleteException { get; init; }
         public ListingProductProjection? LastProjection { get; private set; }
         public IReadOnlySet<string>? LastChangedFields { get; private set; }
+        public IReadOnlyList<ListingRemoteProductSummary> ShopProducts { get; set; } = [];
+        public int ListShopProductsCalls { get; private set; }
+
+        public Task<IReadOnlyList<ListingRemoteProductSummary>> ListShopProductsAsync(string shopId, CancellationToken cancellationToken = default)
+        {
+            ListShopProductsCalls++;
+            return Task.FromResult(ShopProducts);
+        }
 
         public Task<ListingRemoteProduct?> GetAsync(string shopId, string productId, CancellationToken cancellationToken = default)
         {
@@ -530,3 +651,4 @@ public sealed class ListingLifecycleServiceTests
         }
     }
 }
+

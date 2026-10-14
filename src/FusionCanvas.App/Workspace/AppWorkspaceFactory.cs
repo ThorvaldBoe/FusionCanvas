@@ -1,4 +1,4 @@
-﻿using FusionCanvas.Domain.Workspace;
+using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Integration.Persistence;
 using FusionCanvas.Integration.Files;
 using FusionCanvas.Integration.Packages;
@@ -85,7 +85,8 @@ public static class AppWorkspaceFactory
             repository,
             printifyCredentials,
             fileStore,
-            PrintifyListingClient.CreateHttpClient());
+            PrintifyListingClient.CreateHttpClient(),
+            telemetry);
         var useUiTestPrintify = Environment.GetEnvironmentVariable(Program.UiTestModeEnvironmentVariable) == "1"
             && Environment.GetEnvironmentVariable(Program.UiTestPrintifyImportEnvironmentVariable) == "1";
         IPrintifyListingImportClient printifyImportClient = useUiTestPrintify
@@ -257,3 +258,4 @@ public static class AppWorkspaceFactory
             : Path.Combine(directory, "workspace-files");
     }
 }
+

@@ -37,6 +37,39 @@ public sealed class ListingLifecycleService
         CancellationToken cancellationToken = default)
         => await CreateOrUpdateCoreAsync(connectionRequest, projection, forceLocal: false, cancellationToken).ConfigureAwait(false);
 
+    public Task<ListingLifecycleResult> ReconcileUncertainCreateAsync(
+        ListingConnectionRequest connectionRequest,
+        Guid itemId,
+        ListingProductProjection projection,
+        CancellationToken cancellationToken = default) =>
+        InspectUncertainCreateAsync(connectionRequest, itemId, projection, cancellationToken);
+
+    public async Task<ListingLifecycleResult> RetryUncertainCreateAsync(
+        ListingConnectionRequest connectionRequest,
+        Guid itemId,
+        ListingProductProjection projection,
+        CancellationToken cancellationToken = default)
+    {
+        var inspection = await InspectUncertainCreateAsync(connectionRequest, itemId, projection, cancellationToken).ConfigureAwait(false);
+        if (inspection.Kind != ListingLifecycleResultKind.NoRemoteMatch)
+            return inspection;
+
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var existing = snapshot.ExternalListingMappings.SingleOrDefault(value => value.StoreId == connectionRequest.StoreId && value.ItemId == itemId);
+        if (existing is null || existing.ProductId is not null || !IsUncertain(existing))
+            return new(ListingLifecycleResultKind.NotAllowed, existing is null ? null : ToApplicationMapping(existing), Message: "The uncertain create changed while it was being reconciled. Refresh the Printify state before retrying.");
+
+        var retryable = existing with
+        {
+            SynchronizationState = ExternalListingSyncState.Failed,
+            OperationState = ExternalListingOperationState.Failed,
+            OperationJson = JsonSerializer.Serialize(new { kind = ListingOperationKind.Create, resolution = "User confirmed absence after two Printify shop checks." }),
+            UpdatedAt = _clock()
+        };
+        await _repository.SaveAsync(ReplaceMapping(snapshot, retryable), cancellationToken).ConfigureAwait(false);
+        return await CreateOrUpdateCoreAsync(connectionRequest, projection, forceLocal: false, cancellationToken).ConfigureAwait(false);
+    }
+
     public ListingProjectionResult Preview(ListingProjectionRequest request) =>
         ListingProjectionBuilder.Build(request);
 
@@ -68,7 +101,7 @@ public sealed class ListingLifecycleService
         var existing = snapshot.ExternalListingMappings.SingleOrDefault(value => value.StoreId == request.StoreId && value.ItemId == itemId);
         if (existing is not null && !string.Equals(existing.ShopId, request.ShopId, StringComparison.Ordinal))
             return new(false, Message: "This Item is mapped to a different Printify shop. Resolve the Store shop mapping before changing its product.");
-        if (existing is not null && IsUncertain(existing))
+        if (existing is not null && IsUncertain(existing) && existing.ProductId is not null)
             return new(false, Message: "Refresh or reconcile the current Printify product before replacing its mapping.");
 
         var normalizedProductId = productId.Trim();
@@ -138,7 +171,7 @@ public sealed class ListingLifecycleService
 
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
         var existing = snapshot.ExternalListingMappings.SingleOrDefault(value => value.StoreId == request.StoreId && value.ItemId == itemId);
-        if (existing is not null && IsUncertain(existing))
+        if (existing is not null && IsUncertain(existing) && existing.ProductId is not null)
             return new(ListingLifecycleResultKind.Uncertain, ToApplicationMapping(existing), Message: "Refresh or reconcile the current Printify product before replacing its mapping.");
         if (snapshot.ExternalListingMappings.Any(value =>
                 value.StoreId == request.StoreId
@@ -176,6 +209,62 @@ public sealed class ListingLifecycleService
     private static bool IsUncertain(ExternalListingMapping mapping) =>
         mapping.SynchronizationState is ExternalListingSyncState.Pending or ExternalListingSyncState.Uncertain
         || mapping.OperationState is ExternalListingOperationState.IntentRecorded or ExternalListingOperationState.NeedsReconciliation;
+
+    private async Task<ListingLifecycleResult> InspectUncertainCreateAsync(
+        ListingConnectionRequest request,
+        Guid itemId,
+        ListingProductProjection projection,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(projection);
+        var readiness = await _connection.CheckAsync(request, cancellationToken).ConfigureAwait(false);
+        if (!readiness.ProductOperationsAvailable)
+            return new(ListingLifecycleResultKind.Unavailable, Message: readiness.Issues.FirstOrDefault()?.Message ?? "Printify is unavailable.");
+
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var existing = snapshot.ExternalListingMappings.SingleOrDefault(value => value.StoreId == request.StoreId && value.ItemId == itemId);
+        if (existing is null || existing.ProductId is not null || !IsUncertain(existing))
+            return new(ListingLifecycleResultKind.NotAllowed, existing is null ? null : ToApplicationMapping(existing), Message: "There is no unresolved Printify create to reconcile.");
+        if (!string.Equals(existing.ShopId, request.ShopId, StringComparison.Ordinal))
+            return new(ListingLifecycleResultKind.NotAllowed, ToApplicationMapping(existing), Message: "The uncertain create belongs to a different Printify shop. Restore the original shop before reconciling it.");
+
+        IReadOnlyList<ListingRemoteProductSummary> products;
+        try
+        {
+            products = await _products.ListShopProductsAsync(request.ShopId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return new(ListingLifecycleResultKind.Unavailable, ToApplicationMapping(existing), Message: $"Printify's shop products could not be checked. {exception.Message}");
+        }
+
+        ListingSnapshot? intent = null;
+        if (!string.IsNullOrWhiteSpace(existing.SnapshotJson))
+        {
+            try { intent = DeserializeSnapshot(existing.SnapshotJson); }
+            catch (JsonException) { }
+        }
+        var title = intent?.Fields.GetValueOrDefault("createTitle") ?? projection.Title;
+        var blueprintId = int.TryParse(intent?.Fields.GetValueOrDefault("createBlueprintId"), out var savedBlueprintId)
+            ? savedBlueprintId
+            : projection.ExternalBlueprintId;
+        var providerId = int.TryParse(intent?.Fields.GetValueOrDefault("createProviderId"), out var savedProviderId)
+            ? savedProviderId
+            : projection.ExternalProviderId;
+        var candidates = products.Where(product =>
+                string.Equals(product.Title, title, StringComparison.Ordinal)
+                && (blueprintId is null || product.BlueprintId == blueprintId)
+                && (providerId is null || product.ProviderId == providerId))
+            .ToArray();
+        if (candidates.Length > 0)
+        {
+            var candidateIds = string.Join(", ", candidates.Select(candidate => candidate.ProductId));
+            return new(ListingLifecycleResultKind.Uncertain, ToApplicationMapping(existing), Message: $"Printify contains possible matches for this create: {candidateIds}. Verify the product ID below and confirm the link; no new product was created.");
+        }
+
+        return new(ListingLifecycleResultKind.NoRemoteMatch, ToApplicationMapping(existing), Message: "No product matching the saved title, Blueprint, and Provider was found in the selected shop. Check Printify, then confirm a retry only if the product is absent.");
+    }
 
     public async Task<ListingLifecycleResult> RefreshAsync(
         ListingConnectionRequest request,
@@ -327,9 +416,7 @@ public sealed class ListingLifecycleService
         var effectiveProjection = forceLocal ? projection : ApplyIntegrationValues(projection, existing?.IntegrationValuesJson);
         var localSnapshot = ToSnapshot(effectiveProjection);
 
-        if (existing is not null
-            && (existing.SynchronizationState == ExternalListingSyncState.Uncertain
-                || existing.OperationState == ExternalListingOperationState.NeedsReconciliation))
+        if (existing is not null && IsUncertain(existing))
         {
             return new(ListingLifecycleResultKind.Uncertain, ToApplicationMapping(existing), Message: "Reconcile the previous Printify operation before retrying.");
         }
@@ -796,7 +883,12 @@ public sealed class ListingLifecycleService
             ExternalListingSyncState.Pending,
             request.RequirePublication ? ExternalListingPublicationState.Unpublished : ExternalListingPublicationState.NotApplicable,
             ExternalListingOperationState.IntentRecorded,
-            null,
+            JsonSerializer.Serialize(new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["createTitle"] = projection.Title,
+                ["createBlueprintId"] = projection.ExternalBlueprintId?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["createProviderId"] = projection.ExternalProviderId?.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            }),
             null,
             null,
             now,
@@ -972,3 +1064,4 @@ public sealed class ListingLifecycleService
                     mapping.UpdatedAt,
                     ErrorMessage: mapping.OperationJson));
 }
+
