@@ -43,8 +43,13 @@ public sealed class WorkspaceListingProjectionSource(
         var options = snapshot.OfferingOptions.Where(value => !value.IsArchived).ToArray();
         var optionValues = snapshot.OfferingOptionValues.Where(value => !value.IsArchived).ToArray();
         var areas = BuildDesignAreas(snapshot, offering.Id);
+        var variantRows = snapshot.DesignVariantRows
+            .Where(value => value.ItemId == itemId)
+            .ToArray();
+        var variantRowIds = variantRows.Select(value => value.Id).ToHashSet();
         var assignments = snapshot.DesignSlotAssignments
-            .Where(value => areas.Any(area => area.Id == value.DesignAreaId))
+            .Where(value => variantRowIds.Contains(value.RowId)
+                && areas.Any(area => area.Id == value.DesignAreaId))
             .ToArray();
         var assets = snapshot.Assets.Where(value => !value.IsArchived).ToArray();
         var dimensions = new Dictionary<Guid, ArtworkDimensions>();
@@ -73,7 +78,7 @@ public sealed class WorkspaceListingProjectionSource(
             options,
             optionValues,
             snapshot.DesignSelectedColors,
-            snapshot.DesignVariantRows.Where(value => value.ItemId == itemId).ToArray(),
+            variantRows,
             snapshot.DesignVariantRowColors,
             assignments,
             areas,

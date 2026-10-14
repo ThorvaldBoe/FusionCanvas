@@ -97,6 +97,8 @@ Passed: 25, Failed: 0
 
 ## Final acceptance record
 
+| Artwork from another Item sharing the same Offering and Design Area is excluded | `ListingLifecycleTests.Projection_ignores_artwork_assigned_to_another_items_row_for_the_same_design_area` | Pass | Regression passes in the 701-test Application suite; the full solution baseline passes (2,481 tests across Domain, Application, Integration, App, and UI Description). |
+
 | Capability / scenario | Method | Result | Evidence / limitation |
 | --- | --- | --- | --- |
 | Connection readiness and Printify-enabled strategy gating | Application tests, integration fakes, and headless view tests | Pass | Focused lifecycle, strategy, Store repair-guidance, and fail-closed UI tests; full solution baseline also passes. |

@@ -171,6 +171,32 @@ public sealed class ListingLifecycleTests
     }
 
     [Fact]
+    public void Projection_ignores_artwork_assigned_to_another_items_row_for_the_same_design_area()
+    {
+        var request = CreateRequest();
+        var otherItemRow = new DesignVariantRow(Guid.NewGuid(), Guid.NewGuid(), true, 0);
+        var otherItemsAsset = new Asset(Guid.NewGuid(), request.Item.StoreId, "Always up to something", null,
+            AssetKind.ExportedImage, "assets/always-up-to-something.png", null, false, false,
+            DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "{}");
+        request = request with
+        {
+            SlotAssignments = [new DesignSlotAssignment(otherItemRow.Id, request.DesignAreas[0].Id, otherItemsAsset.Id), .. request.SlotAssignments],
+            Assets = [otherItemsAsset, .. request.Assets],
+            ArtworkDimensions = new Dictionary<Guid, ArtworkDimensions>(request.ArtworkDimensions)
+            {
+                [otherItemsAsset.Id] = new(1000, 1000)
+            }
+        };
+
+        var result = ListingProjectionBuilder.Build(request);
+
+        Assert.True(result.IsValid, string.Join("; ", result.Issues.Select(value => value.Message)));
+        var artwork = Assert.Single(result.Projection!.Artwork);
+        Assert.Equal(request.Assets.Last().Id, artwork.AssetId);
+        Assert.Equal("assets/dad-joke.png", artwork.AssetPath);
+    }
+
+    [Fact]
     public void Projection_rejects_when_no_design_area_has_artwork()
     {
         var request = CreateRequest() with { SlotAssignments = [] };

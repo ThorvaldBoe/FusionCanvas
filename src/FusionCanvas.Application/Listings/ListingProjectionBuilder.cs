@@ -143,8 +143,12 @@ public static class ListingProjectionBuilder
         ICollection<ListingReadinessIssue> issues)
     {
         var assetsById = request.Assets.ToDictionary(value => value.Id);
+        var itemRowIds = request.VariantRows
+            .Where(value => value.ItemId == request.Item.Id)
+            .Select(value => value.Id)
+            .ToHashSet();
         var assignmentsByArea = request.SlotAssignments
-            .Where(value => value.AssetId.HasValue)
+            .Where(value => itemRowIds.Contains(value.RowId) && value.AssetId.HasValue)
             .GroupBy(value => value.DesignAreaId)
             .ToDictionary(value => value.Key, value => value.First());
 
