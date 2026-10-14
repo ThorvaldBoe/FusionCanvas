@@ -129,6 +129,11 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     public string VariantSummary => _projection is null ? "Not available" : $"{_projection.Variants.Count} selected variants";
     public string ArtworkSummary => _projection is null ? "Not available" : $"{_projection.Artwork.Count} design area{(_projection.Artwork.Count == 1 ? string.Empty : "s")}";
     public string ProductSummary => _projection is null ? "Not available" : $"Blueprint {(_projection.ExternalBlueprintId?.ToString(CultureInfo.InvariantCulture) ?? "unresolved")}, provider {(_projection.ExternalProviderId?.ToString(CultureInfo.InvariantCulture) ?? "unresolved")}";
+    public string? PublicationAvailabilityMessage => _request is { RequirePublication: false }
+        && _mapping is { Identity: not null, PublicationState: ListingPublicationState.Unpublished }
+            ? "Publishing is available only for a Store configured with the Shopify + Printify fulfillment strategy. Check the strategy in Store settings."
+            : null;
+    public bool HasPublicationAvailabilityMessage => !string.IsNullOrWhiteSpace(PublicationAvailabilityMessage);
     public bool CanCreateOrUpdate => !IsBusy && !HasUnresolvedOperation && _canEdit && _service is not null && _projection is not null && _request is not null && string.IsNullOrWhiteSpace(ErrorMessage) && !HasConflict;
     public bool CanReconcileUncertainCreate => !IsBusy && _canEdit && HasUnresolvedCreate && _service is not null && _projection is not null && _request is not null;
     public bool CanConfirmUncertainCreateRetry => !IsBusy && IsUncertainCreateRetryConfirmationVisible && _service is not null && _projection is not null && _request is not null;
@@ -408,6 +413,8 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanConfirmProductLink));
         OnPropertyChanged(nameof(CanReconcile));
         OnPropertyChanged(nameof(CanDownloadVariantSetup));
+        OnPropertyChanged(nameof(PublicationAvailabilityMessage));
+        OnPropertyChanged(nameof(HasPublicationAvailabilityMessage));
         foreach (var command in new[] { CreateOrUpdateCommand, ReconcileUncertainCreateCommand, ConfirmUncertainCreateRetryCommand, CancelUncertainCreateRetryCommand, RefreshCommand, PublishCommand, UnpublishCommand, ArchiveCommand, DeleteCommand, ConfirmDeleteCommand, CancelDeleteCommand, VerifyProductLinkCommand, ConfirmProductLinkCommand, CancelProductLinkCommand, AcceptRemoteCommand, KeepLocalCommand })
             (command as RelayCommand)?.NotifyCanExecuteChanged();
     }

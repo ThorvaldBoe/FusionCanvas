@@ -70,20 +70,35 @@ public sealed class PrintifyListingClientTests
     }
 
     [Fact]
-    public async Task Product_update_sends_only_fields_changed_from_remote()
+    public async Task Product_update_includes_artwork_when_another_field_changed()
     {
         var handler = new RecordingHandler(_ => Json(HttpStatusCode.OK, "{\"id\":\"product-1\"}"));
         using var http = new HttpClient(handler);
         var client = new PrintifyListingClient(Guid.NewGuid(), http, _ => Task.FromResult<string?>("key"));
+        var assetId = Guid.NewGuid();
+        var projection = Projection() with
+        {
+            Artwork =
+            [
+                new ListingArtworkProjection(Guid.NewGuid(), assetId, "artwork/front.png", new ArtworkDimensions(1000, 1000), new ArtworkDimensions(4500, 5400), new ArtworkPlacement(1, 0.5, 0.5, 0))
+                {
+                    Position = "front"
+                }
+            ]
+        };
 
-        var result = await client.UpdateAsync("42", "product-1", Projection(), new Dictionary<Guid, ListingImageReference>(),
+        var result = await client.UpdateAsync("42", "product-1", projection,
+            new Dictionary<Guid, ListingImageReference> { [assetId] = new("uploaded-image-1", "fingerprint") },
             new HashSet<string>(["title"], StringComparer.Ordinal), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsDefinitive);
         Assert.Equal(HttpMethod.Put, handler.Requests.Single().Method);
         using var payload = System.Text.Json.JsonDocument.Parse(handler.Bodies.Single());
-        Assert.Equal(["title"], payload.RootElement.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["title", "print_areas"], payload.RootElement.EnumerateObject().Select(property => property.Name));
         Assert.Equal(Projection().Title, payload.RootElement.GetProperty("title").GetString());
+        var area = Assert.Single(payload.RootElement.GetProperty("print_areas").EnumerateArray());
+        Assert.Equal("front", area.GetProperty("placeholders")[0].GetProperty("position").GetString());
+        Assert.Equal("uploaded-image-1", area.GetProperty("placeholders")[0].GetProperty("images")[0].GetProperty("id").GetString());
     }
 
     [Fact]

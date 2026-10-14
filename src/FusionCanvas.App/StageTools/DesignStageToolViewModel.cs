@@ -426,21 +426,28 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
 
     public async Task ConfirmPendingRemovalAsync(CancellationToken ct = default)
     {
-        if (_pendingRemoval is null || IsBusy || IsReadOnly) return;
+        var pendingRemoval = _pendingRemoval;
+        if (pendingRemoval is null || IsBusy || IsReadOnly) return;
+
+        // Dismiss the confirmation as soon as the user confirms. A slow workspace
+        // write should not leave a stale warning dialog on screen while removal runs.
+        _pendingRemoval = null;
+        IsRemovalConfirmationVisible = false;
+        RemovalConfirmationMessage = string.Empty;
         IsBusy = true;
         try
         {
             DesignStageResult? result = null;
-            switch (_pendingRemoval.Kind)
+            switch (pendingRemoval.Kind)
             {
                 case PendingRemovalKind.SlotImage:
-                    result = await _designStageService.RemoveSlotImageAsync(_itemId, _pendingRemoval.RowId, _pendingRemoval.DesignAreaId, ct).ConfigureAwait(true);
+                    result = await _designStageService.RemoveSlotImageAsync(_itemId, pendingRemoval.RowId, pendingRemoval.DesignAreaId, ct).ConfigureAwait(true);
                     break;
                 case PendingRemovalKind.SupportingImage:
-                    result = await _designStageService.RemoveSupportingImageAsync(_itemId, _pendingRemoval.AssetId!.Value, ct).ConfigureAwait(true);
+                    result = await _designStageService.RemoveSupportingImageAsync(_itemId, pendingRemoval.AssetId!.Value, ct).ConfigureAwait(true);
                     break;
                 case PendingRemovalKind.SpecificRow:
-                    result = await _designStageService.RemoveSpecificRowAsync(_itemId, _pendingRemoval.RowId, ct).ConfigureAwait(true);
+                    result = await _designStageService.RemoveSpecificRowAsync(_itemId, pendingRemoval.RowId, ct).ConfigureAwait(true);
                     break;
             }
             ErrorMessage = result?.Error;

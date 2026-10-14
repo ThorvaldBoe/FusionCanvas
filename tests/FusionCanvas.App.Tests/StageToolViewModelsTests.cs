@@ -285,6 +285,28 @@ public class StageToolViewModelsTests
         Assert.False(vm.CanConfirmProductLink);
     }
 
+    [Fact]
+    public async Task PrintifyTool_ExplainsWhyUnpublishedProductCannotBePublishedForStandalonePrintify()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var storeId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var store = new Store(storeId, "The Groan Zone", null, false, now, now, "{}", null, FulfillmentStrategy.Printify);
+        var item = new Item(itemId, storeId, null, null, "Dad joke", null, ItemStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
+        var mapping = new ExternalListingMapping(storeId, itemId, "printify", "42", "product-1", null, null,
+            ExternalListingSyncState.Synchronized, ExternalListingPublicationState.Unpublished, ExternalListingOperationState.Succeeded, "{}", null, now, now, now);
+        var repository = new MemoryRepository(WorkspaceSnapshot.Empty with { Stores = [store], Items = [item], ExternalListingMappings = [mapping] });
+        var service = new ListingLifecycleService(repository, new Connection(), new Products(), new Publication());
+        var vm = new PrintifyListingStageToolViewModel(new Factory(service), new ProjectionSource(), () => repository.Snapshot,
+            id => id == storeId ? store : null, new ContextMapper());
+
+        await vm.LoadAsync(itemId, canEdit: true, TestContext.Current.CancellationToken);
+
+        Assert.False(vm.CanPublish);
+        Assert.True(vm.HasPublicationAvailabilityMessage);
+        Assert.Contains("Shopify + Printify", vm.PublicationAvailabilityMessage);
+    }
+
     [AvaloniaFact]
     public async Task PrintifyTool_HeadlessShopifyJourneyPublishesUnpublishesAndReopensDeletionGate()
     {
