@@ -241,7 +241,7 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
             return (estimate, null);
         }
 
-        var fingerprint = OpenRouterQualificationEvidenceStore.CreateFingerprint(new { model.Id, model.SupportedParameters, endpoint.EndpointId, endpoint.ProviderId, profile, OutputModalities = new[] { "text" }, AdapterVersion = typeof(OpenRouterClient).Assembly.GetName().Version?.ToString() });
+        var fingerprint = OpenRouterQualificationEvidenceStore.CreateFingerprint(new { model.Id, model.SupportedParameters, endpoint.EndpointId, endpoint.ProviderId, profile, OutputModalities = new[] { "text" }, AdapterRevision = OpenRouterQualificationEvidenceStore.GetAdapterRevision(typeof(OpenRouterClient).Assembly) });
         if (allowEvidenceReuse && !force && await TryLoadQualificationEvidenceAsync(model.Id, "text", fingerprint, cancellationToken).ConfigureAwait(false) is { Status: "passed" } evidence)
         {
             operations.Add(new("openrouter-chat-completion", "reused", $"Matching passing evidence from {evidence.VerifiedAt:u}; no generation request sent. provider={endpoint.ProviderId}; request={ProfileSummary(profile)}", ModelId: model.Id, ProfileFingerprint: fingerprint, ResourceId: endpoint.EndpointId));
@@ -342,7 +342,7 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
         }
 
         var maximumCost = endpoint.MaximumCost ?? throw new InvalidOperationException("An image cost bound is unavailable.");
-        var fingerprint = OpenRouterQualificationEvidenceStore.CreateFingerprint(new { model.Id, model.SupportedParameters, endpoint.Endpoint.EndpointId, endpoint.Endpoint.Pricing, endpoint.Selection, AdapterVersion = typeof(OpenRouterClient).Assembly.GetName().Version?.ToString() });
+        var fingerprint = OpenRouterQualificationEvidenceStore.CreateFingerprint(new { model.Id, model.SupportedParameters, endpoint.Endpoint.EndpointId, endpoint.Endpoint.Pricing, endpoint.Selection, AdapterRevision = OpenRouterQualificationEvidenceStore.GetAdapterRevision(typeof(OpenRouterClient).Assembly) });
         if (allowEvidenceReuse && !force && await TryLoadQualificationEvidenceAsync(model.Id, "image", fingerprint, cancellationToken).ConfigureAwait(false) is { Status: "passed" } evidence)
         {
             operations.Add(new("openrouter-image-generation", "reused", $"Matching passing evidence from {evidence.VerifiedAt:u}; no generation request sent. provider={endpoint.Endpoint.ProviderName}; options={FormatImageOptions(endpoint.Selection.Options)}.", ModelId: model.Id, ProfileFingerprint: fingerprint, ResourceId: endpoint.Endpoint.EndpointId));

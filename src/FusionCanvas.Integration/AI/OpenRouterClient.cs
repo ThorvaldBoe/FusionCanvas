@@ -1180,6 +1180,12 @@ public sealed class OpenRouterClient :
 
     private static AiTextResult ParseSuccess(JsonElement root, AiProviderTextRequest request)
     {
+        if (root.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.Object)
+        {
+            throw new ChatCompletionContractException(
+                $"OpenRouter returned a provider error envelope with a successful HTTP status. {SummarizeProviderError(error)}");
+        }
+
         if (!root.TryGetProperty("choices", out var choices) || choices.ValueKind != JsonValueKind.Array)
         {
             throw new ChatCompletionContractException(
@@ -1247,6 +1253,20 @@ public sealed class OpenRouterClient :
             ReadString(root, "id"),
             request.Routing ?? request.Profile.Routing,
             ReadString(metadata, "endpoint") ?? ReadString(metadata, "endpoint_name"));
+    }
+
+    private static string SummarizeProviderError(JsonElement error)
+    {
+        var fields = new List<string>(3);
+        var code = ReadString(error, "code");
+        var parameter = ReadString(error, "param");
+        var type = ReadString(error, "type");
+        if (IsSafeDiagnosticToken(code)) fields.Add($"code={code}");
+        if (IsSafeDiagnosticToken(parameter)) fields.Add($"param={parameter}");
+        if (IsSafeDiagnosticToken(type)) fields.Add($"type={type}");
+        return fields.Count > 0
+            ? $"Provider details: {string.Join(", ", fields)}."
+            : "Provider details were omitted.";
     }
 
     private async Task<AiTextResult> ParseFailureAsync(

@@ -788,7 +788,7 @@ public class OpenRouterClientTests : IDisposable
     public async Task GenerateAsync_SummarizesUnexpectedSuccessEnvelopeWithoutEchoingErrorMessage()
     {
         var handler = new RecordingHandler(Json(HttpStatusCode.OK,
-            """{"error":{"message":"private prompt echoed","code":"provider_error","type":"invalid_response"},"model":"vendor/model"}"""));
+            """{"error":{"message":"private prompt echoed","code":"provider_error","param":"max_tokens","type":"invalid_response"},"model":"vendor/model"}"""));
 
         var result = await CreateClient(handler).GenerateAsync(
             new AiProviderTextRequest(
@@ -800,9 +800,9 @@ public class OpenRouterClientTests : IDisposable
             TestContext.Current.CancellationToken);
 
         Assert.Equal(AiTextFailureKind.InvalidProviderResponse, result.FailureKind);
-        Assert.Contains("error=Object", result.Message, StringComparison.Ordinal);
-        Assert.Contains("model=String", result.Message, StringComparison.Ordinal);
+        Assert.Contains("provider error envelope", result.Message, StringComparison.Ordinal);
         Assert.Contains("code=provider_error", result.Message, StringComparison.Ordinal);
+        Assert.Contains("param=max_tokens", result.Message, StringComparison.Ordinal);
         Assert.Contains("type=invalid_response", result.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("private prompt echoed", result.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("secret", result.Message, StringComparison.Ordinal);
