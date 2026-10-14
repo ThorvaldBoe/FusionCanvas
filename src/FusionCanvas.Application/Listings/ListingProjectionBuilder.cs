@@ -21,6 +21,23 @@ public static class ListingProjectionBuilder
             issues.Add(new("store-mismatch", "The Item, offering, and provider must belong to the same Store."));
         }
 
+        var externalOfferingParts = request.Offering.ExternalOfferingId?.Split(':', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        var externalBlueprintId = ReadExternalId(request.Blueprint.MetadataJson)
+            ?? (externalOfferingParts is { Length: >= 1 } && int.TryParse(externalOfferingParts[0], out var offeringBlueprintId) ? offeringBlueprintId : null);
+        int? externalProviderId = request.Provider.ExternalProviderId is not null && int.TryParse(request.Provider.ExternalProviderId, out var providerId)
+            ? providerId
+            : externalOfferingParts is { Length: >= 2 } && int.TryParse(externalOfferingParts[1], out var offeringProviderId) ? offeringProviderId : null;
+
+        if (externalBlueprintId is null or <= 0)
+        {
+            issues.Add(new("printify-blueprint-identity-missing", "The selected Blueprint has no Printify Blueprint ID. Reimport its Printify catalog data before creating a listing."));
+        }
+
+        if (externalProviderId is null or <= 0)
+        {
+            issues.Add(new("printify-provider-identity-missing", "The selected Print Provider has no Printify Provider ID. Reimport its Printify catalog data before creating a listing."));
+        }
+
         var selectedColorValues = request.SelectedColors
             .Where(value => value.ItemId == request.Item.Id)
             .Select(value => value.ColorValue)
@@ -99,13 +116,6 @@ public static class ListingProjectionBuilder
                 ExternalVariantId = ReadExternalId(value.Variant.MetadataJson)
             })
             .ToArray();
-
-        var externalOfferingParts = request.Offering.ExternalOfferingId?.Split(':', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        var externalBlueprintId = ReadExternalId(request.Blueprint.MetadataJson)
-            ?? (externalOfferingParts is { Length: >= 1 } && int.TryParse(externalOfferingParts[0], out var offeringBlueprintId) ? offeringBlueprintId : null);
-        int? externalProviderId = request.Provider.ExternalProviderId is not null && int.TryParse(request.Provider.ExternalProviderId, out var providerId)
-            ? providerId
-            : externalOfferingParts is { Length: >= 2 } && int.TryParse(externalOfferingParts[1], out var offeringProviderId) ? offeringProviderId : null;
 
         return new ListingProjectionResult(
             new ListingProductProjection(
@@ -208,7 +218,20 @@ public static class ListingProjectionBuilder
         try
         {
             using var document = System.Text.Json.JsonDocument.Parse(string.IsNullOrWhiteSpace(metadataJson) ? "{}" : metadataJson);
-            return document.RootElement.TryGetProperty("id", out var id) && id.TryGetInt32(out var value) && value > 0 ? value : null;
+            var root = document.RootElement;
+            if (root.TryGetProperty("id", out var id) && id.TryGetInt32(out var value) && value > 0)
+                return value;
+            if (root.TryGetProperty("blueprintId", out var blueprintId) && blueprintId.TryGetInt32(out value) && value > 0)
+                return value;
+            if (root.TryGetProperty("ids", out var ids)
+                && ids.ValueKind == System.Text.Json.JsonValueKind.Array
+                && ids.EnumerateArray().FirstOrDefault(candidate => candidate.TryGetInt32(out var parsed) && parsed > 0) is { ValueKind: System.Text.Json.JsonValueKind.Number } importedId
+                && importedId.TryGetInt32(out value))
+            {
+                return value;
+            }
+
+            return null;
         }
         catch (System.Text.Json.JsonException)
         {
