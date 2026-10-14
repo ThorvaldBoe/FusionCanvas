@@ -512,6 +512,19 @@ public sealed class ApiVerificationCoreTests
         Assert.Equal("partial", OpenRouterApiVerifier.ResolveSessionStatus("openrouter-text-generation", "passed", operations));
     }
 
+    [Theory]
+    [InlineData(AiTextFailureKind.Blocked, "provider-permission")]
+    [InlineData(AiTextFailureKind.RateLimited, "provider-capacity")]
+    [InlineData(AiTextFailureKind.InvalidRequest, "effective-parameters")]
+    [InlineData(AiTextFailureKind.InvalidProviderResponse, "response-contract")]
+    [InlineData(AiTextFailureKind.RouteNotFulfilled, "provider-route")]
+    [InlineData(AiTextFailureKind.Timeout, "transport")]
+    [InlineData(null, "generation-contract")]
+    public void OpenRouterFailuresAreClassifiedByTheirLikelyOwner(AiTextFailureKind? failureKind, string expected)
+    {
+        Assert.Equal(expected, OpenRouterApiVerifier.ClassifyTextFailure(failureKind));
+    }
+
     [Fact]
     public async Task ProviderVerifiersBlockBeforeNetworkWhenDedicatedCredentialsAreMissing()
     {
