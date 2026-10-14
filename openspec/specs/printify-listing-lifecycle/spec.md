@@ -108,6 +108,23 @@ The Printify tool SHALL create a product when no mapping exists and SHALL update
 - **AND** the tool attempts to reconcile the shop before allowing another create
 - **AND** it does not blindly create a second product
 
+#### Scenario: Reconcile an uncertain create with a matching shop product
+- **WHEN** an uncertain create has no saved Printify product ID and the user starts reconciliation
+- **THEN** the tool searches the selected shop's products for a matching title, Blueprint, and Provider
+- **AND** it presents matching product IDs for explicit verification and linking
+- **AND** it does not create another product while a match is unresolved
+
+#### Scenario: Reconcile an uncertain create with no matching shop product
+- **WHEN** the selected shop contains no product matching the saved create intent
+- **THEN** the tool explains that Printify returned no matching product
+- **AND** it requires the user to confirm they checked the shop before retrying creation
+- **AND** it repeats the shop check before sending another create request
+
+#### Scenario: User links a product found after an uncertain create
+- **WHEN** the user enters and verifies a matching Printify product ID for an uncertain create with no saved product ID
+- **THEN** the tool allows explicit confirmation to link that product to the Item
+- **AND** it records the verified remote identity without changing the remote product
+
 ### Requirement: Remote drift requires an explicit resolution
 Before mutating a mapped product, the Printify tool SHALL compare the current remote product with the last synchronized snapshot and the current desired Fusion Canvas projection. When a remote-only change is detected, the tool SHALL identify the changed fields and offer accepting the remote values into Fusion Canvas or updating Printify from Fusion Canvas. The tool SHALL not silently overwrite either side.
 
@@ -186,4 +203,9 @@ The Printify tool SHALL show distinct text states for connection readiness, sync
 - **WHEN** a previously ready connection fails verification
 - **THEN** the tool shows connection unavailable and disables remote actions
 - **AND** preserves the last known product and publication information with an unverified indication
+
+#### Scenario: Printify operation is in progress
+- **WHEN** a user starts a Printify operation and its request has not completed
+- **THEN** the tool shows visible progress
+- **AND** disables duplicate lifecycle actions until the operation completes
 

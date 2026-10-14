@@ -73,6 +73,8 @@ Every mapped product has a normalized snapshot. Before an update, the service co
 
 The service will never blindly retry an ambiguous create, update, publish, unpublish, or delete. It will re-read by known identity where possible, mark unknown outcomes explicitly, and require reconciliation before another mutation.
 
+For an uncertain create without a returned product ID, reconciliation lists every product in the selected Printify shop and compares exact title, Blueprint, and Provider against the persisted create intent. Matching products are offered for explicit identity verification and linking. If no match is found, the UI requires explicit user confirmation and the application repeats the list check immediately before retrying; it does not infer certainty from a single shop read. The Listing tool reports the blocked state and displays progress while remote operations run.
+
 ### 7. Derive publication from fulfillment strategy
 
 Product operations are available for `Printify` and `Shopify + Printify` when readiness passes. Publish and unpublish actions are available only for `Shopify + Printify` and are sent only to Printify. Publication state is separate from Item lifecycle status and includes pending/unverified states.
@@ -167,3 +169,4 @@ Rollback is additive: disable the Printify tool and remote commands while preser
 ## Open Questions
 
 No product decision is blocking proposal approval. The exact external effect of Printify's unpublish request will be verified against the connected showcase Store and the final remote GET state before implementation acceptance; the application will model the result as pending/unverified when the API does not provide a definitive response.
+

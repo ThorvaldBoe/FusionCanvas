@@ -8,5 +8,7 @@ public enum ListingLifecycleResultKind
     Failed = 3,
     Uncertain = 4,
     Missing = 5,
-    NotAllowed = 6
+    NotAllowed = 6,
+    NoRemoteMatch = 7
 }
+

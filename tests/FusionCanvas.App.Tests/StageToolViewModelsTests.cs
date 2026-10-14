@@ -161,6 +161,57 @@ public class StageToolViewModelsTests
     }
 
     [AvaloniaFact]
+    public async Task PrintifyTool_ReconcilesUncertainCreateAndRequiresExplicitRetryConfirmation()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var storeId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var store = new Store(storeId, "The Groan Zone", null, false, now, now, "{}", null, FulfillmentStrategy.Printify);
+        var item = new Item(itemId, storeId, null, null, "Dad joke", null, ItemStatus.Draft, WorkflowStage.Listing, false, now, now, "{}");
+        var intent = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string?>
+        {
+            ["createTitle"] = "Dad joke – T-shirt",
+            ["createBlueprintId"] = "68",
+            ["createProviderId"] = "23"
+        });
+        var mapping = new ExternalListingMapping(storeId, itemId, "printify", "42", null, null, null,
+            ExternalListingSyncState.Uncertain, ExternalListingPublicationState.NotApplicable, ExternalListingOperationState.NeedsReconciliation,
+            intent, "{\"kind\":\"Create\"}", null, now, now);
+        var repository = new MemoryRepository(WorkspaceSnapshot.Empty with { Stores = [store], Items = [item], ExternalListingMappings = [mapping] });
+        var products = new Products();
+        var service = new ListingLifecycleService(repository, new Connection(), products, new Publication());
+        var vm = new PrintifyListingStageToolViewModel(
+            new Factory(service),
+            new ProjectionSource(),
+            () => repository.Snapshot,
+            id => id == storeId ? store : null,
+            new ContextMapper());
+        var busyStates = new List<bool>();
+        vm.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(vm.IsBusy)) busyStates.Add(vm.IsBusy);
+        };
+
+        await vm.LoadAsync(itemId, canEdit: true, TestContext.Current.CancellationToken);
+        Assert.True(vm.HasUnresolvedCreate);
+        Assert.False(vm.CanCreateOrUpdate);
+        Assert.True(vm.CanReconcileUncertainCreate);
+
+        vm.ReconcileUncertainCreateCommand.Execute(null);
+        await HeadlessUiWait.UntilAsync(() => !vm.IsBusy && vm.IsUncertainCreateRetryConfirmationVisible, "uncertain create shop reconciliation");
+        Assert.Contains("No product matching", vm.ErrorMessage);
+        Assert.Equal(0, products.CreateCalls);
+
+        vm.ConfirmUncertainCreateRetryCommand.Execute(null);
+        await HeadlessUiWait.UntilAsync(() => !vm.IsBusy, "confirmed uncertain create retry");
+
+        Assert.Equal(2, products.ListShopProductsCalls);
+        Assert.Equal(1, products.CreateCalls);
+        Assert.Contains(true, busyStates);
+        Assert.Contains(false, busyStates);
+    }
+
+    [AvaloniaFact]
     public async Task PrintifyTool_VerifiesExistingProductBeforeConfirmingAndCanCancel()
     {
         var now = DateTimeOffset.UtcNow;
@@ -673,7 +724,15 @@ public class StageToolViewModelsTests
         public int CreateCalls { get; private set; }
         public int UpdateCalls { get; private set; }
         public int DeleteCalls { get; private set; }
+        public int ListShopProductsCalls { get; private set; }
         public ListingRemoteProduct? RemoteProduct { get; set; }
+        public IReadOnlyList<ListingRemoteProductSummary> ShopProducts { get; set; } = [];
+
+        public Task<IReadOnlyList<ListingRemoteProductSummary>> ListShopProductsAsync(string shopId, CancellationToken cancellationToken = default)
+        {
+            ListShopProductsCalls++;
+            return Task.FromResult(ShopProducts);
+        }
 
         public Task<ListingRemoteProduct?> GetAsync(string shopId, string productId, CancellationToken cancellationToken = default) =>
             Task.FromResult(RemoteProduct);
@@ -747,3 +806,4 @@ public class StageToolViewModelsTests
         }
     }
 }
+

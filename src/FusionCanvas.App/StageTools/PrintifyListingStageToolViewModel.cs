@@ -26,6 +26,7 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     private Guid _itemId;
     private bool _canEdit;
     private bool _isBusy;
+    private bool _isUncertainCreateRetryConfirmationVisible;
     private bool _isLinkConfirmationVisible;
     private string _status = "Not loaded";
     private string _connectionStatus = "Not checked";
@@ -55,6 +56,9 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         _storeContextMapper = storeContextMapper ?? throw new ArgumentNullException(nameof(storeContextMapper));
         _variantSetupImport = variantSetupImport;
         CreateOrUpdateCommand = new RelayCommand(_ => _ = CreateOrUpdateAsync(), () => CanCreateOrUpdate);
+        ReconcileUncertainCreateCommand = new RelayCommand(_ => _ = ReconcileUncertainCreateAsync(), () => CanReconcileUncertainCreate);
+        ConfirmUncertainCreateRetryCommand = new RelayCommand(_ => _ = ConfirmUncertainCreateRetryAsync(), () => CanConfirmUncertainCreateRetry);
+        CancelUncertainCreateRetryCommand = new RelayCommand(_ => CancelUncertainCreateRetry(), () => IsUncertainCreateRetryConfirmationVisible);
         RefreshCommand = new RelayCommand(_ => _ = RefreshAsync(), () => CanRefresh);
         PublishCommand = new RelayCommand(_ => _ = PublishAsync(), () => CanPublish);
         UnpublishCommand = new RelayCommand(_ => _ = UnpublishAsync(), () => CanUnpublish);
@@ -73,6 +77,9 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ICommand CreateOrUpdateCommand { get; }
+    public ICommand ReconcileUncertainCreateCommand { get; }
+    public ICommand ConfirmUncertainCreateRetryCommand { get; }
+    public ICommand CancelUncertainCreateRetryCommand { get; }
     public ICommand RefreshCommand { get; }
     public ICommand PublishCommand { get; }
     public ICommand UnpublishCommand { get; }
@@ -100,6 +107,12 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     public bool HasFeedback => !string.IsNullOrWhiteSpace(FeedbackMessage);
     public bool HasConflict => _conflict is not null;
     public bool IsDeleteConfirmationVisible { get; private set; }
+    public bool IsUncertainCreateRetryConfirmationVisible { get => _isUncertainCreateRetryConfirmationVisible; private set { if (SetField(ref _isUncertainCreateRetryConfirmationVisible, value)) { OnPropertyChanged(nameof(IsUncertainCreateRetryConfirmationVisible)); NotifyActions(); } } }
+    public bool HasUnresolvedOperation => _mapping is { } mapping
+        && (mapping.SynchronizationState is ListingSynchronizationState.Pending or ListingSynchronizationState.Uncertain
+            || mapping.Operation?.State is ListingOperationState.IntentRecorded or ListingOperationState.NeedsReconciliation);
+    public bool HasUnresolvedCreate => HasUnresolvedOperation && _mapping?.Identity is null;
+    public string UncertainCreateRetryConfirmationText => "Printify did not return a product ID. Check the selected shop directly before retrying. Confirm only if the product is absent; retrying while it exists could create a duplicate.";
     public bool IsLinkConfirmationVisible { get => _isLinkConfirmationVisible; private set { if (SetField(ref _isLinkConfirmationVisible, value)) OnPropertyChanged(nameof(IsLinkConfirmationVisible)); } }
     public string CurrentProductId => _mapping?.Identity?.ProductId ?? string.Empty;
     public string CurrentProductIdDisplay => string.IsNullOrWhiteSpace(CurrentProductId) ? "Not linked" : CurrentProductId;
@@ -116,7 +129,9 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     public string VariantSummary => _projection is null ? "Not available" : $"{_projection.Variants.Count} selected variants";
     public string ArtworkSummary => _projection is null ? "Not available" : $"{_projection.Artwork.Count} design area{(_projection.Artwork.Count == 1 ? string.Empty : "s")}";
     public string ProductSummary => _projection is null ? "Not available" : $"Blueprint {(_projection.ExternalBlueprintId?.ToString(CultureInfo.InvariantCulture) ?? "unresolved")}, provider {(_projection.ExternalProviderId?.ToString(CultureInfo.InvariantCulture) ?? "unresolved")}";
-    public bool CanCreateOrUpdate => !IsBusy && _canEdit && _service is not null && _projection is not null && _request is not null && string.IsNullOrWhiteSpace(ErrorMessage) && !HasConflict;
+    public bool CanCreateOrUpdate => !IsBusy && !HasUnresolvedOperation && _canEdit && _service is not null && _projection is not null && _request is not null && string.IsNullOrWhiteSpace(ErrorMessage) && !HasConflict;
+    public bool CanReconcileUncertainCreate => !IsBusy && _canEdit && HasUnresolvedCreate && _service is not null && _projection is not null && _request is not null;
+    public bool CanConfirmUncertainCreateRetry => !IsBusy && IsUncertainCreateRetryConfirmationVisible && _service is not null && _projection is not null && _request is not null;
     public bool CanRefresh => !IsBusy && _service is not null && _request is not null && _mapping?.Identity is not null;
     public bool CanPublish => !IsBusy && _request?.RequirePublication == true && _mapping?.Identity is not null && _mapping.PublicationState == ListingPublicationState.Unpublished;
     public bool CanUnpublish => !IsBusy && _request?.RequirePublication == true && _mapping?.Identity is not null && _mapping.PublicationState == ListingPublicationState.Published;
@@ -136,6 +151,7 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         _projection = null;
         _conflict = null;
         _mapping = null;
+        IsUncertainCreateRetryConfirmationVisible = false;
         _linkCandidate = null;
         CandidateProductId = string.Empty;
         IsLinkConfirmationVisible = false;
@@ -154,6 +170,8 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         if (savedMapping is not null)
         {
             _mapping = ToApplicationMapping(savedMapping);
+            OnPropertyChanged(nameof(HasUnresolvedOperation));
+            OnPropertyChanged(nameof(HasUnresolvedCreate));
             NotifyActions();
         }
         if (store is null || store.IsArchived)
@@ -196,6 +214,9 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
             return;
         }
         _projection = projectionResult.Projection;
+        OnPropertyChanged(nameof(VariantSummary));
+        OnPropertyChanged(nameof(ArtworkSummary));
+        OnPropertyChanged(nameof(ProductSummary));
         Title = _projection!.Title;
         Description = _projection.Description ?? string.Empty;
         var mapping = _snapshot().ExternalListingMappings.SingleOrDefault(value => value.StoreId == store.Id && value.ItemId == itemId);
@@ -204,6 +225,10 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CurrentProductId));
         OnPropertyChanged(nameof(CurrentProductIdDisplay));
         Status = _mapping?.SynchronizationState.ToString() ?? "Ready to create";
+        if (HasUnresolvedOperation)
+            ErrorMessage = _mapping?.Identity is null
+                ? "A previous Printify create is unresolved. Check the shop before retrying."
+                : "A previous Printify operation is unresolved. Refresh the listing before creating or updating.";
         NotifyActions();
     }
 
@@ -212,17 +237,41 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         if (!CanCreateOrUpdate || _projection is null || _request is null || _service is null) return;
         await RunAsync(async cancellationToken =>
         {
-            var result = await _service.CreateOrUpdateAsync(_request, _projection with
-            {
-                Title = Title,
-                Description = string.IsNullOrWhiteSpace(Description) ? null : Description,
-                ShippingProfile = ShippingProfile,
-                OutOfStockPolicy = null,
-                Pricing = new ListingPricingInput(ListingPricingPolicy.FixedRetailPrice, ParsePrice())
-            }, cancellationToken).ConfigureAwait(true);
+            var result = await _service.CreateOrUpdateAsync(_request, CurrentProjection(), cancellationToken).ConfigureAwait(true);
             ApplyResult(result);
         }).ConfigureAwait(true);
     }
+
+    private Task ReconcileUncertainCreateAsync() => RunAsync(async cancellationToken =>
+    {
+        if (_service is null || _request is null || _projection is null) return;
+        IsUncertainCreateRetryConfirmationVisible = false;
+        var result = await _service.ReconcileUncertainCreateAsync(_request, _itemId, CurrentProjection(), cancellationToken).ConfigureAwait(true);
+        ApplyResult(result);
+        if (result.Kind == ListingLifecycleResultKind.NoRemoteMatch)
+            IsUncertainCreateRetryConfirmationVisible = true;
+    });
+
+    private Task ConfirmUncertainCreateRetryAsync() => RunAsync(async cancellationToken =>
+    {
+        if (_service is null || _request is null || _projection is null) return;
+        IsUncertainCreateRetryConfirmationVisible = false;
+        var result = await _service.RetryUncertainCreateAsync(_request, _itemId, CurrentProjection(), cancellationToken).ConfigureAwait(true);
+        ApplyResult(result);
+        if (result.Kind == ListingLifecycleResultKind.NoRemoteMatch)
+            IsUncertainCreateRetryConfirmationVisible = true;
+    });
+
+    private ListingProductProjection CurrentProjection() => _projection! with
+    {
+        Title = Title,
+        Description = string.IsNullOrWhiteSpace(Description) ? null : Description,
+        ShippingProfile = ShippingProfile,
+        OutOfStockPolicy = null,
+        Pricing = new ListingPricingInput(ListingPricingPolicy.FixedRetailPrice, ParsePrice())
+    };
+
+    private void CancelUncertainCreateRetry() => IsUncertainCreateRetryConfirmationVisible = false;
 
     private Task RefreshAsync() => RunAsync(async cancellationToken => ApplyResult(await _service!.RefreshAsync(_request!, _itemId, cancellationToken).ConfigureAwait(true)));
     private Task PublishAsync() => RunAsync(async cancellationToken => ApplyResult(await _service!.PublishAsync(_request!, _itemId, cancellationToken).ConfigureAwait(true)));
@@ -303,9 +352,11 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         _mapping = result.Mapping;
         _conflict = result.Conflict;
         Status = result.Kind.ToString();
-        ErrorMessage = result.Kind is ListingLifecycleResultKind.Failed or ListingLifecycleResultKind.Unavailable ? result.Message : null;
+        ErrorMessage = result.Kind is ListingLifecycleResultKind.Failed or ListingLifecycleResultKind.Unavailable or ListingLifecycleResultKind.Uncertain or ListingLifecycleResultKind.NoRemoteMatch or ListingLifecycleResultKind.NotAllowed ? result.Message : null;
         FeedbackMessage = result.Kind is ListingLifecycleResultKind.Succeeded ? result.Message : null;
         OnPropertyChanged(nameof(HasConflict));
+        OnPropertyChanged(nameof(HasUnresolvedOperation));
+        OnPropertyChanged(nameof(HasUnresolvedCreate));
         OnPropertyChanged(nameof(ConflictSummary));
         OnPropertyChanged(nameof(DeleteConfirmationText));
         OnPropertyChanged(nameof(CurrentProductId));
@@ -344,6 +395,8 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     private void NotifyActions()
     {
         OnPropertyChanged(nameof(CanCreateOrUpdate));
+        OnPropertyChanged(nameof(CanReconcileUncertainCreate));
+        OnPropertyChanged(nameof(CanConfirmUncertainCreateRetry));
         OnPropertyChanged(nameof(CanRefresh));
         OnPropertyChanged(nameof(CanPublish));
         OnPropertyChanged(nameof(CanUnpublish));
@@ -355,7 +408,7 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanConfirmProductLink));
         OnPropertyChanged(nameof(CanReconcile));
         OnPropertyChanged(nameof(CanDownloadVariantSetup));
-        foreach (var command in new[] { CreateOrUpdateCommand, RefreshCommand, PublishCommand, UnpublishCommand, ArchiveCommand, DeleteCommand, ConfirmDeleteCommand, CancelDeleteCommand, VerifyProductLinkCommand, ConfirmProductLinkCommand, CancelProductLinkCommand, AcceptRemoteCommand, KeepLocalCommand })
+        foreach (var command in new[] { CreateOrUpdateCommand, ReconcileUncertainCreateCommand, ConfirmUncertainCreateRetryCommand, CancelUncertainCreateRetryCommand, RefreshCommand, PublishCommand, UnpublishCommand, ArchiveCommand, DeleteCommand, ConfirmDeleteCommand, CancelDeleteCommand, VerifyProductLinkCommand, ConfirmProductLinkCommand, CancelProductLinkCommand, AcceptRemoteCommand, KeepLocalCommand })
             (command as RelayCommand)?.NotifyCanExecuteChanged();
     }
 
@@ -372,3 +425,4 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
 
     private void OnPropertyChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
+

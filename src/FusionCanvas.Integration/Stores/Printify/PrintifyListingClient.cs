@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FusionCanvas.Application.Listings;
 using FusionCanvas.Application.Stores.Printify;
+using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Application.Workspaces;
 
 namespace FusionCanvas.Integration.Stores.Printify;
@@ -25,11 +26,12 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
         Guid storeId,
         HttpClient client,
         Func<CancellationToken, Task<string?>> credentialResolver,
-        IWorkspaceFileReader? fileReader = null)
+        IWorkspaceFileReader? fileReader = null,
+        ITelemetryRecorder? telemetry = null)
     {
         if (storeId == Guid.Empty) throw new ArgumentException("A Store identifier is required.", nameof(storeId));
         _storeId = storeId;
-        _transport = new PrintifyHttpTransport(client ?? throw new ArgumentNullException(nameof(client)));
+        _transport = new PrintifyHttpTransport(client ?? throw new ArgumentNullException(nameof(client)), telemetry: telemetry);
         _credentialResolver = credentialResolver ?? throw new ArgumentNullException(nameof(credentialResolver));
         _fileReader = fileReader;
     }
@@ -114,6 +116,52 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
         if (string.IsNullOrWhiteSpace(id))
             throw new InvalidOperationException("Printify returned no image identity.");
         return new(id, request.Fingerprint);
+    }
+
+    public async Task<IReadOnlyList<ListingRemoteProductSummary>> ListShopProductsAsync(string shopId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(shopId)) throw new ArgumentException("A Printify shop is required.", nameof(shopId));
+        var secret = await RequireCredentialAsync(cancellationToken).ConfigureAwait(false);
+        var products = new List<ListingRemoteProductSummary>();
+        var productIds = new HashSet<string>(StringComparer.Ordinal);
+        for (var page = 1; page <= 1000; page++)
+        {
+            var path = $"shops/{Uri.EscapeDataString(shopId)}/products.json?limit=50&page={page}";
+            var response = await SendAsync(HttpMethod.Get, path, secret, cancellationToken: cancellationToken).ConfigureAwait(false);
+            if (!response.Succeeded) throw new InvalidOperationException(MessageFor(response.Outcome));
+
+            using var document = JsonDocument.Parse(response.Body);
+            var root = document.RootElement;
+            var data = root.ValueKind == JsonValueKind.Array
+                ? root
+                : root.ValueKind == JsonValueKind.Object && root.TryGetProperty("data", out var dataValue) && dataValue.ValueKind == JsonValueKind.Array
+                    ? dataValue
+                    : throw new InvalidOperationException("Printify returned an invalid shop product list.");
+            foreach (var product in data.EnumerateArray())
+            {
+                var productId = ReadString(product, "id");
+                var title = ReadString(product, "title");
+                if (string.IsNullOrWhiteSpace(productId)
+                    || string.IsNullOrWhiteSpace(title)
+                    || !product.TryGetProperty("blueprint_id", out var blueprintValue)
+                    || !blueprintValue.TryGetInt32(out var blueprintId)
+                    || !product.TryGetProperty("print_provider_id", out var providerValue)
+                    || !providerValue.TryGetInt32(out var providerId)
+                    || !productIds.Add(productId))
+                {
+                    throw new InvalidOperationException("Printify returned an incomplete or duplicate product identity in the shop list.");
+                }
+                products.Add(new(productId, title, blueprintId, providerId));
+            }
+
+            var lastPage = root.ValueKind == JsonValueKind.Object && root.TryGetProperty("last_page", out var lastPageValue) && lastPageValue.TryGetInt32(out var parsedLastPage)
+                ? parsedLastPage
+                : (int?)null;
+            if (lastPage is int last ? page >= last : data.GetArrayLength() < 50)
+                return products;
+        }
+
+        throw new InvalidOperationException("Printify shop pagination exceeded the safe page limit.");
     }
 
     public async Task<ListingRemoteProduct?> GetAsync(string shopId, string productId, CancellationToken cancellationToken = default)
@@ -446,3 +494,4 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
         _ => "Printify returned an unexpected response."
     };
 }
+
