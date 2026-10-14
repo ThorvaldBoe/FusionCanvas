@@ -362,16 +362,22 @@ public sealed class ListingLifecycleServiceTests
     }
 
     [Fact]
-    public async Task Standalone_printify_cannot_publish_or_unpublish()
+    public async Task Publication_readiness_blocks_publish_and_unpublish_for_disconnected_shop()
     {
-        var service = new ListingLifecycleService(new MemoryRepository(), new FakeConnection(), new FakeProducts(), new FakePublication());
-        var request = new ListingConnectionRequest(Guid.NewGuid(), "shop-1", false);
+        var connection = new FakeConnection
+        {
+            Readiness = new ListingReadiness(ListingConnectionState.Ready, true, false,
+                [new ListingReadinessIssue("printify-sales-channel-unavailable", "Connect a supported channel.")])
+        };
+        var service = new ListingLifecycleService(new MemoryRepository(), connection, new FakeProducts(), new FakePublication());
+        var request = new ListingConnectionRequest(Guid.NewGuid(), "shop-1", true);
 
         var publish = await service.PublishAsync(request, Guid.NewGuid(), TestContext.Current.CancellationToken);
         var unpublish = await service.UnpublishAsync(request, Guid.NewGuid(), TestContext.Current.CancellationToken);
 
-        Assert.Equal(ListingLifecycleResultKind.NotAllowed, publish.Kind);
-        Assert.Equal(ListingLifecycleResultKind.NotAllowed, unpublish.Kind);
+        Assert.Equal(ListingLifecycleResultKind.Unavailable, publish.Kind);
+        Assert.Equal(ListingLifecycleResultKind.Unavailable, unpublish.Kind);
+        Assert.Contains("channel", publish.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

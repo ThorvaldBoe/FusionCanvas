@@ -11,7 +11,7 @@ public static class ListingCapabilityResolver
         ArgumentNullException.ThrowIfNull(readiness);
 
         var printifyEnabled = strategy is FulfillmentStrategy.Printify or FulfillmentStrategy.ShopifyPrintify;
-        var publicationEnabled = strategy == FulfillmentStrategy.ShopifyPrintify;
+        var publicationEnabled = printifyEnabled;
         return new(
             printifyEnabled && readiness.ProductOperationsAvailable,
             publicationEnabled && readiness.PublicationOperationsAvailable);

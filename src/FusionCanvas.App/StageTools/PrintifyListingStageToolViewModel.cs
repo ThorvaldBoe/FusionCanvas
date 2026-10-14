@@ -40,6 +40,8 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     private ListingProductLinkCandidate? _linkCandidate;
     private string _candidateProductId = string.Empty;
     private string? _shopTitle;
+    private bool _publicationOperationsAvailable;
+    private string? _publicationAvailabilityMessage;
 
     public PrintifyListingStageToolViewModel(
         IListingLifecycleServiceFactory? serviceFactory,
@@ -129,17 +131,16 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
     public string VariantSummary => _projection is null ? "Not available" : $"{_projection.Variants.Count} selected variants";
     public string ArtworkSummary => _projection is null ? "Not available" : $"{_projection.Artwork.Count} design area{(_projection.Artwork.Count == 1 ? string.Empty : "s")}";
     public string ProductSummary => _projection is null ? "Not available" : $"Blueprint {(_projection.ExternalBlueprintId?.ToString(CultureInfo.InvariantCulture) ?? "unresolved")}, provider {(_projection.ExternalProviderId?.ToString(CultureInfo.InvariantCulture) ?? "unresolved")}";
-    public string? PublicationAvailabilityMessage => _request is { RequirePublication: false }
-        && _mapping is { Identity: not null, PublicationState: ListingPublicationState.Unpublished }
-            ? "Publishing is available only for a Store configured with the Shopify + Printify fulfillment strategy. Check the strategy in Store settings."
-            : null;
+    public string? PublicationAvailabilityMessage => _mapping is { Identity: not null, PublicationState: ListingPublicationState.Unpublished or ListingPublicationState.Published }
+        ? _publicationAvailabilityMessage
+        : null;
     public bool HasPublicationAvailabilityMessage => !string.IsNullOrWhiteSpace(PublicationAvailabilityMessage);
     public bool CanCreateOrUpdate => !IsBusy && !HasUnresolvedOperation && _canEdit && _service is not null && _projection is not null && _request is not null && string.IsNullOrWhiteSpace(ErrorMessage) && !HasConflict;
     public bool CanReconcileUncertainCreate => !IsBusy && _canEdit && HasUnresolvedCreate && _service is not null && _projection is not null && _request is not null;
     public bool CanConfirmUncertainCreateRetry => !IsBusy && IsUncertainCreateRetryConfirmationVisible && _service is not null && _projection is not null && _request is not null;
     public bool CanRefresh => !IsBusy && _service is not null && _request is not null && _mapping?.Identity is not null;
-    public bool CanPublish => !IsBusy && _request?.RequirePublication == true && _mapping?.Identity is not null && _mapping.PublicationState == ListingPublicationState.Unpublished;
-    public bool CanUnpublish => !IsBusy && _request?.RequirePublication == true && _mapping?.Identity is not null && _mapping.PublicationState == ListingPublicationState.Published;
+    public bool CanPublish => !IsBusy && _publicationOperationsAvailable && _request?.RequirePublication == true && _mapping?.Identity is not null && _mapping.PublicationState == ListingPublicationState.Unpublished;
+    public bool CanUnpublish => !IsBusy && _publicationOperationsAvailable && _request?.RequirePublication == true && _mapping?.Identity is not null && _mapping.PublicationState == ListingPublicationState.Published;
     public bool CanArchive => !IsBusy && _mapping is not null && _service is not null;
     public bool CanDelete => !IsBusy && !IsDeleteConfirmationVisible && _mapping?.Identity is not null && _service is not null;
     public bool CanConfirmDelete => !IsBusy && IsDeleteConfirmationVisible && _mapping?.Identity is not null && _service is not null;
@@ -156,6 +157,8 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         _projection = null;
         _conflict = null;
         _mapping = null;
+        _publicationOperationsAvailable = false;
+        _publicationAvailabilityMessage = null;
         IsUncertainCreateRetryConfirmationVisible = false;
         _linkCandidate = null;
         CandidateProductId = string.Empty;
@@ -203,9 +206,19 @@ public sealed class PrintifyListingStageToolViewModel : INotifyPropertyChanged
         }
 
         _service = _serviceFactory.Create(store);
-        _request = new ListingConnectionRequest(store.Id, shopId.ToString(CultureInfo.InvariantCulture), store.FulfillmentStrategy == FulfillmentStrategy.ShopifyPrintify);
+        _request = new ListingConnectionRequest(
+            store.Id,
+            shopId.ToString(CultureInfo.InvariantCulture),
+            RequirePublication: true,
+            RequireShopifyChannel: store.FulfillmentStrategy == FulfillmentStrategy.ShopifyPrintify);
         var readiness = await _service.CheckConnectionAsync(_request, cancellationToken).ConfigureAwait(true);
         ConnectionStatus = readiness.ProductOperationsAvailable ? "Connected" : "Unavailable";
+        _publicationOperationsAvailable = readiness.PublicationOperationsAvailable;
+        _publicationAvailabilityMessage = readiness.PublicationOperationsAvailable
+            ? null
+            : readiness.Issues.FirstOrDefault()?.Message ?? "The selected Printify shop cannot publish to its sales channel.";
+        OnPropertyChanged(nameof(PublicationAvailabilityMessage));
+        OnPropertyChanged(nameof(HasPublicationAvailabilityMessage));
         if (!readiness.ProductOperationsAvailable)
         {
             SetBlocked(readiness.Issues.FirstOrDefault()?.Message ?? "Printify is unavailable.");

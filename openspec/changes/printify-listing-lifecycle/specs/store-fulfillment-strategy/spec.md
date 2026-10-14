@@ -1,16 +1,21 @@
 ## ADDED Requirements
 
 ### Requirement: Printify lifecycle capabilities are derived from fulfillment strategy
-For an active Store using `Printify` or `Shopify + Printify`, Fusion Canvas SHALL make Printify product creation, update, refresh, and reconciliation capabilities available when Printify readiness passes. Shopify publish and unpublish capabilities SHALL be available only for `Shopify + Printify` when Shopify publication readiness passes. The user SHALL not configure the publication capability independently.
+For an active Store using `Printify` or `Shopify + Printify`, Fusion Canvas SHALL make Printify product creation, update, refresh, and reconciliation capabilities available when Printify readiness passes. Publish and unpublish capabilities SHALL be available when the selected Printify shop reports a connected supported sales channel and publication readiness passes. For `Shopify + Printify`, the connected channel SHALL be Shopify. The user SHALL not configure the publication capability independently.
 
-#### Scenario: Strategy is standalone Printify
-- **WHEN** the Store's fulfillment strategy is `Printify`
-- **THEN** Printify product lifecycle actions may be available after readiness
-- **AND** Shopify publication actions are hidden or unavailable with an explanation
+#### Scenario: Strategy is standalone Printify with a connected sales channel
+- **WHEN** the Store's fulfillment strategy is `Printify` and its selected Printify shop has a connected supported sales channel
+- **THEN** Printify product lifecycle and publish/unpublish actions may be available after readiness
+
+#### Scenario: Strategy is standalone Printify without a connected sales channel
+- **WHEN** the Store's fulfillment strategy is `Printify` and its selected Printify shop reports `disconnected`
+- **THEN** Printify product lifecycle actions may be available after product readiness
+- **AND** publish/unpublish actions are unavailable with an explanation
 
 #### Scenario: Strategy is Shopify + Printify
-- **WHEN** the Store's fulfillment strategy is `Shopify + Printify`
+- **WHEN** the Store's fulfillment strategy is `Shopify + Printify` and its selected Printify shop reports Shopify as the connected sales channel
 - **THEN** Printify product lifecycle actions and Printify-mediated Shopify publication actions may be available after their readiness checks
+- **AND** a non-Shopify or disconnected channel disables publication with an explanation
 
 #### Scenario: Strategy is not Printify-enabled
 - **WHEN** the Store's fulfillment strategy is `Manual` or `Shopify + Manual`

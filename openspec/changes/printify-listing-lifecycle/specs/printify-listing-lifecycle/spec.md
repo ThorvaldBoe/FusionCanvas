@@ -1,16 +1,25 @@
 ## ADDED Requirements
 
 ### Requirement: Printify Listing tool availability follows Store and connection readiness
-The Listing stage SHALL expose a Printify tool for an Item whose Store uses `Printify` or `Shopify + Printify`. The tool SHALL evaluate connection readiness before enabling any remote operation. Readiness SHALL require an active Store, a usable Printify credential, a reachable selected Printify shop belonging to that credential, and the permissions required for the requested operation. Shopify publication actions SHALL additionally require that the selected Printify shop is connected to Shopify.
+The Listing stage SHALL expose a Printify tool for an Item whose Store uses `Printify` or `Shopify + Printify`. The tool SHALL evaluate connection readiness before enabling any remote operation. Readiness SHALL require an active Store, a usable Printify credential, a reachable selected Printify shop belonging to that credential, and the permissions required for the requested operation. Publish and unpublish actions SHALL require the selected Printify shop to report a connected sales channel. For a Store using `Shopify + Printify`, that channel SHALL be Shopify; a standalone `Printify` Store MAY use any connected supported sales channel.
 
-#### Scenario: Standalone Printify Store is ready
-- **WHEN** the Item belongs to an active Store using `Printify` and the credential and selected shop pass readiness checks
-- **THEN** the Printify tool enables create, update, refresh, reconciliation, and unpublished-product management actions
-- **AND** it does not expose Shopify publication actions
+#### Scenario: Standalone Printify Store has a connected sales channel
+- **WHEN** the Item belongs to an active Store using `Printify` and the selected shop reports a connected supported sales channel
+- **THEN** the Printify tool enables product lifecycle and publish/unpublish actions after their readiness checks
+
+#### Scenario: Standalone Printify Store has no connected sales channel
+- **WHEN** the Item belongs to an active Store using `Printify` and the selected shop reports `sales_channel` as `disconnected`
+- **THEN** the Printify tool keeps product lifecycle actions available when product readiness passes
+- **AND** disables publish/unpublish actions with guidance to connect a supported sales channel in Printify
 
 #### Scenario: Shopify + Printify Store is publication-ready
-- **WHEN** the Item belongs to an active Store using `Shopify + Printify` and the credential, selected shop, and Shopify connection pass readiness checks
+- **WHEN** the Item belongs to an active Store using `Shopify + Printify` and the selected Printify shop reports Shopify as its connected sales channel
 - **THEN** the Printify tool enables product lifecycle actions and Shopify publish/unpublish actions
+
+#### Scenario: Shopify + Printify Store is connected to another sales channel
+- **WHEN** the Item belongs to an active Store using `Shopify + Printify` and the selected Printify shop is connected to a non-Shopify sales channel
+- **THEN** the Printify tool keeps product lifecycle actions available when product readiness passes
+- **AND** disables publish/unpublish actions with guidance to connect the Store's Shopify channel in Printify
 
 #### Scenario: Printify connection is unavailable
 - **WHEN** a credential, shop, permission, or connectivity check fails
@@ -143,17 +152,17 @@ Before mutating a mapped product, the Printify tool SHALL compare the current re
 - **THEN** the tool updates Printify from the current Fusion Canvas projection
 - **AND** records a new synchronization snapshot after success
 
-### Requirement: Shopify publication is Printify-mediated and strategy-gated
-The Printify tool SHALL use only Printify operations for Shopify publication. It SHALL expose publish and unpublish actions only when the Store uses `Shopify + Printify` and publication readiness passes. A successful publication SHALL persist the Printify product identity, the external sales-channel identity when returned, and a distinct publication state. The publication state SHALL remain separate from the Item lifecycle status.
+### Requirement: Sales-channel publication is Printify-mediated and readiness-gated
+The Printify tool SHALL use only Printify operations for publication to the selected shop's connected sales channel. It SHALL expose publish and unpublish actions for a Printify-enabled Store only when publication readiness passes. For `Shopify + Printify`, publication readiness SHALL require the selected shop's sales channel to be Shopify. A successful publication SHALL persist the Printify product identity, the external sales-channel identity when returned, and a distinct publication state. The publication state SHALL remain separate from the Item lifecycle status.
 
-#### Scenario: Publish is unavailable for standalone Printify
-- **WHEN** the Store uses standalone `Printify`
-- **THEN** the tool does not expose or invoke a Shopify publication action
+#### Scenario: Publish is unavailable when the selected Printify shop is disconnected
+- **WHEN** the selected Printify shop reports `sales_channel` as `disconnected`
+- **THEN** the tool disables publish/unpublish and explains that a supported sales channel must be connected
 
-#### Scenario: Product is published through Printify
-- **WHEN** the Store uses `Shopify + Printify`, readiness passes, and the user confirms publish
+#### Scenario: Product is published through a connected Printify sales channel
+- **WHEN** the Store uses a Printify-enabled strategy, publication readiness passes, and the user confirms publish
 - **THEN** the tool invokes the Printify publication operation
-- **AND** does not call Shopify directly
+- **AND** does not call the sales-channel API directly
 - **AND** records the resulting publication or pending state
 
 #### Scenario: Publication result is pending or uncertain
@@ -162,7 +171,7 @@ The Printify tool SHALL use only Printify operations for Shopify publication. It
 - **AND** the tool offers refresh/reconciliation rather than issuing an uncontrolled duplicate publication request
 
 #### Scenario: Published product is unpublished
-- **WHEN** the Store uses `Shopify + Printify`, the product is published, and the user confirms unpublish
+- **WHEN** the selected Printify shop has a connected sales channel, the product is published, and the user confirms unpublish
 - **THEN** the tool requests unpublication through Printify
 - **AND** verifies or reports the resulting external state
 - **AND** preserves the Printify product and its design/settings mapping

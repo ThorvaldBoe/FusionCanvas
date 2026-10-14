@@ -32,6 +32,29 @@ public sealed class PrintifyListingClientTests
         Assert.Contains(handler.Bodies, body => body.Contains("\"shipping_template_id\":\"shipping-template-1\"", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData("Etsy", false, true)]
+    [InlineData("Shopify", true, true)]
+    [InlineData("Etsy", true, false)]
+    [InlineData("disconnected", false, false)]
+    [InlineData(null, false, false)]
+    public async Task Publication_readiness_uses_the_selected_shops_sales_channel(string? salesChannel, bool requireShopify, bool expectedAvailable)
+    {
+        var storeId = Guid.NewGuid();
+        var shop = System.Text.Json.JsonSerializer.Serialize(new[] { new { id = 42, title = "Main Shop", sales_channel = salesChannel } });
+        using var http = new HttpClient(new RecordingHandler(_ => Json(HttpStatusCode.OK, shop)));
+        var client = new PrintifyListingClient(storeId, http, _ => Task.FromResult<string?>("key"));
+
+        var readiness = await client.CheckAsync(
+            new ListingConnectionRequest(storeId, "42", RequirePublication: true, RequireShopifyChannel: requireShopify),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(readiness.ProductOperationsAvailable);
+        Assert.Equal(expectedAvailable, readiness.PublicationOperationsAvailable);
+        if (!expectedAvailable)
+            Assert.Contains("channel", readiness.Issues.Single().Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task Shop_product_reconciliation_reads_all_pages_and_parses_matching_identity_fields()
     {
