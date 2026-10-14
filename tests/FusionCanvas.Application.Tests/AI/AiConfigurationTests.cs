@@ -217,6 +217,28 @@ public class AiConfigurationTests
     }
 
     [Fact]
+    public void ImageEndpointPolicy_LeavesSeedream45ResolutionAtProviderDefaultAfterLive400()
+    {
+        var endpoint = new AiImageEndpointCapabilities(
+            "seed",
+            "bytedance-seed/seedream-4.5",
+            false,
+            true,
+            ["png"],
+            [],
+            false,
+            "Seed",
+            new AiImageEndpointParameterCapabilities(["1:1", "16:9"], ["1K", "2K", "4K"], false, false, [], true));
+
+        var selected = AiImageEndpointPolicy.SelectEndpoint([endpoint], endpoint.ModelId, false, false, new(1024, 1024));
+
+        Assert.NotNull(selected);
+        Assert.Equal("1:1", selected.Options.AspectRatio);
+        Assert.Null(selected.Options.Resolution);
+        Assert.Equal(1, selected.Options.Count);
+    }
+
+    [Fact]
     public void StaleCatalog_IsExplicitlyRepresentedForUnavailableSelectionGuidance()
     {
         var catalog = new AiModelCatalog(true, DateTimeOffset.UtcNow.AddHours(-2), [], IsStale: true);
@@ -335,6 +357,22 @@ public class AiConfigurationTests
         Assert.Null(effective.Seed);
         Assert.Equal(AiReasoningMode.ProviderDefault, effective.Reasoning.Mode);
         Assert.Contains("future_parameter", model.SupportedParameters);
+    }
+
+    [Fact]
+    public void Resolve_SelectsLegacyCompletionTokenFieldWhenThatIsTheAdvertisedModelParameter()
+    {
+        var model = Model("model", zdr: true, "max_tokens");
+        var settings = AiConfigurationSettings.Default with
+        {
+            RequireZeroDataRetention = false,
+            General = Profile("model") with { MaxCompletionTokens = 128 }
+        };
+
+        var resolution = AiConfigurationResolver.Resolve(settings, AiRequestPurpose.General, [model]);
+
+        Assert.Equal(AiConfigurationAvailability.Ready, resolution.Availability);
+        Assert.Equal("max_tokens", resolution.Profile!.Routing!.CompletionTokenParameter);
     }
 
     [Fact]

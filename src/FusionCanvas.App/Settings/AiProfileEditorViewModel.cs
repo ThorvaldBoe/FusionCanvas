@@ -135,7 +135,10 @@ public sealed class AiProfileEditorViewModel : INotifyPropertyChanged
                 {
                     AiRoutingMode.Automatic => AiRoutingPolicy.Automatic,
                     AiRoutingMode.SpecificProvider => AiRoutingPolicy.ForProvider(current.ProviderId ?? ProviderIds.FirstOrDefault() ?? string.Empty),
-                    AiRoutingMode.ExactEndpoint => AiRoutingPolicy.ForEndpoint(current.EndpointId ?? EndpointIds.FirstOrDefault() ?? string.Empty, current.ProviderId),
+                    AiRoutingMode.ExactEndpoint => AiRoutingPolicy.ForEndpoint(
+                        current.EndpointId ?? EndpointIds.FirstOrDefault() ?? string.Empty,
+                        current.ProviderId,
+                        CompletionTokenParameterFor(SelectedEndpoint)),
                     _ => AiRoutingPolicy.Automatic
                 }
             });
@@ -149,7 +152,14 @@ public sealed class AiProfileEditorViewModel : INotifyPropertyChanged
         set
         {
             var policy = _settings.Routing ?? AiRoutingPolicy.Automatic;
-            Update(_settings with { Routing = policy with { ProviderId = EmptyToNull(value) } });
+            Update(_settings with
+            {
+                Routing = policy with
+                {
+                    ProviderId = EmptyToNull(value),
+                    CompletionTokenParameter = CompletionTokenParameterFor(SelectedEndpoint)
+                }
+            });
             OnPropertyChanged(nameof(EndpointIds));
             OnPropertyChanged(nameof(SelectedEndpoint));
             OnPropertyChanged(nameof(EndpointSummary));
@@ -162,16 +172,37 @@ public sealed class AiProfileEditorViewModel : INotifyPropertyChanged
         set
         {
             var policy = _settings.Routing ?? AiRoutingPolicy.Automatic;
-            Update(_settings with { Routing = policy with { EndpointId = EmptyToNull(value) } });
+            var endpoint = Endpoints.FirstOrDefault(candidate => string.Equals(candidate.EndpointId, value, StringComparison.Ordinal));
+            Update(_settings with
+            {
+                Routing = policy with
+                {
+                    EndpointId = EmptyToNull(value),
+                    CompletionTokenParameter = CompletionTokenParameterFor(endpoint)
+                }
+            });
             OnPropertyChanged(nameof(SelectedEndpoint));
             OnPropertyChanged(nameof(EndpointSummary));
         }
     }
 
     public AiModelEndpointDescriptor? SelectedEndpoint =>
-        Endpoints.FirstOrDefault(endpoint => string.Equals(endpoint.EndpointId, EndpointId, StringComparison.Ordinal));
+        Endpoints.FirstOrDefault(endpoint =>
+            string.Equals(endpoint.EndpointId, EndpointId, StringComparison.Ordinal) &&
+            (RoutingMode != AiRoutingMode.SpecificProvider || string.Equals(endpoint.ProviderId, ProviderId, StringComparison.OrdinalIgnoreCase)));
 
-    public AiProfileSettings Snapshot => _settings with { Routing = _settings.Routing ?? AiRoutingPolicy.Automatic };
+    public AiProfileSettings Snapshot
+    {
+        get
+        {
+            var routing = _settings.Routing ?? AiRoutingPolicy.Automatic;
+            if (routing.Mode != AiRoutingMode.Automatic && SelectedEndpoint is { } endpoint)
+            {
+                routing = routing with { CompletionTokenParameter = CompletionTokenParameterFor(endpoint) };
+            }
+            return _settings with { Routing = routing };
+        }
+    }
     public IReadOnlyList<string> ReasoningEfforts => SelectedModel?.Reasoning?.SupportedEfforts ?? [];
     public bool IsReasoningEffort => ReasoningMode == AiReasoningMode.Effort;
     public bool IsReasoningTokenBudget => ReasoningMode == AiReasoningMode.TokenBudget;
@@ -390,6 +421,13 @@ public sealed class AiProfileEditorViewModel : INotifyPropertyChanged
 
     private static string? EmptyToNull(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string? CompletionTokenParameterFor(AiModelEndpointDescriptor? endpoint) =>
+        endpoint?.SupportedParameters.Contains(AiParameterRegistry.MaxCompletionTokens, StringComparer.Ordinal) == true
+            ? AiParameterRegistry.MaxCompletionTokens
+            : endpoint?.SupportedParameters.Contains("max_tokens", StringComparer.Ordinal) == true
+                ? "max_tokens"
+                : null;
 
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

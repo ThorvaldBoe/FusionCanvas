@@ -3,15 +3,19 @@ namespace FusionCanvas.Application.AI;
 public sealed record AiRoutingPolicy(
     AiRoutingMode Mode,
     string? ProviderId = null,
-    string? EndpointId = null)
+    string? EndpointId = null,
+    string? CompletionTokenParameter = null)
 {
     public static AiRoutingPolicy Automatic { get; } = new(AiRoutingMode.Automatic);
 
     public static AiRoutingPolicy ForProvider(string providerId) =>
         new(AiRoutingMode.SpecificProvider, Normalize(providerId), null);
 
-    public static AiRoutingPolicy ForEndpoint(string endpointId, string? providerId = null) =>
-        new(AiRoutingMode.ExactEndpoint, Normalize(providerId), Normalize(endpointId));
+    public static AiRoutingPolicy ForEndpoint(
+        string endpointId,
+        string? providerId = null,
+        string? completionTokenParameter = null) =>
+        new(AiRoutingMode.ExactEndpoint, Normalize(providerId), Normalize(endpointId), Normalize(completionTokenParameter));
 
     public bool IsAutomatic => Mode == AiRoutingMode.Automatic;
 

@@ -282,7 +282,11 @@ public class OpenRouterClientTests : IDisposable
         using var body = JsonDocument.Parse(handler.Requests[0].Body!);
         Assert.Equal("512x512", body.RootElement.GetProperty("size").GetString());
         Assert.Equal("transparent", body.RootElement.GetProperty("background").GetString());
-        Assert.False(body.RootElement.GetProperty("provider").GetProperty("allow_fallbacks").GetBoolean());
+        var provider = body.RootElement.GetProperty("provider");
+        Assert.False(provider.GetProperty("allow_fallbacks").GetBoolean());
+        Assert.Equal("provider-tag", Assert.Single(provider.GetProperty("only").EnumerateArray()).GetString());
+        Assert.False(provider.TryGetProperty("require_parameters", out _));
+        Assert.False(provider.TryGetProperty("zdr", out _));
         Assert.Single(handler.Requests);
     }
 
@@ -524,6 +528,37 @@ public class OpenRouterClientTests : IDisposable
         Assert.False(body.RootElement.GetProperty("reasoning").TryGetProperty("max_tokens", out _));
         Assert.False(body.RootElement.TryGetProperty("tools", out _));
         Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_UsesEndpointAdvertisedLegacyCompletionTokenParameter()
+    {
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK, """
+            {"id":"gen-1","model":"vendor/model","choices":[{"message":{"content":"answer"},"finish_reason":"stop"}]}
+            """));
+        var client = CreateClient(handler);
+        var profile = AiProfileSettings.Empty with
+        {
+            ModelId = "vendor/model",
+            MaxCompletionTokens = 32,
+            Routing = AiRoutingPolicy.ForEndpoint("provider-variant", "provider", "max_tokens")
+        };
+
+        var result = await client.GenerateAsync(
+            new AiProviderTextRequest(
+                "secret",
+                "vendor/model",
+                [new AiTextMessage(AiMessageRole.User, "hello")],
+                profile,
+                true,
+                profile.Routing),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        using var body = JsonDocument.Parse(handler.Requests[0].Body!);
+        Assert.Equal(32, body.RootElement.GetProperty("max_tokens").GetInt32());
+        Assert.False(body.RootElement.TryGetProperty("max_completion_tokens", out _));
+        Assert.Equal("provider-variant", body.RootElement.GetProperty("provider").GetProperty("order")[0].GetString());
     }
 
     [Fact]

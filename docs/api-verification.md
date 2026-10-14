@@ -43,6 +43,8 @@ Qualification profiles use model catalog capabilities and `AiParameterRegistry`,
 
 The prompt-only image catalog omits Recraft V4 Styles and V4 Styles Pro because those models require style-reference images, which the current image-generation request contract cannot send. Other Recraft models remain available when their endpoint accepts the prompt-only request.
 
+Live qualification found that Seedream 4.5 returns HTTP 400 when `resolution: "1K"` is sent, although its endpoint catalog advertises that value. FusionCanvas omits the explicit resolution and lets the provider use its default 1K tier; aspect ratio and `n: 1` pass with the provider pinned. Recheck this exception if OpenRouter changes the endpoint contract. Image API routing uses its documented routing fields only; zero-data-retention is enforced by selecting and pinning a ZDR-compatible endpoint rather than sending chat-only routing flags.
+
 ## Printify
 
 ```powershell
@@ -73,8 +75,8 @@ The operation inventory is maintained in `src/FusionCanvas.ApiVerification/Inven
 | Operations | Request details to compare with provider evidence | Response details the production adapter must preserve |
 | --- | --- | --- |
 | OpenRouter key, model catalogs, ZDR, and endpoints | Bearer authorization; exact catalog URL and selected model path; `requireZeroDataRetention` selects the ZDR lookup. | Key status and account fields; model IDs/capabilities/prices; endpoint IDs, provider IDs, supported parameters and pricing. |
-| OpenRouter text generation | JSON `model`, `messages`, `stream=false`, provider route/endpoint with fallbacks disabled, and only the effective model parameters from `AiParameterRegistry`; completion tokens are capped at 24. | Choice content/finish reason, requested and resolved model, usage token counts and provider-reported cost. |
-| OpenRouter image generation | JSON model/prompt, one output, exact selected endpoint, dimensions and supported options. Unknown image price units or dimensions block before submission. | Image bytes/media type/resolved model and reported usage/cost; bytes are discarded after verification. |
+| OpenRouter text generation | JSON `model`, `messages`, `stream=false`, provider route/endpoint with fallbacks disabled, and only the effective model parameters from `AiParameterRegistry`; completion tokens are capped at 512 for qualification. | Choice content/finish reason, requested and resolved model, usage token counts and provider-reported cost. |
+| OpenRouter image generation | JSON model/prompt, one output, exact selected endpoint, dimensions and supported options. Image routing uses only Image API routing fields. Unknown image price units or dimensions block before submission. | Image bytes/media type/resolved model and reported usage/cost; bytes are discarded after verification. |
 | Printify shops and catalogs | Bearer credential; catalog/shop-specific base paths; selected product list uses `limit=50&page=N` pagination. | Shop ID is numeric and title must exactly equal `FusionCanvas DevTest`; blueprints/providers/variants preserve integer IDs, booleans, option IDs and placeholder positions/dimensions. |
 | Printify product import/detail/artwork | Shop and product IDs are escaped; artwork requests use validated HTTPS hosts without forwarding the API credential. | Product/variant/print-area identity, visibility, prices and artwork URLs; downloaded artwork has a bounded size, supported content type and valid file signature. |
 | Printify artwork upload | JSON `file_name` plus base64 `contents`, using a generated 1024×1024 PNG fixture. | Non-empty uploaded image `id`, retained with the content fingerprint for product creation. |

@@ -91,6 +91,20 @@ public static class AiConfigurationResolver
         }
 
         var effective = AiParameterRegistry.Effective(profile, model);
+        if (effective.MaxCompletionTokens is not null &&
+            string.IsNullOrWhiteSpace(effective.Routing?.CompletionTokenParameter))
+        {
+            var completionTokenParameter = model.SupportedParameters.Contains(AiParameterRegistry.MaxCompletionTokens, StringComparer.Ordinal)
+                ? AiParameterRegistry.MaxCompletionTokens
+                : model.SupportedParameters.Contains("max_tokens", StringComparer.Ordinal) ? "max_tokens" : null;
+            effective = effective with
+            {
+                Routing = (effective.Routing ?? AiRoutingPolicy.Automatic) with
+                {
+                    CompletionTokenParameter = completionTokenParameter
+                }
+            };
+        }
         var routing = ResolveRouting(settings, effective, model, endpoints);
         if (!routing.IsReady)
         {
