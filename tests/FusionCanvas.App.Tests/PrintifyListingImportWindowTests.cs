@@ -58,6 +58,7 @@ public sealed class PrintifyListingImportWindowTests
             newProduct.IsSelected = false;
             viewModel.Products[1].IsSelected = true;
             Assert.False(viewModel.CanImport);
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), textBlock => textBlock.Text == "Select one or more unlinked products first." && textBlock.IsVisible);
 
             linkedToggle.Command.Execute(linkedToggle.CommandParameter);
             Dispatcher.UIThread.RunJobs();

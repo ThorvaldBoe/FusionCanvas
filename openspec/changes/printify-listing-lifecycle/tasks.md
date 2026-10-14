@@ -61,3 +61,6 @@
 - [x] 8.5 Run strict OpenSpec validation and correct all artifact/spec errors.
 - [x] 8.6 Run `dotnet test .\FusionCanvas.sln` and resolve all failures or document an explicit approved blocker.
 - [x] 8.7 Complete the final criterion-by-criterion verification record before implementation is considered complete.
+- [x] 8.8 Revise artwork readiness so one or more valid design-area assignments are sufficient, project only assigned areas, and reject an Item with no valid artwork; cover partial and empty assignments in Application tests.
+- [x] 8.9 Make production cost optional for fixed-retail pricing, require it only for fixed-profit pricing, preserve optional cost in projection models, and cover both cases in Application tests.
+- [x] 8.10 Preserve the catalog variant cost when a selected shop-product variant omits cost; add an Integration regression test using both endpoint responses.

@@ -49,7 +49,9 @@ The mapping is not inferred from title, description, or SKU. Existing imported s
 
 ### 4. Project Design state without adding a second variant editor
 
-The desired product builder will read selected Design colors, Design variant rows, fixed Offering Provider variants, and Design-slot assignments. It will create enabled Printify variants only from that projection. Missing provider support or missing design-area assignments are readiness diagnostics, not opportunities for the Printify tool to mutate Design.
+The desired product builder will read selected Design colors, Design variant rows, fixed Offering Provider variants, and Design-slot assignments. It will create enabled Printify variants only from that projection. Every valid artwork assignment becomes a print area; unassigned areas are omitted, and at least one valid assignment is required. Missing artwork files or dimensions remain readiness diagnostics. Missing provider support is also a readiness diagnostic, not an opportunity for the Printify tool to mutate Design.
+
+Production cost is optional data on projected variants. Fixed retail pricing remains valid when cost is absent. Fixed-profit pricing requires a known cost for every enabled variant and reports the missing cost as a readiness issue; absent cost is never represented as a zero cost.
 
 ### 5. Use deterministic tolerant artwork placement
 
@@ -128,6 +130,8 @@ Rollback is additive: disable the Printify tool and remote commands while preser
 - Add focused ports for Printify connection/shop readiness, image upload, product retrieval/create/update/delete, and publish/unpublish operations. Keep credential retrieval behind the existing secure credential store contract.
 - Add an application orchestration service/commands for preview, create, update, refresh, reconcile, publish, unpublish, local archive, and remote delete.
 - Add pure projection and comparison components for Design-to-Printify payload construction, price calculation, snapshot normalization, and three-way drift detection.
+- Keep production cost nullable in listing projections. Fixed-retail pricing works without cost data; fixed-profit pricing reports a readiness issue if any enabled variant lacks cost. Preserve cost from the catalog variant response when an imported shop-product variant omits it.
+- Include only design areas with valid artwork assignments in the outbound print areas. Require at least one valid assigned area to create or update; omit other unassigned areas without blocking.
 
 ### Integration
 
@@ -154,7 +158,7 @@ Rollback is additive: disable the Printify tool and remote commands while preser
 
 ### Verification
 
-- Map every scenario in the delta specs to focused domain/application/integration/persistence tests or deterministic Avalonia headless view tests.
+- Map every scenario in the delta specs to focused domain/application/integration/persistence tests or deterministic Avalonia headless view tests. Include partial and empty artwork assignments, both pricing policies with absent costs, and imported cost fallback from catalog data.
 - Add one critical headless user journey covering ready connection → preview → create/save → refresh → conflict decision → update, using isolated persistence and mocked Printify services.
 - Add a second headless journey for `Shopify + Printify` publication state and unpublish/delete gating if the final UI crosses enough rendered and persistence seams to justify it.
 - Perform the planned prototype, screenshot-reference, architecture, UX, and API-safety audits before implementation approval.

@@ -131,7 +131,7 @@ public sealed class PrintifyCatalogClientTests
     }
 
     [Fact]
-    public async Task SelectedProductUsesCatalogPlaceholderDimensionsAndDoesNotFetchUnselectedDetail()
+    public async Task SelectedProductPreservesCatalogCostWhenShopProductOmitsItAndDoesNotFetchUnselectedDetail()
     {
         var requests = new List<string>();
         using var client = new HttpClient(new Handler((request, _) =>
@@ -146,7 +146,7 @@ public sealed class PrintifyCatalogClientTests
                         ? "{\"id\":68,\"title\":\"Tee\",\"brand\":\"Gildan\",\"model\":\"64000\"}"
                         : path.EndsWith("/print_providers.json", StringComparison.Ordinal)
                             ? "[{\"id\":9,\"title\":\"Provider\"}]"
-                            : "{\"variants\":[{\"id\":1,\"title\":\"One size\",\"options\":[],\"placeholders\":[{\"position\":\"front\",\"decoration_method\":\"dtg\",\"width\":4350,\"height\":5850}]}]}";
+                            : "{\"variants\":[{\"id\":1,\"title\":\"One size\",\"cost\":1250,\"options\":[],\"placeholders\":[{\"position\":\"front\",\"decoration_method\":\"dtg\",\"width\":4350,\"height\":5850}]}]}";
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) });
         })) { BaseAddress = PrintifyCatalogClient.ApiBaseUri };
 
@@ -157,6 +157,7 @@ public sealed class PrintifyCatalogClientTests
         var area = Assert.Single(placeholder);
         Assert.Equal(4350, area.Width);
         Assert.Equal(5850, area.Height);
+        Assert.Equal(12.5m, Assert.Single(Assert.Single(result.SelectedProducts!).Providers).Variants[0].ProductionCost);
         Assert.DoesNotContain("/products/unselected.json", requests);
     }
 
