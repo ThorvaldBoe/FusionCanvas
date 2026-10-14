@@ -29,6 +29,12 @@ internal static class HeadlessTestApp
             try { Directory.Delete(TestRoot, recursive: true); }
             catch { }
         };
-        return Program.BuildAvaloniaApp().UseHeadless(new AvaloniaHeadlessPlatformOptions());
+        // The production builder registers platform detection for the desktop app.
+        // Headless xUnit must configure its own platform directly so a test never
+        // waits for a native desktop platform to initialize in CI.
+        return AppBuilder.Configure<FusionCanvas.App.App>()
+            .WithInterFont()
+            .LogToTrace()
+            .UseHeadless(new AvaloniaHeadlessPlatformOptions());
     }
 }
