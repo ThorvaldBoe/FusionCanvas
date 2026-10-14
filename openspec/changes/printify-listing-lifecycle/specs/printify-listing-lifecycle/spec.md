@@ -38,6 +38,7 @@ The Printify tool SHALL use the current Item title and optional description, the
 - **AND** the tool explains that a fixed Provider is required for this module
 
 ### Requirement: Artwork is projected to Printify print areas with tolerant placement
+Artwork assignments SHALL be scoped to Design variant rows belonging to the selected Item. An assignment from another Item sharing the same Offering and Design Area SHALL NOT be projected or uploaded.
 The Printify tool SHALL map each valid Design-stage design-area assignment to the corresponding Printify print area and placeholder. Design areas without an artwork assignment SHALL be omitted from the product projection; at least one valid assignment is required to create or update a product. Each uploaded artwork image SHALL be placed with zero rotation, its full width scaled to the target print-area width, and its top edge aligned with the target print-area top edge. The tool SHALL permit aspect-ratio differences, including square artwork, and SHALL NOT reject a product solely because the artwork dimensions do not exactly match the target placeholder.
 
 #### Scenario: Matching target-resolution artwork is uploaded
@@ -61,6 +62,11 @@ The Printify tool SHALL map each valid Design-stage design-area assignment to th
 - **WHEN** no design area has a valid artwork assignment
 - **THEN** the tool identifies the missing artwork as a readiness problem
 - **AND** does not create or update the remote product
+
+#### Scenario: Another Item uses the same Design Area
+- **WHEN** another Item has artwork assigned to a row for the same Offering and Design Area
+- **THEN** only assignments from the selected Item's Design rows are projected
+- **AND** artwork belonging to the other Item is not uploaded for this product
 
 ### Requirement: Pricing uses one explicit initial policy
 The Printify tool SHALL support either a fixed retail price policy or a fixed profit amount policy for one product operation. Fixed retail price SHALL apply the same retail price to every enabled variant and SHALL NOT require production-cost data. Fixed profit amount SHALL calculate each enabled variant's retail price from its current production cost plus the configured profit amount and SHALL require a production cost for every enabled variant. The tool SHALL not provide arbitrary per-variant pricing in this module.

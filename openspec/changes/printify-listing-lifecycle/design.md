@@ -49,7 +49,7 @@ The mapping is not inferred from title, description, or SKU. Existing imported s
 
 ### 4. Project Design state without adding a second variant editor
 
-The desired product builder will read selected Design colors, Design variant rows, fixed Offering Provider variants, and Design-slot assignments. It will create enabled Printify variants only from that projection. Every valid artwork assignment becomes a print area; unassigned areas are omitted, and at least one valid assignment is required. Missing artwork files or dimensions remain readiness diagnostics. Missing provider support is also a readiness diagnostic, not an opportunity for the Printify tool to mutate Design.
+The desired product builder will read selected Design colors, Design variant rows, fixed Offering Provider variants, and Design-slot assignments. It will create enabled Printify variants only from that projection. Artwork assignments are keyed by Item-owned variant row and Design area, so projection must restrict assignments to the selected Item's rows before resolving assets. Every valid artwork assignment becomes a print area; unassigned areas are omitted, and at least one valid assignment is required. Missing artwork files or dimensions remain readiness diagnostics. Missing provider support is also a readiness diagnostic, not an opportunity for the Printify tool to mutate Design.
 
 Production cost is optional data on projected variants. Fixed retail pricing remains valid when cost is absent. Fixed-profit pricing requires a known cost for every enabled variant and reports the missing cost as a readiness issue; absent cost is never represented as a zero cost.
 
