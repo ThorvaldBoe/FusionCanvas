@@ -103,6 +103,26 @@ public sealed class ApiVerificationCoreTests
     }
 
     [Fact]
+    public void ImageCostBoundUsesDocumentedGoogleTokenCountAndBoundsInputText()
+    {
+        var endpoint = new AiImageEndpointCapabilities(
+            "google-ai-studio",
+            "google/gemini-3.1-flash-image",
+            false,
+            true,
+            ["png"],
+            [],
+            false,
+            Pricing: [new("output_image", 0.00006m, "token"), new("input_text", 0.0000005m, "token")]);
+
+        var actual = OpenRouterCostBound.EstimateImageMaximum(endpoint, new AiImageSize(1024, 1024), 1, 54);
+
+        Assert.Equal(0.08403375m, actual);
+        Assert.Null(OpenRouterCostBound.EstimateImageMaximum(
+            endpoint with { ModelId = "unknown/image-model" }, new AiImageSize(1024, 1024), 1, 54));
+    }
+
+    [Fact]
     public void InvocationRequiresPositiveMaximumCost()
     {
         var exception = Assert.Throws<ArgumentException>(() => VerificationInvocation.Parse(["run", "--provider", "openrouter", "--max-cost", "0"]));

@@ -10,6 +10,7 @@ namespace FusionCanvas.ApiVerification.OpenRouter;
 internal sealed class OpenRouterApiVerifier(VerificationConfiguration configuration)
 {
     private const int MaximumCompletionTokens = 512;
+    private const string ImageQualificationPrompt = "A simple solid blue circle on a plain white background.";
 
     public async Task<int> RunAsync(
         string scenario,
@@ -301,7 +302,11 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
             {
                 candidate.Endpoint,
                 Selection = candidate.Selection!,
-                MaximumCost = OpenRouterCostBound.EstimateImageMaximum(candidate.Endpoint, candidate.Selection!.ProviderSize, 1)
+                MaximumCost = OpenRouterCostBound.EstimateImageMaximum(
+                    candidate.Endpoint,
+                    candidate.Selection!.ProviderSize,
+                    1,
+                    Encoding.UTF8.GetByteCount(ImageQualificationPrompt))
             })
             .Where(candidate => candidate.MaximumCost is not null)
             .OrderBy(candidate => candidate.MaximumCost)
@@ -332,7 +337,7 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
 
         var result = await service.GenerateAsync(new AiImageGenerationRequest(
             model.Id,
-            "A simple solid blue circle on a plain white background.",
+            ImageQualificationPrompt,
             endpoint.Selection.ProviderSize,
             TransparentBackground: false,
             ApiKey: configuration.OpenRouterApiKey!,
@@ -404,7 +409,30 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
         decimal plannedMaximum = 0;
         foreach (var candidate in candidates)
         {
-            var bound = await EstimateCandidateMaximumAsync(service, candidate, textCatalog.Models, imageCatalog.Models, cancellationToken).ConfigureAwait(false);
+            decimal? bound;
+            try
+            {
+                bound = await EstimateCandidateMaximumAsync(service, candidate, textCatalog.Models, imageCatalog.Models, cancellationToken).ConfigureAwait(false);
+            }
+            catch (AiModelCatalogFetchException exception)
+            {
+                var diagnostic = SafeDiagnostic.Redact(exception.Message);
+                operations.Add(new(
+                    $"openrouter-{candidate.Kind}-endpoints",
+                    "failed",
+                    $"Could not qualify {candidate.Kind} model {candidate.Id}: {diagnostic}",
+                    ModelId: candidate.Id));
+                findings.Add(new(
+                    Guid.NewGuid().ToString("N"),
+                    $"openrouter-{candidate.Kind}-endpoints",
+                    "open",
+                    "request-or-response",
+                    "The model endpoint catalog returns a supported endpoint contract.",
+                    diagnostic,
+                    "src/FusionCanvas.Integration/AI/OpenRouterClient.cs",
+                    DateTimeOffset.UtcNow));
+                continue;
+            }
             if (bound is null)
             {
                 operations.Add(new($"openrouter-{candidate.Kind}-generation", "budget-deferred", "No conservative cost bound is available; this model was skipped before any generation request.", ModelId: candidate.Id));
@@ -544,7 +572,11 @@ internal sealed class OpenRouterApiVerifier(VerificationConfiguration configurat
             {
                 candidate.Endpoint,
                 Selection = candidate.Selection!,
-                Cost = OpenRouterCostBound.EstimateImageMaximum(candidate.Endpoint, candidate.Selection!.ProviderSize, 1)
+                Cost = OpenRouterCostBound.EstimateImageMaximum(
+                    candidate.Endpoint,
+                    candidate.Selection!.ProviderSize,
+                    1,
+                    Encoding.UTF8.GetByteCount(ImageQualificationPrompt))
             })
             .Where(candidate => candidate.Cost is not null)
             .OrderBy(candidate => candidate.Cost)
