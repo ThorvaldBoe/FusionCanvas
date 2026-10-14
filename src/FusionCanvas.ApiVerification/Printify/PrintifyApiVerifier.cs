@@ -78,7 +78,7 @@ internal sealed class PrintifyApiVerifier(VerificationConfiguration configuratio
             var credentials = await new PrintifyCredentialVerifier(credentialClient).VerifyAsync(configuration.PrintifyApiKey!, cancellationToken).ConfigureAwait(false);
             var selectedShop = credentials.Kind == PrintifyConfigurationKind.Verified
                 ? ResolveDevTestShop(credentials.Shops, configuration.PrintifyDevTestShopName)
-                : throw new InvalidOperationException("Printify did not verify the dedicated credential; recovery is blocked.");
+                : throw new InvalidOperationException($"Printify credential verification failed ({credentials.Kind}): {credentials.Message} Recovery is blocked.");
             if (selectedShop.Id != shopId)
                 throw new InvalidOperationException("The exact FusionCanvas DevTest shop title no longer resolves to the original session shop ID; recovery is blocked.");
 
@@ -172,7 +172,7 @@ internal sealed class PrintifyApiVerifier(VerificationConfiguration configuratio
             var verifier = new PrintifyCredentialVerifier(credentialClient);
             var credentials = await verifier.VerifyAsync(configuration.PrintifyApiKey!, cancellationToken).ConfigureAwait(false);
             if (credentials.Kind != PrintifyConfigurationKind.Verified)
-                throw new InvalidOperationException("Printify did not verify the dedicated credential. Printify operations are blocked.");
+                throw new InvalidOperationException($"Printify credential verification failed ({credentials.Kind}): {credentials.Message} Operations are blocked.");
             var selectedShop = ResolveDevTestShop(credentials.Shops, configuration.PrintifyDevTestShopName);
             var shopId = selectedShop.Id;
             operations.Add(new("printify-shops", "passed", $"Resolved exact DevTest shop `{selectedShop.Title}` to ID {shopId}."));

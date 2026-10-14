@@ -453,6 +453,38 @@ public sealed class ApiVerificationCoreTests
     }
 
     [Fact]
+    public async Task PrintifyCredentialFailureReportPreservesSafeStatusAndMessage()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "FusionCanvas.ApiVerification.Tests", Guid.NewGuid().ToString("N"));
+        var configuration = new VerificationConfiguration(null, "devtest-key", VerificationConfiguration.RequiredPrintifyDevTestShopName, null, directory);
+        var handler = new JsonResponseHandler("{}", HttpStatusCode.Unauthorized);
+        var runtime = new PrintifyApiVerifierRuntime(
+            () => new HttpClient(handler, disposeHandler: false),
+            () => throw new InvalidOperationException("Catalog access must be blocked after credential verification fails."),
+            () => throw new InvalidOperationException("Import access must be blocked after credential verification fails."),
+            () => throw new InvalidOperationException("Artwork access must be blocked after credential verification fails."),
+            () => throw new InvalidOperationException("Listing access must be blocked after credential verification fails."),
+            (_, _, _) => Task.FromResult(true));
+        try
+        {
+            var exitCode = await new PrintifyApiVerifier(configuration, runtime).RunAsync("printify-catalog", CancellationToken.None);
+
+            Assert.Equal(1, exitCode);
+            Assert.Single(handler.Requests);
+            var reportPath = Assert.Single(Directory.EnumerateFiles(directory, "*.json"));
+            var report = await File.ReadAllTextAsync(reportPath);
+            Assert.Contains("InvalidKey", report, StringComparison.Ordinal);
+            Assert.Contains("invalid or expired", report, StringComparison.Ordinal);
+            Assert.DoesNotContain("devtest-key", report, StringComparison.Ordinal);
+        }
+        finally
+        {
+            handler.Dispose();
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task PrintifyShopMismatchStopsBeforeCatalogAndAnyWriteOperation()
     {
         var directory = Path.Combine(Path.GetTempPath(), "FusionCanvas.ApiVerification.Tests", Guid.NewGuid().ToString("N"));
@@ -484,7 +516,7 @@ public sealed class ApiVerificationCoreTests
         }
     }
 
-    private sealed class JsonResponseHandler(string body) : HttpMessageHandler
+    private sealed class JsonResponseHandler(string body, HttpStatusCode statusCode = HttpStatusCode.OK) : HttpMessageHandler
     {
         public List<Uri> Requests { get; } = [];
         public List<HttpMethod> Methods { get; } = [];
@@ -493,7 +525,7 @@ public sealed class ApiVerificationCoreTests
         {
             Requests.Add(request.RequestUri!);
             Methods.Add(request.Method);
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            return Task.FromResult(new HttpResponseMessage(statusCode)
             {
                 Content = new StringContent(body, Encoding.UTF8, "application/json")
             });
