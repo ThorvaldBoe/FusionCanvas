@@ -333,7 +333,9 @@ public sealed class PrintifyListingClient : IListingConnectionPort, IListingImag
         if (Include("title")) payload["title"] = projection.Title;
         if (Include("description")) payload["description"] = projection.Description ?? string.Empty;
         if (Include("variants")) payload["variants"] = variants;
-        if (Include("variants")) payload["print_areas"] = areas;
+        // Artwork is an independent Printify product field. Always send it so a
+        // title, description, or shipping-only edit cannot leave stale artwork remotely.
+        payload["print_areas"] = areas;
         if (Include("shippingProfile") && shippingTemplate is not null) payload["external"] = shippingTemplate;
         return JsonSerializer.Serialize(payload, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
     }

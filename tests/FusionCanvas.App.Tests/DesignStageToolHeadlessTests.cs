@@ -904,7 +904,14 @@ public class DesignStageToolHeadlessTests
             removeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert.True(vm.DesignTool.IsRemovalConfirmationVisible);
 
-            await vm.DesignTool.ConfirmPendingRemovalAsync();
+            var confirmButton = Assert.Single(window.GetVisualDescendants()
+                .OfType<Button>()
+                .Where(button => AutomationProperties.GetName(button) == "Confirm remove design image"));
+            confirmButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.False(vm.DesignTool.IsRemovalConfirmationVisible);
+            await HeadlessUiWait.UntilAsync(
+                () => !vm.DesignTool.IsRemovalConfirmationVisible,
+                "artwork removal confirmation closes after the UI action");
             window.UpdateLayout();
 
             var reloadedSlot = Assert.Single(vm.DesignTool.Rows[0].Slots

@@ -66,4 +66,7 @@
 - [x] 8.10 Preserve the catalog variant cost when a selected shop-product variant omits cost; add an Integration regression test using both endpoint responses.
 - [x] 8.11 Reconcile uncertain creates by listing the selected Printify shop's products, surface matching products for explicit linking, allow a confirmed retry only after a second no-match check, show uncertainty messages, and expose operation progress; add Application, Integration, and Avalonia headless regression coverage.
 - [x] 8.12 Scope Printify artwork projection to the selected Item's Design variant rows so another Item's assignment for the same Offering and Design Area cannot be uploaded; add a regression test.
+- [x] 8.13 Always include the desired Printify print areas in product updates, even when only listing metadata changed; verify the serialized artwork image references.
+- [x] 8.14 Exercise the Design artwork-removal confirmation through its rendered UI button and verify the confirmation closes after the operation.
+- [x] 8.15 Explain the existing Shopify + Printify publication-strategy gate when an unpublished linked product cannot be published.
 

@@ -51,7 +51,10 @@ The rows below are the implementation checklist. Each row will be linked to a fo
 | One assigned artwork area is sufficient; unassigned areas are omitted; zero assigned areas block | `ListingLifecycleTests` | Pass | 12 focused lifecycle tests passed. |
 | Missing production cost is allowed for fixed retail and blocks only fixed-profit pricing | `ListingLifecycleTests` | Pass | Projection retains `null` cost for fixed-retail pricing and reports a readiness issue for fixed-profit pricing. |
 | Catalog cost is retained when selected shop-product detail omits `cost` | `PrintifyCatalogClientTests` | Pass | 19 focused Printify catalog integration tests passed. |
-| Solution baseline | `dotnet test .\FusionCanvas.sln --no-restore -m:1 -v:q`, with `TEMP` and `TMP` directed to `.codex-test-temp` inside the worktree | Pass | Domain 294, Application 692, Integration 417, App 1,020, UI Description 29; 2,452 passed, 0 failed, 0 skipped. Existing NU1900 offline vulnerability-feed warnings and test-platform compatibility warnings remain. |
+| Metadata-only product update still sends current artwork | `PrintifyListingClientTests.Product_update_includes_artwork_when_another_field_changed` | Pass | Serialized update contains title and `print_areas`, with the uploaded image ID in the selected front placeholder. |
+| Confirming artwork removal dismisses its warning immediately and removes the assignment | `DesignStageToolHeadlessTests.ConfiguredState_AssignedArtwork_ExposesEnlargeDownloadRemoveAndReplace` through the rendered confirm button | Pass | The test checks the confirmation is hidden immediately after the button action and the slot is empty after completion. |
+| Standalone Printify publication restriction is explained | `StageToolViewModelsTests.PrintifyTool_ExplainsWhyUnpublishedProductCannotBePublishedForStandalonePrintify` | Pass | An unpublished linked product remains gated and provides Store strategy guidance; Shopify + Printify publication coverage remains passing. |
+| Solution baseline | `dotnet test .\FusionCanvas.sln --no-restore -m:1 -v:q`, with `TEMP` and `TMP` directed to `.codex-test-temp` inside the worktree | Pass | Domain 294, Application 701, Integration 441, App 1,024, UI Description 29; 2,489 passed, 0 failed, 0 skipped. Existing NU1900 offline vulnerability-feed, package advisory, and test-platform compatibility warnings remain. |
 | Strict OpenSpec validation and whitespace check | `openspec validate printify-listing-lifecycle --strict`; `git diff --check` | Pass | Change validates and the diff has no whitespace errors. |
 
 ## Application contracts and pure behavior
@@ -97,7 +100,7 @@ Passed: 25, Failed: 0
 
 ## Final acceptance record
 
-| Artwork from another Item sharing the same Offering and Design Area is excluded | `ListingLifecycleTests.Projection_ignores_artwork_assigned_to_another_items_row_for_the_same_design_area` | Pass | Regression passes in the 701-test Application suite; the full solution baseline passes (2,481 tests across Domain, Application, Integration, App, and UI Description). |
+| Artwork from another Item sharing the same Offering and Design Area is excluded | `ListingLifecycleTests.Projection_ignores_artwork_assigned_to_another_items_row_for_the_same_design_area` | Pass | Regression passes in the 701-test Application suite; the latest full solution baseline passes (2,489 tests across Domain, Application, Integration, App, and UI Description). |
 
 | Capability / scenario | Method | Result | Evidence / limitation |
 | --- | --- | --- | --- |

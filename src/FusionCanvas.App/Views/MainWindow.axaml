@@ -1020,6 +1020,11 @@
                         <Button Content="Publish" Command="{Binding PrintifyTool.PublishCommand}" />
                         <Button Content="Unpublish" Command="{Binding PrintifyTool.UnpublishCommand}" />
                       </StackPanel>
+                      <TextBlock Text="{Binding PrintifyTool.PublicationAvailabilityMessage}"
+                                 IsVisible="{Binding PrintifyTool.HasPublicationAvailabilityMessage}"
+                                 TextWrapping="Wrap"
+                                 Foreground="{DynamicResource WarningTextBrush}"
+                                 AutomationProperties.Name="Why Printify publishing is unavailable" />
                       <StackPanel Orientation="Horizontal" Spacing="6">
                         <Button Content="Archive locally" Command="{Binding PrintifyTool.ArchiveCommand}" />
                         <Button Content="Delete remote draft"
