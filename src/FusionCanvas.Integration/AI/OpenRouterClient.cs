@@ -209,7 +209,9 @@ public sealed class OpenRouterClient :
         }
         catch (Exception exception) when (exception is IOException or JsonException or InvalidDataException or InvalidOperationException)
         {
-            throw new AiModelCatalogFetchException(AiModelCatalogFailureKind.InvalidResponse, "OpenRouter returned invalid endpoint data.");
+            throw new AiModelCatalogFetchException(
+                AiModelCatalogFailureKind.InvalidResponse,
+                $"OpenRouter returned invalid endpoint data for model {Bound(modelId, 256)}.");
         }
     }
 
@@ -508,7 +510,7 @@ public sealed class OpenRouterClient :
                 var retryDiagnostic = retryAfter is { } delay
                     ? $" Retry after {Math.Ceiling(delay.TotalSeconds):0} seconds."
                     : string.Empty;
-                var providerDiagnostic = await ReadSafeImageErrorFieldsAsync(response, requestCancellation.Token).ConfigureAwait(false);
+                var providerDiagnostic = await ReadSafeProviderErrorFieldsAsync(response, requestCancellation.Token).ConfigureAwait(false);
                 return (null, new(
                     MapImageFailure(response.StatusCode),
                     $"OpenRouter could not complete the image request. HTTP {(int)response.StatusCode}.{retryDiagnostic}{providerDiagnostic}"));
@@ -575,7 +577,7 @@ public sealed class OpenRouterClient :
         _ => AiImageGenerationFailureKind.Unknown
     };
 
-    private async Task<string> ReadSafeImageErrorFieldsAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    private async Task<string> ReadSafeProviderErrorFieldsAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         try
         {
@@ -584,9 +586,11 @@ public sealed class OpenRouterClient :
             var code = ReadString(error, "code");
             var parameter = ReadString(error, "param");
             var message = ReadString(error, "message");
-            var fields = new List<string>(2);
+            var fields = new List<string>(3);
             if (IsSafeDiagnosticToken(code)) fields.Add($"code={code}");
             if (IsSafeDiagnosticToken(parameter)) fields.Add($"param={parameter}");
+            var type = ReadString(error, "type");
+            if (IsSafeDiagnosticToken(type)) fields.Add($"type={type}");
             if (message is { Length: <= 240 } && Regex.IsMatch(
                     message,
                     "^No provider for model [A-Za-z0-9._-]+/[A-Za-z0-9._:-]+ supports parameter\\(s\\): [A-Za-z0-9_, -]+$",
@@ -1158,7 +1162,8 @@ public sealed class OpenRouterClient :
     {
         if (!root.TryGetProperty("choices", out var choices) || choices.ValueKind != JsonValueKind.Array)
         {
-            throw new ChatCompletionContractException("OpenRouter's successful chat response did not contain a choices array.");
+            throw new ChatCompletionContractException(
+                $"OpenRouter's successful chat response did not contain a choices array. {SummarizeResponseShape(root)}");
         }
         if (choices.GetArrayLength() == 0)
         {
@@ -1230,14 +1235,7 @@ public sealed class OpenRouterClient :
         AiRoutingPolicy? routing,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            using var json = await ReadJsonAsync(response, cancellationToken).ConfigureAwait(false);
-            _ = ReadString(ReadObject(json.RootElement, "error"), "message");
-        }
-        catch (Exception exception) when (exception is JsonException or IOException or InvalidDataException)
-        {
-        }
+        var providerDiagnostic = await ReadSafeProviderErrorFieldsAsync(response, cancellationToken).ConfigureAwait(false);
 
         var kind = response.StatusCode switch
         {
@@ -1262,10 +1260,38 @@ public sealed class OpenRouterClient :
             : string.Empty;
         return AiTextResult.Failure(
             kind,
-            $"{SafeFailureMessage(kind)} HTTP {(int)response.StatusCode}.{retryDiagnostic}",
+            $"{SafeFailureMessage(kind)} HTTP {(int)response.StatusCode}.{retryDiagnostic}{providerDiagnostic}",
             requestedModel,
             retryAfter,
             routing: routing);
+    }
+
+    private static string SummarizeResponseShape(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            return $"Response root type: {root.ValueKind}.";
+        }
+
+        var fields = root.EnumerateObject()
+            .Take(12)
+            .Where(property => IsSafeDiagnosticToken(property.Name) && property.Name.Length <= 48)
+            .Select(property => $"{property.Name}={property.Value.ValueKind}")
+            .ToArray();
+        var summary = fields.Length > 0
+            ? $"Response root fields: {string.Join(", ", fields)}."
+            : "Response root object is empty or has no safe field names.";
+        var error = ReadObject(root, "error");
+        var errorFields = new List<string>(3);
+        var code = ReadString(error, "code");
+        var parameter = ReadString(error, "param");
+        var type = ReadString(error, "type");
+        if (IsSafeDiagnosticToken(code)) errorFields.Add($"code={code}");
+        if (IsSafeDiagnosticToken(parameter)) errorFields.Add($"param={parameter}");
+        if (IsSafeDiagnosticToken(type)) errorFields.Add($"type={type}");
+        return errorFields.Count > 0
+            ? $"{summary} Provider error fields: {string.Join(", ", errorFields)}."
+            : summary;
     }
 
     private static bool IsSafeDiagnosticToken(string? value) =>

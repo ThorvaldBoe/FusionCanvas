@@ -529,6 +529,21 @@ public class OpenRouterClientTests : IDisposable
         Assert.Equal("Bearer", handler.Requests[0].Scheme);
     }
 
+    [Fact]
+    public async Task GetEndpointsAsync_IdentifiesModelWhenEndpointEnvelopeIsInvalid()
+    {
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK, """
+            {"data":{"id":"vendor/model","endpoints":"unexpected"}}
+            """));
+
+        var exception = await Assert.ThrowsAsync<AiModelCatalogFetchException>(() =>
+            CreateClient(handler).GetEndpointsAsync(
+                "secret", "vendor/model", false, TestContext.Current.CancellationToken));
+
+        Assert.Equal(AiModelCatalogFailureKind.InvalidResponse, exception.Kind);
+        Assert.Contains("vendor/model", exception.Message, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(AiRoutingMode.Automatic, null, null, false, false)]
     [InlineData(AiRoutingMode.SpecificProvider, "deepinfra", null, false, true)]
@@ -663,6 +678,29 @@ public class OpenRouterClientTests : IDisposable
         Assert.DoesNotContain("prompt", result.Message);
     }
 
+    [Fact]
+    public async Task GenerateAsync_ReportsOnlySafeProviderErrorFields()
+    {
+        var handler = new RecordingHandler(Json(HttpStatusCode.BadRequest,
+            """{"error":{"message":"private prompt content echoed by provider","code":"invalid_parameter","param":"reasoning","type":"invalid_request_error"}}"""));
+
+        var result = await CreateClient(handler).GenerateAsync(
+            new AiProviderTextRequest(
+                "secret",
+                "vendor/model",
+                [new AiTextMessage(AiMessageRole.User, "private prompt content")],
+                AiProfileSettings.Empty with { ModelId = "vendor/model" },
+                false),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(AiTextFailureKind.ProviderFailure, result.FailureKind);
+        Assert.Contains("code=invalid_parameter", result.Message, StringComparison.Ordinal);
+        Assert.Contains("param=reasoning", result.Message, StringComparison.Ordinal);
+        Assert.Contains("type=invalid_request_error", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("private prompt content", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret", result.Message, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("{}", "choices array")]
     [InlineData("{\"choices\":[]}", "empty choices array")]
@@ -688,6 +726,30 @@ public class OpenRouterClientTests : IDisposable
         Assert.Contains(expectedDetail, result.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("secret", result.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("prompt", result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GenerateAsync_SummarizesUnexpectedSuccessEnvelopeWithoutEchoingErrorMessage()
+    {
+        var handler = new RecordingHandler(Json(HttpStatusCode.OK,
+            """{"error":{"message":"private prompt echoed","code":"provider_error","type":"invalid_response"},"model":"vendor/model"}"""));
+
+        var result = await CreateClient(handler).GenerateAsync(
+            new AiProviderTextRequest(
+                "secret",
+                "vendor/model",
+                [new AiTextMessage(AiMessageRole.User, "private prompt echoed")],
+                AiProfileSettings.Empty with { ModelId = "vendor/model" },
+                false),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(AiTextFailureKind.InvalidProviderResponse, result.FailureKind);
+        Assert.Contains("error=Object", result.Message, StringComparison.Ordinal);
+        Assert.Contains("model=String", result.Message, StringComparison.Ordinal);
+        Assert.Contains("code=provider_error", result.Message, StringComparison.Ordinal);
+        Assert.Contains("type=invalid_response", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("private prompt echoed", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret", result.Message, StringComparison.Ordinal);
     }
 
     [Fact]
