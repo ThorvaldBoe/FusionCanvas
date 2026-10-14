@@ -30,7 +30,7 @@ public sealed class ListingLifecycleTests
 
         var prices = ListingPricingCalculator.Calculate(
             new ListingPricingInput(ListingPricingPolicy.FixedProfitAmount, 10m),
-            new Dictionary<Guid, decimal>
+            new Dictionary<Guid, decimal?>
             {
                 [first] = 12m,
                 [second] = 15m
@@ -46,7 +46,7 @@ public sealed class ListingLifecycleTests
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             ListingPricingCalculator.Calculate(
                 new ListingPricingInput(ListingPricingPolicy.FixedRetailPrice, -1m),
-                new Dictionary<Guid, decimal> { [Guid.NewGuid()] = 10m }));
+                new Dictionary<Guid, decimal?> { [Guid.NewGuid()] = 10m }));
     }
 
     [Fact]
@@ -120,7 +120,23 @@ public sealed class ListingLifecycleTests
     }
 
     [Fact]
-    public void Projection_rejects_missing_design_assignment()
+    public void Projection_allows_unassigned_areas_when_another_area_has_artwork()
+    {
+        var request = CreateRequest();
+        var unassignedAreaId = Guid.NewGuid();
+        request = request with
+        {
+            DesignAreas = [.. request.DesignAreas, new DesignArea(unassignedAreaId, request.DesignAreas[0].FulfillmentOfferingId, "Back", null, "back", "dtg", 2000, 3000, [], DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "{}")]
+        };
+
+        var result = ListingProjectionBuilder.Build(request);
+
+        Assert.True(result.IsValid, string.Join("; ", result.Issues.Select(value => value.Message)));
+        Assert.Equal("front", Assert.Single(result.Projection!.Artwork).Position);
+    }
+
+    [Fact]
+    public void Projection_rejects_when_no_design_area_has_artwork()
     {
         var request = CreateRequest() with { SlotAssignments = [] };
 
@@ -128,6 +144,35 @@ public sealed class ListingLifecycleTests
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Issues, value => value.Code == "artwork-assignment-missing");
+    }
+
+    [Fact]
+    public void Projection_allows_missing_cost_for_fixed_retail_price()
+    {
+        var request = CreateRequest();
+        request = request with { Variants = [request.Variants[0] with { MetadataJson = "{}" }] };
+
+        var result = ListingProjectionBuilder.Build(request);
+
+        Assert.True(result.IsValid, string.Join("; ", result.Issues.Select(value => value.Message)));
+        Assert.Null(Assert.Single(result.Projection!.Variants).ProductionCost);
+        Assert.Equal(30m, result.Projection.Variants[0].Price.RetailPrice);
+    }
+
+    [Fact]
+    public void Projection_requires_cost_for_fixed_profit_price()
+    {
+        var request = CreateRequest();
+        request = request with
+        {
+            Variants = [request.Variants[0] with { MetadataJson = "{}" }],
+            Pricing = new ListingPricingInput(ListingPricingPolicy.FixedProfitAmount, 10m)
+        };
+
+        var result = ListingProjectionBuilder.Build(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Issues, value => value.Code == "production-cost-missing");
     }
 
     private static ListingProjectionRequest CreateRequest()

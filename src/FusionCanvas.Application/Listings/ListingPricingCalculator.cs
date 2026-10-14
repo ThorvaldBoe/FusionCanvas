@@ -4,7 +4,7 @@ public static class ListingPricingCalculator
 {
     public static IReadOnlyList<ListingPrice> Calculate(
         ListingPricingInput input,
-        IReadOnlyDictionary<Guid, decimal> productionCosts)
+        IReadOnlyDictionary<Guid, decimal?> productionCosts)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(productionCosts);
@@ -19,7 +19,7 @@ public static class ListingPricingCalculator
             .OrderBy(value => value.Key)
             .Select(value =>
             {
-                if (value.Value < 0m)
+                if (value.Value is < 0m)
                 {
                     throw new ArgumentOutOfRangeException(nameof(productionCosts), value.Value, "Production cost cannot be negative.");
                 }
@@ -27,7 +27,9 @@ public static class ListingPricingCalculator
                 var retailPrice = input.Policy switch
                 {
                     ListingPricingPolicy.FixedRetailPrice => input.Amount,
-                    ListingPricingPolicy.FixedProfitAmount => value.Value + input.Amount,
+                    ListingPricingPolicy.FixedProfitAmount => value.Value is decimal cost
+                        ? cost + input.Amount
+                        : throw new InvalidOperationException("Fixed-profit pricing requires a production cost for every enabled variant."),
                     _ => throw new ArgumentOutOfRangeException(nameof(input), input.Policy, "Pricing policy is not supported.")
                 };
 

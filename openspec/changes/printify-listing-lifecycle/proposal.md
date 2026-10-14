@@ -14,9 +14,9 @@ This module establishes a small, predictable Printify listing lifecycle: create 
 - Consume the Item's title, optional description, selected Blueprint, fixed Print Provider, Design-stage selected colors, variant rows, and design-area artwork assignments.
 - Treat Design as the authority for selected colors and variant policy; the Printify tool SHALL NOT edit Design color selections.
 - Exclude Provider-Network offerings, including unresolved Printify Choice offerings, until concrete-provider support exists.
-- Upload required artwork and create or update a complete Printify product, including enabled variants, per-variant prices, and one or more Printify print areas.
+- Upload artwork assigned to one or more Design areas and create or update a Printify product, including enabled variants, per-variant prices, and the assigned Printify print areas. Unassigned areas are optional; at least one valid artwork assignment is required.
 - Use tolerant artwork placement: align artwork to the top of the target design area and scale it to the full available width; do not reject minor dimension differences or require exact aspect-ratio matches.
-- Support two initial pricing policies: one fixed retail price for all enabled variants, or one fixed profit amount calculated per variant.
+- Support two initial pricing policies: one fixed retail price for all enabled variants, or one fixed profit amount calculated per variant. Production cost is optional for fixed retail pricing and required for fixed-profit pricing.
 - Expose publishing and unpublishing only when the Store fulfillment strategy is `Shopify + Printify`; use Printify API operations only and make no direct Shopify API calls.
 - Provide lifecycle management for create, update, refresh/reconcile, publish, unpublish, local archive, and explicit remote deletion of an unpublished product.
 - Prevent remote deletion while a product is published, locked, or in an uncertain remote state.

@@ -38,7 +38,7 @@ The Printify tool SHALL use the current Item title and optional description, the
 - **AND** the tool explains that a fixed Provider is required for this module
 
 ### Requirement: Artwork is projected to Printify print areas with tolerant placement
-The Printify tool SHALL map each valid Design-stage design-area assignment to the corresponding Printify print area and placeholder. Each uploaded artwork image SHALL be placed with zero rotation, its full width scaled to the target print-area width, and its top edge aligned with the target print-area top edge. The tool SHALL permit aspect-ratio differences, including square artwork, and SHALL NOT reject a product solely because the artwork dimensions do not exactly match the target placeholder.
+The Printify tool SHALL map each valid Design-stage design-area assignment to the corresponding Printify print area and placeholder. Design areas without an artwork assignment SHALL be omitted from the product projection; at least one valid assignment is required to create or update a product. Each uploaded artwork image SHALL be placed with zero rotation, its full width scaled to the target print-area width, and its top edge aligned with the target print-area top edge. The tool SHALL permit aspect-ratio differences, including square artwork, and SHALL NOT reject a product solely because the artwork dimensions do not exactly match the target placeholder.
 
 #### Scenario: Matching target-resolution artwork is uploaded
 - **WHEN** an artwork asset is assigned to a compatible design area
@@ -52,13 +52,18 @@ The Printify tool SHALL map each valid Design-stage design-area assignment to th
 - **AND** scales it to the full target width
 - **AND** aligns its top edge to the target print-area top
 
-#### Scenario: A design area has no valid assignment
-- **WHEN** a required Printify placeholder has no compatible Design-stage assignment
-- **THEN** the tool identifies the missing assignment as a readiness problem
+#### Scenario: Only some design areas have artwork
+- **WHEN** at least one design area has a valid artwork assignment and other design areas have none
+- **THEN** the tool projects only the assigned areas
+- **AND** creates or updates the product without treating unassigned areas as a readiness problem
+
+#### Scenario: No design area has artwork
+- **WHEN** no design area has a valid artwork assignment
+- **THEN** the tool identifies the missing artwork as a readiness problem
 - **AND** does not create or update the remote product
 
 ### Requirement: Pricing uses one explicit initial policy
-The Printify tool SHALL support either a fixed retail price policy or a fixed profit amount policy for one product operation. Fixed retail price SHALL apply the same retail price to every enabled variant. Fixed profit amount SHALL calculate each enabled variant's retail price from its current production cost plus the configured profit amount. The tool SHALL not provide arbitrary per-variant pricing in this module.
+The Printify tool SHALL support either a fixed retail price policy or a fixed profit amount policy for one product operation. Fixed retail price SHALL apply the same retail price to every enabled variant and SHALL NOT require production-cost data. Fixed profit amount SHALL calculate each enabled variant's retail price from its current production cost plus the configured profit amount and SHALL require a production cost for every enabled variant. The tool SHALL not provide arbitrary per-variant pricing in this module.
 
 #### Scenario: Fixed retail price is selected
 - **WHEN** the user selects fixed retail price and confirms a valid price
@@ -69,12 +74,22 @@ The Printify tool SHALL support either a fixed retail price policy or a fixed pr
 - **THEN** each enabled variant receives its production cost plus that amount
 - **AND** variants with different production costs receive different calculated retail prices when necessary
 
+#### Scenario: Fixed retail price is selected when production cost is missing
+- **WHEN** the user selects fixed retail price and one or more enabled variants have no production-cost data
+- **THEN** each enabled variant receives the configured retail price
+- **AND** missing production-cost data does not block product creation or update
+
+#### Scenario: Fixed profit amount is selected when production cost is missing
+- **WHEN** the user selects fixed profit amount and an enabled variant has no production-cost data
+- **THEN** the tool identifies the missing cost as a readiness problem
+- **AND** does not create or update the remote product
+
 ### Requirement: Product creation and update are synchronized and idempotent
 The Printify tool SHALL create a product when no mapping exists and SHALL update the mapped product when a mapping exists. A successful operation SHALL persist the Store identity, Printify shop ID, Printify product ID, external publication identity when present, the resulting lifecycle state, and a normalized synchronization snapshot. An ambiguous create or update result SHALL trigger remote re-read or reconciliation before another mutation is attempted.
 
 #### Scenario: New product is created
 - **WHEN** readiness passes and the user confirms creation for an Item without a Printify mapping
-- **THEN** the tool uploads required artwork, creates one Printify product, persists its stable identity, and shows the resulting state
+- **THEN** the tool uploads artwork assigned to one or more design areas, creates one Printify product, persists its stable identity, and shows the resulting state
 
 #### Scenario: Existing product is updated
 - **WHEN** readiness passes and the user confirms an update for an Item with a mapped Printify product
