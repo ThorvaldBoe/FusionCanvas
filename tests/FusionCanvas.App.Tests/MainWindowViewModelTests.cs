@@ -11,6 +11,7 @@ using FusionCanvas.App.Workflow;
 using FusionCanvas.Domain.Workspace;
 using FusionCanvas.Domain.Workflow;
 using FusionCanvas.Domain.Items;
+using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Niches;
 using FusionCanvas.Domain.Stores;
 using FusionCanvas.Application.Workspaces;
@@ -879,6 +880,31 @@ public class MainWindowViewModelTests
         viewModel.OpenFromNavigation(ActiveItemContext(viewModel));
         Assert.True(viewModel.CanMoveStageBack);
         Assert.False(viewModel.CanMoveStageForward);
+    }
+
+    [Fact]
+    public async Task RefreshAfterImport_RefreshesOpenPrintifyListingMapping()
+    {
+        var snapshot = SampleWorkspace.Create();
+        var repository = new InMemoryWorkspaceRepository(snapshot);
+        var viewModel = MainWindowViewModelFactory.CreateFromSnapshot(snapshot, repository);
+        viewModel.OpenFromNavigation(viewModel.NavigationContexts.Single(context => context.Context.Id == SampleWorkspace.ListingNodeId));
+        await GetCommandTasks(viewModel).WaitForTasksAsync()
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal("Not linked", viewModel.PrintifyTool.CurrentProductIdDisplay);
+
+        var item = snapshot.Items.Single(value => value.Id == SampleWorkspace.ListingNodeId);
+        var now = DateTimeOffset.UtcNow;
+        var mapping = new ExternalListingMapping(item.StoreId, item.Id, "printify", "42", "printify-product-1", null, null,
+            ExternalListingSyncState.Synchronized, ExternalListingPublicationState.Published, ExternalListingOperationState.Succeeded, null, null, now, now, now);
+        await repository.SaveAsync(repository.Snapshot with { ExternalListingMappings = [mapping] }, TestContext.Current.CancellationToken);
+
+        await viewModel.RefreshWorkspaceAfterImportAsync(TestContext.Current.CancellationToken);
+        await GetCommandTasks(viewModel).WaitForTasksAsync()
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.Equal("printify-product-1", viewModel.PrintifyTool.CurrentProductIdDisplay);
+        await viewModel.DisposeAsync();
     }
 
     [Fact]
