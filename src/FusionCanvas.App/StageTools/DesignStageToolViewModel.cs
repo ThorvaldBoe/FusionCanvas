@@ -33,6 +33,14 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     private Guid _previewAssetId;
     private Stream? _previewStream;
     private Bitmap? _previewBitmap;
+    private Guid _previewRowId;
+    private Guid _previewDesignAreaId;
+    private bool _isFinalArtworkPreview;
+    private ArtworkImageInspection? _artworkInspection;
+    private ArtworkPixelRectangle? _draftArtworkBounds;
+    private bool _isArtworkAdjustmentMode;
+    private bool _isArtworkAdjustmentDirty;
+    private string _previewStatusMessage = string.Empty;
     private string? _errorMessage;
     private string _noConfigMessage = "No listing configuration selected. Select a configuration from the offerings below to show the design slot grid.";
     private Guid _itemId;
@@ -282,6 +290,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             _isReadOnly = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(CanGenerateArtwork));
+            NotifyArtworkPreviewState();
             GenerateArtworkCommand.NotifyCanExecuteChanged();
         }
     }
@@ -300,6 +309,7 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
             if (_isBusy == value) return;
             _isBusy = value;
             OnPropertyChanged();
+            NotifyArtworkPreviewState();
             OnPropertyChanged(nameof(CanChooseRecoveryOffering));
             ConfirmListingMigrationCommand.NotifyCanExecuteChanged();
             CancelListingMigrationCommand.NotifyCanExecuteChanged();
@@ -309,8 +319,9 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
     public string? ErrorMessage
     {
         get => _errorMessage;
-        set { _errorMessage = value; OnPropertyChanged(); }
+        set { _errorMessage = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasErrorMessage)); }
     }
+    public bool HasErrorMessage => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     public bool ShowPreviewDialog
     {
@@ -330,6 +341,25 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         get => _previewBitmap;
         private set { _previewBitmap = value; OnPropertyChanged(); }
     }
+
+    public ArtworkPixelRectangle? ArtworkSourceBounds => _artworkInspection?.VisibleBounds;
+    public ArtworkPixelRectangle? DraftArtworkBounds => _draftArtworkBounds;
+    public int PreviewCanvasWidth => _artworkInspection?.CanvasWidth ?? 0;
+    public int PreviewCanvasHeight => _artworkInspection?.CanvasHeight ?? 0;
+    public double PreviewImageOpacity => IsArtworkAdjustmentMode ? 0 : 1;
+    public bool IsFinalArtworkPreview => _isFinalArtworkPreview;
+    public bool IsArtworkAdjustmentMode => _isArtworkAdjustmentMode;
+    public bool IsArtworkAdjustmentDirty => _isArtworkAdjustmentDirty;
+    public string PreviewStatusMessage
+    {
+        get => _previewStatusMessage;
+        private set { if (_previewStatusMessage == value) return; _previewStatusMessage = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasPreviewStatusMessage)); }
+    }
+    public bool HasPreviewStatusMessage => !string.IsNullOrWhiteSpace(PreviewStatusMessage);
+    public bool HasVisibleArtwork => _artworkInspection?.HasVisibleArtwork == true;
+    public bool CanBeginArtworkAdjustment => IsFinalArtworkPreview && !IsReadOnly && !IsBusy && HasVisibleArtwork && !IsArtworkAdjustmentMode;
+    public bool CanApplyArtworkAdjustment => IsFinalArtworkPreview && IsArtworkAdjustmentMode && IsArtworkAdjustmentDirty && !IsReadOnly && !IsBusy && DraftArtworkBounds is { IsFinitePositive: true };
+    public bool CanCancelArtworkAdjustment => IsArtworkAdjustmentMode && !IsBusy;
 
     public Stream? PreviewStream
     {
@@ -869,18 +899,46 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         IsBusy = true;
         try
         {
-            var stream = await _designStageService.OpenSlotPreviewAsync(rowId, designAreaId, ct).ConfigureAwait(true);
-            if (_isDisposed)
+            var result = await _designStageService.InspectSlotArtworkAsync(_itemId, rowId, designAreaId, ct).ConfigureAwait(true);
+            if (_isDisposed) return;
+            if (!result.Succeeded || result.Png is null || result.Inspection is null)
             {
-                stream?.Dispose();
+                if (string.Equals(result.Error, "Artwork adjustment is unavailable.", StringComparison.Ordinal))
+                {
+                    await using var legacyPreview = await _designStageService.OpenSlotPreviewAsync(rowId, designAreaId, ct).ConfigureAwait(true);
+                    using var buffer = new MemoryStream();
+                    await legacyPreview.CopyToAsync(buffer, ct).ConfigureAwait(true);
+                    if (_isDisposed) return;
+                    SetPreviewImage(buffer.ToArray());
+                    PreviewAssetId = Guid.Empty;
+                    _previewRowId = Guid.Empty;
+                    _previewDesignAreaId = Guid.Empty;
+                    _isFinalArtworkPreview = false;
+                    _artworkInspection = null;
+                    _draftArtworkBounds = null;
+                    _isArtworkAdjustmentMode = false;
+                    _isArtworkAdjustmentDirty = false;
+                    PreviewStatusMessage = "Artwork adjustment is unavailable for this preview.";
+                    NotifyArtworkPreviewState();
+                    ShowPreviewDialog = true;
+                    return;
+                }
+
+                ErrorMessage = result.Error ?? "The managed artwork could not be opened.";
                 return;
             }
 
-            PreviewStream?.Dispose();
-            PreviewBitmap?.Dispose();
-            PreviewStream = stream;
-            PreviewBitmap = stream is not null ? new Bitmap(stream) : null;
-            PreviewAssetId = Guid.Empty;
+            SetPreviewImage(result.Png);
+            PreviewAssetId = result.AssetId;
+            _previewRowId = rowId;
+            _previewDesignAreaId = designAreaId;
+            _isFinalArtworkPreview = true;
+            _artworkInspection = result.Inspection;
+            _draftArtworkBounds = result.Inspection.VisibleBounds;
+            _isArtworkAdjustmentMode = false;
+            _isArtworkAdjustmentDirty = false;
+            PreviewStatusMessage = result.Inspection.HasVisibleArtwork ? string.Empty : "No visible artwork was found in this image.";
+            NotifyArtworkPreviewState();
             ShowPreviewDialog = true;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -958,6 +1016,13 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         // For supporting images, load the thumbnail directly from the managed file path
         try
         {
+            _isFinalArtworkPreview = false;
+            _artworkInspection = null;
+            _draftArtworkBounds = null;
+            _isArtworkAdjustmentMode = false;
+            _isArtworkAdjustmentDirty = false;
+            PreviewStatusMessage = string.Empty;
+            NotifyArtworkPreviewState();
             PreviewStream?.Dispose();
             PreviewBitmap?.Dispose();
             PreviewStream = null;
@@ -1007,6 +1072,82 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         PreviewBitmap = null;
         PreviewStream?.Dispose();
         PreviewStream = null;
+        _previewRowId = Guid.Empty;
+        _previewDesignAreaId = Guid.Empty;
+        _isFinalArtworkPreview = false;
+        _artworkInspection = null;
+        _draftArtworkBounds = null;
+        _isArtworkAdjustmentMode = false;
+        _isArtworkAdjustmentDirty = false;
+        PreviewStatusMessage = string.Empty;
+        NotifyArtworkPreviewState();
+    }
+
+    public void BeginArtworkAdjustment()
+    {
+        if (!CanBeginArtworkAdjustment || _artworkInspection?.VisibleBounds is not ArtworkPixelRectangle bounds) return;
+        _isArtworkAdjustmentMode = true;
+        _draftArtworkBounds = bounds;
+        _isArtworkAdjustmentDirty = false;
+        PreviewStatusMessage = "Drag the artwork to move it. Drag the lower-right handle to resize proportionally.";
+        NotifyArtworkPreviewState();
+    }
+
+    public void UpdateArtworkAdjustmentBounds(ArtworkPixelRectangle bounds)
+    {
+        if (!IsArtworkAdjustmentMode || !bounds.IsFinitePositive) return;
+        _draftArtworkBounds = bounds;
+        _isArtworkAdjustmentDirty = _artworkInspection?.VisibleBounds is not ArtworkPixelRectangle original || original != bounds;
+        OnPropertyChanged(nameof(DraftArtworkBounds));
+        OnPropertyChanged(nameof(IsArtworkAdjustmentDirty));
+        NotifyArtworkPreviewState();
+    }
+
+    public void CancelArtworkAdjustment()
+    {
+        if (!IsArtworkAdjustmentMode || IsBusy) return;
+        _draftArtworkBounds = _artworkInspection?.VisibleBounds;
+        _isArtworkAdjustmentMode = false;
+        _isArtworkAdjustmentDirty = false;
+        PreviewStatusMessage = string.Empty;
+        OnPropertyChanged(nameof(DraftArtworkBounds));
+        NotifyArtworkPreviewState();
+    }
+
+    public async Task ApplyArtworkAdjustmentAsync(CancellationToken cancellationToken = default)
+    {
+        if (!CanApplyArtworkAdjustment || _draftArtworkBounds is not ArtworkPixelRectangle bounds) return;
+        IsBusy = true;
+        ErrorMessage = null;
+        try
+        {
+            var result = await _designStageService.ApplySlotArtworkAdjustmentAsync(
+                _itemId,
+                _previewRowId,
+                _previewDesignAreaId,
+                bounds,
+                cancellationToken).ConfigureAwait(true);
+            if (!result.Succeeded)
+            {
+                ErrorMessage = result.Error ?? "The artwork adjustment could not be applied.";
+                return;
+            }
+
+            _isArtworkAdjustmentMode = false;
+            _isArtworkAdjustmentDirty = false;
+            await LoadAsync(_itemId, !IsReadOnly, cancellationToken).ConfigureAwait(true);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            ErrorMessage = $"The artwork adjustment could not be applied. {exception.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+
+        if (ErrorMessage is null && _isFinalArtworkPreview)
+            await PreviewSlotImageAsync(_previewRowId, _previewDesignAreaId, cancellationToken).ConfigureAwait(true);
     }
 
     public void Dispose()
@@ -1475,6 +1616,30 @@ public sealed class DesignStageToolViewModel : INotifyPropertyChanged, IDisposab
         OnPropertyChanged(nameof(CanGenerateArtwork));
         OnPropertyChanged(nameof(CanUseTransparentBackground));
         GenerateArtworkCommand.NotifyCanExecuteChanged();
+    }
+
+    private void SetPreviewImage(byte[] png)
+    {
+        PreviewBitmap?.Dispose();
+        PreviewStream?.Dispose();
+        PreviewStream = new MemoryStream(png, writable: false);
+        PreviewBitmap = new Bitmap(PreviewStream);
+    }
+
+    private void NotifyArtworkPreviewState()
+    {
+        OnPropertyChanged(nameof(ArtworkSourceBounds));
+        OnPropertyChanged(nameof(DraftArtworkBounds));
+        OnPropertyChanged(nameof(PreviewCanvasWidth));
+        OnPropertyChanged(nameof(PreviewCanvasHeight));
+        OnPropertyChanged(nameof(IsFinalArtworkPreview));
+        OnPropertyChanged(nameof(IsArtworkAdjustmentMode));
+        OnPropertyChanged(nameof(PreviewImageOpacity));
+        OnPropertyChanged(nameof(IsArtworkAdjustmentDirty));
+        OnPropertyChanged(nameof(HasVisibleArtwork));
+        OnPropertyChanged(nameof(CanBeginArtworkAdjustment));
+        OnPropertyChanged(nameof(CanApplyArtworkAdjustment));
+        OnPropertyChanged(nameof(CanCancelArtworkAdjustment));
     }
 
     private void InvalidateArtworkOperation()

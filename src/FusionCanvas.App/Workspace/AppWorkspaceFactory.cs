@@ -129,7 +129,14 @@ public static class AppWorkspaceFactory
         var itemCsvImport = new ItemCsvImportService(repository);
         var aiImageProvenanceCodec = new AiImageProvenanceCodec();
         var mockupInvalidation = new MockupOutputInvalidationService(repository, fileStore);
-        var designStage = new DesignStageService(repository, fileStore, aiImageProvenanceCodec, contentRiskReviews: contentRiskReviews, mockupInvalidation: mockupInvalidation);
+        var designStage = new DesignStageService(
+            repository,
+            fileStore,
+            aiImageProvenanceCodec,
+            contentRiskReviews: contentRiskReviews,
+            mockupInvalidation: mockupInvalidation,
+            outputStore: fileStore,
+            artworkImageProcessor: new ImageSharpArtworkImageProcessor());
         var globalColorRemoval = new GlobalColorRemovalService(
             repository,
             fileStore,

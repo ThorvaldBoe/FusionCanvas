@@ -1757,7 +1757,28 @@
                                                      Width="{DynamicResource Token.Media.DesignStageThumbnailWidth}"
                                                      Height="{DynamicResource Token.Media.DesignStageThumbnailHeight}"
                                                     Background="{DynamicResource PanelSurfaceBrush}" CornerRadius="4">
-<Image Source="{Binding Thumbnail}" Stretch="Uniform" />
+                                              <Grid>
+                                                <Image Source="{Binding Thumbnail}" Stretch="Uniform" />
+                                                <Button HorizontalAlignment="Right"
+                                                        VerticalAlignment="Bottom"
+                                                        Width="28"
+                                                        Height="28"
+                                                        Padding="4"
+                                                        Margin="2"
+                                                        Click="OnViewSlotImage"
+                                                        Tag="{Binding .}"
+                                                        IsEnabled="{Binding CanPreview}"
+                                                        Classes="compactAction"
+                                                        ToolTip.Tip="Preview and adjust final design artwork"
+                                                        AutomationProperties.Name="{Binding ArtworkPreviewAccessibleName}">
+                                                  <Grid Width="16" Height="16">
+                                                    <Ellipse Width="10" Height="10" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                             Stroke="{DynamicResource StrongTextBrush}" StrokeThickness="1.8" />
+                                                    <Line StartPoint="8,8" EndPoint="15,15"
+                                                          Stroke="{DynamicResource StrongTextBrush}" StrokeThickness="1.8" />
+                                                  </Grid>
+                                                </Button>
+                                              </Grid>
                                             </Border>
                                              <Border IsVisible="{Binding !HasImage}"
                                                      Width="{DynamicResource Token.Media.DesignStageThumbnailWidth}"
@@ -1783,12 +1804,6 @@
                                             <StackPanel IsVisible="{Binding HasImage}"
                                                           Orientation="Horizontal" Spacing="2"
                                                           HorizontalAlignment="Center">
-                                              <Button Content="Enlarge" Click="OnViewSlotImage"
-                                                      Tag="{Binding .}"
-                                                      IsEnabled="{Binding CanPreview}"
-                                                       Classes="compactAction"
-                                                      ToolTip.Tip="Open a larger preview of this final design artwork"
-                                                      AutomationProperties.Name="{Binding ArtworkPreviewAccessibleName}" />
                                               <Button Content="Download" Click="OnExportSlotImage"
                                                       Tag="{Binding .}"
                                                       IsEnabled="{Binding CanExport}"

@@ -11,6 +11,7 @@ using FusionCanvas.Domain.Items;
 using FusionCanvas.Domain.Products;
 using FusionCanvas.Domain.Mockups;
 using FusionCanvas.Integration.AI;
+using Avalonia.Headless.XUnit;
 
 namespace FusionCanvas.App.Tests;
 
@@ -299,6 +300,90 @@ public class DesignStageToolViewModelTests
         Assert.Null(viewModel.PreviewBitmap);
     }
 
+    [AvaloniaFact]
+    public async Task ArtworkAdjustmentDraft_CanMoveResizeAndCancelWithoutApplying()
+    {
+        var service = new DelayedArtworkPreferenceService(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var pngPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+            "../../../../../src/FusionCanvas.App/Assets/FusionCanvasLogo_Square.png"));
+        service.InspectionResult = ArtworkInspectionResult.Success(Guid.NewGuid(), "artwork.png",
+            await File.ReadAllBytesAsync(pngPath, TestContext.Current.CancellationToken),
+            new ArtworkImageInspection(100, 100, new ArtworkPixelRectangle(20, 20, 40, 40)));
+        using var viewModel = new DesignStageToolViewModel(service);
+
+        await viewModel.LoadAsync(service.ItemId, canEdit: true, TestContext.Current.CancellationToken);
+        await viewModel.PreviewSlotImageAsync(Guid.NewGuid(), Guid.NewGuid(), TestContext.Current.CancellationToken);
+        Assert.True(viewModel.CanBeginArtworkAdjustment,
+            $"readOnly={viewModel.IsReadOnly}, final={viewModel.IsFinalArtworkPreview}, visible={viewModel.HasVisibleArtwork}, busy={viewModel.IsBusy}, error={viewModel.ErrorMessage}");
+        viewModel.BeginArtworkAdjustment();
+        Assert.Equal(0, viewModel.PreviewImageOpacity);
+        viewModel.UpdateArtworkAdjustmentBounds(new ArtworkPixelRectangle(-10, 30, 80, 80));
+
+        Assert.True(viewModel.IsArtworkAdjustmentDirty);
+        Assert.True(viewModel.CanApplyArtworkAdjustment);
+        Assert.Equal(new ArtworkPixelRectangle(-10, 30, 80, 80), viewModel.DraftArtworkBounds);
+        viewModel.CancelArtworkAdjustment();
+
+        Assert.False(viewModel.IsArtworkAdjustmentMode);
+        Assert.False(viewModel.IsArtworkAdjustmentDirty);
+        Assert.Equal(1, viewModel.PreviewImageOpacity);
+        Assert.False(service.ApplyWasCalled);
+        Assert.Equal(new ArtworkPixelRectangle(20, 20, 40, 40), viewModel.DraftArtworkBounds);
+    }
+
+    [AvaloniaFact]
+    public async Task ArtworkAdjustmentPreview_DisablesAdjustmentForReadOnlyOrTransparentArtwork()
+    {
+        var pngPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+            "../../../../../src/FusionCanvas.App/Assets/FusionCanvasLogo_Square.png"));
+        var png = await File.ReadAllBytesAsync(pngPath, TestContext.Current.CancellationToken);
+        var readOnlyService = new DelayedArtworkPreferenceService(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        readOnlyService.SetReadOnly(true);
+        readOnlyService.InspectionResult = ArtworkInspectionResult.Success(Guid.NewGuid(), "artwork.png", png,
+            new ArtworkImageInspection(100, 100, new ArtworkPixelRectangle(10, 10, 80, 80)));
+        using (var readOnlyViewModel = new DesignStageToolViewModel(readOnlyService))
+        {
+            await readOnlyViewModel.LoadAsync(readOnlyService.ItemId, canEdit: true, TestContext.Current.CancellationToken);
+            await readOnlyViewModel.PreviewSlotImageAsync(Guid.NewGuid(), Guid.NewGuid(), TestContext.Current.CancellationToken);
+            Assert.True(readOnlyViewModel.IsFinalArtworkPreview);
+            Assert.False(readOnlyViewModel.CanBeginArtworkAdjustment);
+        }
+
+        var transparentService = new DelayedArtworkPreferenceService(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        transparentService.InspectionResult = ArtworkInspectionResult.Success(Guid.NewGuid(), "empty.png", png,
+            new ArtworkImageInspection(100, 100, null));
+        using var transparentViewModel = new DesignStageToolViewModel(transparentService);
+        await transparentViewModel.LoadAsync(transparentService.ItemId, canEdit: true, TestContext.Current.CancellationToken);
+        await transparentViewModel.PreviewSlotImageAsync(Guid.NewGuid(), Guid.NewGuid(), TestContext.Current.CancellationToken);
+        Assert.False(transparentViewModel.HasVisibleArtwork);
+        Assert.False(transparentViewModel.CanBeginArtworkAdjustment);
+        Assert.Contains("No visible artwork", transparentViewModel.PreviewStatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [AvaloniaFact]
+    public async Task ArtworkAdjustmentApply_PersistsDraftBoundsAndRefreshesPreview()
+    {
+        var service = new DelayedArtworkPreferenceService(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var pngPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+            "../../../../../src/FusionCanvas.App/Assets/FusionCanvasLogo_Square.png"));
+        service.InspectionResult = ArtworkInspectionResult.Success(Guid.NewGuid(), "artwork.png",
+            await File.ReadAllBytesAsync(pngPath, TestContext.Current.CancellationToken),
+            new ArtworkImageInspection(100, 100, new ArtworkPixelRectangle(20, 20, 40, 40)));
+        using var viewModel = new DesignStageToolViewModel(service);
+        await viewModel.LoadAsync(service.ItemId, canEdit: true, TestContext.Current.CancellationToken);
+        await viewModel.PreviewSlotImageAsync(Guid.NewGuid(), Guid.NewGuid(), TestContext.Current.CancellationToken);
+        viewModel.BeginArtworkAdjustment();
+        var target = new ArtworkPixelRectangle(12, 34, 56, 56);
+        viewModel.UpdateArtworkAdjustmentBounds(target);
+
+        await viewModel.ApplyArtworkAdjustmentAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(service.ApplyWasCalled);
+        Assert.Equal(target, service.AppliedBounds);
+        Assert.True(viewModel.IsFinalArtworkPreview);
+        Assert.False(viewModel.IsArtworkAdjustmentDirty);
+    }
+
     private sealed class TrackingMemoryStream : MemoryStream
     {
         public bool WasDisposed { get; private set; }
@@ -359,6 +444,9 @@ public class DesignStageToolViewModelTests
         public Guid ItemId => _itemId;
         public bool ThrowIfLoadCancelled { get; }
         public int LoadCount { get; private set; }
+        public ArtworkInspectionResult? InspectionResult { get; set; }
+        public bool ApplyWasCalled { get; private set; }
+        public ArtworkPixelRectangle? AppliedBounds { get; private set; }
         public TaskCompletionSource SaveStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource LoadStarted { get; private set; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource PreviewStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -409,6 +497,17 @@ public class DesignStageToolViewModelTests
         public void CompleteSave() => _saveCompletion.TrySetResult();
 
         public void CompletePreview(Stream stream) => _previewCompletion.TrySetResult(stream);
+        public void SetReadOnly(bool value) => State = State with { IsReadOnly = value };
+
+        public Task<ArtworkInspectionResult> InspectSlotArtworkAsync(Guid itemId, Guid rowId, Guid designAreaId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(InspectionResult ?? ArtworkInspectionResult.Failure("Artwork adjustment is unavailable."));
+
+        public Task<DesignStageResult> ApplySlotArtworkAdjustmentAsync(Guid itemId, Guid rowId, Guid designAreaId, ArtworkPixelRectangle targetBounds, CancellationToken cancellationToken = default)
+        {
+            ApplyWasCalled = true;
+            AppliedBounds = targetBounds;
+            return Task.FromResult(DesignStageResult.Success(State));
+        }
 
         public Task<DesignStageResult> SelectConfigurationAsync(Guid itemId, Guid offeringId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<DesignStageResult> RecoverStaleConfigurationAsync(Guid itemId, Guid offeringId, CancellationToken cancellationToken = default) => throw new NotSupportedException();

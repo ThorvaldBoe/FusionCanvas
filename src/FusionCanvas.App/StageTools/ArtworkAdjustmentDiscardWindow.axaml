@@ -1,0 +1,26 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="FusionCanvas.App.StageTools.ArtworkAdjustmentDiscardWindow"
+        Title="Discard artwork adjustment?"
+        Width="430"
+        Height="180"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ElevatedSurfaceBrush}">
+  <Grid Margin="20" RowDefinitions="*,Auto" RowSpacing="16">
+    <TextBlock Text="Discard the unapplied artwork adjustment? The managed image has not changed."
+               TextWrapping="Wrap"
+               VerticalAlignment="Center" />
+    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button x:Name="KeepEditingButton"
+              Content="Keep editing"
+              Click="OnKeepEditing"
+              Classes="storeSecondary"
+              AutomationProperties.Name="Keep editing artwork" />
+      <Button Content="Discard"
+              Click="OnDiscard"
+              Classes="storeAction"
+              AutomationProperties.Name="Discard artwork adjustment" />
+    </StackPanel>
+  </Grid>
+</Window>

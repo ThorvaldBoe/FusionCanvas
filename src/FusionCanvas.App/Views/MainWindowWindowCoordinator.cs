@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FusionCanvas.App.Assets;
 using FusionCanvas.App.Ideation;
@@ -29,6 +30,7 @@ internal sealed class MainWindowWindowCoordinator
     private Window? _designPreviewWindow;
     private Window? _globalColorRemovalWindow;
     private Window? _mockupPreviewWindow;
+    private Control? _designPreviewFocusTarget;
 
     public MainWindowWindowCoordinator(Window owner, Control workspaceTreeControl)
     {
@@ -37,6 +39,8 @@ internal sealed class MainWindowWindowCoordinator
     }
 
     public void SetSettings(SettingsViewModel? settings) => _settings = settings;
+
+    public void SetDesignPreviewFocusTarget(Control? control) => _designPreviewFocusTarget = control;
 
     public void SyncSettingsWindow(SettingsViewModel settings)
     {
@@ -241,6 +245,13 @@ internal sealed class MainWindowWindowCoordinator
             {
                 _designPreviewWindow = null;
                 designTool.ClosePreviewDialog();
+                var focusTarget = _designPreviewFocusTarget;
+                _designPreviewFocusTarget = null;
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (focusTarget is { IsEffectivelyVisible: true, IsEnabled: true })
+                        focusTarget.Focus();
+                }, DispatcherPriority.Input);
             };
             _designPreviewWindow.Show(_owner);
             return;

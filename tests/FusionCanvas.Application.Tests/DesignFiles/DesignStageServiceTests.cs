@@ -10,6 +10,9 @@ using FusionCanvas.Application.Workspaces;
 using FusionCanvas.Application.DesignFiles;
 using FusionCanvas.Application.Catalog;
 using System.Text.Json;
+using FusionCanvas.Integration.Files;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace FusionCanvas.Application.Tests.DesignFiles;
 
@@ -503,6 +506,105 @@ public class DesignStageServiceTests
         Assert.Null(reloadedSlot.AssetId);
         // Asset record and link removed atomically
         Assert.DoesNotContain(assetId, repo.Snapshot.Assets.Select(a => a.Id));
+    }
+
+    [Fact]
+    public async Task ApplySlotArtworkAdjustmentAsync_SavesBeforeImageAndReplacesSlotWithClippedPng()
+    {
+        var repo = new InMemoryWorkspaceRepository(SeedWithProduct());
+        var setup = New(repo);
+        var (itemId, offeringId) = await AddItemWithConfig(setup, repo);
+        await setup.AddSelectedColorAsync(itemId, "Black", TestContext.Current.CancellationToken);
+        var state = await setup.LoadDesignStageStateAsync(itemId, TestContext.Current.CancellationToken);
+        var row = Assert.Single(state.Rows);
+        var slot = Assert.Single(row.Slots);
+        var sourceAssetId = Guid.NewGuid();
+        var sourceBytes = CreateArtworkPng();
+        var files = new ArtworkMemoryFileStore(sourceBytes);
+        var sourceAsset = new Asset(sourceAssetId, StoreId, "artwork.png", null, AssetKind.ExportedImage,
+            "designs/artwork.png", null, false, false, Now, Now, "{}");
+        repo.Snapshot = repo.Snapshot with
+        {
+            Assets = [.. repo.Snapshot.Assets, sourceAsset],
+            AssetLinks = [.. repo.Snapshot.AssetLinks, new AssetLink(sourceAssetId, WorkspaceEntityKind.Item, itemId)],
+            DesignSlotAssignments = [.. repo.Snapshot.DesignSlotAssignments.Select(assignment =>
+                assignment.RowId == row.RowId && assignment.DesignAreaId == slot.DesignAreaId
+                    ? assignment with { AssetId = sourceAssetId }
+                    : assignment)]
+        };
+        var service = new DesignStageService(repo, files, new TestAiImageProvenanceCodec(), () => Now, Guid.NewGuid,
+            outputStore: files, artworkImageProcessor: new ImageSharpArtworkImageProcessor());
+
+        var result = await service.ApplySlotArtworkAdjustmentAsync(itemId, row.RowId, slot.DesignAreaId,
+            new ArtworkPixelRectangle(4, 2, 4, 4), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded, result.Error);
+        var replacementId = Assert.Single(repo.Snapshot.DesignSlotAssignments,
+            assignment => assignment.RowId == row.RowId && assignment.DesignAreaId == slot.DesignAreaId).AssetId;
+        Assert.NotNull(replacementId);
+        Assert.NotEqual(sourceAssetId, replacementId);
+        Assert.Equal(replacementId, Assert.Single(repo.Snapshot.AssetLinks,
+            link => link.AssetId == replacementId && link.EntityId == itemId).AssetId);
+        var backup = Assert.Single(repo.Snapshot.Assets, asset => asset.Kind == AssetKind.ReferenceImage
+            && asset.Description == "Before artwork adjustment: artwork.png");
+        Assert.Contains(repo.Snapshot.AssetLinks, link => link.AssetId == backup.Id && link.EntityId == itemId);
+        Assert.Equal(sourceBytes, files.ReadSaved(backup.WorkspaceRelativePath));
+        var output = Assert.Single(repo.Snapshot.Assets, asset => asset.Id == replacementId);
+        await using var outputStream = new MemoryStream(files.ReadSaved(output.WorkspaceRelativePath));
+        using var transformed = await Image.LoadAsync<Rgba32>(outputStream, TestContext.Current.CancellationToken);
+        Assert.Equal(6, transformed.Width);
+        Assert.Equal(6, transformed.Height);
+        Assert.Equal(0, transformed[0, 0].A);
+        Assert.True(transformed[4, 2].A > 0);
+        Assert.Single(repo.Snapshot.ContentRiskReviews, review => review.Target.OwnerId == replacementId);
+
+        var firstAppliedBytes = files.ReadSaved(output.WorkspaceRelativePath);
+        var secondResult = await service.ApplySlotArtworkAdjustmentAsync(itemId, row.RowId, slot.DesignAreaId,
+            new ArtworkPixelRectangle(0, 0, 2, 2), TestContext.Current.CancellationToken);
+
+        Assert.True(secondResult.Succeeded, secondResult.Error);
+        var beforeImages = repo.Snapshot.Assets.Where(asset => asset.Kind == AssetKind.ReferenceImage
+            && asset.Description == "Before artwork adjustment: artwork.png").ToArray();
+        Assert.Equal(2, beforeImages.Length);
+        Assert.Equal(sourceBytes, files.ReadSaved(beforeImages[0].WorkspaceRelativePath));
+        Assert.Equal(firstAppliedBytes, files.ReadSaved(beforeImages[1].WorkspaceRelativePath));
+
+        var currentAssetId = repo.Snapshot.DesignSlotAssignments.Single(assignment => assignment.RowId == row.RowId
+            && assignment.DesignAreaId == slot.DesignAreaId).AssetId!.Value;
+        var priorSnapshot = repo.Snapshot;
+        repo.SaveFailure = new InvalidOperationException("Simulated artwork-adjustment save failure.");
+        var deletedBeforeFailure = files.DeletedPaths.Count;
+        var failedResult = await service.ApplySlotArtworkAdjustmentAsync(itemId, row.RowId, slot.DesignAreaId,
+            new ArtworkPixelRectangle(2, 2, 3, 3), TestContext.Current.CancellationToken);
+
+        Assert.False(failedResult.Succeeded);
+        Assert.Same(priorSnapshot, repo.Snapshot);
+        Assert.Equal(currentAssetId, repo.Snapshot.DesignSlotAssignments.Single(assignment => assignment.RowId == row.RowId
+            && assignment.DesignAreaId == slot.DesignAreaId).AssetId);
+        Assert.Equal(deletedBeforeFailure + 2, files.DeletedPaths.Count);
+
+        repo.SaveFailure = null;
+        var item = repo.Snapshot.Items.Single(value => value.Id == itemId);
+        repo.Snapshot = repo.Snapshot with { Items = [.. repo.Snapshot.Items.Select(value =>
+            value.Id == itemId ? value with { Status = ItemStatus.Published } : value)] };
+        var readOnlyResult = await service.ApplySlotArtworkAdjustmentAsync(itemId, row.RowId, slot.DesignAreaId,
+            new ArtworkPixelRectangle(2, 2, 3, 3), TestContext.Current.CancellationToken);
+        Assert.False(readOnlyResult.Succeeded);
+        Assert.Equal(currentAssetId, repo.Snapshot.DesignSlotAssignments.Single(assignment => assignment.RowId == row.RowId
+            && assignment.DesignAreaId == slot.DesignAreaId).AssetId);
+        repo.Snapshot = repo.Snapshot with { Items = [.. repo.Snapshot.Items.Select(value =>
+            value.Id == itemId ? item : value)] };
+    }
+
+    private static byte[] CreateArtworkPng()
+    {
+        using var image = new Image<Rgba32>(6, 6, Color.Transparent);
+        for (var y = 1; y <= 2; y++)
+        for (var x = 1; x <= 2; x++)
+            image[x, y] = new Rgba32(230, 20, 30, 255);
+        using var output = new MemoryStream();
+        image.SaveAsPng(output);
+        return output.ToArray();
     }
 
     // --- Supporting images ---
@@ -1110,6 +1212,43 @@ public class DesignStageServiceTests
         Guid StaleOfferingId,
         string StaleOfferingName,
         Guid ReplacementOfferingId);
+
+    private sealed class ArtworkMemoryFileStore(byte[] sourceBytes) : IWorkspaceFileStore, IWorkspaceFileOutputStore
+    {
+        private readonly Dictionary<string, byte[]> _files = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["designs/artwork.png"] = sourceBytes
+        };
+        private int _counter;
+        public List<string> DeletedPaths { get; } = [];
+
+        public string WorkspaceRoot => Path.GetTempPath();
+        public bool Exists(string workspaceRelativePath) => _files.ContainsKey(workspaceRelativePath);
+        public string ResolvePath(string workspaceRelativePath) => workspaceRelativePath;
+        public bool TryDelete(string workspaceRelativePath)
+        {
+            DeletedPaths.Add(workspaceRelativePath);
+            return _files.Remove(workspaceRelativePath);
+        }
+        public Task<Stream> OpenReadAsync(string workspaceRelativePath, CancellationToken cancellationToken = default) =>
+            Task.FromResult<Stream>(new MemoryStream(_files[workspaceRelativePath], writable: false));
+        public byte[] ReadSaved(string workspaceRelativePath) => _files[workspaceRelativePath];
+
+        public Task<ManagedWorkspaceFile> SaveAsync(string fileName, AssetKind kind, Stream content, CancellationToken cancellationToken = default)
+        {
+            using var output = new MemoryStream();
+            content.CopyTo(output);
+            var relativePath = $"managed/{Interlocked.Increment(ref _counter)}-{fileName}";
+            _files[relativePath] = output.ToArray();
+            return Task.FromResult(new ManagedWorkspaceFile(fileName, kind, relativePath, relativePath, string.Empty));
+        }
+
+        public Task<ManagedWorkspaceFile> ImportAsync(string sourcePath, AssetKind kind, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task ExportCopyAsync(string workspaceRelativePath, string destinationPath, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
 
     private sealed class DeterministicFileStore : IWorkspaceFileStore
     {
