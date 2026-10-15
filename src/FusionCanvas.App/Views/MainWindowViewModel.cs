@@ -957,6 +957,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable, I
         RefreshWorkspaceSnapshot();
         await WorkspaceTree.ExecuteTrackedCommandAsync(WorkspaceTree.ReloadAsync, cancellationToken).ConfigureAwait(true);
         RefreshActiveItemInspector();
+        RefreshStageToolState();
     }
 
     private void RefreshActiveItemInspector()
