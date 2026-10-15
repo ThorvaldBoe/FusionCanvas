@@ -46,6 +46,17 @@ public interface IDesignStageService
     /// <summary>Opens a preview stream for a slot's image.</summary>
     Task<Stream> OpenSlotPreviewAsync(Guid rowId, Guid designAreaId, CancellationToken cancellationToken = default);
 
+    Task<ArtworkInspectionResult> InspectSlotArtworkAsync(Guid itemId, Guid rowId, Guid designAreaId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(ArtworkInspectionResult.Failure("Artwork adjustment is unavailable."));
+
+    Task<DesignStageResult> ApplySlotArtworkAdjustmentAsync(
+        Guid itemId,
+        Guid rowId,
+        Guid designAreaId,
+        ArtworkPixelRectangle targetBounds,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(DesignStageResult.Failure("Artwork adjustment is unavailable."));
+
     /// <summary>Exports a slot's image to a destination path.</summary>
     Task ExportSlotImageAsync(Guid rowId, Guid designAreaId, string destinationPath, CancellationToken cancellationToken = default);
 

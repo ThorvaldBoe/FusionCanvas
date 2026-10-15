@@ -775,6 +775,8 @@ public partial class MainWindow : Window
             return;
 
         await vm.DesignTool.PreviewSlotImageAsync(rowVM.RowId, slot.DesignAreaId);
+        if (vm.DesignTool.ShowPreviewDialog && sender is Control invokingControl)
+            _windowCoordinator.SetDesignPreviewFocusTarget(invokingControl);
     }
 
     private async void OnRemoveSlotImage(object? sender, RoutedEventArgs e)

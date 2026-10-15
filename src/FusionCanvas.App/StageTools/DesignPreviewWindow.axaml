@@ -4,24 +4,51 @@
         x:Class="FusionCanvas.App.StageTools.DesignPreviewWindow"
         x:DataType="stageTools:DesignStageToolViewModel"
         Title="Image Preview"
-        Width="800"
-        Height="600"
+        Width="900"
+        Height="680"
         MinWidth="400"
         MinHeight="300"
-        SizeToContent="WidthAndHeight"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ApplicationBackgroundBrush}"
         CanResize="True">
   <DockPanel LastChildFill="True" Margin="16">
-    <StackPanel DockPanel.Dock="Bottom"
-                Orientation="Horizontal"
-                HorizontalAlignment="Center"
-                Spacing="8"
-                Margin="0,12,0,0">
-      <Button Content="Close"
-              Click="OnCloseClick"
-              MinWidth="90"
-              Classes="storeAction" />
+    <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+      <TextBlock Text="{Binding PreviewStatusMessage}"
+                 IsVisible="{Binding HasPreviewStatusMessage}"
+                 TextWrapping="Wrap"
+                 Foreground="{DynamicResource SecondaryTextBrush}"
+                 AutomationProperties.LiveSetting="Polite" />
+      <TextBlock Text="{Binding ErrorMessage}"
+                 IsVisible="{Binding HasErrorMessage}"
+                 TextWrapping="Wrap"
+                 Foreground="{DynamicResource DangerTextBrush}"
+                 AutomationProperties.LiveSetting="Polite" />
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+        <Button x:Name="AdjustArtworkButton"
+                Content="Adjust artwork"
+                IsVisible="{Binding CanBeginArtworkAdjustment}"
+                Click="OnAdjustClick"
+                Classes="storeSecondary"
+                AutomationProperties.Name="Adjust final artwork" />
+        <Button x:Name="ApplyArtworkButton"
+                Content="Apply"
+                IsVisible="{Binding IsArtworkAdjustmentMode}"
+                IsEnabled="{Binding CanApplyArtworkAdjustment}"
+                Click="OnApplyClick"
+                Classes="storeAction"
+                AutomationProperties.Name="Apply artwork adjustment" />
+        <Button x:Name="CancelArtworkButton"
+                Content="Cancel"
+                IsVisible="{Binding IsArtworkAdjustmentMode}"
+                IsEnabled="{Binding CanCancelArtworkAdjustment}"
+                Click="OnCancelAdjustmentClick"
+                Classes="storeSecondary"
+                AutomationProperties.Name="Cancel artwork adjustment" />
+        <Button Content="Close"
+                Click="OnCloseClick"
+                Classes="storeSecondary"
+                AutomationProperties.Name="Close artwork preview" />
+      </StackPanel>
     </StackPanel>
     <Border Background="{DynamicResource ElevatedSurfaceBrush}"
             BorderBrush="{DynamicResource ControlBorderBrush}"
@@ -30,10 +57,17 @@
             Padding="8"
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch">
-      <Image Source="{Binding PreviewBitmap}"
-             Stretch="Uniform"
-             MaxWidth="740"
-             MaxHeight="540" />
+      <Grid>
+        <stageTools:ArtworkCheckerboardSurface Source="{Binding PreviewBitmap}"
+                                               IsHitTestVisible="False" />
+        <Image Source="{Binding PreviewBitmap}" Stretch="Uniform" Opacity="{Binding PreviewImageOpacity}" />
+        <stageTools:ArtworkAdjustmentSurface x:Name="AdjustmentSurface"
+                                             Source="{Binding PreviewBitmap}"
+                                             SourceBounds="{Binding ArtworkSourceBounds}"
+                                             DraftBounds="{Binding DraftArtworkBounds}"
+                                             IsAdjustmentMode="{Binding IsArtworkAdjustmentMode}"
+                                             AutomationProperties.Name="Artwork preview and adjustment surface" />
+      </Grid>
     </Border>
   </DockPanel>
 </Window>

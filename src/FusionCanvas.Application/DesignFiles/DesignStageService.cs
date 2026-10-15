@@ -13,6 +13,7 @@ using FusionCanvas.Application.Catalog;
 using FusionCanvas.Application.Mockups;
 using FusionCanvas.Application.ContentRisk;
 using FusionCanvas.Application.Listings;
+using System.Text.Json;
 
 namespace FusionCanvas.Application.DesignFiles;
 
@@ -25,6 +26,8 @@ public sealed class DesignStageService : IDesignStageService
     private readonly Func<Guid> _newId;
     private readonly IMockupOutputInvalidationService? _mockupInvalidation;
     private readonly IContentRiskReviewService? _contentRiskReviews;
+    private readonly IWorkspaceFileOutputStore? _outputStore;
+    private readonly IArtworkImageProcessor? _artworkImageProcessor;
 
     public DesignStageService(
         IWorkspaceRepository repository,
@@ -33,7 +36,9 @@ public sealed class DesignStageService : IDesignStageService
         Func<DateTimeOffset>? clock = null,
         Func<Guid>? newId = null,
         IContentRiskReviewService? contentRiskReviews = null,
-        IMockupOutputInvalidationService? mockupInvalidation = null)
+        IMockupOutputInvalidationService? mockupInvalidation = null,
+        IWorkspaceFileOutputStore? outputStore = null,
+        IArtworkImageProcessor? artworkImageProcessor = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _fileStore = fileStore ?? throw new ArgumentNullException(nameof(fileStore));
@@ -42,7 +47,8 @@ public sealed class DesignStageService : IDesignStageService
         _newId = newId ?? Guid.NewGuid;
         _mockupInvalidation = mockupInvalidation;
         _contentRiskReviews = contentRiskReviews;
-        _mockupInvalidation = mockupInvalidation;
+        _outputStore = outputStore;
+        _artworkImageProcessor = artworkImageProcessor;
     }
 
     public async Task<DesignStageState> LoadDesignStageStateAsync(Guid itemId, CancellationToken cancellationToken = default)
@@ -597,6 +603,178 @@ public sealed class DesignStageService : IDesignStageService
         return await _fileStore.OpenReadAsync(asset.WorkspaceRelativePath, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<ArtworkInspectionResult> InspectSlotArtworkAsync(
+        Guid itemId,
+        Guid rowId,
+        Guid designAreaId,
+        CancellationToken cancellationToken = default)
+    {
+        if (_artworkImageProcessor is null)
+            return ArtworkInspectionResult.Failure("Artwork adjustment is unavailable.");
+
+        var resolved = await ResolveArtworkSlotAsync(itemId, rowId, designAreaId, requireEditable: false, cancellationToken).ConfigureAwait(false);
+        if (!resolved.Succeeded)
+            return ArtworkInspectionResult.Failure(resolved.Error!);
+
+        try
+        {
+            var bytes = await ReadAssetBytesAsync(resolved.Asset!, cancellationToken).ConfigureAwait(false);
+            await using var stream = new MemoryStream(bytes, writable: false);
+            var inspection = await _artworkImageProcessor.InspectAsync(stream, cancellationToken).ConfigureAwait(false);
+            return ArtworkInspectionResult.Success(resolved.Asset!.Id, resolved.Asset.Name, bytes, inspection);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return ArtworkInspectionResult.Failure($"The managed artwork could not be inspected. {exception.Message}");
+        }
+    }
+
+    public async Task<DesignStageResult> ApplySlotArtworkAdjustmentAsync(
+        Guid itemId,
+        Guid rowId,
+        Guid designAreaId,
+        ArtworkPixelRectangle targetBounds,
+        CancellationToken cancellationToken = default)
+    {
+        if (_outputStore is null || _artworkImageProcessor is null)
+            return DesignStageResult.Failure("Artwork adjustment is unavailable.");
+        if (!targetBounds.IsFinitePositive)
+            return DesignStageResult.Failure("The artwork adjustment bounds are invalid.");
+
+        var resolved = await ResolveArtworkSlotAsync(itemId, rowId, designAreaId, requireEditable: true, cancellationToken).ConfigureAwait(false);
+        if (!resolved.Succeeded)
+            return DesignStageResult.Failure(resolved.Error!, resolved.Snapshot is null ? null : BuildState(resolved.Snapshot, itemId));
+
+        var snapshot = resolved.Snapshot!;
+        var sourceAsset = resolved.Asset!;
+        byte[] sourceBytes;
+        byte[] transformedBytes;
+        try
+        {
+            sourceBytes = await ReadAssetBytesAsync(sourceAsset, cancellationToken).ConfigureAwait(false);
+            await using var sourceStream = new MemoryStream(sourceBytes, writable: false);
+            var inspection = await _artworkImageProcessor.InspectAsync(sourceStream, cancellationToken).ConfigureAwait(false);
+            if (inspection.VisibleBounds is not ArtworkPixelRectangle visibleBounds)
+                return DesignStageResult.Failure("No visible artwork was found in this image.", BuildState(snapshot, itemId));
+
+            await using var transformStream = new MemoryStream(sourceBytes, writable: false);
+            transformedBytes = await _artworkImageProcessor.TransformAsync(
+                transformStream,
+                visibleBounds,
+                targetBounds,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return DesignStageResult.Failure($"The adjusted artwork could not be rendered. {exception.Message}", BuildState(snapshot, itemId));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        ManagedWorkspaceFile? backupOutput = null;
+        ManagedWorkspaceFile? artworkOutput = null;
+        try
+        {
+            var backupName = BuildBeforeAdjustmentName(sourceAsset.Name, _clock());
+            await using (var backupStream = new MemoryStream(sourceBytes, writable: false))
+                backupOutput = await _outputStore.SaveAsync(backupName, AssetKind.ReferenceImage, backupStream, cancellationToken).ConfigureAwait(false);
+            await using (var artworkStream = new MemoryStream(transformedBytes, writable: false))
+                artworkOutput = await _outputStore.SaveAsync(sourceAsset.Name, AssetKind.ExportedImage, artworkStream, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            await CleanupStagedArtworkFilesAsync(backupOutput, artworkOutput).ConfigureAwait(false);
+            return DesignStageResult.Failure($"The adjusted artwork could not be written to managed storage. {exception.Message}", BuildState(snapshot, itemId));
+        }
+        catch (OperationCanceledException)
+        {
+            await CleanupStagedArtworkFilesAsync(backupOutput, artworkOutput).ConfigureAwait(false);
+            throw;
+        }
+
+        var now = _clock();
+        var backupId = _newId();
+        var replacementId = _newId();
+        var backupAsset = new Asset(
+            backupId,
+            resolved.Item!.StoreId,
+            backupOutput!.Name,
+            $"Before artwork adjustment: {sourceAsset.Name}",
+            AssetKind.ReferenceImage,
+            backupOutput.WorkspaceRelativePath,
+            sourceAsset.OriginalSourcePath,
+            isMissing: false,
+            isArchived: false,
+            now,
+            now,
+            JsonSerializer.Serialize(new { sourceAssetId = sourceAsset.Id, operation = "artwork-adjustment-before-image" }));
+        var replacementAsset = new Asset(
+            replacementId,
+            resolved.Item.StoreId,
+            sourceAsset.Name,
+            sourceAsset.Description,
+            AssetKind.ExportedImage,
+            artworkOutput!.WorkspaceRelativePath,
+            sourceAsset.OriginalSourcePath,
+            isMissing: false,
+            isArchived: false,
+            now,
+            now,
+            sourceAsset.MetadataJson);
+        var backupLink = new AssetLink(backupId, WorkspaceEntityKind.Item, itemId);
+        var replacementLink = new AssetLink(replacementId, WorkspaceEntityKind.Item, itemId);
+        var reviewTarget = new ContentRiskReviewTarget(replacementId, ContentRiskOwnerKind.Asset, ContentRiskContentKind.Image, "design.asset");
+        var review = ContentRiskReview.Unreviewed(reviewTarget, ContentRiskFingerprint.ForImage(reviewTarget, transformedBytes));
+        var isGenerated = _provenanceCodec.TryDeserialize(sourceAsset.MetadataJson, out _);
+        var usedElsewhere = snapshot.DesignSlotAssignments.Any(assignment =>
+            assignment.AssetId == sourceAsset.Id
+            && (assignment.RowId != rowId || assignment.DesignAreaId != designAreaId));
+        var preserveSourceAsset = isGenerated || usedElsewhere;
+        var updated = snapshot with
+        {
+            Assets = [.. snapshot.Assets.Where(asset => preserveSourceAsset || asset.Id != sourceAsset.Id), backupAsset, replacementAsset],
+            AssetLinks = [.. snapshot.AssetLinks.Where(link => preserveSourceAsset || link.AssetId != sourceAsset.Id), backupLink, replacementLink],
+            DesignSlotAssignments = [.. snapshot.DesignSlotAssignments.Select(assignment =>
+                assignment.RowId == rowId && assignment.DesignAreaId == designAreaId
+                    ? assignment with { AssetId = replacementId }
+                    : assignment)],
+            ContentRiskReviews = [.. snapshot.ContentRiskReviews.Where(existing =>
+                existing.Target.OwnerId != sourceAsset.Id && existing.Target.OwnerId != replacementId), review]
+        };
+
+        try
+        {
+            await _repository.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            await CleanupStagedArtworkFilesAsync(backupOutput, artworkOutput).ConfigureAwait(false);
+            return DesignStageResult.Failure($"The adjusted artwork could not be saved. {exception.Message}", BuildState(snapshot, itemId));
+        }
+        catch (OperationCanceledException)
+        {
+            await CleanupStagedArtworkFilesAsync(backupOutput, artworkOutput).ConfigureAwait(false);
+            throw;
+        }
+
+        if (!preserveSourceAsset)
+            _fileStore.TryDelete(sourceAsset.WorkspaceRelativePath);
+
+        await InvalidateMockupsAsync(itemId, new HashSet<Guid> { sourceAsset.Id }, false, cancellationToken).ConfigureAwait(false);
+        if (_contentRiskReviews is not null)
+        {
+            try
+            {
+                await _contentRiskReviews.ReviewImageAsync(reviewTarget, "image/png", transformedBytes, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // The persisted Unreviewed state remains visible when advisory review cannot run.
+            }
+        }
+
+        return DesignStageResult.Success(BuildState(updated, itemId));
+    }
+
     public async Task ExportSlotImageAsync(Guid rowId, Guid designAreaId, string destinationPath, CancellationToken cancellationToken = default)
     {
         var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
@@ -915,6 +1093,83 @@ public sealed class DesignStageService : IDesignStageService
         {
             throw new InvalidOperationException(result.Error ?? "Generated mockups could not be invalidated.");
         }
+    }
+
+    private async Task<ArtworkSourceResolution> ResolveArtworkSlotAsync(
+        Guid itemId,
+        Guid rowId,
+        Guid designAreaId,
+        bool requireEditable,
+        CancellationToken cancellationToken)
+    {
+        var snapshot = await _repository.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var item = snapshot.Items.SingleOrDefault(candidate => candidate.Id == itemId);
+        if (item is null)
+            return ArtworkSourceResolution.Failure("Item was not found.", snapshot);
+
+        if (requireEditable)
+        {
+            var editDecision = ItemWorkflowPolicy.CanPerformOperation(item, ItemOperationKind.DesignStage);
+            if (!editDecision.IsAllowed)
+                return ArtworkSourceResolution.Failure(editDecision.Reason, snapshot);
+        }
+
+        if (!snapshot.DesignVariantRows.Any(row => row.Id == rowId && row.ItemId == itemId))
+            return ArtworkSourceResolution.Failure("The artwork row does not belong to this Item.", snapshot);
+
+        var assignment = snapshot.DesignSlotAssignments.SingleOrDefault(value => value.RowId == rowId && value.DesignAreaId == designAreaId);
+        if (assignment?.AssetId is not Guid assetId)
+            return ArtworkSourceResolution.Failure("The Design slot has no artwork assigned.", snapshot);
+
+        var asset = snapshot.Assets.SingleOrDefault(value => value.Id == assetId);
+        if (asset is null
+            || !snapshot.AssetLinks.Any(link => link.AssetId == assetId && link.EntityKind == WorkspaceEntityKind.Item && link.EntityId == itemId))
+            return ArtworkSourceResolution.Failure("The managed artwork is not attached to this Item.", snapshot);
+        if (asset.Kind != AssetKind.ExportedImage || !Path.GetExtension(asset.Name).Equals(".png", StringComparison.OrdinalIgnoreCase))
+            return ArtworkSourceResolution.Failure("Only final Design PNG artwork can be adjusted.", snapshot);
+        if (asset.IsMissing || !_fileStore.Exists(asset.WorkspaceRelativePath))
+            return ArtworkSourceResolution.Failure("The managed artwork is missing from workspace storage.", snapshot);
+
+        return ArtworkSourceResolution.Success(snapshot, item, asset);
+    }
+
+    private async Task<byte[]> ReadAssetBytesAsync(Asset asset, CancellationToken cancellationToken)
+    {
+        await using var stream = await _fileStore.OpenReadAsync(asset.WorkspaceRelativePath, cancellationToken).ConfigureAwait(false);
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
+        return buffer.ToArray();
+    }
+
+    private async Task CleanupStagedArtworkFilesAsync(params ManagedWorkspaceFile?[] files)
+    {
+        if (_outputStore is null) return;
+        foreach (var file in files)
+        {
+            if (file is not null)
+                await ManagedWorkspaceFileCleanup.TryDeleteAsync(_outputStore, file.WorkspaceRelativePath).ConfigureAwait(false);
+        }
+    }
+
+    private static string BuildBeforeAdjustmentName(string sourceName, DateTimeOffset timestamp)
+    {
+        var baseName = Path.GetFileNameWithoutExtension(sourceName);
+        if (string.IsNullOrWhiteSpace(baseName)) baseName = "artwork";
+        return $"Before adjustment - {baseName} - {timestamp:yyyyMMdd-HHmmss-fff}.png";
+    }
+
+    private sealed record ArtworkSourceResolution(
+        bool Succeeded,
+        string? Error,
+        WorkspaceSnapshot? Snapshot,
+        Item? Item,
+        Asset? Asset)
+    {
+        public static ArtworkSourceResolution Success(WorkspaceSnapshot snapshot, Item item, Asset asset) =>
+            new(true, null, snapshot, item, asset);
+
+        public static ArtworkSourceResolution Failure(string error, WorkspaceSnapshot snapshot) =>
+            new(false, string.IsNullOrWhiteSpace(error) ? "The managed artwork is unavailable." : error, snapshot, null, null);
     }
 
     private DesignStageState BuildState(WorkspaceSnapshot snapshot, Guid itemId)

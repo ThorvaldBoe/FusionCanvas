@@ -1,6 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Interactivity;
+using Avalonia.Input;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using FusionCanvas.App.StageTools;
@@ -88,5 +90,33 @@ public class DesignPreviewWindowTests
         {
             window.Close();
         }
+    }
+
+    [AvaloniaFact]
+    public void AdjustmentSurface_KeyboardMovesAndThenResizesProportionally()
+    {
+        var imagePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+            "../../../../../src/FusionCanvas.App/Assets/FusionCanvasLogo_Square.png"));
+        var bounds = new FusionCanvas.Application.DesignFiles.ArtworkPixelRectangle(20, 20, 40, 20);
+        var surface = new ArtworkAdjustmentSurface
+        {
+            Source = new Bitmap(imagePath),
+            SourceBounds = bounds,
+            DraftBounds = bounds,
+            IsAdjustmentMode = true
+        };
+
+        surface.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Right });
+        Assert.Equal(new FusionCanvas.Application.DesignFiles.ArtworkPixelRectangle(21, 20, 40, 20), surface.DraftBounds);
+
+        surface.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Space });
+        surface.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Right });
+
+        var resized = Assert.IsType<FusionCanvas.Application.DesignFiles.ArtworkPixelRectangle>(surface.DraftBounds);
+        Assert.Equal(21, resized.X);
+        Assert.Equal(20, resized.Y);
+        Assert.True(resized.Width > 40);
+        Assert.Equal(resized.Width / resized.Height, 2, precision: 5);
+        surface.Source.Dispose();
     }
 }
