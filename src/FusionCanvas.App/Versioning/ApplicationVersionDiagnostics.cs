@@ -24,7 +24,7 @@ public static class ApplicationVersionDiagnostics
             return true;
         }
 
-        var productVersion = informational[..plusIndex];
+        var productVersion = NormalizeProductVersion(informational[..plusIndex]);
         var commitMetadata = informational[(plusIndex + 1)..];
         var commitId = ExtractCommitId(commitMetadata);
 
@@ -33,6 +33,15 @@ public static class ApplicationVersionDiagnostics
             InformationalVersion: informational,
             CommitId: commitId);
         return true;
+    }
+
+    private static string NormalizeProductVersion(string version)
+    {
+        // NBGV appends the commit height as a fourth numeric component for stable builds
+        // (for example, 0.2.0.693). Update manifests use the three-component product version.
+        var stableBuild = System.Text.RegularExpressions.Regex.Match(version,
+            "^(?<product>(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*))\\.(0|[1-9][0-9]*)$");
+        return stableBuild.Success ? stableBuild.Groups["product"].Value : version;
     }
 
     public static string Format(ApplicationVersionInfo info, string platform)
