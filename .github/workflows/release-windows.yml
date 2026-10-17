@@ -84,7 +84,8 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $publishDirectory = Join-Path $env:GITHUB_WORKSPACE "artifacts\publish"
-          $version = (dotnet msbuild .\src\FusionCanvas.App\FusionCanvas.App.csproj -target:GetBuildVersion -getProperty:NuGetPackageVersion -nologo | Out-String).Trim()
+          $informationalVersion = (dotnet msbuild .\src\FusionCanvas.App\FusionCanvas.App.csproj -target:GetBuildVersion -getProperty:AssemblyInformationalVersion -nologo | Out-String).Trim()
+          $version = $informationalVersion.Split('+')[0]
           $tagVersion = $env:GITHUB_REF_NAME.Substring(1)
           Import-Module .\tools\updates\FusionCanvasReleaseVersion.psm1 -Force
           $track = Get-FusionCanvasReleaseTrack -TagName $env:GITHUB_REF_NAME -PackageVersion $version

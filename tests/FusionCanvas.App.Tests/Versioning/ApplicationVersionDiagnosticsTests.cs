@@ -27,6 +27,23 @@ public class ApplicationVersionDiagnosticsTests
     }
 
     [Fact]
+    public void TryParse_StripsNerdbankBuildHeightFromStableProductVersion()
+    {
+        ApplicationVersionDiagnostics.TryParse("0.2.0.693+g9749712", out var info);
+
+        Assert.Equal("0.2.0", info.ProductVersion);
+        Assert.Equal("9749712", info.CommitId);
+    }
+
+    [Fact]
+    public void TryParse_PreservesPreviewVersion()
+    {
+        ApplicationVersionDiagnostics.TryParse("0.2.0-preview.693+g9749712", out var info);
+
+        Assert.Equal("0.2.0-preview.693", info.ProductVersion);
+    }
+
+    [Fact]
     public void TryParse_HandlesMissingCommitMetadata()
     {
         ApplicationVersionDiagnostics.TryParse("0.1.42", out var info);
