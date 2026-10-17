@@ -65,7 +65,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
         _themeController.ApplyDarkMode(_isDarkMode);
         Version = _versionProvider.GetVersion();
         DiagnosticsText = ApplicationVersionDiagnostics.Format(Version, ApplicationVersionDiagnostics.BuildPlatformString());
-        Updates = new UpdateViewModel(updateService ?? new DisabledUpdateService());
+        Updates = new UpdateViewModel(updateService ?? new DisabledUpdateService(), initialSettings.UpdateTrack, SaveUpdateTrack, Version.ProductVersion);
 
         OpenCommand = new RelayCommand(_ => Open());
         Ai = ai ?? CreateOfflineAi(initialSettings.Ai);
@@ -139,6 +139,12 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IWindowGeometryS
     public WorkspaceTelemetrySettingsViewModel Telemetry { get; }
 
     public UpdateViewModel Updates { get; }
+
+    private void SaveUpdateTrack(UpdateTrack track)
+    {
+        _currentSettings = _currentSettings with { UpdateTrack = track };
+        QueueSave(_currentSettings);
+    }
 
     internal void ReplaceUpdateService(IUpdateService service)
     {

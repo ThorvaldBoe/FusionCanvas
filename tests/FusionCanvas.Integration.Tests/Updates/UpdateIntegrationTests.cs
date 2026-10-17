@@ -10,93 +10,81 @@ namespace FusionCanvas.Integration.Tests.Updates;
 public sealed class UpdateIntegrationTests
 {
     [Fact]
-    public async Task GitHubUpdateSource_DeserializesManifest()
+    public async Task GitHubUpdateSource_ListsStableAndPreviewReleaseAssets()
     {
-        var json = """
-        {"schemaVersion":2,"productVersion":"0.3.0","platform":"win-x64","installerUri":"https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe","sha256":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","releaseUri":"https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0","publisherCertificateSha256":"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"}
-        """;
         using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = new StringContent(json, Encoding.UTF8, "application/json")
+            Content = new StringContent("""[{"tag_name":"v0.4.0-preview.1","prerelease":true,"draft":false,"html_url":"https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.4.0-preview.1","assets":[{"name":"FusionCanvas-0.4.0-preview.1.json"}]},{"tag_name":"v0.3.0","prerelease":false,"draft":false,"html_url":"https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0","assets":[{"name":"FusionCanvas-0.3.0.json"}]}]""", Encoding.UTF8, "application/json")
         });
-        var manifest = await new GitHubUpdateSource(client).GetLatestAsync();
 
-        Assert.NotNull(manifest);
-        Assert.Equal("0.3.0", manifest.ProductVersion);
-        Assert.Equal(UpdatePlatform.WindowsX64, manifest.Platform);
+        var releases = await new GitHubUpdateSource(client).GetReleasesAsync();
+
+        Assert.Equal(2, releases.Count);
+        Assert.Equal(UpdateTrack.Preview, releases[0].Track);
+        Assert.Equal("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0.json", releases[1].ManifestUri.AbsoluteUri);
     }
 
     [Fact]
-    public async Task GitHubUpdateSource_FollowsOneCanonicalRedirect()
-    {
-        var json = ManifestJson();
-        using var client = new HttpClient(new SequenceHandler(
-        [
-            new HttpResponseMessage(HttpStatusCode.Redirect)
-            {
-                Headers = { Location = new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/latest.json") }
-            },
-            new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent(json, Encoding.UTF8, "application/json")
-            }
-        ]));
-
-        var manifest = await new GitHubUpdateSource(client).GetLatestAsync();
-
-        Assert.NotNull(manifest);
-        Assert.Equal("0.3.0", manifest.ProductVersion);
-    }
-
-    [Fact]
-    public async Task GitHubUpdateSource_RejectsSecondRedirect()
-    {
-        using var client = new HttpClient(new SequenceHandler(
-        [
-            new HttpResponseMessage(HttpStatusCode.Redirect)
-            {
-                Headers = { Location = new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/latest.json") }
-            },
-            new HttpResponseMessage(HttpStatusCode.Redirect)
-            {
-                Headers = { Location = new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/latest.json") }
-            }
-        ]));
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => new GitHubUpdateSource(client).GetLatestAsync());
-    }
-
-    [Fact]
-    public async Task GitHubUpdateSource_RejectsMalformedManifest()
+    public async Task GitHubUpdateSource_RejectsMalformedReleaseData()
     {
         using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent("not-json", Encoding.UTF8, "application/json")
         });
-
-        await Assert.ThrowsAsync<System.Text.Json.JsonException>(() => new GitHubUpdateSource(client).GetLatestAsync());
+        await Assert.ThrowsAnyAsync<System.Text.Json.JsonException>(() => new GitHubUpdateSource(client).GetReleasesAsync());
     }
 
     [Fact]
-    public async Task GitHubUpdateSource_PropagatesCancellation()
+    public async Task GitHubUpdateSource_StopsAtReleaseHistoryLimit()
     {
-        using var client = new HttpClient(new BlockingHandler());
-        using var cancellation = new CancellationTokenSource();
-        var started = BlockingHandler.Started.Task;
-        var request = new GitHubUpdateSource(client).GetLatestAsync(cancellation.Token);
+        var item = """{"tag_name":"v0.3.0","prerelease":false,"draft":false,"html_url":"https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0","assets":[{"name":"FusionCanvas-0.3.0.json"}]}""";
+        var fullPage = "[" + string.Join(',', Enumerable.Repeat(item, 100)) + "]";
+        var requests = 0;
+        using var client = CreateClient(_ => { requests++; return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(fullPage, Encoding.UTF8, "application/json") }; });
 
-        await started.WaitAsync(TimeSpan.FromSeconds(3));
-        cancellation.Cancel();
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => request);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new GitHubUpdateSource(client).GetReleasesAsync());
+        Assert.Equal(5, requests);
     }
 
     [Fact]
-    public async Task GitHubUpdateSource_PropagatesNetworkFailure()
+    public async Task GitHubUpdateSource_DeserializesVersionedManifestUsingCanonicalUrl()
     {
-        using var client = CreateClient(_ => throw new HttpRequestException("offline"));
+        const string json = """{"schemaVersion":3,"productVersion":"0.3.0","platform":"win-x64","track":"stable","tagName":"v0.3.0","sourceCommit":"CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC","installerUri":"https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe","sha256":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","releaseUri":"https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0","bundleUri":"https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe.sigstore.json"}""";
+        using var client = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") });
+        var release = new UpdateRelease("v0.3.0", "0.3.0", UpdateTrack.Stable,
+            new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0"),
+            new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0.json"));
 
-        await Assert.ThrowsAsync<HttpRequestException>(() => new GitHubUpdateSource(client).GetLatestAsync());
+        var manifest = await new GitHubUpdateSource(client).GetManifestAsync(release);
+
+        Assert.NotNull(manifest);
+        Assert.Equal(UpdateTrack.Stable, manifest.Track);
+        Assert.Equal(new string('C', 40), manifest.SourceCommit);
+    }
+
+    [Fact]
+    public async Task GitHubUpdateSource_RejectsNoncanonicalManifestAssetBeforeRequest()
+    {
+        using var client = CreateClient(_ => throw new InvalidOperationException("The source must not request an untrusted URL."));
+        var release = new UpdateRelease("v0.3.0", "0.3.0", UpdateTrack.Stable,
+            new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0"), new Uri("https://example.test/manifest.json"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new GitHubUpdateSource(client).GetManifestAsync(release));
+    }
+
+    [Fact]
+    public async Task GitHubUpdateSource_PropagatesCancellationAndNetworkErrors()
+    {
+        using (var client = new HttpClient(new BlockingHandler()))
+        using (var cancellation = new CancellationTokenSource())
+        {
+            var request = new GitHubUpdateSource(client).GetReleasesAsync(cancellation.Token);
+            await BlockingHandler.Started.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            cancellation.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => request);
+        }
+        using var failedClient = CreateClient(_ => throw new HttpRequestException("offline"));
+        await Assert.ThrowsAsync<HttpRequestException>(() => new GitHubUpdateSource(failedClient).GetReleasesAsync());
     }
 
     [Fact]
@@ -243,18 +231,33 @@ public sealed class UpdateIntegrationTests
         }
     }
 
-    private static UpdateManifest Manifest(string hash) => new(
-        UpdateManifestValidator.CurrentSchemaVersion,
-        "0.3.0",
-        UpdatePlatform.WindowsX64,
-        new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe"),
-        hash,
-        new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0"),
-        new string('B', 64));
+    [Fact]
+    public async Task Downloader_RejectsMissingBundleAndCleansUpInstaller()
+    {
+        var bytes = Encoding.UTF8.GetBytes("installer bytes");
+        var manifest = Manifest(Convert.ToHexString(SHA256.HashData(bytes)));
+        using var client = CreateClient(request => request.RequestUri!.AbsolutePath.EndsWith(".sigstore.json", StringComparison.Ordinal)
+            ? new HttpResponseMessage(HttpStatusCode.NotFound)
+            : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) });
+        var directory = Path.Combine(Path.GetTempPath(), "FusionCanvasUpdateTests", Guid.NewGuid().ToString("N"));
 
-    private static string ManifestJson() => """
-    {"schemaVersion":2,"productVersion":"0.3.0","platform":"win-x64","installerUri":"https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe","sha256":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","releaseUri":"https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0","publisherCertificateSha256":"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"}
-    """;
+        try
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                new UpdatePackageDownloader(client, new AcceptingAuthenticityVerifier(), directory).DownloadAndVerifyAsync(manifest));
+            Assert.Empty(Directory.EnumerateFiles(directory));
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static UpdateManifest Manifest(string hash) => new(
+        UpdateManifestValidator.CurrentSchemaVersion, "0.3.0", UpdatePlatform.WindowsX64, UpdateTrack.Stable, "v0.3.0", new string('C', 40),
+        new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe"), hash,
+        new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0"),
+        new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe.sigstore.json"));
 
     private static HttpClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> handler) =>
         new(new DelegateHandler(handler));
@@ -363,13 +366,13 @@ public sealed class UpdateIntegrationTests
 
     private sealed class AcceptingAuthenticityVerifier : IInstallerAuthenticityVerifier
     {
-        public Task VerifyAsync(string installerPath, UpdateManifest manifest, CancellationToken cancellationToken = default) =>
+        public Task VerifyAsync(string installerPath, string bundlePath, UpdateManifest manifest, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
     }
 
     private sealed class RejectingAuthenticityVerifier : IInstallerAuthenticityVerifier
     {
-        public Task VerifyAsync(string installerPath, UpdateManifest manifest, CancellationToken cancellationToken = default) =>
+        public Task VerifyAsync(string installerPath, string bundlePath, UpdateManifest manifest, CancellationToken cancellationToken = default) =>
             Task.FromException(new InvalidOperationException("signature rejected"));
     }
 }

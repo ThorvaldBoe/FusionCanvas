@@ -29,6 +29,23 @@ public sealed class UpdateViewModelTests
     }
 
     [Fact]
+    public async Task ChangingTrackClearsTheOldCandidateAndRechecksThatTrack()
+    {
+        var service = new FakeUpdateService { CheckResult = new UpdateCheckResult(UpdateCheckStatus.UpdateAvailable, Manifest("0.3.0")) };
+        var savedTrack = UpdateTrack.Stable;
+        var vm = new UpdateViewModel(service, trackChanged: track => savedTrack = track);
+        await ExecuteAsync(vm.CheckCommand);
+        Assert.True(vm.IsUpdateAvailable);
+
+        vm.SelectedTrack = UpdateTrack.Preview;
+
+        Assert.Equal(UpdateTrack.Preview, savedTrack);
+        Assert.Equal(UpdateTrack.Preview, service.LastTrack);
+        Assert.Equal(UpdatePresentationStatus.UpdateAvailable, vm.Status);
+        Assert.Equal(2, service.CheckTracks.Count);
+    }
+
+    [Fact]
     public async Task CheckFailure_IsVisibleAndRetryable()
     {
         const string rawMessage = "https://updates.example.test/?token=secret";
@@ -161,10 +178,13 @@ public sealed class UpdateViewModelTests
         UpdateManifestValidator.CurrentSchemaVersion,
         version,
         UpdatePlatform.WindowsX64,
+        version.Contains("-preview.", StringComparison.Ordinal) ? UpdateTrack.Preview : UpdateTrack.Stable,
+        "v" + version,
+        new string('C', 40),
         new Uri($"https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v{version}/FusionCanvas-{version}-win-x64-Setup.exe"),
         new string('A', 64),
         new Uri($"https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v{version}"),
-        new string('B', 64));
+        new Uri($"https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v{version}/FusionCanvas-{version}-win-x64-Setup.exe.sigstore.json"));
 
     private sealed class FakeUpdateService : IUpdateService
     {
@@ -175,9 +195,14 @@ public sealed class UpdateViewModelTests
         public Exception? ApplyException { get; set; }
         public bool BlockDownload { get; set; }
         public TaskCompletionSource<bool> DownloadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public List<UpdateTrack> CheckTracks { get; } = [];
+        public UpdateTrack LastTrack => CheckTracks.LastOrDefault();
 
-        public Task<UpdateCheckResult> CheckForUpdateAsync(CancellationToken cancellationToken = default) =>
-            CheckException is null ? Task.FromResult(CheckResult) : Task.FromException<UpdateCheckResult>(CheckException);
+        public Task<UpdateCheckResult> CheckForUpdateAsync(UpdateTrack track = UpdateTrack.Stable, CancellationToken cancellationToken = default)
+        {
+            CheckTracks.Add(track);
+            return CheckException is null ? Task.FromResult(CheckResult) : Task.FromException<UpdateCheckResult>(CheckException);
+        }
 
         public async Task<VerifiedUpdatePackage> DownloadAsync(UpdateManifest manifest, IProgress<UpdateDownloadProgress>? progress = null, CancellationToken cancellationToken = default)
         {

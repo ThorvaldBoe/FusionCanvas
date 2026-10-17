@@ -274,10 +274,13 @@ public class SettingsWindowTests
                 UpdateManifestValidator.CurrentSchemaVersion,
                 "0.3.0",
                 UpdatePlatform.WindowsX64,
+                UpdateTrack.Stable,
+                "v0.3.0",
+                new string('C', 40),
                 new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe"),
                 new string('A', 64),
                 new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0"),
-                PublisherCertificateSha256: new string('B', 64)))
+                new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe.sigstore.json")))
         };
         var settings = new SettingsViewModel(
             new InMemoryApplicationSettingsStore(),
@@ -295,6 +298,9 @@ public class SettingsWindowTests
             PumpLayout(window);
             var checkButton = FindControl<Button>(window, b => (b.Content as string) == "Check for updates" && b.IsVisible);
             Assert.NotNull(checkButton);
+            var trackSelector = FindControl<ComboBox>(window, combo => combo.IsVisible && AutomationProperties.GetAutomationId(combo) == "Updates.Track");
+            Assert.NotNull(trackSelector);
+            Assert.True(trackSelector!.IsEnabled);
 
             checkButton!.Command!.Execute(null);
             await ((FusionCanvas.App.Commands.AsyncRelayCommand)settings.Updates.CheckCommand).ExecutionTask!
@@ -314,13 +320,16 @@ public class SettingsWindowTests
         var updateService = new FakeUpdateService
         {
             CheckResult = new UpdateCheckResult(UpdateCheckStatus.UpdateAvailable, new UpdateManifest(
-                1,
+                UpdateManifestValidator.CurrentSchemaVersion,
                 "0.3.0",
                 UpdatePlatform.WindowsX64,
-                new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-Setup.exe"),
+                UpdateTrack.Stable,
+                "v0.3.0",
+                new string('C', 40),
+                new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe"),
                 new string('A', 64),
                 new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.3.0"),
-                new string('B', 64))),
+                new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v0.3.0/FusionCanvas-0.3.0-win-x64-Setup.exe.sigstore.json"))),
             BlockDownload = true
         };
         var settings = new SettingsViewModel(
@@ -353,6 +362,9 @@ public class SettingsWindowTests
             var cancelButton = FindControl<Button>(window, b =>
                 (b.Content as string) == "Cancel" && b.IsVisible);
             Assert.NotNull(cancelButton);
+            var trackSelector = FindControl<ComboBox>(window, combo => combo.IsVisible && AutomationProperties.GetAutomationId(combo) == "Updates.Track");
+            Assert.NotNull(trackSelector);
+            Assert.False(trackSelector!.IsEnabled);
             Assert.True(cancelButton!.Command?.CanExecute(null));
 
             cancelButton.Command!.Execute(null);
@@ -378,7 +390,7 @@ public class SettingsWindowTests
         public bool BlockDownload { get; set; }
         public TaskCompletionSource<bool> DownloadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public Task<UpdateCheckResult> CheckForUpdateAsync(CancellationToken cancellationToken = default) =>
+        public Task<UpdateCheckResult> CheckForUpdateAsync(UpdateTrack track = UpdateTrack.Stable, CancellationToken cancellationToken = default) =>
             Task.FromResult(CheckResult);
 
         public async Task<VerifiedUpdatePackage> DownloadAsync(UpdateManifest manifest, IProgress<UpdateDownloadProgress>? progress = null, CancellationToken cancellationToken = default)

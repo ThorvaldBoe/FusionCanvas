@@ -2,7 +2,7 @@ namespace FusionCanvas.Application.Updates;
 
 public interface IUpdateService
 {
-    Task<UpdateCheckResult> CheckForUpdateAsync(CancellationToken cancellationToken = default);
+    Task<UpdateCheckResult> CheckForUpdateAsync(UpdateTrack track = UpdateTrack.Stable, CancellationToken cancellationToken = default);
 
     Task<VerifiedUpdatePackage> DownloadAsync(
         UpdateManifest manifest,

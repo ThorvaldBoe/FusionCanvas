@@ -4,12 +4,13 @@ using FusionCanvas.Application.AI;
 using FusionCanvas.Application.Settings;
 using FusionCanvas.Application.Telemetry;
 using FusionCanvas.Application.TermsConsent;
+using FusionCanvas.Application.Updates;
 
 namespace FusionCanvas.Integration.Settings;
 
 public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
 {
-    private const int SupportedVersion = 6;
+    private const int SupportedVersion = 7;
 
     private static readonly JsonSerializerOptions WriteOptions = new()
     {
@@ -101,7 +102,7 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
                 var noAiGeometry = TryReadWindowGeometry(version, root, out var noAiGeometryWarning);
                 var noAiConsent = TryReadTermsConsent(root, out var noAiConsentWarning);
                 return new ApplicationSettingsLoadResult(
-                    new ApplicationSettings(darkMode, AiConfigurationSettings.Default, noAiLayout, activeWorkspaceId, noAiGeometry, TryReadGuid(root, "activeStoreId"), noAiConsent),
+                    new ApplicationSettings(darkMode, AiConfigurationSettings.Default, noAiLayout, activeWorkspaceId, noAiGeometry, TryReadGuid(root, "activeStoreId"), noAiConsent, TryReadUpdateTrack(root)),
                     UsedDefault: false,
                     CombineWarnings(CombineWarnings(noAiLayoutWarning, noAiGeometryWarning), noAiConsentWarning));
             }
@@ -127,7 +128,7 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
             var consent = TryReadTermsConsent(root, out var consentWarning);
             warning = CombineWarnings(warning, consentWarning);
             return new ApplicationSettingsLoadResult(
-                new ApplicationSettings(darkMode, aiSettings, layout, activeWorkspaceId, geometry, TryReadGuid(root, "activeStoreId"), consent),
+                new ApplicationSettings(darkMode, aiSettings, layout, activeWorkspaceId, geometry, TryReadGuid(root, "activeStoreId"), consent, TryReadUpdateTrack(root)),
                 UsedDefault: false,
                 warning);
         }
@@ -160,6 +161,7 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
                         ActiveWorkspaceId = settings.ActiveWorkspaceId,
                         ActiveStoreId = settings.ActiveStoreId,
                         TermsConsent = settings.TermsConsent,
+                        UpdateTrack = settings.UpdateTrack.ToString(),
                         WindowGeometry = settings.WindowGeometry is { Count: > 0 } geo
                             ? geo.ToDictionary(p => p.Key, p => p.Value)
                             : null
@@ -383,6 +385,12 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
             : null;
     }
 
+    private static UpdateTrack TryReadUpdateTrack(JsonElement root) =>
+        TryGetProperty(root, "updateTrack", out var element)
+        && element.ValueKind == JsonValueKind.String
+        && Enum.TryParse<UpdateTrack>(element.GetString(), ignoreCase: true, out var track)
+        && Enum.IsDefined(track) ? track : UpdateTrack.Stable;
+
     private static void TryDelete(string path)
     {
         try { File.Delete(path); }
@@ -402,5 +410,6 @@ public sealed class JsonApplicationSettingsStore : IApplicationSettingsStore
         public Guid? ActiveStoreId { get; set; }
         public Dictionary<string, WindowGeometrySettings>? WindowGeometry { get; set; }
         public TermsConsentRecord? TermsConsent { get; set; }
+        public string UpdateTrack { get; set; } = nameof(FusionCanvas.Application.Updates.UpdateTrack.Stable);
     }
 }

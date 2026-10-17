@@ -33,6 +33,7 @@ public sealed class UpdatePackageDownloader : IUpdatePackageDownloader
 
         Directory.CreateDirectory(_downloadDirectory);
         var temporaryPath = Path.Combine(_downloadDirectory, $"FusionCanvas-{Guid.NewGuid():N}.download");
+        var temporaryBundlePath = Path.Combine(_downloadDirectory, $"FusionCanvas-{Guid.NewGuid():N}.bundle.download");
         var installerPath = Path.Combine(_downloadDirectory, $"FusionCanvas-{manifest.ProductVersion}-Setup.exe");
 
         try
@@ -81,13 +82,38 @@ public sealed class UpdatePackageDownloader : IUpdatePackageDownloader
                 }
             }
 
-            await _authenticityVerifier.VerifyAsync(temporaryPath, manifest, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                using var bundleRequest = new HttpRequestMessage(HttpMethod.Get, manifest.BundleUri);
+                using var bundleResponse = await _httpClient.SendAsync(bundleRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                bundleResponse.EnsureSuccessStatusCode();
+                if (bundleResponse.Content.Headers.ContentLength is > 4 * 1024 * 1024) throw new InvalidOperationException("The provenance bundle is larger than the supported response limit. Setup was not launched.");
+                await using var source = await bundleResponse.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                await using var destination = new FileStream(temporaryBundlePath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 8192, useAsync: true);
+                var buffer = new byte[8192];
+                int read;
+                var total = 0;
+                while ((read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+                {
+                    total += read;
+                    if (total > 4 * 1024 * 1024) throw new InvalidOperationException("The provenance bundle is larger than the supported response limit. Setup was not launched.");
+                    await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (Exception exception) when (exception is not InvalidOperationException)
+            {
+                throw new InvalidOperationException("The release provenance bundle could not be downloaded. Setup was not launched.", exception);
+            }
+            await _authenticityVerifier.VerifyAsync(temporaryPath, temporaryBundlePath, manifest, cancellationToken).ConfigureAwait(false);
+            TryDelete(temporaryBundlePath);
             File.Move(temporaryPath, installerPath, overwrite: true);
             return new VerifiedUpdatePackage(manifest, installerPath);
         }
         catch
         {
             TryDelete(temporaryPath);
+            TryDelete(temporaryBundlePath);
             TryDelete(installerPath);
             throw;
         }
