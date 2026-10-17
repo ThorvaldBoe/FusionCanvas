@@ -2,85 +2,40 @@ namespace FusionCanvas.Application.Updates;
 
 public static class UpdateManifestValidator
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
+    public const string Repository = "ThorvaldBoe/FusionCanvas";
+    public const string ReleaseWorkflow = "ThorvaldBoe/FusionCanvas/.github/workflows/release-windows.yml";
+    public static Uri ReleasesApiUri { get; } = new("https://api.github.com/repos/ThorvaldBoe/FusionCanvas/releases?per_page=100");
 
-    public static Uri DiscoveryUri { get; } = new(
-        "https://github.com/ThorvaldBoe/FusionCanvas/releases/latest/download/latest.json");
+    public static bool IsSupported(UpdateManifest? manifest, string platform) =>
+        manifest is not null && manifest.SchemaVersion == CurrentSchemaVersion
+        && string.Equals(manifest.Platform, platform, StringComparison.Ordinal)
+        && Enum.IsDefined(manifest.Track)
+        && UpdateProductVersion.TryParse(manifest.ProductVersion, out var version)
+        && string.Equals(manifest.ProductVersion, version.ToString(), StringComparison.Ordinal)
+        && string.Equals(manifest.TagName, "v" + version, StringComparison.Ordinal)
+        && ((version.IsPreview && manifest.Track == UpdateTrack.Preview) || (!version.IsPreview && manifest.Track == UpdateTrack.Stable))
+        && IsCommit(manifest.SourceCommit)
+        && IsCanonicalAssetUri(manifest.InstallerUri, version, $"FusionCanvas-{version}-win-x64-Setup.exe")
+        && IsCanonicalAssetUri(manifest.BundleUri, version, $"FusionCanvas-{version}-win-x64-Setup.exe.sigstore.json")
+        && IsCanonicalReleaseUri(manifest.ReleaseUri, version)
+        && IsSha256(manifest.Sha256);
 
-    public static bool IsSupported(UpdateManifest? manifest, string platform)
-    {
-        ArgumentNullException.ThrowIfNull(platform);
+    public static bool MatchesRelease(UpdateManifest manifest, UpdateRelease release) =>
+        manifest.ProductVersion == release.ProductVersion && manifest.TagName == release.TagName
+        && manifest.Track == release.Track
+        && manifest.ReleaseUri == release.ReleaseUri;
 
-        return manifest is not null
-            && manifest.SchemaVersion == CurrentSchemaVersion
-            && string.Equals(manifest.Platform, platform, StringComparison.Ordinal)
-            && StableProductVersion.TryParse(manifest.ProductVersion, out var version)
-            && string.Equals(manifest.ProductVersion, version.ToString(), StringComparison.Ordinal)
-            && IsCanonicalInstallerUri(manifest.InstallerUri, version)
-            && IsCanonicalReleaseUri(manifest.ReleaseUri, version)
-            && IsSha256(manifest.Sha256)
-            && IsSha256(manifest.PublisherCertificateSha256);
-    }
+    public static bool IsCanonicalAssetUri(Uri? uri, UpdateProductVersion version, string filename) =>
+        IsGitHubUri(uri) && uri!.AbsolutePath == $"/{Repository}/releases/download/v{version}/{filename}";
 
-    public static bool IsCanonicalManifestRedirect(Uri? uri)
-    {
-        if (!IsGitHubHttpsUri(uri))
-        {
-            return false;
-        }
+    public static bool IsCanonicalReleaseUri(Uri? uri, UpdateProductVersion version) =>
+        IsGitHubUri(uri) && uri!.AbsolutePath == $"/{Repository}/releases/tag/v{version}";
 
-        var segments = GetPathSegments(uri!);
-        return segments.Length == 6
-            && string.Equals(segments[0], "ThorvaldBoe", StringComparison.Ordinal)
-            && string.Equals(segments[1], "FusionCanvas", StringComparison.Ordinal)
-            && string.Equals(segments[2], "releases", StringComparison.Ordinal)
-            && string.Equals(segments[3], "download", StringComparison.Ordinal)
-            && segments[4].StartsWith("v", StringComparison.Ordinal)
-            && StableProductVersion.TryParse(segments[4][1..], out var version)
-            && string.Equals(segments[4], "v" + version, StringComparison.Ordinal)
-            && string.Equals(segments[5], "latest.json", StringComparison.Ordinal);
-    }
+    private static bool IsGitHubUri(Uri? uri) => uri is { IsAbsoluteUri: true, Scheme: "https" }
+        && uri.Authority.Equals("github.com", StringComparison.OrdinalIgnoreCase)
+        && string.IsNullOrEmpty(uri.UserInfo) && string.IsNullOrEmpty(uri.Query) && string.IsNullOrEmpty(uri.Fragment);
 
-    private static bool IsCanonicalInstallerUri(Uri? uri, StableProductVersion version)
-    {
-        var expectedPath = $"/ThorvaldBoe/FusionCanvas/releases/download/v{version}/FusionCanvas-{version}-win-x64-Setup.exe";
-        return IsGitHubHttpsUri(uri)
-            && string.Equals(uri!.AbsolutePath, expectedPath, StringComparison.Ordinal);
-    }
-
-    private static bool IsCanonicalReleaseUri(Uri? uri, StableProductVersion version)
-    {
-        var expectedPath = $"/ThorvaldBoe/FusionCanvas/releases/tag/v{version}";
-        return IsGitHubHttpsUri(uri)
-            && string.Equals(uri!.AbsolutePath, expectedPath, StringComparison.Ordinal);
-    }
-
-    private static bool IsGitHubHttpsUri(Uri? uri) =>
-        uri is not null
-        && uri.IsAbsoluteUri
-        && uri.Scheme == Uri.UriSchemeHttps
-        && string.Equals(uri.Authority, "github.com", StringComparison.OrdinalIgnoreCase)
-        && string.IsNullOrEmpty(uri.UserInfo)
-        && string.IsNullOrEmpty(uri.Query)
-        && string.IsNullOrEmpty(uri.Fragment);
-
-    private static string[] GetPathSegments(Uri uri) =>
-        uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-
-    private static bool IsSha256(string? value) =>
-        !string.IsNullOrWhiteSpace(value)
-        && value.Length == 64
-        && TryDecodeSha256(value);
-
-    private static bool TryDecodeSha256(string value)
-    {
-        try
-        {
-            return Convert.FromHexString(value).Length == 32;
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
-    }
+    private static bool IsCommit(string? value) => value is { Length: 40 } && value.All(Uri.IsHexDigit);
+    private static bool IsSha256(string? value) => value is { Length: 64 } && value.All(Uri.IsHexDigit);
 }

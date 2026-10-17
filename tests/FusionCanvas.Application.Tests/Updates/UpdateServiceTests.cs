@@ -38,6 +38,34 @@ public sealed class UpdateServiceTests
         Assert.Equal(UpdateCheckStatus.Unsupported, result.Status);
     }
 
+    [Fact]
+    public async Task CheckForUpdate_StableSkipsPreviewWhilePreviewSelectsNewestEligibleStableOrPreview()
+    {
+        var preview = Manifest("0.4.0-preview.1") with { Track = UpdateTrack.Preview };
+        var stable = Manifest("0.4.0");
+        var source = new MultiReleaseSource(preview, stable);
+        var service = new UpdateService(new ConstantVersionProvider("0.3.0"), source, new RecordingDownloader(), new RecordingLauncher(), new RecordingLifecycle(), UpdatePlatform.WindowsX64);
+
+        Assert.Equal(UpdateCheckStatus.UpdateAvailable, (await service.CheckForUpdateAsync(UpdateTrack.Stable)).Status);
+        var previewTrack = await service.CheckForUpdateAsync(UpdateTrack.Preview);
+        Assert.Equal("0.4.0", previewTrack.Manifest!.ProductVersion);
+    }
+
+    [Fact]
+    public async Task CheckForUpdate_StableReturnsUpToDateWhenOnlyPreviewReleaseIsNewer()
+    {
+        var preview = Manifest("0.4.0-preview.1") with { Track = UpdateTrack.Preview };
+        var service = new UpdateService(new ConstantVersionProvider("0.3.0"), new MultiReleaseSource(preview),
+            new RecordingDownloader(), new RecordingLauncher(), new RecordingLifecycle(), UpdatePlatform.WindowsX64);
+
+        var stable = await service.CheckForUpdateAsync(UpdateTrack.Stable);
+        var previewTrack = await service.CheckForUpdateAsync(UpdateTrack.Preview);
+
+        Assert.Equal(UpdateCheckStatus.UpToDate, stable.Status);
+        Assert.Equal(UpdateCheckStatus.UpdateAvailable, previewTrack.Status);
+        Assert.Equal("0.4.0-preview.1", previewTrack.Manifest!.ProductVersion);
+    }
+
     [Theory]
     [InlineData("0.2.0")]
     [InlineData("0.1.9")]
@@ -120,10 +148,13 @@ public sealed class UpdateServiceTests
         UpdateManifestValidator.CurrentSchemaVersion,
         version,
         UpdatePlatform.WindowsX64,
+        UpdateTrack.Stable,
+        "v" + version,
+        new string('C', 40),
         new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v" + version + "/FusionCanvas-" + version + "-win-x64-Setup.exe"),
         new string('A', 64),
         new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v" + version),
-        new string('B', 64));
+        new Uri("https://github.com/ThorvaldBoe/FusionCanvas/releases/download/v" + version + "/FusionCanvas-" + version + "-win-x64-Setup.exe.sigstore.json"));
 
     private sealed class ConstantVersionProvider(string version) : IApplicationVersionProvider
     {
@@ -132,7 +163,20 @@ public sealed class UpdateServiceTests
 
     private sealed class ConstantSource(UpdateManifest manifest) : IUpdateSource
     {
-        public Task<UpdateManifest?> GetLatestAsync(CancellationToken cancellationToken = default) => Task.FromResult<UpdateManifest?>(manifest);
+        public Task<IReadOnlyList<UpdateRelease>> GetReleasesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<UpdateRelease>>(
+            [new UpdateRelease(manifest.TagName, manifest.ProductVersion, manifest.Track, manifest.ReleaseUri,
+                new Uri($"https://github.com/ThorvaldBoe/FusionCanvas/releases/download/{manifest.TagName}/FusionCanvas-{manifest.ProductVersion}.json"))]);
+        public Task<UpdateManifest?> GetManifestAsync(UpdateRelease release, CancellationToken cancellationToken = default) => Task.FromResult<UpdateManifest?>(manifest);
+    }
+
+    private sealed class MultiReleaseSource(params UpdateManifest[] manifests) : IUpdateSource
+    {
+        private readonly IReadOnlyList<UpdateRelease> _releases = manifests.Select(manifest => new UpdateRelease(
+            manifest.TagName, manifest.ProductVersion, manifest.Track, manifest.ReleaseUri,
+            new Uri($"https://github.com/ThorvaldBoe/FusionCanvas/releases/download/{manifest.TagName}/FusionCanvas-{manifest.ProductVersion}.json"))).ToArray();
+        public Task<IReadOnlyList<UpdateRelease>> GetReleasesAsync(CancellationToken cancellationToken = default) => Task.FromResult(_releases);
+        public Task<UpdateManifest?> GetManifestAsync(UpdateRelease release, CancellationToken cancellationToken = default) =>
+            Task.FromResult<UpdateManifest?>(manifests.Single(m => m.TagName == release.TagName));
     }
 
     private sealed class RecordingDownloader : IUpdatePackageDownloader

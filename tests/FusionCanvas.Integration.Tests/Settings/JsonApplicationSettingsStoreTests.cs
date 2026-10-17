@@ -103,7 +103,7 @@ public class JsonApplicationSettingsStoreTests
     {
         using var tempDirectory = new TemporaryDirectory();
         var path = tempDirectory.GetPath("settings.json");
-        await File.WriteAllTextAsync(path, "{\"version\":7,\"darkMode\":true}", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(path, "{\"version\":8,\"darkMode\":true}", TestContext.Current.CancellationToken);
         var store = new JsonApplicationSettingsStore(path);
 
         var result = await store.LoadAsync(TestContext.Current.CancellationToken);
@@ -111,6 +111,22 @@ public class JsonApplicationSettingsStoreTests
         Assert.True(result.UsedDefault);
         Assert.False(result.Value.DarkMode);
         Assert.NotNull(result.Warning);
+    }
+
+    [Fact]
+    public async Task SaveAndLoad_PreservesPreviewTrackAndLegacyDocumentsDefaultToStable()
+    {
+        using var tempDirectory = new TemporaryDirectory();
+        var path = tempDirectory.GetPath("settings.json");
+        var store = new JsonApplicationSettingsStore(path);
+        await store.SaveAsync(ApplicationSettings.Default with { UpdateTrack = FusionCanvas.Application.Updates.UpdateTrack.Preview }, TestContext.Current.CancellationToken);
+        var loaded = await store.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(FusionCanvas.Application.Updates.UpdateTrack.Preview, loaded.Value.UpdateTrack);
+
+        await File.WriteAllTextAsync(path, "{\"version\":6,\"darkMode\":true}", TestContext.Current.CancellationToken);
+        var legacy = await store.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(FusionCanvas.Application.Updates.UpdateTrack.Stable, legacy.Value.UpdateTrack);
+        Assert.True(legacy.Value.DarkMode);
     }
 
     [Fact]
@@ -266,7 +282,7 @@ public class JsonApplicationSettingsStoreTests
         Assert.Equal("idea/model", loaded.Value.Ai.Ideation.CustomProfile.ModelId);
         Assert.Equal("retained/model", loaded.Value.Ai.Concept.CustomProfile.ModelId);
         Assert.Equal("sll/model", loaded.Value.Ai.Sll.CustomProfile.ModelId);
-        Assert.Contains("\"version\": 6", json);
+        Assert.Contains("\"version\": 7", json);
         Assert.DoesNotContain("apiKey", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("secret", json, StringComparison.OrdinalIgnoreCase);
     }
@@ -472,7 +488,7 @@ public class JsonApplicationSettingsStoreTests
 
         Assert.Equal(layout, loaded.Value.WindowLayout);
         Assert.Equal(new WindowGeometrySettings(60, 90, 800, 600), loaded.Value.WindowGeometry!["ideation"]);
-        Assert.Contains("\"version\": 6", json);
+        Assert.Contains("\"version\": 7", json);
     }
 
     [Fact]

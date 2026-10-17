@@ -111,7 +111,7 @@ public static class AppServicesFactory
         return new UpdateService(
             new AssemblyApplicationVersionProvider(),
             new GitHubUpdateSource(updateHttpClient),
-            new UpdatePackageDownloader(updateHttpClient, new WindowsInstallerAuthenticodeVerifier()),
+            new UpdatePackageDownloader(updateHttpClient, new GitHubAttestationVerifier()),
             new WindowsInstallerLauncher(),
             new AppUpdateApplicationLifecycle(
                 settings.FlushAsync,

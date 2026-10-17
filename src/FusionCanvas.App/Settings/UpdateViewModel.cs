@@ -18,10 +18,16 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
     private bool _downloadRetryAvailable;
     private bool _backgroundCheckStarted;
     private bool _disposed;
+    private UpdateTrack _selectedTrack;
+    private readonly Action<UpdateTrack>? _trackChanged;
+    private readonly string? _currentVersion;
 
-    public UpdateViewModel(IUpdateService service)
+    public UpdateViewModel(IUpdateService service, UpdateTrack selectedTrack = UpdateTrack.Stable, Action<UpdateTrack>? trackChanged = null, string? currentVersion = null)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
+        _selectedTrack = selectedTrack;
+        _trackChanged = trackChanged;
+        _currentVersion = currentVersion;
         CheckCommand = new AsyncRelayCommand(() => CheckAsync(manual: true), CanCheck);
         UpdateCommand = new AsyncRelayCommand(DownloadAsync, CanDownload);
         InstallCommand = new AsyncRelayCommand(InstallAsync, CanInstall);
@@ -79,6 +85,36 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
 
     public bool IsUnsupported => Status == UpdatePresentationStatus.Unsupported;
 
+    public IReadOnlyList<UpdateTrack> AvailableTracks { get; } = Enum.GetValues<UpdateTrack>();
+
+    public UpdateTrack SelectedTrack
+    {
+        get => _selectedTrack;
+        set
+        {
+            if (!Enum.IsDefined(value) || value == _selectedTrack) return;
+            if (!CanChangeTrack)
+            {
+                OnPropertyChanged();
+                return;
+            }
+            _selectedTrack = value;
+            OnPropertyChanged();
+            _trackChanged?.Invoke(value);
+            _manifest = null;
+            _package = null;
+            _downloadRetryAvailable = false;
+            ErrorMessage = null;
+            Status = UpdatePresentationStatus.NotChecked;
+            NotifyCommands();
+            NotifyStateProperties();
+            _ = CheckAsync(manual: false);
+        }
+    }
+
+    public bool CanChangeTrack => !_disposed && Status is not UpdatePresentationStatus.Checking
+        and not UpdatePresentationStatus.Downloading and not UpdatePresentationStatus.Installing;
+
     public string UpdateActionText => Status switch
     {
         UpdatePresentationStatus.Downloading => "Downloading update…",
@@ -90,7 +126,9 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
     {
         UpdatePresentationStatus.NotChecked => "Updates have not been checked yet.",
         UpdatePresentationStatus.Checking => "Checking for updates…",
-        UpdatePresentationStatus.UpToDate => "FusionCanvas is up to date.",
+        UpdatePresentationStatus.UpToDate => _selectedTrack == UpdateTrack.Stable && IsInstalledPreview
+            ? "No newer Stable release is available; switching tracks will not downgrade FusionCanvas."
+            : "FusionCanvas is up to date.",
         UpdatePresentationStatus.UpdateAvailable => $"Version {_manifest?.ProductVersion} is available.",
         UpdatePresentationStatus.Downloading => $"Downloading version {_manifest?.ProductVersion}…",
         UpdatePresentationStatus.ReadyToInstall => ErrorMessage ?? $"Version {_manifest?.ProductVersion} is ready. FusionCanvas will close and restart to install it.",
@@ -101,6 +139,8 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
     };
 
     public string? AvailableVersion => _manifest?.ProductVersion;
+
+    private bool IsInstalledPreview => UpdateProductVersion.TryParse(_currentVersion, out var version) && version.IsPreview;
 
     public ICommand CheckCommand { get; }
 
@@ -165,7 +205,7 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
 
         try
         {
-            var result = await _service.CheckForUpdateAsync(cancellation.Token).ConfigureAwait(true);
+            var result = await _service.CheckForUpdateAsync(_selectedTrack, cancellation.Token).ConfigureAwait(true);
             if (result.IsUpdateAvailable)
             {
                 _manifest = result.Manifest;
@@ -317,6 +357,7 @@ public sealed class UpdateViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(UpdateActionText));
         OnPropertyChanged(nameof(StatusMessage));
         OnPropertyChanged(nameof(AvailableVersion));
+        OnPropertyChanged(nameof(CanChangeTrack));
     }
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

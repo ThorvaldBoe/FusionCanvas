@@ -27,7 +27,7 @@ public sealed class UpdateService : IUpdateService
         _platform = string.IsNullOrWhiteSpace(platform) ? throw new ArgumentException("Platform is required.", nameof(platform)) : platform;
     }
 
-    public async Task<UpdateCheckResult> CheckForUpdateAsync(CancellationToken cancellationToken = default)
+    public async Task<UpdateCheckResult> CheckForUpdateAsync(UpdateTrack track = UpdateTrack.Stable, CancellationToken cancellationToken = default)
     {
         if (!string.Equals(_platform, UpdatePlatform.WindowsX64, StringComparison.Ordinal))
         {
@@ -35,21 +35,31 @@ public sealed class UpdateService : IUpdateService
         }
 
         var currentVersion = _versionProvider.GetVersion();
-        if (!StableProductVersion.TryParse(currentVersion.ProductVersion, out var current))
+        if (!Enum.IsDefined(track) || !UpdateProductVersion.TryParse(currentVersion.ProductVersion, out var current))
         {
             return new UpdateCheckResult(UpdateCheckStatus.Unsupported, null);
         }
 
-        var manifest = await _source.GetLatestAsync(cancellationToken).ConfigureAwait(false);
-        if (!UpdateManifestValidator.IsSupported(manifest, _platform)
-            || !StableProductVersion.TryParse(manifest!.ProductVersion, out var available))
+        var releases = await _source.GetReleasesAsync(cancellationToken).ConfigureAwait(false);
+        var candidate = releases
+            .Where(release => UpdateProductVersion.TryParse(release.ProductVersion, out var version)
+                && string.Equals(release.ProductVersion, version.ToString(), StringComparison.Ordinal)
+                && (track == UpdateTrack.Preview || release.Track == UpdateTrack.Stable)
+                && (!version.IsPreview || release.Track == UpdateTrack.Preview))
+            .Where(release => UpdateProductVersion.TryParse(release.ProductVersion, out var version) && version.CompareTo(current) > 0)
+            .OrderByDescending(release => UpdateProductVersion.TryParse(release.ProductVersion, out var version) ? version : default)
+            .ThenBy(release => release.TagName, StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (candidate is null)
         {
-            return new UpdateCheckResult(UpdateCheckStatus.Unsupported, null);
+            return new UpdateCheckResult(UpdateCheckStatus.UpToDate, null);
         }
 
-        return available.CompareTo(current) > 0
-            ? new UpdateCheckResult(UpdateCheckStatus.UpdateAvailable, manifest)
-            : new UpdateCheckResult(UpdateCheckStatus.UpToDate, null);
+        var manifest = await _source.GetManifestAsync(candidate, cancellationToken).ConfigureAwait(false);
+        if (!UpdateManifestValidator.IsSupported(manifest, _platform) || !UpdateManifestValidator.MatchesRelease(manifest!, candidate))
+            return new UpdateCheckResult(UpdateCheckStatus.Unsupported, null);
+
+        return new UpdateCheckResult(UpdateCheckStatus.UpdateAvailable, manifest);
     }
 
     public async Task<VerifiedUpdatePackage> DownloadAsync(
@@ -83,7 +93,7 @@ public sealed class UpdateService : IUpdateService
     }
 
     private bool IsNewerThanCurrent(UpdateManifest manifest) =>
-        StableProductVersion.TryParse(_versionProvider.GetVersion().ProductVersion, out var current)
-        && StableProductVersion.TryParse(manifest.ProductVersion, out var available)
+        UpdateProductVersion.TryParse(_versionProvider.GetVersion().ProductVersion, out var current)
+        && UpdateProductVersion.TryParse(manifest.ProductVersion, out var available)
         && available.CompareTo(current) > 0;
 }

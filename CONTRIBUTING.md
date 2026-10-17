@@ -91,11 +91,11 @@ The reusable `deterministic-tests` workflow runs on pull requests to `main`, on 
 
 Repository maintainers own GitHub Actions updates. Each action must use a full commit SHA from its official repository, with the reviewed release version in a comment. Update the SHA and version together in a pull request, review the upstream release and action permissions, and run the deterministic baseline before merging. Do not replace a SHA with a mutable tag.
 
-The `Windows package` workflow runs after every merge to `main` and on manual dispatch. It waits for the reusable deterministic test gate, publishes a self-contained `win-x64` ZIP named from Nerdbank.GitVersioning's canonical package SemVer, writes a SHA-256 checksum, and creates a signed GitHub artifact attestation. The separate `Windows installer` workflow uses the same gate and publish input to produce a versioned NSIS setup candidate with its own checksum and attestation. Both remain downloadable candidate artifacts. Stable tags use the `Stable Windows release` workflow to publish a GitHub Release containing the NSIS setup, checksum, and `latest.json` update manifest consumed by the in-app updater. The installer defaults to a per-user destination below `%LOCALAPPDATA%\Programs\FusionCanvas` and preserves application data below `%LOCALAPPDATA%\FusionCanvas` during installation, upgrade, and uninstall. Separate code signing is not required for ZIP distribution, but any future installer or platform package must use the platform's signing requirements before release. The CI test-result artifacts are diagnostics, not release outputs.
+The `Windows package` workflow runs after every merge to `main` and on manual dispatch. It waits for the reusable deterministic test gate, publishes a self-contained `win-x64` ZIP named from Nerdbank.GitVersioning's canonical package SemVer, writes a SHA-256 checksum, and creates a signed GitHub artifact attestation. The separate `Windows installer` workflow uses the same gate and publish input to produce a versioned NSIS setup candidate with its own checksum and attestation. Tagged Stable and Preview releases use the `Windows release` workflow to publish immutable GitHub Release assets: the NSIS setup, SHA-256 file, versioned update manifest, and Sigstore bundle. Stable releases are ordinary releases; Preview releases are marked prerelease. The updater lists retained releases and selects the newest eligible build from the user's saved track. The installer defaults to a per-user destination below `%LOCALAPPDATA%\Programs\FusionCanvas` and preserves application data below `%LOCALAPPDATA%\FusionCanvas` during installation, upgrade, and uninstall. The CI test-result artifacts are diagnostics, not release outputs.
 
 ### Release tag convention
 
-Releases use the Git tag form:
+Stable releases use the Git tag form:
 
 ```text
 vMajor.Minor.Build
@@ -108,8 +108,22 @@ Stable releases use the same `Major.Minor.Build` value for the Git tag, applicat
 ```text
 Application version: 0.4.127
 Git tag:              v0.4.127
-Release title:       FusionCanvas 0.4.127
-Artifact:            FusionCanvas-0.4.127-win-x64.zip
+Release title:       FusionCanvas stable 0.4.127
+Setup:               FusionCanvas-0.4.127-win-x64-Setup.exe
+Manifest:            FusionCanvas-0.4.127.json
+Attestation:         FusionCanvas-0.4.127-win-x64-Setup.exe.sigstore.json
 ```
 
-The stable release workflow is intentionally tag-only: commits merged to `main` do not publish an update-channel release, and the in-app updater accepts only a validated `Major.Minor.Build` manifest for the supported Windows installer.
+Preview releases use `vMajor.Minor.Build-preview.N`, such as `v0.5.0-preview.1`. Set the NBGV `version` in `version.json` to the exact matching version before creating the tag. The workflow rejects any tag/package version mismatch before publishing. Preview releases are experimental and may contain unfinished features; stable bug fixes go to Stable releases.
+
+Both tracks retain every versioned GitHub Release asset. The updater defaults to Stable. Preview includes Preview builds and later Stable releases, while Stable excludes prereleases. Neither track offers a downgrade. To verify a downloaded setup independently, download its adjacent `.sigstore.json` bundle and run:
+
+```powershell
+gh attestation verify .\FusionCanvas-<version>-win-x64-Setup.exe `
+  --bundle .\FusionCanvas-<version>-win-x64-Setup.exe.sigstore.json `
+  --repo ThorvaldBoe/FusionCanvas `
+  --signer-workflow ThorvaldBoe/FusionCanvas/.github/workflows/release-windows.yml `
+  --source-ref refs/tags/v<version>
+```
+
+This verifies that GitHub attested the setup from the named repository, workflow, tag, and source revision. It does not assess source-code quality.

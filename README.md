@@ -1,5 +1,11 @@
 # FusionCanvas
 
+## Download
+
+Download the current [Stable release](https://github.com/ThorvaldBoe/FusionCanvas/releases/latest), or browse [all Stable and Preview releases](https://github.com/ThorvaldBoe/FusionCanvas/releases). Each release includes a Windows setup file, checksum, versioned update manifest, and Sigstore provenance bundle. The in-app updater defaults to Stable; Preview builds are intended for users who want to try experimental features.
+
+To independently verify a downloaded setup with GitHub CLI, download its `.sigstore.json` file and run the command shown in [Versioning and releases](CONTRIBUTING.md#versioning-and-releases). The attestation ties the installer to a repository commit and build workflow; it does not certify the code's quality.
+
 **FusionCanvas** is an open-source desktop toolkit for Print-on-Demand creators.
 
 It is intended to help creators manage the full product workflow from early ideas to published listings, including concept development, design organization, mockup generation, listing preparation, and future automation with platforms such as Shopify and Printify.
