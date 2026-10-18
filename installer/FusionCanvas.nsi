@@ -107,7 +107,7 @@ Function .onInit
     ${If} $LegacyInstallDir != ""
       StrCmp $LegacyInstallDir "$LegacyDefaultDir" legacy_default legacy_custom
 legacy_custom:
-      MessageBox MB_OK|MB_ICONSTOP "An existing FusionCanvas installation uses a custom per-user location. Uninstall that version first, then run this setup again to install FusionCanvas machine-wide. Your workspace and settings will remain in place."
+      MessageBox MB_OK|MB_ICONSTOP /SD IDOK "An existing FusionCanvas installation uses a custom per-user location. Uninstall that version first, then run this setup again to install FusionCanvas machine-wide. Your workspace and settings will remain in place."
       Abort
 legacy_default:
       StrCpy $INSTDIR "$PROGRAMFILES64\FusionCanvas"
@@ -171,7 +171,7 @@ install_failed:
     DeleteRegKey HKLM "${UNINSTALL_KEY}"
     DeleteRegKey HKLM "${INSTALL_KEY}"
   ${EndIf}
-  MessageBox MB_ICONSTOP "FusionCanvas could not be installed completely. No successful installation is reported."
+  MessageBox MB_ICONSTOP /SD IDOK "FusionCanvas could not be installed completely. No successful installation is reported."
   Abort
 
 install_complete:
