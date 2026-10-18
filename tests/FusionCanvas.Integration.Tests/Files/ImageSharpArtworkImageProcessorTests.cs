@@ -10,7 +10,7 @@ public sealed class ImageSharpArtworkImageProcessorTests
     [Fact]
     public async Task InspectAsync_FindsAlphaBoundsIncludingSemiTransparentPixels()
     {
-        using var image = new Image<Rgba32>(8, 6, Color.Transparent);
+        using var image = new Image<Rgba32>(Configuration.Default, 8, 6, default);
         image[2, 1] = new Rgba32(200, 30, 40, 1);
         image[5, 4] = new Rgba32(20, 100, 220, 128);
         await using var source = new MemoryStream();
@@ -27,7 +27,7 @@ public sealed class ImageSharpArtworkImageProcessorTests
     [Fact]
     public async Task InspectAsync_OpaqueCanvasUsesFullBoundsAndTransparentCanvasHasNoBounds()
     {
-        using var opaque = new Image<Rgba32>(3, 2, Color.White);
+        using var opaque = new Image<Rgba32>(Configuration.Default, 3, 2, new Rgba32(255, 255, 255, 255));
         await using var opaqueSource = new MemoryStream();
         await opaque.SaveAsPngAsync(opaqueSource);
         opaqueSource.Position = 0;
@@ -37,7 +37,7 @@ public sealed class ImageSharpArtworkImageProcessorTests
 
         Assert.Equal(new ArtworkPixelRectangle(0, 0, 3, 2), opaqueResult.VisibleBounds);
 
-        using var transparent = new Image<Rgba32>(3, 2, Color.Transparent);
+        using var transparent = new Image<Rgba32>(Configuration.Default, 3, 2, default);
         await using var transparentSource = new MemoryStream();
         await transparent.SaveAsPngAsync(transparentSource);
         transparentSource.Position = 0;
@@ -49,7 +49,7 @@ public sealed class ImageSharpArtworkImageProcessorTests
     [Fact]
     public async Task TransformAsync_ResizesProportionallyMovesAndClipsOnOriginalCanvas()
     {
-        using var image = new Image<Rgba32>(6, 6, Color.Transparent);
+        using var image = new Image<Rgba32>(Configuration.Default, 6, 6, default);
         image[1, 1] = new Rgba32(255, 0, 0, 255);
         image[2, 1] = new Rgba32(255, 0, 0, 255);
         image[1, 2] = new Rgba32(255, 0, 0, 255);

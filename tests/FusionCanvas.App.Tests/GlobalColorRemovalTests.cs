@@ -172,7 +172,7 @@ public sealed class GlobalColorRemovalTests
 
         private static byte[] PngBytes()
         {
-            using var image = new Image<Rgba32>(1, 1, new Rgba32(0, 0, 0, 255));
+            using var image = new Image<Rgba32>(Configuration.Default, 1, 1, new Rgba32(0, 0, 0, 255));
             using var stream = new MemoryStream();
             image.SaveAsPng(stream);
             stream.Position = 0;

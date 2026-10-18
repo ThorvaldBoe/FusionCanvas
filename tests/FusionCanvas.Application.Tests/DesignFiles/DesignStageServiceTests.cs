@@ -598,7 +598,7 @@ public class DesignStageServiceTests
 
     private static byte[] CreateArtworkPng()
     {
-        using var image = new Image<Rgba32>(6, 6, Color.Transparent);
+        using var image = new Image<Rgba32>(Configuration.Default, 6, 6, default);
         for (var y = 1; y <= 2; y++)
         for (var x = 1; x <= 2; x++)
             image[x, y] = new Rgba32(230, 20, 30, 255);

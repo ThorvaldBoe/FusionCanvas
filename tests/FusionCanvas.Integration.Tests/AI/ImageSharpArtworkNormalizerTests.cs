@@ -11,7 +11,7 @@ public sealed class ImageSharpArtworkNormalizerTests
     [Fact]
     public async Task NormalizeAsync_FitsArtworkOnTransparentTargetCanvas()
     {
-        using var sourceImage = new Image<Rgba32>(20, 10, new Rgba32(255, 0, 0, 255));
+        using var sourceImage = new Image<Rgba32>(Configuration.Default, 20, 10, new Rgba32(255, 0, 0, 255));
         await using var source = new MemoryStream();
         await sourceImage.SaveAsPngAsync(source);
         source.Position = 0;
@@ -34,7 +34,7 @@ public sealed class ImageSharpArtworkNormalizerTests
     [Fact]
     public async Task NormalizeAsync_RejectsFullyTransparentArtwork()
     {
-        using var sourceImage = new Image<Rgba32>(4, 4, Color.Transparent);
+        using var sourceImage = new Image<Rgba32>(Configuration.Default, 4, 4, default);
         await using var source = new MemoryStream();
         await sourceImage.SaveAsPngAsync(source);
         source.Position = 0;
@@ -49,7 +49,7 @@ public sealed class ImageSharpArtworkNormalizerTests
     [Fact]
     public async Task NormalizeAsync_EnforcesDecodedPixelLimit()
     {
-        using var sourceImage = new Image<Rgba32>(3, 2, Color.White);
+        using var sourceImage = new Image<Rgba32>(Configuration.Default, 3, 2, new Rgba32(255, 255, 255, 255));
         await using var source = new MemoryStream();
         await sourceImage.SaveAsPngAsync(source);
         source.Position = 0;
@@ -64,7 +64,7 @@ public sealed class ImageSharpArtworkNormalizerTests
     [Fact]
     public async Task NormalizeAsync_AcceptsJpegAndReportsOpaqueTransparencyShortfall()
     {
-        using var sourceImage = new Image<Rgba32>(10, 20, new Rgba32(0, 120, 255, 255));
+        using var sourceImage = new Image<Rgba32>(Configuration.Default, 10, 20, new Rgba32(0, 120, 255, 255));
         await using var source = new MemoryStream();
         await sourceImage.SaveAsJpegAsync(source, new JpegEncoder { Quality = 90 });
         source.Position = 0;
@@ -81,7 +81,7 @@ public sealed class ImageSharpArtworkNormalizerTests
     [Fact]
     public async Task NormalizeAsync_PreservesSourceAlphaAndCentersOnTopInset()
     {
-        using var sourceImage = new Image<Rgba32>(2, 1);
+        using var sourceImage = new Image<Rgba32>(Configuration.Default, 2, 1);
         sourceImage[0, 0] = new Rgba32(255, 0, 0, 255);
         sourceImage[1, 0] = new Rgba32(255, 0, 0, 0);
         await using var source = new MemoryStream();
