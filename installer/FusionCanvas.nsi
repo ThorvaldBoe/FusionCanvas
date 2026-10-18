@@ -24,12 +24,16 @@ Unicode true
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define INSTALL_KEY "Software\${PRODUCT_NAME}"
 
+Var LegacyInstallDir
+Var HasMachineInstall
+Var LegacyDefaultDir
+
 Name "${PRODUCT_NAME}"
 Caption "${PRODUCT_NAME} ${APP_VERSION} Setup"
 OutFile "${OUTFILE}"
-InstallDir "$LOCALAPPDATA\Programs\FusionCanvas"
-InstallDirRegKey HKCU "${INSTALL_KEY}" "InstallDir"
-RequestExecutionLevel user
+InstallDir "$PROGRAMFILES64\FusionCanvas"
+InstallDirRegKey HKLM "${INSTALL_KEY}" "InstallDir"
+RequestExecutionLevel admin
 Icon "${ICON_PATH}"
 UninstallIcon "${ICON_PATH}"
 ShowInstDetails show
@@ -84,41 +88,89 @@ Function un.AssertApplicationStopped
 FunctionEnd
 
 Function .onInit
+  SetRegView 64
   SetShellVarContext current
+  StrCpy $LegacyDefaultDir "$LOCALAPPDATA\Programs\FusionCanvas"
+  SetShellVarContext all
+  StrCpy $HasMachineInstall 0
+  StrCpy $LegacyInstallDir ""
+
+  ReadRegStr $0 HKLM "${INSTALL_KEY}" "InstallDir"
+  ${If} $0 != ""
+    StrCpy $HasMachineInstall 1
+    StrCpy $INSTDIR $0
+  ${Else}
+    ; The original per-user installer used NSIS's default 32-bit registry view.
+    SetRegView 32
+    ReadRegStr $LegacyInstallDir HKCU "${INSTALL_KEY}" "InstallDir"
+    SetRegView 64
+    ${If} $LegacyInstallDir != ""
+      StrCmp $LegacyInstallDir "$LegacyDefaultDir" legacy_default legacy_custom
+legacy_custom:
+      MessageBox MB_OK|MB_ICONSTOP "An existing FusionCanvas installation uses a custom per-user location. Uninstall that version first, then run this setup again to install FusionCanvas machine-wide. Your workspace and settings will remain in place."
+      Abort
+legacy_default:
+      StrCpy $INSTDIR "$PROGRAMFILES64\FusionCanvas"
+    ${EndIf}
+  ${EndIf}
+
   Call AssertApplicationStopped
 FunctionEnd
 
 Function un.onInit
-  SetShellVarContext current
+  SetRegView 64
+  SetShellVarContext all
   Call un.AssertApplicationStopped
 FunctionEnd
 
 Section "FusionCanvas" SEC_APPLICATION
   SectionIn RO
-  SetShellVarContext current
+  SetRegView 64
+  SetShellVarContext all
   SetOutPath "$INSTDIR"
 
-  ; The installer owns only this application directory. User data lives below
+  ; The installer owns only this application directory. User data remains below
   ; %LOCALAPPDATA%\FusionCanvas and is intentionally never touched here.
-  Delete "$SMPROGRAMS\FusionCanvas\FusionCanvas.lnk"
-  RMDir "$SMPROGRAMS\FusionCanvas"
-  Delete "$DESKTOP\FusionCanvas.lnk"
   File /r "${PUBLISH_DIRECTORY}\*.*"
   IfErrors install_failed
 
   WriteUninstaller "$INSTDIR\Uninstall.exe"
-  WriteRegStr HKCU "${INSTALL_KEY}" "InstallDir" "$INSTDIR"
-  WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayName" "${PRODUCT_NAME}"
-  WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayVersion" "${APP_VERSION}"
-  WriteRegStr HKCU "${UNINSTALL_KEY}" "Publisher" "FusionCanvas contributors"
-  WriteRegStr HKCU "${UNINSTALL_KEY}" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKCU "${UNINSTALL_KEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
-  WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoModify" 1
-  WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoRepair" 1
   IfErrors install_failed
+  WriteRegStr HKLM "${INSTALL_KEY}" "InstallDir" "$INSTDIR"
+  WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayName" "${PRODUCT_NAME}"
+  WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayVersion" "${APP_VERSION}"
+  WriteRegStr HKLM "${UNINSTALL_KEY}" "Publisher" "FusionCanvas contributors"
+  WriteRegStr HKLM "${UNINSTALL_KEY}" "InstallLocation" "$INSTDIR"
+  WriteRegStr HKLM "${UNINSTALL_KEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
+  WriteRegDWORD HKLM "${UNINSTALL_KEY}" "NoModify" 1
+  WriteRegDWORD HKLM "${UNINSTALL_KEY}" "NoRepair" 1
+  IfErrors install_failed
+
+  ; Remove old user-scoped shortcuts from the initial per-user installer and
+  ; stale shared shortcuts before the selected all-users shortcuts are created.
+  SetShellVarContext current
+  Delete "$SMPROGRAMS\FusionCanvas\FusionCanvas.lnk"
+  RMDir "$SMPROGRAMS\FusionCanvas"
+  Delete "$DESKTOP\FusionCanvas.lnk"
+  SetShellVarContext all
+  Delete "$SMPROGRAMS\FusionCanvas\FusionCanvas.lnk"
+  RMDir "$SMPROGRAMS\FusionCanvas"
+  Delete "$DESKTOP\FusionCanvas.lnk"
+
+  ${If} $LegacyInstallDir != ""
+    SetRegView 32
+    DeleteRegKey HKCU "${UNINSTALL_KEY}"
+    DeleteRegKey HKCU "${INSTALL_KEY}"
+    SetRegView 64
+    RMDir /r "$LegacyInstallDir"
+  ${EndIf}
   Goto install_complete
 
 install_failed:
+  ${If} $HasMachineInstall == 0
+    DeleteRegKey HKLM "${UNINSTALL_KEY}"
+    DeleteRegKey HKLM "${INSTALL_KEY}"
+  ${EndIf}
   MessageBox MB_ICONSTOP "FusionCanvas could not be installed completely. No successful installation is reported."
   Abort
 
@@ -126,23 +178,31 @@ install_complete:
 SectionEnd
 
 Section "Start Menu shortcut" SEC_START_MENU
-  SetShellVarContext current
+  SetShellVarContext all
   CreateDirectory "$SMPROGRAMS\FusionCanvas"
   CreateShortCut "$SMPROGRAMS\FusionCanvas\FusionCanvas.lnk" "$INSTDIR\${PRODUCT_EXE}"
 SectionEnd
 
 Section "Desktop shortcut" SEC_DESKTOP
-  SetShellVarContext current
+  SetShellVarContext all
   CreateShortCut "$DESKTOP\FusionCanvas.lnk" "$INSTDIR\${PRODUCT_EXE}"
 SectionEnd
 
 Section "Uninstall"
+  SetRegView 64
+  SetShellVarContext all
+  Delete "$SMPROGRAMS\FusionCanvas\FusionCanvas.lnk"
+  RMDir "$SMPROGRAMS\FusionCanvas"
+  Delete "$DESKTOP\FusionCanvas.lnk"
   SetShellVarContext current
   Delete "$SMPROGRAMS\FusionCanvas\FusionCanvas.lnk"
   RMDir "$SMPROGRAMS\FusionCanvas"
   Delete "$DESKTOP\FusionCanvas.lnk"
+  DeleteRegKey HKLM "${UNINSTALL_KEY}"
+  DeleteRegKey HKLM "${INSTALL_KEY}"
+  SetRegView 32
   DeleteRegKey HKCU "${UNINSTALL_KEY}"
   DeleteRegKey HKCU "${INSTALL_KEY}"
+  SetRegView 64
   RMDir /r "$INSTDIR"
 SectionEnd
-

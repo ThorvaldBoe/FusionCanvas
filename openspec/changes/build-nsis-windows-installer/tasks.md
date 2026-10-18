@@ -1,29 +1,25 @@
-## 1. Installer inputs and script
+## 1. Revise installer ownership and elevation
 
-- [x] 1.1 Add the repository-owned NSIS script and build-directory conventions described in `design.md`.
-- [x] 1.2 Define canonical version propagation, installer filename metadata, self-contained publish-file inclusion, default per-user destination, optional shortcuts, uninstall registration, and explicit exclusion of `%LOCALAPPDATA%\FusionCanvas`.
-- [x] 1.3 Implement safe rerun/upgrade behavior, including running-process detection, close-and-retry messaging, and failure handling that cannot report a partial upgrade as successful.
+- [ ] 1.1 Change the fresh-install default to the 64-bit Program Files directory and request administrator elevation for setup and uninstallation.
+- [ ] 1.2 Write machine-wide install/uninstall metadata and selected shortcuts under all-users locations; ensure cancellation and failures leave no partial state.
+- [ ] 1.3 Preserve machine-wide paths and detect the initial per-user HKCU registration; migrate the known default installation to Program Files and remove its old files, registration, and shortcuts only after successful replacement; reject legacy custom paths before mutation.
+- [ ] 1.4 Inspect application and integration storage paths for runtime writes under the installation directory; record evidence or escalate if accepted data-path behavior must change.
 
-## 2. Hosted installer workflow
+## 2. Update deterministic installer verification
 
-- [x] 2.1 Add a Windows installer workflow that reuses the deterministic test workflow and supports merge-to-`main` and manual candidate triggers.
-- [x] 2.2 Add RID-aware self-contained publish and canonical `NuGetPackageVersion` extraction with SemVer validation.
-- [x] 2.3 Acquire and pin the NSIS compiler/toolchain, verify the expected toolchain integrity, build `FusionCanvas-<SemVer>-win-x64-Setup.exe`, and fail closed when the version or compiler is unavailable.
-- [x] 2.4 Generate the installer checksum, create the provenance attestation, and upload the setup program and checksum as a retained workflow artifact without creating a GitHub Release or update manifest.
+- [ ] 2.1 Extend the Windows smoke harness for fresh default and alternate paths, HKLM metadata, shortcut selection, and clean elevation cancellation/failure outcomes.
+- [ ] 2.2 Cover machine-wide upgrade, legacy per-user upgrade, no duplicate installation, running-process protection, and data preservation.
+- [ ] 2.3 Verify elevated uninstall removes only installer-owned application files, registration, and shortcuts; verify cancellation leaves the install intact.
 
-## 3. Installer verification
+## 3. Align documentation and preserve distribution contract
 
-- [x] 3.1 Add deterministic Windows smoke checks for fresh per-user installation, selected shortcut creation, installed-file presence, exit codes, and uninstaller registration.
-- [x] 3.2 Add an upgrade scenario that installs or stages an earlier candidate, runs the newer installer, verifies the new application files, and confirms a user-data sentinel remains intact.
-- [x] 3.3 Add a running-process scenario that verifies the installer refuses or safely defers locked-file replacement and reports an actionable retry path.
-- [x] 3.4 Add an uninstall scenario that verifies installer-owned files and shortcuts are removed while `%LOCALAPPDATA%\FusionCanvas` remains intact and reinstall is possible.
+- [ ] 3.1 Update installation documentation to describe the Program Files default, elevation, all-users shortcuts, upgrade compatibility, and per-user data preservation.
+- [ ] 3.2 Confirm candidate workflow still gates on deterministic tests and publishes versioned installer, checksum, and provenance without creating a release or update manifest.
 
-## 4. Documentation and acceptance evidence
+## 4. Verify and record evidence
 
-- [x] 4.1 Document the NSIS candidate artifact, per-user install location, shortcut behavior, upgrade contract, uninstall data-preservation rule, and the distinction between installer candidates and future public releases.
-- [x] 4.2 Review and correct proposal, design, specs, or tasks if implementation exposes a requirement or acceptance mismatch; record any approved change in the authoritative artifact.
-- [x] 4.3 Run focused installer checks and map every windows-installer scenario to concrete evidence in `verification.md`.
-- [x] 4.4 Run `openspec validate build-nsis-windows-installer --strict`.
-- [x] 4.5 Run the baseline `dotnet test .\FusionCanvas.sln` and record any environment limitation separately from installer evidence.
-- [x] 4.6 Verify the hosted Windows installer workflow after merge and record artifact, checksum, attestation, and smoke-check results.
-
+- [ ] 4.1 Run focused installer checks and map every requirement scenario to evidence in `verification.md`.
+- [ ] 4.2 Run `openspec validate build-nsis-windows-installer --strict` and correct all reported issues.
+- [ ] 4.3 Run `dotnet test .\FusionCanvas.sln -m:1` and record any environment limitation separately.
+- [ ] 4.4 Perform a supplemental interactive Windows check of the elevation prompt and Program Files destination.
+- [ ] 4.5 Record the user-testing feedback, approved change, applicability, classification, and promotion target in `retrospective.md`.

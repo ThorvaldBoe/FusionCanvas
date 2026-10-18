@@ -1,105 +1,95 @@
 ## Context
 
-The completed Windows package pipeline produces a self-contained `win-x64` ZIP after the deterministic test gate. Its accepted specification intentionally excludes installers, releases, and automatic updates. FusionCanvas already obtains a canonical application version from Nerdbank.GitVersioning and already stores workspace, settings, and telemetry data below `%LOCALAPPDATA%\FusionCanvas`.
+The original installer package selected a per-user default at `%LOCALAPPDATA%\Programs\FusionCanvas` so installation and updates would not need elevation. During installer testing, the user requested the standard 64-bit Program Files directory as the default. The revised contract is a machine-wide install under `%ProgramFiles%\FusionCanvas`, with administrator elevation, HKLM registration, and shortcuts in shared shell locations. Workspace, settings, managed files, AI cache, and telemetry remain owned by each user's `%LOCALAPPDATA%\FusionCanvas` directory.
 
-This module adds a conventional Windows setup program without putting installer behavior into Domain or Application code. The installer is an operational distribution boundary: it packages the published application, manages shortcuts and uninstall registration, and leaves user data under application ownership.
+The existing NSIS installer, smoke harness, and docs implement the original per-user contract. This change revises the same active installer delivery package before it is archived. It does not change the application data model or distribution candidate pipeline.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Build a reproducible NSIS installer from the existing self-contained publish output.
-- Gate installer creation on the reusable deterministic test workflow.
-- Produce versioned, checksum-protected, provenance-attested installer candidates.
-- Make the default installation per user so normal installation and future updates do not require administrator rights.
-- Verify fresh install, upgrade, running-application protection, uninstall, shortcut behavior, and user-data preservation.
-- Leave a stable installer upgrade contract for the later in-app update module.
+- Default fresh installs to the 64-bit Program Files directory and require elevation for protected writes.
+- Register machine-wide installs in HKLM and expose only user-selected shortcuts to all users.
+- Preserve installed data and registration on elevation cancellation or failed installation.
+- Upgrade existing machine-wide installations in place.
+- Recognize the initial per-user installation during upgrade, migrate it to the machine-wide default, and remove its old application files only after successful replacement.
+- Preserve each user's existing application data through install, upgrade, and uninstall.
+- Verify that the application runs without attempting to write mutable data under Program Files.
 
 **Non-Goals:**
 
-- Creating GitHub Releases or a public release channel.
-- Implementing the in-app “Update available” button, release manifest, download logic, restart flow, rollback, or update policy.
-- Authenticode signing or certificate procurement; provenance attestation and code signing remain separate concerns.
-- Supporting all-users machine installation, enterprise deployment, MSI, MSIX, or another installer technology.
-- Changing application runtime code, workspace schema, user-data paths, or database migration behavior.
+- A 32-bit installer or installation under `Program Files (x86)`.
+- An optional per-user installation mode.
+- Changing app data locations, application behavior, release channels, or automatic updates.
+- Authenticode signing, MSI/MSIX, or enterprise deployment policy.
 
 ## Decisions
 
-### Use NSIS as the installer engine
+### Use the 64-bit Program Files directory
 
-The installer SHALL be expressed as a repository-owned NSIS script with a pinned compiler/toolchain in CI. NSIS provides a conventional setup executable and script-level control while keeping the application independent of the packaging technology.
+Use NSIS `$PROGRAMFILES64` (or the equivalent verified 64-bit shell constant) for the default path. The published application is `win-x64`; `Program Files (x86)` is not an appropriate default. The directory browser remains available for a user-selected supported location.
 
-Alternatives considered:
+### Elevate installer operations
 
-- Inno Setup was not selected because its commercial policy introduces a licensing consideration for qualifying commercial use and CI compiler use.
-- WiX was not selected because its current project policy introduces a maintenance-fee consideration for revenue-generating use.
-- MSIX was not selected for this first module because it couples distribution more closely to Windows package identity and signing mechanisms.
-- ZIP-only distribution remains useful for portable candidates but does not provide installation, shortcut, or uninstall behavior.
+Request administrator execution level for setup and uninstaller operations that write application files, HKLM registration, or shared shortcuts. Cancellation must stop before mutation, and failures must not report success or leave partial registration. The installer UI remains the existing focused NSIS wizard; no application UI change is introduced.
 
-### Keep the installer thin and consume the existing publish output
+### Use machine-wide ownership for new installations
 
-The workflow SHALL publish the application once as self-contained `win-x64` output, then feed that directory to NSIS. The NSIS script owns only packaging concerns: file inclusion, install destination, shortcuts, uninstall registration, version metadata, and safe upgrade behavior. It SHALL not contain application configuration, database migration, or workspace logic.
+Write install and uninstall metadata under HKLM and place selected Start Menu and desktop shortcuts in all-users shell locations. Keep shortcut checkboxes and the current setup wizard flow. The application itself continues to store mutable files under the current user's LocalAppData; review the app's path usage to ensure it never needs write access to the installation directory.
 
-### Default to per-user installation
+### Upgrade registrations safely
 
-The default destination SHALL be `%LOCALAPPDATA%\Programs\FusionCanvas`. This avoids administrator elevation for the normal individual-creator scenario and makes later installer-driven updates compatible with the same permission boundary. It remains distinct from `%LOCALAPPDATA%\FusionCanvas`, which continues to hold workspace databases, managed files, settings, AI cache, and telemetry data.
+When both registrations exist, prefer the HKLM machine-wide install path. If no HKLM installation exists but the legacy HKCU registration does, migrate only when its registered path exactly matches the initial default `%LOCALAPPDATA%\Programs\FusionCanvas`; use the fixed machine-wide destination under Program Files. Remove the legacy directory, HKCU installer registration, and user-scoped shortcuts only after the machine-wide install and registration succeed. Never recursively delete an arbitrary HKCU-supplied path from an elevated process. If a legacy custom location is registered, stop before mutation and ask the user to uninstall that legacy version first. If migration fails, retain the prior usable installation and registration. Future upgrades use the HKLM path.
 
-The first module will not offer an all-users installation mode. Adding one later would require separate elevation, permissions, multi-user, and update decisions.
+### Keep data outside installer ownership
 
-### Treat user data as outside installer ownership
+Install, upgrade, and uninstall must not delete or rewrite any user's `%LOCALAPPDATA%\FusionCanvas` tree. Smoke tests use disposable profiles and assert sentinels for the invoking user; tests should also verify another user's data fixture remains untouched if the harness can create a second profile without introducing nondeterminism.
 
-The installer SHALL never delete or rewrite the existing `%LOCALAPPDATA%\FusionCanvas` data tree during install, upgrade, or uninstall. Upgrade verification will create a sentinel user-data file or database fixture, run the installer again, and verify the sentinel remains. Uninstall verification will perform the same check after removal.
+### Keep candidate distribution unchanged
 
-### Build candidates without creating a release channel
-
-The installer workflow will be triggered in the same candidate-oriented manner as the existing package workflow (merge to `main` and manual dispatch), will reuse the deterministic test gate, and will upload a retained workflow artifact. It will not create a GitHub Release or update manifest. That boundary lets the separate update module choose and secure its release channel after the installer contract is proven.
-
-### Verification strategy
-
-Installer behavior will be verified in the Windows workflow with scripted NSIS install, upgrade, and uninstall operations in an isolated temporary profile/directory. The verification will inspect installed files, shortcuts, uninstaller registration, exit codes, and preservation of a user-data sentinel. A fresh installer build and a second install of the same or newer candidate will exercise upgrade behavior.
-
-No Avalonia headless view test is warranted because this module adds no application view or binding behavior. The installer wizard is native NSIS UI, and deterministic silent-mode Windows checks provide more reliable coverage. A manual interactive wizard check may supplement CI for visual judgment but is not a completion gate.
+Retain the existing deterministic test gate, pinned NSIS compiler, canonical version, checksum, provenance, and workflow artifact behavior. This change alters install mechanics only; it does not create releases or update manifests.
 
 ## Risks / Trade-offs
 
-- **[NSIS compiler acquisition changes or becomes unavailable]** → Pin the compiler version and source, verify its checksum, fail closed when the expected toolchain is not available, and document the acquisition path.
-- **[The setup executable is not trusted by Windows SmartScreen]** → Keep provenance attestation and checksum publication; treat Authenticode signing as a separate release-readiness module.
-- **[An application process keeps files locked during upgrade]** → Detect or safely defer replacement, show an actionable close-and-retry message, and verify that no partial upgrade is reported as successful.
-- **[A future update mechanism assumes machine-wide installation]** → Capture the per-user installation contract now and make the later updater use the installer’s same user context.
-- **[Install and data paths are accidentally conflated]** → Keep explicit path constants in the script and assert data preservation in automated upgrade/uninstall verification.
-- **[A candidate installer is mistaken for a supported release]** → Use candidate naming and workflow-artifact documentation; defer release-channel and update-manifest creation to the later module.
+- **[Elevation is declined or unavailable]** → Exit cleanly before mutation and verify no partial files, registrations, or shortcuts.
+- **[Program Files permissions reveal runtime writes to the install directory]** → Inspect app storage paths and add a focused regression check; redirect mutable data only if existing application contracts already define the destination, otherwise stop for a product decision.
+- **[Legacy HKCU upgrade creates parallel or orphaned installs]** → Detect both registry hives, prefer the machine-wide path, migrate registration only after successful file replacement, and assert that no parallel installation remains.
+- **[Uninstaller runs without elevation]** → Request elevation before removing machine-wide files; on cancellation leave files and registration intact.
+- **[Shared shortcuts surprise users]** → Keep shortcut selection explicit and test that only selected shared shortcuts are created and removed.
+- **[A 32-bit process resolves the wrong Program Files directory]** → Build and run the installer harness on x64 Windows and assert the resolved path is the 64-bit Program Files directory.
 
 ## Migration Plan
 
-Existing ZIP users can continue running their extracted copy. Running the setup program installs a new copy under the default per-user installation directory and does not move or delete `%LOCALAPPDATA%\FusionCanvas`. Later setup runs upgrade that installation in place. No database migration or workspace conversion is introduced.
-
-Rollback is operational: a user can reinstall an earlier setup candidate, while the preserved user-data tree remains available. The workflow will retain the ZIP candidate during this module so the installer path can be compared or used as a fallback.
+Fresh installations use `%ProgramFiles%\FusionCanvas`. Existing machine-wide installs retain their registered path. The initial per-user default install is migrated to Program Files on the first elevated setup run; successful migration removes the old app files, registration, and shortcuts. A legacy custom per-user path is not trusted for elevated cleanup; the setup stops with instructions to uninstall it first. No application data is moved or deleted. A failed or cancelled upgrade preserves the usable prior installation. Rollback remains operational: reinstall the prior candidate using the retained registration while keeping user data intact.
 
 ## Implementation Plan
 
-1. Add a repository-owned NSIS script under a focused installer/build directory. Define application file inclusion from the publish directory, canonical version propagation, default per-user destination, optional shortcut components, uninstall registration, upgrade behavior, running-process detection, and explicit exclusion of `%LOCALAPPDATA%\FusionCanvas`.
-2. Add a Windows installer workflow that calls the reusable deterministic test workflow, performs RID-aware self-contained publish, obtains and validates `NuGetPackageVersion`, acquires a pinned NSIS compiler, builds the setup executable, generates the checksum, creates the provenance attestation, and uploads the installer candidate.
-3. Add isolated Windows packaging smoke checks for fresh install, upgrade, running-process handling, shortcut selection, uninstall, exit codes, and user-data preservation. Keep them outside the normal application test solution if they require a Windows installer process, but make them deterministic and runnable by the hosted workflow.
-4. Update contributor/release documentation to distinguish ZIP candidates, NSIS installer candidates, and future public releases/update channels. Document the per-user install and user-data preservation contract.
-5. Verify workflow structure and action/tool pins, run strict OpenSpec validation, run the full deterministic solution test baseline, and verify the hosted Windows installer workflow after merge.
+1. Update `installer/FusionCanvas.nsi`: request administrator execution level; choose the 64-bit Program Files directory for a fresh install; detect existing HKLM then legacy HKCU install registrations; write machine-wide uninstall and install metadata; use all-users shortcut roots; elevate uninstallation; and make registration/shortcut cleanup conditional on successful install/uninstall. Preserve the running-process guard and user-data exclusion.
+2. Review application and integration storage paths used at runtime to confirm writable files remain under user data locations rather than the install directory. Do not relocate data or change application behavior as part of this installer change.
+3. Update `tools/installer/Test-FusionCanvasInstaller.ps1` to verify fresh default path, selected alternate path, HKLM registration, selected shared shortcuts, elevation cancellation/failure behavior where automatable, upgrade of both machine-wide and legacy HKCU installs, no duplicate installation, running-process protection, elevated uninstall, and user-data preservation.
+4. Update installer documentation and CI workflow permissions only as needed. Preserve the deterministic test gate, versioning, checksum, provenance, candidate artifact retention, and no-release boundary.
+5. Run installer-specific checks and `openspec validate build-nsis-windows-installer --strict`; run `dotnet test .\FusionCanvas.sln -m:1` and record any environment limitation. Exercise the interactive setup once on Windows to confirm the elevation prompt and Program Files destination, as supplemental evidence.
 
 ## Acceptance-to-Verification Mapping
 
 | Acceptance area | Planned evidence |
 | --- | --- |
-| Deterministic gate blocks installer failures | Workflow inspection plus hosted success/failure control-path evidence where practical |
-| Versioned setup, checksum, and provenance | Hosted workflow outputs plus checksum validation and attestation inspection |
-| Fresh per-user install | Scripted Windows installer smoke check in an isolated profile |
-| Upgrade preserves app operation and user data | Two-version or repeated-install smoke check with sentinel data |
-| Running app is handled safely | Scripted process-lock scenario with actionable exit/result assertion |
-| Uninstall removes only installer-owned content | Scripted uninstall followed by file/shortcut/data-tree assertions |
-| Candidate boundary remains intact | Workflow inspection confirming no GitHub Release or update manifest |
+| Fresh default install and machine-wide registration | Isolated Windows smoke test asserts `$PROGRAMFILES64` path, HKLM keys, installer exit code, and selected shared shortcuts |
+| Alternate location | Smoke test supplies a temporary alternate path and verifies HKLM registration and shortcut targets |
+| Elevation cancelled | Interactive installer check plus deterministic cancellation/result checks where supported; assert no partial state |
+| Legacy per-user upgrade | Seed HKCU registration and files, run elevated candidate, assert migration to Program Files, HKLM registration, old app cleanup, no duplicate, and data sentinel preservation |
+| Machine-wide upgrade | Run newer/repeated candidate and assert same registered location, versioned files, shortcut targets, and data preservation |
+| Running app guard | Existing process-stub scenario verifies safe refusal/retry path |
+| Elevated uninstall and cancellation | Isolated smoke test verifies machine files, HKLM registration, and selected shared shortcuts are removed; cancellation leaves install intact |
+| User data ownership | Sentinel checks under LocalAppData before/after install, upgrade, and uninstall |
+| Runtime writable paths | Source inspection of path providers plus focused check that launch does not create mutable files under Program Files |
+| Candidate boundary | Workflow inspection confirms artifact-only publishing and no release/update manifest |
 
 ## Decisions Not to Reopen During Implementation
 
-- NSIS is the installer engine for this module.
-- The default installation is per user under `%LOCALAPPDATA%\Programs\FusionCanvas`.
-- User data remains under `%LOCALAPPDATA%\FusionCanvas` and is preserved by install, upgrade, and uninstall.
-- Installer candidates are workflow artifacts; release-channel and in-app update behavior belong to the next module.
-- The existing ZIP candidate workflow remains available.
-
+- New installations are machine-wide and default to 64-bit `%ProgramFiles%\FusionCanvas`.
+- The setup and uninstaller require administrator elevation for protected operations.
+- Install/uninstall registration and selected shortcuts are machine-wide.
+- Existing machine-wide install paths are preserved during upgrade; the initial per-user install is migrated to the machine-wide default with no parallel copy.
+- Each user's application data remains under `%LOCALAPPDATA%\FusionCanvas` and is not installer-owned.
+- Installer candidates remain workflow artifacts; release-channel behavior is out of scope.
