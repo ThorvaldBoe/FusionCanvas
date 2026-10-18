@@ -23,3 +23,17 @@
 - The mandated baseline `dotnet test .\FusionCanvas.sln -m:1 --no-restore --nologo -v minimal` passed: Domain 279, Application 598, Integration 313, App 920, and UI Description 29 tests.
 - Hosted evidence: [main Windows installer run 37345986624](https://github.com/ThorvaldBoe/FusionCanvas/actions/runs/37345986624), [installer job](https://github.com/ThorvaldBoe/FusionCanvas/actions/runs/37345986624/job/111887810033), and [retained installer artifact](https://github.com/ThorvaldBoe/FusionCanvas/actions/runs/37345986624/artifacts/11361456157). The run completed successfully; the artifact is retained for 30 days.
 
+
+## Revised machine-wide installation criteria
+
+The evidence above verifies the original per-user contract only. It does not verify the revised Program Files, elevation, HKLM, shared shortcut, legacy migration, or elevated uninstall requirements. These scenarios are pending implementation and must be replaced with fresh evidence before the change is considered complete.
+
+| Revised requirement / scenario | Planned method | Status |
+| --- | --- | --- |
+| Fresh installation defaults to 64-bit Program Files and registers in HKLM | Elevated Windows smoke test asserts resolved path, registry view and keys, and selected shared shortcuts | Pending |
+| Alternate location remains supported | Elevated smoke test installs to an isolated temporary directory and verifies machine-wide registration and shortcut targets | Pending |
+| Elevation cancellation leaves no partial install | Interactive Windows check plus deterministic installer exit/state assertions where supported | Pending |
+| Initial per-user installation migrates without duplication | Seed legacy HKCU registration and files, run elevated setup, assert Program Files files, HKLM registration, old files/keys/shortcuts removed, and data preserved | Pending |
+| Machine-wide upgrade preserves location and shortcuts | Run a newer or repeated candidate and inspect files, registration, and shortcut targets | Pending |
+| Uninstall requires elevation and removes only installer-owned items | Elevated smoke test checks app files, HKLM registration, shared shortcuts, and LocalAppData data preservation | Pending |
+| Runtime does not write mutable files beneath Program Files | Inspect path providers and launch with isolated user data; assert no mutable files are created in install directory | Pending |

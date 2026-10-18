@@ -103,6 +103,10 @@ The Idea-stage `Ideation…` tool uses the OpenRouter configuration in **Setting
 
 The API key is never stored in the workspace database or workspace packages. Ideation candidates remain transient until they are created or rejected; Snowclones mode uses the application-wide Snowclone Library.
 
+## Windows Installer
+
+The Windows installer defaults to the 64-bit Program Files directory and requires administrator approval. See [Windows Installer](docs/windows-installer.md) for upgrade, uninstall, shortcut, and user-data details.
+
 ## Testing Baseline
 
 Run the automated baseline from the repository root:
