@@ -17,20 +17,20 @@
 
 | Scenario group | Result and evidence |
 | --- | --- |
-| Stable and Preview releases publish versioned setup, checksum, manifest, and provenance bundle | Implemented in `.github/workflows/release-windows.yml`; tag/version helper tests pass. A hosted tagged release has not been run, so actual release assets and flags remain unverified. |
-| Failed deterministic or installer gates prevent publishing | Workflow requires the reusable deterministic-tests job to succeed, and release creation is the final step after installer build, attestation, and disposable install smoke check. No deliberately failing hosted tag run was triggered; no release object was created for this change. |
+| Stable and Preview releases publish versioned setup, checksum, manifest, and provenance bundle | PASS for Preview; Stable remains pending. Hosted tag `v0.2.0-preview.7` published [release assets](https://github.com/ThorvaldBoe/FusionCanvas/releases/tag/v0.2.0-preview.7): versioned setup, SHA-256 file, update manifest, and Sigstore bundle. Workflow run [39145562006](https://github.com/ThorvaldBoe/FusionCanvas/actions/runs/39145562006) completed successfully on commit `b725ffdc209f3de6ef2c5e8e46288a0dae39cafb`. |
+| Failed deterministic or installer gates prevent publishing | PASS. `v0.2.0-preview.6` passed deterministic tests, build, and attestation but its disposable install trust smoke failed before the Create GitHub Release step; no Release object was created for that tag. After forwarding the explicit machine-wide mutation opt-in only in the disposable hosted runner, the `v0.2.0-preview.7` trust smoke and release passed. |
 | Users find current Stable and full release history | README links to GitHub Releases and `/releases/latest`; contributor guidance documents Stable and Preview tag and verification steps. |
 | Stable default, Stable exclusion, Preview inclusion, deterministic order | Covered by settings migration and Application update policy tests. |
 | Track selection saves, restores, rechecks, and does not auto-install | Covered by settings-store, UpdateViewModel, and Avalonia headless tests. |
 | Update uses the newest eligible release and never downgrades | Covered by Application release-selection tests, Integration download/verifier tests, and Preview-on-Stable no-downgrade tests. |
 | Manifest and release binding; malformed data, pagination, URL, API, cancellation handling | Covered by Application validator and GitHubUpdateSource Integration tests. |
 | Valid provenance and rejection of digest/identity/ref/commit/bundle failures; cleanup | Production verifier enforces GitHub Actions certificate identity and extensions plus in-toto subject/predicate claims. The upstream representative fixture verifies with the pinned library. Downloader tests cover manifest digest mismatch, missing bundle, verification failure, and temporary-file cleanup. A checked-in cryptographic negative-fixture matrix is not present; those policy branches are enforced by verifier validation. |
-| User independently verifies downloaded installer | README and CONTRIBUTING document `gh attestation verify` with repository, signer workflow, source ref, and the release bundle. Running the command against a hosted FusionCanvas release remains pending. |
-| Stable/Preview tag and generated-version agreement | PowerShell preflight tests pass for both tracks and mismatch/malformed cases; the workflow invokes the helper before packaging. A hosted release execution remains pending. |
+| User independently verifies downloaded installer | PASS. The hosted `v0.2.0-preview.7` release gate ran `gh attestation verify` with repository, signer workflow, source ref, and the release bundle as part of `Test-FusionCanvasRelease.ps1`; the complete trust smoke passed. README and CONTRIBUTING document the same command for users. |
+| Stable/Preview tag and generated-version agreement | PASS for Preview `v0.2.0-preview.7`. PowerShell preflight tests pass for both tracks and mismatch/malformed cases; the hosted workflow invoked the helper before packaging and published the matching prerelease. |
 
-## Hosted release evidence still required
+## Hosted release evidence
 
-Do not create a production or test tag just to satisfy local verification. Before treating hosted release scenarios as observed, run the workflow against an approved candidate tag and confirm: Stable versus prerelease flags, all four versioned assets, checksum equality, `gh attestation verify`, installer smoke success, and absence of a Release object when a gate fails. The implementation changes alone do not create or publish a release.
+Hosted Preview evidence is now recorded for `v0.2.0-preview.7`: prerelease flag, all four versioned assets, checksum validation, `gh attestation verify`, disposable installer smoke, and successful GitHub Release creation. The failed `v0.2.0-preview.6` candidate also confirms the release object is not created when installer trust smoke fails. Stable publishing remains unverified by a hosted stable tag.
 
 ## Environment notes
 
