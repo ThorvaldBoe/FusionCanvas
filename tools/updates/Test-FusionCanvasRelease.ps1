@@ -16,7 +16,9 @@ param(
     [string]$ExpectedSourceCommit,
 
     [Parameter(Mandatory)]
-    [string]$InstallDirectory
+    [string]$InstallDirectory,
+
+    [switch]$AllowMachineWideMutation
 )
 
 $ErrorActionPreference = "Stop"
@@ -68,6 +70,7 @@ if (Test-Path -LiteralPath $InstallDirectory) {
     -InstallerPath $InstallerPath `
     -InstallDirectory $InstallDirectory `
     -ExpectedVersion $ExpectedVersion `
-    -AllowLocalUserDataMutation
+    -AllowLocalUserDataMutation `
+    -AllowMachineWideMutation:$AllowMachineWideMutation
 
 Write-Host "FusionCanvas release trust checks passed for version $ExpectedVersion."
