@@ -51,7 +51,7 @@ public sealed class ImageSharpArtworkNormalizer : IRasterArtworkNormalizer
             Sampler = KnownResamplers.Lanczos3
         }));
 
-        using var canvas = new Image<Rgba32>(request.TargetSize.Width, request.TargetSize.Height, Color.Transparent);
+        using var canvas = new Image<Rgba32>(Configuration.Default, request.TargetSize.Width, request.TargetSize.Height, default);
         canvas.Mutate(context => context.DrawImage(image, new Point((request.TargetSize.Width - fittedWidth) / 2, topInset), 1f));
         var hasTransparency = HasTransparentPixels(canvas);
         var warnings = request.TransparencyRequested && !sourceHasTransparency

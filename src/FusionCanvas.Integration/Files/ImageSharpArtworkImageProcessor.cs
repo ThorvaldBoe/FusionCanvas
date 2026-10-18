@@ -47,7 +47,7 @@ public sealed class ImageSharpArtworkImageProcessor : IArtworkImageProcessor
 
         var x = checked((int)Math.Round(targetBounds.X, MidpointRounding.AwayFromZero));
         var y = checked((int)Math.Round(targetBounds.Y, MidpointRounding.AwayFromZero));
-        var canvas = new Image<Rgba32>(image.Width, image.Height);
+        var canvas = new Image<Rgba32>(Configuration.Default, image.Width, image.Height);
         try
         {
             cancellationToken.ThrowIfCancellationRequested();

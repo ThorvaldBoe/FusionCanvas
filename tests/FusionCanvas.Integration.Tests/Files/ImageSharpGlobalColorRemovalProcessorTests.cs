@@ -10,7 +10,7 @@ public sealed class ImageSharpGlobalColorRemovalProcessorTests
     [Fact]
     public async Task PreviewAndApply_MatchEveryVisiblePixelGlobally()
     {
-        using var sourceImage = new Image<Rgba32>(6, 1);
+        using var sourceImage = new Image<Rgba32>(Configuration.Default, 6, 1);
         sourceImage[0, 0] = new Rgba32(0, 0, 0, 255);
         sourceImage[1, 0] = new Rgba32(255, 255, 255, 255);
         sourceImage[2, 0] = new Rgba32(4, 4, 4, 255);
@@ -45,7 +45,7 @@ public sealed class ImageSharpGlobalColorRemovalProcessorTests
     [Fact]
     public async Task SampleAsync_ReturnsVisibleColorAndIgnoresTransparentPixel()
     {
-        using var sourceImage = new Image<Rgba32>(2, 1);
+        using var sourceImage = new Image<Rgba32>(Configuration.Default, 2, 1);
         sourceImage[0, 0] = new Rgba32(10, 20, 30, 255);
         sourceImage[1, 0] = new Rgba32(10, 20, 30, 0);
         await using var source = new MemoryStream();
