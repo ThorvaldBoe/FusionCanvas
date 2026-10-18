@@ -146,7 +146,8 @@ jobs:
             -BundlePath "artifacts\${{ steps.release-assets.outputs.installer }}.sigstore.json" `
             -ExpectedVersion "${{ steps.release-assets.outputs.version }}" `
             -ExpectedSourceCommit "$env:GITHUB_SHA" `
-            -InstallDirectory $installDirectory
+            -InstallDirectory $installDirectory `
+            -AllowMachineWideMutation
 
       - name: Create GitHub Release
         env:
