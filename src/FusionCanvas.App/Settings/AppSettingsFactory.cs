@@ -1,5 +1,6 @@
 using FusionCanvas.Application.Settings;
 using FusionCanvas.Integration.Settings;
+using FusionCanvas.App.Storage;
 
 namespace FusionCanvas.App.Settings;
 
@@ -22,13 +23,6 @@ public static class AppSettingsFactory
 
     public static string DefaultSettingsPath()
     {
-        var overridePath = Environment.GetEnvironmentVariable(SettingsPathEnvironmentVariable);
-        if (!string.IsNullOrWhiteSpace(overridePath))
-        {
-            return Path.GetFullPath(overridePath);
-        }
-
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        return Path.Combine(appData, "FusionCanvas", "settings.json");
+        return AppDataPathResolver.ResolveFromEnvironment().Settings;
     }
 }

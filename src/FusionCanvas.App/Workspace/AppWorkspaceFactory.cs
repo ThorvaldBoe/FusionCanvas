@@ -34,6 +34,7 @@ using FusionCanvas.Application.Listings;
 using FusionCanvas.Application.Stores.Printify;
 using FusionCanvas.Integration.Stores.Printify;
 using FusionCanvas.App.StageTools;
+using FusionCanvas.App.Storage;
 
 namespace FusionCanvas.App.Workspace;
 
@@ -42,7 +43,7 @@ public static class AppWorkspaceFactory
     public const string WorkspaceDatabaseEnvironmentVariable = "FUSIONCANVAS_WORKSPACE_DB";
     public const string WorkspaceRootEnvironmentVariable = "FUSIONCANVAS_WORKSPACE_ROOT";
 
-    public static string ResolveDefaultDatabasePath() => DefaultDatabasePath();
+    public static string ResolveDefaultDatabasePath() => AppDataPathResolver.ResolveFromEnvironment().WorkspaceDatabase;
 
     public static AppWorkspaceRuntime CreateDefault(
         IAiTextGenerationService ai,
@@ -51,7 +52,18 @@ public static class AppWorkspaceFactory
         Guid? initialActiveWorkspaceId = null,
         Guid? initialActiveStoreId = null,
         CancellationToken cancellationToken = default)
-        => Create(DefaultDatabasePath(), DefaultWorkspaceRoot(DefaultDatabasePath()), ai, artworkProvider, telemetry, initialActiveWorkspaceId, initialActiveStoreId, cancellationToken);
+    {
+        var paths = AppDataPathResolver.ResolveFromEnvironment();
+        return Create(
+            paths.WorkspaceDatabase,
+            paths.WorkspaceFiles,
+            ai,
+            artworkProvider,
+            telemetry,
+            initialActiveWorkspaceId,
+            initialActiveStoreId,
+            cancellationToken);
+    }
 
     public static AppWorkspaceRuntime Create(
         string databasePath,
@@ -237,18 +249,6 @@ public static class AppWorkspaceFactory
             new MockupGenerationService(repository, fileStore, mockupTemplateSetup, new ImageSharpMockupRasterCompositor(), invalidation: mockupInvalidation),
             mainWindowServices,
             artworkProvider is null ? null : new ArtworkGenerationService(repository, fileStore, aiImageProvenanceCodec, artworkProvider, new ImageSharpArtworkNormalizer(), telemetry: telemetry, contentRiskReviews: contentRiskReviews));
-    }
-
-    private static string DefaultDatabasePath()
-    {
-        var overridePath = Environment.GetEnvironmentVariable(WorkspaceDatabaseEnvironmentVariable);
-        if (!string.IsNullOrWhiteSpace(overridePath))
-        {
-            return Path.GetFullPath(overridePath);
-        }
-
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        return Path.Combine(appData, "FusionCanvas", "workspace.db");
     }
 
     private static string DefaultWorkspaceRoot(string databasePath)
