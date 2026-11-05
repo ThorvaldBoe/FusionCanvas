@@ -107,6 +107,10 @@ The API key is never stored in the workspace database or workspace packages. Ide
 
 The Windows installer defaults to the 64-bit Program Files directory and requires administrator approval. See [Windows Installer](docs/windows-installer.md) for upgrade, uninstall, shortcut, and user-data details.
 
+## Development Data
+
+Use the repository's `Development` launch profile to keep source-built workspace data separate from the installed app. See [Development Data Environment](docs/development-environment.md) for its location and path overrides.
+
 ## Testing Baseline
 
 Run the automated baseline from the repository root:
